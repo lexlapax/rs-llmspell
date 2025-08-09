@@ -47,20 +47,20 @@ fn test_file_system_tools_creation() {
     let sandbox = create_file_sandbox();
 
     // FileWatcherTool
-    let tool = FileWatcherTool::new(Default::default(), sandbox.clone());
+    let tool = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
     let schema = tool.schema();
     assert_eq!(schema.name, "file_watcher");
     assert!(!schema.description.is_empty());
     assert!(!schema.parameters.is_empty());
 
     // FileConverterTool
-    let tool = FileConverterTool::new(Default::default(), sandbox.clone());
+    let tool = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
     let schema = tool.schema();
     assert_eq!(schema.name, "file_converter");
     assert!(!schema.description.is_empty());
 
     // FileSearchTool
-    let tool = FileSearchTool::new(Default::default(), sandbox);
+    let tool = FileSearchTool::new(FileSearchConfig::default(), sandbox);
     let schema = tool.schema();
     assert_eq!(schema.name, "file_search");
     assert!(!schema.description.is_empty());
@@ -146,9 +146,9 @@ fn test_tool_schemas_have_required_fields() {
 
     // Check that tools have proper parameter definitions
     let tools: Vec<Box<dyn Tool>> = vec![
-        Box::new(FileWatcherTool::new(Default::default(), sandbox.clone())),
-        Box::new(FileConverterTool::new(Default::default(), sandbox.clone())),
-        Box::new(FileSearchTool::new(Default::default(), sandbox)),
+        Box::new(FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone())),
+        Box::new(FileConverterTool::new(FileConverterConfig::default(), sandbox.clone())),
+        Box::new(FileSearchTool::new(FileSearchConfig::default(), sandbox)),
         Box::new(EnvironmentReaderTool::new(
             EnvironmentReaderConfig::default(),
         )),
@@ -264,9 +264,9 @@ fn test_tool_creation_performance() {
 
     for _ in 0..iterations {
         let sandbox = create_file_sandbox();
-        let _ = FileWatcherTool::new(Default::default(), sandbox.clone());
-        let _ = FileConverterTool::new(Default::default(), sandbox.clone());
-        let _ = FileSearchTool::new(Default::default(), sandbox);
+        let _ = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
+        let _ = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
+        let _ = FileSearchTool::new(FileSearchConfig::default(), sandbox);
         let _ = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
         let _ = ProcessExecutorTool::new(ProcessExecutorConfig::default());
         let _ = ServiceCheckerTool::new(ServiceCheckerConfig::default());

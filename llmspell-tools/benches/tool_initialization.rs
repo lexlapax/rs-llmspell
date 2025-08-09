@@ -6,15 +6,26 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use llmspell_tools::{
-    data::{CsvAnalyzerTool, JsonProcessorTool},
-    fs::{
-        ArchiveHandlerTool, FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,
+    api::{http_request::HttpRequestConfig, web_search::WebSearchConfig},
+    data::{
+        csv_analyzer::CsvAnalyzerConfig, graphql_query::GraphQLConfig,
+        json_processor::JsonProcessorConfig, CsvAnalyzerTool, JsonProcessorTool,
     },
-    system::{EnvironmentReaderTool, ProcessExecutorTool, ServiceCheckerTool, SystemMonitorTool},
+    fs::{
+        file_converter::FileConverterConfig, file_operations::FileOperationsConfig,
+        file_search::FileSearchConfig, file_watcher::FileWatcherConfig, ArchiveHandlerTool,
+        FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,
+    },
+    system::{
+        environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
+        service_checker::ServiceCheckerConfig, system_monitor::SystemMonitorConfig,
+        EnvironmentReaderTool, ProcessExecutorTool, ServiceCheckerTool, SystemMonitorTool,
+    },
     util::{
-        Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool,
-        DiffCalculatorTool, HashCalculatorTool, TemplateEngineTool, TextManipulatorTool,
-        UuidGeneratorTool,
+        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+        uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool,
+        DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool,
+        TemplateEngineTool, TextManipulatorTool, UuidGeneratorTool,
     },
     GraphQLQueryTool, HttpRequestTool, WebSearchTool,
 };
@@ -27,7 +38,7 @@ fn create_test_sandbox() -> Arc<FileSandbox> {
         "benchmark-sandbox".to_string(),
         llmspell_core::traits::tool::SecurityRequirements::default()
             .with_file_access(temp_dir.path().to_str().unwrap()),
-        Default::default(),
+        llmspell_core::traits::tool::ResourceLimits::default(),
     );
     Arc::new(FileSandbox::new(context).unwrap())
 }
@@ -73,7 +84,7 @@ fn bench_utility_tools_init(c: &mut Criterion) {
 
     group.bench_function("hash_calculator", |b| {
         b.iter(|| {
-            let tool = HashCalculatorTool::new(Default::default());
+            let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
             black_box(tool)
         });
     });
@@ -87,14 +98,14 @@ fn bench_utility_tools_init(c: &mut Criterion) {
 
     group.bench_function("text_manipulator", |b| {
         b.iter(|| {
-            let tool = TextManipulatorTool::new(Default::default());
+            let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
             black_box(tool)
         });
     });
 
     group.bench_function("uuid_generator", |b| {
         b.iter(|| {
-            let tool = UuidGeneratorTool::new(Default::default());
+            let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
             black_box(tool)
         });
     });
@@ -107,14 +118,14 @@ fn bench_data_tools_init(c: &mut Criterion) {
 
     group.bench_function("csv_analyzer", |b| {
         b.iter(|| {
-            let tool = CsvAnalyzerTool::new(Default::default());
+            let tool = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
             black_box(tool)
         });
     });
 
     group.bench_function("json_processor", |b| {
         b.iter(|| {
-            let tool = JsonProcessorTool::new(Default::default());
+            let tool = JsonProcessorTool::new(JsonProcessorConfig::default());
             black_box(tool)
         });
     });
@@ -122,7 +133,7 @@ fn bench_data_tools_init(c: &mut Criterion) {
     group.bench_function("graphql_query", |b| {
         b.iter(|| {
             let tool =
-                GraphQLQueryTool::new(Default::default()).expect("Failed to create GraphQL tool");
+                GraphQLQueryTool::new(GraphQLConfig::default()).expect("Failed to create GraphQL tool");
             black_box(tool)
         });
     });
@@ -130,7 +141,7 @@ fn bench_data_tools_init(c: &mut Criterion) {
     group.bench_function("http_request", |b| {
         b.iter(|| {
             let tool =
-                HttpRequestTool::new(Default::default()).expect("Failed to create HTTP tool");
+                HttpRequestTool::new(HttpRequestConfig::default()).expect("Failed to create HTTP tool");
             black_box(tool)
         });
     });
@@ -151,14 +162,14 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
     group.bench_function("file_converter", |b| {
         let sandbox = create_test_sandbox();
         b.iter(|| {
-            let tool = FileConverterTool::new(Default::default(), sandbox.clone());
+            let tool = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
             black_box(tool)
         });
     });
 
     group.bench_function("file_operations", |b| {
         b.iter(|| {
-            let tool = FileOperationsTool::new(Default::default());
+            let tool = FileOperationsTool::new(FileOperationsConfig::default());
             black_box(tool)
         });
     });
@@ -166,7 +177,7 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
     group.bench_function("file_search", |b| {
         let sandbox = create_test_sandbox();
         b.iter(|| {
-            let tool = FileSearchTool::new(Default::default(), sandbox.clone());
+            let tool = FileSearchTool::new(FileSearchConfig::default(), sandbox.clone());
             black_box(tool)
         });
     });
@@ -174,7 +185,7 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
     group.bench_function("file_watcher", |b| {
         let sandbox = create_test_sandbox();
         b.iter(|| {
-            let tool = FileWatcherTool::new(Default::default(), sandbox.clone());
+            let tool = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
             black_box(tool)
         });
     });
@@ -187,28 +198,28 @@ fn bench_system_tools_init(c: &mut Criterion) {
 
     group.bench_function("environment_reader", |b| {
         b.iter(|| {
-            let tool = EnvironmentReaderTool::new(Default::default());
+            let tool = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
             black_box(tool)
         });
     });
 
     group.bench_function("process_executor", |b| {
         b.iter(|| {
-            let tool = ProcessExecutorTool::new(Default::default());
+            let tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
             black_box(tool)
         });
     });
 
     group.bench_function("service_checker", |b| {
         b.iter(|| {
-            let tool = ServiceCheckerTool::new(Default::default());
+            let tool = ServiceCheckerTool::new(ServiceCheckerConfig::default());
             black_box(tool)
         });
     });
 
     group.bench_function("system_monitor", |b| {
         b.iter(|| {
-            let tool = SystemMonitorTool::new(Default::default());
+            let tool = SystemMonitorTool::new(SystemMonitorConfig::default());
             black_box(tool)
         });
     });
@@ -221,7 +232,7 @@ fn bench_search_tools_init(c: &mut Criterion) {
 
     group.bench_function("web_search", |b| {
         b.iter(|| {
-            let tool = WebSearchTool::new(Default::default());
+            let tool = WebSearchTool::new(WebSearchConfig::default());
             black_box(tool)
         });
     });
@@ -242,33 +253,33 @@ fn bench_all_tools_sequential(c: &mut Criterion) {
             let _data_val = DataValidationTool::new();
             let _datetime = DateTimeHandlerTool::new();
             let _diff = DiffCalculatorTool::new();
-            let _hash = HashCalculatorTool::new(Default::default());
+            let _hash = HashCalculatorTool::new(HashCalculatorConfig::default());
             let _template = TemplateEngineTool::new();
-            let _text = TextManipulatorTool::new(Default::default());
-            let _uuid = UuidGeneratorTool::new(Default::default());
+            let _text = TextManipulatorTool::new(TextManipulatorConfig::default());
+            let _uuid = UuidGeneratorTool::new(UuidGeneratorConfig::default());
 
             // Data tools
-            let _csv = CsvAnalyzerTool::new(Default::default());
-            let _json = JsonProcessorTool::new(Default::default());
+            let _csv = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
+            let _json = JsonProcessorTool::new(JsonProcessorConfig::default());
             let _graphql =
-                GraphQLQueryTool::new(Default::default()).expect("GraphQL creation failed");
-            let _http = HttpRequestTool::new(Default::default()).expect("HTTP creation failed");
+                GraphQLQueryTool::new(GraphQLConfig::default()).expect("GraphQL creation failed");
+            let _http = HttpRequestTool::new(HttpRequestConfig::default()).expect("HTTP creation failed");
 
             // File system tools
             let _archive = ArchiveHandlerTool::new();
-            let _file_conv = FileConverterTool::new(Default::default(), sandbox.clone());
-            let _file_ops = FileOperationsTool::new(Default::default());
-            let _file_search = FileSearchTool::new(Default::default(), sandbox.clone());
-            let _file_watch = FileWatcherTool::new(Default::default(), sandbox.clone());
+            let _file_conv = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
+            let _file_ops = FileOperationsTool::new(FileOperationsConfig::default());
+            let _file_search = FileSearchTool::new(FileSearchConfig::default(), sandbox.clone());
+            let _file_watch = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
 
             // System tools
-            let _env = EnvironmentReaderTool::new(Default::default());
-            let _proc = ProcessExecutorTool::new(Default::default());
-            let _service = ServiceCheckerTool::new(Default::default());
-            let _system = SystemMonitorTool::new(Default::default());
+            let _env = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
+            let _proc = ProcessExecutorTool::new(ProcessExecutorConfig::default());
+            let _service = ServiceCheckerTool::new(ServiceCheckerConfig::default());
+            let _system = SystemMonitorTool::new(SystemMonitorConfig::default());
 
             // Search tools
-            let _web_search = WebSearchTool::new(Default::default());
+            let _web_search = WebSearchTool::new(WebSearchConfig::default());
 
             black_box(());
         });

@@ -12,7 +12,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 #[tokio::test]
 async fn test_hash_calculator_large_input_limit() {
-    let hash_tool = HashCalculatorTool::new(Default::default());
+    let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
 
     // Try to hash extremely large data
     let large_data = "A".repeat(100_000_000); // 100MB
@@ -44,7 +44,7 @@ async fn test_hash_calculator_large_input_limit() {
 }
 #[tokio::test]
 async fn test_json_processor_recursive_query_limit() {
-    let json_tool = JsonProcessorTool::new(Default::default());
+    let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
 
     // Create deeply nested JSON
     let mut nested = json!({"value": "bottom"});
@@ -73,7 +73,7 @@ async fn test_json_processor_recursive_query_limit() {
 }
 #[tokio::test]
 async fn test_text_manipulator_regex_bomb_protection() {
-    let text_tool = TextManipulatorTool::new(Default::default());
+    let text_tool = TextManipulatorTool::new(TextManipulatorConfig::default());
 
     // Regex bomb patterns
     let dangerous_patterns = vec![
@@ -149,7 +149,7 @@ async fn test_calculator_computation_limit() {
 }
 #[tokio::test]
 async fn test_csv_analyzer_large_file_limit() {
-    let csv_tool = CsvAnalyzerTool::new(Default::default());
+    let csv_tool = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
 
     // Generate large CSV data
     let mut csv_data = String::from("id,name,value\n");
@@ -228,7 +228,7 @@ async fn test_archive_handler_zip_bomb_protection() {
 async fn test_concurrent_resource_usage() {
     use tokio::task::JoinSet;
 
-    let hash_tool = Arc::new(HashCalculatorTool::new(Default::default()));
+    let hash_tool = Arc::new(HashCalculatorTool::new(HashCalculatorConfig::default()));
     let mut tasks = JoinSet::new();
 
     // Spawn many concurrent operations

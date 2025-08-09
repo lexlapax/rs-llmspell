@@ -15,6 +15,9 @@ use llmspell_core::{
     ExecutionContext,
 };
 use llmspell_tools::util::*;
+use llmspell_tools::util::hash_calculator::HashCalculatorConfig;
+use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
+use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
 use serde_json::{json, Value};
 use std::{collections::HashMap, time::Instant};
 
@@ -44,7 +47,7 @@ async fn test_parameter_standardization_compliance() {
         ),
         (
             "hash_calculator",
-            Box::new(HashCalculatorTool::new(Default::default())),
+            Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
             json!({"operation": "hash", "algorithm": "md5", "input": "test"}),
         ),
         (
@@ -124,10 +127,10 @@ async fn test_tool_initialization_performance() {
                     let _tool = DateTimeHandlerTool::new();
                 }
                 "uuid_generator" => {
-                    let _tool = UuidGeneratorTool::new(Default::default());
+                    let _tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
                 }
                 "text_manipulator" => {
-                    let _tool = TextManipulatorTool::new(Default::default());
+                    let _tool = TextManipulatorTool::new(TextManipulatorConfig::default());
                 }
                 "data_validation" => {
                     let _tool = DataValidationTool::new();
@@ -207,7 +210,7 @@ async fn test_response_builder_consistency() {
         ),
         (
             "uuid_generator",
-            Box::new(UuidGeneratorTool::new(Default::default())),
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())),
             json!({"operation": "generate", "version": "v4"}),
         ),
         (

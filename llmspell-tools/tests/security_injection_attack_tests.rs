@@ -4,7 +4,7 @@
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
     api::http_request::HttpRequestConfig,
-    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
+    data::{graphql_query::GraphQLConfig, json_processor::JsonProcessorConfig, JsonProcessorTool},
     system::{
         environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
         EnvironmentReaderTool, ProcessExecutorTool,
@@ -119,7 +119,7 @@ async fn test_json_processor_jq_injection() {
 #[tokio::test]
 async fn test_graphql_query_injection() {
     let graphql_tool =
-        GraphQLQueryTool::new(Default::default()).expect("Failed to create GraphQL tool");
+        GraphQLQueryTool::new(GraphQLConfig::default()).expect("Failed to create GraphQL tool");
 
     // GraphQL injection attempts
     let injections = vec![

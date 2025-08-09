@@ -5,6 +5,8 @@ use llmspell_core::traits::tool::{SecurityLevel, Tool};
 use llmspell_tools::util::{
     Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool,
     HashCalculatorTool, TemplateEngineTool, TextManipulatorTool, UuidGeneratorTool,
+    hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+    uuid_generator::UuidGeneratorConfig,
 };
 
 /// Test that all utility tools have appropriate security levels
@@ -13,15 +15,15 @@ fn test_utility_tools_security_levels() {
     let utility_tools: Vec<(String, Box<dyn Tool>)> = vec![
         (
             "TextManipulatorTool".to_string(),
-            Box::new(TextManipulatorTool::new(Default::default())),
+            Box::new(TextManipulatorTool::new(TextManipulatorConfig::default())),
         ),
         (
             "UuidGeneratorTool".to_string(),
-            Box::new(UuidGeneratorTool::new(Default::default())),
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())),
         ),
         (
             "HashCalculatorTool".to_string(),
-            Box::new(HashCalculatorTool::new(Default::default())),
+            Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
         ),
         (
             "Base64EncoderTool".to_string(),
@@ -90,7 +92,7 @@ fn test_resource_limits_are_reasonable() {
     let tools = vec![
         (
             "UuidGeneratorTool",
-            Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())) as Box<dyn Tool>,
         ),
         (
             "CalculatorTool",
@@ -98,7 +100,7 @@ fn test_resource_limits_are_reasonable() {
         ),
         (
             "HashCalculatorTool",
-            Box::new(HashCalculatorTool::new(Default::default())) as Box<dyn Tool>,
+            Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())) as Box<dyn Tool>,
         ),
     ];
 
@@ -131,7 +133,7 @@ fn test_security_requirements_structure() {
     let tools = vec![
         (
             "TextManipulatorTool",
-            Box::new(TextManipulatorTool::new(Default::default())) as Box<dyn Tool>,
+            Box::new(TextManipulatorTool::new(TextManipulatorConfig::default())) as Box<dyn Tool>,
         ),
         (
             "TemplateEngineTool",
@@ -202,7 +204,7 @@ fn test_tools_have_metadata() {
     let tools = vec![
         (
             "UuidGeneratorTool",
-            Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())) as Box<dyn Tool>,
         ),
         (
             "Base64EncoderTool",
@@ -262,7 +264,7 @@ fn test_security_configuration_consistency() {
     let tools = vec![
         (
             "Tool1",
-            Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())) as Box<dyn Tool>,
         ),
         ("Tool2", Box::new(Base64EncoderTool::new()) as Box<dyn Tool>),
         ("Tool3", Box::new(CalculatorTool::new()) as Box<dyn Tool>),

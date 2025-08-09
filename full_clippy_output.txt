@@ -40,54 +40,7 @@ warning: function call inside of `unwrap_or`
     = note: `-W clippy::or-fun-call` implied by `-W clippy::nursery`
     = help: to override `-W clippy::nursery` add `#[allow(clippy::or_fun_call)]`
 
-warning: the function has a cognitive complexity of (39/25)
-   --> llmspell-tools/src/fs/archive_handler.rs:286:8
-    |
-286 |     fn extract_zip(
-    |        ^^^^^^^^^^^
-    |
-    = help: you could split it up into multiple smaller functions
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
-    = note: `-W clippy::cognitive-complexity` implied by `-W clippy::nursery`
-    = help: to override `-W clippy::nursery` add `#[allow(clippy::cognitive_complexity)]`
-
-warning: the function has a cognitive complexity of (35/25)
-   --> llmspell-tools/src/fs/archive_handler.rs:378:8
-    |
-378 |     fn extract_tar(
-    |        ^^^^^^^^^^^
-    |
-    = help: you could split it up into multiple smaller functions
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
-
-warning: the function has a cognitive complexity of (35/25)
-   --> llmspell-tools/src/fs/archive_handler.rs:446:8
-    |
-446 |     fn extract_tar_gz(
-    |        ^^^^^^^^^^^^^^
-    |
-    = help: you could split it up into multiple smaller functions
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
-
-warning: the function has a cognitive complexity of (42/25)
-   --> llmspell-tools/src/system/environment_reader.rs:129:8
-    |
-129 |     fn is_var_allowed(&self, var_name: &str) -> bool {
-    |        ^^^^^^^^^^^^^^
-    |
-    = help: you could split it up into multiple smaller functions
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
-
-warning: the function has a cognitive complexity of (26/25)
-   --> llmspell-tools/src/system/process_executor.rs:216:8
-    |
-216 |     fn is_executable_allowed(&self, executable: &str) -> bool {
-    |        ^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: you could split it up into multiple smaller functions
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
-
-warning: `llmspell-tools` (lib) generated 7 warnings
+warning: `llmspell-tools` (lib) generated 2 warnings
     Checking llmspell-agents v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents)
     Checking llmspell-bridge v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-bridge)
 warning: unused import: `crate::providers::ProviderManagerConfig`
@@ -1632,255 +1585,260 @@ help: you can use a slice directly
 warning: `llmspell-bridge` (lib) generated 107 warnings (run `cargo clippy --fix --lib -p llmspell-bridge` to apply 67 suggestions)
     Checking llmspell-testing v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-testing)
     Checking llmspell-cli v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-cli)
-    Checking llmspell-core v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core)
     Checking llmspell-sessions v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-sessions)
-    Checking llmspell-workflows v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-workflows)
     Checking llmspell-state-persistence v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-state-persistence)
-warning: calling `FileOperationsConfig::default()` is more clear than this expression
-  --> llmspell-tools/tests/security_sandbox_escape_tests.rs:13:45
+    Checking llmspell-core v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core)
+warning: `assert!(true)` will be optimized out by the compiler
+  --> llmspell-testing/tests/unit/agents_tests.rs:12:9
    |
-13 |     let file_tool = FileOperationsTool::new(Default::default());
-   |                                             ^^^^^^^^^^^^^^^^^^ help: try: `FileOperationsConfig::default()`
+12 |         assert!(true);
+   |         ^^^^^^^^^^^^^
+   |
+   = help: remove it
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+   = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/tools_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/workflows_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/bridge_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/state_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/hooks_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/events_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/storage_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `assert!(true)` will be optimized out by the compiler
+ --> llmspell-testing/tests/unit/utils_tests.rs:8:9
+  |
+8 |         assert!(true);
+  |         ^^^^^^^^^^^^^
+  |
+  = help: remove it
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+
+warning: `llmspell-testing` (test "unit") generated 9 warnings
+warning: calling `GraphQLConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_injection_attack_tests.rs:122:31
+    |
+122 |         GraphQLQueryTool::new(Default::default()).expect("Failed to create GraphQL tool");
+    |                               ^^^^^^^^^^^^^^^^^^ help: try: `GraphQLConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+    = note: `-W clippy::default-trait-access` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::default_trait_access)]`
+
+warning: function call inside of `unwrap_or`
+   --> llmspell-tools/tests/security_injection_attack_tests.rs:183:52
+    |
+183 |                 serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|_| json!({"success": false}))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+    = note: `-W clippy::or-fun-call` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::or_fun_call)]`
+
+warning: function call inside of `unwrap_or`
+   --> llmspell-tools/tests/security_injection_attack_tests.rs:229:52
+    |
+229 |                 serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|_| json!({"success": false}))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: function call inside of `unwrap_or`
+   --> llmspell-tools/tests/security_injection_attack_tests.rs:323:52
+    |
+323 |                 serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|_| json!({"success": false}))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: function call inside of `unwrap_or`
+   --> llmspell-tools/tests/security_injection_attack_tests.rs:365:52
+    |
+365 |                 serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+    |                                                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|_| json!({"success": false}))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: binding's name is too similar to existing binding
+   --> llmspell-tools/tests/webpage_monitor_integration.rs:149:25
+    |
+149 |                     let output_value: serde_json::Value =
+    |                         ^^^^^^^^^^^^
+    |
+note: existing binding defined here
+   --> llmspell-tools/tests/webpage_monitor_integration.rs:135:17
+    |
+135 |             let output1_value: serde_json::Value = serde_json::from_str(&output1.text).unwrap();
+    |                 ^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+    = note: `-W clippy::similar-names` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-tools/tests/csv_analyzer_integration.rs:133:5
+    |
+133 |     use std::fmt::Write;
+    |     ^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-W clippy::items-after-statements` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/input_validation_tests.rs:277:37
+    |
+277 |                 "input": "A".repeat(100000),
+    |                                     ^^^^^^ help: consider: `100_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+    = note: `-W clippy::unreadable-literal` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unreadable_literal)]`
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/path_security_tests.rs:266:26
+    |
+266 |                 "bytes": 1000000
+    |                          ^^^^^^^ help: consider: `1_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/rate_limit_tests.rs:146:35
+    |
+146 |                 "content_length": 1000000,
+    |                                   ^^^^^^^ help: consider: `1_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/rate_limit_tests.rs:213:36
+    |
+213 |                 "collision_count": 1000000
+    |                                    ^^^^^^^ help: consider: `1_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+warning: calling `TextManipulatorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:16:47
+   |
+16 |             Box::new(TextManipulatorTool::new(Default::default())),
+   |                                               ^^^^^^^^^^^^^^^^^^ help: try: `TextManipulatorConfig::default()`
    |
    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
    = note: `-W clippy::default-trait-access` implied by `-W clippy::pedantic`
    = help: to override `-W clippy::pedantic` add `#[allow(clippy::default_trait_access)]`
 
-warning: calling `FileOperationsConfig::default()` is more clear than this expression
-  --> llmspell-tools/tests/security_sandbox_escape_tests.rs:57:45
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:20:45
    |
-57 |     let file_tool = FileOperationsTool::new(Default::default());
-   |                                             ^^^^^^^^^^^^^^^^^^ help: try: `FileOperationsConfig::default()`
-   |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-warning: calling `ProcessExecutorConfig::default()` is more clear than this expression
-  --> llmspell-tools/tests/security_sandbox_escape_tests.rs:83:49
-   |
-83 |     let process_tool = ProcessExecutorTool::new(Default::default());
-   |                                                 ^^^^^^^^^^^^^^^^^^ help: try: `ProcessExecutorConfig::default()`
+20 |             Box::new(UuidGeneratorTool::new(Default::default())),
+   |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
    |
    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-warning: calling `FileSearchConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/security_sandbox_escape_tests.rs:136:43
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:24:46
+   |
+24 |             Box::new(HashCalculatorTool::new(Default::default())),
+   |                                              ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:93:45
+   |
+93 |             Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+   |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:101:46
     |
-136 |     let search_tool = FileSearchTool::new(Default::default(), sandbox);
-    |                                           ^^^^^^^^^^^^^^^^^^ help: try: `FileSearchConfig::default()`
+101 |             Box::new(HashCalculatorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                              ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
     |
     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-warning: calling `SystemMonitorConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/security_sandbox_escape_tests.rs:173:47
+warning: calling `TextManipulatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:134:47
     |
-173 |     let monitor_tool = SystemMonitorTool::new(Default::default());
-    |                                               ^^^^^^^^^^^^^^^^^^ help: try: `SystemMonitorConfig::default()`
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-warning: calling `FileOperationsConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/security_sandbox_escape_tests.rs:206:45
-    |
-206 |     let file_tool = FileOperationsTool::new(Default::default());
-    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `FileOperationsConfig::default()`
+134 |             Box::new(TextManipulatorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                               ^^^^^^^^^^^^^^^^^^ help: try: `TextManipulatorConfig::default()`
     |
     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-warning: calling `ProcessExecutorConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/security_sandbox_escape_tests.rs:246:49
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:205:45
     |
-246 |     let process_tool = ProcessExecutorTool::new(Default::default());
-    |                                                 ^^^^^^^^^^^^^^^^^^ help: try: `ProcessExecutorConfig::default()`
+205 |             Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
     |
     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-warning: binding's name is too similar to existing binding
-  --> llmspell-tools/tests/web_scraper_integration.rs:28:9
-   |
-28 |     let content = &output_value["result"]["content"];
-   |         ^^^^^^^
-   |
-note: existing binding defined here
-  --> llmspell-tools/tests/web_scraper_integration.rs:14:9
-   |
-14 |     let context = create_test_context();
-   |         ^^^^^^^
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
-   = note: `-W clippy::similar-names` implied by `-W clippy::pedantic`
-   = help: to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`
-
-warning: binding's name is too similar to existing binding
-  --> llmspell-tools/tests/web_scraper_integration.rs:52:9
-   |
-52 |     let content = &output_value["result"]["content"];
-   |         ^^^^^^^
-   |
-note: existing binding defined here
-  --> llmspell-tools/tests/web_scraper_integration.rs:39:9
-   |
-39 |     let context = create_test_context();
-   |         ^^^^^^^
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
-
-warning: binding's name is too similar to existing binding
-  --> llmspell-tools/tests/web_scraper_integration.rs:74:9
-   |
-74 |     let content = &output_value["result"]["content"];
-   |         ^^^^^^^
-   |
-note: existing binding defined here
-  --> llmspell-tools/tests/web_scraper_integration.rs:61:9
-   |
-61 |     let context = create_test_context();
-   |         ^^^^^^^
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
-
-warning: binding's name is too similar to existing binding
-  --> llmspell-tools/tests/web_scraper_integration.rs:96:9
-   |
-96 |     let content = &output_value["result"]["content"];
-   |         ^^^^^^^
-   |
-note: existing binding defined here
-  --> llmspell-tools/tests/web_scraper_integration.rs:83:9
-   |
-83 |     let context = create_test_context();
-   |         ^^^^^^^
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
-
-warning: `llmspell-tools` (test "security_sandbox_escape_tests") generated 7 warnings
-warning: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
-  --> llmspell-tools/tests/hook_performance_test.rs:93:45
-   |
-93 |         let avg_no_hooks = total_no_hooks / ITERATIONS as u32;
-   |                                             ^^^^^^^^^^^^^^^^^
-   |
-   = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
-   = note: `-W clippy::cast-possible-truncation` implied by `-W clippy::pedantic`
-   = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_possible_truncation)]`
-help: ... or use `try_from` and handle the error accordingly
-   |
-93 -         let avg_no_hooks = total_no_hooks / ITERATIONS as u32;
-93 +         let avg_no_hooks = total_no_hooks / u32::try_from(ITERATIONS);
-   |
-
-warning: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
-   --> llmspell-tools/tests/hook_performance_test.rs:106:49
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:265:45
     |
-106 |         let avg_with_hooks = total_with_hooks / ITERATIONS as u32;
-    |                                                 ^^^^^^^^^^^^^^^^^
+265 |             Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
     |
-    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
-help: ... or use `try_from` and handle the error accordingly
-    |
-106 -         let avg_with_hooks = total_with_hooks / ITERATIONS as u32;
-106 +         let avg_with_hooks = total_with_hooks / u32::try_from(ITERATIONS);
-    |
-
-warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   --> llmspell-tools/tests/hook_performance_test.rs:109:31
-    |
-109 |         let overhead_micros = avg_with_hooks.as_micros() as f64 - avg_no_hooks.as_micros() as f64;
-    |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-    = note: `-W clippy::cast-precision-loss` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_precision_loss)]`
-
-warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   --> llmspell-tools/tests/hook_performance_test.rs:109:67
-    |
-109 |         let overhead_micros = avg_with_hooks.as_micros() as f64 - avg_no_hooks.as_micros() as f64;
-    |                                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   --> llmspell-tools/tests/hook_performance_test.rs:111:32
-    |
-111 |             (overhead_micros / avg_no_hooks.as_micros() as f64) * 100.0
-    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-warning: casting `i32` to `u32` may lose the sign of the value
-   --> llmspell-tools/tests/hook_performance_test.rs:158:41
-    |
-158 |     let avg_duration = total_duration / iterations as u32;
-    |                                         ^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
-    = note: `-W clippy::cast-sign-loss` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_sign_loss)]`
-
-warning: casting `i32` to `u32` may lose the sign of the value
-   --> llmspell-tools/tests/hook_performance_test.rs:199:41
-    |
-199 |     let avg_duration = total_duration / iterations as u32;
-    |                                         ^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
-
-warning: binding to `_` prefixed variable with no side-effect
-   --> llmspell-tools/tests/web_tools_integration.rs:276:9
-    |
-276 |     let _output = result; // Just check it doesn't panic
-    |         ^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#no_effect_underscore_binding
-    = note: `-W clippy::no-effect-underscore-binding` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::no_effect_underscore_binding)]`
-
-warning: item in documentation is missing backticks
- --> llmspell-tools/tests/web_scraper_integration.rs:1:36
-  |
-1 | //! ABOUTME: Integration tests for WebScraperTool
-  |                                    ^^^^^^^^^^^^^^
-  |
-  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-  = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
-  = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
-help: try
-  |
-1 - //! ABOUTME: Integration tests for WebScraperTool
-1 + //! ABOUTME: Integration tests for `WebScraperTool`
-  |
-
-warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   --> llmspell-tools/tests/hook_performance_test.rs:307:9
-    |
-307 |         duration_with_audit.as_millis() as f64 - duration_no_audit.as_millis() as f64;
-    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   --> llmspell-tools/tests/hook_performance_test.rs:307:50
-    |
-307 |         duration_with_audit.as_millis() as f64 - duration_no_audit.as_millis() as f64;
-    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   --> llmspell-tools/tests/hook_performance_test.rs:309:28
-    |
-309 |         (overhead_millis / duration_no_audit.as_millis() as f64) * 100.0
-    |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-warning: adding items after statements is confusing, since items exist from the start of the scope
-   --> llmspell-tools/tests/web_search_integration.rs:204:5
-    |
-204 |     use llmspell_core::traits::tool::ToolCategory;
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
-    = note: `-W clippy::items-after-statements` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
 warning: use Option::map_or_else instead of an if let/else
   --> llmspell-tools/tests/common/mod.rs:64:21
@@ -1925,721 +1883,525 @@ warning: use Option::map_or_else instead of an if let/else
    |
    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
 
-warning: `llmspell-tools` (test "web_search_integration") generated 1 warning
-warning: `llmspell-tools` (test "hook_performance_test") generated 10 warnings
-warning: `llmspell-tools` (test "web_tools_integration") generated 1 warning
-warning: `llmspell-tools` (test "web_scraper_integration") generated 7 warnings (run `cargo clippy --fix --test "web_scraper_integration"` to apply 1 suggestion)
-warning: unused `async` for function with no await statements
-  --> llmspell-bridge/tests/sync_behavior_test.rs:12:1
-   |
-12 | / async fn create_test_registry() -> Arc<ComponentRegistry> {
-13 | |     let registry = Arc::new(ComponentRegistry::new());
-14 | |     registry
-15 | |         .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
-16 | |         .unwrap();
-17 | |     registry
-18 | | }
-   | |_^
-   |
-   = help: consider removing the `async` from this function
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
-   = note: `-W clippy::unused-async` implied by `-W clippy::pedantic`
-   = help: to override `-W clippy::pedantic` add `#[allow(clippy::unused_async)]`
+warning: `llmspell-tools` (test "security_injection_attack_tests") generated 5 warnings
+warning: `llmspell-tools` (test "csv_analyzer_integration") generated 1 warning
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:108:9
+    |
+108 |         use async_trait::async_trait;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-W clippy::items-after-statements` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
 
-warning: unused `async` for function with no await statements
-  --> llmspell-bridge/tests/sync_behavior_test.rs:31:1
-   |
-31 | / async fn create_test_engine() -> LuaEngine {
-32 | |     let config = LuaConfig::default();
-33 | |     LuaEngine::new(&config).expect("Failed to create Lua engine")
-34 | | }
-   | |_^
-   |
-   = help: consider removing the `async` from this function
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:109:9
+    |
+109 |         use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: long literal lacking separators
-   --> llmspell-tools/tests/calculator_integration.rs:135:34
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:109:43
     |
-135 |     assert_eq!(result["result"], 10000000000.0);
-    |                                  ^^^^^^^^^^^^^ help: consider: `10_000_000_000.0`
+109 |         use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
+    |                                           ^^^^^^^^^^^^^
     |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
-    = note: `-W clippy::unreadable-literal` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unreadable_literal)]`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: long literal lacking separators
-   --> llmspell-tools/tests/calculator_integration.rs:139:34
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:109:58
     |
-139 |     assert_eq!(result["result"], 0.000001);
-    |                                  ^^^^^^^^ help: consider: `0.000_001`
+109 |         use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
+    |                                                          ^^^^^^^^^^^^
     |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: `llmspell-bridge` (test "sync_behavior_test") generated 2 warnings
-warning: use Option::map_or_else instead of an if let/else
-  --> llmspell-tools/tests/calculator_integration.rs:36:5
-   |
-36 | /     if let Some(result_obj) = output.get("result") {
-37 | |         Ok(result_obj.clone())
-38 | |     } else {
-39 | |         Ok(output)
-40 | |     }
-   | |_____^ help: try: `output.get("result").map_or_else(|| Ok(output), |result_obj| Ok(result_obj.clone()))`
-   |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
-   = note: `-W clippy::option-if-let-else` implied by `-W clippy::nursery`
-   = help: to override `-W clippy::nursery` add `#[allow(clippy::option_if_let_else)]`
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:109:72
+    |
+109 |         use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
+    |                                                                        ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:14:5
-   |
-14 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:13:5
-   |
-13 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-   = note: `#[warn(unused_attributes)]` on by default
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:110:9
+    |
+110 |         use llmspell_core::{BaseAgent, Tool};
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:15:5
-   |
-15 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:13:5
-   |
-13 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:110:29
+    |
+110 |         use llmspell_core::{BaseAgent, Tool};
+    |                             ^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:16:5
-   |
-16 |     #[ignore = "Workflow execution without steps not implemented - placeholder test"]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:13:5
-   |
-13 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:110:40
+    |
+110 |         use llmspell_core::{BaseAgent, Tool};
+    |                                        ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:58:5
-   |
-58 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:57:5
-   |
-57 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:111:9
+    |
+111 |         use llmspell_core::{ComponentMetadata, ExecutionContext};
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:59:5
-   |
-59 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:57:5
-   |
-57 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:111:29
+    |
+111 |         use llmspell_core::{ComponentMetadata, ExecutionContext};
+    |                             ^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:60:5
-   |
-60 |     #[ignore = "Workflow oneshot execution not implemented - placeholder test"]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:57:5
-   |
-57 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:111:48
+    |
+111 |         use llmspell_core::{ComponentMetadata, ExecutionContext};
+    |                                                ^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:89:5
-   |
-89 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:88:5
-   |
-88 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:114:9
+    |
+114 |         struct TestTool;
+    |         ^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:90:5
-   |
-90 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:88:5
-   |
-88 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:91:5
-   |
-91 |     #[ignore = "Workflow metrics tracking not implemented - placeholder test"]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-   |
-note: attribute also specified here
-  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:88:5
-   |
-88 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:131:5
-    |
-131 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:130:5
-    |
-130 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:132:5
-    |
-132 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:130:5
-    |
-130 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:157:5
-    |
-157 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:156:5
-    |
-156 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:158:5
-    |
-158 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:156:5
-    |
-156 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:177:5
-    |
-177 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:176:5
-    |
-176 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:178:5
-    |
-178 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:176:5
-    |
-176 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:179:5
-    |
-179 |     #[ignore = "Workflow execution history not implemented - placeholder test"]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:176:5
-    |
-176 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:214:5
-    |
-214 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:213:5
-    |
-213 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:215:5
-    |
-215 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:213:5
-    |
-213 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: unused attribute
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:216:5
-    |
-216 |     #[ignore = "Workflow concurrent execution not implemented - placeholder test"]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
-    |
-note: attribute also specified here
-   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:213:5
-    |
-213 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-warning: binding's name is too similar to existing binding
-   --> llmspell-tools/tests/webpage_monitor_integration.rs:149:25
-    |
-149 |                     let output_value: serde_json::Value =
-    |                         ^^^^^^^^^^^^
-    |
-note: existing binding defined here
-   --> llmspell-tools/tests/webpage_monitor_integration.rs:135:17
-    |
-135 |             let output1_value: serde_json::Value = serde_json::from_str(&output1.text).unwrap();
-    |                 ^^^^^^^^^^^^^
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
-    = note: `-W clippy::similar-names` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`
-
-warning: `llmspell-tools` (test "calculator_integration") generated 3 warnings
-warning: `llmspell-bridge` (test "workflow_bridge_integration_tests") generated 19 warnings (run `cargo clippy --fix --test "workflow_bridge_integration_tests"` to apply 19 suggestions)
-warning: `llmspell-tools` (test "webpage_monitor_integration") generated 3 warnings (2 duplicates)
-error[E0061]: this method takes 2 arguments but 0 arguments were supplied
-   --> llmspell-workflows/benches/workflow_hook_overhead.rs:322:35
-    |
-322 |             let result = workflow.execute().await.unwrap();
-    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
-    |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
-    |
-93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
-    |              ^^^^^^^
-help: provide the arguments
-    |
-322 -             let result = workflow.execute().await.unwrap();
-322 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
-    |
-
-error[E0061]: this method takes 2 arguments but 0 arguments were supplied
-   --> llmspell-workflows/benches/workflow_hook_overhead.rs:340:35
-    |
-340 |             let result = workflow.execute().await.unwrap();
-    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
-    |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
-    |
-93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
-    |              ^^^^^^^
-help: provide the arguments
-    |
-340 -             let result = workflow.execute().await.unwrap();
-340 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
-    |
-
-error[E0061]: this method takes 2 arguments but 0 arguments were supplied
-   --> llmspell-workflows/benches/workflow_hook_overhead.rs:360:35
-    |
-360 |             let result = workflow.execute().await.unwrap();
-    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
-    |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
-    |
-93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
-    |              ^^^^^^^
-help: provide the arguments
-    |
-360 -             let result = workflow.execute().await.unwrap();
-360 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
-    |
-
-error[E0061]: this method takes 2 arguments but 0 arguments were supplied
-   --> llmspell-workflows/benches/workflow_hook_overhead.rs:385:35
-    |
-385 |             let result = workflow.execute().await.unwrap();
-    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
-    |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
-    |
-93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
-    |              ^^^^^^^
-help: provide the arguments
-    |
-385 -             let result = workflow.execute().await.unwrap();
-385 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
-    |
-
-For more information about this error, try `rustc --explain E0061`.
-error: could not compile `llmspell-workflows` (bench "workflow_hook_overhead") due to 4 previous errors
-warning: build failed, waiting for other jobs to finish...
-warning: unnecessary hashes around raw string literal
-   --> llmspell-tools/tests/csv_analyzer_integration.rs:168:23
-    |
-168 |       let csv_content = r#"id,email,age
-    |  _______________________^
-169 | | 1,john@example.com,25
-170 | | 2,invalid-email,30
-171 | | 3,mary@test.org,150
-172 | | 4,bob@demo.net,-5
-173 | | "#;
-    | |__^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_raw_string_hashes
-    = note: `-W clippy::needless-raw-string-hashes` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::needless_raw_string_hashes)]`
-help: remove all the hashes around the string literal
-    |
-168 ~     let csv_content = r"id,email,age
-169 | 1,john@example.com,25
-...
-172 | 4,bob@demo.net,-5
-173 ~ ";
-    |
-
-warning: unnecessary hashes around raw string literal
-   --> llmspell-tools/tests/csv_analyzer_integration.rs:207:23
-    |
-207 |       let csv_content = r#"product,price,quantity
-    |  _______________________^
-208 | | Apple,1.50,100
-209 | | Banana,0.75,200
-210 | | Orange,2.00,150
-211 | | "#;
-    | |__^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_raw_string_hashes
-help: remove all the hashes around the string literal
-    |
-207 ~     let csv_content = r"product,price,quantity
-208 | Apple,1.50,100
-209 | Banana,0.75,200
-210 | Orange,2.00,150
-211 ~ ";
-    |
-
-warning: item in documentation is missing backticks
- --> llmspell-tools/tests/csv_analyzer_integration.rs:1:36
-  |
-1 | //! ABOUTME: Integration tests for CsvAnalyzerTool with real-world CSV scenarios
-  |                                    ^^^^^^^^^^^^^^^
-  |
-  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-  = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
-  = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
-help: try
-  |
-1 - //! ABOUTME: Integration tests for CsvAnalyzerTool with real-world CSV scenarios
-1 + //! ABOUTME: Integration tests for `CsvAnalyzerTool` with real-world CSV scenarios
-  |
-
-warning: `format!(..)` appended to existing `String`
-   --> llmspell-tools/tests/csv_analyzer_integration.rs:135:9
-    |
-135 | /         csv_content.push_str(&format!(
-136 | |             "{},value_{},{}\n",
-137 | |             i,
-138 | |             i,
-139 | |             if i % 2 == 0 { "A" } else { "B" }
-140 | |         ));
-    | |__________^
-    |
-    = help: consider using `write!` to avoid the extra allocation
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#format_push_string
-    = note: `-W clippy::format-push-string` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::format_push_string)]`
-
-warning: `llmspell-tools` (test "csv_analyzer_integration") generated 4 warnings (run `cargo clippy --fix --test "csv_analyzer_integration"` to apply 3 suggestions)
-error[E0308]: mismatched types
-  --> llmspell-testing/tests/agents/isolation_tests.rs:96:50
-   |
-96 |         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
-   |                                             ---- ^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
-   |                                             |
-   |                                             arguments to this enum variant are incorrect
-   |
-help: the type constructed contains `std::string::String` due to the type of the argument passed
-  --> llmspell-testing/tests/agents/isolation_tests.rs:96:45
-   |
-96 |         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
-   |                                             ^^^^^-------------------^
-   |                                                  |
-   |                                                  this argument influences the type of `Some`
-note: tuple variant defined here
-  --> /private/tmp/rust-20250403-7454-rkwlec/rustc-1.86.0-src/library/core/src/option.rs:580:5
-help: try removing the method call
-   |
-96 -         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
-96 +         .create_shared_scope("shared_data", Some("admin"), shared_config)
-   |
-
-warning: this function has too many lines (147/100)
-   --> llmspell-tools/tests/refactored_tools_integration.rs:35:7
-    |
-35  |   async fn test_all_refactored_tools_response_format() {
-    |  _______^
+warning: this function has too many lines (101/100)
+   --> llmspell-bridge/tests/globals_test.rs:218:11
+    |
+218 |       async fn test_workflow_global_lua() -> Result<()> {
+    |  ___________^
+219 | |         let lua = Lua::new();
+220 | |         let context = setup_test_context().await;
+221 | |         let registry = create_standard_registry(context.clone()).await?;
 ...   |
-201 | |     assert!(output["result"].is_object());
-202 | | }
-    | |_^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
-    = note: `-W clippy::too-many-lines` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::too_many_lines)]`
-
-warning: item in documentation is missing backticks
- --> llmspell-tools/tests/sitemap_crawler_integration.rs:1:36
-  |
-1 | //! ABOUTME: Integration tests for SitemapCrawlerTool
-  |                                    ^^^^^^^^^^^^^^^^^^
-  |
-  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-  = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
-  = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
-help: try
-  |
-1 - //! ABOUTME: Integration tests for SitemapCrawlerTool
-1 + //! ABOUTME: Integration tests for `SitemapCrawlerTool`
-  |
-
-warning: calling `HashCalculatorConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/refactored_tools_integration.rs:210:46
-    |
-210 |             Box::new(HashCalculatorTool::new(Default::default())),
-    |                                              ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-    = note: `-W clippy::default-trait-access` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::default_trait_access)]`
-
-warning: calling `TextManipulatorConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/refactored_tools_integration.rs:218:47
-    |
-218 |             Box::new(TextManipulatorTool::new(Default::default())),
-    |                                               ^^^^^^^^^^^^^^^^^^ help: try: `TextManipulatorConfig::default()`
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-warning: this function has too many lines (133/100)
-   --> llmspell-tools/tests/refactored_tools_integration.rs:262:7
-    |
-262 |   async fn test_refactored_tools_functionality() {
-    |  _______^
-...   |
-414 | |     assert_eq!(output["rendered"], "Hello, World!");
-415 | | }
-    | |_^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
-
-warning: this function has too many lines (102/100)
-   --> llmspell-tools/tests/security_hardening_test.rs:13:7
-    |
-13  |   async fn test_calculator_dos_protection_comprehensive() {
-    |  _______^
-14  | |     let tool = CalculatorTool::new();
-...   |
-132 | | }
-    | |_^
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
-    = note: `-W clippy::too-many-lines` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::too_many_lines)]`
-
-warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/refactored_tools_integration.rs:421:44
-    |
-421 |     let uuid_tool = UuidGeneratorTool::new(Default::default());
-    |                                            ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-warning: calling `HashCalculatorConfig::default()` is more clear than this expression
-   --> llmspell-tools/tests/refactored_tools_integration.rs:431:45
-    |
-431 |     let hash_tool = HashCalculatorTool::new(Default::default());
-    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
-    |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-warning: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
-  --> llmspell-tools/tests/sitemap_crawler_integration.rs:23:5
-   |
-23 | /     match tool.execute(input, context).await {
-24 | |         Ok(output) => {
-25 | |             assert_success_output(&output, &["operation", "result"]);
-...  |
-40 | |     }
-   | |_____^
-   |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_match_else
-   = note: `-W clippy::single-match-else` implied by `-W clippy::pedantic`
-   = help: to override `-W clippy::pedantic` add `#[allow(clippy::single_match_else)]`
-help: try
-   |
-23 ~     if let Ok(output) = tool.execute(input, context).await {
-24 +         assert_success_output(&output, &["operation", "result"]);
-25 + 
-26 +         let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-27 +         let result = &output_value["result"];
-28 + 
-29 +         // Should have URLs from sitemap
-30 +         assert!(result["urls"].is_array() || result["pages"].is_array());
-31 +         assert!(
-32 +             result["url_count"].as_u64().unwrap_or(0) > 0
-33 +                 || result["total_urls"].as_u64().unwrap_or(0) > 0
-34 +         );
-35 +     } else {
-36 +         // Some sites might block automated access, which is okay for tests
-37 +     }
-   |
-
-warning: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
-  --> llmspell-tools/tests/sitemap_crawler_integration.rs:83:5
-   |
-83 | /     match tool.execute(input, context).await {
-84 | |         Ok(output) => {
-85 | |             let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-86 | |             if output_value["success"].as_bool().unwrap() {
-...  |
-97 | |     }
-   | |_____^
-   |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_match_else
-help: try
-   |
-83 ~     if let Ok(output) = tool.execute(input, context).await {
-84 +         let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-85 +         if output_value["success"].as_bool().unwrap() {
-86 +             let result = &output_value["result"];
-87 +             // If successful, check filters were applied
-88 +             if let Some(urls) = result["urls"].as_array() {
-89 +                 assert!(urls.len() <= 10);
-90 +             }
-91 +         }
-92 +     } else {
-93 +         // Site might not have sitemap or block access
-94 +     }
-   |
-
-warning: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
-   --> llmspell-tools/tests/sitemap_crawler_integration.rs:113:5
-    |
-113 | /     match tool.execute(input, context).await {
-114 | |         Ok(output) => {
-115 | |             let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-...   |
-122 | |     }
+327 | |         Ok(())
+328 | |     }
     | |_____^
     |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_match_else
-help: try
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+    = note: `-W clippy::too-many-lines` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::too_many_lines)]`
+
+warning: `llmspell-tools` (test "security_basic") generated 8 warnings
+warning: docs for function returning `Result` missing `# Errors` section
+  --> llmspell-tools/tests/common/mod.rs:17:1
+   |
+17 | pub fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+   = note: `-W clippy::missing-errors-doc` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::missing_errors_doc)]`
+
+warning: redundant closure
+   --> llmspell-bridge/tests/workflow_tool_integration_test.rs:415:59
     |
-113 ~     if let Ok(output) = tool.execute(input, context).await {
-114 +         let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-115 +         // Should respect depth limit
-116 +         assert!(output_value["success"].as_bool().is_some());
-117 +     } else {
-118 +         // Acceptable if no sitemap exists
-119 +     }
+415 |                 let success = res.get("success").and_then(|v| v.as_bool()).unwrap_or(true);
+    |                                                           ^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `serde_json::Value::as_bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+    = note: `-W clippy::redundant-closure-for-method-calls` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::redundant_closure_for_method_calls)]`
+
+warning: docs for function returning `Result` missing `# Errors` section
+  --> llmspell-tools/tests/common/mod.rs:31:1
+   |
+31 | pub fn create_simple_input(input: &str) -> Result<AgentInput, LLMSpellError> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function which may panic missing `# Panics` section
+  --> llmspell-tools/tests/common/mod.rs:37:1
+   |
+37 | pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first possible panic found here
+  --> llmspell-tools/tests/common/mod.rs:38:31
+   |
+38 |     let output_value: Value = serde_json::from_str(&output.text).unwrap();
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+   = note: `-W clippy::missing-panics-doc` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::missing_panics_doc)]`
+
+warning: docs for function which may panic missing `# Panics` section
+  --> llmspell-tools/tests/common/mod.rs:55:1
+   |
+55 | pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first possible panic found here
+  --> llmspell-tools/tests/common/mod.rs:56:31
+   |
+56 |     let output_value: Value = serde_json::from_str(&output.text).unwrap();
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+
+warning: docs for function which may panic missing `# Panics` section
+   --> llmspell-tools/tests/common/mod.rs:148:1
+    |
+148 | pub fn assert_json_contains(actual: &Value, expected: &Value) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: first possible panic found here
+   --> llmspell-tools/tests/common/mod.rs:152:17
+    |
+152 | /                 assert!(
+153 | |                     actual_map.contains_key(key),
+154 | |                     "Expected key '{key}' not found in actual JSON"
+155 | |                 );
+    | |_________________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+
+warning: `llmspell-tools` (test "webpage_monitor_integration") generated 3 warnings
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/auth_tests.rs:494:14
+    |
+494 |             .collect();
+    |              ^^^^^^^
+...
+497 |         assert!(auth_tests.len() > 15);
+    |                 ---------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+    = note: `-W clippy::needless-collect` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::needless_collect)]`
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+491 ~         
+492 |
+493 |         // Should have comprehensive authentication test coverage
+494 ~         assert!(tests
+495 +             .iter()
+496 ~             .filter(|t| t.categories.contains(&TestCategory::Authentication)).count() > 15);
     |
 
-error[E0308]: mismatched types
-   --> llmspell-testing/tests/agents/isolation_tests.rs:96:72
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/auth_tests.rs:505:14
     |
-96  |         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
-    |          ------------------- arguments to this method are incorrect    ^^^^^^^^^^^^^ expected `&SharedScopeConfig`, found `SharedScopeConfig`
+505 |             .collect();
+    |              ^^^^^^^
+...
+508 |         assert!(authz_tests.len() > 5);
+    |                 ----------------- the iterator could be used here instead
     |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:287:12
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
     |
-287 |     pub fn create_shared_scope(
-    |            ^^^^^^^^^^^^^^^^^^^
-help: consider borrowing here
+502 ~         
+503 |
+504 |         // Should have authorization test coverage
+505 ~         assert!(tests
+506 +             .iter()
+507 ~             .filter(|t| t.categories.contains(&TestCategory::Authorization)).count() > 5);
     |
-96  |         .create_shared_scope("shared_data", Some("admin".to_string()), &shared_config)
-    |                                                                        +
 
-warning: variables can be used directly in the `format!` string
-   --> llmspell-tools/tests/sitemap_crawler_integration.rs:185:13
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/data_exposure_tests.rs:451:14
     |
-185 | /             assert!(
-186 | |                 error_str.contains("timeout")
-187 | |                     || error_str.contains("elapsed")
-188 | |                     || error_str.contains("timed out")
+451 |             .collect();
+    |              ^^^^^^^
+...
+454 |         assert_eq!(disclosure_tests.len(), tests.len());
+    |                    ---------------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+448 ~         
+449 |
+450 |         // All data exposure tests should be information disclosure
+451 ~         assert_eq!(tests
+452 +             .iter()
+453 ~             .filter(|t| t.categories.contains(&TestCategory::InformationDisclosure)).count(), tests.len());
+    |
+
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/input_validation_tests.rs:497:14
+    |
+497 |             .collect();
+    |              ^^^^^^^
+...
+500 |         assert!(injection_tests.len() > 20);
+    |                 --------------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+494 ~         
+495 |
+496 |         // Should have comprehensive injection test coverage
+497 ~         assert!(tests
+498 +             .iter()
+499 ~             .filter(|t| t.categories.contains(&TestCategory::Injection)).count() > 20);
+    |
+
+warning: `llmspell-bridge` (test "globals_test") generated 13 warnings
+warning: `llmspell-bridge` (test "workflow_tool_integration_test") generated 1 warning (run `cargo clippy --fix --test "workflow_tool_integration_test"` to apply 1 suggestion)
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/rate_limit_tests.rs:422:14
+    |
+422 |             .collect();
+    |              ^^^^^^^
+...
+425 |         assert_eq!(dos_tests.len(), tests.len());
+    |                    --------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+419 ~         
+420 |
+421 |         // All rate limit tests should be DoS category
+422 ~         assert_eq!(tests
+423 +             .iter()
+424 ~             .filter(|t| t.categories.contains(&TestCategory::DoS)).count(), tests.len());
+    |
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:53:5
+   |
+53 | /     pub fn with_attack_vector(mut self, vector: impl Into<String>) -> Self {
+54 | |         self.attack_vector = vector.into();
+55 | |         self
+56 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+   = note: `-W clippy::return-self-not-must-use` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::return_self_not_must_use)]`
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:66:5
+   |
+66 | /     pub fn with_response(mut self, response: impl Into<String>) -> Self {
+67 | |         self.response = Some(response.into());
+68 | |         self
+69 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:72:5
+   |
+72 | /     pub fn with_error(mut self, error: impl Into<String>) -> Self {
+73 | |         self.error = Some(error.into());
+74 | |         self
+75 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:85:5
+   |
+85 | /     pub fn add_metadata(mut self, key: impl Into<String>, value: Value) -> Self {
+86 | |         self.metadata.insert(key.into(), value);
+87 | |         self
+88 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:303:21
+    |
+303 |     fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+    |                     ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+    = note: `-W clippy::unused-self` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unused_self)]`
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-tools/tests/security/test_framework.rs:303:5
+    |
+303 | /     fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+304 | |         let mut input = AgentInput::text("");
+305 | |
+306 | |         if let Value::Object(params) = payload {
 ...   |
-193 | |                 error_str
-194 | |             );
+314 | |         Ok(input)
+315 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+    = note: `-W clippy::unnecessary-wraps` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnecessary_wraps)]`
+help: remove `Result` from the return type...
+    |
+303 -     fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+303 +     fn create_input(&self, payload: &Value) -> llmspell_core::types::AgentInput {
+    |
+help: ...and then change returning expressions
+    |
+314 -         Ok(input)
+314 +         input
+    |
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:318:25
+    |
+318 |     fn check_prevention(&self, output: &AgentOutput, expected: &ExpectedBehavior) -> bool {
+    |                         ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+
+warning: temporary with significant `Drop` can be early dropped
+   --> llmspell-tools/tests/security/test_framework.rs:335:17
+    |
+334 |       async fn update_stats(&self, result: &SecurityTestResult, test_case: &SecurityTestCase) {
+    |  _____________________________________________________________________________________________-
+335 | |         let mut stats = self.stats.lock().await;
+    | |                 ^^^^^
+336 | |         stats.total_tests += 1;
+...   |
+355 | |     }
+    | |_____- temporary `stats` is currently being dropped at the end of its contained scope
+    |
+    = note: this might lead to unnecessary resource contention
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#significant_drop_tightening
+    = note: `-W clippy::significant-drop-tightening` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::significant_drop_tightening)]`
+help: drop the temporary after the end of its last usage
+    |
+350 ~         let tool_stats = stats.by_tool.entry(result.tool_name.clone()).or_default();
+351 +         drop(stats);
+    |
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:374:21
+    |
+374 |     fn print_result(&self, result: &SecurityTestResult) {
+    |                     ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:417:32
+    |
+417 |     fn extract_vulnerabilities(&self, results: &[SecurityTestResult]) -> Vec<Vulnerability> {
+    |                                ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-tools/tests/security/test_framework.rs:464:1
+    |
+464 | pub fn create_params_input(params: Value) -> Result<AgentInput> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-tools/tests/security/test_framework.rs:464:36
+    |
+464 | pub fn create_params_input(params: Value) -> Result<AgentInput> {
+    |                                    ^^^^^ help: consider taking a reference instead: `&Value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+    = note: `-W clippy::needless-pass-by-value` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::needless_pass_by_value)]`
+
+warning: `llmspell-tools` (test "lib") generated 28 warnings (2 duplicates)
+warning: use Option::map_or_else instead of an if let/else
+   --> llmspell-tools/tests/webhook_caller_integration.rs:142:29
+    |
+142 |               let error_msg = if let Some(error_str) = output_value["error"].as_str() {
+    |  _____________________________^
+143 | |                 error_str.to_lowercase()
+144 | |             } else if let Some(error_obj) = output_value["error"].as_object() {
+145 | |                 if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
+...   |
+159 | |                 String::new()
+160 | |             };
     | |_____________^
     |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-    = note: `-W clippy::uninlined-format-args` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::uninlined_format_args)]`
-
-warning: item in documentation is missing backticks
- --> llmspell-tools/tests/calculator_dos_protection.rs:4:24
-  |
-4 | //! Security tests for CalculatorTool DoS protection
-  |                        ^^^^^^^^^^^^^^
-  |
-  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-  = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
-  = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
 help: try
-  |
-4 - //! Security tests for CalculatorTool DoS protection
-4 + //! Security tests for `CalculatorTool` DoS protection
-  |
+    |
+142 ~             let error_msg = output_value["error"].as_str().map_or_else(|| if let Some(error_obj) = output_value["error"].as_object() {
+143 +                 if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
+144 +                     msg.to_lowercase()
+145 +                 } else {
+146 +                     serde_json::to_string(error_obj)
+147 +                         .unwrap_or_default()
+148 +                         .to_lowercase()
+149 +                 }
+150 +             } else if let Some(result) = output_value.get("result") {
+151 +                 if let Some(err) = result.get("error").and_then(|e| e.as_str()) {
+152 +                     err.to_lowercase()
+153 +                 } else {
+154 +                     String::new()
+155 +                 }
+156 +             } else {
+157 +                 String::new()
+158 ~             }, |error_str| error_str.to_lowercase());
+    |
 
-warning: item in documentation is missing backticks
- --> llmspell-tools/tests/calculator_dos_protection.rs:4:39
-  |
-4 | //! Security tests for CalculatorTool DoS protection
-  |                                       ^^^
-  |
-  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+warning: use Option::map_or_else instead of an if let/else
+   --> llmspell-tools/tests/webhook_caller_integration.rs:145:17
+    |
+145 | /                 if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
+146 | |                     msg.to_lowercase()
+147 | |                 } else {
+148 | |                     serde_json::to_string(error_obj)
+149 | |                         .unwrap_or_default()
+150 | |                         .to_lowercase()
+151 | |                 }
+    | |_________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
 help: try
-  |
-4 - //! Security tests for CalculatorTool DoS protection
-4 + //! Security tests for CalculatorTool `DoS` protection
-  |
+    |
+145 ~                 error_obj.get("message").and_then(|m| m.as_str()).map_or_else(|| serde_json::to_string(error_obj)
+146 +                         .unwrap_or_default()
+147 +                         .to_lowercase(), |msg| msg.to_lowercase())
+    |
 
+warning: use Option::map_or_else instead of an if let/else
+   --> llmspell-tools/tests/webhook_caller_integration.rs:153:17
+    |
+153 | /                 if let Some(err) = result.get("error").and_then(|e| e.as_str()) {
+154 | |                     err.to_lowercase()
+155 | |                 } else {
+156 | |                     String::new()
+157 | |                 }
+    | |_________________^ help: try: `result.get("error").and_then(|e| e.as_str()).map_or_else(String::new, |err| err.to_lowercase())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+
+warning: `llmspell-tools` (test "webhook_caller_integration") generated 5 warnings (2 duplicates)
+warning: `llmspell-tools` (test "sitemap_crawler_integration") generated 2 warnings (2 duplicates)
 error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
   --> llmspell-tools/benches/hook_performance.rs:19:9
    |
@@ -2648,105 +2410,257 @@ error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `e
    |
    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
 
-warning: use Option::map_or_else instead of an if let/else
-  --> llmspell-tools/tests/calculator_dos_protection.rs:34:17
-   |
-34 | /                 if let Some(error) = output.get("error") {
-35 | |                     if let Some(message) = error.get("message") {
-36 | |                         Err(message.as_str().unwrap_or("Unknown error").to_string())
-37 | |                     } else {
-...  |
-41 | |                     Err("Unknown error".to_string())
-42 | |                 }
-   | |_________________^
-   |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
-   = note: `-W clippy::option-if-let-else` implied by `-W clippy::nursery`
-   = help: to override `-W clippy::nursery` add `#[allow(clippy::option_if_let_else)]`
-help: try
-   |
-34 ~                 output.get("error").map_or_else(|| Err("Unknown error".to_string()), |error| if let Some(message) = error.get("message") {
-35 +                         Err(message.as_str().unwrap_or("Unknown error").to_string())
-36 +                     } else {
-37 +                         Err("Unknown error".to_string())
-38 +                     })
-   |
+warning: unexpected `cfg` condition value: `unit-tests`
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:186:16
+    |
+186 |     #[cfg_attr(feature = "unit-tests", ignore = "unit")]
+    |                ^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = note: expected values for `feature` are: `bridge-tests`, `default`, `integration-tests`, `javascript`, `lua`, and `workflow-tests`
+    = help: consider adding `unit-tests` as a feature in `Cargo.toml`
+    = note: see <https://doc.rust-lang.org/nightly/rustc/check-cfg/cargo-specifics.html> for more information about checking conditional configuration
+    = note: `#[warn(unexpected_cfgs)]` on by default
 
-warning: use Option::map_or_else instead of an if let/else
-  --> llmspell-tools/tests/calculator_dos_protection.rs:35:21
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:13:5
    |
-35 | /                     if let Some(message) = error.get("message") {
-36 | |                         Err(message.as_str().unwrap_or("Unknown error").to_string())
-37 | |                     } else {
-38 | |                         Err("Unknown error".to_string())
-39 | |                     }
-   | |_____________________^ help: try: `error.get("message").map_or_else(|| Err("Unknown error".to_string()), |message| Err(message.as_str().unwrap_or("Unknown error").to_string()))`
+13 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
    |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:12:5
+   |
+12 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(unused_attributes)]` on by default
 
-warning: use of `format!` to build up a string from an iterator
-  --> llmspell-tools/tests/calculator_dos_protection.rs:65:20
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:14:5
    |
-65 |     let many_ops = (0..110).map(|i| format!("{i} + ")).collect::<String>() + "0";
-   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
    |
-help: call `fold` instead
-  --> llmspell-tools/tests/calculator_dos_protection.rs:65:29
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:12:5
    |
-65 |     let many_ops = (0..110).map(|i| format!("{i} + ")).collect::<String>() + "0";
-   |                             ^^^
-help: ... and use the `write!` macro here
-  --> llmspell-tools/tests/calculator_dos_protection.rs:65:37
-   |
-65 |     let many_ops = (0..110).map(|i| format!("{i} + ")).collect::<String>() + "0";
-   |                                     ^^^^^^^^^^^^^^^^^
-   = note: this can be written more efficiently by appending to a `String` directly
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#format_collect
-   = note: `-W clippy::format-collect` implied by `-W clippy::pedantic`
-   = help: to override `-W clippy::pedantic` add `#[allow(clippy::format_collect)]`
+12 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: use Option::map_or instead of an if let/else
-  --> llmspell-tools/tests/calculator_dos_protection.rs:77:13
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:15:5
    |
-77 | /             if let Ok(ref output) = result {
-78 | |                 output["result"]["result"].as_str() == Some("Infinity")
-79 | |             } else {
-80 | |                 false
-81 | |             }
-   | |_____________^ help: try: `result.as_ref().map_or(false, |output| output["result"]["result"].as_str() == Some("Infinity"))`
+15 |     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
    |
-   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:12:5
+   |
+12 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: casts from `i32` to `f64` can be expressed infallibly using `From`
-   --> llmspell-tools/tests/calculator_dos_protection.rs:135:41
-    |
-135 |         vars[format!("var{i}")] = json!(i as f64);
-    |                                         ^^^^^^^^
-    |
-    = help: an `as` cast can become silently lossy if the types change in the future
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_lossless
-    = note: `-W clippy::cast-lossless` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_lossless)]`
-help: use `f64::from` instead
-    |
-135 -         vars[format!("var{i}")] = json!(i as f64);
-135 +         vars[format!("var{i}")] = json!(f64::from(i));
-    |
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:54:5
+   |
+54 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:53:5
+   |
+53 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-warning: variables can be used directly in the `format!` string
-   --> llmspell-tools/tests/calculator_dos_protection.rs:186:18
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:55:5
+   |
+55 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:53:5
+   |
+53 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:56:5
+   |
+56 |     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:53:5
+   |
+53 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:92:5
+   |
+92 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:91:5
+   |
+91 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:93:5
+   |
+93 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:91:5
+   |
+91 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:94:5
+   |
+94 |     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/standardized_workflows_tests.rs:91:5
+   |
+91 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:130:5
     |
-186 |         .map(|i| format!("sin({})", i))
-    |                  ^^^^^^^^^^^^^^^^^^^^^
+130 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
     |
-    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-    = note: `-W clippy::uninlined-format-args` implied by `-W clippy::pedantic`
-    = help: to override `-W clippy::pedantic` add `#[allow(clippy::uninlined_format_args)]`
-help: change this to
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:129:5
     |
-186 -         .map(|i| format!("sin({})", i))
-186 +         .map(|i| format!("sin({i})"))
+129 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:131:5
     |
+131 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:129:5
+    |
+129 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:132:5
+    |
+132 |     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:129:5
+    |
+129 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:188:5
+    |
+188 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:187:5
+    |
+187 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:202:5
+    |
+202 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:201:5
+    |
+201 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:203:5
+    |
+203 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:201:5
+    |
+201 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:231:5
+    |
+231 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:230:5
+    |
+230 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:232:5
+    |
+232 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:230:5
+    |
+230 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:252:5
+    |
+252 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:251:5
+    |
+251 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:253:5
+    |
+253 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:251:5
+    |
+251 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:254:5
+    |
+254 |     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/standardized_workflows_tests.rs:251:5
+    |
+251 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
   --> llmspell-tools/benches/hook_performance.rs:59:9
@@ -2811,24 +2725,6 @@ error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `e
     |         ^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
     |
     = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `max_security_level`, `audit`
-
-error[E0308]: mismatched types
-   --> llmspell-testing/tests/agents/isolation_tests.rs:256:54
-    |
-256 |     isolation_manager.grant_permission("contractor", scope.clone(), StatePermission::Write);
-    |                       ----------------               ^^^^^^^^^^^^^ expected `&StateScope`, found `StateScope`
-    |                       |
-    |                       arguments to this method are incorrect
-    |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:351:12
-    |
-351 |     pub fn grant_permission(
-    |            ^^^^^^^^^^^^^^^^
-help: consider borrowing here
-    |
-256 |     isolation_manager.grant_permission("contractor", &scope.clone(), StatePermission::Write);
-    |                                                      +
 
 error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
    --> llmspell-tools/benches/hook_performance.rs:243:17
@@ -2910,85 +2806,431 @@ error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `e
     |
     = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
 
-warning: `llmspell-tools` (test "refactored_tools_integration") generated 6 warnings
-warning: `llmspell-tools` (test "security_hardening_test") generated 1 warning
-error[E0308]: mismatched types
-   --> llmspell-testing/tests/agents/isolation_tests.rs:264:56
-    |
-264 |     isolation_manager.revoke_permissions("contractor", scope.clone());
-    |                       ------------------               ^^^^^^^^^^^^^ expected `&StateScope`, found `StateScope`
-    |                       |
-    |                       arguments to this method are incorrect
-    |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:367:12
-    |
-367 |     pub fn revoke_permissions(&self, agent_id: &str, scope: &StateScope) {
-    |            ^^^^^^^^^^^^^^^^^^
-help: consider borrowing here
-    |
-264 |     isolation_manager.revoke_permissions("contractor", &scope.clone());
-    |                                                        +
-
-warning: `llmspell-tools` (test "sitemap_crawler_integration") generated 7 warnings (2 duplicates) (run `cargo clippy --fix --test "sitemap_crawler_integration"` to apply 5 suggestions)
 For more information about this error, try `rustc --explain E0560`.
-warning: `llmspell-tools` (test "calculator_dos_protection") generated 8 warnings (run `cargo clippy --fix --test "calculator_dos_protection"` to apply 4 suggestions)
-error[E0308]: mismatched types
-   --> llmspell-testing/tests/agents/isolation_tests.rs:330:43
-    |
-330 |         .create_pipeline("data_pipeline", stages.clone())
-    |          ---------------                  ^^^^^^^^^^^^^^ expected `&[String]`, found `Vec<String>`
-    |          |
-    |          arguments to this method are incorrect
-    |
-    = note: expected reference `&[std::string::String]`
-                  found struct `std::vec::Vec<std::string::String>`
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/sharing.rs:421:12
-    |
-421 |     pub fn create_pipeline(
-    |            ^^^^^^^^^^^^^^^
-help: consider borrowing here
-    |
-330 |         .create_pipeline("data_pipeline", &stages.clone())
-    |                                           +
-
 error: could not compile `llmspell-tools` (bench "hook_performance") due to 19 previous errors
-error[E0308]: mismatched types
-   --> llmspell-testing/tests/agents/isolation_tests.rs:373:55
+warning: build failed, waiting for other jobs to finish...
+warning: `llmspell-bridge` (test "standardized_workflows_tests") generated 21 warnings (run `cargo clippy --fix --test "standardized_workflows_tests"` to apply 20 suggestions)
+warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> llmspell-tools/tests/hook_integration_tests.rs:266:10
     |
-373 |         .create_shared_scope("concurrent_test", None, config)
-    |          -------------------                          ^^^^^^ expected `&SharedScopeConfig`, found `SharedScopeConfig`
-    |          |
-    |          arguments to this method are incorrect
+266 |         ((overhead_ms as f64) / (no_hooks_ms as f64)) * 100.0
+    |          ^^^^^^^^^^^^^^^^^^^^
     |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:287:12
-    |
-287 |     pub fn create_shared_scope(
-    |            ^^^^^^^^^^^^^^^^^^^
-help: consider borrowing here
-    |
-373 |         .create_shared_scope("concurrent_test", None, &config)
-    |                                                       +
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+    = note: `-W clippy::cast-precision-loss` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_precision_loss)]`
 
-error[E0308]: mismatched types
-   --> llmspell-testing/tests/agents/isolation_tests.rs:451:48
+warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> llmspell-tools/tests/hook_integration_tests.rs:266:33
     |
-451 |         .create_shared_scope("writable", None, config)
-    |          -------------------                   ^^^^^^ expected `&SharedScopeConfig`, found `SharedScopeConfig`
-    |          |
-    |          arguments to this method are incorrect
+266 |         ((overhead_ms as f64) / (no_hooks_ms as f64)) * 100.0
+    |                                 ^^^^^^^^^^^^^^^^^^^^
     |
-note: method defined here
-   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:287:12
-    |
-287 |     pub fn create_shared_scope(
-    |            ^^^^^^^^^^^^^^^^^^^
-help: consider borrowing here
-    |
-451 |         .create_shared_scope("writable", None, &config)
-    |                                                +
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
 
-For more information about this error, try `rustc --explain E0308`.
-error: could not compile `llmspell-testing` (test "agents") due to 7 previous errors
+warning: `llmspell-tools` (test "hook_integration_tests") generated 2 warnings
+warning: calling `ResourceLimits::default()` is more clear than this expression
+  --> llmspell-tools/benches/tool_initialization.rs:30:9
+   |
+30 |         Default::default(),
+   |         ^^^^^^^^^^^^^^^^^^ help: try: `ResourceLimits::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+   = note: `-W clippy::default-trait-access` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::default_trait_access)]`
+
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+  --> llmspell-tools/benches/tool_initialization.rs:76:48
+   |
+76 |             let tool = HashCalculatorTool::new(Default::default());
+   |                                                ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `TextManipulatorConfig::default()` is more clear than this expression
+  --> llmspell-tools/benches/tool_initialization.rs:90:49
+   |
+90 |             let tool = TextManipulatorTool::new(Default::default());
+   |                                                 ^^^^^^^^^^^^^^^^^^ help: try: `TextManipulatorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+  --> llmspell-tools/benches/tool_initialization.rs:97:47
+   |
+97 |             let tool = UuidGeneratorTool::new(Default::default());
+   |                                               ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `CsvAnalyzerConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:110:45
+    |
+110 |             let tool = CsvAnalyzerTool::new(Default::default());
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `CsvAnalyzerConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `JsonProcessorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:117:47
+    |
+117 |             let tool = JsonProcessorTool::new(Default::default());
+    |                                               ^^^^^^^^^^^^^^^^^^ help: try: `JsonProcessorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `GraphQLConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:125:39
+    |
+125 |                 GraphQLQueryTool::new(Default::default()).expect("Failed to create GraphQL tool");
+    |                                       ^^^^^^^^^^^^^^^^^^ help: try: `GraphQLConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:133:38
+    |
+133 |                 HttpRequestTool::new(Default::default()).expect("Failed to create HTTP tool");
+    |                                      ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileConverterConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:154:47
+    |
+154 |             let tool = FileConverterTool::new(Default::default(), sandbox.clone());
+    |                                               ^^^^^^^^^^^^^^^^^^ help: try: `FileConverterConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileOperationsConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:161:48
+    |
+161 |             let tool = FileOperationsTool::new(Default::default());
+    |                                                ^^^^^^^^^^^^^^^^^^ help: try: `FileOperationsConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileSearchConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:169:44
+    |
+169 |             let tool = FileSearchTool::new(Default::default(), sandbox.clone());
+    |                                            ^^^^^^^^^^^^^^^^^^ help: try: `FileSearchConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileWatcherConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:177:45
+    |
+177 |             let tool = FileWatcherTool::new(Default::default(), sandbox.clone());
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `FileWatcherConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `EnvironmentReaderConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:190:51
+    |
+190 |             let tool = EnvironmentReaderTool::new(Default::default());
+    |                                                   ^^^^^^^^^^^^^^^^^^ help: try: `EnvironmentReaderConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `ProcessExecutorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:197:49
+    |
+197 |             let tool = ProcessExecutorTool::new(Default::default());
+    |                                                 ^^^^^^^^^^^^^^^^^^ help: try: `ProcessExecutorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `ServiceCheckerConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:204:48
+    |
+204 |             let tool = ServiceCheckerTool::new(Default::default());
+    |                                                ^^^^^^^^^^^^^^^^^^ help: try: `ServiceCheckerConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `SystemMonitorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:211:47
+    |
+211 |             let tool = SystemMonitorTool::new(Default::default());
+    |                                               ^^^^^^^^^^^^^^^^^^ help: try: `SystemMonitorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `WebSearchConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:224:43
+    |
+224 |             let tool = WebSearchTool::new(Default::default());
+    |                                           ^^^^^^^^^^^^^^^^^^ help: try: `WebSearchConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:245:49
+    |
+245 |             let _hash = HashCalculatorTool::new(Default::default());
+    |                                                 ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `TextManipulatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:247:50
+    |
+247 |             let _text = TextManipulatorTool::new(Default::default());
+    |                                                  ^^^^^^^^^^^^^^^^^^ help: try: `TextManipulatorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:248:48
+    |
+248 |             let _uuid = UuidGeneratorTool::new(Default::default());
+    |                                                ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `CsvAnalyzerConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:251:45
+    |
+251 |             let _csv = CsvAnalyzerTool::new(Default::default());
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `CsvAnalyzerConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `JsonProcessorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:252:48
+    |
+252 |             let _json = JsonProcessorTool::new(Default::default());
+    |                                                ^^^^^^^^^^^^^^^^^^ help: try: `JsonProcessorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `GraphQLConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:254:39
+    |
+254 |                 GraphQLQueryTool::new(Default::default()).expect("GraphQL creation failed");
+    |                                       ^^^^^^^^^^^^^^^^^^ help: try: `GraphQLConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:255:46
+    |
+255 |             let _http = HttpRequestTool::new(Default::default()).expect("HTTP creation failed");
+    |                                              ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileConverterConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:259:53
+    |
+259 |             let _file_conv = FileConverterTool::new(Default::default(), sandbox.clone());
+    |                                                     ^^^^^^^^^^^^^^^^^^ help: try: `FileConverterConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileOperationsConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:260:53
+    |
+260 |             let _file_ops = FileOperationsTool::new(Default::default());
+    |                                                     ^^^^^^^^^^^^^^^^^^ help: try: `FileOperationsConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileSearchConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:261:52
+    |
+261 |             let _file_search = FileSearchTool::new(Default::default(), sandbox.clone());
+    |                                                    ^^^^^^^^^^^^^^^^^^ help: try: `FileSearchConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `FileWatcherConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:262:52
+    |
+262 |             let _file_watch = FileWatcherTool::new(Default::default(), sandbox.clone());
+    |                                                    ^^^^^^^^^^^^^^^^^^ help: try: `FileWatcherConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `EnvironmentReaderConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:265:51
+    |
+265 |             let _env = EnvironmentReaderTool::new(Default::default());
+    |                                                   ^^^^^^^^^^^^^^^^^^ help: try: `EnvironmentReaderConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `ProcessExecutorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:266:50
+    |
+266 |             let _proc = ProcessExecutorTool::new(Default::default());
+    |                                                  ^^^^^^^^^^^^^^^^^^ help: try: `ProcessExecutorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `ServiceCheckerConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:267:52
+    |
+267 |             let _service = ServiceCheckerTool::new(Default::default());
+    |                                                    ^^^^^^^^^^^^^^^^^^ help: try: `ServiceCheckerConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `SystemMonitorConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:268:50
+    |
+268 |             let _system = SystemMonitorTool::new(Default::default());
+    |                                                  ^^^^^^^^^^^^^^^^^^ help: try: `SystemMonitorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `WebSearchConfig::default()` is more clear than this expression
+   --> llmspell-tools/benches/tool_initialization.rs:271:50
+    |
+271 |             let _web_search = WebSearchTool::new(Default::default());
+    |                                                  ^^^^^^^^^^^^^^^^^^ help: try: `WebSearchConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: binding's name is too similar to existing binding
+  --> llmspell-tools/tests/web_scraper_integration.rs:28:9
+   |
+28 |     let content = &output_value["result"]["content"];
+   |         ^^^^^^^
+   |
+note: existing binding defined here
+  --> llmspell-tools/tests/web_scraper_integration.rs:14:9
+   |
+14 |     let context = create_test_context();
+   |         ^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+   = note: `-W clippy::similar-names` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::similar_names)]`
+
+warning: binding's name is too similar to existing binding
+  --> llmspell-tools/tests/web_scraper_integration.rs:52:9
+   |
+52 |     let content = &output_value["result"]["content"];
+   |         ^^^^^^^
+   |
+note: existing binding defined here
+  --> llmspell-tools/tests/web_scraper_integration.rs:39:9
+   |
+39 |     let context = create_test_context();
+   |         ^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+warning: binding's name is too similar to existing binding
+  --> llmspell-tools/tests/web_scraper_integration.rs:74:9
+   |
+74 |     let content = &output_value["result"]["content"];
+   |         ^^^^^^^
+   |
+note: existing binding defined here
+  --> llmspell-tools/tests/web_scraper_integration.rs:61:9
+   |
+61 |     let context = create_test_context();
+   |         ^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+warning: binding's name is too similar to existing binding
+  --> llmspell-tools/tests/web_scraper_integration.rs:96:9
+   |
+96 |     let content = &output_value["result"]["content"];
+   |         ^^^^^^^
+   |
+note: existing binding defined here
+  --> llmspell-tools/tests/web_scraper_integration.rs:83:9
+   |
+83 |     let context = create_test_context();
+   |         ^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+warning: `llmspell-tools` (bench "tool_initialization") generated 33 warnings
+error[E0433]: failed to resolve: use of undeclared type `HashCalculatorConfig`
+  --> llmspell-tools/tests/security_resource_exhaustion_tests.rs:15:45
+   |
+15 |     let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
+   |                                             ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `HashCalculatorConfig`
+   |
+help: a struct with a similar name exists
+   |
+15 -     let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
+15 +     let hash_tool = HashCalculatorTool::new(HashCalculatorTool::default());
+   |
+help: consider importing this struct
+   |
+4  + use llmspell_tools::util::HashCalculatorConfig;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `JsonProcessorConfig`
+  --> llmspell-tools/tests/security_resource_exhaustion_tests.rs:47:44
+   |
+47 |     let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
+   |                                            ^^^^^^^^^^^^^^^^^^^ use of undeclared type `JsonProcessorConfig`
+   |
+help: a struct with a similar name exists
+   |
+47 -     let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
+47 +     let json_tool = JsonProcessorTool::new(JsonProcessorTool::default());
+   |
+help: consider importing this struct
+   |
+4  + use llmspell_tools::data::json_processor::JsonProcessorConfig;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `TextManipulatorConfig`
+  --> llmspell-tools/tests/security_resource_exhaustion_tests.rs:76:46
+   |
+76 |     let text_tool = TextManipulatorTool::new(TextManipulatorConfig::default());
+   |                                              ^^^^^^^^^^^^^^^^^^^^^ use of undeclared type `TextManipulatorConfig`
+   |
+help: a struct with a similar name exists
+   |
+76 -     let text_tool = TextManipulatorTool::new(TextManipulatorConfig::default());
+76 +     let text_tool = TextManipulatorTool::new(TextManipulatorTool::default());
+   |
+help: consider importing this struct
+   |
+4  + use llmspell_tools::util::TextManipulatorConfig;
+   |
+
+error[E0433]: failed to resolve: use of undeclared type `CsvAnalyzerConfig`
+   --> llmspell-tools/tests/security_resource_exhaustion_tests.rs:152:41
+    |
+152 |     let csv_tool = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
+    |                                         ^^^^^^^^^^^^^^^^^ use of undeclared type `CsvAnalyzerConfig`
+    |
+help: a struct with a similar name exists
+    |
+152 -     let csv_tool = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
+152 +     let csv_tool = CsvAnalyzerTool::new(CsvAnalyzerTool::default());
+    |
+help: consider importing this struct
+    |
+4   + use llmspell_tools::data::csv_analyzer::CsvAnalyzerConfig;
+    |
+
+error[E0433]: failed to resolve: use of undeclared type `HashCalculatorConfig`
+   --> llmspell-tools/tests/security_resource_exhaustion_tests.rs:231:54
+    |
+231 |     let hash_tool = Arc::new(HashCalculatorTool::new(HashCalculatorConfig::default()));
+    |                                                      ^^^^^^^^^^^^^^^^^^^^ use of undeclared type `HashCalculatorConfig`
+    |
+help: a struct with a similar name exists
+    |
+231 -     let hash_tool = Arc::new(HashCalculatorTool::new(HashCalculatorConfig::default()));
+231 +     let hash_tool = Arc::new(HashCalculatorTool::new(HashCalculatorTool::default()));
+    |
+help: consider importing this struct
+    |
+4   + use llmspell_tools::util::HashCalculatorConfig;
+    |
+
+warning: `llmspell-tools` (test "web_scraper_integration") generated 6 warnings (2 duplicates)
+warning: `llmspell-tools` (test "url_analyzer_integration") generated 2 warnings (2 duplicates)
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `llmspell-tools` (test "security_resource_exhaustion_tests") due to 5 previous errors
