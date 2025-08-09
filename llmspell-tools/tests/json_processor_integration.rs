@@ -462,9 +462,7 @@ async fn test_advanced_array_operations() {
         for value in expected_values {
             assert!(
                 output.text.contains(value),
-                "Query {} failed - missing value {}",
-                query,
-                value
+                "Query {query} failed - missing value {value}"
             );
         }
     }

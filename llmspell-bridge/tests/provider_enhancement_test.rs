@@ -69,8 +69,7 @@ async fn test_agent_create_with_provider_model_syntax() {
                 error_msg.contains("API key")
                     || error_msg.contains("provider")
                     || error_msg.contains("configuration"),
-                "Unexpected error: {}",
-                error_msg
+                "Unexpected error: {error_msg}"
             );
         }
     }
@@ -152,8 +151,7 @@ async fn test_backward_compatibility() {
             let error_msg = e.to_string();
             assert!(
                 error_msg.contains("API key") || error_msg.contains("provider"),
-                "Unexpected error: {}",
-                error_msg
+                "Unexpected error: {error_msg}"
             );
         }
     }
@@ -249,7 +247,7 @@ async fn test_provider_fallback() {
             // Test passed
         }
         Err(e) => {
-            panic!("Script failed with error: {}", e);
+            panic!("Script failed with error: {e}");
         }
     }
 }

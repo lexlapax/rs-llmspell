@@ -54,7 +54,7 @@ impl GlobalObject for ToolGlobal {
     ) -> Result<()> {
         crate::javascript::globals::tool::inject_tool_global(ctx, context).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Tool global for JavaScript: {}", e),
+                message: format!("Failed to inject Tool global for JavaScript: {e}"),
                 source: None,
             }
         })

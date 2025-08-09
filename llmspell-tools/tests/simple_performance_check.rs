@@ -61,14 +61,13 @@ async fn test_simple_hook_overhead() {
         0.0
     };
 
-    println!("No hooks: {:?}", duration_no_hooks);
-    println!("With hooks: {:?}", duration_with_hooks);
-    println!("Overhead: {:.2}%", overhead_percent);
+    println!("No hooks: {duration_no_hooks:?}");
+    println!("With hooks: {duration_with_hooks:?}");
+    println!("Overhead: {overhead_percent:.2}%");
 
     // Pass if overhead is reasonable (< 20% for CI environments)
     assert!(
         overhead_percent < 20.0,
-        "Hook overhead too high: {:.2}%",
-        overhead_percent
+        "Hook overhead too high: {overhead_percent:.2}%"
     );
 }

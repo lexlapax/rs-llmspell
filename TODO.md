@@ -616,9 +616,27 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
                 - di.rs:195 - with_tool function in DIContainerBuilder
                 - composition/tool_composition.rs:319 - execute function
             - **Result**: All 45 panic documentation warnings fixed (100% complete)
-        - [ ] Fix format string interpolations (23 warnings)
-            - llmspell-tools: 16
-            - llmspell-bridge: 7
+        - [x] Fix format string interpolations (23 warnings)
+            - Fixed format! strings to use inline variable interpolation (e.g., format!("{var}") instead of format!("{}", var))
+            - llmspell-bridge (7 warnings fixed):
+                - globals/agent_global.rs:99 - format!("Failed to inject Agent global for JavaScript: {e}")
+                - globals/streaming_global.rs:54 - format!("Failed to inject Streaming global for JavaScript: {e}")
+                - globals/tool_global.rs:57 - format!("Failed to inject Tool global for JavaScript: {e}")
+                - globals/workflow_global.rs:67 - format!("Failed to inject Workflow global for JavaScript: {e}")
+                - tests/provider_enhancement_test.rs:72,153 - assert! format strings with {error_msg}
+                - tests/provider_enhancement_test.rs:250 - panic!("Script failed with error: {e}")
+            - llmspell-tools (16 warnings fixed):
+                - tests/simple_performance_check.rs:64-66 - println! with {duration_no_hooks:?}, {duration_with_hooks:?}, {overhead_percent:.2}
+                - tests/simple_performance_check.rs:71 - assert! with {overhead_percent:.2}%
+                - tests/json_processor_integration.rs:465 - assert! with {query} and {value}
+                - tests/calculator_dos_protection.rs:27 - format!("Evaluation took too long: {elapsed:?}")
+                - tests/calculator_dos_protection.rs:65 - format!("{i} + ") in map closure
+                - tests/calculator_dos_protection.rs:135 - format!("var{i}") in loop
+                - tests/calculator_dos_protection.rs:140,227 - format!("var{i}") in map closures
+                - tests/calculator_dos_protection.rs:218 - assert! with {expr}, {value}, {expected}
+                - tests/calculator_dos_protection.rs:253 - format!("sin({i}) + cos({i}) + tan({i})")
+                - tests/calculator_dos_protection.rs:302,305 - assert! with {expr} and {elapsed:?}
+            - **Result**: All 23 format string interpolation warnings fixed (100% complete)
         - [ ] Fix redundant code (22 warnings)
             - llmspell-bridge: 15
             - llmspell-agents: 7

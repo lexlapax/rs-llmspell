@@ -96,7 +96,7 @@ impl GlobalObject for AgentGlobal {
     ) -> Result<()> {
         crate::javascript::globals::agent::inject_agent_global(ctx, context).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Agent global for JavaScript: {}", e),
+                message: format!("Failed to inject Agent global for JavaScript: {e}"),
                 source: None,
             }
         })

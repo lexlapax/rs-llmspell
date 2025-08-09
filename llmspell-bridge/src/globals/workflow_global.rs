@@ -64,7 +64,7 @@ impl GlobalObject for WorkflowGlobal {
     ) -> Result<()> {
         crate::javascript::globals::workflow::inject_workflow_global(ctx, context).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Workflow global for JavaScript: {}", e),
+                message: format!("Failed to inject Workflow global for JavaScript: {e}"),
                 source: None,
             }
         })
