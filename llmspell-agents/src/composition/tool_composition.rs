@@ -313,6 +313,10 @@ impl ToolComposition {
     }
 
     /// Execute the composition with the given tool provider
+    ///
+    /// # Panics
+    ///
+    /// Panics if a RwLock is poisoned
     pub async fn execute<T>(
         &self,
         tool_provider: &T,

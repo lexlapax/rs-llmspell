@@ -416,6 +416,10 @@ impl MetricRegistry {
     ///
     /// Currently never returns an error, but the Result type is provided for future
     /// extensibility (e.g., validation of metric names or handling registration conflicts).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn register(&self, name: String, metric: Arc<dyn MetricAccess>) -> Result<()> {
         let mut metrics = self.metrics.write().unwrap();
         metrics.insert(name, metric);
@@ -423,12 +427,20 @@ impl MetricRegistry {
     }
 
     /// Get a metric
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     #[must_use]
     pub fn get(&self, name: &str) -> Option<Arc<dyn MetricAccess>> {
         self.metrics.read().unwrap().get(name).cloned()
     }
 
     /// Get or create agent metrics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     #[must_use]
     pub fn get_agent_metrics(&self, agent_id: &str) -> Arc<AgentMetrics> {
         let mut agent_metrics = self.agent_metrics.write().unwrap();

@@ -414,6 +414,10 @@ impl EventLogger {
     }
 
     /// Get event statistics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_statistics(&self) -> EventStatistics {
         let buffer = self.buffer.read().unwrap();
 

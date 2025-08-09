@@ -243,6 +243,10 @@ impl<R: AgentRegistry> Discovery<R> {
     /// # Errors
     ///
     /// Returns an error if recommendation generation fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if DateTime conversion fails
     pub async fn get_recommendations(
         &self,
         context: &RecommendationContext,

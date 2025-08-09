@@ -19,8 +19,7 @@ async fn test_pipeline_coordination() {
         "depth": "comprehensive"
     });
 
-    let workflow =
-        create_pipeline_workflow("test_pipeline".to_string(), agents, initial_input).unwrap();
+    let workflow = create_pipeline_workflow("test_pipeline", &agents, &initial_input).unwrap();
 
     // Verify workflow was created successfully
     assert_eq!(workflow.name(), "test_pipeline");
@@ -47,12 +46,9 @@ async fn test_fork_join_coordination() {
         ),
     ];
 
-    let workflow = create_fork_join_workflow(
-        "test_fork_join".to_string(),
-        agent_tasks,
-        Some("coordinator_agent".to_string()),
-    )
-    .unwrap();
+    let workflow =
+        create_fork_join_workflow("test_fork_join", &agent_tasks, Some("coordinator_agent"))
+            .unwrap();
 
     // Verify workflow was created successfully
     assert_eq!(workflow.name(), "test_fork_join");
@@ -73,10 +69,10 @@ async fn test_consensus_coordination() {
     ]);
 
     let workflow = create_consensus_workflow(
-        "test_consensus".to_string(),
-        evaluators,
+        "test_consensus",
+        &evaluators,
         0.7, // 70% consensus threshold
-        options,
+        &options,
     )
     .unwrap();
 

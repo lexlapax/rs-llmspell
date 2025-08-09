@@ -330,6 +330,10 @@ pub struct AlertManager {
 
 impl AlertManager {
     /// Create a new alert manager
+    ///
+    /// # Panics
+    ///
+    /// Panics if creating Arc<RwLock<_>> fails (should never happen)
     #[must_use]
     pub fn new(config: AlertConfig) -> Self {
         Self {
@@ -343,6 +347,10 @@ impl AlertManager {
     }
 
     /// Register an alert rule
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn register_rule(&self, rule: AlertRule) {
         self.rules.write().unwrap().insert(rule.id.clone(), rule);
     }
@@ -360,6 +368,10 @@ impl AlertManager {
     /// - Rule evaluation fails
     /// - Alert triggering fails
     /// - Notification sending fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a RwLock is poisoned
     pub async fn evaluate_rules(&self, context: AlertContext<'_>) -> Result<()> {
         let rules_to_evaluate: Vec<AlertRule> = {
             let rules = self.rules.read().unwrap();
@@ -506,6 +518,10 @@ impl AlertManager {
     }
 
     /// Add alert to history
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned or if Duration conversion fails
     fn add_to_history(&self, alert: Alert) {
         let mut history = self.history.write().unwrap();
 
@@ -519,6 +535,10 @@ impl AlertManager {
     }
 
     /// Get active alerts
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     #[must_use]
     pub fn get_active_alerts(&self) -> Vec<Alert> {
         self.active_alerts
@@ -534,6 +554,10 @@ impl AlertManager {
     /// # Errors
     ///
     /// Returns an error if the alert is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn acknowledge_alert(&self, alert_id: &str) -> Result<()> {
         self.active_alerts
             .write()
@@ -558,6 +582,10 @@ impl AlertManager {
     /// # Errors
     ///
     /// Returns an error if the alert is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn resolve_alert(&self, alert_id: &str) -> Result<()> {
         self.active_alerts
             .write()

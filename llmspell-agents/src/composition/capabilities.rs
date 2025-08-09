@@ -470,6 +470,10 @@ impl CapabilityAggregator {
     /// # Errors
     ///
     /// Returns an error if capability is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn set_availability(
         &self,
         provider_id: &str,

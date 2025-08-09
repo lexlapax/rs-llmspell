@@ -7,6 +7,15 @@ use llmspell_core::{
     BaseAgent, ExecutionContext, LLMSpellError,
 };
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
+use llmspell_tools::communication::database_connector::DatabaseConnectorConfig;
+use llmspell_tools::communication::email_sender::EmailSenderConfig;
+use llmspell_tools::data::json_processor::JsonProcessorConfig;
+use llmspell_tools::fs::{FileOperationsConfig, FileSearchConfig};
+use llmspell_tools::search::WebSearchConfig;
+use llmspell_tools::system::ProcessExecutorConfig;
+use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
+use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
+use llmspell_tools::web::web_scraper::WebScraperConfig;
 use llmspell_tools::*;
 use serde_json::{json, Value};
 use std::sync::Arc;

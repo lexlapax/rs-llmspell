@@ -155,6 +155,10 @@ impl TestHarness {
     /// - Agent creation fails
     /// - The test function returns an error
     /// - The test times out
+    ///
+    /// # Panics
+    ///
+    /// Panics if a Mutex is poisoned
     pub async fn run_test<F, Fut>(
         &self,
         agent_config: AgentConfig,
@@ -205,6 +209,10 @@ impl TestHarness {
     /// # Errors
     ///
     /// Returns an error if agent execution fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a Mutex is poisoned
     pub async fn execute_and_record(
         &self,
         agent: Arc<dyn Agent>,
@@ -271,6 +279,10 @@ impl TestHarness {
     }
 
     /// Record resource usage
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn record_resource_usage(&self, memory: usize, cpu_time: Duration, tool_calls: usize) {
         let mut usage = self.resource_usage.lock().unwrap();
         usage.peak_memory = usage.peak_memory.max(memory);
@@ -538,6 +550,10 @@ pub struct LifecycleEventRecorder {
 
 impl LifecycleEventRecorder {
     /// Create new event recorder
+    ///
+    /// # Panics
+    ///
+    /// Panics if spawning the background task fails
     #[must_use]
     pub fn new(receiver: broadcast::Receiver<LifecycleEvent>) -> Self {
         let events = Arc::new(Mutex::new(Vec::new()));
@@ -560,17 +576,29 @@ impl LifecycleEventRecorder {
     }
 
     /// Get recorded events
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn get_events(&self) -> Vec<LifecycleEvent> {
         self.events.lock().unwrap().clone()
     }
 
     /// Clear recorded events
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn clear(&self) {
         self.events.lock().unwrap().clear();
     }
 
     /// Find events of specific type
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn find_events(&self, event_type: LifecycleEventType) -> Vec<LifecycleEvent> {
         self.events

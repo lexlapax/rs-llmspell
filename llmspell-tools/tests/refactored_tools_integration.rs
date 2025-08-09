@@ -4,8 +4,10 @@
 use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::AgentInput;
 use llmspell_core::ExecutionContext;
+use llmspell_tools::util::hash_calculator::{HashCalculatorConfig, HashCalculatorTool};
+use llmspell_tools::util::text_manipulator::{TextManipulatorConfig, TextManipulatorTool};
+use llmspell_tools::util::uuid_generator::{UuidGeneratorConfig, UuidGeneratorTool};
 use llmspell_tools::util::*;
-use llmspell_tools::{HashCalculatorConfig, TextManipulatorConfig, UuidGeneratorConfig};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 

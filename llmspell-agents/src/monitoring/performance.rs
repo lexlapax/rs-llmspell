@@ -381,6 +381,10 @@ impl PerformanceMonitor {
     }
 
     /// Store a snapshot
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     fn store_snapshot(&self, snapshot: PerformanceSnapshot) {
         let mut snapshots = self.snapshots.write().unwrap();
 
@@ -393,6 +397,10 @@ impl PerformanceMonitor {
     }
 
     /// Generate a performance report
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     #[must_use]
     pub fn generate_report(&self) -> PerformanceReport {
         let snapshots = self.snapshots.read().unwrap();

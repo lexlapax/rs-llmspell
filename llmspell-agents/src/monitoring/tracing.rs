@@ -318,6 +318,10 @@ impl TraceCollector {
     }
 
     /// Get all traces
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_all_traces(&self) -> HashMap<String, Vec<TraceSpan>> {
         let mut traces = HashMap::new();
 
@@ -349,6 +353,10 @@ pub struct SpanHandle {
 
 impl SpanHandle {
     /// Add a tag to the span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn add_tag(&self, key: String, value: String) {
         if let Some(span) = self
             .collector
@@ -362,6 +370,10 @@ impl SpanHandle {
     }
 
     /// Add an event to the span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn add_event(&self, event: TraceEvent) {
         if let Some(span) = self
             .collector

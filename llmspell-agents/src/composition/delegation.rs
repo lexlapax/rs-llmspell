@@ -295,6 +295,10 @@ impl DelegatingAgent {
     /// - No suitable agent is found
     /// - Agent execution fails
     /// - Strategy processing fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a RwLock is poisoned
     pub async fn delegate(&self, request: DelegationRequest) -> Result<DelegationResult> {
         let start_time = std::time::Instant::now();
 
@@ -390,11 +394,19 @@ impl DelegatingAgent {
     }
 
     /// Set the delegation strategy
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn set_strategy(&self, strategy: DelegationStrategy) {
         *self.strategy.write().unwrap() = strategy;
     }
 
     /// Get delegation metrics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn metrics(&self) -> DelegationMetrics {
         self.metrics.read().unwrap().clone()
     }

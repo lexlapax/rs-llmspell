@@ -118,6 +118,10 @@ impl HierarchicalCompositeAgent {
     ///
     /// Currently never returns an error, but the Result type is provided for future
     /// extensibility (e.g., validation of parent-child relationships, cycle detection).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn set_parent(&self, parent: Weak<dyn HierarchicalAgent>) -> Result<()> {
         let mut parent_guard = self.parent.write().unwrap();
         *parent_guard = Some(parent);
@@ -567,6 +571,10 @@ impl HierarchicalAgentBuilder {
     }
 
     /// Build the hierarchical agent
+    ///
+    /// # Panics
+    ///
+    /// Panics if creating Arc<RwLock<_>> fails
     #[must_use]
     pub fn build(self) -> HierarchicalCompositeAgent {
         let name = self.name.clone();

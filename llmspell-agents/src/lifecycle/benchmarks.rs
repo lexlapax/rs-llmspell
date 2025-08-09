@@ -24,6 +24,11 @@ impl ProductionLoggingHook {
         }
     }
 
+    /// Get the current log count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn get_log_count(&self) -> u64 {
         *self.log_count.lock().unwrap()
@@ -76,6 +81,11 @@ impl ProductionMetricsHook {
         }
     }
 
+    /// Get the metrics count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn get_metrics_count(&self) -> usize {
         self.metrics.lock().unwrap().len()
