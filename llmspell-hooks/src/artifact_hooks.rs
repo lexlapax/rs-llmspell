@@ -124,7 +124,7 @@ mod tests {
             artifact_id.clone(),
             "test".to_string(),
             "test.txt".to_string(),
-            component_id.clone(),
+            component_id,
         );
 
         let event = ArtifactEventBuilder::new(component_id).created(metadata, None);

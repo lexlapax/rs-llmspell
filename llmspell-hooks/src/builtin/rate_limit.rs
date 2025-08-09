@@ -793,8 +793,8 @@ mod tests {
         );
 
         // Ensure rate limit specific data was removed
-        assert!(deserialized.data.get("_rate_limit_config").is_none());
-        assert!(deserialized.data.get("_rate_limit_metrics").is_none());
+        assert!(!deserialized.data.contains_key("_rate_limit_config"));
+        assert!(!deserialized.data.contains_key("_rate_limit_metrics"));
 
         // Test replay ID
         assert_eq!(hook.replay_id(), "RateLimitHook:1.0.0");

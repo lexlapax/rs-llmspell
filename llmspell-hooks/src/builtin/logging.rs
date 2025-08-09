@@ -428,7 +428,7 @@ mod tests {
         );
 
         // Ensure _logging_config was removed
-        assert!(deserialized.data.get("_logging_config").is_none());
+        assert!(!deserialized.data.contains_key("_logging_config"));
 
         // Test replay ID
         assert_eq!(hook.replay_id(), "logging_hook:1.0.0");

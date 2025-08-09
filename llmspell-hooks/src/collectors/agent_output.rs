@@ -229,8 +229,10 @@ mod tests {
     use crate::types::{ComponentId, ComponentType};
     #[tokio::test]
     async fn test_agent_output_collection() {
-        let mut config = CollectionConfig::default();
-        config.min_size = 10; // Lower minimum for tests
+        let config = CollectionConfig {
+            min_size: 10, // Lower minimum for tests
+            ..Default::default()
+        };
         let collector = AgentOutputCollector::with_config(config);
         let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
         let mut context = HookContext::new(HookPoint::AfterAgentExecution, component_id);
@@ -267,8 +269,10 @@ mod tests {
     }
     #[tokio::test]
     async fn test_text_output_collection() {
-        let mut config = CollectionConfig::default();
-        config.min_size = 10; // Lower minimum for tests
+        let config = CollectionConfig {
+            min_size: 10, // Lower minimum for tests
+            ..Default::default()
+        };
         let collector = AgentOutputCollector::with_config(config);
         let component_id = ComponentId::new(ComponentType::Agent, "writer-agent".to_string());
         let mut context = HookContext::new(HookPoint::AfterAgentExecution, component_id);
@@ -289,9 +293,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_size_limits() {
-        let mut config = CollectionConfig::default();
-        config.min_size = 10;
-        config.max_size = 100;
+        let config = CollectionConfig {
+            min_size: 10,
+            max_size: 100,
+            ..Default::default()
+        };
 
         let collector = AgentOutputCollector::with_config(config);
         let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());

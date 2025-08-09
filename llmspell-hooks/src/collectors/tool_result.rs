@@ -211,8 +211,10 @@ mod tests {
     use uuid::Uuid;
     #[tokio::test]
     async fn test_tool_result_collection() {
-        let mut config = CollectionConfig::default();
-        config.min_size = 10; // Lower minimum for tests
+        let config = CollectionConfig {
+            min_size: 10, // Lower minimum for tests
+            ..Default::default()
+        };
         let collector = ToolResultCollector::with_config(config);
         let component_id = ComponentId::new(ComponentType::Tool, "calculator".to_string());
         let mut context = HookContext::new(HookPoint::AfterToolExecution, component_id);

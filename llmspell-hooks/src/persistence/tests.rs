@@ -2,32 +2,43 @@
 // ABOUTME: Tests storage, replay, and inspection capabilities
 
 #[cfg(test)]
-mod tests {
-    use crate::context::HookContext;
-    use crate::persistence::*;
-    use crate::result::HookResult;
-    use crate::traits::{Hook, ReplayableHook};
-    use crate::types::{ComponentId, ComponentType, HookPoint};
-    use anyhow::Result;
-    use async_trait::async_trait;
-    use std::sync::Arc;
-    use std::time::{Duration, SystemTime};
-    use uuid::Uuid;
+use crate::context::HookContext;
+#[cfg(test)]
+use crate::persistence::*;
+#[cfg(test)]
+use crate::result::HookResult;
+#[cfg(test)]
+use crate::traits::{Hook, ReplayableHook};
+#[cfg(test)]
+use crate::types::{ComponentId, ComponentType, HookPoint};
+#[cfg(test)]
+use anyhow::Result;
+#[cfg(test)]
+use async_trait::async_trait;
+#[cfg(test)]
+use std::sync::Arc;
+#[cfg(test)]
+use std::time::{Duration, SystemTime};
+#[cfg(test)]
+use uuid::Uuid;
 
-    /// Mock replayable hook for testing
-    struct MockReplayableHook {
+/// Mock replayable hook for testing
+#[cfg(test)]
+struct MockReplayableHook {
         id: String,
         result: HookResult,
     }
 
-    impl MockReplayableHook {
+#[cfg(test)]
+impl MockReplayableHook {
         fn new(id: String, result: HookResult) -> Self {
             Self { id, result }
         }
     }
 
-    #[async_trait]
-    impl Hook for MockReplayableHook {
+#[cfg(test)]
+#[async_trait]
+impl Hook for MockReplayableHook {
         async fn execute(&self, _context: &mut HookContext) -> Result<HookResult> {
             Ok(self.result.clone())
         }
@@ -52,8 +63,9 @@ mod tests {
         }
     }
 
-    #[async_trait]
-    impl ReplayableHook for MockReplayableHook {
+#[cfg(test)]
+#[async_trait]
+impl ReplayableHook for MockReplayableHook {
         fn replay_id(&self) -> String {
             self.id.clone()
         }
@@ -74,7 +86,8 @@ mod tests {
         HookContext::new(HookPoint::BeforeAgentExecution, component_id)
     }
 
-    fn create_test_execution(hook_id: String, correlation_id: Uuid) -> SerializedHookExecution {
+#[cfg(test)]
+fn create_test_execution(hook_id: String, correlation_id: Uuid) -> SerializedHookExecution {
         let context = create_test_context();
         let context_bytes = serde_json::to_vec(&context).unwrap();
 
@@ -89,8 +102,8 @@ mod tests {
             metadata: std::collections::HashMap::new(),
         }
     }
-    #[tokio::test]
-    async fn test_storage_backend_lifecycle() {
+#[tokio::test]
+async fn test_storage_backend_lifecycle() {
         let backend = InMemoryStorageBackend::new();
         let correlation_id = Uuid::new_v4();
         let execution = create_test_execution("test_hook".to_string(), correlation_id);
@@ -126,8 +139,8 @@ mod tests {
         assert_eq!(stats.total_executions, 1);
         assert!(stats.compression_ratio < 1.0);
     }
-    #[tokio::test]
-    async fn test_hook_persistence_manager() {
+#[tokio::test]
+async fn test_hook_persistence_manager() {
         // Create mock replay manager (simplified)
         struct MockReplayManager;
 
@@ -160,8 +173,8 @@ mod tests {
         let stats = persistence_manager.get_storage_statistics().await.unwrap();
         assert_eq!(stats.total_executions, 0);
     }
-    #[tokio::test]
-    async fn test_replay_engine() {
+#[tokio::test]
+async fn test_replay_engine() {
         let mut engine = HookReplayEngine::new();
         let hook = MockReplayableHook::new("test_hook".to_string(), HookResult::Continue);
         let execution = create_test_execution("test_hook".to_string(), Uuid::new_v4());
@@ -180,8 +193,8 @@ mod tests {
         assert_eq!(success, 1);
         assert_eq!(failed, 0);
     }
-    #[tokio::test]
-    async fn test_replay_manager_session() {
+#[tokio::test]
+async fn test_replay_manager_session() {
         let replay_manager = Arc::new(MockReplayManager);
         let storage_backend = Arc::new(InMemoryStorageBackend::new());
         let persistence_manager = Arc::new(HookPersistenceManager::with_storage_backend(
@@ -217,8 +230,8 @@ mod tests {
         let ended_session = manager.end_session(&session_name).unwrap();
         assert_eq!(ended_session.executions_replayed, 0);
     }
-    #[tokio::test]
-    async fn test_hook_inspector_analysis() {
+#[tokio::test]
+async fn test_hook_inspector_analysis() {
         let storage_backend = Arc::new(InMemoryStorageBackend::new());
         let inspector = HookInspector::new(storage_backend.clone());
 
@@ -250,8 +263,8 @@ mod tests {
         assert_eq!(analysis.execution_by_hook.get("hook1"), Some(&2));
         assert_eq!(analysis.execution_by_hook.get("hook2"), Some(&1));
     }
-    #[tokio::test]
-    async fn test_execution_pattern_detection() {
+#[tokio::test]
+async fn test_execution_pattern_detection() {
         let storage_backend = Arc::new(InMemoryStorageBackend::new());
         let inspector = HookInspector::new(storage_backend);
 
@@ -273,8 +286,8 @@ mod tests {
             .find(|p| matches!(p.pattern_type, PatternType::Sequential));
         assert!(sequential_pattern.is_some());
     }
-    #[tokio::test]
-    async fn test_timeline_construction() {
+#[tokio::test]
+async fn test_timeline_construction() {
         let replay_manager = Arc::new(MockReplayManager);
         let storage_backend = Arc::new(InMemoryStorageBackend::new());
         let persistence_manager = Arc::new(HookPersistenceManager::with_storage_backend(
@@ -322,17 +335,19 @@ mod tests {
         assert_eq!(timeline.entries.len(), 2);
         assert!(timeline.total_duration >= Duration::from_secs(0));
     }
-    #[tokio::test]
-    async fn test_replay_options_modification() {
+#[tokio::test]
+async fn test_replay_options_modification() {
         let mut engine = HookReplayEngine::new();
         let hook = MockReplayableHook::new("test_hook".to_string(), HookResult::Continue);
         let execution = create_test_execution("test_hook".to_string(), Uuid::new_v4());
 
         // Test with parameter modification
-        let mut options = ReplayOptions::default();
-        options.modify_parameters = true;
-        options.custom_parameters = Some(serde_json::json!({"test": "value"}));
-        options.dry_run = false; // Actually execute
+        let options = ReplayOptions {
+            modify_parameters: true,
+            custom_parameters: Some(serde_json::json!({"test": "value"})),
+            dry_run: false, // Actually execute
+            ..Default::default()
+        };
 
         let result = engine
             .replay_execution(&hook, &execution, &options)
@@ -340,8 +355,8 @@ mod tests {
             .unwrap();
         assert!(matches!(result, HookResult::Continue));
     }
-    #[tokio::test]
-    async fn test_inspection_query_filtering() {
+#[tokio::test]
+async fn test_inspection_query_filtering() {
         let storage_backend = Arc::new(InMemoryStorageBackend::new());
         let inspector = HookInspector::new(storage_backend.clone());
 
@@ -387,4 +402,3 @@ mod tests {
             Ok(vec![])
         }
     }
-}

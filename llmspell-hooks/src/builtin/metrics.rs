@@ -726,8 +726,8 @@ mod tests {
         );
 
         // Ensure metrics-specific data was removed
-        assert!(deserialized.data.get("_metrics_config").is_none());
-        assert!(deserialized.data.get("_metrics_snapshot").is_none());
+        assert!(!deserialized.data.contains_key("_metrics_config"));
+        assert!(!deserialized.data.contains_key("_metrics_snapshot"));
 
         // Test replay ID
         assert_eq!(hook.replay_id(), "MetricsHook:1.0.0");

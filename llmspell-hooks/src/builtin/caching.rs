@@ -453,6 +453,75 @@ impl MetricHook for CachingHook {
     }
 }
 
+#[async_trait]
+impl ReplayableHook for CachingHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with caching config
+        let mut context_data = ctx.data.clone();
+
+        // Add caching configuration for replay
+        context_data.insert(
+            "_caching_config".to_string(),
+            serde_json::json!({
+                "max_entries": self.config.max_entries,
+                "default_ttl_secs": self.config.default_ttl.as_secs(),
+                "strategy": match &self.config.strategy {
+                    CachingStrategy::CacheAll => "CacheAll",
+                    CachingStrategy::CacheSuccessOnly => "CacheSuccessOnly",
+                    CachingStrategy::CacheSpecificTypes(_) => "CacheSpecificTypes",
+                    CachingStrategy::Custom => "Custom",
+                },
+                "use_full_context": self.config.use_full_context,
+                "min_execution_time_ms": self.config.min_execution_time.as_millis(),
+                "extend_ttl_on_hit": self.config.extend_ttl_on_hit,
+                "cache_errors": self.config.cache_errors,
+            }),
+        );
+
+        // Add cache statistics for debugging
+        let stats = self.cache.stats();
+        context_data.insert("_cache_stats".to_string(), serde_json::to_value(&stats)?);
+
+        // Add metrics snapshot
+        let metrics = self.metrics.read().unwrap();
+        context_data.insert(
+            "_caching_metrics".to_string(),
+            serde_json::json!({
+                "hit_ratio": metrics.hit_ratio(),
+                "total_attempts": metrics.total_cache_attempts,
+                "hits": metrics.cache_hits,
+                "misses": metrics.cache_misses,
+                "evictions": metrics.cache_evictions,
+                "time_saved_ms": metrics.time_saved_ms,
+            }),
+        );
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the caching-specific data from context
+        context.data.remove("_caching_config");
+        context.data.remove("_cache_stats");
+        context.data.remove("_caching_metrics");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -740,71 +809,3 @@ mod tests {
     }
 }
 
-#[async_trait]
-impl ReplayableHook for CachingHook {
-    fn is_replayable(&self) -> bool {
-        true
-    }
-
-    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
-        // Create a serializable version of the context with caching config
-        let mut context_data = ctx.data.clone();
-
-        // Add caching configuration for replay
-        context_data.insert(
-            "_caching_config".to_string(),
-            serde_json::json!({
-                "max_entries": self.config.max_entries,
-                "default_ttl_secs": self.config.default_ttl.as_secs(),
-                "strategy": match &self.config.strategy {
-                    CachingStrategy::CacheAll => "CacheAll",
-                    CachingStrategy::CacheSuccessOnly => "CacheSuccessOnly",
-                    CachingStrategy::CacheSpecificTypes(_) => "CacheSpecificTypes",
-                    CachingStrategy::Custom => "Custom",
-                },
-                "use_full_context": self.config.use_full_context,
-                "min_execution_time_ms": self.config.min_execution_time.as_millis(),
-                "extend_ttl_on_hit": self.config.extend_ttl_on_hit,
-                "cache_errors": self.config.cache_errors,
-            }),
-        );
-
-        // Add cache statistics for debugging
-        let stats = self.cache.stats();
-        context_data.insert("_cache_stats".to_string(), serde_json::to_value(&stats)?);
-
-        // Add metrics snapshot
-        let metrics = self.metrics.read().unwrap();
-        context_data.insert(
-            "_caching_metrics".to_string(),
-            serde_json::json!({
-                "hit_ratio": metrics.hit_ratio(),
-                "total_attempts": metrics.total_cache_attempts,
-                "hits": metrics.cache_hits,
-                "misses": metrics.cache_misses,
-                "evictions": metrics.cache_evictions,
-                "time_saved_ms": metrics.time_saved_ms,
-            }),
-        );
-
-        let mut replay_context = ctx.clone();
-        replay_context.data = context_data;
-
-        Ok(serde_json::to_vec(&replay_context)?)
-    }
-
-    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
-        let mut context: HookContext = serde_json::from_slice(data)?;
-
-        // Remove the caching-specific data from context
-        context.data.remove("_caching_config");
-        context.data.remove("_cache_stats");
-        context.data.remove("_caching_metrics");
-
-        Ok(context)
-    }
-
-    fn replay_id(&self) -> String {
-        format!("{}:{}", self.metadata.name, self.metadata.version)
-    }
-}

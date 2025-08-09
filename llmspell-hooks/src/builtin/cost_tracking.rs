@@ -671,6 +671,87 @@ impl MetricHook for CostTrackingHook {
     }
 }
 
+
+#[async_trait]
+impl ReplayableHook for CostTrackingHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with cost tracking config
+        let mut context_data = ctx.data.clone();
+
+        // Add cost tracking configuration for replay
+        context_data.insert(
+            "_cost_tracking_config".to_string(),
+            serde_json::json!({
+                "default_currency": self.config.default_currency,
+                "track_per_user": self.config.track_per_user,
+                "track_per_component": self.config.track_per_component,
+                "aggregation_window_hours": self.config.aggregation_window.as_secs() / 3600,
+                "budget_alerts": self.config.budget_alerts.iter().map(|alert| {
+                    serde_json::json!({
+                        "threshold": alert.threshold,
+                        "level": match alert.level {
+                            AlertLevel::Info => "info",
+                            AlertLevel::Warning => "warning",
+                            AlertLevel::Critical => "critical",
+                        },
+                        "block_on_exceed": alert.block_on_exceed,
+                    })
+                }).collect::<Vec<_>>(),
+                "provider_count": self.config.providers.len(),
+            }),
+        );
+
+        // Add cost tracking metrics for debugging
+        let metrics = self.metrics.read().unwrap();
+        context_data.insert(
+            "_cost_metrics".to_string(),
+            serde_json::json!({
+                "total_cost": metrics.total_cost,
+                "total_requests": metrics.total_requests,
+                "average_cost_per_request": metrics.average_cost_per_request(),
+                "total_tokens": metrics.total_input_tokens + metrics.total_output_tokens,
+                "alerts_triggered": metrics.alerts_triggered,
+                "operations_blocked": metrics.operations_blocked,
+            }),
+        );
+
+        // Add current cost state summary
+        let total_cost = self.aggregator.total_cost.read();
+        context_data.insert(
+            "_cost_summary".to_string(),
+            serde_json::json!({
+                "total_cost": *total_cost,
+                "component_costs_count": self.aggregator.component_costs.read().len(),
+                "user_costs_count": self.aggregator.user_costs.read().len(),
+            }),
+        );
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the cost tracking specific data from context
+        context.data.remove("_cost_tracking_config");
+        context.data.remove("_cost_metrics");
+        context.data.remove("_cost_summary");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -893,82 +974,3 @@ mod tests {
     }
 }
 
-#[async_trait]
-impl ReplayableHook for CostTrackingHook {
-    fn is_replayable(&self) -> bool {
-        true
-    }
-
-    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
-        // Create a serializable version of the context with cost tracking config
-        let mut context_data = ctx.data.clone();
-
-        // Add cost tracking configuration for replay
-        context_data.insert(
-            "_cost_tracking_config".to_string(),
-            serde_json::json!({
-                "default_currency": self.config.default_currency,
-                "track_per_user": self.config.track_per_user,
-                "track_per_component": self.config.track_per_component,
-                "aggregation_window_hours": self.config.aggregation_window.as_secs() / 3600,
-                "budget_alerts": self.config.budget_alerts.iter().map(|alert| {
-                    serde_json::json!({
-                        "threshold": alert.threshold,
-                        "level": match alert.level {
-                            AlertLevel::Info => "info",
-                            AlertLevel::Warning => "warning",
-                            AlertLevel::Critical => "critical",
-                        },
-                        "block_on_exceed": alert.block_on_exceed,
-                    })
-                }).collect::<Vec<_>>(),
-                "provider_count": self.config.providers.len(),
-            }),
-        );
-
-        // Add cost tracking metrics for debugging
-        let metrics = self.metrics.read().unwrap();
-        context_data.insert(
-            "_cost_metrics".to_string(),
-            serde_json::json!({
-                "total_cost": metrics.total_cost,
-                "total_requests": metrics.total_requests,
-                "average_cost_per_request": metrics.average_cost_per_request(),
-                "total_tokens": metrics.total_input_tokens + metrics.total_output_tokens,
-                "alerts_triggered": metrics.alerts_triggered,
-                "operations_blocked": metrics.operations_blocked,
-            }),
-        );
-
-        // Add current cost state summary
-        let total_cost = self.aggregator.total_cost.read();
-        context_data.insert(
-            "_cost_summary".to_string(),
-            serde_json::json!({
-                "total_cost": *total_cost,
-                "component_costs_count": self.aggregator.component_costs.read().len(),
-                "user_costs_count": self.aggregator.user_costs.read().len(),
-            }),
-        );
-
-        let mut replay_context = ctx.clone();
-        replay_context.data = context_data;
-
-        Ok(serde_json::to_vec(&replay_context)?)
-    }
-
-    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
-        let mut context: HookContext = serde_json::from_slice(data)?;
-
-        // Remove the cost tracking specific data from context
-        context.data.remove("_cost_tracking_config");
-        context.data.remove("_cost_metrics");
-        context.data.remove("_cost_summary");
-
-        Ok(context)
-    }
-
-    fn replay_id(&self) -> String {
-        format!("{}:{}", self.metadata.name, self.metadata.version)
-    }
-}

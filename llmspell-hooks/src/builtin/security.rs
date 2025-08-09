@@ -667,6 +667,75 @@ impl MetricHook for SecurityHook {
     }
 }
 
+
+#[async_trait]
+impl ReplayableHook for SecurityHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with security config
+        let mut context_data = ctx.data.clone();
+
+        // Add security configuration for replay (excluding sensitive data)
+        context_data.insert(
+            "_security_config".to_string(),
+            serde_json::json!({
+                "enable_audit_logging": self.storage.config.enable_audit_logging,
+                "enable_parameter_validation": self.storage.config.enable_parameter_validation,
+                "enable_rate_limiting": self.storage.config.enable_rate_limiting,
+                "min_severity": serde_json::to_value(self.storage.config.min_severity)?,
+                "block_on_violations": self.storage.config.block_on_violations,
+                "max_parameter_length": self.storage.config.max_parameter_length,
+                // Note: We don't serialize sensitive_parameters for security reasons
+                "sensitive_parameters_count": self.storage.config.sensitive_parameters.len(),
+            }),
+        );
+
+        // Add security event summary (not full events for privacy)
+        let events = self.storage.events.read().unwrap();
+        let event_summary = serde_json::json!({
+            "total_events": events.len(),
+            "events_by_severity": {
+                "info": events.iter().filter(|e| e.severity == SecuritySeverity::Info).count(),
+                "low": events.iter().filter(|e| e.severity == SecuritySeverity::Low).count(),
+                "medium": events.iter().filter(|e| e.severity == SecuritySeverity::Medium).count(),
+                "high": events.iter().filter(|e| e.severity == SecuritySeverity::High).count(),
+                "critical": events.iter().filter(|e| e.severity == SecuritySeverity::Critical).count(),
+            },
+            "blocked_events": events.iter().filter(|e| e.blocked).count(),
+        });
+        context_data.insert("_security_event_summary".to_string(), event_summary);
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        // Mask any sensitive data in the context before serialization
+        for (key, value) in &mut replay_context.data {
+            if self.storage.config.sensitive_parameters.contains(key) {
+                *value = serde_json::Value::String("[REDACTED]".to_string());
+            }
+        }
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the security-specific data from context
+        context.data.remove("_security_config");
+        context.data.remove("_security_event_summary");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -900,70 +969,3 @@ mod tests {
     }
 }
 
-#[async_trait]
-impl ReplayableHook for SecurityHook {
-    fn is_replayable(&self) -> bool {
-        true
-    }
-
-    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
-        // Create a serializable version of the context with security config
-        let mut context_data = ctx.data.clone();
-
-        // Add security configuration for replay (excluding sensitive data)
-        context_data.insert(
-            "_security_config".to_string(),
-            serde_json::json!({
-                "enable_audit_logging": self.storage.config.enable_audit_logging,
-                "enable_parameter_validation": self.storage.config.enable_parameter_validation,
-                "enable_rate_limiting": self.storage.config.enable_rate_limiting,
-                "min_severity": serde_json::to_value(self.storage.config.min_severity)?,
-                "block_on_violations": self.storage.config.block_on_violations,
-                "max_parameter_length": self.storage.config.max_parameter_length,
-                // Note: We don't serialize sensitive_parameters for security reasons
-                "sensitive_parameters_count": self.storage.config.sensitive_parameters.len(),
-            }),
-        );
-
-        // Add security event summary (not full events for privacy)
-        let events = self.storage.events.read().unwrap();
-        let event_summary = serde_json::json!({
-            "total_events": events.len(),
-            "events_by_severity": {
-                "info": events.iter().filter(|e| e.severity == SecuritySeverity::Info).count(),
-                "low": events.iter().filter(|e| e.severity == SecuritySeverity::Low).count(),
-                "medium": events.iter().filter(|e| e.severity == SecuritySeverity::Medium).count(),
-                "high": events.iter().filter(|e| e.severity == SecuritySeverity::High).count(),
-                "critical": events.iter().filter(|e| e.severity == SecuritySeverity::Critical).count(),
-            },
-            "blocked_events": events.iter().filter(|e| e.blocked).count(),
-        });
-        context_data.insert("_security_event_summary".to_string(), event_summary);
-
-        let mut replay_context = ctx.clone();
-        replay_context.data = context_data;
-
-        // Mask any sensitive data in the context before serialization
-        for (key, value) in &mut replay_context.data {
-            if self.storage.config.sensitive_parameters.contains(key) {
-                *value = serde_json::Value::String("[REDACTED]".to_string());
-            }
-        }
-
-        Ok(serde_json::to_vec(&replay_context)?)
-    }
-
-    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
-        let mut context: HookContext = serde_json::from_slice(data)?;
-
-        // Remove the security-specific data from context
-        context.data.remove("_security_config");
-        context.data.remove("_security_event_summary");
-
-        Ok(context)
-    }
-
-    fn replay_id(&self) -> String {
-        format!("{}:{}", self.metadata.name, self.metadata.version)
-    }
-}
