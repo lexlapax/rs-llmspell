@@ -536,14 +536,14 @@ mod tests {
             })
             .add_config("custom_config", "value".into());
 
-        let customized = customizer.build();
+        let customized_template = customizer.build();
 
         // Verify the template still works
         let params = TemplateInstantiationParams::new("test-agent".to_string())
             .with_parameter("agent_name", "Test Agent".into())
             .with_parameter("custom_param", "custom_value".into());
 
-        let result = customized.validate_parameters(&params).await;
+        let result = customized_template.validate_parameters(&params).await;
         assert!(result.is_ok());
     }
     #[tokio::test]
@@ -658,14 +658,14 @@ mod tests {
                 max_execution_time: None,
             });
 
-        let customized = customizer.build();
+        let customized_template = customizer.build();
 
         // Test that override validation works
         let params = TemplateInstantiationParams::new("test-agent".to_string())
             .with_parameter("agent_name", "Test Agent".into())
             .with_parameter("max_tools", 20.into()); // Should fail - exceeds max of 10
 
-        let result = customized.validate_parameters(&params).await;
+        let result = customized_template.validate_parameters(&params).await;
         assert!(result.is_err());
     }
 }

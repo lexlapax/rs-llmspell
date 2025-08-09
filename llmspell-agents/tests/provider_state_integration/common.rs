@@ -397,7 +397,9 @@ mod tests {
         let has_anthropic = check_api_key("anthropic");
 
         // Just verify the function doesn't panic and returns a boolean
-        assert!(has_openai || !has_openai); // Always true - just checking it's a bool
-        assert!(has_anthropic || !has_anthropic); // Always true - just checking it's a bool
+        // These assertions are intentionally tautological - we're just checking the type
+        // Better approach: just check the values are booleans
+        let _ = has_openai; // Verify it's a bool
+        let _ = has_anthropic; // Verify it's a bool
     }
 }

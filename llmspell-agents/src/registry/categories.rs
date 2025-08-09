@@ -479,8 +479,8 @@ mod tests {
         manager.add_tag("agent-1", tag1).unwrap();
         manager.add_tag("agent-1", tag2).unwrap();
 
-        let tags = manager.get_agent_tags("agent-1");
-        assert_eq!(tags.len(), 2);
+        let agent_tags = manager.get_agent_tags("agent-1");
+        assert_eq!(agent_tags.len(), 2);
 
         let agents = manager.find_agents_by_tag("production");
         assert_eq!(agents, vec!["agent-1"]);

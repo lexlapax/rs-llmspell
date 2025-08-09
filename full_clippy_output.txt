@@ -1,0 +1,3721 @@
+warning: use Option::map_or_else instead of an if let/else
+   --> llmspell-tools/src/communication/database_connector.rs:392:37
+    |
+392 | / ...                   if let Ok(v) = row.try_get::<String, _>(i) {
+393 | | ...                       serde_json::Value::String(v)
+394 | | ...                   } else if let Ok(v) = row.try_get::<i64, _>(i) {
+395 | | ...                       serde_json::Value::Number(v.into())
+...   |
+404 | | ...                       serde_json::Value::Null
+405 | | ...                   };
+    | |_______________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+    = note: `-W clippy::option-if-let-else` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::option_if_let_else)]`
+help: try
+    |
+392 ~                                     row.try_get::<String, _>(i).map_or_else(|_| if let Ok(v) = row.try_get::<i64, _>(i) {
+393 +                                         serde_json::Value::Number(v.into())
+394 +                                     } else if let Ok(v) = row.try_get::<f64, _>(i) {
+395 +                                         serde_json::Value::Number(
+396 +                                             serde_json::Number::from_f64(v)
+397 +                                                 .unwrap_or(serde_json::Number::from(0)),
+398 +                                         )
+399 +                                     } else if let Ok(v) = row.try_get::<bool, _>(i) {
+400 +                                         serde_json::Value::Bool(v)
+401 +                                     } else {
+402 +                                         serde_json::Value::Null
+403 ~                                     }, |v| serde_json::Value::String(v));
+    |
+
+warning: function call inside of `unwrap_or`
+   --> llmspell-tools/src/communication/database_connector.rs:399:50
+    |
+399 | ...                   .unwrap_or(serde_json::Number::from(0)),
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|| serde_json::Number::from(0))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+    = note: `-W clippy::or-fun-call` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::or_fun_call)]`
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+    --> llmspell-tools/src/data/csv_analyzer.rs:1084:5
+     |
+1084 | /     fn evaluate_expression(
+1085 | |         expr: &str,
+1086 | |         headers: &csv::StringRecord,
+1087 | |         record: &csv::StringRecord,
+...    |
+1106 | |         Ok(expr.to_string())
+1107 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+     = note: `-W clippy::unnecessary-wraps` implied by `-W clippy::pedantic`
+     = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnecessary_wraps)]`
+help: remove `Result` from the return type...
+     |
+1088 -     ) -> Result<String> {
+1088 +     ) -> std::string::String {
+     |
+help: ...and then change returning expressions
+     |
+1100 ~                     return format!("{:.2}", left * right);
+1101 |                 }
+ ...
+1105 |         // Default: return the expression as-is
+1106 ~         expr.to_string()
+     |
+
+warning: the function has a cognitive complexity of (39/25)
+   --> llmspell-tools/src/fs/archive_handler.rs:286:8
+    |
+286 |     fn extract_zip(
+    |        ^^^^^^^^^^^
+    |
+    = help: you could split it up into multiple smaller functions
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
+    = note: `-W clippy::cognitive-complexity` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::cognitive_complexity)]`
+
+warning: the function has a cognitive complexity of (35/25)
+   --> llmspell-tools/src/fs/archive_handler.rs:378:8
+    |
+378 |     fn extract_tar(
+    |        ^^^^^^^^^^^
+    |
+    = help: you could split it up into multiple smaller functions
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
+
+warning: the function has a cognitive complexity of (35/25)
+   --> llmspell-tools/src/fs/archive_handler.rs:446:8
+    |
+446 |     fn extract_tar_gz(
+    |        ^^^^^^^^^^^^^^
+    |
+    = help: you could split it up into multiple smaller functions
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
+
+warning: wildcard pattern covers any other pattern as it will match anyway
+   --> llmspell-tools/src/fs/file_watcher.rs:183:13
+    |
+183 |             notify::EventKind::Other | _ => FileEventType::Other,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider handling `_` separately
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#wildcard_in_or_patterns
+    = note: `-W clippy::wildcard-in-or-patterns` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::wildcard_in_or_patterns)]`
+
+warning: assigning the result of `Clone::clone()` may be inefficient
+   --> llmspell-tools/src/lifecycle/hook_integration.rs:378:25
+    |
+378 |                         audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `audit_entry.resource_metrics.clone_from(&tool_context.resource_metrics)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assigning_clones
+    = note: `-W clippy::assigning-clones` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::assigning_clones)]`
+
+warning: assigning the result of `Clone::clone()` may be inefficient
+   --> llmspell-tools/src/lifecycle/hook_integration.rs:395:25
+    |
+395 |                         audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `audit_entry.resource_metrics.clone_from(&tool_context.resource_metrics)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assigning_clones
+
+warning: assigning the result of `Clone::clone()` may be inefficient
+   --> llmspell-tools/src/lifecycle/hook_integration.rs:434:9
+    |
+434 |         audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `audit_entry.resource_metrics.clone_from(&tool_context.resource_metrics)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assigning_clones
+
+warning: wildcard pattern covers any other pattern as it will match anyway
+   --> llmspell-tools/src/lifecycle/state_machine.rs:261:13
+    |
+261 |             (Terminated, _) | _ => false,
+    |             ^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider handling `_` separately
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#wildcard_in_or_patterns
+
+warning: called `map(<f>).unwrap_or_else(<g>)` on an `Option` value
+   --> llmspell-tools/src/media/audio_processor.rs:555:37
+    |
+555 |                   let target_format = extract_optional_string(params, "target_format")
+    |  _____________________________________^
+556 | |                     .map(|s| match s.to_lowercase().as_str() {
+557 | |                         "wav" => AudioFormat::Wav,
+558 | |                         "mp3" => AudioFormat::Mp3,
+559 | |                         _ => AudioFormat::Unknown,
+560 | |                     })
+561 | |                     .unwrap_or_else(|| AudioFormat::from_extension(Path::new(target_path)));
+    | |___________________________________________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#map_unwrap_or
+    = note: `-W clippy::map-unwrap-or` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::map_unwrap_or)]`
+
+warning: called `map(<f>).unwrap_or_else(<g>)` on an `Option` value
+   --> llmspell-tools/src/media/image_processor.rs:549:37
+    |
+549 |                   let target_format = extract_optional_string(params, "target_format")
+    |  _____________________________________^
+550 | |                     .map(|s| match s.to_lowercase().as_str() {
+551 | |                         "png" => ImageFormat::Png,
+552 | |                         "jpeg" | "jpg" => ImageFormat::Jpeg,
+...   |
+556 | |                     })
+557 | |                     .unwrap_or_else(|| ImageFormat::from_extension(Path::new(output_path)));
+    | |___________________________________________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#map_unwrap_or
+
+warning: use Option::map_or instead of an if let/else
+   --> llmspell-tools/src/search/web_search.rs:473:27
+    |
+473 |           let max_results = if let Some(n) = params
+    |  ___________________________^
+474 | |             .get("max_results")
+475 | |             .and_then(serde_json::Value::as_u64)
+...   |
+479 | |             self.config.max_results
+480 | |         };
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+help: try
+    |
+473 ~         let max_results = params
+474 +             .get("max_results")
+475 ~             .and_then(serde_json::Value::as_u64).map_or(self.config.max_results, |n| usize::try_from(n).unwrap_or(usize::MAX));
+    |
+
+warning: use Option::map_or_else instead of an if let/else
+   --> llmspell-tools/src/search/web_search.rs:507:29
+    |
+507 |           let provider_used = if let Some(r) = results.first() {
+    |  _____________________________^
+508 | |             r.provider.clone()
+509 | |         } else {
+510 | |             "unknown".to_string()
+511 | |         };
+    | |_________^ help: try: `results.first().map_or_else(|| "unknown".to_string(), |r| r.provider.clone())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+
+warning: the function has a cognitive complexity of (42/25)
+   --> llmspell-tools/src/system/environment_reader.rs:129:8
+    |
+129 |     fn is_var_allowed(&self, var_name: &str) -> bool {
+    |        ^^^^^^^^^^^^^^
+    |
+    = help: you could split it up into multiple smaller functions
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
+
+warning: the function has a cognitive complexity of (26/25)
+   --> llmspell-tools/src/system/process_executor.rs:216:8
+    |
+216 |     fn is_executable_allowed(&self, executable: &str) -> bool {
+    |        ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: you could split it up into multiple smaller functions
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
+
+warning: this function's return value is unnecessary
+   --> llmspell-tools/src/util/data_validation.rs:268:5
+    |
+268 | /     fn validate_value(
+269 | |         &self,
+270 | |         field: &str,
+271 | |         value: &Value,
+...   |
+293 | |         Ok(())
+294 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove the return type...
+    |
+274 -     ) -> Result<()> {
+274 +     ) -> () {
+    |
+help: ...and then remove returned values
+    |
+293 -         Ok(())
+    |
+
+warning: the function has a cognitive complexity of (31/25)
+   --> llmspell-tools/src/util/data_validation.rs:298:8
+    |
+298 |     fn validate_rule(
+    |        ^^^^^^^^^^^^^
+    |
+    = help: you could split it up into multiple smaller functions
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cognitive_complexity
+
+warning: this looks like a formatting argument but it is not part of a formatting macro
+   --> llmspell-tools/src/util/data_validation.rs:569:32
+    |
+569 |             |msg| msg.replace("{field}", field),
+    |                                ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#literal_string_with_formatting_args
+    = note: `-W clippy::literal-string-with-formatting-args` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::literal_string_with_formatting_args)]`
+
+warning: this argument (1 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
+   --> llmspell-tools/src/util/uuid_generator.rs:140:47
+    |
+140 |     fn format_uuid(&self, uuid: Uuid, format: &UuidFormat) -> String {
+    |                                               ^^^^^^^^^^^ help: consider passing by value instead: `UuidFormat`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#trivially_copy_pass_by_ref
+    = note: `-W clippy::trivially-copy-pass-by-ref` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::trivially_copy_pass_by_ref)]`
+
+warning: function call inside of `unwrap_or`
+   --> llmspell-tools/src/web/api_tester.rs:212:44
+    |
+212 |                 "body": body_json.as_ref().unwrap_or(&json!(body_text)),
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|| &json!(body_text))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-tools/src/web/sitemap_crawler.rs:330:5
+    |
+330 | /     fn parse_sitemap(&self, xml_content: &str) -> Result<Vec<Value>> {
+331 | |         let mut urls = Vec::new();
+332 | |         let lines: Vec<&str> = xml_content.lines().collect();
+...   |
+405 | |         Ok(urls)
+406 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+330 -     fn parse_sitemap(&self, xml_content: &str) -> Result<Vec<Value>> {
+330 +     fn parse_sitemap(&self, xml_content: &str) -> std::vec::Vec<serde_json::Value> {
+    |
+help: ...and then change returning expressions
+    |
+405 -         Ok(urls)
+405 +         urls
+    |
+
+warning: wildcard pattern covers any other pattern as it will match anyway
+   --> llmspell-tools/src/web/webhook_caller.rs:171:17
+    |
+171 |                 "POST" | _ => client.post(url), // Default to POST for unknown methods
+    |                 ^^^^^^^^^^
+    |
+    = help: consider handling `_` separately
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#wildcard_in_or_patterns
+
+warning: function call inside of `unwrap_or`
+   --> llmspell-tools/src/web/webhook_caller.rs:228:56
+    |
+228 | ...                   "body": body_json.as_ref().unwrap_or(&json!(body_text)),
+    |                                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `unwrap_or_else(|| &json!(body_text))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
+
+warning: `llmspell-tools` (lib) generated 25 warnings
+    Checking llmspell-agents v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents)
+    Checking llmspell-bridge v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-bridge)
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> llmspell-bridge/src/engine/factory.rs:391:25
+    |
+391 | static PLUGIN_REGISTRY: LazyLock<Arc<RwLock<HashMap<String, Box<dyn ScriptEnginePlugin>>>>> =
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+    = note: `-W clippy::type-complexity` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::type_complexity)]`
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/runtime.rs:394:5
+    |
+394 | /     pub fn javascript_config(mut self, config: JSConfig) -> Self {
+395 | |         self.config.engines.javascript = config;
+396 | |         self
+397 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+    = note: `-W clippy::missing-const-for-fn` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::missing_const_for_fn)]`
+help: make the function `const`
+    |
+394 |     pub const fn javascript_config(mut self, config: JSConfig) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/runtime.rs:491:5
+    |
+491 | /     pub fn max_concurrent_scripts(mut self, max: usize) -> Self {
+492 | |         self.config.max_concurrent_scripts = max;
+493 | |         self
+494 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+491 |     pub const fn max_concurrent_scripts(mut self, max: usize) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/runtime.rs:498:5
+    |
+498 | /     pub fn script_timeout_seconds(mut self, timeout: u64) -> Self {
+499 | |         self.config.script_timeout_seconds = timeout;
+500 | |         self
+501 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+498 |     pub const fn script_timeout_seconds(mut self, timeout: u64) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/runtime.rs:505:5
+    |
+505 | /     pub fn enable_streaming(mut self, enable: bool) -> Self {
+506 | |         self.config.enable_streaming = enable;
+507 | |         self
+508 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+505 |     pub const fn enable_streaming(mut self, enable: bool) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/runtime.rs:512:5
+    |
+512 | /     pub fn security(mut self, security: SecurityConfig) -> Self {
+513 | |         self.config.security = security;
+514 | |         self
+515 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+512 |     pub const fn security(mut self, security: SecurityConfig) -> Self {
+    |         +++++
+
+warning: more than 3 bools in a struct
+   --> llmspell-bridge/src/runtime.rs:575:1
+    |
+575 | / pub struct StatePersistenceConfig {
+576 | |     /// Enable state persistence
+577 | |     pub enabled: bool,
+578 | |     /// Backend type for storage (memory, file, redis, etc.)
+...   |
+591 | |     pub backup: Option<BackupConfig>,
+592 | | }
+    | |_^
+    |
+    = help: consider using a state machine or refactoring bools into two-variant enums
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#struct_excessive_bools
+    = note: `-W clippy::struct-excessive-bools` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::struct_excessive_bools)]`
+
+warning: item in documentation is missing backticks
+ --> llmspell-bridge/src/storage.rs:2:78
+  |
+2 | //! ABOUTME: Provides discovery of available storage backends (Memory, Sled, RocksDB)
+  |                                                                              ^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+  = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
+  = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
+help: try
+  |
+2 - //! ABOUTME: Provides discovery of available storage backends (Memory, Sled, RocksDB)
+2 + //! ABOUTME: Provides discovery of available storage backends (Memory, Sled, `RocksDB`)
+  |
+
+warning: item in documentation is missing backticks
+   --> llmspell-bridge/src/storage.rs:252:58
+    |
+252 |     /// Performance optimization preset (fast, balanced, storage_optimized)
+    |                                                          ^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+252 -     /// Performance optimization preset (fast, balanced, storage_optimized)
+252 +     /// Performance optimization preset (fast, balanced, `storage_optimized`)
+    |
+
+warning: item in documentation is missing backticks
+   --> llmspell-bridge/src/storage.rs:269:34
+    |
+269 |     /// Create a new builder for StorageConfig
+    |                                  ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+269 -     /// Create a new builder for StorageConfig
+269 +     /// Create a new builder for `StorageConfig`
+    |
+
+warning: item in documentation is missing backticks
+   --> llmspell-bridge/src/storage.rs:276:17
+    |
+276 | /// Builder for StorageConfig
+    |                 ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+276 - /// Builder for StorageConfig
+276 + /// Builder for `StorageConfig`
+    |
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/storage.rs:312:5
+    |
+312 | /     pub fn enable_compression(mut self, enable: bool) -> Self {
+313 | |         self.config.enable_compression = enable;
+314 | |         self
+315 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+312 |     pub const fn enable_compression(mut self, enable: bool) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/storage.rs:319:5
+    |
+319 | /     pub fn enable_encryption(mut self, enable: bool) -> Self {
+320 | |         self.config.enable_encryption = enable;
+321 | |         self
+322 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+319 |     pub const fn enable_encryption(mut self, enable: bool) -> Self {
+    |         +++++
+
+warning: item in documentation is missing backticks
+   --> llmspell-bridge/src/storage.rs:358:25
+    |
+358 |     /// Build the final StorageConfig
+    |                         ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+358 -     /// Build the final StorageConfig
+358 +     /// Build the final `StorageConfig`
+    |
+
+warning: this argument is passed by value, but not consumed in the function body
+  --> llmspell-bridge/src/tools.rs:74:15
+   |
+74 |     registry: Arc<ComponentRegistry>,
+   |               ^^^^^^^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&Arc<ComponentRegistry>`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+   = note: `-W clippy::needless-pass-by-value` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::needless_pass_by_value)]`
+
+warning: this argument is passed by value, but not consumed in the function body
+  --> llmspell-bridge/src/tools.rs:91:15
+   |
+91 |     registry: Arc<ComponentRegistry>,
+   |               ^^^^^^^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&Arc<ComponentRegistry>`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-bridge/src/tools.rs:109:15
+    |
+109 |     registry: Arc<ComponentRegistry>,
+    |               ^^^^^^^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&Arc<ComponentRegistry>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/tools.rs:320:5
+    |
+320 | /     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
+321 | |         Self { registry }
+322 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+320 |     pub const fn new(registry: Arc<ComponentRegistry>) -> Self {
+    |         +++++
+
+warning: item in documentation is missing backticks
+  --> llmspell-bridge/src/event_bridge.rs:53:29
+   |
+53 |     /// Returns an error if EventBridge initialization fails
+   |                             ^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+53 -     /// Returns an error if EventBridge initialization fails
+53 +     /// Returns an error if `EventBridge` initialization fails
+   |
+
+warning: this method could have a `#[must_use]` attribute
+   --> llmspell-bridge/src/event_bridge.rs:210:5
+    |
+210 |     pub fn get_stats(&self) -> serde_json::Value {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get_stats(&self) -> serde_json::Value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+    = note: `-W clippy::must-use-candidate` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::must_use_candidate)]`
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/globals/injection.rs:199:5
+    |
+199 | /     pub fn get_metrics(&self) -> &InjectionMetrics {
+200 | |         self.registry.metrics()
+201 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+199 |     pub const fn get_metrics(&self) -> &InjectionMetrics {
+    |         +++++
+
+warning: docs for function returning `Result` missing `# Errors` section
+  --> llmspell-bridge/src/globals/session_infrastructure.rs:16:1
+   |
+16 | / pub async fn get_or_create_session_infrastructure(
+17 | |     context: &GlobalContext,
+18 | |     config: &SessionConfig,
+19 | | ) -> Result<SessionInfrastructure> {
+   | |__________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+   = note: `-W clippy::missing-errors-doc` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::missing_errors_doc)]`
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/globals/session_infrastructure.rs:99:1
+    |
+99  | / fn get_or_create_hook_registry(context: &GlobalContext) -> Result<Arc<HookRegistry>> {
+100 | |     if let Some(registry) = context.get_bridge::<HookRegistry>("hook_registry") {
+101 | |         return Ok(registry);
+...   |
+107 | |     Ok(registry)
+108 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+    = note: `-W clippy::unnecessary-wraps` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnecessary_wraps)]`
+help: remove `Result` from the return type...
+    |
+99  - fn get_or_create_hook_registry(context: &GlobalContext) -> Result<Arc<HookRegistry>> {
+99  + fn get_or_create_hook_registry(context: &GlobalContext) -> std::sync::Arc<llmspell_hooks::HookRegistry> {
+    |
+help: ...and then change returning expressions
+    |
+101 ~         return registry;
+102 |     }
+...
+106 |     context.set_bridge("hook_registry", registry.clone());
+107 ~     registry
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/globals/session_infrastructure.rs:111:1
+    |
+111 | / fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
+112 | |     if let Some(executor) = context.get_bridge::<HookExecutor>("hook_executor") {
+113 | |         return Ok(executor);
+...   |
+119 | |     Ok(executor)
+120 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+111 - fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
+111 + fn get_or_create_hook_executor(context: &GlobalContext) -> std::sync::Arc<llmspell_hooks::HookExecutor> {
+    |
+help: ...and then change returning expressions
+    |
+113 ~         return executor;
+114 |     }
+...
+118 |     context.set_bridge("hook_executor", executor.clone());
+119 ~     executor
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/globals/session_infrastructure.rs:123:1
+    |
+123 | / fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+124 | |     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
+125 | |         return Ok(event_bus);
+...   |
+131 | |     Ok(event_bus)
+132 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+123 - fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+123 + fn get_or_create_event_bus(context: &GlobalContext) -> std::sync::Arc<llmspell_events::EventBus> {
+    |
+help: ...and then change returning expressions
+    |
+125 ~         return event_bus;
+126 |     }
+...
+130 |     context.set_bridge("event_bus", event_bus.clone());
+131 ~     event_bus
+    |
+
+warning: docs for function returning `Result` missing `# Errors` section
+  --> llmspell-bridge/src/globals/state_infrastructure.rs:21:1
+   |
+21 | / pub async fn get_or_create_state_infrastructure(
+22 | |     context: &GlobalContext,
+23 | |     config: &StatePersistenceConfig,
+24 | | ) -> Result<StateInfrastructure> {
+   | |________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/globals/state_infrastructure.rs:189:1
+    |
+189 | / fn create_backend_type(config: &StatePersistenceConfig) -> Result<StorageBackendType> {
+190 | |     match config.backend_type.as_str() {
+191 | |         "memory" => {
+192 | |             debug!("Creating in-memory storage backend type");
+...   |
+210 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+189 - fn create_backend_type(config: &StatePersistenceConfig) -> Result<StorageBackendType> {
+189 + fn create_backend_type(config: &StatePersistenceConfig) -> llmspell_state_persistence::StorageBackendType {
+    |
+help: ...and then change returning expressions
+    |
+193 ~             StorageBackendType::Memory
+194 |         }
+...
+198 |                 .unwrap_or_else(|_| "./llmspell_state".to_string());
+199 ~             StorageBackendType::Sled(SledConfig {
+200 +                 path: std::path::PathBuf::from(path),
+201 +                 cache_capacity: 64 * 1024 * 1024, // 64MB
+202 +                 use_compression: true,
+203 +             })
+204 |         }
+205 |         backend => {
+206 |             warn!("Unknown backend type '{}', falling back to memory", backend);
+207 ~             StorageBackendType::Memory
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/globals/state_infrastructure.rs:213:1
+    |
+213 | / fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+214 | |     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
+215 | |         return Ok(event_bus);
+...   |
+221 | |     Ok(event_bus)
+222 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+213 - fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+213 + fn get_or_create_event_bus(context: &GlobalContext) -> std::sync::Arc<llmspell_events::EventBus> {
+    |
+help: ...and then change returning expressions
+    |
+215 ~         return event_bus;
+216 |     }
+...
+220 |     context.set_bridge("event_bus", event_bus.clone());
+221 ~     event_bus
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/globals/state_infrastructure.rs:225:1
+    |
+225 | / fn get_or_create_correlation_tracker(
+226 | |     context: &GlobalContext,
+227 | | ) -> Result<Arc<EventCorrelationTracker>> {
+228 | |     if let Some(tracker) = context.get_bridge::<EventCorrelationTracker>("correlation_tracker") {
+...   |
+235 | |     Ok(tracker)
+236 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+227 - ) -> Result<Arc<EventCorrelationTracker>> {
+227 + ) -> std::sync::Arc<llmspell_events::EventCorrelationTracker> {
+    |
+help: ...and then change returning expressions
+    |
+229 ~         return tracker;
+230 |     }
+...
+234 |     context.set_bridge("correlation_tracker", tracker.clone());
+235 ~     tracker
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/globals/state_infrastructure.rs:239:1
+    |
+239 | / fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
+240 | |     if let Some(executor) = context.get_bridge::<HookExecutor>("hook_executor") {
+241 | |         return Ok(executor);
+...   |
+247 | |     Ok(executor)
+248 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+239 - fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
+239 + fn get_or_create_hook_executor(context: &GlobalContext) -> std::sync::Arc<llmspell_hooks::HookExecutor> {
+    |
+help: ...and then change returning expressions
+    |
+241 ~         return executor;
+242 |     }
+...
+246 |     context.set_bridge("hook_executor", executor.clone());
+247 ~     executor
+    |
+
+warning: item in documentation is missing backticks
+  --> llmspell-bridge/src/globals/tool_api_standard.rs:79:9
+   |
+79 | //! ### ToolInfo
+   |         ^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+79 - //! ### ToolInfo
+79 + //! ### `ToolInfo`
+   |
+
+warning: item in documentation is missing backticks
+  --> llmspell-bridge/src/globals/tool_api_standard.rs:89:9
+   |
+89 | //! ### ToolSchema
+   |         ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+89 - //! ### ToolSchema
+89 + //! ### `ToolSchema`
+   |
+
+warning: item in documentation is missing backticks
+   --> llmspell-bridge/src/globals/tool_api_standard.rs:127:27
+    |
+127 | //! - Direct tool access (Tool.tool_name) uses lazy loading
+    |                           ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+127 - //! - Direct tool access (Tool.tool_name) uses lazy loading
+127 + //! - Direct tool access (`Tool.tool_name`) uses lazy loading
+    |
+
+warning: item in documentation is missing backticks
+   --> llmspell-bridge/src/globals/tool_api_standard.rs:172:23
+    |
+172 | /// Convert from core ToolSchema to standard schema
+    |                       ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+172 - /// Convert from core ToolSchema to standard schema
+172 + /// Convert from core `ToolSchema` to standard schema
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-bridge/src/hook_bridge.rs:417:5
+    |
+417 | /     fn create_hook_event(
+418 | |         hook_point: &HookPoint,
+419 | |         status: &str,
+420 | |         correlation_id: Uuid,
+...   |
+444 | |         Ok(event)
+445 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+422 -     ) -> Result<UniversalEvent, LLMSpellError> {
+422 +     ) -> llmspell_events::UniversalEvent {
+    |
+help: ...and then change returning expressions
+    |
+444 -         Ok(event)
+444 +         event
+    |
+
+warning: this method could have a `#[must_use]` attribute
+   --> llmspell-bridge/src/agent_bridge.rs:108:5
+    |
+108 |     pub fn list_agent_types(&self) -> Vec<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn list_agent_types(&self) -> Vec<String>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+warning: this method could have a `#[must_use]` attribute
+   --> llmspell-bridge/src/agent_bridge.rs:113:5
+    |
+113 |     pub fn list_templates(&self) -> Vec<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn list_templates(&self) -> Vec<String>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+warning: this argument is passed by value, but not consumed in the function body
+    --> llmspell-bridge/src/agent_bridge.rs:1127:16
+     |
+1127 |         scope: serde_json::Value,
+     |                ^^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&serde_json::Value`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: this argument is passed by value, but not consumed in the function body
+    --> llmspell-bridge/src/agent_bridge.rs:1143:16
+     |
+1143 |         scope: serde_json::Value,
+     |                ^^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&serde_json::Value`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: it is more concise to loop over references to containers instead of using explicit iteration methods
+  --> llmspell-bridge/src/multi_agent.rs:94:41
+   |
+94 |     for (agent_id, task_name, input) in agent_tasks.iter() {
+   |                                         ^^^^^^^^^^^^^^^^^^ help: to write this more concisely, try: `agent_tasks`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#explicit_iter_loop
+   = note: `-W clippy::explicit-iter-loop` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::explicit_iter_loop)]`
+
+warning: this expression creates a reference which is immediately dereferenced by the compiler
+   --> llmspell-bridge/src/multi_agent.rs:202:46
+    |
+202 |             agent_id: ComponentId::from_name(&coordinator_agent),
+    |                                              ^^^^^^^^^^^^^^^^^^ help: change this to: `coordinator_agent`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrow
+    = note: `-W clippy::needless-borrow` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::needless_borrow)]`
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/orchestration.rs:85:5
+   |
+85 | /     pub fn max_concurrent_workflows(mut self, max: usize) -> Self {
+86 | |         self.limits.max_concurrent_workflows = max;
+87 | |         self
+88 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+85 |     pub const fn max_concurrent_workflows(mut self, max: usize) -> Self {
+   |         +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/orchestration.rs:92:5
+   |
+92 | /     pub fn max_agent_invocations(mut self, max: usize) -> Self {
+93 | |         self.limits.max_agent_invocations = max;
+94 | |         self
+95 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+92 |     pub const fn max_agent_invocations(mut self, max: usize) -> Self {
+   |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:99:5
+    |
+99  | /     pub fn max_memory_mb(mut self, max: usize) -> Self {
+100 | |         self.limits.max_memory_mb = max;
+101 | |         self
+102 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+99  |     pub const fn max_memory_mb(mut self, max: usize) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:106:5
+    |
+106 | /     pub fn build(self) -> ResourceLimits {
+107 | |         self.limits
+108 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+106 |     pub const fn build(self) -> ResourceLimits {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:154:5
+    |
+154 | /     pub fn strategy(mut self, strategy: OrchestrationStrategy) -> Self {
+155 | |         self.config.strategy = strategy;
+156 | |         self
+157 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+154 |     pub const fn strategy(mut self, strategy: OrchestrationStrategy) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:161:5
+    |
+161 | /     pub fn max_depth(mut self, depth: usize) -> Self {
+162 | |         self.config.max_depth = depth;
+163 | |         self
+164 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+161 |     pub const fn max_depth(mut self, depth: usize) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:168:5
+    |
+168 | /     pub fn timeout_seconds(mut self, timeout: u64) -> Self {
+169 | |         self.config.timeout_seconds = timeout;
+170 | |         self
+171 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+168 |     pub const fn timeout_seconds(mut self, timeout: u64) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:175:5
+    |
+175 | /     pub fn allow_parallel(mut self, allow: bool) -> Self {
+176 | |         self.config.allow_parallel = allow;
+177 | |         self
+178 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+175 |     pub const fn allow_parallel(mut self, allow: bool) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:182:5
+    |
+182 | /     pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+183 | |         self.config.resource_limits = limits;
+184 | |         self
+185 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+182 |     pub const fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:189:5
+    |
+189 | /     pub fn build(self) -> OrchestrationConfig {
+190 | |         self.config
+191 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+189 |     pub const fn build(self) -> OrchestrationConfig {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:304:5
+    |
+304 | /     pub fn max_attempts(mut self, attempts: usize) -> Self {
+305 | |         self.config.max_attempts = attempts;
+306 | |         self
+307 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+304 |     pub const fn max_attempts(mut self, attempts: usize) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:311:5
+    |
+311 | /     pub fn backoff_ms(mut self, ms: u64) -> Self {
+312 | |         self.config.backoff_ms = ms;
+313 | |         self
+314 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+311 |     pub const fn backoff_ms(mut self, ms: u64) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:318:5
+    |
+318 | /     pub fn exponential_backoff(mut self, exponential: bool) -> Self {
+319 | |         self.config.exponential_backoff = exponential;
+320 | |         self
+321 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+318 |     pub const fn exponential_backoff(mut self, exponential: bool) -> Self {
+    |         +++++
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/orchestration.rs:325:5
+    |
+325 | /     pub fn build(self) -> RetryConfig {
+326 | |         self.config
+327 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+325 |     pub const fn build(self) -> RetryConfig {
+    |         +++++
+
+warning: unnecessary closure used to substitute value for `Option::None`
+  --> llmspell-bridge/src/standardized_workflows.rs:38:20
+   |
+38 |           let name = params
+   |  ____________________^
+39 | |             .get("name")
+40 | |             .and_then(|v| v.as_str())
+41 | |             .unwrap_or_else(|| workflow_type)
+   | |_____________________________________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_lazy_evaluations
+   = note: `-W clippy::unnecessary-lazy-evaluations` implied by `-W clippy::all`
+   = help: to override `-W clippy::all` add `#[allow(clippy::unnecessary_lazy_evaluations)]`
+help: use `unwrap_or` instead
+   |
+41 -             .unwrap_or_else(|| workflow_type)
+41 +             .unwrap_or(workflow_type)
+   |
+
+warning: called `map(f)` on an `Option` value where `f` is a closure that returns the unit type `()`
+  --> llmspell-bridge/src/standardized_workflows.rs:47:9
+   |
+47 | /         params
+48 | |             .get("timeout")
+49 | |             .and_then(serde_json::Value::as_u64)
+50 | |             .map(|timeout_ms| {
+51 | |                 config.max_execution_time = Some(Duration::from_millis(timeout_ms));
+52 | |             });
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_map_unit_fn
+   = note: `-W clippy::option-map-unit-fn` implied by `-W clippy::all`
+   = help: to override `-W clippy::all` add `#[allow(clippy::option_map_unit_fn)]`
+help: try
+   |
+47 ~         if let Some(timeout_ms) = params
+48 +             .get("timeout")
+49 +             .and_then(serde_json::Value::as_u64) { config.max_execution_time = Some(Duration::from_millis(timeout_ms)); }
+   |
+
+warning: called `map(f)` on an `Option` value where `f` is a closure that returns the unit type `()`
+  --> llmspell-bridge/src/standardized_workflows.rs:54:9
+   |
+54 | /         params
+55 | |             .get("continue_on_error")
+56 | |             .and_then(serde_json::Value::as_bool)
+57 | |             .map(|continue_on_error| {
+58 | |                 config.continue_on_error = continue_on_error;
+59 | |             });
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_map_unit_fn
+help: try
+   |
+54 ~         if let Some(continue_on_error) = params
+55 +             .get("continue_on_error")
+56 +             .and_then(serde_json::Value::as_bool) { config.continue_on_error = continue_on_error; }
+   |
+
+warning: called `map(f)` on an `Option` value where `f` is a closure that returns the unit type `()`
+  --> llmspell-bridge/src/standardized_workflows.rs:61:9
+   |
+61 | /         params
+62 | |             .get("max_retry_attempts")
+63 | |             .and_then(serde_json::Value::as_u64)
+64 | |             .map(|max_retries| {
+65 | |                 config.max_retry_attempts = u32::try_from(max_retries).unwrap_or(u32::MAX);
+66 | |             });
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_map_unit_fn
+help: try
+   |
+61 ~         if let Some(max_retries) = params
+62 +             .get("max_retry_attempts")
+63 +             .and_then(serde_json::Value::as_u64) { config.max_retry_attempts = u32::try_from(max_retries).unwrap_or(u32::MAX); }
+   |
+
+warning: this macro has been superceded by `std::sync::LazyLock`
+  --> llmspell-bridge/src/workflow_performance.rs:12:1
+   |
+12 | / lazy_static! {
+13 | |     /// Cache for workflow type information to avoid repeated discovery
+14 | |     static ref WORKFLOW_TYPE_CACHE: Arc<RwLock<HashMap<String, WorkflowTypeInfo>>> =
+15 | |         Arc::new(RwLock::new(HashMap::new()));
+16 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#non_std_lazy_statics
+   = note: `-W clippy::non-std-lazy-statics` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::non_std_lazy_statics)]`
+
+warning: this function could have a `#[must_use]` attribute
+   --> llmspell-bridge/src/workflow_performance.rs:221:1
+    |
+221 | pub fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTypeInfo> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTypeInfo>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-bridge/src/workflows.rs:231:17
+    |
+231 |         params: serde_json::Value,
+    |                 ^^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&serde_json::Value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: this method could have a `#[must_use]` attribute
+   --> llmspell-bridge/src/workflows.rs:850:5
+    |
+850 |     pub fn list_workflow_types(&self) -> Vec<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn list_workflow_types(&self) -> Vec<String>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+warning: this method could have a `#[must_use]` attribute
+   --> llmspell-bridge/src/workflows.rs:855:5
+    |
+855 |     pub fn get_workflow_info(&self, workflow_type: &str) -> Option<WorkflowInfo> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get_workflow_info(&self, workflow_type: &str) -> Option<WorkflowInfo>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+warning: this method could have a `#[must_use]` attribute
+   --> llmspell-bridge/src/workflows.rs:860:5
+    |
+860 |     pub fn get_all_workflow_info(&self) -> Vec<(String, WorkflowInfo)> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get_all_workflow_info(&self) -> Vec<(String, WorkflowInfo)>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+warning: all fields have the same prefix: `total`
+    --> llmspell-bridge/src/workflows.rs:1266:1
+     |
+1266 | / struct RegistryMetrics {
+1267 | |     /// Total workflows registered
+1268 | |     total_registered: AtomicU64,
+1269 | |     /// Total templates registered
+...    |
+1272 | |     total_executions: AtomicU64,
+1273 | | }
+     | |_^
+     |
+     = help: remove the prefixes
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#struct_field_names
+     = note: `-W clippy::struct-field-names` implied by `-W clippy::pedantic`
+     = help: to override `-W clippy::pedantic` add `#[allow(clippy::struct_field_names)]`
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-bridge/src/lua/conversion.rs:141:51
+    |
+141 | pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentInput> {
+    |                                                   ^^^^^ help: consider taking a reference instead: `&Table`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: binding to `_` prefixed variable with no side-effect
+   --> llmspell-bridge/src/lua/conversion.rs:156:9
+    |
+156 |     let _context: Option<ExecutionContext> = None;
+    |         ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#no_effect_underscore_binding
+    = note: `-W clippy::no-effect-underscore-binding` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::no_effect_underscore_binding)]`
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-bridge/src/lua/conversion.rs:208:43
+    |
+208 | fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
+    |                                           ^^^^^ help: consider taking a reference instead: `&Table`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-bridge/src/lua/conversion.rs:414:56
+    |
+414 | pub fn workflow_result_to_lua_table(lua: &Lua, result: serde_json::Value) -> mlua::Result<Table> {
+    |                                                        ^^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&serde_json::Value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: this could be a `const fn`
+   --> llmspell-bridge/src/lua/globals/agent.rs:854:5
+    |
+854 | /     fn new(bridge: Arc<AgentBridge>) -> Self {
+855 | |         Self {
+856 | |             bridge,
+857 | |             name: None,
+...   |
+873 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+    |
+854 |     const fn new(bridge: Arc<AgentBridge>) -> Self {
+    |     +++++
+
+warning: this argument is passed by value, but not consumed in the function body
+    --> llmspell-bridge/src/lua/globals/agent.rs:1095:13
+     |
+1095 |     bridge: Arc<AgentBridge>,
+     |             ^^^^^^^^^^^^^^^^ help: consider taking a reference instead: `&Arc<AgentBridge>`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: redundant clone
+    --> llmspell-bridge/src/lua/globals/agent.rs:1541:36
+     |
+1541 |     let bridge_for_builder = bridge.clone();
+     |                                    ^^^^^^^^ help: remove this
+     |
+note: this value is dropped without further use
+    --> llmspell-bridge/src/lua/globals/agent.rs:1541:30
+     |
+1541 |     let bridge_for_builder = bridge.clone();
+     |                              ^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
+     = note: `-W clippy::redundant-clone` implied by `-W clippy::nursery`
+     = help: to override `-W clippy::nursery` add `#[allow(clippy::redundant_clone)]`
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-bridge/src/lua/globals/hook.rs:235:22
+    |
+235 | fn parse_priority(s: Option<String>) -> Priority {
+    |                      ^^^^^^^^^^^^^^ help: consider taking a reference instead: `&Option<String>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-bridge/src/lua/globals/hook.rs:247:1
+    |
+247 | / pub fn inject_hook_global(
+248 | |     lua: &Lua,
+249 | |     _context: &GlobalContext,
+250 | |     hook_bridge: Arc<HookBridge>,
+251 | | ) -> Result<()> {
+    | |_______________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+  --> llmspell-bridge/src/lua/globals/json.rs:10:1
+   |
+10 | pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: used underscore-prefixed binding
+   --> llmspell-bridge/src/lua/globals/replay.rs:156:48
+    |
+156 |                     arr.push(lua_value_to_json(_lua, v)?);
+    |                                                ^^^^
+    |
+note: binding is defined here
+   --> llmspell-bridge/src/lua/globals/replay.rs:125:22
+    |
+125 | fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
+    |                      ^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_binding
+    = note: `-W clippy::used-underscore-binding` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::used_underscore_binding)]`
+
+warning: used underscore-prefixed binding
+   --> llmspell-bridge/src/lua/globals/replay.rs:163:53
+    |
+163 |                     map.insert(k, lua_value_to_json(_lua, v)?);
+    |                                                     ^^^^
+    |
+note: binding is defined here
+   --> llmspell-bridge/src/lua/globals/replay.rs:125:22
+    |
+125 | fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
+    |                      ^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_binding
+
+warning: item in documentation is missing backticks
+  --> llmspell-bridge/src/lua/globals/session.rs:16:5
+   |
+16 | /// SessionBuilder for creating sessions with method chaining
+   |     ^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+16 - /// SessionBuilder for creating sessions with method chaining
+16 + /// `SessionBuilder` for creating sessions with method chaining
+   |
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/lua/globals/session.rs:26:5
+   |
+26 | /     fn new(bridge: Arc<SessionBridge>) -> Self {
+27 | |         Self {
+28 | |             bridge,
+29 | |             name: None,
+...  |
+33 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+26 |     const fn new(bridge: Arc<SessionBridge>) -> Self {
+   |     +++++
+
+warning: all if blocks contain the same code at the end
+  --> llmspell-bridge/src/lua/globals/streaming.rs:56:29
+   |
+56 | / ...                       Ok(value)
+57 | | ...                   }
+   | |_______________________^
+   |
+   = note: the end suggestion probably needs some adjustments to use the expression result correctly
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#branches_sharing_code
+   = note: `-W clippy::branches-sharing-code` implied by `-W clippy::nursery`
+   = help: to override `-W clippy::nursery` add `#[allow(clippy::branches_sharing_code)]`
+help: consider moving these statements after the if
+   |
+56 ~                             }
+57 +                             Ok(value)
+   |
+
+warning: wildcard pattern covers any other pattern as it will match anyway
+   --> llmspell-bridge/src/lua/globals/workflow.rs:107:9
+    |
+107 |         "fail_fast" | "failfast" | _ => ErrorStrategy::FailFast,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider handling `_` separately
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#wildcard_in_or_patterns
+    = note: `-W clippy::wildcard-in-or-patterns` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::wildcard_in_or_patterns)]`
+
+warning: used underscore-prefixed item
+   --> llmspell-bridge/src/lua/globals/workflow.rs:154:45
+    |
+154 |                         and_conditions.push(_parse_condition(_lua, cond_value)?);
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: item is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:113:1
+    |
+113 | fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_items
+    = note: `-W clippy::used-underscore-items` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::used_underscore_items)]`
+
+warning: used underscore-prefixed binding
+   --> llmspell-bridge/src/lua/globals/workflow.rs:154:62
+    |
+154 |                         and_conditions.push(_parse_condition(_lua, cond_value)?);
+    |                                                              ^^^^
+    |
+note: binding is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:113:21
+    |
+113 | fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+    |                     ^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_binding
+
+warning: used underscore-prefixed item
+   --> llmspell-bridge/src/lua/globals/workflow.rs:167:44
+    |
+167 |                         or_conditions.push(_parse_condition(_lua, cond_value)?);
+    |                                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: item is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:113:1
+    |
+113 | fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_items
+
+warning: used underscore-prefixed binding
+   --> llmspell-bridge/src/lua/globals/workflow.rs:167:61
+    |
+167 |                         or_conditions.push(_parse_condition(_lua, cond_value)?);
+    |                                                             ^^^^
+    |
+note: binding is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:113:21
+    |
+113 | fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+    |                     ^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_binding
+
+warning: used underscore-prefixed item
+   --> llmspell-bridge/src/lua/globals/workflow.rs:177:45
+    |
+177 |                         condition: Box::new(_parse_condition(_lua, inner)?),
+    |                                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: item is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:113:1
+    |
+113 | fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_items
+
+warning: used underscore-prefixed binding
+   --> llmspell-bridge/src/lua/globals/workflow.rs:177:62
+    |
+177 |                         condition: Box::new(_parse_condition(_lua, inner)?),
+    |                                                              ^^^^
+    |
+note: binding is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:113:21
+    |
+113 | fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+    |                     ^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_binding
+
+warning: item in documentation is missing backticks
+   --> llmspell-bridge/src/lua/globals/workflow.rs:443:5
+    |
+443 | /// WorkflowBuilder for creating workflows with method chaining
+    |     ^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+443 - /// WorkflowBuilder for creating workflows with method chaining
+443 + /// `WorkflowBuilder` for creating workflows with method chaining
+    |
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> llmspell-bridge/src/lua/globals/workflow.rs:453:16
+    |
+453 |     condition: Option<Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>>,
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+warning: very complex type used. Consider factoring parts into `type` definitions
+   --> llmspell-bridge/src/lua/globals/workflow.rs:457:21
+    |
+457 |     loop_condition: Option<Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>>,
+    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
+
+warning: used underscore-prefixed item
+   --> llmspell-bridge/src/lua/globals/workflow.rs:530:24
+    |
+530 |             let step = _parse_workflow_step(lua, &step_table)?;
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: item is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:20:1
+    |
+20  | fn _parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_items
+
+warning: used underscore-prefixed item
+   --> llmspell-bridge/src/lua/globals/workflow.rs:548:24
+    |
+548 |             let step = _parse_workflow_step(lua, &step_table)?;
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: item is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:20:1
+    |
+20  | fn _parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_items
+
+warning: used underscore-prefixed item
+   --> llmspell-bridge/src/lua/globals/workflow.rs:554:24
+    |
+554 |             let step = _parse_workflow_step(lua, &step_table)?;
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: item is defined here
+   --> llmspell-bridge/src/lua/globals/workflow.rs:20:1
+    |
+20  | fn _parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_items
+
+warning: item in documentation is missing backticks
+  --> llmspell-bridge/src/lua/hook_adapter.rs:74:68
+   |
+74 |     /// Returns an error if the Lua value cannot be converted to a HookResult
+   |                                                                    ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+74 -     /// Returns an error if the Lua value cannot be converted to a HookResult
+74 +     /// Returns an error if the Lua value cannot be converted to a `HookResult`
+   |
+
+warning: use Option::map_or_else instead of an if let/else
+   --> llmspell-bridge/src/lua/sync_utils.rs:196:21
+    |
+196 | /                     match tokio::time::timeout(duration, future).await {
+197 | |                         Ok(result) => result,
+198 | |                         Err(_) => Err(mlua::Error::RuntimeError(format!(
+199 | |                             "{op_name} timed out after {duration:?}"
+200 | |                         ))),
+201 | |                     }
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+    = note: `-W clippy::option-if-let-else` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::option_if_let_else)]`
+help: try
+    |
+196 ~                     (tokio::time::timeout(duration, future).await).map_or_else(|_| Err(mlua::Error::RuntimeError(format!(
+197 +                             "{op_name} timed out after {duration:?}"
+198 +                         ))), |result| result)
+    |
+
+warning: item in documentation is missing backticks
+ --> llmspell-bridge/src/javascript/mod.rs:1:57
+  |
+1 | //! ABOUTME: JavaScript script engine implementation of ScriptEngineBridge
+  |                                                         ^^^^^^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+1 - //! ABOUTME: JavaScript script engine implementation of ScriptEngineBridge
+1 + //! ABOUTME: JavaScript script engine implementation of `ScriptEngineBridge`
+  |
+
+warning: item in documentation is missing backticks
+ --> llmspell-bridge/src/javascript/engine.rs:1:14
+  |
+1 | //! ABOUTME: JSEngine implementation of ScriptEngineBridge trait
+  |              ^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+1 - //! ABOUTME: JSEngine implementation of ScriptEngineBridge trait
+1 + //! ABOUTME: `JSEngine` implementation of ScriptEngineBridge trait
+  |
+
+warning: item in documentation is missing backticks
+ --> llmspell-bridge/src/javascript/engine.rs:1:41
+  |
+1 | //! ABOUTME: JSEngine implementation of ScriptEngineBridge trait
+  |                                         ^^^^^^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+1 - //! ABOUTME: JSEngine implementation of ScriptEngineBridge trait
+1 + //! ABOUTME: JSEngine implementation of `ScriptEngineBridge` trait
+  |
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/engine.rs:31:5
+   |
+31 | /     pub fn engine_features() -> EngineFeatures {
+32 | |         EngineFeatures {
+33 | |             async_execution: true, // Native async/await
+34 | |             streaming: true,       // Via async generators
+...  |
+41 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+31 |     pub const fn engine_features() -> EngineFeatures {
+   |         +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/agent.rs:13:1
+   |
+13 | / pub fn inject_agent_global(
+14 | |     _ctx: &mut boa_engine::Context,
+15 | |     _context: &GlobalContext,
+16 | | ) -> Result<(), LLMSpellError> {
+...  |
+22 | |     Ok(())
+23 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+13 | pub const fn inject_agent_global(
+   |     +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/event.rs:18:1
+   |
+18 | / pub fn inject_event_global(
+19 | |     _ctx: &mut Context,
+20 | |     _context: &GlobalContext,
+21 | | ) -> Result<(), LLMSpellError> {
+...  |
+27 | |     Ok(())
+28 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+18 | pub const fn inject_event_global(
+   |     +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/hook.rs:13:1
+   |
+13 | / pub fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalContext) -> Result<()> {
+...  |
+19 | |     Ok(())
+20 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+13 | pub const fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalContext) -> Result<()> {
+   |     +++++
+
+warning: item in documentation is missing backticks
+ --> llmspell-bridge/src/javascript/globals/json.rs:9:41
+  |
+9 | /// Note: JavaScript already has native JSON.parse() and JSON.stringify()
+  |                                         ^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+9 - /// Note: JavaScript already has native JSON.parse() and JSON.stringify()
+9 + /// Note: JavaScript already has native `JSON.parse()` and JSON.stringify()
+  |
+
+warning: item in documentation is missing backticks
+ --> llmspell-bridge/src/javascript/globals/json.rs:9:58
+  |
+9 | /// Note: JavaScript already has native JSON.parse() and JSON.stringify()
+  |                                                          ^^^^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+9 - /// Note: JavaScript already has native JSON.parse() and JSON.stringify()
+9 + /// Note: JavaScript already has native JSON.parse() and `JSON.stringify()`
+  |
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/json.rs:16:1
+   |
+16 | / pub fn inject_json_global(
+17 | |     _ctx: &mut boa_engine::Context,
+18 | |     _context: &GlobalContext,
+19 | | ) -> Result<(), LLMSpellError> {
+...  |
+25 | |     Ok(())
+26 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+16 | pub const fn inject_json_global(
+   |     +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/state.rs:13:1
+   |
+13 | / pub fn inject_state_global(
+14 | |     _ctx: &mut boa_engine::Context,
+15 | |     _context: &GlobalContext,
+16 | |     _state_global: &StateGlobal,
+...  |
+25 | |     Ok(())
+26 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+13 | pub const fn inject_state_global(
+   |     +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/streaming.rs:13:1
+   |
+13 | / pub fn inject_streaming_global(
+14 | |     _ctx: &mut boa_engine::Context,
+15 | |     _context: &GlobalContext,
+16 | | ) -> Result<(), LLMSpellError> {
+...  |
+23 | |     Ok(())
+24 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+13 | pub const fn inject_streaming_global(
+   |     +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/tool.rs:13:1
+   |
+13 | / pub fn inject_tool_global(
+14 | |     _ctx: &mut boa_engine::Context,
+15 | |     _context: &GlobalContext,
+16 | | ) -> Result<(), LLMSpellError> {
+...  |
+23 | |     Ok(())
+24 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+13 | pub const fn inject_tool_global(
+   |     +++++
+
+warning: this could be a `const fn`
+  --> llmspell-bridge/src/javascript/globals/workflow.rs:13:1
+   |
+13 | / pub fn inject_workflow_global(
+14 | |     _ctx: &mut boa_engine::Context,
+15 | |     _context: &GlobalContext,
+16 | | ) -> Result<(), LLMSpellError> {
+...  |
+23 | |     Ok(())
+24 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
+help: make the function `const`
+   |
+13 | pub const fn inject_workflow_global(
+   |     +++++
+
+warning: useless use of `vec!`
+   --> llmspell-bridge/src/multi_agent.rs:348:13
+    |
+348 | /             &vec![
+349 | |                 "paper_reader_agent".to_string(),
+350 | |                 "concept_extractor_agent".to_string(),
+351 | |                 "critic_agent".to_string(),
+352 | |                 "summary_writer_agent".to_string(),
+353 | |             ],
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
+    = note: `-W clippy::useless-vec` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::useless_vec)]`
+help: you can use a slice directly
+    |
+348 ~             &["paper_reader_agent".to_string(),
+349 +                 "concept_extractor_agent".to_string(),
+350 +                 "critic_agent".to_string(),
+351 ~                 "summary_writer_agent".to_string()],
+    |
+
+warning: useless use of `vec!`
+   --> llmspell-bridge/src/multi_agent.rs:398:13
+    |
+398 | /             &vec![
+399 | |                 "fundamental_analyst".to_string(),
+400 | |                 "technical_analyst".to_string(),
+401 | |                 "risk_analyst".to_string(),
+402 | |                 "market_analyst".to_string(),
+403 | |             ],
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_vec
+help: you can use a slice directly
+    |
+398 ~             &["fundamental_analyst".to_string(),
+399 +                 "technical_analyst".to_string(),
+400 +                 "risk_analyst".to_string(),
+401 ~                 "market_analyst".to_string()],
+    |
+
+warning: `llmspell-bridge` (lib) generated 112 warnings (run `cargo clippy --fix --lib -p llmspell-bridge` to apply 68 suggestions)
+    Checking llmspell-testing v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-testing)
+    Checking llmspell-cli v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-cli)
+warning: `assert!(true)` will be optimized out by the compiler
+   --> llmspell-testing/src/macros.rs:169:9
+    |
+169 |         assert!(true);
+    |         ^^^^^^^^^^^^^
+    |
+    = help: remove it
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assertions_on_constants
+    = note: `#[warn(clippy::assertions_on_constants)]` on by default
+
+    Checking llmspell-tools v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-tools)
+    Checking llmspell-sessions v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-sessions)
+    Checking llmspell-state-persistence v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-state-persistence)
+warning: `llmspell-testing` (lib test) generated 1 warning
+warning: item in documentation is missing backticks
+ --> llmspell-tools/tests/calculator_dos_protection.rs:4:24
+  |
+4 | //! Security tests for CalculatorTool DoS protection
+  |                        ^^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+  = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
+  = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
+help: try
+  |
+4 - //! Security tests for CalculatorTool DoS protection
+4 + //! Security tests for `CalculatorTool` DoS protection
+  |
+
+warning: item in documentation is missing backticks
+ --> llmspell-tools/tests/calculator_dos_protection.rs:4:39
+  |
+4 | //! Security tests for CalculatorTool DoS protection
+  |                                       ^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+4 - //! Security tests for CalculatorTool DoS protection
+4 + //! Security tests for CalculatorTool `DoS` protection
+  |
+
+warning: use Option::map_or_else instead of an if let/else
+  --> llmspell-tools/tests/calculator_dos_protection.rs:34:17
+   |
+34 | /                 if let Some(error) = output.get("error") {
+35 | |                     if let Some(message) = error.get("message") {
+36 | |                         Err(message.as_str().unwrap_or("Unknown error").to_string())
+37 | |                     } else {
+...  |
+41 | |                     Err("Unknown error".to_string())
+42 | |                 }
+   | |_________________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+   = note: `-W clippy::option-if-let-else` implied by `-W clippy::nursery`
+   = help: to override `-W clippy::nursery` add `#[allow(clippy::option_if_let_else)]`
+help: try
+   |
+34 ~                 output.get("error").map_or_else(|| Err("Unknown error".to_string()), |error| if let Some(message) = error.get("message") {
+35 +                         Err(message.as_str().unwrap_or("Unknown error").to_string())
+36 +                     } else {
+37 +                         Err("Unknown error".to_string())
+38 +                     })
+   |
+
+warning: use Option::map_or_else instead of an if let/else
+  --> llmspell-tools/tests/calculator_dos_protection.rs:35:21
+   |
+35 | /                     if let Some(message) = error.get("message") {
+36 | |                         Err(message.as_str().unwrap_or("Unknown error").to_string())
+37 | |                     } else {
+38 | |                         Err("Unknown error".to_string())
+39 | |                     }
+   | |_____________________^ help: try: `error.get("message").map_or_else(|| Err("Unknown error".to_string()), |message| Err(message.as_str().unwrap_or("Unknown error").to_string()))`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+
+warning: use of `format!` to build up a string from an iterator
+  --> llmspell-tools/tests/calculator_dos_protection.rs:65:20
+   |
+65 |     let many_ops = (0..110).map(|i| format!("{i} + ")).collect::<String>() + "0";
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: call `fold` instead
+  --> llmspell-tools/tests/calculator_dos_protection.rs:65:29
+   |
+65 |     let many_ops = (0..110).map(|i| format!("{i} + ")).collect::<String>() + "0";
+   |                             ^^^
+help: ... and use the `write!` macro here
+  --> llmspell-tools/tests/calculator_dos_protection.rs:65:37
+   |
+65 |     let many_ops = (0..110).map(|i| format!("{i} + ")).collect::<String>() + "0";
+   |                                     ^^^^^^^^^^^^^^^^^
+   = note: this can be written more efficiently by appending to a `String` directly
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#format_collect
+   = note: `-W clippy::format-collect` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::format_collect)]`
+
+warning: use Option::map_or instead of an if let/else
+  --> llmspell-tools/tests/calculator_dos_protection.rs:77:13
+   |
+77 | /             if let Ok(ref output) = result {
+78 | |                 output["result"]["result"].as_str() == Some("Infinity")
+79 | |             } else {
+80 | |                 false
+81 | |             }
+   | |_____________^ help: try: `result.as_ref().map_or(false, |output| output["result"]["result"].as_str() == Some("Infinity"))`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+
+warning: item in documentation is missing backticks
+ --> llmspell-tools/tests/http_request_integration.rs:1:27
+  |
+1 | //! Integration tests for HttpRequestTool
+  |                           ^^^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+  = note: `-W clippy::doc-markdown` implied by `-W clippy::pedantic`
+  = help: to override `-W clippy::pedantic` add `#[allow(clippy::doc_markdown)]`
+help: try
+  |
+1 - //! Integration tests for HttpRequestTool
+1 + //! Integration tests for `HttpRequestTool`
+  |
+
+warning: casts from `i32` to `f64` can be expressed infallibly using `From`
+   --> llmspell-tools/tests/calculator_dos_protection.rs:135:41
+    |
+135 |         vars[format!("var{i}")] = json!(i as f64);
+    |                                         ^^^^^^^^
+    |
+    = help: an `as` cast can become silently lossy if the types change in the future
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_lossless
+    = note: `-W clippy::cast-lossless` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_lossless)]`
+help: use `f64::from` instead
+    |
+135 -         vars[format!("var{i}")] = json!(i as f64);
+135 +         vars[format!("var{i}")] = json!(f64::from(i));
+    |
+
+warning: variables can be used directly in the `format!` string
+   --> llmspell-tools/tests/calculator_dos_protection.rs:186:18
+    |
+186 |         .map(|i| format!("sin({})", i))
+    |                  ^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+    = note: `-W clippy::uninlined-format-args` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::uninlined_format_args)]`
+help: change this to
+    |
+186 -         .map(|i| format!("sin({})", i))
+186 +         .map(|i| format!("sin({i})"))
+    |
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/http_request_integration.rs:12:37
+   |
+12 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+   |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+   = note: `-W clippy::default-trait-access` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::default_trait_access)]`
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/http_request_integration.rs:23:37
+   |
+23 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+   |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: variables can be used directly in the `format!` string
+  --> llmspell-tools/tests/http_request_integration.rs:59:13
+   |
+59 |             eprintln!("Warning: HTTP GET test failed due to network issue: {}", e);
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+   = note: `-W clippy::uninlined-format-args` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::uninlined_format_args)]`
+help: change this to
+   |
+59 -             eprintln!("Warning: HTTP GET test failed due to network issue: {}", e);
+59 +             eprintln!("Warning: HTTP GET test failed due to network issue: {e}");
+   |
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/http_request_integration.rs:66:37
+   |
+66 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+   |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/http_request_integration.rs:92:37
+   |
+92 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+   |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:118:37
+    |
+118 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:143:37
+    |
+143 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: variables can be used directly in the `format!` string
+   --> llmspell-tools/tests/http_request_integration.rs:166:13
+    |
+166 | /             eprintln!(
+167 | |                 "Warning: HTTP custom headers test failed due to network issue: {}",
+168 | |                 e
+169 | |             );
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:177:37
+    |
+177 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:197:37
+    |
+197 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: variables can be used directly in the `format!` string
+   --> llmspell-tools/tests/http_request_integration.rs:224:13
+    |
+224 | /             eprintln!(
+225 | |                 "Warning: HTTP retry logic test failed due to network issue: {}",
+226 | |                 e
+227 | |             );
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:235:37
+    |
+235 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:257:37
+    |
+257 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:280:37
+    |
+280 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:307:37
+    |
+307 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:331:37
+    |
+331 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:357:37
+    |
+357 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HttpRequestConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/http_request_integration.rs:372:37
+    |
+372 |     let tool = HttpRequestTool::new(Default::default()).unwrap();
+    |                                     ^^^^^^^^^^^^^^^^^^ help: try: `HttpRequestConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: `llmspell-tools` (test "calculator_dos_protection") generated 8 warnings (run `cargo clippy --fix --test "calculator_dos_protection"` to apply 4 suggestions)
+warning: unused import: `std::sync::Arc`
+ --> llmspell-bridge/benches/session_bench.rs:9:5
+  |
+9 | use std::sync::Arc;
+  |     ^^^^^^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` on by default
+
+warning: calling `TextManipulatorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:16:47
+   |
+16 |             Box::new(TextManipulatorTool::new(Default::default())),
+   |                                               ^^^^^^^^^^^^^^^^^^ help: try: `TextManipulatorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+   = note: `-W clippy::default-trait-access` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::default_trait_access)]`
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:20:45
+   |
+20 |             Box::new(UuidGeneratorTool::new(Default::default())),
+   |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:24:46
+   |
+24 |             Box::new(HashCalculatorTool::new(Default::default())),
+   |                                              ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/security_basic.rs:93:45
+   |
+93 |             Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+   |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:101:46
+    |
+101 |             Box::new(HashCalculatorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                              ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `TextManipulatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:134:47
+    |
+134 |             Box::new(TextManipulatorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                               ^^^^^^^^^^^^^^^^^^ help: try: `TextManipulatorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:205:45
+    |
+205 |             Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/security_basic.rs:265:45
+    |
+265 |             Box::new(UuidGeneratorTool::new(Default::default())) as Box<dyn Tool>,
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: `llmspell-tools` (test "http_request_integration") generated 19 warnings (run `cargo clippy --fix --test "http_request_integration"` to apply 4 suggestions)
+warning: this argument is passed by value, but not consumed in the function body
+  --> llmspell-tools/tests/security_test_suite.rs:31:31
+   |
+31 | fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
+   |                               ^^^^^ help: consider taking a reference instead: `&Value`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+   = note: `-W clippy::needless-pass-by-value` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::needless_pass_by_value)]`
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+  --> llmspell-tools/tests/security_test_suite.rs:31:1
+   |
+31 | / fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
+32 | |     // AgentInput expects parameters to be wrapped in a "parameters" object
+33 | |     let mut input = AgentInput::text("");
+34 | |     let wrapped_params = json!({ "parameters": params });
+...  |
+39 | |     Ok(input)
+40 | | }
+   | |_^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+   = note: `-W clippy::unnecessary-wraps` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnecessary_wraps)]`
+help: remove `Result` from the return type...
+   |
+31 - fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
+31 + fn create_agent_input(params: Value) -> llmspell_core::types::AgentInput {
+   |
+help: ...and then change returning expressions
+   |
+39 -     Ok(input)
+39 +     input
+   |
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-tools/tests/web_search_integration.rs:204:5
+    |
+204 |     use llmspell_core::traits::tool::ToolCategory;
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-W clippy::items-after-statements` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
+
+warning: binding to `_` prefixed variable with no side-effect
+   --> llmspell-tools/tests/web_tools_integration.rs:276:9
+    |
+276 |     let _output = result; // Just check it doesn't panic
+    |         ^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#no_effect_underscore_binding
+    = note: `-W clippy::no-effect-underscore-binding` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::no_effect_underscore_binding)]`
+
+warning: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
+   --> llmspell-tools/tests/security_test_suite.rs:131:13
+    |
+131 | /             match result {
+132 | |                 Ok(Ok(output)) => {
+133 | |                     assert!(
+134 | |                         !output.text.contains("/etc/passwd") && !output.text.contains("metadata"),
+...   |
+141 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_match_else
+    = note: `-W clippy::single-match-else` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::single_match_else)]`
+help: try
+    |
+131 ~             if let Ok(Ok(output)) = result {
+132 +                 assert!(
+133 +                     !output.text.contains("/etc/passwd") && !output.text.contains("metadata"),
+134 +                     "Tool {tool_name} may be vulnerable to SSRF with URL: {url}"
+135 +                 );
+136 +             } else {
+137 +                 // Tool rejected the URL or timed out - both are acceptable for SSRF prevention
+138 +             }
+    |
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/input_validation_tests.rs:277:37
+    |
+277 |                 "input": "A".repeat(100000),
+    |                                     ^^^^^^ help: consider: `100_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+    = note: `-W clippy::unreadable-literal` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unreadable_literal)]`
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/path_security_tests.rs:266:26
+    |
+266 |                 "bytes": 1000000
+    |                          ^^^^^^^ help: consider: `1_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/rate_limit_tests.rs:146:35
+    |
+146 |                 "content_length": 1000000,
+    |                                   ^^^^^^^ help: consider: `1_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+warning: long literal lacking separators
+   --> llmspell-tools/tests/security/rate_limit_tests.rs:213:36
+    |
+213 |                 "collision_count": 1000000
+    |                                    ^^^^^^^ help: consider: `1_000_000`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+    Checking llmspell-core v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core)
+warning: `llmspell-tools` (test "security_basic") generated 8 warnings
+    Checking llmspell-hooks v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-hooks)
+warning: this `map_or` can be simplified
+   --> llmspell-bridge/tests/workflow_tool_integration_test.rs:415:31
+    |
+415 |                   let success = res
+    |  _______________________________^
+416 | |                     .get("success")
+417 | |                     .map_or(true, |v| v.as_bool().unwrap_or(true));
+    | |__________________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
+    = note: `-W clippy::unnecessary-map-or` implied by `-W clippy::all`
+    = help: to override `-W clippy::all` add `#[allow(clippy::unnecessary_map_or)]`
+help: use is_none_or instead
+    |
+417 -                     .map_or(true, |v| v.as_bool().unwrap_or(true));
+417 +                     .is_none_or(|v| v.as_bool().unwrap_or(true));
+    |
+
+warning: `llmspell-tools` (test "web_search_integration") generated 1 warning
+warning: `llmspell-tools` (test "web_tools_integration") generated 1 warning
+    Checking llmspell-workflows v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-workflows)
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+  --> llmspell-bridge/benches/session_bench.rs:28:20
+   |
+28 |             engine.execute(lua_code).await.unwrap()
+   |                    ^^^^^^^
+   |
+help: there is a method `execute_script` with a similar name
+   |
+28 |             engine.execute_script(lua_code).await.unwrap()
+   |                           +++++++
+
+warning: docs for function returning `Result` missing `# Errors` section
+  --> llmspell-tools/tests/common/mod.rs:17:1
+   |
+17 | pub fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+   = note: `-W clippy::missing-errors-doc` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::missing_errors_doc)]`
+
+warning: `llmspell-tools` (test "security_test_suite") generated 3 warnings (run `cargo clippy --fix --test "security_test_suite"` to apply 1 suggestion)
+warning: docs for function returning `Result` missing `# Errors` section
+  --> llmspell-tools/tests/common/mod.rs:31:1
+   |
+31 | pub fn create_simple_input(input: &str) -> Result<AgentInput, LLMSpellError> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function which may panic missing `# Panics` section
+  --> llmspell-tools/tests/common/mod.rs:37:1
+   |
+37 | pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first possible panic found here
+  --> llmspell-tools/tests/common/mod.rs:38:31
+   |
+38 |     let output_value: Value = serde_json::from_str(&output.text).unwrap();
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+   = note: `-W clippy::missing-panics-doc` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::missing_panics_doc)]`
+
+warning: docs for function which may panic missing `# Panics` section
+  --> llmspell-tools/tests/common/mod.rs:55:1
+   |
+55 | pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+note: first possible panic found here
+  --> llmspell-tools/tests/common/mod.rs:56:31
+   |
+56 |     let output_value: Value = serde_json::from_str(&output.text).unwrap();
+   |                               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+
+warning: use Option::map_or_else instead of an if let/else
+  --> llmspell-tools/tests/common/mod.rs:64:21
+   |
+64 |       let error_msg = if let Some(error_str) = output_value["error"].as_str() {
+   |  _____________________^
+65 | |         // Simple string error format
+66 | |         error_str.to_string()
+67 | |     } else if let Some(error_obj) = output_value["error"].as_object() {
+...  |
+76 | |         panic!("Expected error field in output, got: {output_value}");
+77 | |     };
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+   = note: `-W clippy::option-if-let-else` implied by `-W clippy::nursery`
+   = help: to override `-W clippy::nursery` add `#[allow(clippy::option_if_let_else)]`
+help: try
+   |
+64 ~     let error_msg = output_value["error"].as_str().map_or_else(|| if let Some(error_obj) = output_value["error"].as_object() {
+65 +         // Complex error object format - try message field first
+66 +         if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
+67 +             msg.to_string()
+68 +         } else {
+69 +             // Fallback to serializing the entire error object
+70 +             serde_json::to_string(error_obj).unwrap_or_else(|_| format!("{error_obj:?}"))
+71 +         }
+72 +     } else {
+73 +         panic!("Expected error field in output, got: {output_value}");
+74 ~     }, |error_str| error_str.to_string());
+   |
+
+warning: use Option::map_or_else instead of an if let/else
+  --> llmspell-tools/tests/common/mod.rs:69:9
+   |
+69 | /         if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
+70 | |             msg.to_string()
+71 | |         } else {
+...  |
+74 | |         }
+   | |_________^ help: try: `error_obj.get("message").and_then(|m| m.as_str()).map_or_else(|| serde_json::to_string(error_obj).unwrap_or_else(|_| format!("{error_obj:?}")), |msg| msg.to_string())`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+
+warning: docs for function which may panic missing `# Panics` section
+   --> llmspell-tools/tests/common/mod.rs:148:1
+    |
+148 | pub fn assert_json_contains(actual: &Value, expected: &Value) {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: first possible panic found here
+   --> llmspell-tools/tests/common/mod.rs:152:17
+    |
+152 | /                 assert!(
+153 | |                     actual_map.contains_key(key),
+154 | |                     "Expected key '{key}' not found in actual JSON"
+155 | |                 );
+    | |_________________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+
+warning: `llmspell-bridge` (test "workflow_tool_integration_test") generated 1 warning (run `cargo clippy --fix --test "workflow_tool_integration_test"` to apply 1 suggestion)
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+  --> llmspell-bridge/benches/session_bench.rs:47:16
+   |
+47 |         engine.execute(create_code).await.unwrap()
+   |                ^^^^^^^
+   |
+help: there is a method `execute_script` with a similar name
+   |
+47 |         engine.execute_script(create_code).await.unwrap()
+   |                       +++++++
+
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/auth_tests.rs:494:14
+    |
+494 |             .collect();
+    |              ^^^^^^^
+...
+497 |         assert!(auth_tests.len() > 15);
+    |                 ---------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+    = note: `-W clippy::needless-collect` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::needless_collect)]`
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+491 ~         
+492 |
+493 |         // Should have comprehensive authentication test coverage
+494 ~         assert!(tests
+495 +             .iter()
+496 ~             .filter(|t| t.categories.contains(&TestCategory::Authentication)).count() > 15);
+    |
+
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/auth_tests.rs:505:14
+    |
+505 |             .collect();
+    |              ^^^^^^^
+...
+508 |         assert!(authz_tests.len() > 5);
+    |                 ----------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+502 ~         
+503 |
+504 |         // Should have authorization test coverage
+505 ~         assert!(tests
+506 +             .iter()
+507 ~             .filter(|t| t.categories.contains(&TestCategory::Authorization)).count() > 5);
+    |
+
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/data_exposure_tests.rs:451:14
+    |
+451 |             .collect();
+    |              ^^^^^^^
+...
+454 |         assert_eq!(disclosure_tests.len(), tests.len());
+    |                    ---------------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+448 ~         
+449 |
+450 |         // All data exposure tests should be information disclosure
+451 ~         assert_eq!(tests
+452 +             .iter()
+453 ~             .filter(|t| t.categories.contains(&TestCategory::InformationDisclosure)).count(), tests.len());
+    |
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+  --> llmspell-bridge/benches/session_bench.rs:68:20
+   |
+68 |             engine.execute(&save_code).await.unwrap()
+   |                    ^^^^^^^
+   |
+help: there is a method `execute_script` with a similar name
+   |
+68 |             engine.execute_script(&save_code).await.unwrap()
+   |                           +++++++
+
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/input_validation_tests.rs:497:14
+    |
+497 |             .collect();
+    |              ^^^^^^^
+...
+500 |         assert!(injection_tests.len() > 20);
+    |                 --------------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+494 ~         
+495 |
+496 |         // Should have comprehensive injection test coverage
+497 ~         assert!(tests
+498 +             .iter()
+499 ~             .filter(|t| t.categories.contains(&TestCategory::Injection)).count() > 20);
+    |
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+  --> llmspell-bridge/benches/session_bench.rs:75:20
+   |
+75 |             engine.execute(&load_code).await.unwrap()
+   |                    ^^^^^^^
+   |
+help: there is a method `execute_script` with a similar name
+   |
+75 |             engine.execute_script(&load_code).await.unwrap()
+   |                           +++++++
+
+warning: avoid using `collect()` when not needed
+   --> llmspell-tools/tests/security/rate_limit_tests.rs:422:14
+    |
+422 |             .collect();
+    |              ^^^^^^^
+...
+425 |         assert_eq!(dos_tests.len(), tests.len());
+    |                    --------------- the iterator could be used here instead
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_collect
+help: take the original Iterator's count instead of collecting it and finding the length
+    |
+419 ~         
+420 |
+421 |         // All rate limit tests should be DoS category
+422 ~         assert_eq!(tests
+423 +             .iter()
+424 ~             .filter(|t| t.categories.contains(&TestCategory::DoS)).count(), tests.len());
+    |
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+  --> llmspell-bridge/benches/session_bench.rs:94:16
+   |
+94 |         engine.execute(create_code).await.unwrap()
+   |                ^^^^^^^
+   |
+help: there is a method `execute_script` with a similar name
+   |
+94 |         engine.execute_script(create_code).await.unwrap()
+   |                       +++++++
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:53:5
+   |
+53 | /     pub fn with_attack_vector(mut self, vector: impl Into<String>) -> Self {
+54 | |         self.attack_vector = vector.into();
+55 | |         self
+56 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+   = note: `-W clippy::return-self-not-must-use` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::return_self_not_must_use)]`
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:66:5
+   |
+66 | /     pub fn with_response(mut self, response: impl Into<String>) -> Self {
+67 | |         self.response = Some(response.into());
+68 | |         self
+69 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:72:5
+   |
+72 | /     pub fn with_error(mut self, error: impl Into<String>) -> Self {
+73 | |         self.error = Some(error.into());
+74 | |         self
+75 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-tools/tests/security/test_framework.rs:85:5
+   |
+85 | /     pub fn add_metadata(mut self, key: impl Into<String>, value: Value) -> Self {
+86 | |         self.metadata.insert(key.into(), value);
+87 | |         self
+88 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:303:21
+    |
+303 |     fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+    |                     ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+    = note: `-W clippy::unused-self` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unused_self)]`
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-tools/tests/security/test_framework.rs:303:5
+    |
+303 | /     fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+304 | |         let mut input = AgentInput::text("");
+305 | |
+306 | |         if let Value::Object(params) = payload {
+...   |
+314 | |         Ok(input)
+315 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+    = note: `-W clippy::unnecessary-wraps` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::unnecessary_wraps)]`
+help: remove `Result` from the return type...
+    |
+303 -     fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+303 +     fn create_input(&self, payload: &Value) -> llmspell_core::types::AgentInput {
+    |
+help: ...and then change returning expressions
+    |
+314 -         Ok(input)
+314 +         input
+    |
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:318:25
+    |
+318 |     fn check_prevention(&self, output: &AgentOutput, expected: &ExpectedBehavior) -> bool {
+    |                         ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+
+warning: temporary with significant `Drop` can be early dropped
+   --> llmspell-tools/tests/security/test_framework.rs:335:17
+    |
+334 |       async fn update_stats(&self, result: &SecurityTestResult, test_case: &SecurityTestCase) {
+    |  _____________________________________________________________________________________________-
+335 | |         let mut stats = self.stats.lock().await;
+    | |                 ^^^^^
+336 | |         stats.total_tests += 1;
+...   |
+355 | |     }
+    | |_____- temporary `stats` is currently being dropped at the end of its contained scope
+    |
+    = note: this might lead to unnecessary resource contention
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#significant_drop_tightening
+    = note: `-W clippy::significant-drop-tightening` implied by `-W clippy::nursery`
+    = help: to override `-W clippy::nursery` add `#[allow(clippy::significant_drop_tightening)]`
+help: drop the temporary after the end of its last usage
+    |
+350 ~         let tool_stats = stats.by_tool.entry(result.tool_name.clone()).or_default();
+351 +         drop(stats);
+    |
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:374:21
+    |
+374 |     fn print_result(&self, result: &SecurityTestResult) {
+    |                     ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+
+warning: unused `self` argument
+   --> llmspell-tools/tests/security/test_framework.rs:417:32
+    |
+417 |     fn extract_vulnerabilities(&self, results: &[SecurityTestResult]) -> Vec<Vulnerability> {
+    |                                ^^^^^
+    |
+    = help: consider refactoring to an associated function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_self
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-tools/tests/security/test_framework.rs:464:1
+    |
+464 | pub fn create_params_input(params: Value) -> Result<AgentInput> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:131:20
+    |
+131 |             engine.execute(&store_code).await.unwrap()
+    |                    ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+131 |             engine.execute_script(&store_code).await.unwrap()
+    |                           +++++++
+
+warning: this argument is passed by value, but not consumed in the function body
+   --> llmspell-tools/tests/security/test_framework.rs:464:36
+    |
+464 | pub fn create_params_input(params: Value) -> Result<AgentInput> {
+    |                                    ^^^^^ help: consider taking a reference instead: `&Value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+    = note: `-W clippy::needless-pass-by-value` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::needless_pass_by_value)]`
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:138:20
+    |
+138 |             engine.execute(&list_code).await.unwrap()
+    |                    ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+138 |             engine.execute_script(&list_code).await.unwrap()
+    |                           +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:145:20
+    |
+145 |             engine.execute(&query_code).await.unwrap()
+    |                    ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+145 |             engine.execute_script(&query_code).await.unwrap()
+    |                           +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:178:28
+    |
+178 |                     engine.execute(&lua_code).await.unwrap()
+    |                            ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+178 |                     engine.execute_script(&lua_code).await.unwrap()
+    |                                   +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:188:14
+    |
+187 | /         engine
+188 | |             .execute(r#"return Session.create({ name = "batch_artifact_test" })"#)
+    | |_____________-^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+188 |             .execute_script(r#"return Session.create({ name = "batch_artifact_test" })"#)
+    |                     +++++++
+
+warning: `llmspell-tools` (test "lib") generated 28 warnings
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:219:28
+    |
+219 |                     engine.execute(&store_batch_code).await.unwrap()
+    |                            ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+219 |                     engine.execute_script(&store_batch_code).await.unwrap()
+    |                                   +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:237:18
+    |
+236 | /             engine
+237 | |                 .execute(r#"return Session.create({ name = "perf_test" })"#)
+    | |_________________-^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+237 |                 .execute_script(r#"return Session.create({ name = "perf_test" })"#)
+    |                         +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:247:14
+    |
+246 | /         engine
+247 | |             .execute(r#"return Session.create({ name = "save_load_test" })"#)
+    | |_____________-^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+247 |             .execute_script(r#"return Session.create({ name = "save_load_test" })"#)
+    |                     +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:257:20
+    |
+257 |             engine.execute(&save_code).await.unwrap()
+    |                    ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+257 |             engine.execute_script(&save_code).await.unwrap()
+    |                           +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:266:20
+    |
+266 |             engine.execute(&load_code).await.unwrap()
+    |                    ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+266 |             engine.execute_script(&load_code).await.unwrap()
+    |                           +++++++
+
+error[E0599]: no method named `execute` found for struct `llmspell_bridge::lua::LuaEngine` in the current scope
+   --> llmspell-bridge/benches/session_bench.rs:287:20
+    |
+287 |             engine.execute(&store_text_code).await.unwrap()
+    |                    ^^^^^^^
+    |
+help: there is a method `execute_script` with a similar name
+    |
+287 |             engine.execute_script(&store_text_code).await.unwrap()
+    |                           +++++++
+
+For more information about this error, try `rustc --explain E0599`.
+warning: `llmspell-bridge` (bench "session_bench") generated 1 warning
+error: could not compile `llmspell-bridge` (bench "session_bench") due to 16 previous errors; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> llmspell-sessions/tests/security_validation_test.rs:154:9
+    |
+154 |         config.max_storage_size_bytes = 5 * 1024; // 5KB total
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `llmspell_sessions::SessionManagerConfig { max_storage_size_bytes: 5 * 1024, ..Default::default() }` and removing relevant reassignments
+   --> llmspell-sessions/tests/security_validation_test.rs:150:9
+    |
+150 |         let mut config = SessionManagerConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+    = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> llmspell-sessions/tests/security_validation_test.rs:183:9
+    |
+183 |         config.max_storage_size_bytes = 10 * 1024;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `llmspell_sessions::SessionManagerConfig { max_storage_size_bytes: 10 * 1024, ..Default::default() }` and removing relevant reassignments
+   --> llmspell-sessions/tests/security_validation_test.rs:181:9
+    |
+181 |         let mut config = SessionManagerConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: `llmspell-sessions` (test "security_validation_test") generated 2 warnings
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+  --> llmspell-tools/benches/hook_performance.rs:19:9
+   |
+19 |         enable_hooks: false,
+   |         ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+   |
+   = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> llmspell-sessions/tests/policy_performance_test.rs:152:9
+    |
+152 |         policy_config.composition_pattern = pattern;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `llmspell_sessions::policies::SessionPolicyConfig { composition_pattern: pattern, ..Default::default() }` and removing relevant reassignments
+   --> llmspell-sessions/tests/policy_performance_test.rs:151:9
+    |
+151 |         let mut policy_config = SessionPolicyConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+    = note: `#[warn(clippy::field_reassign_with_default)]` on by default
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+  --> llmspell-tools/benches/hook_performance.rs:59:9
+   |
+59 |         enable_hooks: true,
+   |         ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+   |
+   = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_security_validation`
+  --> llmspell-tools/benches/hook_performance.rs:60:9
+   |
+60 |         enable_security_validation: true,
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+   |
+   = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_audit_logging`
+  --> llmspell-tools/benches/hook_performance.rs:61:9
+   |
+61 |         enable_audit_logging: true,
+   |         ^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+   |
+   = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+   --> llmspell-tools/benches/hook_performance.rs:101:9
+    |
+101 |         enable_hooks: false,
+    |         ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+   --> llmspell-tools/benches/hook_performance.rs:107:9
+    |
+107 |         enable_hooks: true,
+    |         ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_security_validation`
+   --> llmspell-tools/benches/hook_performance.rs:108:9
+    |
+108 |         enable_security_validation: true,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+   --> llmspell-tools/benches/hook_performance.rs:196:9
+    |
+196 |         enable_hooks: true,
+    |         ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `max_security_level`, `audit`
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_circuit_breaker`
+   --> llmspell-tools/benches/hook_performance.rs:197:9
+    |
+197 |         enable_circuit_breaker: true,
+    |         ^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `max_security_level`, `audit`
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+   --> llmspell-tools/benches/hook_performance.rs:243:17
+    |
+243 |                 enable_hooks: false,
+    |                 ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+   --> llmspell-tools/benches/hook_performance.rs:249:17
+    |
+249 |                 enable_hooks: true,
+    |                 ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_security_validation`
+   --> llmspell-tools/benches/hook_performance.rs:250:17
+    |
+250 |                 enable_security_validation: true,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_audit_logging`
+   --> llmspell-tools/benches/hook_performance.rs:251:17
+    |
+251 |                 enable_audit_logging: true,
+    |                 ^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_circuit_breaker`
+   --> llmspell-tools/benches/hook_performance.rs:252:17
+    |
+252 |                 enable_circuit_breaker: true,
+    |                 ^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+   --> llmspell-tools/benches/hook_performance.rs:322:9
+    |
+322 |         enable_hooks: true,
+    |         ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_security_validation`
+   --> llmspell-tools/benches/hook_performance.rs:323:9
+    |
+323 |         enable_security_validation: true,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_audit_logging`
+   --> llmspell-tools/benches/hook_performance.rs:324:9
+    |
+324 |         enable_audit_logging: true,
+    |         ^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_hooks`
+   --> llmspell-tools/benches/hook_performance.rs:371:9
+    |
+371 |         enable_hooks: true,
+    |         ^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+error[E0560]: struct `llmspell_tools::ToolLifecycleConfig` has no field named `enable_security_validation`
+   --> llmspell-tools/benches/hook_performance.rs:372:9
+    |
+372 |         enable_security_validation: true,
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ `llmspell_tools::ToolLifecycleConfig` does not have this field
+    |
+    = note: available fields are: `features`, `max_hook_execution_time`, `resource_limits`, `circuit_breaker_failure_threshold`, `circuit_breaker_recovery_time` ... and 2 others
+
+warning: long literal lacking separators
+  --> llmspell-bridge/tests/integration_test.rs:68:23
+   |
+68 |         "max_memory": 50000000,
+   |                       ^^^^^^^^ help: consider: `50_000_000`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+   = note: `-W clippy::unreadable-literal` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::unreadable_literal)]`
+
+For more information about this error, try `rustc --explain E0560`.
+warning: `llmspell-sessions` (test "policy_performance_test") generated 1 warning
+error: could not compile `llmspell-tools` (bench "hook_performance") due to 19 previous errors
+warning: this function has too many lines (144/100)
+   --> llmspell-agents/examples/code_gen_agent.rs:13:7
+    |
+13  |   async fn main() -> anyhow::Result<()> {
+    |  _______^
+14  | |     // Initialize logging
+15  | |     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
+...   |
+195 | |     Ok(())
+196 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+    = note: `-W clippy::too-many-lines` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::too_many_lines)]`
+
+warning: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide pointers
+   --> llmspell-bridge/tests/integration_test.rs:414:49
+    |
+414 |         assert_eq!(output.output.as_i64(), Some((i * i) as i64));
+    |                                                 ^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_wrap
+    = note: `-W clippy::cast-possible-wrap` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_possible_wrap)]`
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+  --> llmspell-tools/tests/dry_principle_verification_test.rs:38:9
+   |
+38 |         use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+   = note: `-W clippy::items-after-statements` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+  --> llmspell-tools/tests/dry_principle_verification_test.rs:38:40
+   |
+38 |         use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
+   |                                        ^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+  --> llmspell-tools/tests/dry_principle_verification_test.rs:38:53
+   |
+38 |         use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
+   |                                                     ^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+  --> llmspell-tools/tests/dry_principle_verification_test.rs:38:68
+   |
+38 |         use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
+   |                                                                    ^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+warning: `llmspell-agents` (example "code_gen_agent") generated 1 warning
+warning: `llmspell-bridge` (test "integration_test") generated 2 warnings
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/dry_principle_verification_test.rs:17:49
+   |
+17 |         let hash_tool = HashCalculatorTool::new(Default::default());
+   |                                                 ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+   = note: `-W clippy::default-trait-access` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::default_trait_access)]`
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+  --> llmspell-tools/tests/dry_principle_verification_test.rs:69:9
+   |
+69 |         use llmspell_utils::encoding::base64_encode;
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+  --> llmspell-tools/tests/dry_principle_verification_test.rs:79:48
+   |
+79 |         let uuid_tool = UuidGeneratorTool::new(Default::default());
+   |                                                ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `JsonProcessorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/dry_principle_verification_test.rs:115:48
+    |
+115 |         let json_tool = JsonProcessorTool::new(Default::default());
+    |                                                ^^^^^^^^^^^^^^^^^^ help: try: `JsonProcessorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/dry_principle_verification_test.rs:176:49
+    |
+176 |         let hash_tool = HashCalculatorTool::new(Default::default());
+    |                                                 ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `HashCalculatorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/dry_principle_verification_test.rs:221:46
+    |
+221 |             Box::new(HashCalculatorTool::new(Default::default())),
+    |                                              ^^^^^^^^^^^^^^^^^^ help: try: `HashCalculatorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `UuidGeneratorConfig::default()` is more clear than this expression
+   --> llmspell-tools/tests/dry_principle_verification_test.rs:223:45
+    |
+223 |             Box::new(UuidGeneratorTool::new(Default::default())),
+    |                                             ^^^^^^^^^^^^^^^^^^ help: try: `UuidGeneratorConfig::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+  --> llmspell-bridge/tests/performance_test.rs:88:23
+   |
+88 |     let degradation = last_100_avg as f64 / first_100_avg as f64;
+   |                       ^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+   = note: `-W clippy::cast-precision-loss` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_precision_loss)]`
+
+warning: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
+  --> llmspell-bridge/tests/performance_test.rs:88:45
+   |
+88 |     let degradation = last_100_avg as f64 / first_100_avg as f64;
+   |                                             ^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: casting `i32` to `u128` may lose the sign of the value
+   --> llmspell-bridge/tests/performance_test.rs:188:49
+    |
+188 |         let avg_micros = duration.as_micros() / iterations as u128;
+    |                                                 ^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+    = note: `-W clippy::cast-sign-loss` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::cast_sign_loss)]`
+
+warning: `format!(..)` appended to existing `String`
+   --> llmspell-bridge/tests/performance_test.rs:295:9
+    |
+295 |         large_script.push_str(&format!("  ['key_{i}'] = 'value_{i}_with_some_padding',\n"));
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: consider using `write!` to avoid the extra allocation
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#format_push_string
+    = note: `-W clippy::format-push-string` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::format_push_string)]`
+
+warning: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   --> llmspell-bridge/tests/performance_test.rs:299:26
+    |
+299 |     let script_size_mb = large_script.len() as f64 / (1024.0 * 1024.0);
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+warning: binding's name is too similar to existing binding
+    --> llmspell-sessions/src/artifact/storage.rs:1669:13
+     |
+1669 |         let artifact1 = SessionArtifact::new(
+     |             ^^^^^^^^^
+     |
+note: existing binding defined here
+    --> llmspell-sessions/src/artifact/storage.rs:1665:13
+     |
+1665 |         let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+     |             ^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+note: the lint level is defined here
+    --> llmspell-sessions/src/lib.rs:6:9
+     |
+6    | #![warn(clippy::pedantic)]
+     |         ^^^^^^^^^^^^^^^^
+     = note: `#[warn(clippy::similar_names)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: binding's name is too similar to existing binding
+    --> llmspell-sessions/src/artifact/storage.rs:1679:13
+     |
+1679 |         let artifact2 = SessionArtifact::new(
+     |             ^^^^^^^^^
+     |
+note: existing binding defined here
+    --> llmspell-sessions/src/artifact/storage.rs:1665:13
+     |
+1665 |         let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+     |             ^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+warning: binding's name is too similar to existing binding
+   --> llmspell-sessions/src/replay/session_debug_tests.rs:201:13
+    |
+201 |     let mut state1 = create_test_captured_state("hook_1", Uuid::new_v4());
+    |             ^^^^^^
+    |
+note: existing binding defined here
+   --> llmspell-sessions/src/replay/session_debug_tests.rs:199:13
+    |
+199 |     let mut states = VecDeque::new();
+    |             ^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+warning: binding's name is too similar to existing binding
+   --> llmspell-sessions/src/replay/session_debug_tests.rs:206:13
+    |
+206 |     let mut state2 = create_test_captured_state("hook_2", Uuid::new_v4());
+    |             ^^^^^^
+    |
+note: existing binding defined here
+   --> llmspell-sessions/src/replay/session_debug_tests.rs:199:13
+    |
+199 |     let mut states = VecDeque::new();
+    |             ^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+warning: `llmspell-tools` (test "dry_principle_verification_test") generated 11 warnings
+warning: `llmspell-bridge` (test "performance_test") generated 5 warnings
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> llmspell-sessions/src/artifact/storage.rs:1254:9
+     |
+1254 |         config.max_artifact_size = 1024; // 1KB limit for testing
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `artifact::storage::ArtifactStorageConfig { max_artifact_size: 1024, ..Default::default() }` and removing relevant reassignments
+    --> llmspell-sessions/src/artifact/storage.rs:1253:9
+     |
+1253 |         let mut config = ArtifactStorageConfig::default();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+note: the lint level is defined here
+    --> llmspell-sessions/src/lib.rs:5:9
+     |
+5    | #![warn(clippy::all)]
+     |         ^^^^^^^^^^^
+     = note: `#[warn(clippy::field_reassign_with_default)]` implied by `#[warn(clippy::all)]`
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+    --> llmspell-sessions/src/artifact/storage.rs:1388:9
+     |
+1388 |         config.chunk_size = 1024; // 1KB chunks for testing
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+note: consider initializing the variable with `artifact::storage::ArtifactStorageConfig { chunk_size: 1024, ..Default::default() }` and removing relevant reassignments
+    --> llmspell-sessions/src/artifact/storage.rs:1387:9
+     |
+1387 |         let mut config = ArtifactStorageConfig::default();
+     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: casting `u64` to `u32` may truncate the value
+   --> llmspell-sessions/src/artifact/versioning.rs:248:21
+    |
+248 |                     i as u32,
+    |                     ^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+    = note: `#[warn(clippy::cast_possible_truncation)]` implied by `#[warn(clippy::pedantic)]`
+help: ... or use `try_from` and handle the error accordingly
+    |
+248 -                     i as u32,
+248 +                     u32::try_from(i),
+    |
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/session_controls.rs:707:9
+    |
+707 |         assert_eq!(speed.multiplier(), 1.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: `#[warn(clippy::float_cmp)]` implied by `#[warn(clippy::pedantic)]`
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/session_controls.rs:710:9
+    |
+710 |         assert_eq!(speed.multiplier(), 1.5);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/session_controls.rs:713:9
+    |
+713 |         assert_eq!(speed.multiplier(), 1.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/session_controls.rs:716:9
+    |
+716 |         assert_eq!(speed.multiplier(), 5.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/session_controls.rs:719:9
+    |
+719 |         assert_eq!(speed.multiplier(), 10.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/session_controls.rs:754:9
+    |
+754 |         assert_eq!(progress.progress_percentage, 25.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: calls to `push` immediately after creation
+  --> llmspell-sessions/src/replay/session_debug_tests.rs:43:5
+   |
+43 | /     let mut errors = Vec::new();
+44 | |     errors.push(ReplayError {
+45 | |         timestamp: SystemTime::now(),
+46 | |         execution_id: Uuid::new_v4(),
+...  |
+56 | |         error_type: ReplayErrorType::ValidationError,
+57 | |     });
+   | |_______^ help: consider using the `vec![]` macro: `let errors = vec![..];`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#vec_init_then_push
+   = note: `#[warn(clippy::vec_init_then_push)]` implied by `#[warn(clippy::all)]`
+
+warning: module has the same name as its containing module
+   --> llmspell-sessions/src/replay/tests.rs:5:1
+    |
+5   | / mod tests {
+6   | |     use super::super::{
+7   | |         session_adapter::{SessionReplayAdapter, SessionReplayConfig, SessionReplayStatus},
+8   | |         HookReplayBridge, ReplayEngine,
+...   |
+980 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#module_inception
+    = note: `#[warn(clippy::module_inception)]` implied by `#[warn(clippy::all)]`
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/tests.rs:820:9
+    |
+820 |         assert_eq!(speed.multiplier(), 1.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/tests.rs:823:9
+    |
+823 |         assert_eq!(speed.multiplier(), 2.0);
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/tests.rs:827:9
+    |
+827 |         assert_eq!(speed.multiplier(), 0.1); // Clamped to min
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: strict comparison of `f32` or `f64`
+   --> llmspell-sessions/src/replay/tests.rs:830:9
+    |
+830 |         assert_eq!(speed.multiplier(), 10.0); // Clamped to max
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
+    = note: this warning originates in the macro `assert_eq` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+warning: calling `HashMap::default()` is more clear than this expression
+   --> llmspell-sessions/src/bridge/operations.rs:245:23
+    |
+245 |             metadata: Default::default(),
+    |                       ^^^^^^^^^^^^^^^^^^ help: try: `HashMap::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+    = note: `#[warn(clippy::default_trait_access)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: calling `Option::default()` is more clear than this expression
+   --> llmspell-sessions/src/bridge/operations.rs:357:21
+    |
+357 |                     Default::default(),
+    |                     ^^^^^^^^^^^^^^^^^^ help: try: `Option::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: calling `Option::default()` is more clear than this expression
+   --> llmspell-sessions/src/bridge/operations.rs:387:17
+    |
+387 |                 Default::default(),
+    |                 ^^^^^^^^^^^^^^^^^^ help: try: `Option::default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> llmspell-sessions/src/policies/mod.rs:291:9
+    |
+291 |         config.composition_pattern = PolicyComposition::Sequential;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `policies::SessionPolicyConfig { composition_pattern: PolicyComposition::Sequential, ..Default::default() }` and removing relevant reassignments
+   --> llmspell-sessions/src/policies/mod.rs:290:9
+    |
+290 |         let mut config = SessionPolicyConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> llmspell-sessions/src/policies/mod.rs:300:9
+    |
+300 |         config.composition_pattern = PolicyComposition::Parallel;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `policies::SessionPolicyConfig { composition_pattern: PolicyComposition::Parallel, ..Default::default() }` and removing relevant reassignments
+   --> llmspell-sessions/src/policies/mod.rs:299:9
+    |
+299 |         let mut config = SessionPolicyConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> llmspell-sessions/src/policies/mod.rs:309:9
+    |
+309 |         config.composition_pattern = PolicyComposition::Voting { threshold: 0.6 };
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `policies::SessionPolicyConfig { composition_pattern: PolicyComposition::Voting { threshold: 0.6 }, ..Default::default() }` and removing relevant reassignments
+   --> llmspell-sessions/src/policies/mod.rs:308:9
+    |
+308 |         let mut config = SessionPolicyConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: field assignment outside of initializer for an instance created with Default::default()
+   --> llmspell-sessions/src/analytics/session_metrics.rs:557:9
+    |
+557 |         config.privacy_mode = true;
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: consider initializing the variable with `analytics::session_metrics::SessionAnalyticsConfig { privacy_mode: true, ..Default::default() }` and removing relevant reassignments
+   --> llmspell-sessions/src/analytics/session_metrics.rs:556:9
+    |
+556 |         let mut config = SessionAnalyticsConfig::default();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+warning: unused `async` for function with no await statements
+  --> llmspell-sessions/src/replay/tests.rs:18:5
+   |
+18 | /     async fn create_test_replay_components() -> (
+19 | |         Arc<ReplayManager>,
+20 | |         Arc<HookReplayManager>,
+21 | |         Arc<dyn llmspell_storage::StorageBackend>,
+...  |
+52 | |     }
+   | |_____^
+   |
+   = help: consider removing the `async` from this function
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+   = note: `#[warn(clippy::unused_async)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: `llmspell-sessions` (lib test) generated 27 warnings

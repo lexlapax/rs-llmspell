@@ -539,25 +539,21 @@ mod tests {
         assert_eq!(counter.get(), 0);
     }
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_gauge() {
         let gauge = Gauge::new();
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(gauge.get(), 0.0);
 
         gauge.set(42.5);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(gauge.get(), 42.5);
 
         gauge.inc();
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(gauge.get(), 43.5);
 
         gauge.add(10.0);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(gauge.get(), 53.5);
 
         gauge.sub(3.5);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(gauge.get(), 50.0);
     }
     #[test]
@@ -586,16 +582,15 @@ mod tests {
         }
     }
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_agent_metrics() {
         let metrics = AgentMetrics::new("test-agent".to_string());
 
         // Test request tracking
         let timer = metrics.start_request();
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(metrics.requests_active.get(), 1.0);
 
         metrics.complete_request(timer, true);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(metrics.requests_active.get(), 0.0);
         assert_eq!(metrics.requests_total.get(), 1);
         assert_eq!(metrics.requests_failed.get(), 0);
@@ -613,9 +608,7 @@ mod tests {
 
         // Test resource updates
         metrics.update_resources(1024.0 * 1024.0, 25.5);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(metrics.memory_bytes.get(), 1024.0 * 1024.0);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(metrics.cpu_percent.get(), 25.5);
     }
     #[test]

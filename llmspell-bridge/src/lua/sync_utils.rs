@@ -191,7 +191,6 @@ where
             };
 
             let result = if let Some(duration) = timeout {
-                #[allow(clippy::option_if_let_else)] // Complex pattern
                 debug!("Executing {} with timeout of {:?}", op_name, duration);
                 handle.block_on(async {
                     match tokio::time::timeout(duration, future).await {

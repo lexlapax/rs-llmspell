@@ -533,6 +533,7 @@ mod tests {
         assert!(usage.thread_count > 0);
     }
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_performance_report_from_snapshots() {
         let mut snapshots = Vec::new();
 
@@ -560,15 +561,11 @@ mod tests {
 
         let report = PerformanceReport::from_snapshots(&snapshots);
 
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.avg_cpu_percent, 30.0); // (20 + 25 + 30 + 35 + 40) / 5
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.peak_cpu_percent, 40.0);
         assert_eq!(report.avg_memory_bytes, 120 * 1024 * 1024); // Average of the memory values
         assert_eq!(report.peak_memory_bytes, 140 * 1024 * 1024);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.p95_response_time, 90.0); // 5th element (index 4)
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.p99_response_time, 90.0); // Same for small dataset
 
         let summary = report.summary();
@@ -611,6 +608,7 @@ mod tests {
         assert!(violations.iter().any(|v| v.metric == "throughput"));
     }
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_snapshot_storage() {
         let metrics = Arc::new(AgentMetrics::new("test-agent".to_string()));
         let monitor = PerformanceMonitor::new(
@@ -637,11 +635,8 @@ mod tests {
         // Should only have 3 snapshots (oldest removed)
         let snapshots = monitor.snapshots.read().unwrap();
         assert_eq!(snapshots.len(), 3);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(snapshots[0].request_rate, 2.0); // First two were removed
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(snapshots[1].request_rate, 3.0);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(snapshots[2].request_rate, 4.0);
     }
 }

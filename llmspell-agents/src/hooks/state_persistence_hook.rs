@@ -330,11 +330,11 @@ impl Clone for StatePersistenceHook {
 mod tests {
     use super::*;
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_persistence_config_default() {
         let config = PersistenceConfig::default();
         assert!(config.auto_save_interval.is_none());
         assert_eq!(config.max_retries, 3);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(config.backoff_multiplier, 2.0);
         assert_eq!(config.failure_threshold, 5);
         assert!(config.event_settings.save_on_pause);

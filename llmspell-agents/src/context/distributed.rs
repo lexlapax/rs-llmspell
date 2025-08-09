@@ -622,9 +622,9 @@ mod tests {
 
         dist_ctx.initialize().await.unwrap();
 
-        let nodes = dist_ctx.nodes.read().await;
-        assert_eq!(nodes.len(), 1);
-        assert!(nodes.contains_key("node1"));
+        let registered_nodes = dist_ctx.nodes.read().await;
+        assert_eq!(registered_nodes.len(), 1);
+        assert!(registered_nodes.contains_key("node1"));
     }
     #[tokio::test]
     async fn test_replication_strategies() {

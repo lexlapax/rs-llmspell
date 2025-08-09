@@ -345,10 +345,10 @@ mod tests {
         assert_ne!(AgentStatus::Active, AgentStatus::Paused);
     }
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertion on float values
     fn test_agent_metrics_default() {
         let metrics = AgentMetrics::default();
         assert_eq!(metrics.execution_count, 0);
-        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(metrics.success_rate, 1.0);
     }
 }

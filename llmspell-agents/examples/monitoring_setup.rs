@@ -4,9 +4,11 @@
 use llmspell_agents::agents::basic::BasicAgent;
 use llmspell_agents::factory::{AgentConfig, ResourceLimits};
 use llmspell_agents::{
-    AlertCondition, AlertConfig, AlertManager, AlertRule, AlertSeverity, ConsoleLogExporter,
-    ConsoleNotificationChannel, ConsoleTraceExporter, EventLogger, HealthMonitor, LogLevel,
-    MetricRegistry, PerformanceMonitor, ThresholdOperator, TraceCollector, TraceSpan,
+    AlertCondition, AlertConfig, AlertContext, AlertManager, AlertRule, AlertSeverity,
+    ComponentFilter, ConsoleLogExporter, ConsoleNotificationChannel, ConsoleTraceExporter,
+    ErrorDetails, EventLogger, HealthMonitor, LogLevel, MetricRegistry,
+    MonitoringHealthStatus as HealthStatus, PerformanceMonitor, RateLimitFilter, ThresholdOperator,
+    TraceAnalyzer, TraceCollector, TraceSpan,
 };
 use llmspell_core::BaseAgent;
 use std::sync::Arc;
@@ -227,7 +229,6 @@ async fn setup_tracing(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     println!("🔗 Trace Analysis:");
     let trace = collector.get_trace(&trace_id);
 
-    use llmspell_agents::TraceAnalyzer;
     let critical_path = TraceAnalyzer::critical_path(&trace);
     println!("   Critical Path: {} spans", critical_path.len());
 
@@ -245,7 +246,6 @@ fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error::Erro
     logger.add_exporter(Box::new(ConsoleLogExporter));
 
     // Add filters
-    use llmspell_agents::{ComponentFilter, RateLimitFilter};
     logger.add_filter(Box::new(ComponentFilter::new(vec![
         "auth".to_string(),
         "processing".to_string(),
@@ -258,7 +258,6 @@ fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error::Erro
     logger.info("auth", "User authenticated successfully")?;
     logger.warn("processing", "High memory usage detected")?;
 
-    use llmspell_agents::ErrorDetails;
     let error = ErrorDetails {
         error_type: "ValidationError".to_string(),
         message: "Invalid input format".to_string(),
@@ -329,7 +328,6 @@ async fn setup_alerting(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::erro
     agent_metrics.requests_failed.inc_by(7); // 7% error rate
 
     // Evaluate rules
-    use llmspell_agents::{AlertContext, MonitoringHealthStatus as HealthStatus};
     let metrics = registry.collect();
     let context = AlertContext {
         metrics: &metrics,
