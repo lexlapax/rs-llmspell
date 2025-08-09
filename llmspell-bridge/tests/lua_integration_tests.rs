@@ -31,7 +31,7 @@ async fn create_full_test_environment() -> (Lua, GlobalContext, Arc<HookBridge>)
 
 fn run_lua_test_file(lua: &Lua, file_path: &str) -> mlua::Result<bool> {
     let test_content = fs::read_to_string(file_path)
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to read {}: {}", file_path, e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to read {file_path}: {e}")))?;
 
     // Execute the Lua test file and get the result
     lua.load(&test_content).eval()
@@ -57,7 +57,7 @@ async fn test_lua_basic_hooks_integration() {
             assert!(success, "Basic hooks integration test failed");
         }
         Err(e) => {
-            panic!("Failed to run basic hooks test: {}", e);
+            panic!("Failed to run basic hooks test: {e}");
         }
     }
 }
@@ -82,7 +82,7 @@ async fn test_lua_cross_language_integration() {
             assert!(success, "Cross-language integration test failed");
         }
         Err(e) => {
-            panic!("Failed to run cross-language test: {}", e);
+            panic!("Failed to run cross-language test: {e}");
         }
     }
 }
@@ -107,7 +107,7 @@ async fn test_lua_performance_integration() {
             assert!(success, "Performance integration test failed");
         }
         Err(e) => {
-            panic!("Failed to run performance test: {}", e);
+            panic!("Failed to run performance test: {e}");
         }
     }
 }

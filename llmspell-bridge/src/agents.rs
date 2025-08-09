@@ -275,7 +275,7 @@ mod tests {
             .get_or_create_agent("test", "basic", config.clone())
             .await;
         if let Err(e) = &agent1 {
-            eprintln!("Agent creation failed: {:?}", e);
+            eprintln!("Agent creation failed: {e:?}");
         }
         assert!(agent1.is_ok());
 

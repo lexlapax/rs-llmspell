@@ -4,14 +4,14 @@
 use llmspell_bridge::globals::types::GlobalContext;
 use llmspell_bridge::hook_bridge::HookBridge;
 use llmspell_bridge::lua::globals::hook::inject_hook_global;
-use llmspell_bridge::{ComponentRegistry, ProviderManager};
+use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
 use mlua::Lua;
 use std::sync::Arc;
 
 async fn create_test_environment() -> (Lua, GlobalContext, Arc<HookBridge>) {
     let lua = Lua::new();
     let registry = Arc::new(ComponentRegistry::new());
-    let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+    let providers = Arc::new(ProviderManager::new(ProviderManagerConfig::default()).await.unwrap());
     let context = GlobalContext::new(registry, providers);
     let hook_bridge = Arc::new(HookBridge::new(Arc::new(context.clone())).unwrap());
 

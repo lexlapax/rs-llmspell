@@ -190,6 +190,7 @@ where
                 }
             };
 
+            #[allow(clippy::option_if_let_else)] // Complex timeout logic is clearer with if let
             let result = if let Some(duration) = timeout {
                 debug!("Executing {} with timeout of {:?}", op_name, duration);
                 handle.block_on(async {

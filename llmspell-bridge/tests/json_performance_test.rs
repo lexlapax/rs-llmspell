@@ -62,7 +62,7 @@ fn test_json_parse_performance() {
         .unwrap();
     }
     let small_duration = start.elapsed();
-    let small_per_op = small_duration.as_micros() as f64 / f64::from(iterations);
+    let small_per_op = small_duration.as_secs_f64() * 1_000_000.0 / f64::from(iterations);
 
     // Benchmark medium JSON parsing
     let start = Instant::now();
@@ -79,7 +79,7 @@ fn test_json_parse_performance() {
         .unwrap();
     }
     let medium_duration = start.elapsed();
-    let medium_per_op = medium_duration.as_micros() as f64 / f64::from(iterations);
+    let medium_per_op = medium_duration.as_secs_f64() * 1_000_000.0 / f64::from(iterations);
 
     // Benchmark large JSON parsing
     let start = Instant::now();
@@ -96,7 +96,7 @@ fn test_json_parse_performance() {
         .unwrap();
     }
     let large_duration = start.elapsed();
-    let large_per_op = large_duration.as_micros() as f64 / f64::from(iterations);
+    let large_per_op = large_duration.as_secs_f64() * 1_000_000.0 / f64::from(iterations);
 
     println!("JSON Parse Performance:");
     println!("  Small JSON (~100 bytes):  {small_per_op:.2} μs/op");
@@ -149,7 +149,7 @@ fn test_json_stringify_performance() {
         .unwrap();
     }
     let small_duration = start.elapsed();
-    let small_per_op = small_duration.as_micros() as f64 / f64::from(iterations);
+    let small_per_op = small_duration.as_secs_f64() * 1_000_000.0 / f64::from(iterations);
 
     // Benchmark medium data stringify
     let start = Instant::now();
@@ -165,7 +165,7 @@ fn test_json_stringify_performance() {
         .unwrap();
     }
     let medium_duration = start.elapsed();
-    let medium_per_op = medium_duration.as_micros() as f64 / f64::from(iterations);
+    let medium_per_op = medium_duration.as_secs_f64() * 1_000_000.0 / f64::from(iterations);
 
     // Benchmark large data stringify
     let start = Instant::now();
@@ -181,7 +181,7 @@ fn test_json_stringify_performance() {
         .unwrap();
     }
     let large_duration = start.elapsed();
-    let large_per_op = large_duration.as_micros() as f64 / f64::from(iterations);
+    let large_per_op = large_duration.as_secs_f64() * 1_000_000.0 / f64::from(iterations);
 
     println!("\nJSON Stringify Performance:");
     println!("  Small data:  {small_per_op:.2} μs/op");
@@ -224,7 +224,7 @@ fn test_json_roundtrip_performance() {
     }
 
     let duration = start.elapsed();
-    let per_op = duration.as_micros() as f64 / f64::from(iterations);
+    let per_op = duration.as_secs_f64() * 1_000_000.0 / f64::from(iterations);
 
     println!("\nJSON Roundtrip Performance:");
     println!("  Parse->Stringify->Parse: {per_op:.2} μs/op");

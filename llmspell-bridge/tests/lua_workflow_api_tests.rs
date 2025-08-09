@@ -246,7 +246,7 @@ async fn test_lua_workflow_error_handling() {
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test with invalid workflow configuration
-    let script = r#"
+    let script = r"
         local success, err = pcall(function()
             local workflow = Workflow.sequential({
                 -- Missing required 'name' field
@@ -258,7 +258,7 @@ async fn test_lua_workflow_error_handling() {
             success = success,
             has_error = err ~= nil
         }
-    "#;
+    ";
 
     let result = engine.execute_script(script).await.unwrap();
     let value = result.output;

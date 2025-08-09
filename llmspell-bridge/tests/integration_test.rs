@@ -411,6 +411,9 @@ async fn test_concurrent_script_execution() {
         let result = handle.await.unwrap();
         assert!(result.is_ok());
         let output = result.unwrap();
-        assert_eq!(output.output.as_i64(), Some((i * i) as i64));
+        assert_eq!(
+            output.output.as_i64(),
+            Some(i64::try_from(i * i).expect("index square should fit in i64"))
+        );
     }
 }

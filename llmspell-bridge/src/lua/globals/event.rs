@@ -94,12 +94,11 @@ mod tests {
             Ok(outcome) => {
                 assert!(
                     outcome == "received_event" || outcome == "timeout",
-                    "Should either receive event or timeout, got: {}",
-                    outcome
+                    "Should either receive event or timeout, got: {outcome}"
                 );
             }
             Err(e) => {
-                panic!("Event flow test failed: {}", e);
+                panic!("Event flow test failed: {e}");
             }
         }
     }

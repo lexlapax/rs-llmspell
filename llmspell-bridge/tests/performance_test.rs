@@ -6,6 +6,7 @@ use llmspell_bridge::{
     providers::{ProviderManager, ProviderManagerConfig},
     ComponentRegistry,
 };
+use std::fmt::Write;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -44,6 +45,7 @@ async fn test_memory_usage_simple_scripts() {
 
 /// Test for memory leaks with repeated execution
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::cast_precision_loss)] // Timing measurements for performance testing
 async fn test_no_memory_leaks() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -85,7 +87,7 @@ async fn test_no_memory_leaks() {
     println!("First 100 avg: {first_100_avg}μs, Last 100 avg: {last_100_avg}μs");
 
     // Performance should not degrade significantly (indicates memory issues)
-    let degradation = last_100_avg as f64 / first_100_avg as f64;
+    let degradation = (last_100_avg as f64) / (first_100_avg as f64);
     assert!(
         degradation < 2.0,
         "Performance degraded by {degradation:.2}x, possible memory leak"
@@ -185,7 +187,7 @@ async fn test_operation_benchmarks() {
         }
 
         let duration = start.elapsed();
-        let avg_micros = duration.as_micros() / iterations as u128;
+        let avg_micros = duration.as_micros() / u128::try_from(iterations).expect("iterations should be positive");
 
         println!("Operation '{name}': avg {avg_micros}μs");
 
@@ -278,6 +280,7 @@ async fn test_concurrent_execution_correctness() {
 
 /// Test memory usage with large scripts
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::cast_precision_loss)] // File size calculation for diagnostics
 async fn test_large_script_memory() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -292,7 +295,7 @@ async fn test_large_script_memory() {
     let mut large_script = String::new();
     large_script.push_str("local data = {\n");
     for i in 0..10000 {
-        large_script.push_str(&format!("  ['key_{i}'] = 'value_{i}_with_some_padding',\n"));
+        write!(large_script, "  ['key_{i}'] = 'value_{i}_with_some_padding',\n").unwrap();
     }
     large_script.push_str("}\nreturn #data");
 

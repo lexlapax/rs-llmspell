@@ -414,7 +414,8 @@ mod workflow_tool_tests {
                 // Check if execution failed due to timeout
                 let success = res
                     .get("success")
-                    .map_or(true, |v| v.as_bool().unwrap_or(true));
+                    .and_then(|v| v.as_bool())
+                    .unwrap_or(true);
                 let has_error = res.get("error").is_some() || res.get("error_message").is_some();
                 assert!(
                     !success || has_error,

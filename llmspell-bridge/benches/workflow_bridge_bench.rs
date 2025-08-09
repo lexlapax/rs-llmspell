@@ -173,7 +173,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
     let provider_config = ProviderManagerConfig::default();
     let providers =
         Arc::new(rt.block_on(async { ProviderManager::new(provider_config).await.unwrap() }));
-    let context = Arc::new(GlobalContext::new(registry.clone(), providers));
+    let context = Arc::new(GlobalContext::new(registry, providers));
     let global_registry =
         rt.block_on(async { create_standard_registry(context.clone()).await.unwrap() });
     let injector = GlobalInjector::new(Arc::new(global_registry));
