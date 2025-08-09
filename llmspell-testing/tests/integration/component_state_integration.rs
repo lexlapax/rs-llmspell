@@ -2,12 +2,11 @@
 // ABOUTME: Validates state persistence integration and cross-component data consistency
 
 use llmspell_core::ComponentMetadata;
-use llmspell_state_persistence::{StateManager as PersistentStateManager, StateScope};
+use llmspell_state_persistence::StateScope;
 use llmspell_testing::state_helpers::create_test_state_manager;
 use llmspell_tools::state::{ToolState, ToolStateRegistry};
 use llmspell_workflows::state::{PersistentWorkflowState, PersistentWorkflowStateManager};
 use llmspell_workflows::WorkflowConfig;
-use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
@@ -283,7 +282,7 @@ mod component_integration_tests {
         let mut active_components = Vec::new();
         let mut inactive_components = Vec::new();
 
-        for (scope_suffix, component_id, is_active) in &components {
+        for (scope_suffix, component_id, _is_active) in &components {
             let scope = StateScope::Custom(scope_suffix.to_string());
             if let Ok(Some(state_value)) = state_manager.get(scope, "state").await {
                 if state_value["active"].as_bool().unwrap_or(false) {

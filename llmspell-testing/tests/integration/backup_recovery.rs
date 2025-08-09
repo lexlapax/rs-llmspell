@@ -189,7 +189,7 @@ mod backup_recovery_tests {
 
     #[tokio::test]
     async fn test_disaster_recovery_simulation() {
-        let (state_manager, backup_manager, temp_dir) =
+        let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
 
         // Populate critical application data
@@ -279,7 +279,7 @@ mod backup_recovery_tests {
 
     #[tokio::test]
     async fn test_backup_integrity_validation() {
-        let (state_manager, backup_manager, temp_dir) =
+        let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
 
         // Create test data with various data types

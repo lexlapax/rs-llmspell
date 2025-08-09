@@ -2,8 +2,8 @@
 // ABOUTME: Validates isolation boundaries and permission enforcement
 
 use llmspell_agents::state::{
-    IsolationBoundary, SharedScopeConfig, SharingPattern, StateIsolationManager,
-    StateOperation, StatePermission, StateScope, StateSharingManager,
+    IsolationBoundary, SharedScopeConfig, SharingPattern, StateIsolationManager, StateOperation,
+    StatePermission, StateScope, StateSharingManager,
 };
 use serde_json::json;
 use std::collections::HashMap;

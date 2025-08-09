@@ -7,8 +7,8 @@ use llmspell_hooks::{
     HookContext, HookExecutor, HookPoint, HookRegistry,
 };
 use llmspell_sessions::policies::{
-    PolicyComposition, SessionPolicyConfig, SessionPolicyManager, 
-    timeout::TimeoutConfig, rate_limit::RateLimitConfig
+    rate_limit::RateLimitConfig, timeout::TimeoutConfig, PolicyComposition, SessionPolicyConfig,
+    SessionPolicyManager,
 };
 use std::sync::Arc;
 use std::time::{Duration, Instant};

@@ -25,7 +25,7 @@ async fn test_complex_schema_migration() {
         enabled: true,
         ..Default::default()
     };
-    let state_manager = Arc::new(
+    let _state_manager = Arc::new(
         StateManager::with_backend(StorageBackendType::Memory, config)
             .await
             .unwrap(),
@@ -414,7 +414,7 @@ async fn test_multi_step_migration_chain() {
     // In Phase 6, this might have worked differently, but the current behavior is valid
     // We'll accept either multi-step or direct migration as both are valid approaches
     assert!(
-        plan.steps.len() >= 1,
+        !plan.steps.is_empty(),
         "Should have at least 1 migration step, but got {}",
         plan.steps.len()
     );
@@ -851,7 +851,7 @@ async fn test_concurrent_migration_safety() {
     let final_results = results.lock().await;
     assert_eq!(
         final_results.len(),
-        num_items as usize,
+        num_items,
         "All items should be processed"
     );
 
