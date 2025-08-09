@@ -1,7 +1,7 @@
 // ABOUTME: Comprehensive security tests for CalculatorTool DoS protection
 // ABOUTME: Tests enhanced protection against various attack vectors
 
-//! Security tests for CalculatorTool DoS protection
+//! Security tests for `CalculatorTool` `DoS` protection
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::util::CalculatorTool;
@@ -62,7 +62,11 @@ async fn test_basic_complexity_limits() {
     assert!(result.unwrap_err().to_lowercase().contains("too deep"));
 
     // Test operation count limit (need more than 100 operations)
-    let many_ops = (0..110).map(|i| format!("{i} + ")).collect::<String>() + "0";
+    let many_ops = (0..110).fold(String::new(), |mut acc, i| {
+        acc.push_str(&i.to_string());
+        acc.push_str(" + ");
+        acc
+    }) + "0";
     let result = try_evaluate(&many_ops).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_lowercase().contains("operations"));
@@ -132,7 +136,7 @@ async fn test_memory_limits() {
     // Test with way too many variables
     let mut vars = json!({});
     for i in 0..1000 {
-        vars[format!("var{i}")] = json!(i as f64);
+        vars[format!("var{i}")] = json!(f64::from(i));
     }
 
     // Create an expression that uses many variables
@@ -183,7 +187,7 @@ async fn test_timeout_enforcement() {
 
     // Test with many function calls to exceed limits
     let complex = (0..60)
-        .map(|i| format!("sin({})", i))
+        .map(|i| format!("sin({i})"))
         .collect::<Vec<_>>()
         .join(" + ");
     let result = try_evaluate(&complex).await;

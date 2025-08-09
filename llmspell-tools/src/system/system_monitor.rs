@@ -794,7 +794,7 @@ mod tests {
             .await
             .unwrap();
         assert!(result.text.contains("Memory usage"));
-        assert!(result.text.contains("%"));
+        assert!(result.text.contains('%'));
     }
     #[tokio::test]
     async fn test_collect_disk_stats() {

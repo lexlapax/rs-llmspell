@@ -90,7 +90,8 @@ async fn test_hook_overhead_under_5_percent() {
                 .unwrap();
             total_no_hooks += start.elapsed();
         }
-        let avg_no_hooks = total_no_hooks / ITERATIONS as u32;
+        let avg_no_hooks =
+            total_no_hooks / u32::try_from(ITERATIONS).expect("ITERATIONS should fit in u32");
 
         // Measure with hooks
         let mut total_with_hooks = Duration::ZERO;
@@ -103,12 +104,17 @@ async fn test_hook_overhead_under_5_percent() {
                 .unwrap();
             total_with_hooks += start.elapsed();
         }
-        let avg_with_hooks = total_with_hooks / ITERATIONS as u32;
+        let avg_with_hooks =
+            total_with_hooks / u32::try_from(ITERATIONS).expect("ITERATIONS should fit in u32");
 
         // Calculate overhead
-        let overhead_micros = avg_with_hooks.as_micros() as f64 - avg_no_hooks.as_micros() as f64;
+        let overhead_micros = avg_with_hooks
+            .as_micros()
+            .saturating_sub(avg_no_hooks.as_micros());
         let overhead_percent = if avg_no_hooks.as_micros() > 0 {
-            (overhead_micros / avg_no_hooks.as_micros() as f64) * 100.0
+            (f64::from(u32::try_from(overhead_micros).unwrap_or(u32::MAX))
+                / f64::from(u32::try_from(avg_no_hooks.as_micros()).unwrap_or(u32::MAX)))
+                * 100.0
         } else {
             0.0
         };
@@ -155,7 +161,8 @@ async fn test_circuit_breaker_performance() {
     }
 
     let total_duration = start.elapsed();
-    let avg_duration = total_duration / iterations as u32;
+    let avg_duration =
+        total_duration / u32::try_from(iterations).expect("iterations should be positive");
 
     println!("\nCircuit breaker performance:");
     println!("  Average execution time: {avg_duration:?}");
@@ -196,7 +203,8 @@ async fn test_resource_tracking_overhead() {
     }
 
     let total_duration = start.elapsed();
-    let avg_duration = total_duration / iterations as u32;
+    let avg_duration =
+        total_duration / u32::try_from(iterations).expect("iterations should be positive");
 
     println!("\nResource tracking performance:");
     println!("  Average execution time: {avg_duration:?}");
@@ -303,10 +311,11 @@ async fn test_audit_logging_performance_impact() {
     let duration_with_audit = start_with_audit.elapsed();
 
     // Calculate audit logging overhead
-    let overhead_millis =
-        duration_with_audit.as_millis() as f64 - duration_no_audit.as_millis() as f64;
-    let overhead_percent = if duration_no_audit.as_millis() > 0 {
-        (overhead_millis / duration_no_audit.as_millis() as f64) * 100.0
+    let audit_millis = duration_with_audit.as_millis();
+    let no_audit_millis = duration_no_audit.as_millis();
+    let overhead_millis = audit_millis.saturating_sub(no_audit_millis);
+    let overhead_percent = if no_audit_millis > 0 {
+        ((overhead_millis as f64) / (no_audit_millis as f64)) * 100.0
     } else {
         0.0
     };

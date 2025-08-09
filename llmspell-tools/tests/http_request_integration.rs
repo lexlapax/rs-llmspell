@@ -1,4 +1,4 @@
-//! Integration tests for HttpRequestTool
+//! Integration tests for `HttpRequestTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
@@ -56,7 +56,7 @@ async fn test_http_get_request() {
             assert!(result["headers"].is_object());
         }
         Err(e) => {
-            eprintln!("Warning: HTTP GET test failed due to network issue: {}", e);
+            eprintln!("Warning: HTTP GET test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
         }
     }
@@ -163,10 +163,7 @@ async fn test_http_custom_headers() {
             assert!(output.text.contains("custom-value"));
         }
         Err(e) => {
-            eprintln!(
-                "Warning: HTTP custom headers test failed due to network issue: {}",
-                e
-            );
+            eprintln!("Warning: HTTP custom headers test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
             // Skip test instead of panicking
         }
@@ -221,10 +218,7 @@ async fn test_http_retry_logic() {
             assert!(output.text.contains("503"));
         }
         Err(e) => {
-            eprintln!(
-                "Warning: HTTP retry logic test failed due to network issue: {}",
-                e
-            );
+            eprintln!("Warning: HTTP retry logic test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
             // Skip test instead of panicking
         }

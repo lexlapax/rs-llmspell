@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WebScraperTool
+//! ABOUTME: Integration tests for `WebScraperTool`
 //! ABOUTME: Tests web scraping functionality with real websites
 
 mod common;

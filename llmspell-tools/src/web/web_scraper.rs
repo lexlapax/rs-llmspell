@@ -471,7 +471,7 @@ mod tests {
             }),
         );
         let input = AgentInput {
-            text: "".to_string(),
+            text: String::new(),
             media: vec![],
             context: None,
             parameters: params,
@@ -494,7 +494,7 @@ mod tests {
             }),
         );
         let input = AgentInput {
-            text: "".to_string(),
+            text: String::new(),
             media: vec![],
             context: None,
             parameters: params,

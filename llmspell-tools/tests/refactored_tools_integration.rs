@@ -207,7 +207,7 @@ async fn test_refactored_tools_error_consistency() {
     // Test missing required parameters
     let test_cases: Vec<(Box<dyn BaseAgent>, serde_json::Value)> = vec![
         (
-            Box::new(HashCalculatorTool::new(Default::default())),
+            Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
             json!({"operation": "hash", "algorithm": "md5"}),
         ), // missing input
         (
@@ -215,7 +215,7 @@ async fn test_refactored_tools_error_consistency() {
             json!({"operation": "encode"}),
         ), // missing input
         (
-            Box::new(TextManipulatorTool::new(Default::default())),
+            Box::new(TextManipulatorTool::new(TextManipulatorConfig::default())),
             json!({"operation": "uppercase"}),
         ), // missing text
         (
@@ -418,7 +418,7 @@ async fn test_tool_chaining_integration() {
     // Test chaining multiple refactored tools together
 
     // Step 1: Generate a UUID
-    let uuid_tool = UuidGeneratorTool::new(Default::default());
+    let uuid_tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
     let uuid_input = create_test_input("generate", json!({}));
     let uuid_result = uuid_tool
         .execute(uuid_input, ExecutionContext::default())
@@ -428,7 +428,7 @@ async fn test_tool_chaining_integration() {
     let uuid = uuid_output["uuid"].as_str().unwrap();
 
     // Step 2: Hash the UUID
-    let hash_tool = HashCalculatorTool::new(Default::default());
+    let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
     let hash_input = create_test_input(
         "hash",
         json!({

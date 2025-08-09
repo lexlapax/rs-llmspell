@@ -742,7 +742,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "metadata"),
-            ("file_path", &file_path.to_str().unwrap()),
+            ("file_path", file_path.to_str().unwrap()),
         ]);
 
         let result = tool
@@ -763,7 +763,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "detect"),
-            ("file_path", &file_path.to_str().unwrap()),
+            ("file_path", file_path.to_str().unwrap()),
         ]);
 
         let result = tool
@@ -789,7 +789,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "metadata"),
-            ("file_path", &file_path.to_str().unwrap()),
+            ("file_path", file_path.to_str().unwrap()),
         ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
@@ -807,8 +807,8 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "convert"),
-            ("source_path", &source_path.to_str().unwrap()),
-            ("target_path", &target_path.to_str().unwrap()),
+            ("source_path", source_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
             ("target_format", "wav"),
         ]);
 
@@ -831,8 +831,8 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "convert"),
-            ("source_path", &source_path.to_str().unwrap()),
-            ("target_path", &target_path.to_str().unwrap()),
+            ("source_path", source_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
             ("target_format", "flac"),
         ]);
 
@@ -897,7 +897,7 @@ mod tests {
         create_test_wav_file(&file_path).unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_tool_input(vec![("file_path", &file_path.to_str().unwrap())]);
+        let input = create_test_tool_input(vec![("file_path", file_path.to_str().unwrap())]);
 
         let result = tool
             .execute(input, ExecutionContext::default())

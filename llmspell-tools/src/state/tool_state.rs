@@ -525,7 +525,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -565,7 +565,7 @@ mod tests {
         }
 
         fn set_state_manager(&self, state_manager: Arc<dyn StateManager>) {
-            ToolStateManagerHolder::set_state_manager(self, state_manager)
+            ToolStateManagerHolder::set_state_manager(self, state_manager);
         }
 
         fn execution_statistics(&self) -> Option<ToolExecutionStats> {

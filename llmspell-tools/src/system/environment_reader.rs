@@ -126,6 +126,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Check if an environment variable is allowed to be read
+    #[allow(clippy::cognitive_complexity)]
     fn is_var_allowed(&self, var_name: &str) -> bool {
         // Check sandbox permissions first if available
         if let Some(sandbox) = &self.sandbox_context {

@@ -49,7 +49,7 @@ async fn test_tool_executor_basic_execution() {
 
     assert!(result.is_ok());
     let output = result.unwrap();
-    assert!(output.text.contains("4"));
+    assert!(output.text.contains('4'));
 }
 #[tokio::test]
 async fn test_security_validation_with_safe_tool() {
@@ -259,23 +259,23 @@ async fn test_hook_performance_overhead() {
     let duration_with_hooks = start_with_hooks.elapsed();
 
     // Calculate overhead percentage
-    let overhead_ms = duration_with_hooks.as_millis() as f64 - duration_no_hooks.as_millis() as f64;
-    let overhead_percent = if duration_no_hooks.as_millis() > 0 {
-        (overhead_ms / duration_no_hooks.as_millis() as f64) * 100.0
+    let with_hooks_ms = duration_with_hooks.as_millis();
+    let no_hooks_ms = duration_no_hooks.as_millis();
+    let overhead_ms = with_hooks_ms.saturating_sub(no_hooks_ms);
+    let overhead_percent = if no_hooks_ms > 0 {
+        ((overhead_ms as f64) / (no_hooks_ms as f64)) * 100.0
     } else {
         0.0
     };
 
     println!(
-        "No hooks: {:?}, With hooks: {:?}, Overhead: {:.2}%",
-        duration_no_hooks, duration_with_hooks, overhead_percent
+        "No hooks: {duration_no_hooks:?}, With hooks: {duration_with_hooks:?}, Overhead: {overhead_percent:.2}%"
     );
 
     // Verify overhead is reasonable (less than 20% for CI environments)
     assert!(
         overhead_percent < 20.0,
-        "Hook overhead {:.2}% exceeds 20% threshold",
-        overhead_percent
+        "Hook overhead {overhead_percent:.2}% exceeds 20% threshold"
     );
 }
 #[tokio::test]
@@ -296,7 +296,7 @@ async fn test_circuit_breaker_functionality() {
 
     // Cause multiple executions with valid expressions
     for i in 0..5 {
-        let input = AgentInput::text(format!("Circuit breaker test {}", i)).with_parameter(
+        let input = AgentInput::text(format!("Circuit breaker test {i}")).with_parameter(
             "parameters",
             json!({
                 "operation": "evaluate",
@@ -350,7 +350,7 @@ async fn test_hook_integration_with_multiple_tool_types() {
     ];
 
     for (tool, name, params, expected_category, expected_security) in test_cases {
-        let input = AgentInput::text(format!("Test {}", name)).with_parameter("parameters", params);
+        let input = AgentInput::text(format!("Test {name}")).with_parameter("parameters", params);
 
         let result = executor
             .execute_tool_with_hooks(tool.as_ref(), input, ExecutionContext::default())
@@ -410,7 +410,7 @@ async fn test_tool_registry_with_executor() {
 
     assert!(result.is_ok());
     let output = result.unwrap();
-    assert!(output.text.contains("4"));
+    assert!(output.text.contains('4'));
 }
 #[tokio::test]
 async fn test_hookable_tool_execution_trait() {

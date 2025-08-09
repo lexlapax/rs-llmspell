@@ -439,8 +439,7 @@ mod tests {
         let err = result.unwrap_err();
         assert!(
             err.to_string().contains("Replace operation requires"),
-            "Error was: {}",
-            err
+            "Error was: {err}"
         );
     }
     #[tokio::test]
@@ -502,7 +501,7 @@ mod tests {
                     .insert("options".to_string(), opts);
             }
 
-            let input = AgentInput::text(format!("test {}", operation))
+            let input = AgentInput::text(format!("test {operation}"))
                 .with_parameter("parameters".to_string(), params);
 
             let result = tool.execute(input, context.clone()).await;
@@ -513,12 +512,11 @@ mod tests {
                     let result_text = response["result"]["result"].as_str().unwrap();
                     assert_eq!(
                         result_text, expected,
-                        "Operation {} produced unexpected result",
-                        operation
+                        "Operation {operation} produced unexpected result"
                     );
                 }
                 Err(e) => {
-                    panic!("Operation {} failed with error: {}", operation, e);
+                    panic!("Operation {operation} failed with error: {e}");
                 }
             }
         }

@@ -3,14 +3,20 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
-use llmspell_tools::fs::{FileOperationsTool, FileSearchTool};
-use llmspell_tools::system::{ProcessExecutorTool, SystemMonitorTool};
+use llmspell_tools::fs::{
+    file_operations::FileOperationsConfig, file_search::FileSearchConfig, FileOperationsTool,
+    FileSearchTool,
+};
+use llmspell_tools::system::{
+    process_executor::ProcessExecutorConfig, system_monitor::SystemMonitorConfig,
+    ProcessExecutorTool, SystemMonitorTool,
+};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
 #[tokio::test]
 async fn test_file_sandbox_path_traversal_prevention() {
-    let file_tool = FileOperationsTool::new(Default::default());
+    let file_tool = FileOperationsTool::new(FileOperationsConfig::default());
 
     // Attempt path traversal attacks
     let attacks = vec![
@@ -54,7 +60,7 @@ async fn test_file_sandbox_symlink_escape() {
         let _ = symlink("/etc/passwd", &link_path);
     }
 
-    let file_tool = FileOperationsTool::new(Default::default());
+    let file_tool = FileOperationsTool::new(FileOperationsConfig::default());
 
     // Try to read through symlink
     let input = AgentInput::text("read").with_parameter(
@@ -80,7 +86,7 @@ async fn test_file_sandbox_symlink_escape() {
 }
 #[tokio::test]
 async fn test_process_executor_command_injection() {
-    let process_tool = ProcessExecutorTool::new(Default::default());
+    let process_tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
 
     // Attempt command injection attacks
     let attacks = vec![
@@ -133,7 +139,7 @@ async fn test_file_search_directory_traversal() {
     );
 
     let sandbox = Arc::new(FileSandbox::new(sandbox_context).unwrap());
-    let search_tool = FileSearchTool::new(Default::default(), sandbox);
+    let search_tool = FileSearchTool::new(FileSearchConfig::default(), sandbox);
 
     // Try to search outside sandbox
     let attacks = vec![
@@ -170,7 +176,7 @@ async fn test_file_search_directory_traversal() {
 }
 #[tokio::test]
 async fn test_system_monitor_information_disclosure() {
-    let monitor_tool = SystemMonitorTool::new(Default::default());
+    let monitor_tool = SystemMonitorTool::new(SystemMonitorConfig::default());
 
     // System monitor should not expose sensitive information
     let input = AgentInput::text("monitor").with_parameter(
@@ -203,7 +209,7 @@ async fn test_sandbox_resource_exhaustion_prevention() {
     let temp_dir = TempDir::new().unwrap();
     let sandbox_path = temp_dir.path().to_path_buf();
 
-    let file_tool = FileOperationsTool::new(Default::default());
+    let file_tool = FileOperationsTool::new(FileOperationsConfig::default());
 
     // Try to write a very large file (should be limited by tool)
     let large_content = "A".repeat(10_000_000); // 10MB
@@ -243,7 +249,7 @@ fn test_sandbox_escape_via_environment_variables() {
     env::set_var("PATH", "/tmp/malicious:/usr/bin");
 
     // Create process executor
-    let process_tool = ProcessExecutorTool::new(Default::default());
+    let process_tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
 
     // Test that process tool exists and can be created
     // The actual security validation happens in separate security tests

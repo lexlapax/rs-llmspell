@@ -213,6 +213,7 @@ impl ProcessExecutorTool {
     }
 
     /// Check if an executable is allowed to be executed
+    #[allow(clippy::cognitive_complexity)]
     fn is_executable_allowed(&self, executable: &str) -> bool {
         // Check blocked executables first (takes precedence)
         for blocked in &self.config.blocked_executables {

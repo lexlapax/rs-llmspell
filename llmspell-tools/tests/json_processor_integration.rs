@@ -1,4 +1,4 @@
-//! Integration tests for JsonProcessorTool
+//! Integration tests for `JsonProcessorTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},

@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for TemplateEngineTool
+//! ABOUTME: Integration tests for `TemplateEngineTool`
 //! ABOUTME: Tests template rendering with both Tera and Handlebars engines
 
 use llmspell_core::{
@@ -43,7 +43,7 @@ async fn test_tera_loops_and_conditions() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "input": r#"
+            "input": r"
 {% if users %}
 Users:
 {% for user in users %}
@@ -52,15 +52,15 @@ Users:
 {% else %}
 No users found.
 {% endif %}
-"#,
-        "context": {
-            "users": [
-                {"name": "Alice", "age": 25},
-                {"name": "Bob", "age": 30}
-            ]
-        },
-        "engine": "tera"
-    });
+",
+            "context": {
+                "users": [
+                    {"name": "Alice", "age": 25},
+                    {"name": "Bob", "age": 30}
+                ]
+            },
+            "engine": "tera"
+        });
 
     let input = AgentInput::text("").with_parameter("parameters", params);
     let result = tool
@@ -76,7 +76,7 @@ async fn test_handlebars_block_helpers() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "input": r#"
+            "input": r"
 {{#if showGreeting}}
 Hello {{name}}!
 {{#each items}}
@@ -85,14 +85,14 @@ Hello {{name}}!
 {{else}}
 Goodbye!
 {{/if}}
-"#,
-        "context": {
-            "showGreeting": true,
-            "name": "World",
-            "items": ["apple", "banana", "cherry"]
-        },
-        "engine": "handlebars"
-    });
+",
+            "context": {
+                "showGreeting": true,
+                "name": "World",
+                "items": ["apple", "banana", "cherry"]
+            },
+            "engine": "handlebars"
+        });
 
     let input = AgentInput::text("").with_parameter("parameters", params);
     let result = tool
@@ -191,7 +191,7 @@ async fn test_complex_data_structures() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "input": r#"
+            "input": r"
 Company: {{ company.name }}
 Employees:
 {% for dept, employees in departments %}
@@ -200,23 +200,23 @@ Employees:
     - {{ emp.name }}: {{ emp.role }}
   {% endfor %}
 {% endfor %}
-"#,
-        "context": {
-            "company": {
-                "name": "TechCorp"
+",
+            "context": {
+                "company": {
+                    "name": "TechCorp"
+                },
+                "departments": {
+                    "Engineering": [
+                        {"name": "Alice", "role": "Senior Engineer"},
+                        {"name": "Bob", "role": "Junior Engineer"}
+                    ],
+                    "Sales": [
+                        {"name": "Charlie", "role": "Sales Manager"}
+                    ]
+                }
             },
-            "departments": {
-                "Engineering": [
-                    {"name": "Alice", "role": "Senior Engineer"},
-                    {"name": "Bob", "role": "Junior Engineer"}
-                ],
-                "Sales": [
-                    {"name": "Charlie", "role": "Sales Manager"}
-                ]
-            }
-        },
-        "engine": "tera"
-    });
+            "engine": "tera"
+        });
 
     let input = AgentInput::text("").with_parameter("parameters", params);
     let result = tool
@@ -266,8 +266,7 @@ async fn test_missing_parameters() {
     // The error message should mention missing input parameter (standardized from template)
     assert!(
         error_msg.contains("input") || error_msg.contains("Input"),
-        "Expected error about missing input, got: {}",
-        error_msg
+        "Expected error about missing input, got: {error_msg}"
     );
 }
 #[tokio::test]

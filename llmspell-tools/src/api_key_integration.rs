@@ -175,7 +175,7 @@ mod tests {
             .unwrap()
             .as_nanos();
         let service = format!("test_tool_{}_{}", std::process::id(), timestamp);
-        let key_id = format!("tool_{}", service);
+        let key_id = format!("tool_{service}");
 
         let metadata = ApiKeyMetadata {
             key_id: key_id.clone(),

@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for SitemapCrawlerTool
+//! ABOUTME: Integration tests for `SitemapCrawlerTool`
 //! ABOUTME: Tests sitemap parsing and crawling functionality
 
 mod common;
@@ -20,23 +20,20 @@ async fn test_sitemap_crawler_xml() {
     }))
     .unwrap();
 
-    match tool.execute(input, context).await {
-        Ok(output) => {
-            assert_success_output(&output, &["operation", "result"]);
+    if let Ok(output) = tool.execute(input, context).await {
+        assert_success_output(&output, &["operation", "result"]);
 
-            let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-            let result = &output_value["result"];
+        let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+        let result = &output_value["result"];
 
-            // Should have URLs from sitemap
-            assert!(result["urls"].is_array() || result["pages"].is_array());
-            assert!(
-                result["url_count"].as_u64().unwrap_or(0) > 0
-                    || result["total_urls"].as_u64().unwrap_or(0) > 0
-            );
-        }
-        Err(_) => {
-            // Some sites might block automated access, which is okay for tests
-        }
+        // Should have URLs from sitemap
+        assert!(result["urls"].is_array() || result["pages"].is_array());
+        assert!(
+            result["url_count"].as_u64().unwrap_or(0) > 0
+                || result["total_urls"].as_u64().unwrap_or(0) > 0
+        );
+    } else {
+        // Some sites might block automated access, which is okay for tests
     }
 }
 #[tokio::test]
@@ -80,20 +77,17 @@ async fn test_sitemap_crawler_with_filters() {
     }))
     .unwrap();
 
-    match tool.execute(input, context).await {
-        Ok(output) => {
-            let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-            if output_value["success"].as_bool().unwrap() {
-                let result = &output_value["result"];
-                // If successful, check filters were applied
-                if let Some(urls) = result["urls"].as_array() {
-                    assert!(urls.len() <= 10);
-                }
+    if let Ok(output) = tool.execute(input, context).await {
+        let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+        if output_value["success"].as_bool().unwrap() {
+            let result = &output_value["result"];
+            // If successful, check filters were applied
+            if let Some(urls) = result["urls"].as_array() {
+                assert!(urls.len() <= 10);
             }
         }
-        Err(_) => {
-            // Site might not have sitemap or block access
-        }
+    } else {
+        // Site might not have sitemap or block access
     }
 }
 #[tokio::test]
@@ -110,15 +104,12 @@ async fn test_sitemap_crawler_depth_limit() {
     }))
     .unwrap();
 
-    match tool.execute(input, context).await {
-        Ok(output) => {
-            let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-            // Should respect depth limit
-            assert!(output_value["success"].as_bool().is_some());
-        }
-        Err(_) => {
-            // Acceptable if no sitemap exists
-        }
+    if let Ok(output) = tool.execute(input, context).await {
+        let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+        // Should respect depth limit
+        assert!(output_value["success"].as_bool().is_some());
+    } else {
+        // Acceptable if no sitemap exists
     }
 }
 #[tokio::test]
@@ -189,8 +180,7 @@ async fn test_sitemap_crawler_timeout() {
                     || error_str.contains("connection")
                     || error_str.contains("error sending request")
                     || error_str.to_lowercase().contains("timeout"),
-                "Unexpected error message: {}",
-                error_str
+                "Unexpected error message: {error_str}"
             );
         }
     }

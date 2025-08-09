@@ -283,6 +283,7 @@ impl ArchiveHandlerTool {
     }
 
     /// Extract ZIP archive
+    #[allow(clippy::cognitive_complexity)]
     fn extract_zip(
         &self,
         archive_path: &Path,
@@ -375,6 +376,7 @@ impl ArchiveHandlerTool {
     }
 
     /// Extract TAR archive
+    #[allow(clippy::cognitive_complexity)]
     fn extract_tar(
         &self,
         archive_path: &Path,
@@ -443,6 +445,7 @@ impl ArchiveHandlerTool {
     }
 
     /// Extract TAR.GZ archive
+    #[allow(clippy::cognitive_complexity)]
     fn extract_tar_gz(
         &self,
         archive_path: &Path,

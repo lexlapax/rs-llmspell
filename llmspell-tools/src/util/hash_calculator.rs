@@ -393,7 +393,7 @@ mod tests {
         let input = create_test_tool_input(vec![
             ("operation", "hash"),
             ("input_type", "file"),
-            ("file", &file_path.to_str().unwrap()),
+            ("file", file_path.to_str().unwrap()),
             ("algorithm", "md5"),
         ]);
 
@@ -489,7 +489,7 @@ mod tests {
         let input = create_test_tool_input(vec![
             ("operation", "hash"),
             ("input_type", "file"),
-            ("file", &file_path.to_str().unwrap()),
+            ("file", file_path.to_str().unwrap()),
         ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;

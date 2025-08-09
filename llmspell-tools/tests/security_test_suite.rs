@@ -128,16 +128,13 @@ async fn test_ssrf_prevention() {
             .await;
 
             // Tools should either reject, timeout, or handle safely
-            match result {
-                Ok(Ok(output)) => {
-                    assert!(
-                        !output.text.contains("/etc/passwd") && !output.text.contains("metadata"),
-                        "Tool {tool_name} may be vulnerable to SSRF with URL: {url}"
-                    );
-                }
-                Ok(Err(_)) | Err(_) => {
-                    // Tool rejected the URL or timed out - both are acceptable for SSRF prevention
-                }
+            if let Ok(Ok(output)) = result {
+                assert!(
+                    !output.text.contains("/etc/passwd") && !output.text.contains("metadata"),
+                    "Tool {tool_name} may be vulnerable to SSRF with URL: {url}"
+                );
+            } else {
+                // Tool rejected the URL or timed out - both are acceptable for SSRF prevention
             }
         }
     }

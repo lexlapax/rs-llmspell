@@ -560,7 +560,7 @@ mod tests {
     impl MockTool {
         fn new(name: String, category: ToolCategory, security_level: SecurityLevel) -> Self {
             Self {
-                metadata: ComponentMetadata::new(name.clone(), format!("Mock tool: {}", name)),
+                metadata: ComponentMetadata::new(name.clone(), format!("Mock tool: {name}")),
                 category,
                 security_level,
                 name,
@@ -587,7 +587,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -701,8 +701,8 @@ mod tests {
         impl InvalidTool {
             fn new() -> Self {
                 // Create invalid metadata with empty name
-                let mut metadata = ComponentMetadata::new("".to_string(), "".to_string());
-                metadata.name = "".to_string(); // Force empty name
+                let mut metadata = ComponentMetadata::new(String::new(), String::new());
+                metadata.name = String::new(); // Force empty name
                 Self { metadata }
             }
         }
@@ -726,7 +726,7 @@ mod tests {
             }
 
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-                Ok(AgentOutput::text(format!("Error: {}", error)))
+                Ok(AgentOutput::text(format!("Error: {error}")))
             }
         }
 
@@ -741,7 +741,7 @@ mod tests {
             }
 
             fn schema(&self) -> ToolSchema {
-                ToolSchema::new("".to_string(), "".to_string()) // Empty name and description
+                ToolSchema::new(String::new(), String::new()) // Empty name and description
             }
         }
 
@@ -968,12 +968,12 @@ mod tests {
         // Register multiple tools
         for i in 0..3 {
             let tool = MockTool::new(
-                format!("test_tool_{}", i),
+                format!("test_tool_{i}"),
                 ToolCategory::Utility,
                 SecurityLevel::Safe,
             );
             registry
-                .register(format!("test_tool_{}", i), tool)
+                .register(format!("test_tool_{i}"), tool)
                 .await
                 .unwrap();
         }

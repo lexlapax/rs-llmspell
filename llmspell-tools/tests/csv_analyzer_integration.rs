@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for CsvAnalyzerTool with real-world CSV scenarios
+//! ABOUTME: Integration tests for `CsvAnalyzerTool` with real-world CSV scenarios
 //! ABOUTME: Tests complex workflows, large file handling, and error cases
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
@@ -130,14 +130,17 @@ async fn test_large_csv_streaming() {
     let tool = CsvAnalyzerTool::default();
 
     // Generate a large CSV (but still within default limits)
+    use std::fmt::Write;
     let mut csv_content = String::from("id,value,category\n");
     for i in 1..=1000 {
-        csv_content.push_str(&format!(
-            "{},value_{},{}\n",
+        writeln!(
+            csv_content,
+            "{},value_{},{}",
             i,
             i,
             if i % 2 == 0 { "A" } else { "B" }
-        ));
+        )
+        .unwrap();
     }
 
     let input = AgentInput::text("sample large csv").with_parameter(
@@ -165,12 +168,12 @@ async fn test_large_csv_streaming() {
 async fn test_csv_validation() {
     let tool = CsvAnalyzerTool::default();
 
-    let csv_content = r#"id,email,age
+    let csv_content = r"id,email,age
 1,john@example.com,25
 2,invalid-email,30
 3,mary@test.org,150
 4,bob@demo.net,-5
-"#;
+";
 
     let input = AgentInput::text("validate csv data").with_parameter(
         "parameters".to_string(),
@@ -204,11 +207,11 @@ async fn test_csv_validation() {
 async fn test_csv_transform_operation() {
     let tool = CsvAnalyzerTool::default();
 
-    let csv_content = r#"product,price,quantity
+    let csv_content = r"product,price,quantity
 Apple,1.50,100
 Banana,0.75,200
 Orange,2.00,150
-"#;
+";
 
     let input = AgentInput::text("transform csv").with_parameter(
         "parameters".to_string(),

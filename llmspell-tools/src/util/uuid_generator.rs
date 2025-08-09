@@ -613,7 +613,7 @@ mod tests {
         let id = response["result"]["id"].as_str().unwrap();
         assert!(id.starts_with("custom_"));
         assert!(id.ends_with("_v1"));
-        assert!(id.contains("_")); // Contains timestamp separator
+        assert!(id.contains('_')); // Contains timestamp separator
     }
     #[tokio::test]
     async fn test_validate_uuid() {
@@ -672,7 +672,7 @@ mod tests {
             let context = ExecutionContext::with_conversation("test".to_string());
 
             let result = tool.execute(input, context).await;
-            assert!(result.is_ok(), "Format {} failed", format);
+            assert!(result.is_ok(), "Format {format} failed");
 
             let output = result.unwrap().text;
             let response: Value = serde_json::from_str(&output).unwrap();

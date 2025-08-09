@@ -816,7 +816,7 @@ mod tests {
 
         // Create expression with too many operations
         let many_ops = (0..150)
-            .map(|i| format!("{}", i))
+            .map(|i| format!("{i}"))
             .collect::<Vec<_>>()
             .join(" + ");
 
@@ -923,18 +923,13 @@ mod tests {
                 .unwrap();
             let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-            assert_eq!(
-                output["success"], false,
-                "Expression '{}' should fail",
-                expr
-            );
+            assert_eq!(output["success"], false, "Expression '{expr}' should fail");
             let error_msg = output["error"]["message"].as_str().unwrap();
             assert!(
                 error_msg.contains("consecutive")
                     || error_msg.contains("stack overflow")
                     || error_msg.contains("complex"),
-                "Expression '{}' should have appropriate error message",
-                expr
+                "Expression '{expr}' should have appropriate error message"
             );
         }
     }
