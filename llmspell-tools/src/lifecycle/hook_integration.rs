@@ -1143,16 +1143,6 @@ mod tests {
             metadata: ComponentMetadata,
         }
 
-        let config = ToolLifecycleConfig {
-            features: HookFeatures {
-                security_validation_enabled: false,
-                ..Default::default()
-            },
-            max_security_level: SecurityLevel::Safe, // Restrictive, but disabled
-            ..Default::default()
-        };
-        let executor = ToolExecutor::new(config, None, None);
-
         impl PrivilegedMockTool {
             fn new() -> Self {
                 Self {
@@ -1212,6 +1202,16 @@ mod tests {
                     .with_returns(ParameterType::String)
             }
         }
+
+        let config = ToolLifecycleConfig {
+            features: HookFeatures {
+                security_validation_enabled: false,
+                ..Default::default()
+            },
+            max_security_level: SecurityLevel::Safe, // Restrictive, but disabled
+            ..Default::default()
+        };
+        let executor = ToolExecutor::new(config, None, None);
 
         let tool = PrivilegedMockTool::new();
         let input = AgentInput::text("test security validation disabled");

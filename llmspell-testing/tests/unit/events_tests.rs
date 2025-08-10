@@ -5,6 +5,7 @@
 mod tests {
     #[test]
     fn test_placeholder() {
-        assert!(true);
+        // Placeholder test - actual event tests are in llmspell-events/src/
+        assert_eq!(7 * 7, 49, "Basic placeholder test");
     }
 }

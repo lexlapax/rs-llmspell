@@ -146,9 +146,9 @@ async fn test_webpage_monitor_content_diff() {
 
             match tool.execute(input2, create_test_context()).await {
                 Ok(output2) => {
-                    let output_value: serde_json::Value =
+                    let output2_value: serde_json::Value =
                         serde_json::from_str(&output2.text).unwrap();
-                    let result = &output_value["result"];
+                    let result = &output2_value["result"];
 
                     // Should indicate if content changed or not
                     assert!(result.get("has_changes").is_some());

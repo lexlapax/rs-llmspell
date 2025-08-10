@@ -6,15 +6,10 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_core::{traits::tool::Tool, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::json_processor::{JsonProcessorConfig, JsonProcessorTool},
+    data::json_processor::JsonProcessorTool,
     fs::file_operations::FileOperationsTool,
     lifecycle::hook_integration::{HookFeatures, ToolExecutor, ToolLifecycleConfig},
-    util::{
-        calculator::CalculatorTool,
-        hash_calculator::HashCalculatorTool,
-        text_manipulator::{TextManipulatorConfig, TextManipulatorTool},
-        uuid_generator::UuidGeneratorTool,
-    },
+    util::calculator::CalculatorTool,
 };
 use serde_json::json;
 use std::time::Duration;
@@ -329,8 +324,10 @@ fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
                     let duration_with_hooks = start_with_hooks.elapsed();
 
                     // Calculate overhead
+                    #[allow(clippy::cast_precision_loss)]
                     let with_hooks_micros =
                         u64::try_from(duration_with_hooks.as_micros()).unwrap_or(u64::MAX) as f64;
+                    #[allow(clippy::cast_precision_loss)]
                     let no_hooks_micros =
                         u64::try_from(duration_no_hooks.as_micros()).unwrap_or(u64::MAX) as f64;
                     let overhead_micros = with_hooks_micros - no_hooks_micros;

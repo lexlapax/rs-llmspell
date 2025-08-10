@@ -141,17 +141,19 @@ async fn test_webhook_caller_timeout() {
             // Extract error message from various possible locations
             let error_msg = output_value["error"]
                 .as_str()
-                .map(|s| s.to_lowercase())
+                .map(str::to_lowercase)
                 .or_else(|| {
-                    output_value["error"].as_object().map(|error_obj| {
+                    output_value["error"].as_object().and_then(|error_obj| {
                         error_obj
                             .get("message")
                             .and_then(|m| m.as_str())
-                            .map(|s| s.to_lowercase())
-                            .unwrap_or_else(|| {
-                                serde_json::to_string(error_obj)
-                                    .unwrap_or_default()
-                                    .to_lowercase()
+                            .map(str::to_lowercase)
+                            .or_else(|| {
+                                Some(
+                                    serde_json::to_string(error_obj)
+                                        .unwrap_or_default()
+                                        .to_lowercase(),
+                                )
                             })
                     })
                 })
@@ -160,7 +162,7 @@ async fn test_webhook_caller_timeout() {
                         result
                             .get("error")
                             .and_then(|e| e.as_str())
-                            .map(|s| s.to_lowercase())
+                            .map(str::to_lowercase)
                     })
                 })
                 .unwrap_or_default();

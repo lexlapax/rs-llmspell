@@ -315,7 +315,11 @@ async fn test_audit_logging_performance_impact() {
     let no_audit_millis = duration_no_audit.as_millis();
     let overhead_millis = audit_millis.saturating_sub(no_audit_millis);
     let overhead_percent = if no_audit_millis > 0 {
-        ((overhead_millis as f64) / (no_audit_millis as f64)) * 100.0
+        #[allow(clippy::cast_precision_loss)]
+        let overhead_millis_f64 = u64::try_from(overhead_millis).unwrap_or(u64::MAX) as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let no_audit_millis_f64 = u64::try_from(no_audit_millis).unwrap_or(u64::MAX) as f64;
+        (overhead_millis_f64 / no_audit_millis_f64) * 100.0
     } else {
         0.0
     };

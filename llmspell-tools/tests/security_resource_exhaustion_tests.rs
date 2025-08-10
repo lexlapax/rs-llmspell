@@ -160,7 +160,8 @@ async fn test_csv_analyzer_large_file_limit() {
     // Generate large CSV data
     let mut csv_data = String::from("id,name,value\n");
     for i in 0..1_000_000 {
-        csv_data.push_str(&format!("{},name{},{}\n", i, i, i * 100));
+        use std::fmt::Write;
+        let _ = writeln!(&mut csv_data, "{},name{},{}", i, i, i * 100);
     }
 
     let input = AgentInput::text("analyze").with_parameter(

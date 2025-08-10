@@ -36,13 +36,13 @@ mod timeout_tests {
 
                 let error_msg = output_value["error"]
                     .as_str()
-                    .map(|s| s.to_lowercase())
+                    .map(str::to_lowercase)
                     .or_else(|| {
                         output_value["error"].as_object().and_then(|error_obj| {
                             error_obj
                                 .get("message")
                                 .and_then(|m| m.as_str())
-                                .map(|s| s.to_lowercase())
+                                .map(str::to_lowercase)
                                 .or_else(|| {
                                     serde_json::to_string(error_obj)
                                         .ok()
@@ -55,7 +55,7 @@ mod timeout_tests {
                             .get("result")
                             .and_then(|result| result.get("error"))
                             .and_then(|e| e.as_str())
-                            .map(|s| s.to_lowercase())
+                            .map(str::to_lowercase)
                     })
                     .unwrap_or_default();
 
@@ -126,40 +126,35 @@ mod invalid_url_tests {
                     // Check if it's an error response
                     let output_value: serde_json::Value =
                         serde_json::from_str(&output.text).unwrap();
-                    output_value["success"]
-                        .as_bool()
-                        .filter(|&success| !success)
-                        .map(|_| {
-                            // It's an error response - check error message
-                            output_value["error"]
-                                .as_str()
-                                .map(|s| s.to_lowercase())
-                                .or_else(|| {
-                                    output_value["error"].as_object().and_then(|error_obj| {
-                                        error_obj
-                                            .get("message")
-                                            .and_then(|m| m.as_str())
-                                            .map(|s| s.to_lowercase())
-                                            .or_else(|| {
-                                                serde_json::to_string(error_obj)
-                                                    .ok()
-                                                    .map(|s| s.to_lowercase())
-                                            })
-                                    })
+                    if output_value["success"].as_bool() == Some(false) {
+                        // It's an error response - check error message
+                        let error_msg = output_value["error"]
+                            .as_str()
+                            .map(str::to_lowercase)
+                            .or_else(|| {
+                                output_value["error"].as_object().and_then(|error_obj| {
+                                    error_obj
+                                        .get("message")
+                                        .and_then(|m| m.as_str())
+                                        .map(str::to_lowercase)
+                                        .or_else(|| {
+                                            serde_json::to_string(error_obj)
+                                                .ok()
+                                                .map(|s| s.to_lowercase())
+                                        })
                                 })
-                                .unwrap_or_default()
-                        })
-                        .map(|error_msg| {
-                            assert!(
-                                error_msg.contains("url")
-                                    || error_msg.contains("invalid")
-                                    || error_msg.contains("request failed")
-                                    || error_msg.contains("builder error")
-                            );
-                        })
-                        .unwrap_or_else(|| {
-                            panic!("Expected error response, got success: {output_value}")
-                        });
+                            })
+                            .unwrap_or_default();
+
+                        assert!(
+                            error_msg.contains("url")
+                                || error_msg.contains("invalid")
+                                || error_msg.contains("request failed")
+                                || error_msg.contains("builder error")
+                        );
+                    } else {
+                        panic!("Expected error response, got success: {output_value}")
+                    }
                 }
                 Err(e) => {
                     println!("{tool_name} {case_name} test: Got error: {e}");

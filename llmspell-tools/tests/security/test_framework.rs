@@ -235,14 +235,7 @@ impl SecurityTestRunner {
             .with_attack_vector(format!("{:?}", test_case.payload));
 
         // Create input from payload
-        let input = match Self::create_input(&test_case.payload) {
-            Ok(input) => input,
-            Err(e) => {
-                return result
-                    .with_error(format!("Failed to create input: {e}"))
-                    .with_execution_time(start.elapsed());
-            }
-        };
+        let input = Self::create_input(&test_case.payload);
 
         // Execute with timeout
         let execution_result = tokio::time::timeout(
@@ -304,7 +297,7 @@ impl SecurityTestRunner {
     }
 
     /// Create input from payload
-    fn create_input(payload: &Value) -> Result<AgentInput> {
+    fn create_input(payload: &Value) -> AgentInput {
         let mut input = AgentInput::text("");
 
         if let Value::Object(params) = payload {
@@ -315,7 +308,7 @@ impl SecurityTestRunner {
             }
         }
 
-        Ok(input)
+        input
     }
 
     /// Check if attack was prevented
@@ -469,8 +462,8 @@ pub fn create_test_context() -> ExecutionContext {
 ///
 /// # Errors
 ///
-/// Returns an error if the parameters cannot be processed into AgentInput.
-pub fn create_params_input(params: Value) -> Result<AgentInput> {
+/// Returns an error if the parameters cannot be processed into `AgentInput`.
+pub fn create_params_input(params: &Value) -> Result<AgentInput> {
     let mut input = AgentInput::text("");
     let wrapped = json!({ "parameters": params });
     if let Value::Object(map) = wrapped {

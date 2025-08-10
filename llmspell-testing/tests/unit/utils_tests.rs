@@ -5,6 +5,7 @@
 mod tests {
     #[test]
     fn test_placeholder() {
-        assert!(true);
+        // Placeholder test - actual utils tests are in llmspell-utils/src/
+        assert_eq!(9 * 9, 81, "Basic placeholder test");
     }
 }

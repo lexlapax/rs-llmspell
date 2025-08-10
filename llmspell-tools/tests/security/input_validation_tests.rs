@@ -491,12 +491,12 @@ mod tests {
     #[test]
     fn test_injection_category_coverage() {
         let tests = all_input_validation_tests();
-        let injection_tests: Vec<_> = tests
+        let injection_test_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::Injection))
-            .collect();
+            .count();
 
         // Should have comprehensive injection test coverage
-        assert!(injection_tests.len() > 20);
+        assert!(injection_test_count > 20);
     }
 }

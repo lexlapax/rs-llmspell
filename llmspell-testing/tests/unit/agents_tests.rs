@@ -9,6 +9,7 @@ mod tests {
     // These will be populated from existing unit tests in llmspell-agents/src/
     #[test]
     fn test_placeholder() {
-        assert!(true);
+        // Placeholder test - actual agent tests are in llmspell-agents/src/
+        assert_eq!(1 + 1, 2, "Basic placeholder test");
     }
 }

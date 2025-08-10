@@ -31,15 +31,12 @@ async fn try_evaluate(expression: &str) -> Result<Value, String> {
 
             if output["success"] == false {
                 // Extract error message from error.message field
-                if let Some(error) = output.get("error") {
-                    if let Some(message) = error.get("message") {
-                        Err(message.as_str().unwrap_or("Unknown error").to_string())
-                    } else {
-                        Err("Unknown error".to_string())
-                    }
-                } else {
-                    Err("Unknown error".to_string())
-                }
+                Err(output
+                    .get("error")
+                    .and_then(|error| error.get("message"))
+                    .and_then(|message| message.as_str())
+                    .unwrap_or("Unknown error")
+                    .to_string())
             } else {
                 Ok(output)
             }
@@ -78,11 +75,13 @@ async fn test_enhanced_pattern_detection() {
     assert!(
         result.is_err() || {
             // If it evaluates, it should return infinity
-            if let Ok(ref output) = result {
-                output["result"]["result"].as_str() == Some("Infinity")
-            } else {
-                false
-            }
+            matches!(
+                result
+                    .as_ref()
+                    .ok()
+                    .and_then(|output| output["result"]["result"].as_str()),
+                Some("Infinity")
+            )
         }
     );
 

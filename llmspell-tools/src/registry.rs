@@ -696,8 +696,6 @@ mod tests {
             metadata: ComponentMetadata,
         }
 
-        let registry = ToolRegistry::new();
-
         impl InvalidTool {
             fn new() -> Self {
                 // Create invalid metadata with empty name
@@ -745,6 +743,7 @@ mod tests {
             }
         }
 
+        let registry = ToolRegistry::new();
         let invalid_tool = InvalidTool::new();
         let result = registry.register("invalid".to_string(), invalid_tool).await;
         assert!(result.is_err());

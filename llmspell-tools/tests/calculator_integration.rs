@@ -33,11 +33,9 @@ async fn evaluate_expression(
     let output: Value = serde_json::from_str(&result.text)?;
 
     // Extract the result from the response wrapper
-    if let Some(result_obj) = output.get("result") {
-        Ok(result_obj.clone())
-    } else {
-        Ok(output)
-    }
+    Ok(output
+        .get("result")
+        .map_or_else(|| output.clone(), Clone::clone))
 }
 #[tokio::test]
 async fn test_complex_arithmetic() {
@@ -132,11 +130,11 @@ async fn test_logical_operations() {
 async fn test_edge_cases() {
     // Test very large numbers
     let result = evaluate_expression("10^10", None).await.unwrap();
-    assert_eq!(result["result"], 10000000000.0);
+    assert_eq!(result["result"], 10_000_000_000.0);
 
     // Test very small numbers
     let result = evaluate_expression("1.0 / 1000000", None).await.unwrap();
-    assert_eq!(result["result"], 0.000001);
+    assert_eq!(result["result"], 0.000_001);
 
     // Test negative numbers
     let result = evaluate_expression("-5 * -3", None).await.unwrap();

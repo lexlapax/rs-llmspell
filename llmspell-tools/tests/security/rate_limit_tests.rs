@@ -416,12 +416,12 @@ mod tests {
     #[test]
     fn test_dos_category_coverage() {
         let tests = all_rate_limit_tests();
-        let dos_tests: Vec<_> = tests
+        let dos_test_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::DoS))
-            .collect();
+            .count();
 
         // All rate limit tests should be DoS category
-        assert_eq!(dos_tests.len(), tests.len());
+        assert_eq!(dos_test_count, tests.len());
     }
 }
