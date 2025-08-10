@@ -50,6 +50,7 @@ impl SecurityTestResult {
     }
 
     /// Set the attack vector
+    #[must_use]
     pub fn with_attack_vector(mut self, vector: impl Into<String>) -> Self {
         self.attack_vector = vector.into();
         self
@@ -63,12 +64,14 @@ impl SecurityTestResult {
     }
 
     /// Add response
+    #[must_use]
     pub fn with_response(mut self, response: impl Into<String>) -> Self {
         self.response = Some(response.into());
         self
     }
 
     /// Add error
+    #[must_use]
     pub fn with_error(mut self, error: impl Into<String>) -> Self {
         self.error = Some(error.into());
         self
@@ -82,6 +85,7 @@ impl SecurityTestResult {
     }
 
     /// Add metadata
+    #[must_use]
     pub fn add_metadata(mut self, key: impl Into<String>, value: Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
@@ -231,7 +235,7 @@ impl SecurityTestRunner {
             .with_attack_vector(format!("{:?}", test_case.payload));
 
         // Create input from payload
-        let input = match self.create_input(&test_case.payload) {
+        let input = match Self::create_input(&test_case.payload) {
             Ok(input) => input,
             Err(e) => {
                 return result
@@ -250,7 +254,7 @@ impl SecurityTestRunner {
         match execution_result {
             Ok(Ok(output)) => {
                 result = result.with_response(output.text.clone());
-                result.prevented = self.check_prevention(&output, &test_case.expected_behavior);
+                result.prevented = Self::check_prevention(&output, &test_case.expected_behavior);
             }
             Ok(Err(e)) => {
                 result = result.with_error(e.to_string());
@@ -290,7 +294,7 @@ impl SecurityTestRunner {
             let result = self.run_test_case(tool, &test_case).await;
 
             if self.config.verbose {
-                self.print_result(&result);
+                Self::print_result(&result);
             }
 
             results.push(result);
@@ -300,7 +304,7 @@ impl SecurityTestRunner {
     }
 
     /// Create input from payload
-    fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+    fn create_input(payload: &Value) -> Result<AgentInput> {
         let mut input = AgentInput::text("");
 
         if let Value::Object(params) = payload {
@@ -315,7 +319,7 @@ impl SecurityTestRunner {
     }
 
     /// Check if attack was prevented
-    fn check_prevention(&self, output: &AgentOutput, expected: &ExpectedBehavior) -> bool {
+    fn check_prevention(output: &AgentOutput, expected: &ExpectedBehavior) -> bool {
         match expected {
             ExpectedBehavior::Reject => false, // If we got output, it wasn't rejected
             ExpectedBehavior::Sanitize => {
@@ -352,6 +356,7 @@ impl SecurityTestRunner {
         if !result.prevented {
             tool_stats.vulnerabilities += 1;
         }
+        drop(stats); // Explicitly drop the lock guard
     }
 
     /// Should skip test
@@ -371,7 +376,7 @@ impl SecurityTestRunner {
     }
 
     /// Print test result
-    fn print_result(&self, result: &SecurityTestResult) {
+    fn print_result(result: &SecurityTestResult) {
         let status = if result.prevented {
             "✓ PASS"
         } else {
@@ -409,12 +414,12 @@ impl SecurityTestRunner {
             config: self.config.clone(),
             statistics: stats,
             results: results.clone(),
-            vulnerabilities: self.extract_vulnerabilities(&results),
+            vulnerabilities: Self::extract_vulnerabilities(&results),
         }
     }
 
     /// Extract vulnerabilities from results
-    fn extract_vulnerabilities(&self, results: &[SecurityTestResult]) -> Vec<Vulnerability> {
+    fn extract_vulnerabilities(results: &[SecurityTestResult]) -> Vec<Vulnerability> {
         results
             .iter()
             .filter(|r| !r.prevented)
@@ -461,6 +466,10 @@ pub fn create_test_context() -> ExecutionContext {
 }
 
 /// Helper to create parameter-based input
+///
+/// # Errors
+///
+/// Returns an error if the parameters cannot be processed into AgentInput.
 pub fn create_params_input(params: Value) -> Result<AgentInput> {
     let mut input = AgentInput::text("");
     let wrapped = json!({ "parameters": params });

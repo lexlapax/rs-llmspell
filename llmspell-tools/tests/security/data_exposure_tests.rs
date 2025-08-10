@@ -445,12 +445,12 @@ mod tests {
     #[test]
     fn test_information_disclosure_coverage() {
         let tests = all_data_exposure_tests();
-        let disclosure_tests: Vec<_> = tests
+        let disclosure_tests_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::InformationDisclosure))
-            .collect();
+            .count();
 
         // All data exposure tests should be information disclosure
-        assert_eq!(disclosure_tests.len(), tests.len());
+        assert_eq!(disclosure_tests_count, tests.len());
     }
 }

@@ -91,7 +91,7 @@ async fn test_api_tester_status_codes() {
 
     // Test various status codes
     let mut successful_tests = 0;
-    for status_code in [200, 201, 400, 404, 500] {
+    for status_code in [200u32, 201, 400, 404, 500] {
         let context = create_test_context();
         let input = create_agent_input(json!({
             "input": format!("{}/{}", test_endpoints::HTTPBIN_STATUS, status_code),
@@ -133,7 +133,7 @@ async fn test_api_tester_status_codes() {
 
         assert_eq!(
             actual_status,
-            Some(status_code as u64),
+            Some(u64::from(status_code)),
             "Status code mismatch for {status_code}: got {actual_status:?}"
         );
         successful_tests += 1;

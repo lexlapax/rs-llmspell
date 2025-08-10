@@ -3,8 +3,8 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    api::http_request::HttpRequestConfig,
-    data::{graphql_query::GraphQLConfig, json_processor::JsonProcessorConfig, JsonProcessorTool},
+    api::{graphql_query::GraphQLConfig, http_request::HttpRequestConfig},
+    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
     system::{
         environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
         EnvironmentReaderTool, ProcessExecutorTool,
@@ -180,7 +180,7 @@ async fn test_graphql_query_injection() {
         // Should handle safely (likely fail due to no real endpoint)
         if let Ok(output) = result {
             let response: serde_json::Value =
-                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
             // Should not expose sensitive schema information
             if response["success"].as_bool() == Some(true) {
@@ -226,7 +226,7 @@ async fn test_process_executor_argument_injection() {
         // Should either fail or be restricted
         if let Ok(output) = result {
             let response: serde_json::Value =
-                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
             if response["success"].as_bool() == Some(true) {
                 let stdout = response["result"]["stdout"].as_str().unwrap_or("");
@@ -320,7 +320,7 @@ async fn test_http_request_header_injection() {
         // Headers should be sanitized or request should fail
         if let Ok(output) = result {
             let response: serde_json::Value =
-                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
             if response["success"].as_bool() == Some(true) {
                 let headers = &response["result"]["headers"];
@@ -362,7 +362,7 @@ async fn test_environment_reader_information_leak() {
         // Should either fail or return sanitized/empty value
         if let Ok(output) = result {
             let response: serde_json::Value =
-                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
             if response["success"].as_bool() == Some(true) {
                 let value = response["result"]["value"].as_str().unwrap_or("");

@@ -28,7 +28,7 @@ fn create_test_context() -> ExecutionContext {
 }
 
 /// Create an agent input with the given parameters
-fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
+fn create_agent_input(params: &Value) -> AgentInput {
     // AgentInput expects parameters to be wrapped in a "parameters" object
     let mut input = AgentInput::text("");
     let wrapped_params = json!({ "parameters": params });
@@ -36,7 +36,7 @@ fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
         // Convert serde_json::Map to HashMap
         input.parameters = map.into_iter().collect();
     }
-    Ok(input)
+    input
 }
 
 /// Test path traversal attempts across file system tools
@@ -537,7 +537,7 @@ async fn test_error_message_safety() {
 /// Helper function to execute tools directly
 async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput, LLMSpellError> {
     let context = create_test_context();
-    let input = create_agent_input(params)?;
+    let input = create_agent_input(&params);
 
     match tool_name {
         // File system tools

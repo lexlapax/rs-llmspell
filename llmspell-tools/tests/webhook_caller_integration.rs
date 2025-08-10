@@ -139,25 +139,31 @@ async fn test_webhook_caller_timeout() {
             );
 
             // Extract error message from various possible locations
-            let error_msg = if let Some(error_str) = output_value["error"].as_str() {
-                error_str.to_lowercase()
-            } else if let Some(error_obj) = output_value["error"].as_object() {
-                if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
-                    msg.to_lowercase()
-                } else {
-                    serde_json::to_string(error_obj)
-                        .unwrap_or_default()
-                        .to_lowercase()
-                }
-            } else if let Some(result) = output_value.get("result") {
-                if let Some(err) = result.get("error").and_then(|e| e.as_str()) {
-                    err.to_lowercase()
-                } else {
-                    String::new()
-                }
-            } else {
-                String::new()
-            };
+            let error_msg = output_value["error"]
+                .as_str()
+                .map(|s| s.to_lowercase())
+                .or_else(|| {
+                    output_value["error"].as_object().map(|error_obj| {
+                        error_obj
+                            .get("message")
+                            .and_then(|m| m.as_str())
+                            .map(|s| s.to_lowercase())
+                            .unwrap_or_else(|| {
+                                serde_json::to_string(error_obj)
+                                    .unwrap_or_default()
+                                    .to_lowercase()
+                            })
+                    })
+                })
+                .or_else(|| {
+                    output_value.get("result").and_then(|result| {
+                        result
+                            .get("error")
+                            .and_then(|e| e.as_str())
+                            .map(|s| s.to_lowercase())
+                    })
+                })
+                .unwrap_or_default();
 
             assert!(
                 error_msg.contains("timeout")

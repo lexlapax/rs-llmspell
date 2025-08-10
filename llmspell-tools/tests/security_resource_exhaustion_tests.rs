@@ -3,9 +3,15 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::{CsvAnalyzerTool, JsonProcessorTool},
+    data::{
+        csv_analyzer::CsvAnalyzerConfig, json_processor::JsonProcessorConfig, CsvAnalyzerTool,
+        JsonProcessorTool,
+    },
     fs::ArchiveHandlerTool,
-    util::{CalculatorTool, HashCalculatorTool, TextManipulatorTool},
+    util::{
+        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+        CalculatorTool, HashCalculatorTool, TextManipulatorTool,
+    },
 };
 use serde_json::json;
 use std::sync::Arc;

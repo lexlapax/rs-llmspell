@@ -6,10 +6,11 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::JsonProcessorTool,
+    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
     util::{
-        Base64EncoderTool, CalculatorTool, HashCalculatorTool, TextManipulatorTool,
-        UuidGeneratorTool,
+        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+        uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, HashCalculatorTool,
+        TextManipulatorTool, UuidGeneratorTool,
     },
 };
 use serde_json::json;

@@ -918,7 +918,7 @@ mod tests {
         let stats = tool.collect_system_stats().await.unwrap();
 
         // CPU usage should be 0 when collection is disabled
-        assert_eq!(stats.cpu_usage_percent, 0.0);
+        assert!((stats.cpu_usage_percent - 0.0).abs() < f64::EPSILON);
 
         // Disk usage should be empty when collection is disabled
         assert!(stats.disk_usage.is_empty());

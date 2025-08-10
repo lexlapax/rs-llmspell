@@ -198,10 +198,11 @@ async fn test_error_handling() {
 }
 #[tokio::test]
 async fn test_tool_metadata() {
+    use llmspell_core::traits::tool::ToolCategory;
+
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
 
     // Test category
-    use llmspell_core::traits::tool::ToolCategory;
     assert!(matches!(tool.category(), ToolCategory::Web));
 
     // Test security level

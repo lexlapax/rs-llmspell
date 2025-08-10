@@ -6,16 +6,17 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use llmspell_tools::{
-    api::{http_request::HttpRequestConfig, web_search::WebSearchConfig},
+    api::{graphql_query::GraphQLConfig, http_request::HttpRequestConfig},
     data::{
-        csv_analyzer::CsvAnalyzerConfig, graphql_query::GraphQLConfig,
-        json_processor::JsonProcessorConfig, CsvAnalyzerTool, JsonProcessorTool,
+        csv_analyzer::CsvAnalyzerConfig, json_processor::JsonProcessorConfig, CsvAnalyzerTool,
+        JsonProcessorTool,
     },
     fs::{
         file_converter::FileConverterConfig, file_operations::FileOperationsConfig,
         file_search::FileSearchConfig, file_watcher::FileWatcherConfig, ArchiveHandlerTool,
         FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,
     },
+    search::web_search::WebSearchConfig,
     system::{
         environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
         service_checker::ServiceCheckerConfig, system_monitor::SystemMonitorConfig,
@@ -23,9 +24,9 @@ use llmspell_tools::{
     },
     util::{
         hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
-        uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool,
-        DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool,
-        TemplateEngineTool, TextManipulatorTool, UuidGeneratorTool,
+        uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, DataValidationTool,
+        DateTimeHandlerTool, DiffCalculatorTool, HashCalculatorTool, TemplateEngineTool,
+        TextManipulatorTool, UuidGeneratorTool,
     },
     GraphQLQueryTool, HttpRequestTool, WebSearchTool,
 };
@@ -132,16 +133,16 @@ fn bench_data_tools_init(c: &mut Criterion) {
 
     group.bench_function("graphql_query", |b| {
         b.iter(|| {
-            let tool =
-                GraphQLQueryTool::new(GraphQLConfig::default()).expect("Failed to create GraphQL tool");
+            let tool = GraphQLQueryTool::new(GraphQLConfig::default())
+                .expect("Failed to create GraphQL tool");
             black_box(tool)
         });
     });
 
     group.bench_function("http_request", |b| {
         b.iter(|| {
-            let tool =
-                HttpRequestTool::new(HttpRequestConfig::default()).expect("Failed to create HTTP tool");
+            let tool = HttpRequestTool::new(HttpRequestConfig::default())
+                .expect("Failed to create HTTP tool");
             black_box(tool)
         });
     });
@@ -263,11 +264,13 @@ fn bench_all_tools_sequential(c: &mut Criterion) {
             let _json = JsonProcessorTool::new(JsonProcessorConfig::default());
             let _graphql =
                 GraphQLQueryTool::new(GraphQLConfig::default()).expect("GraphQL creation failed");
-            let _http = HttpRequestTool::new(HttpRequestConfig::default()).expect("HTTP creation failed");
+            let _http =
+                HttpRequestTool::new(HttpRequestConfig::default()).expect("HTTP creation failed");
 
             // File system tools
             let _archive = ArchiveHandlerTool::new();
-            let _file_conv = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
+            let _file_conv =
+                FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
             let _file_ops = FileOperationsTool::new(FileOperationsConfig::default());
             let _file_search = FileSearchTool::new(FileSearchConfig::default(), sandbox.clone());
             let _file_watch = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());

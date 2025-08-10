@@ -691,12 +691,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_validation() {
-        let registry = ToolRegistry::new();
-
         // Tool with empty name should fail validation
         struct InvalidTool {
             metadata: ComponentMetadata,
         }
+
+        let registry = ToolRegistry::new();
 
         impl InvalidTool {
             fn new() -> Self {

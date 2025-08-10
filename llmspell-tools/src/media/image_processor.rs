@@ -914,7 +914,7 @@ mod tests {
             width: 1000,
             height: 1000,
         };
-        assert_eq!(square.aspect_ratio(), 1.0);
+        assert!((square.aspect_ratio() - 1.0).abs() < f64::EPSILON);
         assert_eq!(square.orientation(), "square");
     }
     #[tokio::test]

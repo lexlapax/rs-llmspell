@@ -143,7 +143,7 @@ pub fn slow_attack_tests() -> Vec<SecurityTestCase> {
             name: "SLOW_POST_ATTACK".to_string(),
             description: "Slow POST attack".to_string(),
             payload: json!({
-                "content_length": 1000000,
+                "content_length": 1_000_000,
                 "send_rate": 1,
                 "operation": "slow_post"
             }),
@@ -210,7 +210,7 @@ pub fn application_dos_tests() -> Vec<SecurityTestCase> {
             payload: json!({
                 "keys": ["Aa", "BB", "C#", "D4"],
                 "operation": "hash_attack",
-                "collision_count": 1000000
+                "collision_count": 1_000_000
             }),
             expected_behavior: ExpectedBehavior::Reject,
             severity: Severity::Medium,

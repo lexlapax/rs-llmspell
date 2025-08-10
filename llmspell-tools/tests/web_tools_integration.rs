@@ -270,10 +270,9 @@ async fn test_sitemap_crawler_tool_basic() {
     }));
     let context = create_test_context();
 
-    let result = tool.execute(input, context).await;
     // Note: This might fail because httpbin.org/xml doesn't return a valid sitemap
     // But it should fail gracefully with an error message, not panic
-    let _output = result; // Just check it doesn't panic
+    let _ = tool.execute(input, context).await; // Just check it doesn't panic
 }
 #[tokio::test]
 async fn test_sitemap_crawler_tool_invalid_url() {

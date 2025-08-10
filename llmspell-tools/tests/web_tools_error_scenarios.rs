@@ -34,26 +34,30 @@ mod timeout_tests {
                 let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
                 assert!(!output_value["success"].as_bool().unwrap_or(true));
 
-                let error_msg = if let Some(error_str) = output_value["error"].as_str() {
-                    error_str.to_lowercase()
-                } else if let Some(error_obj) = output_value["error"].as_object() {
-                    if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
-                        msg.to_lowercase()
-                    } else {
-                        serde_json::to_string(error_obj)
-                            .unwrap_or_default()
-                            .to_lowercase()
-                    }
-                } else if let Some(result) = output_value.get("result") {
-                    // Some tools put error in result.error
-                    if let Some(err) = result.get("error").and_then(|e| e.as_str()) {
-                        err.to_lowercase()
-                    } else {
-                        String::new()
-                    }
-                } else {
-                    String::new()
-                };
+                let error_msg = output_value["error"]
+                    .as_str()
+                    .map(|s| s.to_lowercase())
+                    .or_else(|| {
+                        output_value["error"].as_object().and_then(|error_obj| {
+                            error_obj
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .map(|s| s.to_lowercase())
+                                .or_else(|| {
+                                    serde_json::to_string(error_obj)
+                                        .ok()
+                                        .map(|s| s.to_lowercase())
+                                })
+                        })
+                    })
+                    .or_else(|| {
+                        output_value
+                            .get("result")
+                            .and_then(|result| result.get("error"))
+                            .and_then(|e| e.as_str())
+                            .map(|s| s.to_lowercase())
+                    })
+                    .unwrap_or_default();
 
                 assert!(
                     error_msg.contains("timeout")
@@ -122,31 +126,40 @@ mod invalid_url_tests {
                     // Check if it's an error response
                     let output_value: serde_json::Value =
                         serde_json::from_str(&output.text).unwrap();
-                    if output_value["success"].as_bool().unwrap_or(true) {
-                        panic!("Expected error response, got success: {output_value}");
-                    } else {
-                        // It's an error response - check error message
-                        let error_msg = if let Some(error_str) = output_value["error"].as_str() {
-                            error_str.to_lowercase()
-                        } else if let Some(error_obj) = output_value["error"].as_object() {
-                            if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
-                                msg.to_lowercase()
-                            } else {
-                                serde_json::to_string(error_obj)
-                                    .unwrap_or_default()
-                                    .to_lowercase()
-                            }
-                        } else {
-                            String::new()
-                        };
-
-                        assert!(
-                            error_msg.contains("url")
-                                || error_msg.contains("invalid")
-                                || error_msg.contains("request failed")
-                                || error_msg.contains("builder error")
-                        );
-                    }
+                    output_value["success"]
+                        .as_bool()
+                        .filter(|&success| !success)
+                        .map(|_| {
+                            // It's an error response - check error message
+                            output_value["error"]
+                                .as_str()
+                                .map(|s| s.to_lowercase())
+                                .or_else(|| {
+                                    output_value["error"].as_object().and_then(|error_obj| {
+                                        error_obj
+                                            .get("message")
+                                            .and_then(|m| m.as_str())
+                                            .map(|s| s.to_lowercase())
+                                            .or_else(|| {
+                                                serde_json::to_string(error_obj)
+                                                    .ok()
+                                                    .map(|s| s.to_lowercase())
+                                            })
+                                    })
+                                })
+                                .unwrap_or_default()
+                        })
+                        .map(|error_msg| {
+                            assert!(
+                                error_msg.contains("url")
+                                    || error_msg.contains("invalid")
+                                    || error_msg.contains("request failed")
+                                    || error_msg.contains("builder error")
+                            );
+                        })
+                        .unwrap_or_else(|| {
+                            panic!("Expected error response, got success: {output_value}")
+                        });
                 }
                 Err(e) => {
                     println!("{tool_name} {case_name} test: Got error: {e}");
@@ -246,7 +259,7 @@ mod http_status_tests {
     use super::*;
     #[tokio::test]
     async fn test_http_error_statuses() {
-        let statuses = vec![400, 401, 403, 404, 500, 502, 503];
+        let statuses: Vec<u32> = vec![400, 401, 403, 404, 500, 502, 503];
         let tool = ApiTesterTool::new();
 
         for status in statuses {
@@ -290,7 +303,7 @@ mod http_status_tests {
                 continue; // Skip to next status code
             }
 
-            assert_eq!(actual_status, status as u64);
+            assert_eq!(actual_status, u64::from(status));
         }
     }
 }

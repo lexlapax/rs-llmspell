@@ -274,7 +274,7 @@ pub fn buffer_overflow_tests() -> Vec<SecurityTestCase> {
             name: "BUFFER_LONG_STRING".to_string(),
             description: "Extremely long string".to_string(),
             payload: json!({
-                "input": "A".repeat(100000),
+                "input": "A".repeat(100_000),
                 "field": "text"
             }),
             expected_behavior: ExpectedBehavior::Reject,

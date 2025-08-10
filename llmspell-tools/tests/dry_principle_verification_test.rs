@@ -16,6 +16,8 @@ mod dry_principle_tests {
     use super::*;
     #[tokio::test]
     async fn test_hash_consistency_across_tools() {
+        use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
+
         // Test that hash operations produce consistent results
         let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
         let test_data = "Hello, DRY Principle!";
@@ -38,7 +40,6 @@ mod dry_principle_tests {
         let sha256_hash = output["result"]["hash"].as_str().unwrap();
 
         // Verify the hash is consistent with the utility function
-        use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
         let expected_hash_bytes = hash_string(test_data, HashAlgorithm::Sha256);
         let expected_hash = to_hex_string(&expected_hash_bytes);
         assert_eq!(
@@ -48,6 +49,8 @@ mod dry_principle_tests {
     }
     #[tokio::test]
     async fn test_base64_consistency() {
+        use llmspell_utils::encoding::base64_encode;
+
         // Test that base64 operations are consistent
         let base64_tool = Base64EncoderTool::new();
         let test_data = "Test Base64 Consistency";
@@ -69,7 +72,6 @@ mod dry_principle_tests {
         let encoded = output["result"]["output"].as_str().unwrap();
 
         // Verify with utility
-        use llmspell_utils::encoding::base64_encode;
         let expected = base64_encode(test_data.as_bytes());
         assert_eq!(
             encoded, expected,

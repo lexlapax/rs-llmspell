@@ -263,7 +263,7 @@ pub fn special_file_tests() -> Vec<SecurityTestCase> {
             payload: json!({
                 "path": "/dev/random",
                 "operation": "read",
-                "bytes": 1000000
+                "bytes": 1_000_000
             }),
             expected_behavior: ExpectedBehavior::Reject,
             severity: Severity::Medium,

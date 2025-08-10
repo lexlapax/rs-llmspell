@@ -589,7 +589,7 @@ mod tests {
         let notify_event = notify::Event {
             kind: notify::EventKind::Create(notify::event::CreateKind::File),
             paths: vec![temp_dir.path().join("test.txt")],
-            attrs: EventAttributes::default(),
+            attrs: notify::event::EventAttributes::default(),
         };
 
         let file_event = tool.convert_notify_event(notify_event, &config);

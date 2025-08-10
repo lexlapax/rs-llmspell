@@ -10,10 +10,8 @@ use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use llmspell_tools::util::calculator::CalculatorTool;
 use serde_json::{json, Value as JsonValue};
 #[tokio::test]
-async fn test_calculator_dos_protection_comprehensive() {
+async fn test_calculator_expression_length_limit() {
     let tool = CalculatorTool::new();
-
-    // Test 1: Expression length limit
     let long_expr = "1 + 2 * 3 - 4 / 5 + ".repeat(100) + "6";
     let input = AgentInput::text("test").with_parameter(
         "parameters",
@@ -33,8 +31,11 @@ async fn test_calculator_dos_protection_comprehensive() {
         .as_str()
         .unwrap()
         .contains("too long"));
+}
 
-    // Test 2: Nesting depth limit
+#[tokio::test]
+async fn test_calculator_nesting_depth_limit() {
+    let tool = CalculatorTool::new();
     let nested = "sin(cos(tan(".repeat(10) + "1" + &")))".repeat(10);
     let input = AgentInput::text("test").with_parameter(
         "parameters",
@@ -50,8 +51,11 @@ async fn test_calculator_dos_protection_comprehensive() {
         .unwrap();
     let output: JsonValue = serde_json::from_str(&result.text).unwrap();
     assert_eq!(output["success"], false);
+}
 
-    // Test 3: Operation count limit
+#[tokio::test]
+async fn test_calculator_operation_count_limit() {
+    let tool = CalculatorTool::new();
     let many_ops = (0..150)
         .map(|i| i.to_string())
         .collect::<Vec<_>>()
@@ -70,16 +74,15 @@ async fn test_calculator_dos_protection_comprehensive() {
         .unwrap();
     let output: JsonValue = serde_json::from_str(&result.text).unwrap();
     assert_eq!(output["success"], false);
-    println!(
-        "Error message for many operations: {}",
-        output["error"]["message"]
-    );
     assert!(output["error"]["message"]
         .as_str()
         .unwrap()
         .contains("operation"));
+}
 
-    // Test 4: Function count limit
+#[tokio::test]
+async fn test_calculator_function_count_limit() {
+    let tool = CalculatorTool::new();
     let many_funcs = (0..60)
         .map(|i| format!("sin({i})"))
         .collect::<Vec<_>>()
@@ -102,8 +105,11 @@ async fn test_calculator_dos_protection_comprehensive() {
         .as_str()
         .unwrap()
         .contains("function"));
+}
 
-    // Test 5: Dangerous patterns
+#[tokio::test]
+async fn test_calculator_dangerous_patterns() {
+    let tool = CalculatorTool::new();
     let patterns = vec![
         "1 +++ 2",
         "x --- y",

@@ -14,10 +14,10 @@ use llmspell_core::{
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_tools::util::*;
 use llmspell_tools::util::hash_calculator::HashCalculatorConfig;
 use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
 use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
+use llmspell_tools::util::*;
 use serde_json::{json, Value};
 use std::{collections::HashMap, time::Instant};
 
@@ -112,7 +112,7 @@ async fn test_tool_initialization_performance() {
                     let _tool = CalculatorTool::new();
                 }
                 "hash_calculator" => {
-                    let _tool = HashCalculatorTool::new(Default::default());
+                    let _tool = HashCalculatorTool::new(HashCalculatorConfig::default());
                 }
                 "base64_encoder" => {
                     let _tool = Base64EncoderTool::new();
@@ -280,7 +280,7 @@ async fn test_phase30_migration_compliance() {
     );
 
     // 2. Hash calculator uses "input" instead of "data"
-    let hasher = HashCalculatorTool::new(Default::default());
+    let hasher = HashCalculatorTool::new(HashCalculatorConfig::default());
     let test_input = create_test_input(
         "test",
         json!({

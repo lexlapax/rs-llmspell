@@ -16,13 +16,13 @@ async fn test_json_processor_complex_workflow() {
         "company": {
             "name": "TechCorp",
             "employees": [
-                {"name": "Alice", "department": "Engineering", "salary": 120000},
-                {"name": "Bob", "department": "Sales", "salary": 90000},
-                {"name": "Charlie", "department": "Engineering", "salary": 110000}
+                {"name": "Alice", "department": "Engineering", "salary": 120_000},
+                {"name": "Bob", "department": "Sales", "salary": 90_000},
+                {"name": "Charlie", "department": "Engineering", "salary": 110_000}
             ],
             "departments": {
-                "Engineering": {"budget": 5000000, "head": "Alice"},
-                "Sales": {"budget": 2000000, "head": "David"}
+                "Engineering": {"budget": 5_000_000, "head": "Alice"},
+                "Sales": {"budget": 2_000_000, "head": "David"}
             }
         }
     });
@@ -352,11 +352,11 @@ async fn test_enhanced_jq_complex_workflow() {
             "departments": {
                 "engineering": {
                     "employees": ["Alice", "Bob", "Charlie"],
-                    "budget": 1000000
+                    "budget": 1_000_000
                 },
                 "sales": {
                     "employees": ["David", "Eve"],
-                    "budget": 500000
+                    "budget": 500_000
                 }
             }
         }

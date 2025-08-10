@@ -14,6 +14,10 @@ pub use llmspell_testing::tool_helpers::create_test_tool_input_json;
 // create_test_context is now re-exported from llmspell_testing::environment_helpers
 
 /// Create an agent input with the given parameters (delegates to llmspell-testing)
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if params is not a JSON object.
 pub fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
     // Convert Value to HashMap for the helper
     if let Value::Object(map) = params {
@@ -28,11 +32,19 @@ pub fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
 }
 
 /// Create an agent input with a single "input" parameter
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if the JSON object creation fails.
 pub fn create_simple_input(input: &str) -> Result<AgentInput, LLMSpellError> {
     create_agent_input(json!({ "input": input }))
 }
 
 /// Validate that output is successful with expected fields
+///
+/// # Panics
+///
+/// Panics if the output text is not valid JSON or if expected fields are missing.
 #[allow(dead_code)]
 pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
     let output_value: Value = serde_json::from_str(&output.text).unwrap();
@@ -51,6 +63,10 @@ pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
 }
 
 /// Validate that output is an error with expected message pattern
+///
+/// # Panics
+///
+/// Panics if the output text is not valid JSON or if the error message doesn't match the pattern.
 #[allow(dead_code)]
 pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
     let output_value: Value = serde_json::from_str(&output.text).unwrap();
@@ -61,20 +77,24 @@ pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
     );
 
     // Try different error message formats
-    let error_msg = if let Some(error_str) = output_value["error"].as_str() {
-        // Simple string error format
-        error_str.to_string()
-    } else if let Some(error_obj) = output_value["error"].as_object() {
-        // Complex error object format - try message field first
-        if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
-            msg.to_string()
-        } else {
-            // Fallback to serializing the entire error object
-            serde_json::to_string(error_obj).unwrap_or_else(|_| format!("{error_obj:?}"))
-        }
-    } else {
-        panic!("Expected error field in output, got: {output_value}");
-    };
+    let error_msg = output_value["error"]
+        .as_str()
+        .map(String::from)
+        .or_else(|| {
+            output_value["error"].as_object().and_then(|error_obj| {
+                error_obj
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .map(String::from)
+                    .or_else(|| {
+                        // Fallback to serializing the entire error object
+                        serde_json::to_string(error_obj)
+                            .ok()
+                            .or_else(|| Some(format!("{error_obj:?}")))
+                    })
+            })
+        })
+        .unwrap_or_else(|| panic!("Expected error field in output, got: {output_value}"));
 
     assert!(
         error_msg
@@ -144,6 +164,10 @@ pub fn create_test_config() -> serde_json::Map<String, serde_json::Value> {
 }
 
 /// Assert that a value contains expected JSON structure
+///
+/// # Panics
+///
+/// Panics if the expected keys are not found in the actual JSON or if values don't match.
 #[allow(dead_code)]
 pub fn assert_json_contains(actual: &Value, expected: &Value) {
     match (actual, expected) {

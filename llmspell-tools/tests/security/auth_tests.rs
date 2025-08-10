@@ -488,23 +488,23 @@ mod tests {
     #[test]
     fn test_authentication_category_coverage() {
         let tests = all_auth_tests();
-        let auth_tests: Vec<_> = tests
+        let auth_tests_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::Authentication))
-            .collect();
+            .count();
 
         // Should have comprehensive authentication test coverage
-        assert!(auth_tests.len() > 15);
+        assert!(auth_tests_count > 15);
     }
     #[test]
     fn test_authorization_category_coverage() {
         let tests = all_auth_tests();
-        let authz_tests: Vec<_> = tests
+        let authz_tests_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::Authorization))
-            .collect();
+            .count();
 
         // Should have authorization test coverage
-        assert!(authz_tests.len() > 5);
+        assert!(authz_tests_count > 5);
     }
 }

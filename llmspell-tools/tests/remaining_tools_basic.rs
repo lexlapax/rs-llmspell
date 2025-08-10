@@ -7,7 +7,10 @@ use llmspell_core::ExecutionContext;
 use llmspell_security::sandbox::file_sandbox::FileSandbox;
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_tools::{
-    fs::{FileConverterTool, FileSearchTool, FileWatcherTool},
+    fs::{
+        file_converter::FileConverterConfig, file_search::FileSearchConfig,
+        file_watcher::FileWatcherConfig, FileConverterTool, FileSearchTool, FileWatcherTool,
+    },
     media::{
         audio_processor::AudioProcessorConfig, image_processor::ImageProcessorConfig,
         video_processor::VideoProcessorConfig, AudioProcessorTool, ImageProcessorTool,
@@ -146,8 +149,14 @@ fn test_tool_schemas_have_required_fields() {
 
     // Check that tools have proper parameter definitions
     let tools: Vec<Box<dyn Tool>> = vec![
-        Box::new(FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone())),
-        Box::new(FileConverterTool::new(FileConverterConfig::default(), sandbox.clone())),
+        Box::new(FileWatcherTool::new(
+            FileWatcherConfig::default(),
+            sandbox.clone(),
+        )),
+        Box::new(FileConverterTool::new(
+            FileConverterConfig::default(),
+            sandbox.clone(),
+        )),
         Box::new(FileSearchTool::new(FileSearchConfig::default(), sandbox)),
         Box::new(EnvironmentReaderTool::new(
             EnvironmentReaderConfig::default(),

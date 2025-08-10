@@ -58,7 +58,9 @@ async fn test_simple_hook_overhead() {
     let no_hooks_ms = duration_no_hooks.as_millis();
     let overhead_ms = with_hooks_ms.saturating_sub(no_hooks_ms);
     let overhead_percent = if no_hooks_ms > 0 {
-        ((overhead_ms as f64) / (no_hooks_ms as f64)) * 100.0
+        let overhead_ms_f64 = u64::try_from(overhead_ms).unwrap_or(u64::MAX) as f64;
+        let no_hooks_ms_f64 = u64::try_from(no_hooks_ms).unwrap_or(u64::MAX) as f64;
+        (overhead_ms_f64 / no_hooks_ms_f64) * 100.0
     } else {
         0.0
     };

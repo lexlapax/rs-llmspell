@@ -1003,13 +1003,6 @@ mod tests {
     }
     #[tokio::test]
     async fn test_security_validation_fail() {
-        // Create a restricted security config
-        let config = ToolLifecycleConfig {
-            max_security_level: SecurityLevel::Safe,
-            ..Default::default()
-        };
-        let executor = ToolExecutor::new(config, None, None);
-
         // Create a mock tool with higher security level
         struct PrivilegedMockTool {
             metadata: ComponentMetadata,
@@ -1075,6 +1068,13 @@ mod tests {
             }
         }
 
+        // Create a restricted security config
+        let config = ToolLifecycleConfig {
+            max_security_level: SecurityLevel::Safe,
+            ..Default::default()
+        };
+        let executor = ToolExecutor::new(config, None, None);
+
         let tool = PrivilegedMockTool::new();
         let input = AgentInput::text("test security validation failure");
         let context = ExecutionContext::default();
@@ -1138,6 +1138,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_security_validation_disabled() {
+        // Use the privileged tool from the previous test
+        struct PrivilegedMockTool {
+            metadata: ComponentMetadata,
+        }
+
         let config = ToolLifecycleConfig {
             features: HookFeatures {
                 security_validation_enabled: false,
@@ -1147,11 +1152,6 @@ mod tests {
             ..Default::default()
         };
         let executor = ToolExecutor::new(config, None, None);
-
-        // Use the privileged tool from the previous test
-        struct PrivilegedMockTool {
-            metadata: ComponentMetadata,
-        }
 
         impl PrivilegedMockTool {
             fn new() -> Self {

@@ -127,10 +127,11 @@ newline",300
 }
 #[tokio::test]
 async fn test_large_csv_streaming() {
+    use std::fmt::Write;
+
     let tool = CsvAnalyzerTool::default();
 
     // Generate a large CSV (but still within default limits)
-    use std::fmt::Write;
     let mut csv_content = String::from("id,value,category\n");
     for i in 1..=1000 {
         writeln!(
