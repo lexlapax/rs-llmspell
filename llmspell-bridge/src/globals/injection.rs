@@ -196,6 +196,7 @@ impl GlobalInjector {
 
     /// Get injection metrics from the last injection
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Arc deref not supported in const fn
     pub fn get_metrics(&self) -> &InjectionMetrics {
         self.registry.metrics()
     }

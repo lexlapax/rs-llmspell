@@ -213,7 +213,9 @@ impl DataTransformer {
                     obj.insert(part.to_string(), Value::Object(serde_json::Map::new()));
                 }
                 // Move to the nested object
-                current = obj.get_mut(*part).unwrap();
+                current = obj
+                    .get_mut(*part)
+                    .expect("object key should exist after inserting");
             } else {
                 return false;
             }
@@ -500,7 +502,11 @@ impl DataTransformer {
             ("string", "number", "parse_float") => {
                 if let Some(s) = value.as_str() {
                     s.parse::<f64>()
-                        .map(|n| Value::Number(serde_json::Number::from_f64(n).unwrap()))
+                        .and_then(|n| {
+                            serde_json::Number::from_f64(n)
+                                .map(Value::Number)
+                                .ok_or_else(|| "Invalid f64 for JSON Number".to_string())
+                        })
                         .map_err(|_| TransformationError::TypeConversionFailed {
                             field: "unknown".to_string(),
                             from_type: from_type.to_string(),
@@ -580,7 +586,13 @@ impl DataTransformer {
             }
             "sum_numbers" => {
                 let sum: f64 = values.iter().filter_map(|v| v.as_f64()).sum();
-                Ok(Value::Number(serde_json::Number::from_f64(sum).unwrap()))
+                serde_json::Number::from_f64(sum)
+                    .map(Value::Number)
+                    .ok_or_else(|| TransformationError::TypeConversionFailed {
+                        field: "sum_numbers".to_string(),
+                        from_type: "array".to_string(),
+                        to_type: "number".to_string(),
+                    })
             }
             "first_non_null" => {
                 for value in values {
@@ -622,7 +634,7 @@ impl DataTransformer {
 
         match &rule.rule_type {
             ValidationType::NotNull => {
-                if field_value.is_none() || field_value.unwrap().is_null() {
+                if field_value.map_or(true, |v| v.is_null()) {
                     return Err(TransformationError::ValidationFailed {
                         details: rule
                             .error_message

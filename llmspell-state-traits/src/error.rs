@@ -155,11 +155,13 @@ impl StateError {
     }
 
     /// Check if this error indicates a missing/not found state
+    #[must_use]
     pub fn is_not_found(&self) -> bool {
         matches!(self, Self::NotFound { .. })
     }
 
     /// Check if this error is retryable
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
@@ -168,6 +170,7 @@ impl StateError {
     }
 
     /// Check if this error indicates a permanent failure
+    #[must_use]
     pub fn is_permanent(&self) -> bool {
         matches!(
             self,

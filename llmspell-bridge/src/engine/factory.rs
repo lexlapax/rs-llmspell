@@ -112,7 +112,9 @@ impl EngineFactory {
             }
             _ => {
                 // Check if it's a registered plugin
-                let registry = PLUGIN_REGISTRY.read().unwrap();
+                let registry = PLUGIN_REGISTRY
+                    .read()
+                    .unwrap_or_else(|poisoned| poisoned.into_inner());
                 registry.get(name).map_or_else(
                     || {
                         Err(LLMSpellError::Validation {
@@ -153,7 +155,9 @@ impl EngineFactory {
 
         // Add registered plugins
         {
-            let registry = PLUGIN_REGISTRY.read().unwrap();
+            let registry = PLUGIN_REGISTRY
+                .read()
+                .unwrap_or_else(|poisoned| poisoned.into_inner());
             for (name, plugin) in registry.iter() {
                 engines.push(EngineInfo {
                     name: name.clone(),
@@ -388,7 +392,9 @@ pub enum ModuleResolution {
 
 // Plugin system for third-party engines
 
-static PLUGIN_REGISTRY: LazyLock<Arc<RwLock<HashMap<String, Box<dyn ScriptEnginePlugin>>>>> =
+type PluginRegistry = Arc<RwLock<HashMap<String, Box<dyn ScriptEnginePlugin>>>>;
+
+static PLUGIN_REGISTRY: LazyLock<PluginRegistry> =
     LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 /// Plugin interface for third-party script engines
@@ -419,7 +425,9 @@ pub trait ScriptEnginePlugin: Send + Sync {
 ///
 /// Panics if the plugin registry lock is poisoned
 pub fn register_engine_plugin<P: ScriptEnginePlugin + 'static>(plugin: P) {
-    let mut registry = PLUGIN_REGISTRY.write().unwrap();
+    let mut registry = PLUGIN_REGISTRY
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     registry.insert(plugin.engine_name().to_string(), Box::new(plugin));
 }
 
@@ -430,7 +438,9 @@ pub fn register_engine_plugin<P: ScriptEnginePlugin + 'static>(plugin: P) {
 /// Panics if the plugin registry lock is poisoned
 #[must_use]
 pub fn unregister_engine_plugin(name: &str) -> bool {
-    let mut registry = PLUGIN_REGISTRY.write().unwrap();
+    let mut registry = PLUGIN_REGISTRY
+        .write()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
     registry.remove(name).is_some()
 }
 

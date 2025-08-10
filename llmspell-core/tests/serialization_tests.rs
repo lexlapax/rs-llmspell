@@ -6,7 +6,7 @@ use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
         tool::{ParameterDef, ParameterType, SecurityLevel, ToolCategory, ToolSchema},
-        workflow::{RetryPolicy, StepResult, WorkflowStatus, WorkflowStep},
+        workflow::{RetryPolicy, Status as WorkflowStatus, StepResult, WorkflowStep},
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, ExecutionContext, Version,
@@ -296,16 +296,8 @@ fn test_workflow_status_json_roundtrip() {
 fn test_retry_policy_json_roundtrip() {
     let policies = vec![
         RetryPolicy::default(),
-        RetryPolicy {
-            max_attempts: 5,
-            backoff_seconds: 2,
-            exponential_backoff: false,
-        },
-        RetryPolicy {
-            max_attempts: 10,
-            backoff_seconds: 5,
-            exponential_backoff: true,
-        },
+        RetryPolicy::new(5, 2, false),
+        RetryPolicy::new(10, 5, true),
     ];
 
     for policy in policies {

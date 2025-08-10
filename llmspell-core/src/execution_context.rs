@@ -40,10 +40,10 @@ impl fmt::Display for ContextScope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ContextScope::Global => write!(f, "global"),
-            ContextScope::Session(id) => write!(f, "session:{}", id),
-            ContextScope::Workflow(id) => write!(f, "workflow:{}", id),
-            ContextScope::Agent(id) => write!(f, "agent:{}", id),
-            ContextScope::User(id) => write!(f, "user:{}", id),
+            ContextScope::Session(id) => write!(f, "session:{id}"),
+            ContextScope::Workflow(id) => write!(f, "workflow:{id}"),
+            ContextScope::Agent(id) => write!(f, "agent:{id}"),
+            ContextScope::User(id) => write!(f, "user:{id}"),
         }
     }
 }
@@ -67,26 +67,35 @@ impl SharedMemory {
     pub fn get(&self, scope: &ContextScope, key: &str) -> Option<Value> {
         self.regions
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .get(scope)
             .and_then(|region| region.get(key).cloned())
     }
 
     /// Set value in a memory region
     pub fn set(&self, scope: ContextScope, key: String, value: Value) {
-        let mut regions = self.regions.write().unwrap();
+        let mut regions = self
+            .regions
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         regions.entry(scope).or_default().insert(key, value);
     }
 
     /// Remove value from a memory region
     pub fn remove(&self, scope: &ContextScope, key: &str) -> Option<Value> {
-        let mut regions = self.regions.write().unwrap();
+        let mut regions = self
+            .regions
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         regions.get_mut(scope).and_then(|region| region.remove(key))
     }
 
     /// Clear all data in a scope
     pub fn clear_scope(&self, scope: &ContextScope) {
-        let mut regions = self.regions.write().unwrap();
+        let mut regions = self
+            .regions
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         regions.remove(scope);
     }
 
@@ -94,7 +103,7 @@ impl SharedMemory {
     pub fn keys(&self, scope: &ContextScope) -> Vec<String> {
         self.regions
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .get(scope)
             .map(|region| region.keys().cloned().collect())
             .unwrap_or_default()

@@ -1,5 +1,5 @@
 //! ABOUTME: Storage backend discovery for state persistence
-//! ABOUTME: Provides discovery of available storage backends (Memory, Sled, RocksDB)
+//! ABOUTME: Provides discovery of available storage backends (`Memory`, `Sled`, `RocksDB`)
 
 use crate::discovery::BridgeDiscovery;
 use serde::{Deserialize, Serialize};
@@ -249,7 +249,7 @@ pub struct StorageConfig {
     pub enable_compression: bool,
     /// Enable encryption if backend supports it
     pub enable_encryption: bool,
-    /// Performance optimization preset (fast, balanced, storage_optimized)
+    /// Performance optimization preset (`fast`, `balanced`, `storage_optimized`)
     pub performance_preset: String,
 }
 
@@ -266,14 +266,14 @@ impl Default for StorageConfig {
 }
 
 impl StorageConfig {
-    /// Create a new builder for StorageConfig
+    /// Create a new builder for `StorageConfig`
     #[must_use]
     pub fn builder() -> StorageConfigBuilder {
         StorageConfigBuilder::new()
     }
 }
 
-/// Builder for StorageConfig
+/// Builder for `StorageConfig`
 #[derive(Debug, Clone, Default)]
 pub struct StorageConfigBuilder {
     config: StorageConfig,
@@ -309,14 +309,14 @@ impl StorageConfigBuilder {
 
     /// Enable compression
     #[must_use]
-    pub fn enable_compression(mut self, enable: bool) -> Self {
+    pub const fn enable_compression(mut self, enable: bool) -> Self {
         self.config.enable_compression = enable;
         self
     }
 
     /// Enable encryption
     #[must_use]
-    pub fn enable_encryption(mut self, enable: bool) -> Self {
+    pub const fn enable_encryption(mut self, enable: bool) -> Self {
         self.config.enable_encryption = enable;
         self
     }
@@ -355,7 +355,7 @@ impl StorageConfigBuilder {
         self
     }
 
-    /// Build the final StorageConfig
+    /// Build the final `StorageConfig`
     #[must_use]
     pub fn build(self) -> StorageConfig {
         self.config

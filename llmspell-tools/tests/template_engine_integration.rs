@@ -42,8 +42,7 @@ async fn test_tera_simple_variable_substitution() {
 async fn test_tera_loops_and_conditions() {
     let tool = TemplateEngineTool::new();
 
-    let params = json!({
-                                                                            "input": r"
+    let template = r"
 {% if users %}
 Users:
 {% for user in users %}
@@ -52,15 +51,18 @@ Users:
 {% else %}
 No users found.
 {% endif %}
-",
-                                                                            "context": {
-                                                                                "users": [
-                                                                                    {"name": "Alice", "age": 25},
-                                                                                    {"name": "Bob", "age": 30}
-                                                                                ]
-                                                                            },
-                                                                            "engine": "tera"
-                                                                        });
+";
+
+    let users = json!([
+        {"name": "Alice", "age": 25},
+        {"name": "Bob", "age": 30}
+    ]);
+
+    let params = json!({
+        "input": template,
+        "context": {"users": users},
+        "engine": "tera"
+    });
 
     let input = AgentInput::text("").with_parameter("parameters", params);
     let result = tool
@@ -75,8 +77,7 @@ No users found.
 async fn test_handlebars_block_helpers() {
     let tool = TemplateEngineTool::new();
 
-    let params = json!({
-                                                                            "input": r"
+    let template = r"
 {{#if showGreeting}}
 Hello {{name}}!
 {{#each items}}
@@ -85,14 +86,19 @@ Hello {{name}}!
 {{else}}
 Goodbye!
 {{/if}}
-",
-                                                                            "context": {
-                                                                                "showGreeting": true,
-                                                                                "name": "World",
-                                                                                "items": ["apple", "banana", "cherry"]
-                                                                            },
-                                                                            "engine": "handlebars"
-                                                                        });
+";
+
+    let context = json!({
+        "showGreeting": true,
+        "name": "World",
+        "items": ["apple", "banana", "cherry"]
+    });
+
+    let params = json!({
+        "input": template,
+        "context": context,
+        "engine": "handlebars"
+    });
 
     let input = AgentInput::text("").with_parameter("parameters", params);
     let result = tool
@@ -190,8 +196,7 @@ async fn test_html_escaping() {
 async fn test_complex_data_structures() {
     let tool = TemplateEngineTool::new();
 
-    let params = json!({
-                                                                            "input": r"
+    let template = r"
 Company: {{ company.name }}
 Employees:
 {% for dept, employees in departments %}
@@ -200,23 +205,28 @@ Employees:
     - {{ emp.name }}: {{ emp.role }}
   {% endfor %}
 {% endfor %}
-",
-                                                                            "context": {
-                                                                                "company": {
-                                                                                    "name": "TechCorp"
-                                                                                },
-                                                                                "departments": {
-                                                                                    "Engineering": [
-                                                                                        {"name": "Alice", "role": "Senior Engineer"},
-                                                                                        {"name": "Bob", "role": "Junior Engineer"}
-                                                                                    ],
-                                                                                    "Sales": [
-                                                                                        {"name": "Charlie", "role": "Sales Manager"}
-                                                                                    ]
-                                                                                }
-                                                                            },
-                                                                            "engine": "tera"
-                                                                        });
+";
+
+    let company = json!({"name": "TechCorp"});
+    let engineering = json!([
+        {"name": "Alice", "role": "Senior Engineer"},
+        {"name": "Bob", "role": "Junior Engineer"}
+    ]);
+    let sales = json!([{"name": "Charlie", "role": "Sales Manager"}]);
+
+    let context = json!({
+        "company": company,
+        "departments": {
+            "Engineering": engineering,
+            "Sales": sales
+        }
+    });
+
+    let params = json!({
+        "input": template,
+        "context": context,
+        "engine": "tera"
+    });
 
     let input = AgentInput::text("").with_parameter("parameters", params);
     let result = tool

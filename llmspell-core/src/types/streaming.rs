@@ -140,12 +140,12 @@ pub enum ChunkContent {
 impl fmt::Display for ChunkContent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ChunkContent::Text(text) => write!(f, "Text: {}", text),
+            ChunkContent::Text(text) => write!(f, "Text: {text}"),
             ChunkContent::ToolCallProgress { tool_name, .. } => {
-                write!(f, "ToolCallProgress: {}", tool_name)
+                write!(f, "ToolCallProgress: {tool_name}")
             }
             ChunkContent::ToolCallComplete { tool_name, .. } => {
-                write!(f, "ToolCallComplete: {}", tool_name)
+                write!(f, "ToolCallComplete: {tool_name}")
             }
             ChunkContent::Media {
                 mime_type, caption, ..
@@ -156,11 +156,11 @@ impl fmt::Display for ChunkContent {
                     mime_type,
                     caption
                         .as_ref()
-                        .map(|c| format!(": {}", c))
+                        .map(|c| format!(": {c}"))
                         .unwrap_or_default()
                 )
             }
-            ChunkContent::Control(msg) => write!(f, "Control: {}", msg),
+            ChunkContent::Control(msg) => write!(f, "Control: {msg}"),
         }
     }
 }
@@ -193,11 +193,11 @@ impl fmt::Display for ChunkMetadata {
         }
 
         if let Some(count) = self.token_count {
-            parts.push(format!("{} tokens", count));
+            parts.push(format!("{count} tokens"));
         }
 
         if let Some(model) = &self.model {
-            parts.push(format!("model={}", model));
+            parts.push(format!("model={model}"));
         }
 
         if let Some(step) = &self.reasoning_step {
@@ -281,7 +281,7 @@ impl fmt::Display for ControlMessage {
                     f,
                     "StreamStart{}",
                     expected_chunks
-                        .map(|n| format!(" (expecting {} chunks)", n))
+                        .map(|n| format!(" (expecting {n} chunks)"))
                         .unwrap_or_default()
                 )
             }
@@ -297,14 +297,14 @@ impl fmt::Display for ControlMessage {
                 )
             }
             ControlMessage::StreamCancelled { reason } => {
-                write!(f, "StreamCancelled: {}", reason)
+                write!(f, "StreamCancelled: {reason}")
             }
             ControlMessage::Heartbeat => write!(f, "Heartbeat"),
             ControlMessage::RateLimit { remaining, .. } => {
-                write!(f, "RateLimit ({} remaining)", remaining)
+                write!(f, "RateLimit ({remaining} remaining)")
             }
             ControlMessage::Custom { message_type, .. } => {
-                write!(f, "Custom[{}]", message_type)
+                write!(f, "Custom[{message_type}]")
             }
         }
     }

@@ -15,7 +15,7 @@ use llmspell_core::error::LLMSpellError;
 ///
 /// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_event_global(
+pub const fn inject_event_global(
     _ctx: &mut Context,
     _context: &GlobalContext,
 ) -> Result<(), LLMSpellError> {
@@ -33,7 +33,10 @@ pub fn inject_event_global(
 ///
 /// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_event_global(_ctx: &mut (), _context: &GlobalContext) -> Result<(), LLMSpellError> {
+pub const fn inject_event_global(
+    _ctx: &mut (),
+    _context: &GlobalContext,
+) -> Result<(), LLMSpellError> {
     Ok(())
 }
 

@@ -10,7 +10,7 @@ use llmspell_core::error::LLMSpellError;
 ///
 /// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_agent_global(
+pub const fn inject_agent_global(
     _ctx: &mut boa_engine::Context,
     _context: &GlobalContext,
 ) -> Result<(), LLMSpellError> {
@@ -28,7 +28,7 @@ pub fn inject_agent_global(
 ///
 /// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_agent_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
+pub const fn inject_agent_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
     Ok(())
 }
 

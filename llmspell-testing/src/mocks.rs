@@ -39,7 +39,9 @@ use llmspell_core::{
         agent::{Agent, AgentConfig, ConversationMessage},
         base_agent::BaseAgent,
         tool::{SecurityLevel, Tool, ToolCategory, ToolSchema},
-        workflow::{StepResult, Workflow, WorkflowConfig, WorkflowStatus, WorkflowStep},
+        workflow::{
+            Config as WorkflowConfig, Status as WorkflowStatus, StepResult, Workflow, WorkflowStep,
+        },
     },
     types::{AgentInput, AgentOutput, AgentStream, MediaType},
     ComponentId, ComponentMetadata, LLMSpellError, Result,

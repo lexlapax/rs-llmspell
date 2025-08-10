@@ -91,7 +91,7 @@ pub fn create_fork_join_workflow(
     let mut builder = ParallelWorkflowBuilder::new(name.to_string());
 
     // Create parallel branches for each agent task
-    for (agent_id, task_name, input) in agent_tasks.iter() {
+    for (agent_id, task_name, input) in agent_tasks {
         let branch = ParallelBranch::new(task_name.clone())
             .with_description(format!("Task handled by agent: {agent_id}"))
             .add_step(WorkflowStep::new(
@@ -345,7 +345,7 @@ impl MultiAgentExamples {
     pub fn research_pipeline_example() -> Result<llmspell_workflows::SequentialWorkflow> {
         create_pipeline_workflow(
             "research_paper_pipeline",
-            &vec![
+            &[
                 "paper_reader_agent".to_string(),
                 "concept_extractor_agent".to_string(),
                 "critic_agent".to_string(),
@@ -395,7 +395,7 @@ impl MultiAgentExamples {
     pub fn investment_consensus() -> Result<llmspell_workflows::ParallelWorkflow> {
         create_consensus_workflow(
             "investment_decision",
-            &vec![
+            &[
                 "fundamental_analyst".to_string(),
                 "technical_analyst".to_string(),
                 "risk_analyst".to_string(),

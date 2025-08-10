@@ -13,6 +13,13 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Helper function to get or create session infrastructure from `GlobalContext`
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - State manager creation fails
+/// - Storage backend creation fails
+/// - Session manager initialization fails
 pub async fn get_or_create_session_infrastructure(
     context: &GlobalContext,
     config: &SessionConfig,

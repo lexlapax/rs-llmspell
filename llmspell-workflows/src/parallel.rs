@@ -14,8 +14,8 @@ use llmspell_core::{
     execution_context::ExecutionContext,
     traits::base_agent::BaseAgent,
     traits::workflow::{
-        StepResult as CoreStepResult, Workflow, WorkflowConfig as CoreWorkflowConfig,
-        WorkflowStatus as CoreWorkflowStatus, WorkflowStep as CoreWorkflowStep,
+        Config as CoreWorkflowConfig, Status as CoreWorkflowStatus, StepResult as CoreStepResult,
+        Workflow, WorkflowStep as CoreWorkflowStep,
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, LLMSpellError, Result,
@@ -352,11 +352,10 @@ impl ParallelWorkflow {
         let metadata = ComponentMetadata::new(name.clone(), "Parallel workflow".to_string());
 
         // Create core workflow config from our config
-        let core_config = CoreWorkflowConfig {
-            max_parallel: Some(config.max_concurrency),
-            continue_on_error: !config.fail_fast,
-            timeout: config.timeout.or(workflow_config.max_execution_time),
-        };
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(config.max_concurrency))
+            .with_continue_on_error(!config.fail_fast)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
 
         Self {
             name,
@@ -393,11 +392,10 @@ impl ParallelWorkflow {
             ComponentMetadata::new(name.clone(), "Parallel workflow with hooks".to_string());
 
         // Create core workflow config from our config
-        let core_config = CoreWorkflowConfig {
-            max_parallel: Some(config.max_concurrency),
-            continue_on_error: !config.fail_fast,
-            timeout: config.timeout.or(workflow_config.max_execution_time),
-        };
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(config.max_concurrency))
+            .with_continue_on_error(!config.fail_fast)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
 
         Self {
             name,

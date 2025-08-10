@@ -29,7 +29,7 @@ use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
         tool::{SecurityLevel, ToolCategory, ToolSchema},
-        workflow::{RetryPolicy, WorkflowConfig, WorkflowStatus, WorkflowStep},
+        workflow::{Config as WorkflowConfig, RetryPolicy, Status as WorkflowStatus, WorkflowStep},
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, Version,
@@ -179,10 +179,8 @@ pub fn tool_schema_strategy() -> impl Strategy<Value = ToolSchema> {
 /// Strategy for generating RetryPolicy
 pub fn retry_policy_strategy() -> impl Strategy<Value = RetryPolicy> {
     (1u32..10u32, 1u32..60u32, any::<bool>()).prop_map(
-        |(max_attempts, backoff_seconds, exponential_backoff)| RetryPolicy {
-            max_attempts,
-            backoff_seconds,
-            exponential_backoff,
+        |(max_attempts, backoff_seconds, exponential_backoff)| {
+            RetryPolicy::new(max_attempts, backoff_seconds, exponential_backoff)
         },
     )
 }
@@ -214,13 +212,12 @@ pub fn workflow_config_strategy() -> impl Strategy<Value = WorkflowConfig> {
         any::<bool>(),
         prop::option::of(1u64..86400u64),
     )
-        .prop_map(
-            |(max_parallel, continue_on_error, timeout_secs)| WorkflowConfig {
-                max_parallel,
-                continue_on_error,
-                timeout: timeout_secs.map(Duration::from_secs),
-            },
-        )
+        .prop_map(|(max_parallel, continue_on_error, timeout_secs)| {
+            WorkflowConfig::new()
+                .with_max_parallel(max_parallel)
+                .with_continue_on_error(continue_on_error)
+                .with_timeout(timeout_secs.map(Duration::from_secs))
+        })
 }
 
 /// Strategy for generating WorkflowStatus

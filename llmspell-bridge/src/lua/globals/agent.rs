@@ -851,7 +851,7 @@ struct AgentBuilder {
 }
 
 impl AgentBuilder {
-    fn new(bridge: Arc<AgentBridge>) -> Self {
+    const fn new(bridge: Arc<AgentBridge>) -> Self {
         Self {
             bridge,
             name: None,

@@ -98,7 +98,7 @@ SKIP_SLOW_TESTS=true ./scripts/quality-check.sh  # Skip slow tests
 - Require credentials/environment setup (env vars, API keys)
 - Can be slow, skipped in CI by default
 - Test real integrations (OpenAI, Anthropic, web requests)
-
+- For documentation, do not add new folders to docs/. Instead, use one of the existing folders: technical/, developer-guide/, or user-guide/
 #### Test Categorization (MANDATORY)
 
 **Basic Categories** (always required - choose one):

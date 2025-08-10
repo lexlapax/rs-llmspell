@@ -1,4 +1,4 @@
-//! ABOUTME: JSEngine implementation of ScriptEngineBridge trait
+//! ABOUTME: `JSEngine` implementation of `ScriptEngineBridge` trait
 //! ABOUTME: Provides JavaScript (ES2020) execution with async generator streaming
 
 use crate::engine::{
@@ -28,7 +28,7 @@ impl JSEngine {
 
     /// Get the supported features for JavaScript
     #[must_use]
-    pub fn engine_features() -> EngineFeatures {
+    pub const fn engine_features() -> EngineFeatures {
         EngineFeatures {
             async_execution: true, // Native async/await
             streaming: true,       // Via async generators

@@ -16,8 +16,7 @@ use tracing::{debug, info};
 use uuid;
 
 /// Parse step configuration from Lua table
-#[allow(dead_code)]
-fn _parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
+fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
     let name: String = step_table.get("name")?;
     let step_type: String = step_table.get("type")?;
 
@@ -110,7 +109,8 @@ fn _parse_error_strategy(strategy: &str) -> ErrorStrategy {
 
 /// Parse condition from Lua value
 #[allow(dead_code)]
-fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+#[allow(clippy::only_used_in_recursion)]
+fn parse_condition(lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
     match condition_value {
         Value::String(s) => {
             let condition_str = s.to_str()?;
@@ -151,7 +151,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
 
                     for pair in conditions.pairs::<i32, Value>() {
                         let (_, cond_value) = pair?;
-                        and_conditions.push(_parse_condition(_lua, cond_value)?);
+                        and_conditions.push(parse_condition(lua, cond_value)?);
                     }
 
                     Ok(Condition::And {
@@ -164,7 +164,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
 
                     for pair in conditions.pairs::<i32, Value>() {
                         let (_, cond_value) = pair?;
-                        or_conditions.push(_parse_condition(_lua, cond_value)?);
+                        or_conditions.push(parse_condition(lua, cond_value)?);
                     }
 
                     Ok(Condition::Or {
@@ -174,7 +174,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
                 "not" => {
                     let inner: Value = t.get("condition")?;
                     Ok(Condition::Not {
-                        condition: Box::new(_parse_condition(_lua, inner)?),
+                        condition: Box::new(parse_condition(lua, inner)?),
                     })
                 }
                 "step_output_equals" | "step_result_equals" => {
@@ -440,7 +440,10 @@ impl UserData for WorkflowInstance {
     }
 }
 
-/// WorkflowBuilder for creating workflows with method chaining
+/// Type alias for workflow condition functions
+type WorkflowCondition = Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>;
+
+/// `WorkflowBuilder` for creating workflows with method chaining
 struct WorkflowBuilder {
     bridge: Arc<WorkflowBridge>,
     workflow_type: Option<String>,
@@ -450,11 +453,11 @@ struct WorkflowBuilder {
     error_strategy: Option<String>,
     timeout_ms: Option<u64>,
     // Conditional workflow fields
-    condition: Option<Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>>,
+    condition: Option<WorkflowCondition>,
     then_steps: Vec<WorkflowStep>,
     else_steps: Vec<WorkflowStep>,
     // Loop workflow fields
-    loop_condition: Option<Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>>,
+    loop_condition: Option<WorkflowCondition>,
     max_iterations: Option<usize>,
     // Parallel workflow fields
     max_concurrency: Option<usize>,
@@ -527,7 +530,7 @@ impl UserData for WorkflowBuilder {
 
         // Add step (for sequential, loop, and parallel workflows)
         methods.add_method_mut("add_step", |lua, this, step_table: Table| {
-            let step = _parse_workflow_step(lua, &step_table)?;
+            let step = parse_workflow_step(lua, &step_table)?;
             this.steps.push(step);
             Ok(this.clone())
         });
@@ -545,13 +548,13 @@ impl UserData for WorkflowBuilder {
         });
 
         methods.add_method_mut("add_then_step", |lua, this, step_table: Table| {
-            let step = _parse_workflow_step(lua, &step_table)?;
+            let step = parse_workflow_step(lua, &step_table)?;
             this.then_steps.push(step);
             Ok(this.clone())
         });
 
         methods.add_method_mut("add_else_step", |lua, this, step_table: Table| {
-            let step = _parse_workflow_step(lua, &step_table)?;
+            let step = parse_workflow_step(lua, &step_table)?;
             this.else_steps.push(step);
             Ok(this.clone())
         });

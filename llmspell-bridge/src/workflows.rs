@@ -847,16 +847,19 @@ impl WorkflowBridge {
     }
 
     /// List available workflow types
+    #[must_use]
     pub fn list_workflow_types(&self) -> Vec<String> {
         self.standardized_factory.list_workflow_types()
     }
 
     /// Get information about a specific workflow type
+    #[must_use]
     pub fn get_workflow_info(&self, workflow_type: &str) -> Option<WorkflowInfo> {
         self.discovery.get_workflow_info(workflow_type).cloned()
     }
 
     /// Get information about all workflow types
+    #[must_use]
     pub fn get_all_workflow_info(&self) -> Vec<(String, WorkflowInfo)> {
         self.discovery.get_workflow_types()
     }
@@ -1265,11 +1268,11 @@ pub struct WorkflowTemplate {
 #[derive(Debug, Default)]
 struct RegistryMetrics {
     /// Total workflows registered
-    total_registered: AtomicU64,
+    registered: AtomicU64,
     /// Total templates registered
-    total_templates: AtomicU64,
+    templates: AtomicU64,
     /// Total workflow executions through registry
-    total_executions: AtomicU64,
+    executions: AtomicU64,
 }
 
 impl WorkflowRegistry {
@@ -1315,9 +1318,7 @@ impl WorkflowRegistry {
         }
 
         workflows.insert(id, registration);
-        self.metrics
-            .total_registered
-            .fetch_add(1, Ordering::Relaxed);
+        self.metrics.registered.fetch_add(1, Ordering::Relaxed);
 
         Ok(())
     }
@@ -1410,9 +1411,7 @@ impl WorkflowRegistry {
         stats.avg_execution_time_ms = (current_avg * (total - 1) + execution_time_ms) / total;
         stats.last_execution = Some(chrono::Utc::now());
 
-        self.metrics
-            .total_executions
-            .fetch_add(1, Ordering::Relaxed);
+        self.metrics.executions.fetch_add(1, Ordering::Relaxed);
 
         Ok(())
     }
@@ -1441,7 +1440,7 @@ impl WorkflowRegistry {
     pub async fn register_template(&self, template: WorkflowTemplate) -> Result<()> {
         let mut templates = self.templates.write().await;
         templates.insert(template.id.clone(), template);
-        self.metrics.total_templates.fetch_add(1, Ordering::Relaxed);
+        self.metrics.templates.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
 
@@ -1565,7 +1564,7 @@ impl WorkflowRegistry {
         let templates_write = templates_map.get_mut();
         for template in templates {
             templates_write.insert(template.id.clone(), template);
-            self.metrics.total_templates.fetch_add(1, Ordering::Relaxed);
+            self.metrics.templates.fetch_add(1, Ordering::Relaxed);
         }
     }
 }

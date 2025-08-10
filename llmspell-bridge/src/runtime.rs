@@ -391,7 +391,7 @@ impl RuntimeConfigBuilder {
 
     /// Set the JavaScript configuration
     #[must_use]
-    pub fn javascript_config(mut self, config: JSConfig) -> Self {
+    pub const fn javascript_config(mut self, config: JSConfig) -> Self {
         self.config.engines.javascript = config;
         self
     }
@@ -488,28 +488,28 @@ impl GlobalRuntimeConfigBuilder {
 
     /// Set the maximum concurrent scripts
     #[must_use]
-    pub fn max_concurrent_scripts(mut self, max: usize) -> Self {
+    pub const fn max_concurrent_scripts(mut self, max: usize) -> Self {
         self.config.max_concurrent_scripts = max;
         self
     }
 
     /// Set the script execution timeout in seconds
     #[must_use]
-    pub fn script_timeout_seconds(mut self, timeout: u64) -> Self {
+    pub const fn script_timeout_seconds(mut self, timeout: u64) -> Self {
         self.config.script_timeout_seconds = timeout;
         self
     }
 
     /// Enable or disable streaming
     #[must_use]
-    pub fn enable_streaming(mut self, enable: bool) -> Self {
+    pub const fn enable_streaming(mut self, enable: bool) -> Self {
         self.config.enable_streaming = enable;
         self
     }
 
     /// Set the security configuration
     #[must_use]
-    pub fn security(mut self, security: SecurityConfig) -> Self {
+    pub const fn security(mut self, security: SecurityConfig) -> Self {
         self.config.security = security;
         self
     }
@@ -569,24 +569,60 @@ impl Default for SecurityConfig {
     }
 }
 
+/// Core state persistence flags
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct CoreStateFlags {
+    /// Enable state persistence
+    pub enabled: bool,
+    /// Enable migration functionality
+    pub migration_enabled: bool,
+}
+
+/// Backup-related flags
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct BackupFlags {
+    /// Automatic backup on migration
+    pub backup_on_migration: bool,
+    /// Enable backup functionality
+    pub backup_enabled: bool,
+}
+
+impl Default for BackupFlags {
+    fn default() -> Self {
+        Self {
+            backup_on_migration: true,
+            backup_enabled: false,
+        }
+    }
+}
+
+/// State persistence feature flags
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
+pub struct StatePersistenceFlags {
+    /// Core state persistence features
+    #[serde(flatten)]
+    pub core: CoreStateFlags,
+    /// Backup-related features
+    #[serde(flatten)]
+    pub backup: BackupFlags,
+}
+
 /// State persistence configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct StatePersistenceConfig {
-    /// Enable state persistence
-    pub enabled: bool,
+    /// Feature flags for state persistence
+    #[serde(flatten)]
+    pub flags: StatePersistenceFlags,
     /// Backend type for storage (memory, file, redis, etc.)
     pub backend_type: String,
-    /// Enable migration functionality
-    pub migration_enabled: bool,
     /// Directory for schema definitions
     pub schema_directory: Option<String>,
-    /// Automatic backup on migration
-    pub backup_on_migration: bool,
     /// Maximum state size per key in bytes
     pub max_state_size_bytes: Option<usize>,
-    /// Enable backup functionality
-    pub backup_enabled: bool,
     /// Backup configuration
     pub backup: Option<BackupConfig>,
 }
@@ -613,13 +649,10 @@ pub struct BackupConfig {
 impl Default for StatePersistenceConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            flags: StatePersistenceFlags::default(),
             backend_type: "memory".to_string(),
-            migration_enabled: false,
             schema_directory: None,
-            backup_on_migration: true,
             max_state_size_bytes: Some(10_000_000), // 10MB per key
-            backup_enabled: false,
             backup: None,
         }
     }

@@ -14,8 +14,8 @@ use llmspell_core::{
     execution_context::ExecutionContext,
     traits::base_agent::BaseAgent,
     traits::workflow::{
-        StepResult as CoreStepResult, Workflow, WorkflowConfig as CoreWorkflowConfig,
-        WorkflowStatus as CoreWorkflowStatus, WorkflowStep as CoreWorkflowStep,
+        Config as CoreWorkflowConfig, Status as CoreWorkflowStatus, StepResult as CoreStepResult,
+        Workflow, WorkflowStep as CoreWorkflowStep,
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, LLMSpellError, Result,
@@ -303,11 +303,10 @@ impl LoopWorkflow {
         let metadata = ComponentMetadata::new(name.clone(), "Loop workflow".to_string());
 
         // Create core workflow config from our config
-        let core_config = CoreWorkflowConfig {
-            max_parallel: Some(1), // Loop execution is sequential by nature
-            continue_on_error: config.continue_on_error,
-            timeout: config.timeout.or(workflow_config.max_execution_time),
-        };
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Loop execution is sequential by nature
+            .with_continue_on_error(config.continue_on_error)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
 
         Self {
             name,
@@ -341,11 +340,10 @@ impl LoopWorkflow {
         let metadata = ComponentMetadata::new(name.clone(), "Loop workflow with hooks".to_string());
 
         // Create core workflow config from our config
-        let core_config = CoreWorkflowConfig {
-            max_parallel: Some(1), // Loop execution is sequential by nature
-            continue_on_error: config.continue_on_error,
-            timeout: config.timeout.or(workflow_config.max_execution_time),
-        };
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Loop execution is sequential by nature
+            .with_continue_on_error(config.continue_on_error)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
 
         Self {
             name,

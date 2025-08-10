@@ -50,7 +50,7 @@ impl EventBridge {
     ///
     /// # Errors
     ///
-    /// Returns an error if EventBridge initialization fails
+    /// Returns an error if `EventBridge` initialization fails
     pub fn new(context: Arc<GlobalContext>) -> Result<Self> {
         let event_bus = Arc::new(EventBus::new());
 
@@ -207,6 +207,7 @@ impl EventBridge {
     }
 
     /// Get event bus statistics
+    #[must_use]
     pub fn get_stats(&self) -> serde_json::Value {
         let stats = self.event_bus.get_stats();
         let subscription_count = self.subscription_count();

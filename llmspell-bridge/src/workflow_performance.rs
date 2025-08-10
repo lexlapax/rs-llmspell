@@ -3,17 +3,14 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
-use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-lazy_static! {
-    /// Cache for workflow type information to avoid repeated discovery
-    static ref WORKFLOW_TYPE_CACHE: Arc<RwLock<HashMap<String, WorkflowTypeInfo>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
+/// Cache for workflow type information to avoid repeated discovery
+static WORKFLOW_TYPE_CACHE: LazyLock<Arc<RwLock<HashMap<String, WorkflowTypeInfo>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 /// Cached workflow type information
 #[derive(Clone, Debug)]
@@ -218,6 +215,7 @@ impl PerformanceMetrics {
 }
 
 /// Optimized workflow discovery with caching
+#[must_use]
 pub fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTypeInfo> {
     // Check cache first
     {

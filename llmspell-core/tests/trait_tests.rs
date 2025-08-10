@@ -7,7 +7,7 @@ use llmspell_core::{
         agent::{Agent, AgentConfig, ConversationMessage, MessageRole},
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
-        workflow::{RetryPolicy, Workflow, WorkflowStatus, WorkflowStep},
+        workflow::{RetryPolicy, Status as WorkflowStatus, Workflow, WorkflowStep},
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ExecutionContext, LLMSpellError,
@@ -240,11 +240,7 @@ fn test_retry_policy_configuration() {
     assert_eq!(default_policy.backoff_seconds, 1);
     assert!(default_policy.exponential_backoff);
 
-    let custom_policy = RetryPolicy {
-        max_attempts: 5,
-        backoff_seconds: 2,
-        exponential_backoff: false,
-    };
+    let custom_policy = RetryPolicy::new(5, 2, false);
     assert_eq!(custom_policy.max_attempts, 5);
     assert_eq!(custom_policy.backoff_seconds, 2);
     assert!(!custom_policy.exponential_backoff);

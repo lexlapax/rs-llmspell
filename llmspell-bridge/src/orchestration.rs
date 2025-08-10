@@ -82,28 +82,28 @@ impl ResourceLimitsBuilder {
 
     /// Set maximum concurrent workflows
     #[must_use]
-    pub fn max_concurrent_workflows(mut self, max: usize) -> Self {
+    pub const fn max_concurrent_workflows(mut self, max: usize) -> Self {
         self.limits.max_concurrent_workflows = max;
         self
     }
 
     /// Set maximum total agent invocations
     #[must_use]
-    pub fn max_agent_invocations(mut self, max: usize) -> Self {
+    pub const fn max_agent_invocations(mut self, max: usize) -> Self {
         self.limits.max_agent_invocations = max;
         self
     }
 
     /// Set maximum memory usage in MB
     #[must_use]
-    pub fn max_memory_mb(mut self, max: usize) -> Self {
+    pub const fn max_memory_mb(mut self, max: usize) -> Self {
         self.limits.max_memory_mb = max;
         self
     }
 
     /// Build the `ResourceLimits`
     #[must_use]
-    pub fn build(self) -> ResourceLimits {
+    pub const fn build(self) -> ResourceLimits {
         self.limits
     }
 }
@@ -151,42 +151,42 @@ impl OrchestrationConfigBuilder {
 
     /// Set the orchestration strategy
     #[must_use]
-    pub fn strategy(mut self, strategy: OrchestrationStrategy) -> Self {
+    pub const fn strategy(mut self, strategy: OrchestrationStrategy) -> Self {
         self.config.strategy = strategy;
         self
     }
 
     /// Set the maximum orchestration depth
     #[must_use]
-    pub fn max_depth(mut self, depth: usize) -> Self {
+    pub const fn max_depth(mut self, depth: usize) -> Self {
         self.config.max_depth = depth;
         self
     }
 
     /// Set the timeout in seconds
     #[must_use]
-    pub fn timeout_seconds(mut self, timeout: u64) -> Self {
+    pub const fn timeout_seconds(mut self, timeout: u64) -> Self {
         self.config.timeout_seconds = timeout;
         self
     }
 
     /// Set whether to allow parallel orchestration branches
     #[must_use]
-    pub fn allow_parallel(mut self, allow: bool) -> Self {
+    pub const fn allow_parallel(mut self, allow: bool) -> Self {
         self.config.allow_parallel = allow;
         self
     }
 
     /// Set the resource limits
     #[must_use]
-    pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+    pub const fn resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.config.resource_limits = limits;
         self
     }
 
     /// Build the `OrchestrationConfig`
     #[must_use]
-    pub fn build(self) -> OrchestrationConfig {
+    pub const fn build(self) -> OrchestrationConfig {
         self.config
     }
 }
@@ -301,28 +301,28 @@ impl RetryConfigBuilder {
 
     /// Set maximum retry attempts
     #[must_use]
-    pub fn max_attempts(mut self, attempts: usize) -> Self {
+    pub const fn max_attempts(mut self, attempts: usize) -> Self {
         self.config.max_attempts = attempts;
         self
     }
 
     /// Set backoff in milliseconds
     #[must_use]
-    pub fn backoff_ms(mut self, ms: u64) -> Self {
+    pub const fn backoff_ms(mut self, ms: u64) -> Self {
         self.config.backoff_ms = ms;
         self
     }
 
     /// Set whether to use exponential backoff
     #[must_use]
-    pub fn exponential_backoff(mut self, exponential: bool) -> Self {
+    pub const fn exponential_backoff(mut self, exponential: bool) -> Self {
         self.config.exponential_backoff = exponential;
         self
     }
 
     /// Build the `RetryConfig`
     #[must_use]
-    pub fn build(self) -> RetryConfig {
+    pub const fn build(self) -> RetryConfig {
         self.config
     }
 }

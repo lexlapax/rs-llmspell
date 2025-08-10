@@ -296,9 +296,9 @@ async fn test_large_script_memory() {
     let mut large_script = String::new();
     large_script.push_str("local data = {\n");
     for i in 0..10000 {
-        write!(
+        writeln!(
             large_script,
-            "  ['key_{i}'] = 'value_{i}_with_some_padding',\n"
+            "  ['key_{i}'] = 'value_{i}_with_some_padding',"
         )
         .unwrap();
     }

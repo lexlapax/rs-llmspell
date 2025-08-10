@@ -313,7 +313,7 @@ pub struct ToolDiscovery {
 impl ToolDiscovery {
     /// Create a new tool discovery service
     #[must_use]
-    pub fn new(registry: Arc<ComponentRegistry>) -> Self {
+    pub const fn new(registry: Arc<ComponentRegistry>) -> Self {
         Self { registry }
     }
 

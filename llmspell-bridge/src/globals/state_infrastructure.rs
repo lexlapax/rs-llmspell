@@ -3,6 +3,8 @@
 
 use crate::globals::GlobalContext;
 use crate::runtime::StatePersistenceConfig;
+#[cfg(test)]
+use crate::runtime::{CoreStateFlags, StatePersistenceFlags};
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::{EventBus, EventCorrelationTracker};
 use llmspell_hooks::HookExecutor;
@@ -17,6 +19,13 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Helper function to get or create state infrastructure from `GlobalContext`
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Storage backend creation fails
+/// - Migration handler initialization fails
+/// - State manager creation fails
 #[allow(clippy::too_many_lines)]
 pub async fn get_or_create_state_infrastructure(
     context: &GlobalContext,
@@ -48,7 +57,7 @@ pub async fn get_or_create_state_infrastructure(
 
     // Create StateManager with default persistence config
     let persistence_config = PersistenceConfig {
-        enabled: config.enabled,
+        enabled: config.flags.core.enabled,
         backend_type: backend_type.clone(),
         ..Default::default()
     };
@@ -66,7 +75,7 @@ pub async fn get_or_create_state_infrastructure(
     context.set_bridge("state_manager", state_manager.clone());
 
     // Initialize migration infrastructure if enabled
-    let (migration_engine, schema_registry) = if config.migration_enabled {
+    let (migration_engine, schema_registry) = if config.flags.core.migration_enabled {
         debug!("Initializing migration infrastructure");
 
         // Create schema registry that will be shared
@@ -117,7 +126,7 @@ pub async fn get_or_create_state_infrastructure(
     };
 
     // Initialize backup infrastructure if enabled
-    let backup_manager = if config.backup_enabled {
+    let backup_manager = if config.flags.backup.backup_enabled {
         debug!("Initializing backup infrastructure");
 
         // Get backup config or use defaults
@@ -269,7 +278,13 @@ mod tests {
         );
 
         let config = StatePersistenceConfig {
-            enabled: true,
+            flags: StatePersistenceFlags {
+                core: CoreStateFlags {
+                    enabled: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -301,8 +316,13 @@ mod tests {
         );
 
         let config = StatePersistenceConfig {
-            enabled: true,
-            migration_enabled: true,
+            flags: StatePersistenceFlags {
+                core: CoreStateFlags {
+                    enabled: true,
+                    migration_enabled: true,
+                },
+                ..Default::default()
+            },
             ..Default::default()
         };
 

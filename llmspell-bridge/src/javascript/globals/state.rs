@@ -10,7 +10,7 @@ use llmspell_core::error::LLMSpellError;
 ///
 /// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_state_global(
+pub const fn inject_state_global(
     _ctx: &mut boa_engine::Context,
     _context: &GlobalContext,
     _state_global: &StateGlobal,
@@ -31,7 +31,7 @@ pub fn inject_state_global(
 ///
 /// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_state_global(
+pub const fn inject_state_global(
     _ctx: &(),
     _context: &GlobalContext,
     _state_global: &StateGlobal,

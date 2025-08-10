@@ -471,15 +471,14 @@ impl ToolManager {
         }
         .to_string();
 
-        ToolInfo {
-            name: registry_info.name.clone(),
-            description: registry_info.description.clone(),
-            category: registry_info.category.to_string(),
-            security_level: security_level_str,
-            schema: JsonValue::Object(Map::new()), // Schema would need to be generated from the tool itself
-            capabilities: Vec::new(), // Registry ToolInfo doesn't have capabilities field
-            requirements: JsonValue::Object(Map::new()), // Could be expanded with security requirements
-        }
+        ToolInfo::new(
+            registry_info.name.clone(),
+            registry_info.description.clone(),
+            registry_info.category.to_string(),
+            security_level_str,
+        )
+        .with_schema(JsonValue::Object(Map::new())) // Schema would need to be generated from the tool itself
+        .with_requirements(JsonValue::Object(Map::new())) // Could be expanded with security requirements
     }
 
     /// Convert string to `ToolCategory`

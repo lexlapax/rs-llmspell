@@ -83,11 +83,7 @@ prop_compose! {
         backoff_seconds in 1u32..60,
         exponential_backoff in any::<bool>()
     ) -> RetryPolicy {
-        RetryPolicy {
-            max_attempts,
-            backoff_seconds,
-            exponential_backoff,
-        }
+        RetryPolicy::new(max_attempts, backoff_seconds, exponential_backoff)
     }
 }
 

@@ -113,7 +113,7 @@ async fn test_base_url_override() {
     assert!(
         result.is_ok(),
         "Script should handle provider errors gracefully"
-    )
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -382,7 +382,7 @@ mod provider_config_tests {
         assert!(ModelSpecifier::from_str("").is_err());
         // "/model" is valid but has empty provider
         let spec = ModelSpecifier::from_str("/model").unwrap();
-        assert_eq!(spec.provider, Some("".to_string()));
+        assert_eq!(spec.provider, Some(String::new()));
         assert_eq!(spec.model, "model");
         // "provider/" is valid but has empty model
         let spec = ModelSpecifier::from_str("provider/").unwrap();

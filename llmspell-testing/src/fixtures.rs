@@ -28,7 +28,7 @@ use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage},
         tool::ToolSchema,
-        workflow::{RetryPolicy, WorkflowConfig, WorkflowStep},
+        workflow::{Config as WorkflowConfig, RetryPolicy, WorkflowStep},
     },
     types::AgentInput,
     ComponentId, ComponentMetadata, Version,
@@ -173,44 +173,39 @@ pub fn sample_workflow_steps() -> Vec<WorkflowStep> {
     let step3_id = ComponentId::from_name("step-3");
 
     vec![
-        WorkflowStep {
-            id: step1_id,
-            name: "Initialize".to_string(),
-            component_id: ComponentId::from_name("init-agent"),
-            dependencies: vec![],
-            retry_policy: Some(RetryPolicy::default()),
-            timeout: Some(Duration::from_secs(30)),
-        },
-        WorkflowStep {
-            id: step2_id,
-            name: "Process Data".to_string(),
-            component_id: ComponentId::from_name("processor-agent"),
-            dependencies: vec![step1_id],
-            retry_policy: Some(RetryPolicy {
-                max_attempts: 5,
-                backoff_seconds: 2,
-                exponential_backoff: true,
-            }),
-            timeout: Some(Duration::from_secs(120)),
-        },
-        WorkflowStep {
-            id: step3_id,
-            name: "Generate Report".to_string(),
-            component_id: ComponentId::from_name("reporter-agent"),
-            dependencies: vec![step2_id],
-            retry_policy: None,
-            timeout: Some(Duration::from_secs(60)),
-        },
+        WorkflowStep::with_all_fields(
+            step1_id,
+            "Initialize".to_string(),
+            ComponentId::from_name("init-agent"),
+            vec![],
+            Some(RetryPolicy::default()),
+            Some(Duration::from_secs(30)),
+        ),
+        WorkflowStep::with_all_fields(
+            step2_id,
+            "Process Data".to_string(),
+            ComponentId::from_name("processor-agent"),
+            vec![step1_id],
+            Some(RetryPolicy::new(5, 2, true)),
+            Some(Duration::from_secs(120)),
+        ),
+        WorkflowStep::with_all_fields(
+            step3_id,
+            "Generate Report".to_string(),
+            ComponentId::from_name("reporter-agent"),
+            vec![step2_id],
+            None,
+            Some(Duration::from_secs(60)),
+        ),
     ]
 }
 
 /// Sample WorkflowConfig for testing
 pub fn sample_workflow_config() -> WorkflowConfig {
-    WorkflowConfig {
-        max_parallel: Some(3),
-        continue_on_error: false,
-        timeout: Some(Duration::from_secs(600)),
-    }
+    WorkflowConfig::new()
+        .with_max_parallel(Some(3))
+        .with_continue_on_error(false)
+        .with_timeout(Some(Duration::from_secs(600)))
 }
 
 /// Create test error scenarios

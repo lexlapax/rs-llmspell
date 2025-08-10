@@ -300,15 +300,14 @@ impl ToolDiscovery {
         }
         .to_string();
 
-        ToolInfo {
-            name: registry_info.name.clone(),
-            description: registry_info.description.clone(),
-            category: registry_info.category.to_string(),
-            security_level: security_level_str,
-            schema: JsonValue::Object(serde_json::Map::new()), // Would need tool instance for schema
-            capabilities: Vec::new(), // Registry doesn't store capabilities
-            requirements: JsonValue::Object(serde_json::Map::new()),
-        }
+        ToolInfo::new(
+            registry_info.name.clone(),
+            registry_info.description.clone(),
+            registry_info.category.to_string(),
+            security_level_str,
+        )
+        .with_schema(JsonValue::Object(serde_json::Map::new())) // Would need tool instance for schema
+        .with_requirements(JsonValue::Object(serde_json::Map::new()))
     }
 
     /// Convert string to `ToolCategory`

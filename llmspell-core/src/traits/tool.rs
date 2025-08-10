@@ -536,7 +536,7 @@ pub trait Tool: BaseAgent {
         for required in schema.required_parameters() {
             if !params_map.contains_key(&required) {
                 return Err(crate::LLMSpellError::Validation {
-                    message: format!("Missing required parameter: {}", required),
+                    message: format!("Missing required parameter: {required}"),
                     field: Some(required.clone()),
                 });
             }

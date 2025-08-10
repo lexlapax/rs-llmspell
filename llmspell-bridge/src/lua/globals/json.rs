@@ -7,6 +7,10 @@ use mlua::Lua;
 use serde_json;
 
 /// Inject JSON global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if JSON global injection or table creation fails
 pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
     let json_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create JSON table: {e}"),

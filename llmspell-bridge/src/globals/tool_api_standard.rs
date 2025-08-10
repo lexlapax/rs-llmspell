@@ -76,7 +76,7 @@
 //!
 //! ## Data Types
 //!
-//! ### ToolInfo
+//! ### `ToolInfo`
 //! ```typescript
 //! interface ToolInfo {
 //!     name: string;
@@ -86,7 +86,7 @@
 //! }
 //! ```
 //!
-//! ### ToolSchema
+//! ### `ToolSchema`
 //! ```typescript
 //! interface ToolSchema {
 //!     name: string;
@@ -124,7 +124,7 @@
 //! - All methods are synchronous from the script's perspective
 //! - Async operations are handled internally by the bridge
 //! - Tool discovery is cached for performance
-//! - Direct tool access (Tool.tool_name) uses lazy loading
+//! - Direct tool access (`Tool.tool_name`) uses lazy loading
 
 use llmspell_core::traits::tool::ToolSchema;
 use serde::{Deserialize, Serialize};
@@ -169,7 +169,7 @@ pub struct StandardParameterDef {
     pub default: Option<serde_json::Value>,
 }
 
-/// Convert from core ToolSchema to standard schema
+/// Convert from core `ToolSchema` to standard schema
 #[must_use]
 pub fn to_standard_schema(schema: ToolSchema) -> StandardToolSchema {
     StandardToolSchema {

@@ -44,26 +44,23 @@ impl StandardizedWorkflowFactory {
         // Build workflow configuration
         let mut config = WorkflowConfig::default();
 
-        params
-            .get("timeout")
-            .and_then(serde_json::Value::as_u64)
-            .map(|timeout_ms| {
-                config.max_execution_time = Some(Duration::from_millis(timeout_ms));
-            });
+        if let Some(timeout_ms) = params.get("timeout").and_then(serde_json::Value::as_u64) {
+            config.max_execution_time = Some(Duration::from_millis(timeout_ms));
+        }
 
-        params
+        if let Some(continue_on_error) = params
             .get("continue_on_error")
             .and_then(serde_json::Value::as_bool)
-            .map(|continue_on_error| {
-                config.continue_on_error = continue_on_error;
-            });
+        {
+            config.continue_on_error = continue_on_error;
+        }
 
-        params
+        if let Some(max_retries) = params
             .get("max_retry_attempts")
             .and_then(serde_json::Value::as_u64)
-            .map(|max_retries| {
-                config.max_retry_attempts = u32::try_from(max_retries).unwrap_or(u32::MAX);
-            });
+        {
+            config.max_retry_attempts = u32::try_from(max_retries).unwrap_or(u32::MAX);
+        }
 
         // Extract type-specific configuration
         let type_config = match workflow_type {

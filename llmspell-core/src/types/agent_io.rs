@@ -301,7 +301,7 @@ impl fmt::Display for AgentOutput {
             write!(f, ", tool_calls: {} items", self.tool_calls.len())?;
         }
         if let Some(ref agent_id) = self.transfer_to {
-            write!(f, ", transfer_to: {}", agent_id)?;
+            write!(f, ", transfer_to: {agent_id}")?;
         }
         write!(f, " }}")
     }

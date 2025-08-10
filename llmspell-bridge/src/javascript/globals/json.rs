@@ -6,14 +6,14 @@ use llmspell_core::error::LLMSpellError;
 
 /// Inject JSON global into JavaScript engine
 ///
-/// Note: JavaScript already has native JSON.parse() and JSON.stringify()
+/// Note: JavaScript already has native `JSON.parse()` and `JSON.stringify()`
 /// This function ensures the global exists and matches our definition for consistency.
 ///
 /// # Errors
 ///
 /// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_json_global(
+pub const fn inject_json_global(
     _ctx: &mut boa_engine::Context,
     _context: &GlobalContext,
 ) -> Result<(), LLMSpellError> {
@@ -31,7 +31,7 @@ pub fn inject_json_global(
 ///
 /// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_json_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
+pub const fn inject_json_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
     Ok(())
 }
 

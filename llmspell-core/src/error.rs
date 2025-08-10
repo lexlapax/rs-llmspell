@@ -325,7 +325,7 @@ pub type Result<T> = std::result::Result<T, LLMSpellError>;
 impl From<std::io::Error> for LLMSpellError {
     fn from(err: std::io::Error) -> Self {
         LLMSpellError::Storage {
-            message: format!("IO error: {}", err),
+            message: format!("IO error: {err}"),
             operation: None,
             source: Some(Box::new(err)),
         }
@@ -335,7 +335,7 @@ impl From<std::io::Error> for LLMSpellError {
 impl From<serde_json::Error> for LLMSpellError {
     fn from(err: serde_json::Error) -> Self {
         LLMSpellError::Configuration {
-            message: format!("JSON serialization error: {}", err),
+            message: format!("JSON serialization error: {err}"),
             source: Some(Box::new(err)),
         }
     }
@@ -344,7 +344,7 @@ impl From<serde_json::Error> for LLMSpellError {
 impl From<std::fmt::Error> for LLMSpellError {
     fn from(err: std::fmt::Error) -> Self {
         LLMSpellError::Internal {
-            message: format!("Formatting error: {}", err),
+            message: format!("Formatting error: {err}"),
             source: Some(Box::new(err)),
         }
     }

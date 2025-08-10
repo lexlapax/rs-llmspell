@@ -10,7 +10,10 @@ use llmspell_core::Result;
 ///
 /// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalContext) -> Result<()> {
+pub const fn inject_hook_global(
+    _ctx: &mut boa_engine::Context,
+    _context: &GlobalContext,
+) -> Result<()> {
     // TODO (Phase 15): Implement JavaScript hook global
     // This will include:
     // - Hook.register(hook_point, callback, priority)
@@ -25,7 +28,7 @@ pub fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalConte
 ///
 /// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_hook_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()> {
+pub const fn inject_hook_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()> {
     Ok(())
 }
 

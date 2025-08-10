@@ -122,7 +122,8 @@ impl UserData for LuaReplaySchedule {
 }
 
 /// Convert Lua value to JSON
-fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
+#[allow(clippy::only_used_in_recursion)]
+fn lua_value_to_json(lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
     match value {
         Value::Nil => Ok(serde_json::Value::Null),
         Value::Boolean(b) => Ok(serde_json::Value::Bool(b)),
@@ -153,14 +154,14 @@ fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
                 let mut arr = Vec::new();
                 for pair in t.pairs::<i64, Value>() {
                     let (_, v) = pair?;
-                    arr.push(lua_value_to_json(_lua, v)?);
+                    arr.push(lua_value_to_json(lua, v)?);
                 }
                 Ok(serde_json::Value::Array(arr))
             } else {
                 let mut map = serde_json::Map::new();
                 for pair in t.pairs::<String, Value>() {
                     let (k, v) = pair?;
-                    map.insert(k, lua_value_to_json(_lua, v)?);
+                    map.insert(k, lua_value_to_json(lua, v)?);
                 }
                 Ok(serde_json::Value::Object(map))
             }

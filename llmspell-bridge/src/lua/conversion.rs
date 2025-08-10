@@ -6,7 +6,7 @@ use llmspell_core::types::{
     AgentInput, AgentOutput, ColorSpace, ImageFormat, ImageMetadata, MediaContent, MediaType,
     ToolOutput,
 };
-use llmspell_core::{ExecutionContext, LLMSpellError, Result};
+use llmspell_core::{LLMSpellError, Result};
 use mlua::{Error as LuaError, Lua, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -153,7 +153,7 @@ pub fn lua_table_to_agent_input(lua: &Lua, table: &Table) -> mlua::Result<AgentI
     }
 
     // Extract context (optional) - for now we don't support full ExecutionContext from Lua
-    let _context: Option<ExecutionContext> = None;
+    // let _context: Option<ExecutionContext> = None;
 
     // Extract output_modalities (optional)
     let mut output_modalities = Vec::new();

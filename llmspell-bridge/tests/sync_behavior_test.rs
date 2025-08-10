@@ -9,7 +9,7 @@ use llmspell_tools::CalculatorTool;
 use std::sync::Arc;
 
 // Helper function to create test registry with calculator tool
-async fn create_test_registry() -> Arc<ComponentRegistry> {
+fn create_test_registry() -> Arc<ComponentRegistry> {
     let registry = Arc::new(ComponentRegistry::new());
     registry
         .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
@@ -28,17 +28,17 @@ async fn create_test_providers() -> Arc<ProviderManager> {
 }
 
 // Helper function to create test engine
-async fn create_test_engine() -> LuaEngine {
+fn create_test_engine() -> LuaEngine {
     let config = LuaConfig::default();
     LuaEngine::new(&config).expect("Failed to create Lua engine")
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_sync_api_available() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test that Agent API is available and synchronous
@@ -69,10 +69,10 @@ async fn test_agent_sync_api_available() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tool_sync_behavior() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test that Tool operations are synchronous
@@ -109,10 +109,10 @@ async fn test_tool_sync_behavior() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_workflow_sync_behavior() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test that Workflow operations are synchronous
@@ -145,10 +145,10 @@ async fn test_workflow_sync_behavior() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_error_handling_sync() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test that errors are thrown synchronously
@@ -201,10 +201,10 @@ async fn test_error_handling_sync() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_api_synchronous_return_patterns() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test that API methods return values immediately, not promises
@@ -240,10 +240,10 @@ async fn test_api_synchronous_return_patterns() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_sync_timeout_behavior() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test timeout behavior in sync context with tools

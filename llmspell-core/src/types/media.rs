@@ -259,10 +259,10 @@ impl fmt::Display for MediaContent {
             } => {
                 write!(f, "Binary({} bytes", data.len())?;
                 if let Some(mime) = mime_type {
-                    write!(f, ", {}", mime)?;
+                    write!(f, ", {mime}")?;
                 }
                 if let Some(name) = filename {
-                    write!(f, ", {}", name)?;
+                    write!(f, ", {name}")?;
                 }
                 write!(f, ")")
             }
@@ -368,8 +368,7 @@ impl MediaContent {
 
         if size > max_size {
             Err(format!(
-                "{} size {} bytes exceeds maximum {} bytes",
-                type_name, size, max_size
+                "{type_name} size {size} bytes exceeds maximum {max_size} bytes"
             ))
         } else {
             Ok(())
@@ -464,7 +463,7 @@ impl TryFrom<&str> for ImageFormat {
             "gif" => Ok(ImageFormat::Gif),
             "svg" => Ok(ImageFormat::Svg),
             "tif" | "tiff" => Ok(ImageFormat::Tiff),
-            _ => Err(format!("Unknown image format: {}", ext)),
+            _ => Err(format!("Unknown image format: {ext}")),
         }
     }
 }
@@ -479,7 +478,7 @@ impl TryFrom<&str> for AudioFormat {
             "flac" => Ok(AudioFormat::Flac),
             "ogg" | "oga" => Ok(AudioFormat::Ogg),
             "m4a" => Ok(AudioFormat::M4a),
-            _ => Err(format!("Unknown audio format: {}", ext)),
+            _ => Err(format!("Unknown audio format: {ext}")),
         }
     }
 }
@@ -494,7 +493,7 @@ impl TryFrom<&str> for VideoFormat {
             "avi" => Ok(VideoFormat::Avi),
             "mov" => Ok(VideoFormat::Mov),
             "mkv" => Ok(VideoFormat::Mkv),
-            _ => Err(format!("Unknown video format: {}", ext)),
+            _ => Err(format!("Unknown video format: {ext}")),
         }
     }
 }

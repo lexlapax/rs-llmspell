@@ -105,11 +105,13 @@ impl AgentBridge {
     }
 
     /// List available agent types
+    #[must_use]
     pub fn list_agent_types(&self) -> Vec<String> {
         self.discovery.list_agent_types()
     }
 
     /// List available templates
+    #[must_use]
     pub fn list_templates(&self) -> Vec<String> {
         self.discovery.list_templates()
     }

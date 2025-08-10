@@ -47,20 +47,14 @@ pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<()
                         return Ok(Value::Nil);
                     }
 
-                    match thread.resume::<_, Value>(()) {
-                        Ok(value) => {
-                            if thread.status() == mlua::ThreadStatus::Resumable {
-                                Ok(value)
-                            } else {
-                                stream.set("_done", true)?;
-                                Ok(value)
-                            }
-                        }
-                        Err(e) => {
-                            stream.set("_done", true)?;
-                            Err(e)
-                        }
+                    let result = thread.resume::<_, Value>(());
+
+                    // Mark stream as done if thread is no longer resumable or on error
+                    if thread.status() != mlua::ThreadStatus::Resumable || result.is_err() {
+                        stream.set("_done", true)?;
                     }
+
+                    result
                 })?,
             )?;
 

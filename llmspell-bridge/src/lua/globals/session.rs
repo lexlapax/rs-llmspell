@@ -13,7 +13,7 @@ use mlua::{Error as LuaError, Lua, Table, UserData, UserDataMethods};
 use std::str::FromStr;
 use std::sync::Arc;
 
-/// SessionBuilder for creating sessions with method chaining
+/// `SessionBuilder` for creating sessions with method chaining
 #[derive(Clone)]
 struct SessionBuilder {
     bridge: Arc<SessionBridge>,
@@ -23,7 +23,7 @@ struct SessionBuilder {
 }
 
 impl SessionBuilder {
-    fn new(bridge: Arc<SessionBridge>) -> Self {
+    const fn new(bridge: Arc<SessionBridge>) -> Self {
         Self {
             bridge,
             name: None,

@@ -12,8 +12,8 @@ use llmspell_core::{
     execution_context::ExecutionContext,
     traits::base_agent::BaseAgent,
     traits::workflow::{
-        StepResult as CoreStepResult, Workflow, WorkflowConfig as CoreWorkflowConfig,
-        WorkflowStatus as CoreWorkflowStatus, WorkflowStep as CoreWorkflowStep,
+        Config as CoreWorkflowConfig, Status as CoreWorkflowStatus, StepResult as CoreStepResult,
+        Workflow, WorkflowStep as CoreWorkflowStep,
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, LLMSpellError, Result,
@@ -54,11 +54,10 @@ impl SequentialWorkflow {
         let metadata = ComponentMetadata::new(name.clone(), "Sequential workflow".to_string());
 
         // Create core workflow config from our config
-        let core_config = CoreWorkflowConfig {
-            max_parallel: Some(1), // Sequential execution
-            continue_on_error: matches!(error_strategy, ErrorStrategy::Continue),
-            timeout: config.max_execution_time,
-        };
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Sequential execution
+            .with_continue_on_error(matches!(error_strategy, ErrorStrategy::Continue))
+            .with_timeout(config.max_execution_time);
 
         Self {
             name,
@@ -90,11 +89,10 @@ impl SequentialWorkflow {
             ComponentMetadata::new(name.clone(), "Sequential workflow with hooks".to_string());
 
         // Create core workflow config from our config
-        let core_config = CoreWorkflowConfig {
-            max_parallel: Some(1), // Sequential execution
-            continue_on_error: matches!(error_strategy, ErrorStrategy::Continue),
-            timeout: config.max_execution_time,
-        };
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Sequential execution
+            .with_continue_on_error(matches!(error_strategy, ErrorStrategy::Continue))
+            .with_timeout(config.max_execution_time);
 
         Self {
             name,
