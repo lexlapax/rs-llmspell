@@ -110,7 +110,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Register tools with the registry
-        llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+        llmspell_bridge::tools::register_all_tools(&registry).unwrap();
 
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -171,7 +171,7 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Register tools with the registry
-        llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+        llmspell_bridge::tools::register_all_tools(&registry).unwrap();
 
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();

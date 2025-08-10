@@ -24,7 +24,7 @@ impl UserData for LuaAgentInstance {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // invoke method (same as execute in API) - synchronous wrapper
         methods.add_method("invoke", |lua, this, input: Table| {
-            let agent_input = lua_table_to_agent_input(lua, input)?;
+            let agent_input = lua_table_to_agent_input(lua, &input)?;
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -40,7 +40,7 @@ impl UserData for LuaAgentInstance {
 
         // execute method (alias for invoke) - synchronous wrapper
         methods.add_method("execute", |lua, this, input: Table| {
-            let agent_input = lua_table_to_agent_input(lua, input)?;
+            let agent_input = lua_table_to_agent_input(lua, &input)?;
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -58,7 +58,7 @@ impl UserData for LuaAgentInstance {
         methods.add_method(
             "invokeStream",
             |lua, this, (input, callback): (Table, mlua::Function)| {
-                let agent_input = lua_table_to_agent_input(lua, input)?;
+                let agent_input = lua_table_to_agent_input(lua, &input)?;
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();
 
@@ -796,7 +796,7 @@ impl UserData for LuaAgentInstance {
         methods.add_method(
             "execute_with_context",
             |lua, this, (input, context_id): (Table, String)| {
-                let agent_input = lua_table_to_agent_input(lua, input)?;
+                let agent_input = lua_table_to_agent_input(lua, &input)?;
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();
 
@@ -1486,7 +1486,7 @@ pub fn inject_agent_global(
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
         bridge
-            .set_shared_memory(scope_json, key, value_json)
+            .set_shared_memory(&scope_json, key, value_json)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {e}")))?;
 
         Ok(())
@@ -1501,7 +1501,7 @@ pub fn inject_agent_global(
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
         let result = bridge
-            .get_shared_memory(scope_json, &key)
+            .get_shared_memory(&scope_json, &key)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
 
         result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))

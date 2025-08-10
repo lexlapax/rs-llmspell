@@ -161,7 +161,7 @@ impl ScriptRuntime {
         let registry = Arc::new(ComponentRegistry::new());
 
         // Register all Phase 2 tools with the registry
-        register_all_tools(registry.clone()).map_err(|e| LLMSpellError::Component {
+        register_all_tools(&registry).map_err(|e| LLMSpellError::Component {
             message: format!("Failed to register tools: {e}"),
             source: None,
         })?;

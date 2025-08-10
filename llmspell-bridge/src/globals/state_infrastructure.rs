@@ -44,7 +44,7 @@ pub async fn get_or_create_state_infrastructure(
     info!("Initializing state persistence infrastructure");
 
     // Create storage backend type based on config
-    let backend_type = create_backend_type(config)?;
+    let backend_type = create_backend_type(config);
 
     // Create StateManager with default persistence config
     let persistence_config = PersistenceConfig {
@@ -75,7 +75,7 @@ pub async fn get_or_create_state_infrastructure(
         // Get state manager's storage adapter for migration engine
         // Note: StateManager already has a storage adapter, we need to share it
         // For now, create a new one with the same backend type
-        let migration_backend_type = create_backend_type(config)?;
+        let migration_backend_type = create_backend_type(config);
         let migration_backend =
             llmspell_state_persistence::backend_adapter::create_storage_backend(
                 &migration_backend_type,
@@ -92,9 +92,9 @@ pub async fn get_or_create_state_infrastructure(
         ));
 
         // Get or create event infrastructure
-        let event_bus = get_or_create_event_bus(context)?;
-        let correlation_tracker = get_or_create_correlation_tracker(context)?;
-        let hook_executor = get_or_create_hook_executor(context)?;
+        let event_bus = get_or_create_event_bus(context);
+        let correlation_tracker = get_or_create_correlation_tracker(context);
+        let hook_executor = get_or_create_hook_executor(context);
 
         // Create migration engine
         let migration_engine = Arc::new(MigrationEngine::new(
@@ -186,65 +186,63 @@ pub async fn get_or_create_state_infrastructure(
 /// Returns an error if:
 /// - Unknown backend type is specified
 /// - Backend configuration is invalid
-fn create_backend_type(config: &StatePersistenceConfig) -> Result<StorageBackendType> {
+fn create_backend_type(config: &StatePersistenceConfig) -> StorageBackendType {
     match config.backend_type.as_str() {
         "memory" => {
             debug!("Creating in-memory storage backend type");
-            Ok(StorageBackendType::Memory)
+            StorageBackendType::Memory
         }
         "sled" => {
             debug!("Creating sled storage backend type");
             let path = std::env::var("LLMSPELL_STATE_PATH")
                 .unwrap_or_else(|_| "./llmspell_state".to_string());
-            Ok(StorageBackendType::Sled(SledConfig {
+            StorageBackendType::Sled(SledConfig {
                 path: std::path::PathBuf::from(path),
                 cache_capacity: 64 * 1024 * 1024, // 64MB
                 use_compression: true,
-            }))
+            })
         }
         backend => {
             warn!("Unknown backend type '{}', falling back to memory", backend);
-            Ok(StorageBackendType::Memory)
+            StorageBackendType::Memory
         }
     }
 }
 
 /// Get or create `EventBus`
-fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
-        return Ok(event_bus);
+        return event_bus;
     }
 
     // Create new EventBus
     let event_bus = Arc::new(EventBus::new());
     context.set_bridge("event_bus", event_bus.clone());
-    Ok(event_bus)
+    event_bus
 }
 
 /// Get or create `EventCorrelationTracker`
-fn get_or_create_correlation_tracker(
-    context: &GlobalContext,
-) -> Result<Arc<EventCorrelationTracker>> {
+fn get_or_create_correlation_tracker(context: &GlobalContext) -> Arc<EventCorrelationTracker> {
     if let Some(tracker) = context.get_bridge::<EventCorrelationTracker>("correlation_tracker") {
-        return Ok(tracker);
+        return tracker;
     }
 
     // Create new tracker
     let tracker = Arc::new(EventCorrelationTracker::default());
     context.set_bridge("correlation_tracker", tracker.clone());
-    Ok(tracker)
+    tracker
 }
 
 /// Get or create `HookExecutor`
-fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
+fn get_or_create_hook_executor(context: &GlobalContext) -> Arc<HookExecutor> {
     if let Some(executor) = context.get_bridge::<HookExecutor>("hook_executor") {
-        return Ok(executor);
+        return executor;
     }
 
     // Create new executor
     let executor = Arc::new(HookExecutor::new());
     context.set_bridge("hook_executor", executor.clone());
-    Ok(executor)
+    executor
 }
 
 /// Container for state infrastructure components

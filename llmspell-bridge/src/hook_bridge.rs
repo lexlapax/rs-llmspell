@@ -373,7 +373,7 @@ impl HookBridge {
         // Publish before hook event if event bridge is available
         if let Some(ref bridge) = event_bridge {
             let before_event =
-                Self::create_hook_event(&hook_point, "before", correlation_id, context)?;
+                Self::create_hook_event(&hook_point, "before", correlation_id, context);
             if let Err(e) = bridge
                 .publish_correlated_event(before_event, correlation_id)
                 .await
@@ -400,8 +400,7 @@ impl HookBridge {
                 Ok(HookResult::Skipped(_)) => "skipped",
                 Err(_) => "error",
             };
-            let after_event =
-                Self::create_hook_event(&hook_point, status, correlation_id, context)?;
+            let after_event = Self::create_hook_event(&hook_point, status, correlation_id, context);
             if let Err(e) = bridge
                 .publish_correlated_event(after_event, correlation_id)
                 .await
@@ -419,7 +418,7 @@ impl HookBridge {
         status: &str,
         correlation_id: Uuid,
         context: &HookContext,
-    ) -> Result<UniversalEvent, LLMSpellError> {
+    ) -> UniversalEvent {
         let event_type = format!(
             "hook.{}.{}",
             hook_point.to_string().to_lowercase().replace(' ', "_"),
@@ -434,14 +433,12 @@ impl HookBridge {
             "status": status
         });
 
-        let event = UniversalEventBuilder::new(&event_type)
+        UniversalEventBuilder::new(&event_type)
             .language(EventLanguage::Rust)
             .data(event_data)
             .source("hook_bridge")
             .correlation_id(correlation_id)
-            .build();
-
-        Ok(event)
+            .build()
     }
 
     /// Get metrics from the hook executor

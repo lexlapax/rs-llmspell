@@ -13,7 +13,7 @@ mod workflow_tool_tests {
         let registry = Arc::new(ComponentRegistry::new());
 
         // Register all tools
-        register_all_tools(registry.clone()).expect("Failed to register tools");
+        register_all_tools(&registry).expect("Failed to register tools");
 
         Arc::new(WorkflowBridge::new(registry))
     }
@@ -412,7 +412,10 @@ mod workflow_tool_tests {
             }
             Ok(res) => {
                 // Check if execution failed due to timeout
-                let success = res.get("success").and_then(|v| v.as_bool()).unwrap_or(true);
+                let success = res
+                    .get("success")
+                    .and_then(serde_json::Value::as_bool)
+                    .unwrap_or(true);
                 let has_error = res.get("error").is_some() || res.get("error_message").is_some();
                 assert!(
                     !success || has_error,
@@ -501,7 +504,7 @@ mod workflow_tool_tests {
     #[test]
     fn test_tool_discovery_from_workflows() {
         let registry = Arc::new(ComponentRegistry::new());
-        register_all_tools(registry.clone()).expect("Failed to register tools");
+        register_all_tools(&registry).expect("Failed to register tools");
 
         // Verify all expected tools are registered
         let expected_tools = vec![

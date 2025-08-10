@@ -45,7 +45,7 @@ use std::sync::Arc;
 ///
 /// Returns an error if tool registration fails
 pub fn register_all_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // Create a shared file sandbox for file system tools
     let security_requirements = SecurityRequirements::default().with_file_access("/tmp");
@@ -57,14 +57,14 @@ pub fn register_all_tools(
     let file_sandbox = Arc::new(FileSandbox::new(sandbox_context)?);
 
     // Register different tool categories
-    register_utility_tools(&registry)?;
-    register_data_processing_tools(&registry)?;
-    register_file_system_tools(&registry, file_sandbox)?;
-    register_system_tools(&registry)?;
-    register_media_tools(&registry)?;
-    register_search_tools(&registry)?;
-    register_web_tools(&registry)?;
-    register_communication_tools(&registry)?;
+    register_utility_tools(registry)?;
+    register_data_processing_tools(registry)?;
+    register_file_system_tools(registry, file_sandbox)?;
+    register_system_tools(registry)?;
+    register_media_tools(registry)?;
+    register_search_tools(registry)?;
+    register_web_tools(registry)?;
+    register_communication_tools(registry)?;
 
     Ok(())
 }

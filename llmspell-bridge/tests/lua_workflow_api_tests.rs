@@ -9,7 +9,7 @@ use llmspell_tools::CalculatorTool;
 use std::sync::Arc;
 
 // Helper function to create a test script engine
-async fn create_test_engine() -> LuaEngine {
+fn create_test_engine() -> LuaEngine {
     let config = LuaConfig::default();
     LuaEngine::new(&config).expect("Failed to create Lua engine")
 }
@@ -25,7 +25,7 @@ async fn create_test_providers() -> Arc<ProviderManager> {
 }
 
 // Helper function to create test registry with calculator tool
-async fn create_test_registry() -> Arc<ComponentRegistry> {
+fn create_test_registry() -> Arc<ComponentRegistry> {
     let registry = Arc::new(ComponentRegistry::new());
     registry
         .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
@@ -35,10 +35,10 @@ async fn create_test_registry() -> Arc<ComponentRegistry> {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_sequential_creation() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     let script = r#"
@@ -66,10 +66,10 @@ async fn test_lua_workflow_sequential_creation() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_parallel() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     let script = r#"
@@ -94,10 +94,10 @@ async fn test_lua_workflow_parallel() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_conditional() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     let script = r#"
@@ -129,10 +129,10 @@ async fn test_lua_workflow_conditional() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_loop() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     let script = r#"
@@ -162,10 +162,10 @@ async fn test_lua_workflow_loop() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_list() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     let script = r#"
@@ -194,10 +194,10 @@ async fn test_lua_workflow_list() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_discover_types() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     let script = r#"
@@ -239,10 +239,10 @@ async fn test_lua_workflow_discover_types() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_error_handling() {
-    let registry = create_test_registry().await;
+    let registry = create_test_registry();
     let providers = create_test_providers().await;
 
-    let mut engine = create_test_engine().await;
+    let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test with invalid workflow configuration

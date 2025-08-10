@@ -2,7 +2,6 @@
 //! ABOUTME: Placeholder implementation preparing for full JavaScript event integration
 
 use crate::globals::types::GlobalContext;
-use crate::providers::ProviderManagerConfig;
 #[cfg(feature = "javascript")]
 use boa_engine::Context;
 use llmspell_core::error::LLMSpellError;

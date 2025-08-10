@@ -232,7 +232,7 @@ fn parse_hook_point(s: &str) -> mlua::Result<HookPoint> {
 }
 
 /// Parse priority from string or use default
-fn parse_priority(s: Option<String>) -> Priority {
+fn parse_priority(s: &Option<String>) -> Priority {
     match s.as_deref() {
         Some("highest") => Priority::HIGHEST,
         Some("high") => Priority::HIGH,
@@ -289,7 +289,7 @@ pub fn inject_hook_global(
         .create_function(
             move |lua, (hook_point, callback, priority): (String, Function, Option<String>)| {
                 let hook_point = parse_hook_point(&hook_point)?;
-                let priority = parse_priority(priority);
+                let priority = parse_priority(&priority);
                 let hook_bridge = hook_bridge_clone.clone();
 
                 // Store the callback

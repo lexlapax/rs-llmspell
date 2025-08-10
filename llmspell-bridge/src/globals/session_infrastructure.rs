@@ -28,9 +28,9 @@ pub async fn get_or_create_session_infrastructure(
 
     // Get or create required dependencies
     let state_manager = get_or_create_state_manager(context).await?;
-    let hook_registry = get_or_create_hook_registry(context)?;
-    let hook_executor = get_or_create_hook_executor(context)?;
-    let event_bus = get_or_create_event_bus(context)?;
+    let hook_registry = get_or_create_hook_registry(context);
+    let hook_executor = get_or_create_hook_executor(context);
+    let event_bus = get_or_create_event_bus(context);
 
     // Create storage backend based on configuration
     let storage_backend = create_storage_backend(&config.storage_backend)?;
@@ -96,39 +96,39 @@ async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<Stat
 }
 
 /// Get or create `HookRegistry`
-fn get_or_create_hook_registry(context: &GlobalContext) -> Result<Arc<HookRegistry>> {
+fn get_or_create_hook_registry(context: &GlobalContext) -> Arc<HookRegistry> {
     if let Some(registry) = context.get_bridge::<HookRegistry>("hook_registry") {
-        return Ok(registry);
+        return registry;
     }
 
     // Create new registry
     let registry = Arc::new(HookRegistry::new());
     context.set_bridge("hook_registry", registry.clone());
-    Ok(registry)
+    registry
 }
 
 /// Get or create `HookExecutor`
-fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
+fn get_or_create_hook_executor(context: &GlobalContext) -> Arc<HookExecutor> {
     if let Some(executor) = context.get_bridge::<HookExecutor>("hook_executor") {
-        return Ok(executor);
+        return executor;
     }
 
     // Create new executor
     let executor = Arc::new(HookExecutor::new());
     context.set_bridge("hook_executor", executor.clone());
-    Ok(executor)
+    executor
 }
 
 /// Get or create `EventBus`
-fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
-        return Ok(event_bus);
+        return event_bus;
     }
 
     // Create new EventBus
     let event_bus = Arc::new(EventBus::new());
     context.set_bridge("event_bus", event_bus.clone());
-    Ok(event_bus)
+    event_bus
 }
 
 /// Create storage backend based on configuration

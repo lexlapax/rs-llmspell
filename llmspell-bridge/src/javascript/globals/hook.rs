@@ -4,7 +4,6 @@
 use crate::globals::types::GlobalContext;
 use llmspell_core::Result;
 
-use crate::providers::ProviderManagerConfig;
 /// Inject the Hook global into JavaScript (stub for Phase 15)
 ///
 /// # Errors

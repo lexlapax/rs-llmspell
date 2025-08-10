@@ -138,7 +138,7 @@ pub fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result
 /// - Required fields are missing
 /// - Media content parsing fails
 /// - Value conversion fails
-pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentInput> {
+pub fn lua_table_to_agent_input(lua: &Lua, table: &Table) -> mlua::Result<AgentInput> {
     // Extract text (required)
     let text: String = table.get("text").unwrap_or_default();
 
@@ -176,13 +176,13 @@ pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentIn
     if let Ok(media_table) = table.get::<_, Table>("media") {
         // Handle array of media items
         for entry in media_table.sequence_values::<Table>().flatten() {
-            if let Ok(media_content) = parse_media_content(lua, entry) {
+            if let Ok(media_content) = parse_media_content(lua, &entry) {
                 media.push(media_content);
             }
         }
     } else if let Ok(media_table) = table.get::<_, Table>("image") {
         // Legacy single image support
-        if let Ok(media_content) = parse_media_content(lua, media_table) {
+        if let Ok(media_content) = parse_media_content(lua, &media_table) {
             media.push(media_content);
         }
     }
@@ -205,7 +205,7 @@ pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentIn
 }
 
 /// Parse media content from Lua table
-fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
+fn parse_media_content(_lua: &Lua, table: &Table) -> mlua::Result<MediaContent> {
     let base64: String = table.get("base64")?;
     let data = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &base64)
         .map_err(|e| LuaError::RuntimeError(format!("Failed to decode base64 image: {e}")))?;
@@ -411,13 +411,16 @@ pub fn lua_table_to_workflow_params(_lua: &Lua, table: Table) -> Result<JsonValu
 /// Returns an error if:
 /// - JSON to Lua conversion fails
 /// - Table creation fails
-pub fn workflow_result_to_lua_table(lua: &Lua, result: serde_json::Value) -> mlua::Result<Table> {
-    if let LuaValue::Table(table) = json_to_lua_value(lua, &result)? {
+pub fn workflow_result_to_lua_table<'lua>(
+    lua: &'lua Lua,
+    result: &serde_json::Value,
+) -> mlua::Result<Table<'lua>> {
+    if let LuaValue::Table(table) = json_to_lua_value(lua, result)? {
         Ok(table)
     } else {
         // If it's not a table, wrap it in one
         let table = lua.create_table()?;
-        table.set("result", json_to_lua_value(lua, &result)?)?;
+        table.set("result", json_to_lua_value(lua, result)?)?;
         Ok(table)
     }
 }
@@ -436,7 +439,7 @@ pub fn script_workflow_result_to_lua_table(
     // Convert to JSON first, then to Lua
     let json_value = serde_json::to_value(result)
         .map_err(|e| LuaError::RuntimeError(format!("Failed to serialize workflow result: {e}")))?;
-    workflow_result_to_lua_table(lua, json_value)
+    workflow_result_to_lua_table(lua, &json_value)
 }
 
 // ===== Trait implementations =====

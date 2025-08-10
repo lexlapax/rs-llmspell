@@ -16,7 +16,7 @@ async fn test_simple_tool_integration() {
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
     // Register all tools
-    llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+    llmspell_bridge::tools::register_all_tools(&registry).unwrap();
 
     // Create engine
     let lua_config = LuaConfig::default();
@@ -890,7 +890,7 @@ async fn test_tool_performance() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+    llmspell_bridge::tools::register_all_tools(&registry).unwrap();
 
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();

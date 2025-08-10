@@ -98,7 +98,7 @@ pub fn inject_tool_global(
                             // Convert params to agent input
                             let agent_input = crate::lua::conversion::lua_table_to_agent_input(
                                 lua,
-                                params_table,
+                                &params_table,
                             )?;
 
                             // Execute the tool
@@ -155,7 +155,7 @@ pub fn inject_tool_global(
 
                 // Convert input to agent input
                 let agent_input =
-                    crate::lua::conversion::lua_table_to_agent_input(lua, params_table)?;
+                    crate::lua::conversion::lua_table_to_agent_input(lua, &params_table)?;
 
                 // Execute the tool
                 let context = llmspell_core::ExecutionContext::default();
@@ -253,7 +253,7 @@ pub fn inject_tool_global(
                             // Convert params to agent input
                             let agent_input = crate::lua::conversion::lua_table_to_agent_input(
                                 lua,
-                                params_table,
+                                &params_table,
                             )?;
 
                             // Execute the tool

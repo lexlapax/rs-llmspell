@@ -6,6 +6,7 @@ use llmspell_bridge::{
     providers::{ProviderManager, ProviderManagerConfig},
     ComponentRegistry,
 };
+use std::convert::TryFrom;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -473,15 +474,16 @@ async fn test_concurrent_operations() {
 
     for (i, result) in results.iter().enumerate() {
         let output = result.output.as_object().unwrap();
-        assert_eq!(output.get("thread_id").unwrap().as_i64(), Some(i as i64));
+        let i_i64 = i64::try_from(i).expect("index should fit in i64");
+        assert_eq!(output.get("thread_id").unwrap().as_i64(), Some(i_i64));
         assert_eq!(output.get("results_count").unwrap().as_i64(), Some(10));
         assert_eq!(output.get("success").unwrap().as_bool(), Some(true));
 
         // Verify thread-specific computations
-        let expected_last_computed = i * 100 + 10;
+        let expected_last_computed = i_i64 * 100 + 10;
         assert_eq!(
             output.get("last_computed").unwrap().as_i64(),
-            Some(expected_last_computed as i64)
+            Some(expected_last_computed)
         );
     }
 }

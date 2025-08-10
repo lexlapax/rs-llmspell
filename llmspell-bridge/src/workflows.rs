@@ -228,23 +228,23 @@ impl WorkflowFactory {
     /// Returns an error if workflow type is unknown or creation fails
     pub fn create_workflow(
         workflow_type: &str,
-        params: serde_json::Value,
+        params: &serde_json::Value,
     ) -> Result<Box<dyn WorkflowExecutor>> {
         match workflow_type {
             "sequential" => {
-                let workflow = create_sequential_workflow(&params)?;
+                let workflow = create_sequential_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             "conditional" => {
-                let workflow = create_conditional_workflow(&params)?;
+                let workflow = create_conditional_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             "loop" => {
-                let workflow = create_loop_workflow(&params)?;
+                let workflow = create_loop_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             "parallel" => {
-                let workflow = create_parallel_workflow(&params)?;
+                let workflow = create_parallel_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             _ => Err(llmspell_core::LLMSpellError::Configuration {

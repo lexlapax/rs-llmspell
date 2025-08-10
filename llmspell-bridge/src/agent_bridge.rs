@@ -1124,11 +1124,11 @@ impl AgentBridge {
     /// Returns an error if scope parsing fails
     pub fn set_shared_memory(
         &self,
-        scope: serde_json::Value,
+        scope: &serde_json::Value,
         key: String,
         value: serde_json::Value,
     ) -> Result<()> {
-        let scope = Self::parse_context_scope(&scope)?;
+        let scope = Self::parse_context_scope(scope)?;
         self.shared_memory.set(scope, key, value);
         Ok(())
     }
@@ -1140,10 +1140,10 @@ impl AgentBridge {
     /// Returns an error if scope parsing fails
     pub fn get_shared_memory(
         &self,
-        scope: serde_json::Value,
+        scope: &serde_json::Value,
         key: &str,
     ) -> Result<Option<serde_json::Value>> {
-        let scope = Self::parse_context_scope(&scope)?;
+        let scope = Self::parse_context_scope(scope)?;
         Ok(self.shared_memory.get(&scope, key))
     }
 
@@ -2170,13 +2170,13 @@ mod tests {
         });
         bridge
             .set_shared_memory(
-                workflow_scope.clone(),
+                &workflow_scope,
                 "status".to_string(),
                 serde_json::json!("running"),
             )
             .unwrap();
 
-        let status = bridge.get_shared_memory(workflow_scope, "status").unwrap();
+        let status = bridge.get_shared_memory(&workflow_scope, "status").unwrap();
         assert_eq!(status, Some(serde_json::json!("running")));
 
         // Cleanup
