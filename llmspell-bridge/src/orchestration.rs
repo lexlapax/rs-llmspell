@@ -702,6 +702,6 @@ mod tests {
         // Runtime would execute the plan
         // This is a simplified test
         assert_eq!(plan.name, "Research Orchestration");
-        assert_eq!(plan.success_criteria.min_success_rate, 0.8);
+        assert!((plan.success_criteria.min_success_rate - 0.8).abs() < f64::EPSILON);
     }
 }

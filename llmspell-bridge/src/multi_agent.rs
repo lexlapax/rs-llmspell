@@ -420,7 +420,7 @@ mod tests {
     fn test_pipeline_workflow_creation() {
         let workflow = create_pipeline_workflow(
             "test_pipeline",
-            &vec!["agent1".to_string(), "agent2".to_string()],
+            &["agent1".to_string(), "agent2".to_string()],
             &serde_json::json!({"data": "test"}),
         )
         .unwrap();
@@ -431,7 +431,7 @@ mod tests {
     fn test_fork_join_workflow_creation() {
         let workflow = create_fork_join_workflow(
             "test_fork_join",
-            &vec![
+            &[
                 (
                     "agent1".to_string(),
                     "task1".to_string(),

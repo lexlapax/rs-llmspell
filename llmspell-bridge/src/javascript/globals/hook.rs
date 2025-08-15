@@ -38,9 +38,13 @@ mod tests {
     #[tokio::test]
     async fn test_hook_global_stub() {
         // Basic compilation test
+        let config = crate::ProviderManagerConfig {
+            default_provider: None,
+            providers: std::collections::HashMap::new(),
+        };
         let context = GlobalContext::new(
             std::sync::Arc::new(crate::ComponentRegistry::new()),
-            std::sync::Arc::new(crate::ProviderManager::new()),
+            std::sync::Arc::new(crate::ProviderManager::new(config).await.unwrap()),
         );
 
         #[cfg(feature = "javascript")]

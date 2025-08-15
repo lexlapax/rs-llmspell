@@ -210,18 +210,18 @@ mod tests {
         let cache = InjectionCache::new();
 
         // Initially, hit rate should be 0
-        assert_eq!(cache.hit_rate(), 0.0);
+        assert!((cache.hit_rate() - 0.0).abs() < f64::EPSILON);
 
         // Simulate some hits and misses
         *cache.hits.write() = 7;
         *cache.misses.write() = 3;
 
         // Hit rate should be 0.7
-        assert_eq!(cache.hit_rate(), 0.7);
+        assert!((cache.hit_rate() - 0.7).abs() < f64::EPSILON);
 
         // Clear should reset everything
         cache.clear();
-        assert_eq!(cache.hit_rate(), 0.0);
+        assert!((cache.hit_rate() - 0.0).abs() < f64::EPSILON);
     }
     #[test]
     fn test_injection_metrics() {

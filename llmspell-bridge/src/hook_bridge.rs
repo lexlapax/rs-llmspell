@@ -469,16 +469,6 @@ mod tests {
     }
     #[tokio::test]
     async fn test_hook_registration() {
-        let context = Arc::new(GlobalContext::new(
-            Arc::new(crate::ComponentRegistry::new()),
-            Arc::new(
-                crate::ProviderManager::new(ProviderManagerConfig::default())
-                    .await
-                    .unwrap(),
-            ),
-        ));
-        let bridge = HookBridge::new(context).unwrap();
-
         // Create a simple adapter for testing
         struct TestAdapter;
         impl HookAdapter for TestAdapter {
@@ -493,6 +483,16 @@ mod tests {
                 HookResult::Continue
             }
         }
+
+        let context = Arc::new(GlobalContext::new(
+            Arc::new(crate::ComponentRegistry::new()),
+            Arc::new(
+                crate::ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
+        ));
+        let bridge = HookBridge::new(context).unwrap();
 
         // Register the adapter
         bridge

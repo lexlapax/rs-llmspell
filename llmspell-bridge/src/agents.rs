@@ -235,12 +235,12 @@ impl BridgeDiscovery<AgentInfo> for AgentDiscovery {
 mod tests {
     use super::*;
 
-    async fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
+    fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
         Arc::new(llmspell_providers::ProviderManager::new())
     }
     #[tokio::test]
     async fn test_agent_discovery() {
-        let provider_manager = create_test_provider_manager().await;
+        let provider_manager = create_test_provider_manager();
         let discovery = AgentDiscovery::new(provider_manager);
 
         // List agent types
@@ -253,7 +253,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_agent_caching() {
-        let provider_manager = create_test_provider_manager().await;
+        let provider_manager = create_test_provider_manager();
         let discovery = AgentDiscovery::new(provider_manager);
 
         let config = serde_json::json!({
