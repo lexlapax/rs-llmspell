@@ -671,7 +671,7 @@ mod disaster_recovery_scenarios {
         let db_value = db_config.unwrap();
         assert_eq!(db_value["connection_pool_size"], 20); // Original value
         assert_eq!(db_value["timeout_seconds"], 30); // Original value
-        assert!(!db_value.get("status").is_some() || db_value["status"] != "degraded");
+        assert!(!matches!(db_value.get("status"), Some(v) if v == "degraded"));
 
         let feature_flags = app
             .state_manager
@@ -690,7 +690,7 @@ mod disaster_recovery_scenarios {
             .unwrap();
         let agent_1_value = agent_1_config.unwrap();
         assert_eq!(agent_1_value["active"], true); // Original value
-        assert!(!agent_1_value.get("error").is_some());
+        assert!(agent_1_value.get("error").is_none());
 
         // Verify system integrity
         let integrity_check = app.verify_system_integrity().await.unwrap();

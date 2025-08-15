@@ -9,9 +9,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
     async fn test_standardized_sequential_workflow() {
         let factory = StandardizedWorkflowFactory::new();
@@ -50,9 +47,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
     async fn test_standardized_parallel_workflow() {
         let factory = StandardizedWorkflowFactory::new();
@@ -88,9 +82,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
     async fn test_standardized_conditional_workflow() {
         let factory = StandardizedWorkflowFactory::new();
@@ -126,9 +117,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
     async fn test_standardized_loop_workflow() {
         let factory = StandardizedWorkflowFactory::new();
@@ -183,9 +171,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "unit-tests", ignore = "unit")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_list_workflow_types() {
         let factory = StandardizedWorkflowFactory::new();
         let types = factory.list_workflow_types();
@@ -198,9 +183,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_workflow_with_default_name() {
         let factory = StandardizedWorkflowFactory::new();
 
@@ -227,9 +209,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_unknown_workflow_type() {
         let factory = StandardizedWorkflowFactory::new();
 
@@ -248,9 +227,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow factory integration not fully implemented - placeholder test"]
     async fn test_workflow_output_format() {
         let factory = StandardizedWorkflowFactory::new();

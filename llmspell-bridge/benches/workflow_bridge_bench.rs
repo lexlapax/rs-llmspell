@@ -29,8 +29,8 @@ fn benchmark_workflow_creation(c: &mut Criterion) {
                     .await
                     .unwrap();
                 black_box(id);
-            })
-        })
+            });
+        });
     });
 
     c.bench_function("workflow_creation_parallel", |b| {
@@ -48,8 +48,8 @@ fn benchmark_workflow_creation(c: &mut Criterion) {
                     .await
                     .unwrap();
                 black_box(id);
-            })
-        })
+            });
+        });
     });
 }
 
@@ -63,8 +63,8 @@ fn benchmark_workflow_discovery(c: &mut Criterion) {
             rt.block_on(async {
                 let types = bridge.list_workflow_types();
                 black_box(types);
-            })
-        })
+            });
+        });
     });
 
     c.bench_function("get_workflow_info", |b| {
@@ -72,8 +72,8 @@ fn benchmark_workflow_discovery(c: &mut Criterion) {
             rt.block_on(async {
                 let info = bridge.get_workflow_info("sequential").unwrap();
                 black_box(info);
-            })
-        })
+            });
+        });
     });
 }
 
@@ -93,7 +93,7 @@ fn benchmark_parameter_conversion(c: &mut Criterion) {
         b.iter(|| {
             let params = json_to_workflow_params(black_box(json_params.clone())).unwrap();
             black_box(params);
-        })
+        });
     });
 }
 
@@ -122,8 +122,8 @@ fn benchmark_workflow_execution(c: &mut Criterion) {
                     .await
                     .unwrap();
                 black_box(result);
-            })
-        })
+            });
+        });
     });
 }
 
@@ -156,11 +156,12 @@ fn benchmark_bridge_overhead(c: &mut Criterion) {
                 let duration = start.elapsed();
 
                 black_box((id, result, history, duration));
-            })
-        })
+            });
+        });
     });
 }
 
+#[allow(clippy::too_many_lines)]
 fn benchmark_lua_workflow_api(c: &mut Criterion) {
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
     use llmspell_bridge::providers::{ProviderManager, ProviderManagerConfig};
@@ -191,7 +192,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                     steps = {
                         {name = "step1", type = "tool", tool = "mock_tool", input = {value = 42}}
                     }
-                })
+                });
                 return workflow
             "#,
             )
@@ -200,7 +201,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
 
             let duration = start.elapsed();
             black_box(duration);
-        })
+        });
     });
 
     // Benchmark Workflow.conditional creation from Lua
@@ -221,7 +222,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                             }
                         }
                     }
-                })
+                });
                 return workflow
             "#,
             )
@@ -230,7 +231,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
 
             let duration = start.elapsed();
             black_box(duration);
-        })
+        });
     });
 
     // Benchmark Workflow.loop creation from Lua
@@ -249,7 +250,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                     body = {
                         {name = "step1", type = "tool", tool = "mock_tool", input = {}}
                     }
-                })
+                });
                 return workflow
             "#,
             )
@@ -258,7 +259,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
 
             let duration = start.elapsed();
             black_box(duration);
-        })
+        });
     });
 
     // Benchmark Workflow.parallel creation from Lua
@@ -279,7 +280,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                             }
                         }
                     }
-                })
+                });
                 return workflow
             "#,
             )
@@ -288,7 +289,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
 
             let duration = start.elapsed();
             black_box(duration);
-        })
+        });
     });
 
     // Benchmark workflow registry operations from Lua
@@ -302,7 +303,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
 
             let duration = start.elapsed();
             black_box(duration);
-        })
+        });
     });
 
     // Benchmark complete Lua workflow operation (create + execute)
@@ -317,8 +318,8 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                     steps = {
                         {name = "step1", type = "tool", tool = "mock_tool", input = {data = "test"}}
                     }
-                })
-                local result = workflow:execute({input = "test_data"})
+                });
+                local result = workflow:execute({input = "test_data"});
                 return result
             "#,
             )
@@ -327,7 +328,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
 
             let duration = start.elapsed();
             black_box(duration);
-        })
+        });
     });
 }
 

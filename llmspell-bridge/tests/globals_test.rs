@@ -113,10 +113,7 @@ mod lua_globals {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tool_global_lua() -> Result<()> {
-        let lua = Lua::new();
-        let context = setup_test_context().await;
-
-        // Register a test tool
+        // Define test tool struct and implementation before any statements
         #[derive(Clone)]
         struct TestTool;
 
@@ -169,6 +166,9 @@ mod lua_globals {
                 ToolSchema::new("test_tool".to_string(), "A test tool".to_string())
             }
         }
+
+        let lua = Lua::new();
+        let context = setup_test_context().await;
 
         context
             .registry

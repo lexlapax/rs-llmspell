@@ -2,6 +2,7 @@
 
 #[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
+#[allow(clippy::too_many_lines)]
 async fn test_simple_tool_integration() {
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
@@ -158,7 +159,7 @@ async fn test_simple_tool_integration() {
     match engine.execute_script(calc_test).await {
         Ok(result) => {
             let obj = result.output.as_object().expect("Expected object");
-            assert_eq!(obj.get("result").unwrap().as_f64().unwrap(), 14.0);
+            assert!((obj.get("result").unwrap().as_f64().unwrap() - 14.0).abs() < f64::EPSILON);
             println!("✅ Calculator test passed");
         }
         Err(e) => panic!("Calculator test failed: {e}"),

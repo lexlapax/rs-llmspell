@@ -2,7 +2,7 @@
 # Generated from full workspace clippy scan
 # Each warning includes exact file location for efficient fixing
 
-## TOTAL WARNINGS: 60
+## TOTAL WARNINGS: 5
 
 ## WARNINGS BY CATEGORY (Priority Order)
 
@@ -26,319 +26,50 @@ Description: Idiomatic - Better use of Option/Result combinators
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
 
 
-### REDUNDANT_CODE (4 warnings)
-Description: Code Quality - Redundant closures and patterns
-
-#### llmspell-bridge (4 warnings)
-
-1. llmspell-bridge/src/engine/factory.rs:117:37
-   Message: redundant closure
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
-
-2. llmspell-bridge/src/engine/factory.rs:160:33
-   Message: redundant closure
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
-
-3. llmspell-bridge/src/engine/factory.rs:430:25
-   Message: redundant closure
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
-
-4. llmspell-bridge/src/engine/factory.rs:443:25
-   Message: redundant closure
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
-
-
-### OTHER (54 warnings)
+### OTHER (3 warnings)
 Description: Miscellaneous - Various other warnings
 
-#### llmspell-agents (2 warnings)
+#### llmspell-agents (1 warnings)
 
 1. llmspell-agents/src/tool_manager.rs:431:13
    Message: `llmspell-state-persistence` (lib) generated 1 warning (run `cargo clippy --fix --lib -p llmspell-state-persistence` to apply 1 suggestion)
    Suggestion: or try changing either arm body
 
-2. llmspell-agents/tests/communication_tests.rs:1:56
-   Message: this looks like a formatting argument but it is not part of a formatting macro
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#literal_string_with_formatting_args
+#### llmspell-hooks (1 warnings)
 
-#### llmspell-bridge (46 warnings)
+1. llmspell-hooks/tests/provider_hook_integration/common.rs:429:17
+   Message: `llmspell-agents` (lib test) generated 1 warning (1 duplicate)
+   Suggestion: this expression can be optimized out by applying boolean operations to the outer expression
 
-1. llmspell-bridge/src/engine/factory.rs:117:37
-   Message: `llmspell-agents` (lib) generated 1 warning
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+#### llmspell-workflows (1 warnings)
 
-2. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:14:5
-   Message: `llmspell-bridge` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p llmspell-bridge` to apply 4 suggestions)
-
-3. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:14:5
-   Message: unused attribute
-
-4. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:15:5
-   Message: unused attribute
-
-5. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:16:5
-   Message: unused attribute
-
-6. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:58:5
-   Message: unused attribute
-
-7. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:59:5
-   Message: unused attribute
-
-8. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:60:5
-   Message: unused attribute
-
-9. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:89:5
-   Message: unused attribute
-
-10. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:90:5
-   Message: unused attribute
-
-11. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:91:5
-   Message: unused attribute
-
-12. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:131:5
-   Message: unused attribute
-
-13. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:132:5
-   Message: unused attribute
-
-14. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:157:5
-   Message: unused attribute
-
-15. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:158:5
-   Message: unused attribute
-
-16. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:177:5
-   Message: unused attribute
-
-17. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:178:5
-   Message: unused attribute
-
-18. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:179:5
-   Message: unused attribute
-
-19. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:214:5
-   Message: unused attribute
-
-20. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:215:5
-   Message: unused attribute
-
-21. llmspell-bridge/tests/workflow_bridge_integration_tests.rs:216:5
-   Message: unused attribute
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#nonminimal_bool
-
-22. llmspell-bridge/benches/workflow_bridge_bench.rs:19:9
-   Message: `llmspell-testing` (test "scenarios") generated 2 warnings (run `cargo clippy --fix --test "scenarios"` to apply 2 suggestions)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-23. llmspell-bridge/benches/workflow_bridge_bench.rs:19:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-24. llmspell-bridge/benches/workflow_bridge_bench.rs:20:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-25. llmspell-bridge/benches/workflow_bridge_bench.rs:37:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-26. llmspell-bridge/benches/workflow_bridge_bench.rs:38:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-27. llmspell-bridge/benches/workflow_bridge_bench.rs:62:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-28. llmspell-bridge/benches/workflow_bridge_bench.rs:63:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-29. llmspell-bridge/benches/workflow_bridge_bench.rs:71:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-30. llmspell-bridge/benches/workflow_bridge_bench.rs:72:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-31. llmspell-bridge/benches/workflow_bridge_bench.rs:93:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-32. llmspell-bridge/benches/workflow_bridge_bench.rs:117:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-33. llmspell-bridge/benches/workflow_bridge_bench.rs:118:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-34. llmspell-bridge/benches/workflow_bridge_bench.rs:137:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-35. llmspell-bridge/benches/workflow_bridge_bench.rs:138:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-36. llmspell-bridge/benches/workflow_bridge_bench.rs:164:1
-   Message: this function has too many lines (140/100)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
-
-37. llmspell-bridge/benches/workflow_bridge_bench.rs:184:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-38. llmspell-bridge/benches/workflow_bridge_bench.rs:208:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-39. llmspell-bridge/benches/workflow_bridge_bench.rs:238:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-40. llmspell-bridge/benches/workflow_bridge_bench.rs:266:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-41. llmspell-bridge/benches/workflow_bridge_bench.rs:296:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-42. llmspell-bridge/benches/workflow_bridge_bench.rs:310:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-43. llmspell-bridge/tests/integration_test.rs:68:23
-   Message: `llmspell-bridge` (test "workflow_bridge_integration_tests") generated 19 warnings (run `cargo clippy --fix --test "workflow_bridge_integration_tests"` to apply 19 suggestions)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
-
-44. llmspell-bridge/tests/integration_test.rs:68:23
-   Message: `llmspell-bridge` (bench "workflow_bridge_bench") generated 20 warnings (run `cargo clippy --fix --bench "workflow_bridge_bench"` to apply 19 suggestions)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
-
-45. llmspell-bridge/tests/integration_test.rs:68:23
-   Message: long literal lacking separators
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
-
-46. llmspell-bridge/tests/globals_test.rs:121:9
-   Message: adding items after statements is confusing, since items exist from the start of the scope
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
-
-#### llmspell-testing (4 warnings)
-
-1. llmspell-testing/tests/scenarios/disaster_recovery.rs:674:17
-   Message: this boolean expression can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#nonminimal_bool
-
-2. llmspell-testing/tests/scenarios/disaster_recovery.rs:693:17
-   Message: this boolean expression can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#nonminimal_bool
-
-3. llmspell-testing/tests/agents/isolation_tests.rs:96:50
+1. llmspell-workflows/benches/workflow_hook_overhead.rs:322:35
    Message: build failed, waiting for other jobs to finish...
-   Suggestion: the type constructed contains `std::string::String` due to the type of the argument passed
-
-4. llmspell-testing/tests/agents/isolation_tests.rs:330:43
-   Message: `llmspell-agents` (test "communication_tests") generated 1 warning
-   Suggestion: consider borrowing here
-
-#### llmspell-workflows (2 warnings)
-
-1. llmspell-workflows/benches/workflow_hook_overhead.rs:360:35
-   Message: `llmspell-bridge` (test "integration_test") generated 1 warning
-   Suggestion: provide the arguments
-
-2. llmspell-workflows/benches/workflow_hook_overhead.rs:385:35
-   Message: `llmspell-bridge` (test "globals_test") generated 1 warning
    Suggestion: provide the arguments
 
 
 
 ## WARNINGS BY CRATE
 
-### llmspell-agents (3 warnings)
+### llmspell-agents (2 warnings)
 
 #### identical_match_arms (1 warnings)
 - llmspell-agents/src/tool_manager.rs:431:13: this match arm has an identical body to the `_` wildcard arm...
-#### other (2 warnings)
+#### other (1 warnings)
 - llmspell-agents/src/tool_manager.rs:431:13: `llmspell-state-persistence` (lib) generated 1 warning (run `cargo clippy --fix ...
-- llmspell-agents/tests/communication_tests.rs:1:56: this looks like a formatting argument but it is not part of a formatting macro...
 
-### llmspell-bridge (50 warnings)
+### llmspell-hooks (1 warnings)
 
-#### other (46 warnings)
-- llmspell-bridge/src/engine/factory.rs:117:37: `llmspell-agents` (lib) generated 1 warning...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:14:5: `llmspell-bridge` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p l...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:14:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:15:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:16:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:58:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:59:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:60:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:89:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:90:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:91:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:131:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:132:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:157:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:158:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:177:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:178:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:179:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:214:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:215:5: unused attribute...
-- llmspell-bridge/tests/workflow_bridge_integration_tests.rs:216:5: unused attribute...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:19:9: `llmspell-testing` (test "scenarios") generated 2 warnings (run `cargo clippy --...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:19:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:20:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:37:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:38:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:62:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:63:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:71:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:72:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:93:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:117:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:118:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:137:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:138:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:164:1: this function has too many lines (140/100)...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:184:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:208:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:238:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:266:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:296:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:310:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/tests/integration_test.rs:68:23: `llmspell-bridge` (test "workflow_bridge_integration_tests") generated 19 warnin...
-- llmspell-bridge/tests/integration_test.rs:68:23: `llmspell-bridge` (bench "workflow_bridge_bench") generated 20 warnings (run `ca...
-- llmspell-bridge/tests/integration_test.rs:68:23: long literal lacking separators...
-- llmspell-bridge/tests/globals_test.rs:121:9: adding items after statements is confusing, since items exist from the start of ...
-#### redundant_code (4 warnings)
-- llmspell-bridge/src/engine/factory.rs:117:37: redundant closure...
-- llmspell-bridge/src/engine/factory.rs:160:33: redundant closure...
-- llmspell-bridge/src/engine/factory.rs:430:25: redundant closure...
-- llmspell-bridge/src/engine/factory.rs:443:25: redundant closure...
+#### other (1 warnings)
+- llmspell-hooks/tests/provider_hook_integration/common.rs:429:17: `llmspell-agents` (lib test) generated 1 warning (1 duplicate)...
 
 ### llmspell-state-persistence (1 warnings)
 
 #### option_result_patterns (1 warnings)
 - llmspell-state-persistence/src/migration/transforms.rs:641:20: this `map_or` can be simplified...
 
-### llmspell-testing (4 warnings)
+### llmspell-workflows (1 warnings)
 
-#### other (4 warnings)
-- llmspell-testing/tests/scenarios/disaster_recovery.rs:674:17: this boolean expression can be simplified...
-- llmspell-testing/tests/scenarios/disaster_recovery.rs:693:17: this boolean expression can be simplified...
-- llmspell-testing/tests/agents/isolation_tests.rs:96:50: build failed, waiting for other jobs to finish......
-- llmspell-testing/tests/agents/isolation_tests.rs:330:43: `llmspell-agents` (test "communication_tests") generated 1 warning...
-
-### llmspell-workflows (2 warnings)
-
-#### other (2 warnings)
-- llmspell-workflows/benches/workflow_hook_overhead.rs:360:35: `llmspell-bridge` (test "integration_test") generated 1 warning...
-- llmspell-workflows/benches/workflow_hook_overhead.rs:385:35: `llmspell-bridge` (test "globals_test") generated 1 warning...
+#### other (1 warnings)
+- llmspell-workflows/benches/workflow_hook_overhead.rs:322:35: build failed, waiting for other jobs to finish......
 

@@ -114,7 +114,7 @@ impl EngineFactory {
                 // Check if it's a registered plugin
                 let registry = PLUGIN_REGISTRY
                     .read()
-                    .unwrap_or_else(|poisoned| poisoned.into_inner());
+                    .unwrap_or_else(std::sync::PoisonError::into_inner);
                 registry.get(name).map_or_else(
                     || {
                         Err(LLMSpellError::Validation {
@@ -157,7 +157,7 @@ impl EngineFactory {
         {
             let registry = PLUGIN_REGISTRY
                 .read()
-                .unwrap_or_else(|poisoned| poisoned.into_inner());
+                .unwrap_or_else(std::sync::PoisonError::into_inner);
             for (name, plugin) in registry.iter() {
                 engines.push(EngineInfo {
                     name: name.clone(),
@@ -427,7 +427,7 @@ pub trait ScriptEnginePlugin: Send + Sync {
 pub fn register_engine_plugin<P: ScriptEnginePlugin + 'static>(plugin: P) {
     let mut registry = PLUGIN_REGISTRY
         .write()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     registry.insert(plugin.engine_name().to_string(), Box::new(plugin));
 }
 
@@ -440,7 +440,7 @@ pub fn register_engine_plugin<P: ScriptEnginePlugin + 'static>(plugin: P) {
 pub fn unregister_engine_plugin(name: &str) -> bool {
     let mut registry = PLUGIN_REGISTRY
         .write()
-        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
     registry.remove(name).is_some()
 }
 

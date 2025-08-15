@@ -490,6 +490,7 @@ async fn test_concurrent_operations() {
 
 /// Test comprehensive API method availability
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::too_many_lines)]
 async fn test_comprehensive_api_methods() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();

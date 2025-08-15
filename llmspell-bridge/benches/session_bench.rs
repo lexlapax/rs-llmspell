@@ -6,7 +6,6 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_bridge::engine::LuaConfig;
 use llmspell_bridge::lua::engine::LuaEngine;
-use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 /// Benchmark session creation performance

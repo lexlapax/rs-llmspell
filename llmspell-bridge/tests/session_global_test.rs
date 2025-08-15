@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for SessionGlobal functionality
+//! ABOUTME: Integration tests for `SessionGlobal` functionality
 //! ABOUTME: Tests CRUD operations, error handling, and session lifecycle through Lua
 
 #[cfg(feature = "lua")]

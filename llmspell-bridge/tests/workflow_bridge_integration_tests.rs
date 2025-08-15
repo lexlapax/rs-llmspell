@@ -10,9 +10,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow execution without steps not implemented - placeholder test"]
     async fn test_workflow_lifecycle_through_bridge() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -54,9 +51,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow oneshot execution not implemented - placeholder test"]
     async fn test_oneshot_workflow_execution() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -85,9 +79,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow metrics tracking not implemented - placeholder test"]
     async fn test_workflow_metrics() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -127,9 +118,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_workflow_type_discovery() {
         let registry = Arc::new(ComponentRegistry::new());
         let bridge = WorkflowBridge::new(registry);
@@ -153,9 +141,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_workflow_error_handling() {
         let registry = Arc::new(ComponentRegistry::new());
         let bridge = WorkflowBridge::new(registry);
@@ -173,9 +158,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow execution history not implemented - placeholder test"]
     async fn test_execution_history_management() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -210,9 +192,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(feature = "integration-tests", ignore = "integration")]
-    #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
-    #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     #[ignore = "Workflow concurrent execution not implemented - placeholder test"]
     async fn test_concurrent_workflow_execution() {
         let registry = Arc::new(ComponentRegistry::new());

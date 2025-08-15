@@ -284,13 +284,14 @@ mod tests {
         bridge.publish_event(event.clone()).await.unwrap();
 
         // Receive the event
-        let received = tokio::time::timeout(std::time::Duration::from_millis(100), receiver.recv())
-            .await
-            .unwrap()
-            .unwrap();
+        let received_event =
+            tokio::time::timeout(std::time::Duration::from_millis(100), receiver.recv())
+                .await
+                .unwrap()
+                .unwrap();
 
-        assert_eq!(received.event_type, "test.example");
-        assert_eq!(received.language, Language::Rust);
+        assert_eq!(received_event.event_type, "test.example");
+        assert_eq!(received_event.language, Language::Rust);
 
         // Unsubscribe
         let unsubscribed = bridge.unsubscribe(&sub_id).unwrap();
