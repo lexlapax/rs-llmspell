@@ -104,6 +104,11 @@ impl ScriptEngineBridge for LuaEngine {
             let result = {
                 let lua = self.lua.lock();
                 let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
+
+                // Run garbage collection after script execution to prevent memory accumulation
+                // This is especially important when running many scripts in sequence
+                let _ = lua.gc_collect();
+
                 match lua_result {
                     Ok(value) => {
                         // Convert Lua value to JSON
@@ -155,6 +160,10 @@ impl ScriptEngineBridge for LuaEngine {
             let chunk = {
                 let lua = self.lua.lock();
                 let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
+
+                // Run garbage collection after script execution
+                let _ = lua.gc_collect();
+
                 match lua_result {
                     Ok(value) => {
                         // Convert Lua value to JSON

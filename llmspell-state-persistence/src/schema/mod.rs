@@ -30,16 +30,18 @@ pub struct EnhancedStateSchema {
 
 impl EnhancedStateSchema {
     pub fn new(version: SemanticVersion) -> Self {
-        Self {
+        let mut schema = Self {
             version,
-            hash: Self::generate_hash(),
+            hash: String::new(), // Will be calculated after initialization
             created_at: std::time::SystemTime::now(),
             fields: HashMap::new(),
             compatibility: CompatibilityLevel::BackwardCompatible,
             migration_path: Vec::new(),
             dependencies: Vec::new(),
             metadata: HashMap::new(),
-        }
+        };
+        schema.hash = schema.calculate_content_hash();
+        schema
     }
 
     pub fn from_legacy(legacy: StateSchema) -> Self {
@@ -67,13 +69,13 @@ impl EnhancedStateSchema {
 
     pub fn add_field(&mut self, name: String, field: crate::config::FieldSchema) {
         self.fields.insert(name, field);
-        self.hash = Self::generate_hash();
+        self.hash = self.calculate_content_hash();
     }
 
     pub fn remove_field(&mut self, name: &str) -> Option<crate::config::FieldSchema> {
         let result = self.fields.remove(name);
         if result.is_some() {
-            self.hash = Self::generate_hash();
+            self.hash = self.calculate_content_hash();
         }
         result
     }
@@ -88,12 +90,35 @@ impl EnhancedStateSchema {
         self.metadata.insert(key, value);
     }
 
-    fn generate_hash() -> String {
+    fn calculate_content_hash(&self) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
-        std::time::SystemTime::now().hash(&mut hasher);
+
+        // Hash the version
+        self.version.major.hash(&mut hasher);
+        self.version.minor.hash(&mut hasher);
+        self.version.patch.hash(&mut hasher);
+
+        // Hash field names in sorted order for consistency
+        let mut field_names: Vec<_> = self.fields.keys().cloned().collect();
+        field_names.sort();
+        for name in field_names {
+            name.hash(&mut hasher);
+            if let Some(field) = self.fields.get(&name) {
+                field.field_type.hash(&mut hasher);
+                field.required.hash(&mut hasher);
+            }
+        }
+
+        // Hash dependencies
+        for dep in &self.dependencies {
+            dep.major.hash(&mut hasher);
+            dep.minor.hash(&mut hasher);
+            dep.patch.hash(&mut hasher);
+        }
+
         format!("{:x}", hasher.finish())
     }
 }
