@@ -1,5 +1,5 @@
 //! Storage backends and persistence for rs-llmspell
-//! 
+//!
 //! Provides a unified storage interface with multiple backend implementations,
 //! enabling flexible data persistence across different storage systems.
 //!
@@ -25,7 +25,7 @@
 //!
 //! # tokio_test::block_on(async {
 //! let backend = MemoryBackend::new();
-//! 
+//!
 //! // Store data
 //! backend.put("user:123", json!({"name": "Alice"})).await?;
 //!

@@ -1,5 +1,63 @@
-//! ABOUTME: Lua-specific global object implementations
-//! ABOUTME: Contains Lua bindings for global objects
+//! Lua global objects for scripting
+//!
+//! This module provides Lua bindings for all LLMSpell functionality,
+//! making it accessible through global objects in Lua scripts.
+//!
+//! # Available Globals
+//!
+//! ## Agent
+//! ```lua
+//! -- Create and interact with LLM agents
+//! local agent = Agent.create({name = "assistant", provider = "openai"})
+//! local response = agent:execute("Hello!")
+//! ```
+//!
+//! ## Tool
+//! ```lua
+//! -- Execute tools and query capabilities
+//! local result = Tool.execute("calculator", {operation = "add", a = 5, b = 3})
+//! local tools = Tool.list()
+//! ```
+//!
+//! ## Workflow
+//! ```lua
+//! -- Build and execute workflows
+//! local workflow = Workflow.sequential({name = "pipeline", steps = {...}})
+//! local result = workflow:execute()
+//! ```
+//!
+//! ## Session
+//! ```lua
+//! -- Manage sessions and artifacts
+//! local session = Session.create({id = "user-123"})
+//! session:store_artifact("data", {key = "value"})
+//! session:save()
+//! ```
+//!
+//! ## State
+//! ```lua
+//! -- Global state management
+//! State.set("config", {theme = "dark"})
+//! local config = State.get("config")
+//! ```
+//!
+//! ## Event
+//! ```lua
+//! -- Event publishing and subscription
+//! Event.publish("user.login", {user_id = "123"})
+//! Event.subscribe("user.*", function(event) print(event) end)
+//! ```
+//!
+//! ## Hook
+//! ```lua
+//! -- Hook registration and management
+//! Hook.register("before_execute", function(ctx) return true end)
+//! ```
+//!
+//! # Thread Safety
+//!
+//! All global objects are thread-safe and can be used from multiple Lua coroutines
+//! simultaneously. The underlying Rust implementations handle synchronization.
 
 pub mod agent;
 pub mod artifact;

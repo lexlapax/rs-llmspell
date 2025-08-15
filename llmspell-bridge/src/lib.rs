@@ -44,6 +44,145 @@
 //! # }
 //! ```
 //!
+//! ## Lua Integration
+//!
+//! ### Creating Agents
+//!
+//! ```lua
+//! -- Create an agent with OpenAI provider
+//! local agent = Agent.create({
+//!     name = "assistant",
+//!     provider = "openai",
+//!     model = "gpt-4",
+//!     temperature = 0.7
+//! })
+//!
+//! -- Execute the agent
+//! local response = agent:execute("What is the capital of France?")
+//! print(response.text)
+//!
+//! -- Using streaming
+//! local stream = agent:execute_stream("Tell me a story")
+//! for chunk in stream do
+//!     io.write(chunk.content)
+//! end
+//! ```
+//!
+//! ### Using Tools
+//!
+//! ```lua
+//! -- List available tools
+//! local tools = Tool.list()
+//! for _, tool in ipairs(tools) do
+//!     print(tool.name, tool.description)
+//! end
+//!
+//! -- Execute a tool
+//! local result = Tool.execute("file_reader", {
+//!     path = "/tmp/data.txt"
+//! })
+//!
+//! -- Create custom tool wrapper
+//! local calculator = Tool.wrap("calculator")
+//! local sum = calculator({operation = "add", a = 5, b = 3})
+//! ```
+//!
+//! ### Building Workflows
+//!
+//! ```lua
+//! -- Create a sequential workflow
+//! local workflow = Workflow.sequential({
+//!     name = "data_pipeline",
+//!     steps = {
+//!         {tool = "file_reader", params = {path = "input.txt"}},
+//!         {tool = "text_processor", params = {operation = "uppercase"}},
+//!         {tool = "file_writer", params = {path = "output.txt"}}
+//!     }
+//! })
+//!
+//! -- Execute workflow
+//! local result = workflow:execute()
+//!
+//! -- Parallel workflow
+//! local parallel = Workflow.parallel({
+//!     name = "multi_search",
+//!     steps = {
+//!         {tool = "web_search", params = {query = "rust programming"}},
+//!         {tool = "arxiv_search", params = {query = "machine learning"}},
+//!         {tool = "news_search", params = {query = "technology"}}
+//!     }
+//! })
+//! ```
+//!
+//! ### Session Management
+//!
+//! ```lua
+//! -- Create or load session
+//! local session = Session.load("user-123") or Session.create({
+//!     id = "user-123",
+//!     metadata = {user = "alice", created = os.time()}
+//! })
+//!
+//! -- Store artifacts
+//! session:store_artifact("conversation", conversation_history)
+//! session:store_artifact("settings", user_preferences)
+//!
+//! -- Save session
+//! session:save()
+//!
+//! -- List all sessions
+//! local sessions = Session.list()
+//! ```
+//!
+//! ## JavaScript Support (Planned - Phase 5)
+//!
+//! ```javascript
+//! // Create agent
+//! const agent = await Agent.create({
+//!     name: "assistant",
+//!     provider: "anthropic",
+//!     model: "claude-3-opus"
+//! });
+//!
+//! // Execute with async/await
+//! const response = await agent.execute("Explain quantum computing");
+//! console.log(response.text);
+//!
+//! // Tool execution
+//! const result = await Tool.execute("web_search", {
+//!     query: "latest AI news"
+//! });
+//! ```
+//!
+//! ## Python Support (Planned - Phase 9)
+//!
+//! ```python
+//! # Create agent
+//! agent = Agent.create(
+//!     name="assistant",
+//!     provider="openai",
+//!     model="gpt-4"
+//! )
+//!
+//! # Execute
+//! response = agent.execute("What is machine learning?")
+//! print(response.text)
+//!
+//! # Use with async
+//! async def process():
+//!     async for chunk in agent.execute_stream("Tell me about Python"):
+//!         print(chunk.content, end="")
+//! ```
+//!
+//! ## Cross-Language Compatibility
+//!
+//! All scripting languages share the same underlying Rust implementations, ensuring:
+//!
+//! - **Consistent Behavior**: Same results across languages
+//! - **Shared State**: Sessions and artifacts accessible from any language
+//! - **Unified Security**: Same security policies apply to all scripts
+//! - **Performance**: Native Rust performance for all operations
+//!
 //! ## Configuration
 //!
 //! The runtime can be configured through `RuntimeConfig`:

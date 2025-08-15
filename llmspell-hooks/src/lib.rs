@@ -47,34 +47,40 @@
 //! ## Integration Example
 //!
 //! ```rust,no_run
-//! use llmspell_hooks::{HookRegistry, CircuitBreaker, CachingHook, RateLimitHook};
+//! use llmspell_hooks::{
+//!     HookRegistry, HookPoint, CachingHook, CachingConfig,
+//!     RateLimitHook, LoggingHook, MetricsHook
+//! };
 //! use std::time::Duration;
 //!
-//! # tokio_test::block_on(async {
+//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create registry with production-ready hooks
-//! let mut registry = HookRegistry::new();
-//!
-//! // Add circuit breaker for protection
-//! let breaker = CircuitBreaker::new()
-//!     .with_threshold(Duration::from_millis(50))
-//!     .with_half_open_delay(Duration::from_secs(5));
+//! let registry = HookRegistry::new();
 //!
 //! // Add caching for performance
-//! let cache = CachingHook::new()
-//!     .with_ttl(Duration::from_secs(60))
-//!     .with_max_size(1000);
+//! let mut cache_config = CachingConfig::default();
+//! cache_config.default_ttl = Duration::from_secs(60);
+//! cache_config.max_entries = 1000;
+//! let cache = CachingHook::with_config(cache_config);
 //!
 //! // Add rate limiting for cost control  
 //! let limiter = RateLimitHook::new()
-//!     .with_rate(100) // 100 requests per second
+//!     .with_rate_per_second(100.0) // 100 requests per second
 //!     .with_burst(10);
 //!
-//! // Register hooks
-//! registry.register("breaker", Box::new(breaker));
-//! registry.register("cache", Box::new(cache));
-//! registry.register("limiter", Box::new(limiter));
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! # });
+//! // Add logging hook
+//! let logger = LoggingHook::new();
+//!
+//! // Add metrics collection
+//! let metrics = MetricsHook::new();
+//!
+//! // Register hooks for specific hook points
+//! registry.register(HookPoint::BeforeAgentExecution, cache)?;
+//! registry.register(HookPoint::BeforeAgentExecution, limiter)?;
+//! registry.register(HookPoint::BeforeAgentExecution, logger)?;
+//! registry.register(HookPoint::AfterAgentExecution, metrics)?;
+//! # Ok(())
+//! # }
 //! ```
 
 // Re-export core types
@@ -100,7 +106,7 @@ pub mod types;
 
 // Re-export commonly used items at crate root
 pub use artifact_hooks::{event_to_hook_point, is_artifact_hook_point, ArtifactHookPoints};
-pub use circuit_breaker::{BreakerState, CircuitBreaker};
+pub use circuit_breaker::{BreakerConfig, BreakerState, CircuitBreaker};
 pub use collectors::{
     AgentOutputCollector, ArtifactCollector, ArtifactData, CollectionConfig, ToolResultCollector,
 };
@@ -131,8 +137,8 @@ pub use types::{ComponentId, ComponentType, HookMetadata, HookPoint, Language, P
 
 // Re-export built-in hooks for easy access
 pub use builtin::{
-    CachingHook, CostTrackingHook, DebuggingHook, LoggingHook, MetricsHook, RateLimitHook,
-    RetryHook, SecurityHook,
+    caching::CachingConfig, CachingHook, CostTrackingHook, DebuggingHook, LoggingHook, MetricsHook,
+    RateLimitHook, RetryHook, SecurityHook,
 };
 
 // Re-export cache types for easy access
