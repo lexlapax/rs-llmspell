@@ -4,6 +4,7 @@
 pub mod api;
 pub mod api_key_integration;
 pub mod communication;
+/// Data processing and transformation tools
 pub mod data;
 pub mod fs;
 pub mod lifecycle;
@@ -11,6 +12,7 @@ pub mod media;
 pub mod registry;
 pub mod resource_limited;
 pub mod search;
+/// State management and persistence tools
 pub mod state;
 pub mod system;
 pub mod util;

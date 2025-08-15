@@ -108,31 +108,45 @@ pub trait LifecycleEventHandler: Send + Sync {
 pub enum LifecycleEvent {
     /// State transition event
     StateTransition {
+        /// ID of the component undergoing transition
         component_id: String,
+        /// Previous lifecycle state
         from: LifecycleState,
+        /// New lifecycle state
         to: LifecycleState,
+        /// Timestamp of the transition
         timestamp: chrono::DateTime<chrono::Utc>,
     },
     /// Component added
     ComponentAdded {
+        /// ID of the added component
         component_id: String,
+        /// ID of the parent component, if any
         parent_id: Option<String>,
     },
     /// Component removed
     ComponentRemoved {
+        /// ID of the removed component
         component_id: String,
+        /// Reason for removal
         reason: String,
     },
     /// Error occurred
     Error {
+        /// ID of the component that encountered the error
         component_id: String,
+        /// Error description
         error: String,
+        /// Severity level of the error
         severity: ErrorSeverity,
     },
     /// Health check result
     HealthCheck {
+        /// ID of the component being checked
         component_id: String,
+        /// Whether the component is healthy
         healthy: bool,
+        /// Additional health check details
         details: HashMap<String, String>,
     },
 }

@@ -30,9 +30,13 @@ use tracing::{debug, info};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GraphQLOperation {
+    /// Standard GraphQL query operation for fetching data
     Query,
+    /// GraphQL mutation operation for modifying data
     Mutation,
+    /// GraphQL subscription for real-time data updates
     Subscription,
+    /// Schema introspection query for discovering API structure
     Introspection,
 }
 
@@ -67,9 +71,12 @@ impl std::str::FromStr for GraphQLOperation {
 /// GraphQL request structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQLRequest {
+    /// The GraphQL query string
     pub query: String,
+    /// Variables for parameterized queries
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Value>,
+    /// Name of the operation to execute if query contains multiple operations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_name: Option<String>,
 }
@@ -77,10 +84,13 @@ pub struct GraphQLRequest {
 /// GraphQL response structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQLResponse {
+    /// The data returned by the operation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
+    /// Any errors that occurred during execution
     #[serde(skip_serializing_if = "Option::is_none")]
     pub errors: Option<Vec<GraphQLError>>,
+    /// Additional metadata about the response
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Value>,
 }
@@ -88,18 +98,25 @@ pub struct GraphQLResponse {
 /// GraphQL error structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQLError {
+    /// Error message
     pub message: String,
+    /// Locations in the query where the error occurred
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locations: Option<Vec<ErrorLocation>>,
+    /// Path to the field that caused the error
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<Vec<Value>>,
+    /// Additional error information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Value>,
 }
 
+/// Location of an error in the GraphQL query
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorLocation {
+    /// Line number in the query
     pub line: u32,
+    /// Column number in the query
     pub column: u32,
 }
 

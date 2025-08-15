@@ -17,7 +17,9 @@ pub enum Condition {
     Never,
     /// Compare a shared data value to a target value
     SharedDataEquals {
+        /// Key in shared data to check
         key: String,
+        /// Expected value for comparison
         expected_value: serde_json::Value,
     },
     /// Check if shared data key exists

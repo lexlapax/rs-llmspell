@@ -8,7 +8,9 @@ pub mod error_handling;
 pub mod executor;
 pub mod factory;
 pub mod hooks;
+/// Loop workflow for iterative execution patterns
 pub mod r#loop;
+/// Parallel workflow for concurrent execution of multiple steps
 pub mod parallel;
 pub mod sequential;
 pub mod shared_state;

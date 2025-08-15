@@ -93,7 +93,9 @@ pub enum DataFlow {
     SharedContext(String),
     /// Transform data from another source
     Transform {
+        /// Source of the data to transform
         source: Box<DataFlow>,
+        /// Transformation to apply to the source data
         transform: DataTransform,
     },
 }

@@ -119,21 +119,20 @@ impl ToolQuery {
 /// use llmspell_core::traits::tool_capable::ToolInfo;
 /// use serde_json::json;
 ///
-/// let info = ToolInfo {
-///     name: "file_search".to_string(),
-///     description: "Search for files by pattern".to_string(),
-///     category: "filesystem".to_string(),
-///     security_level: "safe".to_string(),
-///     schema: json!({
-///         "type": "object",
-///         "properties": {
-///             "pattern": {"type": "string"},
-///             "recursive": {"type": "boolean"}
-///         }
-///     }),
-///     capabilities: vec!["file_operations".to_string()],
-///     requirements: json!({}),
-/// };
+/// let info = ToolInfo::new(
+///     "file_search",
+///     "Search for files by pattern",
+///     "filesystem",
+///     "safe"
+/// )
+/// .with_schema(json!({
+///     "type": "object",
+///     "properties": {
+///         "pattern": {"type": "string"},
+///         "recursive": {"type": "boolean"}
+///     }
+/// }))
+/// .with_capability("file_operations");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]
@@ -254,25 +253,14 @@ pub enum ContextMode {
 /// use llmspell_core::traits::tool_capable::{ToolComposition, ToolCompositionStep, ErrorStrategy, ContextMode};
 /// use serde_json::json;
 ///
-/// let composition = ToolComposition {
-///     name: "file_analysis".to_string(),
-///     description: "Search and analyze files".to_string(),
-///     steps: vec![
-///         ToolCompositionStep {
-///             tool_name: "file_search".to_string(),
-///             parameters: json!({"pattern": "*.txt"}),
-///             error_strategy: ErrorStrategy::Fail,
-///             context_mode: ContextMode::Full,
-///         },
-///         ToolCompositionStep {
-///             tool_name: "text_analyzer".to_string(),
-///             parameters: json!({"files": "${previous.output}"}),
-///             error_strategy: ErrorStrategy::Continue,
-///             context_mode: ContextMode::Previous,
-///         },
-///     ],
-///     parallel: false,
-/// };
+/// // ToolCompositionStep doesn't have a public constructor due to #[non_exhaustive],
+/// // so we create the composition without steps for demonstration
+/// let composition = ToolComposition::new(
+///     "file_analysis",
+///     "Search and analyze files"
+/// );
+///
+/// // In practice, steps would be added through a builder method or created internally
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[non_exhaustive]

@@ -993,12 +993,19 @@ impl ConditionalWorkflowBuilder {
 /// Result of conditional workflow execution
 #[derive(Debug, Clone)]
 pub struct ConditionalWorkflowResult {
+    /// Name of the workflow that was executed
     pub workflow_name: String,
+    /// Whether the workflow executed successfully
     pub success: bool,
+    /// Details of each branch that was executed
     pub executed_branches: Vec<BranchExecutionResult>,
+    /// Number of branches whose conditions matched
     pub matched_branches: usize,
+    /// Total number of branches in the workflow
     pub total_branches: usize,
+    /// Total execution duration
     pub duration: Duration,
+    /// Error message if the workflow failed
     pub error_message: Option<String>,
 }
 

@@ -124,11 +124,11 @@ impl WorkflowStep {
 /// ```
 /// use llmspell_core::traits::workflow::RetryPolicy;
 ///
-/// let policy = RetryPolicy {
-///     max_attempts: 5,
-///     backoff_seconds: 2,
-///     exponential_backoff: true,
-/// };
+/// // RetryPolicy is #[non_exhaustive], so we use Default and modify fields
+/// let mut policy = RetryPolicy::default();
+/// policy.max_attempts = 5;
+/// policy.backoff_seconds = 2;
+/// policy.exponential_backoff = true;
 ///
 /// // Default policy
 /// let default = RetryPolicy::default();
@@ -273,11 +273,11 @@ impl StepResult {
 /// use llmspell_core::traits::workflow::Config;
 /// use std::time::Duration;
 ///
-/// let config = Config {
-///     max_parallel: Some(4),
-///     continue_on_error: true,
-///     timeout: Some(Duration::from_secs(3600)),
-/// };
+/// // Config is #[non_exhaustive], so we use Default and modify fields
+/// let mut config = Config::default();
+/// config.max_parallel = Some(4);
+/// config.continue_on_error = true;
+/// config.timeout = Some(Duration::from_secs(3600));
 ///
 /// // Default configuration
 /// let default = Config::default();
