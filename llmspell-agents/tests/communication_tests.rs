@@ -1,5 +1,5 @@
-//! ABOUTME: Integration tests for agent communication and message passing
-//! ABOUTME: Tests agent-to-agent communication, tool invocation, and coordination protocols
+//! ABOUTME: Integration tests for agent communication systems
+//! ABOUTME: Tests agent-to-agent communication, tool invocation, coordination protocols
 
 #![allow(clippy::significant_drop_tightening)]
 

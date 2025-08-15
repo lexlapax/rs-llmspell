@@ -6,6 +6,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_bridge::engine::LuaConfig;
 use llmspell_bridge::lua::engine::LuaEngine;
+use llmspell_bridge::ScriptEngineBridge;
 use tokio::runtime::Runtime;
 
 /// Benchmark session creation performance
@@ -24,7 +25,7 @@ fn bench_session_creation(c: &mut Criterion) {
     c.bench_function("session_creation", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(lua_code).await.unwrap()
+            engine.execute_script(lua_code).await.unwrap()
         });
     });
 }
@@ -43,7 +44,7 @@ fn bench_session_persistence(c: &mut Criterion) {
                 name = "persistence_benchmark"
             })
         "#;
-        engine.execute(create_code).await.unwrap()
+        engine.execute_script(create_code).await.unwrap()
     });
 
     let save_code = format!(
@@ -51,27 +52,27 @@ fn bench_session_persistence(c: &mut Criterion) {
         Session.save("{}")
         return true
     "#,
-        session_id.as_str().unwrap()
+        session_id.output.as_str().unwrap()
     );
 
     let load_code = format!(
         r#"
         return Session.load("{}")
     "#,
-        session_id.as_str().unwrap()
+        session_id.output.as_str().unwrap()
     );
 
     c.bench_function("session_save", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&save_code).await.unwrap()
+            engine.execute_script(&save_code).await.unwrap()
         });
     });
 
     c.bench_function("session_load", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&load_code).await.unwrap()
+            engine.execute_script(&load_code).await.unwrap()
         });
     });
 }
@@ -90,7 +91,7 @@ fn bench_artifact_operations(c: &mut Criterion) {
                 name = "artifact_benchmark"
             })
         "#;
-        engine.execute(create_code).await.unwrap()
+        engine.execute_script(create_code).await.unwrap()
     });
 
     let store_code = format!(
@@ -103,14 +104,14 @@ fn bench_artifact_operations(c: &mut Criterion) {
             {{ category = "benchmark" }}
         )
     "#,
-        session_id.as_str().unwrap()
+        session_id.output.as_str().unwrap()
     );
 
     let list_code = format!(
         r#"
         return Artifact.list("{}")
     "#,
-        session_id.as_str().unwrap()
+        session_id.output.as_str().unwrap()
     );
 
     let query_code = format!(
@@ -121,27 +122,27 @@ fn bench_artifact_operations(c: &mut Criterion) {
             limit = 10
         }})
     "#,
-        session_id.as_str().unwrap()
+        session_id.output.as_str().unwrap()
     );
 
     c.bench_function("artifact_store", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&store_code).await.unwrap()
+            engine.execute_script(&store_code).await.unwrap()
         });
     });
 
     c.bench_function("artifact_list", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&list_code).await.unwrap()
+            engine.execute_script(&list_code).await.unwrap()
         });
     });
 
     c.bench_function("artifact_query", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&query_code).await.unwrap()
+            engine.execute_script(&query_code).await.unwrap()
         });
     });
 }
@@ -152,11 +153,11 @@ fn bench_batch_operations(c: &mut Criterion) {
 
     let lua_config = LuaConfig::default();
 
-    for batch_size in [1, 10, 50, 100].iter() {
+    for batch_size in &[1, 10, 50, 100] {
         let lua_code = format!(
             r#"
             local session_ids = {{}}
-            for i = 1, {} do
+            for i = 1, {batch_size} do
                 local id = Session.create({{
                     name = "batch_session_" .. i,
                     description = "Batch operation test"
@@ -164,8 +165,7 @@ fn bench_batch_operations(c: &mut Criterion) {
                 table.insert(session_ids, id)
             end
             return session_ids
-        "#,
-            batch_size
+        "#
         );
 
         c.bench_with_input(
@@ -174,7 +174,7 @@ fn bench_batch_operations(c: &mut Criterion) {
             |b, &_size| {
                 b.to_async(&rt).iter(|| async {
                     let engine = LuaEngine::new(&lua_config).unwrap();
-                    engine.execute(&lua_code).await.unwrap()
+                    engine.execute_script(&lua_code).await.unwrap()
                 });
             },
         );
@@ -184,12 +184,12 @@ fn bench_batch_operations(c: &mut Criterion) {
     let session_id = rt.block_on(async {
         let engine = LuaEngine::new(&lua_config).unwrap();
         engine
-            .execute(r#"return Session.create({ name = "batch_artifact_test" })"#)
+            .execute_script(r#"return Session.create({ name = "batch_artifact_test" })"#)
             .await
             .unwrap()
     });
 
-    for batch_size in [10, 50, 100, 500].iter() {
+    for batch_size in &[10, 50, 100, 500] {
         let store_batch_code = format!(
             r#"
             local artifacts = {{}}
@@ -206,7 +206,7 @@ fn bench_batch_operations(c: &mut Criterion) {
             return artifacts
         "#,
             batch_size,
-            session_id.as_str().unwrap()
+            session_id.output.as_str().unwrap()
         );
 
         c.bench_with_input(
@@ -215,7 +215,7 @@ fn bench_batch_operations(c: &mut Criterion) {
             |b, &_size| {
                 b.to_async(&rt).iter(|| async {
                     let engine = LuaEngine::new(&lua_config).unwrap();
-                    engine.execute(&store_batch_code).await.unwrap()
+                    engine.execute_script(&store_batch_code).await.unwrap()
                 });
             },
         );
@@ -233,7 +233,7 @@ fn bench_target_validation(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
             engine
-                .execute(r#"return Session.create({ name = "perf_test" })"#)
+                .execute_script(r#"return Session.create({ name = "perf_test" })"#)
                 .await
                 .unwrap()
         });
@@ -243,26 +243,29 @@ fn bench_target_validation(c: &mut Criterion) {
     let session_id = rt.block_on(async {
         let engine = LuaEngine::new(&lua_config).unwrap();
         engine
-            .execute(r#"return Session.create({ name = "save_load_test" })"#)
+            .execute_script(r#"return Session.create({ name = "save_load_test" })"#)
             .await
             .unwrap()
     });
 
     // Validate <50ms for session save
-    let save_code = format!(r#"Session.save("{}")"#, session_id.as_str().unwrap());
+    let save_code = format!(r#"Session.save("{}")"#, session_id.output.as_str().unwrap());
     c.bench_function("target_session_save_50ms", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&save_code).await.unwrap()
+            engine.execute_script(&save_code).await.unwrap()
         });
     });
 
     // Validate <50ms for session load
-    let load_code = format!(r#"return Session.load("{}")"#, session_id.as_str().unwrap());
+    let load_code = format!(
+        r#"return Session.load("{}")"#,
+        session_id.output.as_str().unwrap()
+    );
     c.bench_function("target_session_load_50ms", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&load_code).await.unwrap()
+            engine.execute_script(&load_code).await.unwrap()
         });
     });
 
@@ -277,13 +280,13 @@ fn bench_target_validation(c: &mut Criterion) {
             {{}}
         )
     "#,
-        session_id.as_str().unwrap()
+        session_id.output.as_str().unwrap()
     );
 
     c.bench_function("target_artifact_store_text_5ms", |b| {
         b.to_async(&rt).iter(|| async {
             let engine = LuaEngine::new(&lua_config).unwrap();
-            engine.execute(&store_text_code).await.unwrap()
+            engine.execute_script(&store_text_code).await.unwrap()
         });
     });
 }

@@ -425,8 +425,9 @@ mod tests {
         let has_openai = check_api_key("openai");
         let has_anthropic = check_api_key("anthropic");
 
-        // Just verify the function doesn't panic
-        assert!(has_openai || !has_openai);
-        assert!(has_anthropic || !has_anthropic);
+        // Just verify the function doesn't panic and returns boolean values
+        // The actual values depend on environment variables being set
+        let _ = has_openai;
+        let _ = has_anthropic;
     }
 }

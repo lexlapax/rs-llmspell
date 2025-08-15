@@ -638,7 +638,7 @@ impl DataTransformer {
 
         match &rule.rule_type {
             ValidationType::NotNull => {
-                if field_value.map_or(true, |v| v.is_null()) {
+                if field_value.is_none_or(|v| v.is_null()) {
                     return Err(TransformationError::ValidationFailed {
                         details: rule
                             .error_message

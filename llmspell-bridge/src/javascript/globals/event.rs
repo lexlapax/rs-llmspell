@@ -59,11 +59,7 @@ mod tests {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let registry = Arc::new(ComponentRegistry::new());
-            let providers = Arc::new(
-                ProviderManager::new(ProviderManagerConfig::default())
-                    .await
-                    .unwrap(),
-            );
+            let providers = Arc::new(ProviderManager::new());
             let context = GlobalContext::new(registry, providers);
 
             let mut js_context = Context::default();

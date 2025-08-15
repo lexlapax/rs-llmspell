@@ -427,26 +427,17 @@ impl ToolManager {
         let mut parameters = base_parameters.clone();
 
         // Handle parameter substitution based on context mode
-        match context_mode {
-            ContextMode::Full => {
-                // Parameters can reference full context - this would need template resolution
-                // For now, just use the base parameters
-            }
-            ContextMode::Previous => {
-                // Replace ${previous.output} with actual previous output
-                if let Some(prev_output) = previous_output {
-                    parameters = Self::substitute_previous_output(parameters, prev_output);
-                }
-            }
-            ContextMode::Selective(_fields) => {
-                // Replace specific fields - implementation would depend on context structure
-                // For now, treat as Full mode
-            }
-            _ => {
-                // For any future context modes, default to full context
-                // Parameters can reference full context - this would need template resolution
+        if matches!(context_mode, ContextMode::Previous) {
+            // Replace ${previous.output} with actual previous output
+            if let Some(prev_output) = previous_output {
+                parameters = Self::substitute_previous_output(parameters, prev_output);
             }
         }
+        // For other modes (Full, Selective, or future modes):
+        // - Full: Parameters can reference full context - template resolution needed
+        // - Selective: Replace specific fields - implementation would depend on context
+        // - Default: For any future context modes, use base parameters
+        // For now, just use the base parameters without modification
 
         parameters
     }

@@ -93,7 +93,7 @@ async fn test_shared_scope_controlled_access() {
     };
 
     isolation_manager
-        .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
+        .create_shared_scope("shared_data", Some("admin"), &shared_config)
         .unwrap();
 
     // Set agent boundaries
@@ -253,7 +253,7 @@ async fn test_permission_revocation() {
     let scope = StateScope::Custom("temp_project".to_string());
 
     // Grant permission
-    isolation_manager.grant_permission("contractor", scope.clone(), StatePermission::Write);
+    isolation_manager.grant_permission("contractor", &scope, StatePermission::Write);
 
     // Verify access
     assert!(isolation_manager
@@ -261,7 +261,7 @@ async fn test_permission_revocation() {
         .unwrap());
 
     // Revoke permission
-    isolation_manager.revoke_permissions("contractor", scope.clone());
+    isolation_manager.revoke_permissions("contractor", &scope);
 
     // Verify access is revoked
     assert!(!isolation_manager
@@ -327,7 +327,7 @@ async fn test_pipeline_ordered_access() {
         "outputter".to_string(),
     ];
     sharing_manager
-        .create_pipeline("data_pipeline", stages.clone())
+        .create_pipeline("data_pipeline", &stages)
         .unwrap();
 
     // Process through pipeline in order
@@ -370,7 +370,7 @@ async fn test_concurrent_access_safety() {
     };
 
     isolation_manager
-        .create_shared_scope("concurrent_test", None, config)
+        .create_shared_scope("concurrent_test", None, &config)
         .unwrap();
 
     let scope = StateScope::Custom("shared:concurrent_test".to_string());
@@ -448,7 +448,7 @@ async fn test_custom_isolation_policy() {
         expires_at: None,
     };
     isolation_manager
-        .create_shared_scope("writable", None, config)
+        .create_shared_scope("writable", None, &config)
         .unwrap();
 
     // Test write-shared policy

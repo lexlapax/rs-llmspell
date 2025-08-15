@@ -40,11 +40,7 @@ mod tests {
         // Basic compilation test
         let context = GlobalContext::new(
             std::sync::Arc::new(crate::ComponentRegistry::new()),
-            std::sync::Arc::new(
-                crate::ProviderManager::new(ProviderManagerConfig::default())
-                    .await
-                    .unwrap(),
-            ),
+            std::sync::Arc::new(crate::ProviderManager::new()),
         );
 
         #[cfg(feature = "javascript")]
