@@ -1,4 +1,4 @@
-//! ABOUTME: BaseAgent trait - foundation for all components
+//! ABOUTME: `BaseAgent` trait - foundation for all components
 //! ABOUTME: Provides core functionality for agents, tools, and workflows
 
 use crate::execution_context::ExecutionContext;

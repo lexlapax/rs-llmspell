@@ -1,5 +1,5 @@
 //! ABOUTME: Streaming types for agent responses and chunk-based communication
-//! ABOUTME: Provides AgentStream, AgentChunk, and related types for streaming LLM interactions
+//! ABOUTME: Provides `AgentStream`, `AgentChunk`, and related types for streaming LLM interactions
 
 use crate::error::LLMSpellError;
 use chrono::{DateTime, Utc};
@@ -13,7 +13,7 @@ use std::pin::Pin;
 ///
 /// This stream is pinned and boxed to allow for dynamic dispatch across
 /// different stream implementations. Each item in the stream is a Result
-/// containing either an AgentChunk or an error.
+/// containing either an `AgentChunk` or an error.
 ///
 /// # Examples
 ///

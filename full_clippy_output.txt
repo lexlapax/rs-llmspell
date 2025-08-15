@@ -1,0 +1,1176 @@
+    Checking llmspell-core v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core)
+    Checking llmspell-state-traits v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-state-traits)
+    Checking llmspell-utils v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-utils)
+    Checking llmspell-storage v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-storage)
+    Checking llmspell-security v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-security)
+    Checking llmspell-providers v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-providers)
+    Checking llmspell-config v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-config)
+    Checking llmspell-events v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-events)
+    Checking llmspell-hooks v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-hooks)
+    Checking llmspell-state-persistence v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-state-persistence)
+warning: this `map_or` can be simplified
+   --> llmspell-state-persistence/src/migration/transforms.rs:641:20
+    |
+641 |                 if field_value.map_or(true, |v| v.is_null()) {
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
+    = note: `#[warn(clippy::unnecessary_map_or)]` on by default
+help: use is_none_or instead
+    |
+641 -                 if field_value.map_or(true, |v| v.is_null()) {
+641 +                 if field_value.is_none_or(|v| v.is_null()) {
+    |
+
+warning: `llmspell-state-persistence` (lib) generated 1 warning (run `cargo clippy --fix --lib -p llmspell-state-persistence` to apply 1 suggestion)
+    Checking llmspell-tools v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-tools)
+    Checking llmspell-sessions v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-sessions)
+    Checking llmspell-workflows v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-workflows)
+    Checking llmspell-agents v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents)
+warning: this match arm has an identical body to the `_` wildcard arm
+   --> llmspell-agents/src/tool_manager.rs:431:13
+    |
+431 | /             ContextMode::Full => {
+...   |
+435 | |             ContextMode::Previous => {
+    | |____________^ help: try removing the arm
+    |
+    = help: or try changing either arm body
+note: `_` wildcard arm here
+   --> llmspell-agents/src/tool_manager.rs:445:13
+    |
+445 | /             _ => {
+...   |
+448 | |             }
+    | |_____________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+    = note: `-W clippy::match-same-arms` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::match_same_arms)]`
+
+warning: `llmspell-agents` (lib) generated 1 warning
+    Checking llmspell-bridge v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-bridge)
+warning: redundant closure
+   --> llmspell-bridge/src/engine/factory.rs:117:37
+    |
+117 |                     .unwrap_or_else(|poisoned| poisoned.into_inner());
+    |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+    = note: `-W clippy::redundant-closure-for-method-calls` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::redundant_closure_for_method_calls)]`
+
+warning: redundant closure
+   --> llmspell-bridge/src/engine/factory.rs:160:33
+    |
+160 |                 .unwrap_or_else(|poisoned| poisoned.into_inner());
+    |                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+warning: redundant closure
+   --> llmspell-bridge/src/engine/factory.rs:430:25
+    |
+430 |         .unwrap_or_else(|poisoned| poisoned.into_inner());
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+warning: redundant closure
+   --> llmspell-bridge/src/engine/factory.rs:443:25
+    |
+443 |         .unwrap_or_else(|poisoned| poisoned.into_inner());
+    |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+warning: `llmspell-bridge` (lib) generated 4 warnings (run `cargo clippy --fix --lib -p llmspell-bridge` to apply 4 suggestions)
+    Checking llmspell-testing v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-testing)
+    Checking llmspell-cli v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-cli)
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:14:5
+   |
+14 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:13:5
+   |
+13 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = note: `#[warn(unused_attributes)]` on by default
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:15:5
+   |
+15 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:13:5
+   |
+13 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:16:5
+   |
+16 |     #[ignore = "Workflow execution without steps not implemented - placeholder test"]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:13:5
+   |
+13 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:58:5
+   |
+58 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:57:5
+   |
+57 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:59:5
+   |
+59 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:57:5
+   |
+57 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:60:5
+   |
+60 |     #[ignore = "Workflow oneshot execution not implemented - placeholder test"]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:57:5
+   |
+57 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:89:5
+   |
+89 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:88:5
+   |
+88 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:90:5
+   |
+90 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:88:5
+   |
+88 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:91:5
+   |
+91 |     #[ignore = "Workflow metrics tracking not implemented - placeholder test"]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+   |
+note: attribute also specified here
+  --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:88:5
+   |
+88 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:131:5
+    |
+131 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:130:5
+    |
+130 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:132:5
+    |
+132 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:130:5
+    |
+130 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:157:5
+    |
+157 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:156:5
+    |
+156 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:158:5
+    |
+158 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:156:5
+    |
+156 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:177:5
+    |
+177 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:176:5
+    |
+176 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:178:5
+    |
+178 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:176:5
+    |
+176 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:179:5
+    |
+179 |     #[ignore = "Workflow execution history not implemented - placeholder test"]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:176:5
+    |
+176 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:214:5
+    |
+214 |     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:213:5
+    |
+213 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:215:5
+    |
+215 |     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:213:5
+    |
+213 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: unused attribute
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:216:5
+    |
+216 |     #[ignore = "Workflow concurrent execution not implemented - placeholder test"]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: remove this attribute
+    |
+note: attribute also specified here
+   --> llmspell-bridge/tests/workflow_bridge_integration_tests.rs:213:5
+    |
+213 |     #[cfg_attr(feature = "integration-tests", ignore = "integration")]
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: this boolean expression can be simplified
+   --> llmspell-testing/tests/scenarios/disaster_recovery.rs:674:17
+    |
+674 |         assert!(!db_value.get("status").is_some() || db_value["status"] != "degraded");
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `db_value.get("status").is_none()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#nonminimal_bool
+    = note: `#[warn(clippy::nonminimal_bool)]` on by default
+
+warning: this boolean expression can be simplified
+   --> llmspell-testing/tests/scenarios/disaster_recovery.rs:693:17
+    |
+693 |         assert!(!agent_1_value.get("error").is_some());
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `agent_1_value.get("error").is_none()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#nonminimal_bool
+
+warning: `llmspell-testing` (test "scenarios") generated 2 warnings (run `cargo clippy --fix --test "scenarios"` to apply 2 suggestions)
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:19:9
+   |
+19 | /         b.iter(|| {
+20 | |             rt.block_on(async {
+21 | |                 let params = json!({
+22 | |                     "name": "test_workflow",
+...  |
+32 | |             })
+33 | |         })
+   | |__________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+   = note: `-W clippy::semicolon-if-nothing-returned` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::semicolon_if_nothing_returned)]`
+help: add a `;` here
+   |
+19 ~         b.iter(|| {
+20 +             rt.block_on(async {
+21 +                 let params = json!({
+22 +                     "name": "test_workflow",
+23 +                     "steps": [
+24 +                         {"name": "step1", "tool": "mock_tool"}
+25 +                     ]
+26 +                 });
+27 +                 let id = bridge
+28 +                     .create_workflow("sequential", black_box(params))
+29 +                     .await
+30 +                     .unwrap();
+31 +                 black_box(id);
+32 +             })
+33 +         });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:20:13
+   |
+20 | /             rt.block_on(async {
+21 | |                 let params = json!({
+22 | |                     "name": "test_workflow",
+23 | |                     "steps": [
+...  |
+31 | |                 black_box(id);
+32 | |             })
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+20 ~             rt.block_on(async {
+21 +                 let params = json!({
+22 +                     "name": "test_workflow",
+23 +                     "steps": [
+24 +                         {"name": "step1", "tool": "mock_tool"}
+25 +                     ]
+26 +                 });
+27 +                 let id = bridge
+28 +                     .create_workflow("sequential", black_box(params))
+29 +                     .await
+30 +                     .unwrap();
+31 +                 black_box(id);
+32 +             });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:37:9
+   |
+37 | /         b.iter(|| {
+38 | |             rt.block_on(async {
+39 | |                 let params = json!({
+40 | |                     "name": "test_workflow",
+...  |
+51 | |             })
+52 | |         })
+   | |__________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+37 ~         b.iter(|| {
+38 +             rt.block_on(async {
+39 +                 let params = json!({
+40 +                     "name": "test_workflow",
+41 +                     "branches": [
+42 +                         {"name": "branch1", "steps": []}
+43 +                     ],
+44 +                     "max_concurrency": 2
+45 +                 });
+46 +                 let id = bridge
+47 +                     .create_workflow("parallel", black_box(params))
+48 +                     .await
+49 +                     .unwrap();
+50 +                 black_box(id);
+51 +             })
+52 +         });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:38:13
+   |
+38 | /             rt.block_on(async {
+39 | |                 let params = json!({
+40 | |                     "name": "test_workflow",
+41 | |                     "branches": [
+...  |
+50 | |                 black_box(id);
+51 | |             })
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+38 ~             rt.block_on(async {
+39 +                 let params = json!({
+40 +                     "name": "test_workflow",
+41 +                     "branches": [
+42 +                         {"name": "branch1", "steps": []}
+43 +                     ],
+44 +                     "max_concurrency": 2
+45 +                 });
+46 +                 let id = bridge
+47 +                     .create_workflow("parallel", black_box(params))
+48 +                     .await
+49 +                     .unwrap();
+50 +                 black_box(id);
+51 +             });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:62:9
+   |
+62 | /         b.iter(|| {
+63 | |             rt.block_on(async {
+64 | |                 let types = bridge.list_workflow_types();
+65 | |                 black_box(types);
+66 | |             })
+67 | |         })
+   | |__________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+62 ~         b.iter(|| {
+63 +             rt.block_on(async {
+64 +                 let types = bridge.list_workflow_types();
+65 +                 black_box(types);
+66 +             })
+67 +         });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:63:13
+   |
+63 | /             rt.block_on(async {
+64 | |                 let types = bridge.list_workflow_types();
+65 | |                 black_box(types);
+66 | |             })
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+63 ~             rt.block_on(async {
+64 +                 let types = bridge.list_workflow_types();
+65 +                 black_box(types);
+66 +             });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:71:9
+   |
+71 | /         b.iter(|| {
+72 | |             rt.block_on(async {
+73 | |                 let info = bridge.get_workflow_info("sequential").unwrap();
+74 | |                 black_box(info);
+75 | |             })
+76 | |         })
+   | |__________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+71 ~         b.iter(|| {
+72 +             rt.block_on(async {
+73 +                 let info = bridge.get_workflow_info("sequential").unwrap();
+74 +                 black_box(info);
+75 +             })
+76 +         });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:72:13
+   |
+72 | /             rt.block_on(async {
+73 | |                 let info = bridge.get_workflow_info("sequential").unwrap();
+74 | |                 black_box(info);
+75 | |             })
+   | |______________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+72 ~             rt.block_on(async {
+73 +                 let info = bridge.get_workflow_info("sequential").unwrap();
+74 +                 black_box(info);
+75 +             });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+  --> llmspell-bridge/benches/workflow_bridge_bench.rs:93:9
+   |
+93 | /         b.iter(|| {
+94 | |             let params = json_to_workflow_params(black_box(json_params.clone())).unwrap();
+95 | |             black_box(params);
+96 | |         })
+   | |__________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+   |
+93 ~         b.iter(|| {
+94 +             let params = json_to_workflow_params(black_box(json_params.clone())).unwrap();
+95 +             black_box(params);
+96 +         });
+   |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:117:9
+    |
+117 | /         b.iter(|| {
+118 | |             rt.block_on(async {
+119 | |                 let input = json!({"test": "data"});
+120 | |                 let result = bridge
+...   |
+125 | |             })
+126 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+117 ~         b.iter(|| {
+118 +             rt.block_on(async {
+119 +                 let input = json!({"test": "data"});
+120 +                 let result = bridge
+121 +                     .execute_workflow(&workflow_id, black_box(input))
+122 +                     .await
+123 +                     .unwrap();
+124 +                 black_box(result);
+125 +             })
+126 +         });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:118:13
+    |
+118 | /             rt.block_on(async {
+119 | |                 let input = json!({"test": "data"});
+120 | |                 let result = bridge
+121 | |                     .execute_workflow(&workflow_id, black_box(input))
+...   |
+124 | |                 black_box(result);
+125 | |             })
+    | |______________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+118 ~             rt.block_on(async {
+119 +                 let input = json!({"test": "data"});
+120 +                 let result = bridge
+121 +                     .execute_workflow(&workflow_id, black_box(input))
+122 +                     .await
+123 +                     .unwrap();
+124 +                 black_box(result);
+125 +             });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:137:9
+    |
+137 | /         b.iter(|| {
+138 | |             rt.block_on(async {
+139 | |                 // Complete cycle: create, execute, get status
+140 | |                 let params = json!({
+...   |
+159 | |             })
+160 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+137 ~         b.iter(|| {
+138 +             rt.block_on(async {
+139 +                 // Complete cycle: create, execute, get status
+140 +                 let params = json!({
+141 +                     "name": "overhead_test",
+142 +                     "steps": [{"name": "step1", "tool": "mock"}]
+143 +                 });
+144 + 
+145 +                 let start = std::time::Instant::now();
+146 + 
+147 +                 // Create workflow
+148 +                 let id = bridge.create_workflow("sequential", params).await.unwrap();
+149 + 
+150 +                 // Execute workflow
+151 +                 let result = bridge.execute_workflow(&id, json!({})).await.unwrap();
+152 + 
+153 +                 // Get execution history instead of status
+154 +                 let history = bridge.get_execution_history().await;
+155 + 
+156 +                 let duration = start.elapsed();
+157 + 
+158 +                 black_box((id, result, history, duration));
+159 +             })
+160 +         });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:138:13
+    |
+138 | /             rt.block_on(async {
+139 | |                 // Complete cycle: create, execute, get status
+140 | |                 let params = json!({
+141 | |                     "name": "overhead_test",
+...   |
+158 | |                 black_box((id, result, history, duration));
+159 | |             })
+    | |______________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+138 ~             rt.block_on(async {
+139 +                 // Complete cycle: create, execute, get status
+140 +                 let params = json!({
+141 +                     "name": "overhead_test",
+142 +                     "steps": [{"name": "step1", "tool": "mock"}]
+143 +                 });
+144 + 
+145 +                 let start = std::time::Instant::now();
+146 + 
+147 +                 // Create workflow
+148 +                 let id = bridge.create_workflow("sequential", params).await.unwrap();
+149 + 
+150 +                 // Execute workflow
+151 +                 let result = bridge.execute_workflow(&id, json!({})).await.unwrap();
+152 + 
+153 +                 // Get execution history instead of status
+154 +                 let history = bridge.get_execution_history().await;
+155 + 
+156 +                 let duration = start.elapsed();
+157 + 
+158 +                 black_box((id, result, history, duration));
+159 +             });
+    |
+
+warning: this function has too many lines (140/100)
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:164:1
+    |
+164 | / fn benchmark_lua_workflow_api(c: &mut Criterion) {
+165 | |     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
+166 | |     use llmspell_bridge::providers::{ProviderManager, ProviderManagerConfig};
+...   |
+331 | |     });
+332 | | }
+    | |_^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+    = note: `-W clippy::too-many-lines` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::too_many_lines)]`
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:184:9
+    |
+184 | /         b.iter(|| {
+185 | |             let start = std::time::Instant::now();
+186 | |
+187 | |             lua.load(
+...   |
+202 | |             black_box(duration);
+203 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+184 ~         b.iter(|| {
+185 +             let start = std::time::Instant::now();
+186 + 
+187 +             lua.load(
+188 +                 r#"
+189 +                 local workflow = Workflow.sequential({
+190 +                     name = "bench_sequential",
+191 +                     steps = {
+192 +                         {name = "step1", type = "tool", tool = "mock_tool", input = {value = 42}}
+193 +                     }
+194 +                 })
+195 +                 return workflow
+196 +             "#,
+197 +             )
+198 +             .eval::<mlua::Value>()
+199 +             .unwrap();
+200 + 
+201 +             let duration = start.elapsed();
+202 +             black_box(duration);
+203 +         });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:208:9
+    |
+208 | /         b.iter(|| {
+209 | |             let start = std::time::Instant::now();
+210 | |
+211 | |             lua.load(
+...   |
+232 | |             black_box(duration);
+233 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+208 ~         b.iter(|| {
+209 +             let start = std::time::Instant::now();
+210 + 
+211 +             lua.load(
+212 +                 r#"
+213 +                 local workflow = Workflow.conditional({
+214 +                     name = "bench_conditional",
+215 +                     branches = {
+216 +                         {
+217 +                             name = "branch1",
+218 +                             condition = {type = "always"},
+219 +                             steps = {
+220 +                                 {name = "step1", type = "tool", tool = "mock_tool", input = {}}
+221 +                             }
+222 +                         }
+223 +                     }
+224 +                 })
+225 +                 return workflow
+226 +             "#,
+227 +             )
+228 +             .eval::<mlua::Value>()
+229 +             .unwrap();
+230 + 
+231 +             let duration = start.elapsed();
+232 +             black_box(duration);
+233 +         });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:238:9
+    |
+238 | /         b.iter(|| {
+239 | |             let start = std::time::Instant::now();
+240 | |
+241 | |             lua.load(
+...   |
+260 | |             black_box(duration);
+261 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+238 ~         b.iter(|| {
+239 +             let start = std::time::Instant::now();
+240 + 
+241 +             lua.load(
+242 +                 r#"
+243 +                 local workflow = Workflow.loop({
+244 +                     name = "bench_loop",
+245 +                     iterator = "range",
+246 +                     start = 1,
+247 +                     ["end"] = 10,
+248 +                     step = 1,
+249 +                     body = {
+250 +                         {name = "step1", type = "tool", tool = "mock_tool", input = {}}
+251 +                     }
+252 +                 })
+253 +                 return workflow
+254 +             "#,
+255 +             )
+256 +             .eval::<mlua::Value>()
+257 +             .unwrap();
+258 + 
+259 +             let duration = start.elapsed();
+260 +             black_box(duration);
+261 +         });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:266:9
+    |
+266 | /         b.iter(|| {
+267 | |             let start = std::time::Instant::now();
+268 | |
+269 | |             lua.load(
+...   |
+290 | |             black_box(duration);
+291 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+266 ~         b.iter(|| {
+267 +             let start = std::time::Instant::now();
+268 + 
+269 +             lua.load(
+270 +                 r#"
+271 +                 local workflow = Workflow.parallel({
+272 +                     name = "bench_parallel",
+273 +                     max_concurrency = 4,
+274 +                     branches = {
+275 +                         {
+276 +                             name = "branch1",
+277 +                             steps = {
+278 +                                 {name = "step1", type = "tool", tool = "mock_tool", input = {}}
+279 +                             }
+280 +                         }
+281 +                     }
+282 +                 })
+283 +                 return workflow
+284 +             "#,
+285 +             )
+286 +             .eval::<mlua::Value>()
+287 +             .unwrap();
+288 + 
+289 +             let duration = start.elapsed();
+290 +             black_box(duration);
+291 +         });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:296:9
+    |
+296 | /         b.iter(|| {
+297 | |             let start = std::time::Instant::now();
+298 | |
+299 | |             lua.load("return Workflow.list()")
+...   |
+304 | |             black_box(duration);
+305 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+296 ~         b.iter(|| {
+297 +             let start = std::time::Instant::now();
+298 + 
+299 +             lua.load("return Workflow.list()")
+300 +                 .eval::<mlua::Value>()
+301 +                 .unwrap();
+302 + 
+303 +             let duration = start.elapsed();
+304 +             black_box(duration);
+305 +         });
+    |
+
+warning: consider adding a `;` to the last statement for consistent formatting
+   --> llmspell-bridge/benches/workflow_bridge_bench.rs:310:9
+    |
+310 | /         b.iter(|| {
+311 | |             let start = std::time::Instant::now();
+312 | |
+313 | |             lua.load(
+...   |
+329 | |             black_box(duration);
+330 | |         })
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
+help: add a `;` here
+    |
+310 ~         b.iter(|| {
+311 +             let start = std::time::Instant::now();
+312 + 
+313 +             lua.load(
+314 +                 r#"
+315 +                 local workflow = Workflow.sequential({
+316 +                     name = "bench_complete",
+317 +                     steps = {
+318 +                         {name = "step1", type = "tool", tool = "mock_tool", input = {data = "test"}}
+319 +                     }
+320 +                 })
+321 +                 local result = workflow:execute({input = "test_data"})
+322 +                 return result
+323 +             "#,
+324 +             )
+325 +             .eval::<mlua::Value>()
+326 +             .unwrap();
+327 + 
+328 +             let duration = start.elapsed();
+329 +             black_box(duration);
+330 +         });
+    |
+
+warning: `llmspell-bridge` (test "workflow_bridge_integration_tests") generated 19 warnings (run `cargo clippy --fix --test "workflow_bridge_integration_tests"` to apply 19 suggestions)
+warning: `llmspell-bridge` (bench "workflow_bridge_bench") generated 20 warnings (run `cargo clippy --fix --bench "workflow_bridge_bench"` to apply 19 suggestions)
+warning: long literal lacking separators
+  --> llmspell-bridge/tests/integration_test.rs:68:23
+   |
+68 |         "max_memory": 50000000,
+   |                       ^^^^^^^^ help: consider: `50_000_000`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+   = note: `-W clippy::unreadable-literal` implied by `-W clippy::pedantic`
+   = help: to override `-W clippy::pedantic` add `#[allow(clippy::unreadable_literal)]`
+
+error[E0061]: this method takes 2 arguments but 0 arguments were supplied
+   --> llmspell-workflows/benches/workflow_hook_overhead.rs:322:35
+    |
+322 |             let result = workflow.execute().await.unwrap();
+    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
+    |
+93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+    |              ^^^^^^^
+help: provide the arguments
+    |
+322 -             let result = workflow.execute().await.unwrap();
+322 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
+    |
+
+warning: adding items after statements is confusing, since items exist from the start of the scope
+   --> llmspell-bridge/tests/globals_test.rs:121:9
+    |
+121 |         struct TestTool;
+    |         ^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+    = note: `-W clippy::items-after-statements` implied by `-W clippy::pedantic`
+    = help: to override `-W clippy::pedantic` add `#[allow(clippy::items_after_statements)]`
+
+error[E0061]: this method takes 2 arguments but 0 arguments were supplied
+   --> llmspell-workflows/benches/workflow_hook_overhead.rs:340:35
+    |
+340 |             let result = workflow.execute().await.unwrap();
+    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
+    |
+93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+    |              ^^^^^^^
+help: provide the arguments
+    |
+340 -             let result = workflow.execute().await.unwrap();
+340 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
+    |
+
+warning: `llmspell-bridge` (test "integration_test") generated 1 warning
+error[E0061]: this method takes 2 arguments but 0 arguments were supplied
+   --> llmspell-workflows/benches/workflow_hook_overhead.rs:360:35
+    |
+360 |             let result = workflow.execute().await.unwrap();
+    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
+    |
+93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+    |              ^^^^^^^
+help: provide the arguments
+    |
+360 -             let result = workflow.execute().await.unwrap();
+360 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
+    |
+
+warning: `llmspell-bridge` (test "globals_test") generated 1 warning
+error[E0061]: this method takes 2 arguments but 0 arguments were supplied
+   --> llmspell-workflows/benches/workflow_hook_overhead.rs:385:35
+    |
+385 |             let result = workflow.execute().await.unwrap();
+    |                                   ^^^^^^^-- two arguments of type `llmspell_core::types::AgentInput` and `llmspell_core::ExecutionContext` are missing
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core/src/traits/base_agent.rs:93:14
+    |
+93  |     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+    |              ^^^^^^^
+help: provide the arguments
+    |
+385 -             let result = workflow.execute().await.unwrap();
+385 +             let result = workflow.execute(/* llmspell_core::types::AgentInput */, /* llmspell_core::ExecutionContext */).await.unwrap();
+    |
+
+For more information about this error, try `rustc --explain E0061`.
+error: could not compile `llmspell-workflows` (bench "workflow_hook_overhead") due to 4 previous errors
+warning: build failed, waiting for other jobs to finish...
+error[E0308]: mismatched types
+  --> llmspell-testing/tests/agents/isolation_tests.rs:96:50
+   |
+96 |         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
+   |                                             ---- ^^^^^^^^^^^^^^^^^^^ expected `&str`, found `String`
+   |                                             |
+   |                                             arguments to this enum variant are incorrect
+   |
+help: the type constructed contains `std::string::String` due to the type of the argument passed
+  --> llmspell-testing/tests/agents/isolation_tests.rs:96:45
+   |
+96 |         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
+   |                                             ^^^^^-------------------^
+   |                                                  |
+   |                                                  this argument influences the type of `Some`
+note: tuple variant defined here
+  --> /private/tmp/rust-20250403-7454-rkwlec/rustc-1.86.0-src/library/core/src/option.rs:580:5
+help: try removing the method call
+   |
+96 -         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
+96 +         .create_shared_scope("shared_data", Some("admin"), shared_config)
+   |
+
+warning: this looks like a formatting argument but it is not part of a formatting macro
+ --> llmspell-agents/tests/communication_tests.rs:1:56
+  |
+1 | //! ABOUTME: Integration tests for agent communication and message passing
+  |                                                        ^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#literal_string_with_formatting_args
+  = note: `-W clippy::literal-string-with-formatting-args` implied by `-W clippy::nursery`
+  = help: to override `-W clippy::nursery` add `#[allow(clippy::literal_string_with_formatting_args)]`
+
+error[E0308]: mismatched types
+   --> llmspell-testing/tests/agents/isolation_tests.rs:96:72
+    |
+96  |         .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
+    |          ------------------- arguments to this method are incorrect    ^^^^^^^^^^^^^ expected `&SharedScopeConfig`, found `SharedScopeConfig`
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:287:12
+    |
+287 |     pub fn create_shared_scope(
+    |            ^^^^^^^^^^^^^^^^^^^
+help: consider borrowing here
+    |
+96  |         .create_shared_scope("shared_data", Some("admin".to_string()), &shared_config)
+    |                                                                        +
+
+error[E0308]: mismatched types
+   --> llmspell-testing/tests/agents/isolation_tests.rs:256:54
+    |
+256 |     isolation_manager.grant_permission("contractor", scope.clone(), StatePermission::Write);
+    |                       ----------------               ^^^^^^^^^^^^^ expected `&StateScope`, found `StateScope`
+    |                       |
+    |                       arguments to this method are incorrect
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:351:12
+    |
+351 |     pub fn grant_permission(
+    |            ^^^^^^^^^^^^^^^^
+help: consider borrowing here
+    |
+256 |     isolation_manager.grant_permission("contractor", &scope.clone(), StatePermission::Write);
+    |                                                      +
+
+error[E0308]: mismatched types
+   --> llmspell-testing/tests/agents/isolation_tests.rs:264:56
+    |
+264 |     isolation_manager.revoke_permissions("contractor", scope.clone());
+    |                       ------------------               ^^^^^^^^^^^^^ expected `&StateScope`, found `StateScope`
+    |                       |
+    |                       arguments to this method are incorrect
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:367:12
+    |
+367 |     pub fn revoke_permissions(&self, agent_id: &str, scope: &StateScope) {
+    |            ^^^^^^^^^^^^^^^^^^
+help: consider borrowing here
+    |
+264 |     isolation_manager.revoke_permissions("contractor", &scope.clone());
+    |                                                        +
+
+warning: `llmspell-agents` (test "communication_tests") generated 1 warning
+error[E0308]: mismatched types
+   --> llmspell-testing/tests/agents/isolation_tests.rs:330:43
+    |
+330 |         .create_pipeline("data_pipeline", stages.clone())
+    |          ---------------                  ^^^^^^^^^^^^^^ expected `&[String]`, found `Vec<String>`
+    |          |
+    |          arguments to this method are incorrect
+    |
+    = note: expected reference `&[std::string::String]`
+                  found struct `std::vec::Vec<std::string::String>`
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/sharing.rs:421:12
+    |
+421 |     pub fn create_pipeline(
+    |            ^^^^^^^^^^^^^^^
+help: consider borrowing here
+    |
+330 |         .create_pipeline("data_pipeline", &stages.clone())
+    |                                           +
+
+error[E0308]: mismatched types
+   --> llmspell-testing/tests/agents/isolation_tests.rs:373:55
+    |
+373 |         .create_shared_scope("concurrent_test", None, config)
+    |          -------------------                          ^^^^^^ expected `&SharedScopeConfig`, found `SharedScopeConfig`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:287:12
+    |
+287 |     pub fn create_shared_scope(
+    |            ^^^^^^^^^^^^^^^^^^^
+help: consider borrowing here
+    |
+373 |         .create_shared_scope("concurrent_test", None, &config)
+    |                                                       +
+
+error[E0308]: mismatched types
+   --> llmspell-testing/tests/agents/isolation_tests.rs:451:48
+    |
+451 |         .create_shared_scope("writable", None, config)
+    |          -------------------                   ^^^^^^ expected `&SharedScopeConfig`, found `SharedScopeConfig`
+    |          |
+    |          arguments to this method are incorrect
+    |
+note: method defined here
+   --> /Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents/src/state/isolation.rs:287:12
+    |
+287 |     pub fn create_shared_scope(
+    |            ^^^^^^^^^^^^^^^^^^^
+help: consider borrowing here
+    |
+451 |         .create_shared_scope("writable", None, &config)
+    |                                                +
+
+For more information about this error, try `rustc --explain E0308`.
+error: could not compile `llmspell-testing` (test "agents") due to 7 previous errors

@@ -9,7 +9,7 @@ use tracing_subscriber::{
     EnvFilter, Layer,
 };
 
-/// Logging configuration for the LLMSpell system.
+/// Logging configuration for the `LLMSpell` system.
 ///
 /// Controls various aspects of log output including format, level,
 /// and metadata inclusion. Supports both human-readable and JSON formats.
@@ -74,6 +74,7 @@ impl Default for LoggingConfig {
 
 impl LoggingConfig {
     /// Create a development configuration with human-readable output
+    #[must_use]
     pub fn development() -> Self {
         Self {
             default_level: Level::DEBUG,
@@ -87,6 +88,7 @@ impl LoggingConfig {
     }
 
     /// Create a production configuration with JSON output
+    #[must_use]
     pub fn production() -> Self {
         Self::default()
     }

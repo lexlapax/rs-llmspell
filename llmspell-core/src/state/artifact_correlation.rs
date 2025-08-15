@@ -19,6 +19,7 @@ impl ArtifactId {
     }
 
     /// Generate a new random artifact ID
+    #[must_use]
     pub fn generate() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
@@ -69,6 +70,7 @@ pub struct ArtifactMetadata {
 
 impl ArtifactMetadata {
     /// Create new artifact metadata
+    #[must_use]
     pub fn new(
         id: ArtifactId,
         artifact_type: String,
@@ -186,6 +188,7 @@ pub struct ArtifactCorrelationManager {
 
 impl ArtifactCorrelationManager {
     /// Create a new correlation manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             correlations: Arc::new(RwLock::new(HashMap::new())),

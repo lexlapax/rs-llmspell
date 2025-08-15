@@ -1,5 +1,5 @@
 //! ABOUTME: Error types and handling for rs-llmspell
-//! ABOUTME: Provides LLMSpellError enum and Result type alias
+//! ABOUTME: Provides `LLMSpellError` enum and `Result` type alias
 
 use thiserror::Error;
 
@@ -68,7 +68,7 @@ pub enum ErrorCategory {
     Internal,
 }
 
-/// Comprehensive error enum for all LLMSpell operations.
+/// Comprehensive error enum for all `LLMSpell` operations.
 ///
 /// Central error type that encompasses all possible errors in the system.
 /// Each variant includes relevant context and may chain underlying errors.
@@ -224,6 +224,7 @@ pub enum LLMSpellError {
 
 impl LLMSpellError {
     /// Get the error category
+    #[must_use]
     pub fn category(&self) -> ErrorCategory {
         match self {
             Self::Configuration { .. } => ErrorCategory::Configuration,
@@ -243,46 +244,52 @@ impl LLMSpellError {
     }
 
     /// Get the error severity
+    #[must_use]
     pub fn severity(&self) -> ErrorSeverity {
         match self {
-            Self::Validation { .. } => ErrorSeverity::Warning,
+            Self::Validation { .. } | Self::Timeout { .. } => ErrorSeverity::Warning,
             Self::Configuration { .. } => ErrorSeverity::Error,
             Self::Security { .. } => ErrorSeverity::Critical,
             Self::Internal { .. } => ErrorSeverity::Fatal,
-            Self::Timeout { .. } => ErrorSeverity::Warning,
             _ => ErrorSeverity::Error,
         }
     }
 
     /// Check if the error is retryable
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         match self {
             Self::Network { .. }
             | Self::Timeout { .. }
             | Self::Provider { .. }
-            | Self::RateLimit { .. } => true,
-            Self::Resource { .. } => true,
+            | Self::RateLimit { .. }
+            | Self::Resource { .. } => true,
             Self::Storage { operation, .. } => {
                 // Some storage operations are retryable
                 operation
                     .as_ref()
                     .is_some_and(|op| op == "read" || op == "write" || op == "lock")
             }
-            Self::Security { .. } | Self::Configuration { .. } | Self::Validation { .. } => false,
-            Self::Internal { .. } => false,
-            Self::ResourceLimit { .. } => false, // Resource limits are not retryable
-            _ => false,
+            Self::Security { .. }
+            | Self::Configuration { .. }
+            | Self::Validation { .. }
+            | Self::Internal { .. }
+            | Self::ResourceLimit { .. } // Resource limits are not retryable
+            | Self::Component { .. }
+            | Self::Tool { .. }
+            | Self::Script { .. }
+            | Self::Workflow { .. } => false,
         }
     }
 
     /// Get suggested retry delay in milliseconds
+    #[must_use]
     pub fn retry_delay_ms(&self) -> Option<u64> {
         if !self.is_retryable() {
             return None;
         }
 
         match self {
-            Self::Network { .. } => Some(1000), // 1 second
             Self::Timeout { duration_ms, .. } => {
                 // Retry with double the timeout
                 duration_ms.map(|d| d * 2).or(Some(5000))
@@ -290,7 +297,17 @@ impl LLMSpellError {
             Self::Provider { .. } => Some(2000), // 2 seconds
             Self::Resource { .. } => Some(500),  // 500ms
             Self::Storage { .. } => Some(100),   // 100ms
-            _ => Some(1000),                     // Default 1 second
+            Self::Network { .. } | Self::RateLimit { .. } => Some(1000), // 1 second
+            // These errors are not retryable so shouldn't reach here
+            Self::Security { .. }
+            | Self::Configuration { .. }
+            | Self::Validation { .. }
+            | Self::Internal { .. }
+            | Self::ResourceLimit { .. }
+            | Self::Component { .. }
+            | Self::Tool { .. }
+            | Self::Script { .. }
+            | Self::Workflow { .. } => None,
         }
     }
 

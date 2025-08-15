@@ -387,6 +387,7 @@ pub struct TransactionId(pub uuid::Uuid);
 
 impl TransactionId {
     /// Create a new transaction ID
+    #[must_use]
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4())
     }
@@ -520,6 +521,7 @@ mod tests {
             }
         }
 
+        #[allow(clippy::unused_self)]
         fn scoped_key(&self, scope: &StateScope, key: &str) -> String {
             scope.storage_key(key)
         }
@@ -553,7 +555,7 @@ mod tests {
                 .keys()
                 .filter(|k| k.starts_with(&prefix))
                 .filter_map(|k| k.strip_prefix(&prefix))
-                .map(|s| s.to_string())
+                .map(str::to_string)
                 .collect();
             Ok(keys)
         }
@@ -643,15 +645,15 @@ mod tests {
         assert!(manager.delete(StateScope::Global, "test").await.unwrap());
         assert!(!manager.exists(StateScope::Global, "test").await.unwrap());
     }
+    #[derive(Serialize, Deserialize, PartialEq, Debug)]
+    struct TestData {
+        name: String,
+        value: i32,
+    }
+
     #[tokio::test]
     async fn test_state_persistence_typed() {
         let manager = MockStateManager::new();
-
-        #[derive(Serialize, Deserialize, PartialEq, Debug)]
-        struct TestData {
-            name: String,
-            value: i32,
-        }
 
         let data = TestData {
             name: "test".to_string(),

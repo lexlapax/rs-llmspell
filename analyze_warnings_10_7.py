@@ -50,7 +50,7 @@ def categorize_warning(warning_msg):
         return 'other'
 
 # Parse the clippy output file
-with open('/Users/spuri/projects/lexlapax/rs-llmspell/phase_10_7_full_clippy_output.txt', 'r') as f:
+with open('/Users/spuri/projects/lexlapax/rs-llmspell/all_warnings.txt', 'r') as f:
     content = f.read()
 
 # Dictionary to store warnings by crate and type

@@ -1,9 +1,9 @@
 //! ABOUTME: Core traits, types, and infrastructure for rs-llmspell
-//! ABOUTME: Foundation layer providing BaseAgent, Agent, Tool, and Workflow traits
+//! ABOUTME: Foundation layer providing `BaseAgent`, `Agent`, `Tool`, and `Workflow` traits
 //!
 //! # Overview
 //!
-//! `llmspell-core` is the foundational crate of the LLMSpell system, providing:
+//! `llmspell-core` is the foundational crate of the `LLMSpell` system, providing:
 //!
 //! - **Core Traits**: `BaseAgent`, `Agent`, `Tool`, and `Workflow` for component abstraction
 //! - **Type System**: `ComponentId`, `Version`, and `ComponentMetadata` for identification

@@ -1,5 +1,5 @@
 //! ABOUTME: Tool trait for functional components with schema validation
-//! ABOUTME: Extends BaseAgent with parameter validation and tool categorization
+//! ABOUTME: Extends `BaseAgent` with parameter validation and tool categorization
 
 use super::base_agent::BaseAgent;
 use crate::{
@@ -84,6 +84,7 @@ pub enum SecurityLevel {
 
 impl SecurityLevel {
     /// Check if this security level allows execution at the given level
+    #[must_use]
     pub fn allows(&self, required: &SecurityLevel) -> bool {
         self >= required
     }
@@ -118,11 +119,13 @@ impl Default for SecurityRequirements {
 
 impl SecurityRequirements {
     /// Create safe security requirements (no file/network access)
+    #[must_use]
     pub fn safe() -> Self {
         Self::default()
     }
 
     /// Create restricted security requirements with limited access
+    #[must_use]
     pub fn restricted() -> Self {
         Self {
             level: SecurityLevel::Restricted,
@@ -131,6 +134,7 @@ impl SecurityRequirements {
     }
 
     /// Create privileged security requirements with full access
+    #[must_use]
     pub fn privileged() -> Self {
         Self {
             level: SecurityLevel::Privileged,
@@ -189,6 +193,7 @@ impl Default for ResourceLimits {
 
 impl ResourceLimits {
     /// Create unlimited resource limits (for privileged tools)
+    #[must_use]
     pub fn unlimited() -> Self {
         Self {
             max_memory_bytes: None,
@@ -200,6 +205,7 @@ impl ResourceLimits {
     }
 
     /// Create strict resource limits (for safe tools)
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
@@ -211,18 +217,21 @@ impl ResourceLimits {
     }
 
     /// Set memory limit
+    #[must_use]
     pub fn with_memory_limit(mut self, bytes: u64) -> Self {
         self.max_memory_bytes = Some(bytes);
         self
     }
 
     /// Set CPU time limit
+    #[must_use]
     pub fn with_cpu_limit(mut self, milliseconds: u64) -> Self {
         self.max_cpu_time_ms = Some(milliseconds);
         self
     }
 
     /// Set network bandwidth limit
+    #[must_use]
     pub fn with_network_limit(mut self, bytes_per_second: u64) -> Self {
         self.max_network_bps = Some(bytes_per_second);
         self
@@ -298,6 +307,7 @@ pub struct ToolSchema {
 
 impl ToolSchema {
     /// Create a new tool schema
+    #[must_use]
     pub fn new(name: String, description: String) -> Self {
         Self {
             name,
@@ -308,18 +318,21 @@ impl ToolSchema {
     }
 
     /// Add a parameter to the schema
+    #[must_use]
     pub fn with_parameter(mut self, param: ParameterDef) -> Self {
         self.parameters.push(param);
         self
     }
 
     /// Set the return type
+    #[must_use]
     pub fn with_returns(mut self, returns: ParameterType) -> Self {
         self.returns = Some(returns);
         self
     }
 
     /// Get required parameter names
+    #[must_use]
     pub fn required_parameters(&self) -> Vec<String> {
         self.parameters
             .iter()
@@ -329,6 +342,7 @@ impl ToolSchema {
     }
 
     /// Convert to JSON schema format
+    #[must_use]
     pub fn to_json_schema(&self) -> serde_json::Value {
         let mut properties = serde_json::Map::new();
 

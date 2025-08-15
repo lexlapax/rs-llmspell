@@ -1,0 +1,2123 @@
+    Checking llmspell-core v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-core)
+    Checking llmspell-state-traits v0.6.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-state-traits)
+error: redundant closure
+   --> llmspell-state-traits/src/traits.rs:558:22
+    |
+558 |                 .map(|s| s.to_string())
+    |                      ^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::string::ToString::to_string`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+    = note: `-D clippy::redundant-closure-for-method-calls` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_closure_for_method_calls)]`
+
+error: could not compile `llmspell-state-traits` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...
+error: item in documentation is missing backticks
+ --> llmspell-core/src/lib.rs:2:41
+  |
+2 | //! ABOUTME: Foundation layer providing BaseAgent, Agent, Tool, and Workflow traits
+  |                                         ^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+  = note: `-D clippy::doc-markdown` implied by `-D warnings`
+  = help: to override `-D warnings` add `#[allow(clippy::doc_markdown)]`
+help: try
+  |
+2 - //! ABOUTME: Foundation layer providing BaseAgent, Agent, Tool, and Workflow traits
+2 + //! ABOUTME: Foundation layer providing `BaseAgent`, Agent, Tool, and Workflow traits
+  |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/lib.rs:6:54
+  |
+6 | //! `llmspell-core` is the foundational crate of the LLMSpell system, providing:
+  |                                                      ^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+6 - //! `llmspell-core` is the foundational crate of the LLMSpell system, providing:
+6 + //! `llmspell-core` is the foundational crate of the `LLMSpell` system, providing:
+  |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/error.rs:2:23
+  |
+2 | //! ABOUTME: Provides LLMSpellError enum and Result type alias
+  |                       ^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides LLMSpellError enum and Result type alias
+2 + //! ABOUTME: Provides `LLMSpellError` enum and Result type alias
+  |
+
+error: item in documentation is missing backticks
+  --> llmspell-core/src/error.rs:71:38
+   |
+71 | /// Comprehensive error enum for all LLMSpell operations.
+   |                                      ^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+71 - /// Comprehensive error enum for all LLMSpell operations.
+71 + /// Comprehensive error enum for all `LLMSpell` operations.
+   |
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/error.rs:254:13
+    |
+254 |             Self::Timeout { .. } => ErrorSeverity::Warning,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+    = note: `-D clippy::match-same-arms` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::match_same_arms)]`
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+250 ~             Self::Configuration { .. } => ErrorSeverity::Error,
+251 |             Self::Security { .. } => ErrorSeverity::Critical,
+252 |             Self::Internal { .. } => ErrorSeverity::Fatal,
+253 ~             Self::Timeout { .. } | Self::Validation { .. } => ErrorSeverity::Warning,
+    |
+
+error: this match arm has an identical body to the `_` wildcard arm
+   --> llmspell-core/src/error.rs:251:13
+    |
+251 | /             Self::Configuration { .. } => ErrorSeverity::Error,
+252 | |             Self::Security { .. } => ErrorSeverity::Critical,
+    | |____________^ help: try removing the arm
+    |
+    = help: or try changing either arm body
+note: `_` wildcard arm here
+   --> llmspell-core/src/error.rs:255:13
+    |
+255 |             _ => ErrorSeverity::Error,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/error.rs:267:13
+    |
+267 |             Self::Resource { .. } => true,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+263 ~             Self::Resource { .. } | Self::Network { .. }
+264 +             | Self::Timeout { .. }
+265 +             | Self::Provider { .. }
+266 ~             | Self::RateLimit { .. } => true,
+    |
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/error.rs:316:5
+    |
+316 | /     pub fn with_source<E>(mut self, source: E) -> Self
+317 | |     where
+318 | |         E: std::error::Error + Send + Sync + 'static,
+...   |
+335 | |         self
+336 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+    = note: `-D clippy::return-self-not-must-use` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::return_self_not_must_use)]`
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/events/artifact_events.rs:326:5
+    |
+326 | /     pub fn with_context(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+327 | |         self.context.insert(key.into(), value);
+328 | |         self
+329 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/events/artifact_events.rs:356:5
+    |
+356 |     pub fn new(source: ComponentId) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new(source: ComponentId) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+    = note: `-D clippy::must-use-candidate` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::must_use_candidate)]`
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/events/artifact_events.rs:364:5
+    |
+364 | /     pub fn with_context(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+365 | |         self.context.insert(key.into(), value);
+366 | |         self
+367 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/events/artifact_events.rs:370:5
+    |
+370 | /     pub fn created(
+371 | |         self,
+372 | |         artifact: ArtifactMetadata,
+373 | |         location: Option<StorageLocation>,
+374 | |     ) -> ArtifactEvent {
+    | |______________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+help: add the attribute
+    |
+370 ~     #[must_use] pub fn created(
+371 +         self,
+372 +         artifact: ArtifactMetadata,
+373 +         location: Option<StorageLocation>,
+374 ~     ) -> ArtifactEvent {
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/events/artifact_events.rs:388:5
+    |
+388 | /     pub fn modified(
+389 | |         self,
+390 | |         artifact_id: ArtifactId,
+391 | |         modifications: Vec<Modification>,
+392 | |     ) -> ArtifactEvent {
+    | |______________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+help: add the attribute
+    |
+388 ~     #[must_use] pub fn modified(
+389 +         self,
+390 +         artifact_id: ArtifactId,
+391 +         modifications: Vec<Modification>,
+392 ~     ) -> ArtifactEvent {
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/events/artifact_events.rs:408:5
+    |
+408 | /     pub fn deleted(
+409 | |         self,
+410 | |         artifact_id: ArtifactId,
+411 | |         metadata: ArtifactMetadata,
+412 | |         permanent: bool,
+413 | |     ) -> ArtifactEvent {
+    | |______________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+help: add the attribute
+    |
+408 ~     #[must_use] pub fn deleted(
+409 +         self,
+410 +         artifact_id: ArtifactId,
+411 +         metadata: ArtifactMetadata,
+412 +         permanent: bool,
+413 ~     ) -> ArtifactEvent {
+    |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/execution_context.rs:1:23
+  |
+1 | //! ABOUTME: Enhanced ExecutionContext with hierarchical support and service bundle architecture
+  |                       ^^^^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+1 - //! ABOUTME: Enhanced ExecutionContext with hierarchical support and service bundle architecture
+1 + //! ABOUTME: Enhanced `ExecutionContext` with hierarchical support and service bundle architecture
+  |
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/execution_context.rs:60:5
+   |
+60 |     pub fn new() -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/execution_context.rs:67:5
+   |
+67 |     pub fn get(&self, scope: &ContextScope, key: &str) -> Option<Value> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get(&self, scope: &ContextScope, key: &str) -> Option<Value>`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: redundant closure
+  --> llmspell-core/src/execution_context.rs:70:29
+   |
+70 |             .unwrap_or_else(|poisoned| poisoned.into_inner())
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+   = note: `-D clippy::redundant-closure-for-method-calls` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::redundant_closure_for_method_calls)]`
+
+error: redundant closure
+  --> llmspell-core/src/execution_context.rs:80:29
+   |
+80 |             .unwrap_or_else(|poisoned| poisoned.into_inner());
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/execution_context.rs:85:5
+   |
+85 |     pub fn remove(&self, scope: &ContextScope, key: &str) -> Option<Value> {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn remove(&self, scope: &ContextScope, key: &str) -> Option<Value>`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: redundant closure
+  --> llmspell-core/src/execution_context.rs:89:29
+   |
+89 |             .unwrap_or_else(|poisoned| poisoned.into_inner());
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+error: redundant closure
+  --> llmspell-core/src/execution_context.rs:98:29
+   |
+98 |             .unwrap_or_else(|poisoned| poisoned.into_inner());
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:103:5
+    |
+103 |     pub fn keys(&self, scope: &ContextScope) -> Vec<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn keys(&self, scope: &ContextScope) -> Vec<String>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: redundant closure
+   --> llmspell-core/src/execution_context.rs:106:29
+    |
+106 |             .unwrap_or_else(|poisoned| poisoned.into_inner())
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the method itself: `std::sync::PoisonError::into_inner`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:168:5
+    |
+168 |     pub fn new() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:185:5
+    |
+185 |     pub fn with_conversation(conversation_id: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_conversation(conversation_id: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:192:5
+    |
+192 |     pub fn create_child(&self, scope: ContextScope, inheritance: InheritancePolicy) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn create_child(&self, scope: ContextScope, inheritance: InheritancePolicy) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:192:5
+    |
+192 | /     pub fn create_child(&self, scope: ContextScope, inheritance: InheritancePolicy) -> Self {
+193 | |         let mut child = Self {
+194 | |             id: uuid::Uuid::new_v4().to_string(),
+195 | |             parent_id: Some(self.id.clone()),
+...   |
+230 | |         child
+231 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/execution_context.rs:222:13
+    |
+222 | /             InheritancePolicy::Isolate => {
+223 | |                 // Start fresh, no data copied
+224 | |             }
+    | |_____________^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+222 ~             InheritancePolicy::Isolate | InheritancePolicy::Share => {
+223 |                 // Start fresh, no data copied
+224 |             }
+225 ~             }
+    |
+
+error: assigning the result of `Clone::clone()` may be inefficient
+   --> llmspell-core/src/execution_context.rs:211:17
+    |
+211 |                 child.data = self.data.clone();
+    |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `child.data.clone_from(&self.data)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assigning_clones
+    = note: `-D clippy::assigning-clones` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::assigning_clones)]`
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:234:5
+    |
+234 |     pub fn get(&self, key: &str) -> Option<Value> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get(&self, key: &str) -> Option<Value>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:262:5
+    |
+262 |     pub fn get_shared(&self, scope: &ContextScope, key: &str) -> Option<Value> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get_shared(&self, scope: &ContextScope, key: &str) -> Option<Value>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:267:5
+    |
+267 |     pub fn with_data(mut self, key: String, value: Value) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_data(mut self, key: String, value: Value) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:267:5
+    |
+267 | /     pub fn with_data(mut self, key: String, value: Value) -> Self {
+268 | |         self.data.insert(key, value);
+269 | |         self
+270 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:273:5
+    |
+273 |     pub fn with_scope(mut self, scope: ContextScope) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_scope(mut self, scope: ContextScope) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:273:5
+    |
+273 | /     pub fn with_scope(mut self, scope: ContextScope) -> Self {
+274 | |         self.scope = scope;
+275 | |         self
+276 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:279:5
+    |
+279 |     pub fn with_inheritance(mut self, inheritance: InheritancePolicy) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_inheritance(mut self, inheritance: InheritancePolicy) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:279:5
+    |
+279 | /     pub fn with_inheritance(mut self, inheritance: InheritancePolicy) -> Self {
+280 | |         self.inheritance = inheritance;
+281 | |         self
+282 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:285:5
+    |
+285 |     pub fn has_capability(&self, capability: &str) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn has_capability(&self, capability: &str) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: called `map(<f>).unwrap_or(false)` on an `Option` value
+   --> llmspell-core/src/execution_context.rs:286:9
+    |
+286 | /         self.get("capabilities")
+287 | |             .as_ref()
+288 | |             .and_then(|v| v.as_array())
+289 | |             .map(|caps| caps.iter().any(|c| c.as_str() == Some(capability)))
+290 | |             .unwrap_or(false)
+    | |_____________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#map_unwrap_or
+    = note: `-D clippy::map-unwrap-or` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::map_unwrap_or)]`
+help: use `is_some_and(<f>)` instead
+    |
+289 -             .map(|caps| caps.iter().any(|c| c.as_str() == Some(capability)))
+289 +             .is_some_and(|caps| caps.iter().any(|c| c.as_str() == Some(capability)))
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:294:5
+    |
+294 |     pub fn root(&self) -> &ExecutionContext {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn root(&self) -> &ExecutionContext`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:301:5
+    |
+301 |     pub fn depth(&self) -> usize {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn depth(&self) -> usize`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: boolean to int conversion using if
+   --> llmspell-core/src/execution_context.rs:304:9
+    |
+304 | /         if self.parent_id.is_some() {
+305 | |             1
+306 | |         } else {
+307 | |             0
+308 | |         }
+    | |_________^ help: replace with from: `usize::from(self.parent_id.is_some())`
+    |
+    = note: `self.parent_id.is_some() as usize` or `self.parent_id.is_some().into()` can also be valid options
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#bool_to_int_with_if
+    = note: `-D clippy::bool-to-int-with-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::bool_to_int_with_if)]`
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/execution_context.rs:325:17
+    |
+325 | /// Builder for ExecutionContext
+    |                 ^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+325 - /// Builder for ExecutionContext
+325 + /// Builder for `ExecutionContext`
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:332:5
+    |
+332 |     pub fn new() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:339:5
+    |
+339 |     pub fn conversation_id(mut self, id: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn conversation_id(mut self, id: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:339:5
+    |
+339 | /     pub fn conversation_id(mut self, id: String) -> Self {
+340 | |         self.context.conversation_id = Some(id);
+341 | |         self
+342 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:345:5
+    |
+345 |     pub fn user_id(mut self, id: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn user_id(mut self, id: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:345:5
+    |
+345 | /     pub fn user_id(mut self, id: String) -> Self {
+346 | |         self.context.user_id = Some(id);
+347 | |         self
+348 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:351:5
+    |
+351 |     pub fn session_id(mut self, id: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn session_id(mut self, id: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:351:5
+    |
+351 | /     pub fn session_id(mut self, id: String) -> Self {
+352 | |         self.context.session_id = Some(id);
+353 | |         self
+354 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:357:5
+    |
+357 |     pub fn scope(mut self, scope: ContextScope) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn scope(mut self, scope: ContextScope) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:357:5
+    |
+357 | /     pub fn scope(mut self, scope: ContextScope) -> Self {
+358 | |         self.context.scope = scope;
+359 | |         self
+360 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:363:5
+    |
+363 |     pub fn parent_id(mut self, parent_id: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn parent_id(mut self, parent_id: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:363:5
+    |
+363 | /     pub fn parent_id(mut self, parent_id: String) -> Self {
+364 | |         self.context.parent_id = Some(parent_id);
+365 | |         self
+366 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:369:5
+    |
+369 |     pub fn inheritance(mut self, policy: InheritancePolicy) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn inheritance(mut self, policy: InheritancePolicy) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:369:5
+    |
+369 | /     pub fn inheritance(mut self, policy: InheritancePolicy) -> Self {
+370 | |         self.context.inheritance = policy;
+371 | |         self
+372 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:375:5
+    |
+375 |     pub fn data(mut self, key: String, value: Value) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn data(mut self, key: String, value: Value) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:375:5
+    |
+375 | /     pub fn data(mut self, key: String, value: Value) -> Self {
+376 | |         self.context.data.insert(key, value);
+377 | |         self
+378 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:381:5
+    |
+381 |     pub fn security(mut self, security: SecurityContext) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn security(mut self, security: SecurityContext) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/execution_context.rs:381:5
+    |
+381 | /     pub fn security(mut self, security: SecurityContext) -> Self {
+382 | |         self.context.security_context = Some(security);
+383 | |         self
+384 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/execution_context.rs:387:5
+    |
+387 |     pub fn build(self) -> ExecutionContext {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn build(self) -> ExecutionContext`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+  --> llmspell-core/src/logging.rs:12:35
+   |
+12 | /// Logging configuration for the LLMSpell system.
+   |                                   ^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+12 - /// Logging configuration for the LLMSpell system.
+12 + /// Logging configuration for the `LLMSpell` system.
+   |
+
+error: more than 3 bools in a struct
+  --> llmspell-core/src/logging.rs:44:1
+   |
+44 | / pub struct LoggingConfig {
+45 | |     /// Default log level
+46 | |     pub default_level: Level,
+47 | |     /// Whether to use JSON formatting
+...  |
+58 | |     pub with_span_events: bool,
+59 | | }
+   | |_^
+   |
+   = help: consider using a state machine or refactoring bools into two-variant enums
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#struct_excessive_bools
+   = note: `-D clippy::struct-excessive-bools` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::struct_excessive_bools)]`
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/logging.rs:77:5
+   |
+77 |     pub fn development() -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn development() -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/logging.rs:90:5
+   |
+90 |     pub fn production() -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn production() -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-core/src/logging.rs:117:1
+    |
+117 | pub fn init_logging(config: LoggingConfig) -> Result<(), Box<dyn std::error::Error>> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+    = note: `-D clippy::missing-errors-doc` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::missing_errors_doc)]`
+
+error: this argument is passed by value, but not consumed in the function body
+   --> llmspell-core/src/logging.rs:117:29
+    |
+117 | pub fn init_logging(config: LoggingConfig) -> Result<(), Box<dyn std::error::Error>> {
+    |                             ^^^^^^^^^^^^^ help: consider taking a reference instead: `&LoggingConfig`
+    |
+help: or consider marking this type as `Copy`
+   --> llmspell-core/src/logging.rs:44:1
+    |
+44  | pub struct LoggingConfig {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_value
+    = note: `-D clippy::needless-pass-by-value` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_pass_by_value)]`
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-core/src/logging.rs:163:1
+    |
+163 | pub fn init_from_env() -> Result<(), Box<dyn std::error::Error>> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-core/src/logging.rs:174:1
+    |
+174 | pub fn update_log_filter(filter: &str) -> Result<(), Box<dyn std::error::Error>> {
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/state/artifact_correlation.rs:22:5
+   |
+22 |     pub fn generate() -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn generate() -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/state/artifact_correlation.rs:72:5
+   |
+72 | /     pub fn new(
+73 | |         id: ArtifactId,
+74 | |         artifact_type: String,
+75 | |         name: String,
+76 | |         created_by: ComponentId,
+77 | |     ) -> Self {
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+help: add the attribute
+   |
+72 ~     #[must_use] pub fn new(
+73 +         id: ArtifactId,
+74 +         artifact_type: String,
+75 +         name: String,
+76 +         created_by: ComponentId,
+77 ~     ) -> Self {
+   |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/state/artifact_correlation.rs:189:5
+    |
+189 |     pub fn new() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/types/mod.rs:2:23
+  |
+2 | //! ABOUTME: Provides ComponentId, Version, ComponentMetadata and streaming types
+  |                       ^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides ComponentId, Version, ComponentMetadata and streaming types
+2 + //! ABOUTME: Provides `ComponentId`, Version, ComponentMetadata and streaming types
+  |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/types/mod.rs:2:45
+  |
+2 | //! ABOUTME: Provides ComponentId, Version, ComponentMetadata and streaming types
+  |                                             ^^^^^^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides ComponentId, Version, ComponentMetadata and streaming types
+2 + //! ABOUTME: Provides ComponentId, Version, `ComponentMetadata` and streaming types
+  |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/types/agent_io.rs:2:23
+  |
+2 | //! ABOUTME: Provides AgentInput, AgentOutput, and related types for agent communication
+  |                       ^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides AgentInput, AgentOutput, and related types for agent communication
+2 + //! ABOUTME: Provides `AgentInput`, AgentOutput, and related types for agent communication
+  |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/types/agent_io.rs:2:35
+  |
+2 | //! ABOUTME: Provides AgentInput, AgentOutput, and related types for agent communication
+  |                                   ^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides AgentInput, AgentOutput, and related types for agent communication
+2 + //! ABOUTME: Provides AgentInput, `AgentOutput`, and related types for agent communication
+  |
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/types/agent_io.rs:80:5
+   |
+80 |     pub fn with_media(mut self, media: MediaContent) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_media(mut self, media: MediaContent) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-core/src/types/agent_io.rs:80:5
+   |
+80 | /     pub fn with_media(mut self, media: MediaContent) -> Self {
+81 | |         self.media.push(media);
+82 | |         self
+83 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/types/agent_io.rs:86:5
+   |
+86 |     pub fn with_media_vec(mut self, media: Vec<MediaContent>) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_media_vec(mut self, media: Vec<MediaContent>) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-core/src/types/agent_io.rs:86:5
+   |
+86 | /     pub fn with_media_vec(mut self, media: Vec<MediaContent>) -> Self {
+87 | |         self.media.extend(media);
+88 | |         self
+89 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/types/agent_io.rs:92:5
+   |
+92 |     pub fn with_context(mut self, context: ExecutionContext) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_context(mut self, context: ExecutionContext) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+  --> llmspell-core/src/types/agent_io.rs:92:5
+   |
+92 | /     pub fn with_context(mut self, context: ExecutionContext) -> Self {
+93 | |         self.context = Some(context);
+94 | |         self
+95 | |     }
+   | |_____^
+   |
+   = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:98:5
+    |
+98  | /     pub fn with_parameter(mut self, key: impl Into<String>, value: impl Into<Value>) -> Self {
+99  | |         self.parameters.insert(key.into(), value.into());
+100 | |         self
+101 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:104:5
+    |
+104 |     pub fn with_output_modalities(mut self, modalities: Vec<MediaType>) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_output_modalities(mut self, modalities: Vec<MediaType>) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:104:5
+    |
+104 | /     pub fn with_output_modalities(mut self, modalities: Vec<MediaType>) -> Self {
+105 | |         self.output_modalities = modalities;
+106 | |         self
+107 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:110:5
+    |
+110 |     pub fn builder() -> AgentInputBuilder {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn builder() -> AgentInputBuilder`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:115:5
+    |
+115 |     pub fn has_media(&self) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn has_media(&self) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:120:5
+    |
+120 |     pub fn get_media_by_type(&self, media_type: MediaType) -> Vec<&MediaContent> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn get_media_by_type(&self, media_type: MediaType) -> Vec<&MediaContent>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/agent_io.rs:147:17
+    |
+147 | /// Builder for AgentInput
+    |                 ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+147 - /// Builder for AgentInput
+147 + /// Builder for `AgentInput`
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:158:5
+    |
+158 |     pub fn new() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:169:5
+    |
+169 | /     pub fn text(mut self, text: impl Into<String>) -> Self {
+170 | |         self.text = text.into();
+171 | |         self
+172 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:175:5
+    |
+175 |     pub fn add_media(mut self, media: MediaContent) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn add_media(mut self, media: MediaContent) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:175:5
+    |
+175 | /     pub fn add_media(mut self, media: MediaContent) -> Self {
+176 | |         self.media.push(media);
+177 | |         self
+178 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:181:5
+    |
+181 |     pub fn context(mut self, context: ExecutionContext) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn context(mut self, context: ExecutionContext) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:181:5
+    |
+181 | /     pub fn context(mut self, context: ExecutionContext) -> Self {
+182 | |         self.context = Some(context);
+183 | |         self
+184 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:187:5
+    |
+187 | /     pub fn parameter(mut self, key: impl Into<String>, value: impl Into<Value>) -> Self {
+188 | |         self.parameters.insert(key.into(), value.into());
+189 | |         self
+190 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:193:5
+    |
+193 |     pub fn output_modalities(mut self, modalities: Vec<MediaType>) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn output_modalities(mut self, modalities: Vec<MediaType>) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:193:5
+    |
+193 | /     pub fn output_modalities(mut self, modalities: Vec<MediaType>) -> Self {
+194 | |         self.output_modalities = modalities;
+195 | |         self
+196 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/agent_io.rs:198:19
+    |
+198 |     /// Build the AgentInput
+    |                   ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+198 -     /// Build the AgentInput
+198 +     /// Build the `AgentInput`
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:199:5
+    |
+199 |     pub fn build(self) -> AgentInput {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn build(self) -> AgentInput`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:244:5
+    |
+244 |     pub fn with_media(mut self, media: MediaContent) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_media(mut self, media: MediaContent) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:244:5
+    |
+244 | /     pub fn with_media(mut self, media: MediaContent) -> Self {
+245 | |         self.media.push(media);
+246 | |         self
+247 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:250:5
+    |
+250 |     pub fn with_tool_call(mut self, tool_call: ToolCall) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_tool_call(mut self, tool_call: ToolCall) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:250:5
+    |
+250 | /     pub fn with_tool_call(mut self, tool_call: ToolCall) -> Self {
+251 | |         self.tool_calls.push(tool_call);
+252 | |         self
+253 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:256:5
+    |
+256 |     pub fn with_metadata(mut self, metadata: OutputMetadata) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_metadata(mut self, metadata: OutputMetadata) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:256:5
+    |
+256 | /     pub fn with_metadata(mut self, metadata: OutputMetadata) -> Self {
+257 | |         self.metadata = metadata;
+258 | |         self
+259 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:262:5
+    |
+262 |     pub fn with_transfer(mut self, agent_id: ComponentId) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_transfer(mut self, agent_id: ComponentId) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:262:5
+    |
+262 | /     pub fn with_transfer(mut self, agent_id: ComponentId) -> Self {
+263 | |         self.transfer_to = Some(agent_id);
+264 | |         self
+265 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:268:5
+    |
+268 |     pub fn builder() -> AgentOutputBuilder {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn builder() -> AgentOutputBuilder`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:273:5
+    |
+273 |     pub fn has_media(&self) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn has_media(&self) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:278:5
+    |
+278 |     pub fn has_tool_calls(&self) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn has_tool_calls(&self) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:283:5
+    |
+283 |     pub fn is_transfer(&self) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn is_transfer(&self) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/agent_io.rs:310:17
+    |
+310 | /// Builder for AgentOutput
+    |                 ^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+310 - /// Builder for AgentOutput
+310 + /// Builder for `AgentOutput`
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:321:5
+    |
+321 |     pub fn new() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:332:5
+    |
+332 | /     pub fn text(mut self, text: impl Into<String>) -> Self {
+333 | |         self.text = text.into();
+334 | |         self
+335 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:338:5
+    |
+338 |     pub fn add_media(mut self, media: MediaContent) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn add_media(mut self, media: MediaContent) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:338:5
+    |
+338 | /     pub fn add_media(mut self, media: MediaContent) -> Self {
+339 | |         self.media.push(media);
+340 | |         self
+341 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:344:5
+    |
+344 |     pub fn add_tool_call(mut self, tool_call: ToolCall) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn add_tool_call(mut self, tool_call: ToolCall) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:344:5
+    |
+344 | /     pub fn add_tool_call(mut self, tool_call: ToolCall) -> Self {
+345 | |         self.tool_calls.push(tool_call);
+346 | |         self
+347 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:350:5
+    |
+350 |     pub fn metadata(mut self, metadata: OutputMetadata) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn metadata(mut self, metadata: OutputMetadata) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:350:5
+    |
+350 | /     pub fn metadata(mut self, metadata: OutputMetadata) -> Self {
+351 | |         self.metadata = metadata;
+352 | |         self
+353 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:356:5
+    |
+356 |     pub fn transfer_to(mut self, agent_id: ComponentId) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn transfer_to(mut self, agent_id: ComponentId) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/agent_io.rs:356:5
+    |
+356 | /     pub fn transfer_to(mut self, agent_id: ComponentId) -> Self {
+357 | |         self.transfer_to = Some(agent_id);
+358 | |         self
+359 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/agent_io.rs:361:19
+    |
+361 |     /// Build the AgentOutput
+    |                   ^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+361 -     /// Build the AgentOutput
+361 +     /// Build the `AgentOutput`
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/agent_io.rs:362:5
+    |
+362 |     pub fn build(self) -> AgentOutput {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn build(self) -> AgentOutput`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/types/media.rs:2:23
+  |
+2 | //! ABOUTME: Provides MediaContent enum, format types, metadata structures, and validation helpers
+  |                       ^^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides MediaContent enum, format types, metadata structures, and validation helpers
+2 + //! ABOUTME: Provides `MediaContent` enum, format types, metadata structures, and validation helpers
+  |
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/media.rs:123:9
+    |
+123 |     /// WebM format
+    |         ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+123 -     /// WebM format
+123 +     /// `WebM` format
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:337:5
+    |
+337 |     pub fn size_bytes(&self) -> usize {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn size_bytes(&self) -> usize`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/types/media.rs:340:13
+    |
+340 |             MediaContent::Image { data, .. } => data.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+340 ~             MediaContent::Image { data, .. } | MediaContent::Audio { data, .. } => data.len(),
+341 ~             MediaContent::Video { data, .. } => data.len(),
+    |
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/types/media.rs:340:13
+    |
+340 |             MediaContent::Image { data, .. } => data.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+340 ~             MediaContent::Image { data, .. } | MediaContent::Video { data, .. } => data.len(),
+341 |             MediaContent::Audio { data, .. } => data.len(),
+342 ~             MediaContent::Binary { data, .. } => data.len(),
+    |
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/types/media.rs:341:13
+    |
+341 |             MediaContent::Audio { data, .. } => data.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+341 ~             MediaContent::Audio { data, .. } | MediaContent::Video { data, .. } => data.len(),
+342 ~             MediaContent::Binary { data, .. } => data.len(),
+    |
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/types/media.rs:340:13
+    |
+340 |             MediaContent::Image { data, .. } => data.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+340 ~             MediaContent::Image { data, .. } | MediaContent::Binary { data, .. } => data.len(),
+341 |             MediaContent::Audio { data, .. } => data.len(),
+342 |             MediaContent::Video { data, .. } => data.len(),
+343 ~             }
+    |
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/types/media.rs:341:13
+    |
+341 |             MediaContent::Audio { data, .. } => data.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+341 ~             MediaContent::Audio { data, .. } | MediaContent::Binary { data, .. } => data.len(),
+342 |             MediaContent::Video { data, .. } => data.len(),
+343 ~             }
+    |
+
+error: this match arm has an identical body to another arm
+   --> llmspell-core/src/types/media.rs:342:13
+    |
+342 |             MediaContent::Video { data, .. } => data.len(),
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: try changing either arm body
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: or try merging the arm patterns and removing the obsolete arm
+    |
+342 ~             MediaContent::Video { data, .. } | MediaContent::Binary { data, .. } => data.len(),
+343 ~             }
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:348:5
+    |
+348 |     pub fn media_type(&self) -> MediaType {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn media_type(&self) -> MediaType`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-core/src/types/media.rs:359:5
+    |
+359 |     pub fn validate_size(&self) -> Result<(), String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:381:5
+    |
+381 |     pub fn mime_type(&self) -> &'static str {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn mime_type(&self) -> &'static str`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:393:5
+    |
+393 |     pub fn extensions(&self) -> &'static [&'static str] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn extensions(&self) -> &'static [&'static str]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:407:5
+    |
+407 |     pub fn mime_type(&self) -> &'static str {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn mime_type(&self) -> &'static str`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:418:5
+    |
+418 |     pub fn extensions(&self) -> &'static [&'static str] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn extensions(&self) -> &'static [&'static str]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:431:5
+    |
+431 |     pub fn mime_type(&self) -> &'static str {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn mime_type(&self) -> &'static str`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/media.rs:442:5
+    |
+442 |     pub fn extensions(&self) -> &'static [&'static str] {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn extensions(&self) -> &'static [&'static str]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/types/streaming.rs:2:23
+  |
+2 | //! ABOUTME: Provides AgentStream, AgentChunk, and related types for streaming LLM interactions
+  |                       ^^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides AgentStream, AgentChunk, and related types for streaming LLM interactions
+2 + //! ABOUTME: Provides `AgentStream`, AgentChunk, and related types for streaming LLM interactions
+  |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/types/streaming.rs:2:36
+  |
+2 | //! ABOUTME: Provides AgentStream, AgentChunk, and related types for streaming LLM interactions
+  |                                    ^^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Provides AgentStream, AgentChunk, and related types for streaming LLM interactions
+2 + //! ABOUTME: Provides AgentStream, `AgentChunk`, and related types for streaming LLM interactions
+  |
+
+error: item in documentation is missing backticks
+  --> llmspell-core/src/types/streaming.rs:16:26
+   |
+16 | /// containing either an AgentChunk or an error.
+   |                          ^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+16 - /// containing either an AgentChunk or an error.
+16 + /// containing either an `AgentChunk` or an error.
+   |
+
+error: variables can be used directly in the `format!` string
+   --> llmspell-core/src/types/streaming.rs:293:17
+    |
+293 | /                 write!(
+294 | |                     f,
+295 | |                     "StreamEnd ({} chunks in {}ms)",
+296 | |                     total_chunks, duration_ms
+297 | |                 )
+    | |_________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+    = note: `-D clippy::uninlined-format-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::uninlined_format_args)]`
+
+error: item in documentation is missing backticks
+  --> llmspell-core/src/types/mod.rs:25:45
+   |
+25 | /// Unique identifier for components in the LLMSpell system.
+   |                                             ^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+25 - /// Unique identifier for components in the LLMSpell system.
+25 + /// Unique identifier for components in the `LLMSpell` system.
+   |
+
+error: item in documentation is missing backticks
+  --> llmspell-core/src/types/mod.rs:50:31
+   |
+50 |     /// Generate a new random ComponentId
+   |                               ^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+50 -     /// Generate a new random ComponentId
+50 +     /// Generate a new random `ComponentId`
+   |
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/types/mod.rs:51:5
+   |
+51 |     pub fn new() -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+  --> llmspell-core/src/types/mod.rs:55:16
+   |
+55 |     /// Create ComponentId from name (deterministic)
+   |                ^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+   |
+55 -     /// Create ComponentId from name (deterministic)
+55 +     /// Create `ComponentId` from name (deterministic)
+   |
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/types/mod.rs:56:5
+   |
+56 |     pub fn from_name(name: &str) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn from_name(name: &str) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/types/mod.rs:62:5
+   |
+62 |     pub fn uuid(&self) -> Uuid {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn uuid(&self) -> Uuid`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:109:5
+    |
+109 |     pub fn new(major: u32, minor: u32, patch: u32) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new(major: u32, minor: u32, patch: u32) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:118:5
+    |
+118 |     pub fn is_compatible_with(&self, other: &Version) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn is_compatible_with(&self, other: &Version) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:123:5
+    |
+123 |     pub fn is_newer_than(&self, other: &Version) -> bool {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn is_newer_than(&self, other: &Version) -> bool`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/mod.rs:134:36
+    |
+134 | /// Metadata for components in the LLMSpell system.
+    |                                    ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+134 - /// Metadata for components in the LLMSpell system.
+134 + /// Metadata for components in the `LLMSpell` system.
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:167:5
+    |
+167 |     pub fn new(name: String, description: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new(name: String, description: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/mod.rs:179:32
+    |
+179 |     /// Update the version and updated_at timestamp
+    |                                ^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+179 -     /// Update the version and updated_at timestamp
+179 +     /// Update the version and `updated_at` timestamp
+    |
+
+error: item in documentation is missing backticks
+   --> llmspell-core/src/types/mod.rs:186:32
+    |
+186 | /// Metadata for events in the LLMSpell system.
+    |                                ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+    |
+186 - /// Metadata for events in the LLMSpell system.
+186 + /// Metadata for events in the `LLMSpell` system.
+    |
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:230:5
+    |
+230 |     pub fn new() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:238:5
+    |
+238 |     pub fn with_trace(trace_id: String, span_id: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_trace(trace_id: String, span_id: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:248:5
+    |
+248 |     pub fn trace_id(&self) -> Option<&str> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn trace_id(&self) -> Option<&str>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:258:5
+    |
+258 |     pub fn span_id(&self) -> Option<&str> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn span_id(&self) -> Option<&str>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:268:5
+    |
+268 |     pub fn parent_span_id(&self) -> Option<&str> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn parent_span_id(&self) -> Option<&str>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:278:5
+    |
+278 |     pub fn correlation_id(&self) -> Option<&str> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn correlation_id(&self) -> Option<&str>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:288:5
+    |
+288 |     pub fn source(&self) -> Option<&ComponentId> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn source(&self) -> Option<&ComponentId>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:308:5
+    |
+308 |     pub fn attributes(&self) -> &HashMap<String, String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn attributes(&self) -> &HashMap<String, String>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/types/mod.rs:313:5
+    |
+313 |     pub fn create_child(&self, span_id: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn create_child(&self, span_id: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/types/mod.rs:313:5
+    |
+313 | /     pub fn create_child(&self, span_id: String) -> Self {
+314 | |         Self {
+315 | |             trace_id: self.trace_id.clone(),
+316 | |             span_id: Some(span_id),
+...   |
+323 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/traits/agent.rs:2:22
+  |
+2 | //! ABOUTME: Extends BaseAgent with conversation management and LLM provider integration
+  |                      ^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Extends BaseAgent with conversation management and LLM provider integration
+2 + //! ABOUTME: Extends `BaseAgent` with conversation management and LLM provider integration
+  |
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/traits/agent.rs:68:5
+   |
+68 |     pub fn new(role: MessageRole, content: String) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new(role: MessageRole, content: String) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/traits/agent.rs:77:5
+   |
+77 |     pub fn system(content: String) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn system(content: String) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/traits/agent.rs:82:5
+   |
+82 |     pub fn user(content: String) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn user(content: String) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/traits/agent.rs:87:5
+   |
+87 |     pub fn assistant(content: String) -> Self {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn assistant(content: String) -> Self`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/traits/base_agent.rs:1:14
+  |
+1 | //! ABOUTME: BaseAgent trait - foundation for all components
+  |              ^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+1 - //! ABOUTME: BaseAgent trait - foundation for all components
+1 + //! ABOUTME: `BaseAgent` trait - foundation for all components
+  |
+
+error: item in documentation is missing backticks
+ --> llmspell-core/src/traits/tool.rs:2:22
+  |
+2 | //! ABOUTME: Extends BaseAgent with parameter validation and tool categorization
+  |                      ^^^^^^^^^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+help: try
+  |
+2 - //! ABOUTME: Extends BaseAgent with parameter validation and tool categorization
+2 + //! ABOUTME: Extends `BaseAgent` with parameter validation and tool categorization
+  |
+
+error: variables can be used directly in the `format!` string
+  --> llmspell-core/src/traits/tool.rs:54:43
+   |
+54 |             ToolCategory::Custom(name) => write!(f, "{}", name),
+   |                                           ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
+help: change this to
+   |
+54 -             ToolCategory::Custom(name) => write!(f, "{}", name),
+54 +             ToolCategory::Custom(name) => write!(f, "{name}"),
+   |
+
+error: this method could have a `#[must_use]` attribute
+  --> llmspell-core/src/traits/tool.rs:87:5
+   |
+87 |     pub fn allows(&self, required: &SecurityLevel) -> bool {
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn allows(&self, required: &SecurityLevel) -> bool`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:121:5
+    |
+121 |     pub fn safe() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn safe() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:126:5
+    |
+126 |     pub fn restricted() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn restricted() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:134:5
+    |
+134 |     pub fn privileged() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn privileged() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:145:5
+    |
+145 | /     pub fn with_file_access(mut self, path: impl Into<String>) -> Self {
+146 | |         self.file_permissions.push(path.into());
+147 | |         self
+148 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:151:5
+    |
+151 | /     pub fn with_network_access(mut self, domain: impl Into<String>) -> Self {
+152 | |         self.network_permissions.push(domain.into());
+153 | |         self
+154 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:157:5
+    |
+157 | /     pub fn with_env_access(mut self, var: impl Into<String>) -> Self {
+158 | |         self.env_permissions.push(var.into());
+159 | |         self
+160 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:192:5
+    |
+192 |     pub fn unlimited() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn unlimited() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:203:5
+    |
+203 |     pub fn strict() -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn strict() -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:214:5
+    |
+214 |     pub fn with_memory_limit(mut self, bytes: u64) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_memory_limit(mut self, bytes: u64) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:214:5
+    |
+214 | /     pub fn with_memory_limit(mut self, bytes: u64) -> Self {
+215 | |         self.max_memory_bytes = Some(bytes);
+216 | |         self
+217 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:220:5
+    |
+220 |     pub fn with_cpu_limit(mut self, milliseconds: u64) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_cpu_limit(mut self, milliseconds: u64) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:220:5
+    |
+220 | /     pub fn with_cpu_limit(mut self, milliseconds: u64) -> Self {
+221 | |         self.max_cpu_time_ms = Some(milliseconds);
+222 | |         self
+223 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:226:5
+    |
+226 |     pub fn with_network_limit(mut self, bytes_per_second: u64) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_network_limit(mut self, bytes_per_second: u64) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:226:5
+    |
+226 | /     pub fn with_network_limit(mut self, bytes_per_second: u64) -> Self {
+227 | |         self.max_network_bps = Some(bytes_per_second);
+228 | |         self
+229 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:301:5
+    |
+301 |     pub fn new(name: String, description: String) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn new(name: String, description: String) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:311:5
+    |
+311 |     pub fn with_parameter(mut self, param: ParameterDef) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_parameter(mut self, param: ParameterDef) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:311:5
+    |
+311 | /     pub fn with_parameter(mut self, param: ParameterDef) -> Self {
+312 | |         self.parameters.push(param);
+313 | |         self
+314 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:317:5
+    |
+317 |     pub fn with_returns(mut self, returns: ParameterType) -> Self {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn with_returns(mut self, returns: ParameterType) -> Self`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-core/src/traits/tool.rs:317:5
+    |
+317 | /     pub fn with_returns(mut self, returns: ParameterType) -> Self {
+318 | |         self.returns = Some(returns);
+319 | |         self
+320 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:323:5
+    |
+323 |     pub fn required_parameters(&self) -> Vec<String> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn required_parameters(&self) -> Vec<String>`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: this method could have a `#[must_use]` attribute
+   --> llmspell-core/src/traits/tool.rs:332:5
+    |
+332 |     pub fn to_json_schema(&self) -> serde_json::Value {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: add the attribute: `#[must_use] pub fn to_json_schema(&self) -> serde_json::Value`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
+
+error: could not compile `llmspell-core` (lib) due to 200 previous errors

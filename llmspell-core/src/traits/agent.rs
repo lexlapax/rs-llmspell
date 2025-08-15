@@ -1,5 +1,5 @@
 //! ABOUTME: Agent trait for LLM-powered components
-//! ABOUTME: Extends BaseAgent with conversation management and LLM provider integration
+//! ABOUTME: Extends `BaseAgent` with conversation management and LLM provider integration
 
 use super::base_agent::BaseAgent;
 use crate::Result;
@@ -65,6 +65,7 @@ pub struct ConversationMessage {
 
 impl ConversationMessage {
     /// Create a new conversation message
+    #[must_use]
     pub fn new(role: MessageRole, content: String) -> Self {
         Self {
             role,
@@ -74,16 +75,19 @@ impl ConversationMessage {
     }
 
     /// Create a system message
+    #[must_use]
     pub fn system(content: String) -> Self {
         Self::new(MessageRole::System, content)
     }
 
     /// Create a user message
+    #[must_use]
     pub fn user(content: String) -> Self {
         Self::new(MessageRole::User, content)
     }
 
     /// Create an assistant message
+    #[must_use]
     pub fn assistant(content: String) -> Self {
         Self::new(MessageRole::Assistant, content)
     }

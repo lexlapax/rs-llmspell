@@ -1,4 +1,4 @@
-//! ABOUTME: Enhanced ExecutionContext with hierarchical support and service bundle architecture
+//! ABOUTME: Enhanced `ExecutionContext` with hierarchical support and service bundle architecture
 //! ABOUTME: Provides comprehensive runtime services for agents, tools, and workflows
 
 use crate::types::{ComponentId, EventMetadata};
@@ -57,6 +57,7 @@ pub struct SharedMemory {
 
 impl SharedMemory {
     /// Create new shared memory
+    #[must_use]
     pub fn new() -> Self {
         Self {
             regions: Arc::new(RwLock::new(HashMap::new())),
@@ -64,6 +65,7 @@ impl SharedMemory {
     }
 
     /// Get value from a memory region
+    #[must_use]
     pub fn get(&self, scope: &ContextScope, key: &str) -> Option<Value> {
         self.regions
             .read()
@@ -82,6 +84,7 @@ impl SharedMemory {
     }
 
     /// Remove value from a memory region
+    #[must_use]
     pub fn remove(&self, scope: &ContextScope, key: &str) -> Option<Value> {
         let mut regions = self
             .regions
@@ -100,6 +103,7 @@ impl SharedMemory {
     }
 
     /// Get all keys in a scope
+    #[must_use]
     pub fn keys(&self, scope: &ContextScope) -> Vec<String> {
         self.regions
             .read()
@@ -165,6 +169,7 @@ pub struct SecurityContext {
 
 impl ExecutionContext {
     /// Create a new root execution context
+    #[must_use]
     pub fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -182,6 +187,7 @@ impl ExecutionContext {
     }
 
     /// Create with conversation ID
+    #[must_use]
     pub fn with_conversation(conversation_id: String) -> Self {
         let mut ctx = Self::new();
         ctx.conversation_id = Some(conversation_id);
@@ -189,6 +195,7 @@ impl ExecutionContext {
     }
 
     /// Create a child context with inheritance
+    #[must_use]
     pub fn create_child(&self, scope: ContextScope, inheritance: InheritancePolicy) -> Self {
         let mut child = Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -219,11 +226,9 @@ impl ExecutionContext {
                         .insert("conversation_context".to_string(), conv.clone());
                 }
             }
-            InheritancePolicy::Isolate => {
-                // Start fresh, no data copied
-            }
-            InheritancePolicy::Share => {
-                // Parent data accessible via parent reference
+            InheritancePolicy::Isolate | InheritancePolicy::Share => {
+                // Isolate: Start fresh, no data copied
+                // Share: Parent data accessible via parent reference
             }
         }
 
@@ -322,7 +327,7 @@ impl Default for ExecutionContext {
     }
 }
 
-/// Builder for ExecutionContext
+/// Builder for `ExecutionContext`
 pub struct ExecutionContextBuilder {
     context: ExecutionContext,
 }

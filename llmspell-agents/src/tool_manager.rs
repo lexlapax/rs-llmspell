@@ -380,6 +380,10 @@ impl ToolManager {
                         ErrorStrategy::Skip => {
                             // Skip this step and continue with previous output
                         }
+                        _ => {
+                            // For any future error strategies, default to fail
+                            return Err(error);
+                        }
                     }
                 }
             }
@@ -437,6 +441,10 @@ impl ToolManager {
             ContextMode::Selective(_fields) => {
                 // Replace specific fields - implementation would depend on context structure
                 // For now, treat as Full mode
+            }
+            _ => {
+                // For any future context modes, default to full context
+                // Parameters can reference full context - this would need template resolution
             }
         }
 

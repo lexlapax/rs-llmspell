@@ -255,7 +255,6 @@ impl StateScope {
     pub fn parent(&self) -> Option<StateScope> {
         match self {
             StateScope::Global => None,
-            StateScope::User(_) => Some(StateScope::Global),
             StateScope::Session(session_id) => {
                 // Extract user ID from session ID if it follows the pattern "user_session_*"
                 if let Some(user_id) = session_id.split('_').next() {
@@ -264,11 +263,12 @@ impl StateScope {
                     Some(StateScope::Global)
                 }
             }
-            StateScope::Agent(_) => Some(StateScope::Global),
-            StateScope::Tool(_) => Some(StateScope::Global),
-            StateScope::Workflow(_) => Some(StateScope::Global),
-            StateScope::Hook(_) => Some(StateScope::Global),
-            StateScope::Custom(_) => Some(StateScope::Global),
+            StateScope::User(_)
+            | StateScope::Agent(_)
+            | StateScope::Tool(_)
+            | StateScope::Workflow(_)
+            | StateScope::Hook(_)
+            | StateScope::Custom(_) => Some(StateScope::Global),
         }
     }
 }
@@ -361,7 +361,8 @@ mod tests {
         ];
 
         for (storage_key, expected_scope, expected_key) in test_cases {
-            let (scope, key) = StateScope::parse_storage_key(storage_key).unwrap();
+            let (scope, key) = StateScope::parse_storage_key(storage_key)
+                .expect("valid storage key should parse successfully");
             assert_eq!(scope, expected_scope);
             assert_eq!(key, expected_key);
         }

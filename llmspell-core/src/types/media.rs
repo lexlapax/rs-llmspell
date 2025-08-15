@@ -1,5 +1,5 @@
 //! ABOUTME: Multimodal content types for text, image, audio, video, and binary data
-//! ABOUTME: Provides MediaContent enum, format types, metadata structures, and validation helpers
+//! ABOUTME: Provides `MediaContent` enum, format types, metadata structures, and validation helpers
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -120,7 +120,7 @@ pub enum AudioFormat {
 pub enum VideoFormat {
     /// MP4 format
     Mp4,
-    /// WebM format
+    /// `WebM` format
     Webm,
     /// AVI format
     Avi,
@@ -334,17 +334,19 @@ impl fmt::Display for MediaType {
 
 impl MediaContent {
     /// Get the size of the content in bytes
+    #[must_use]
     pub fn size_bytes(&self) -> usize {
         match self {
             MediaContent::Text(text) => text.len(),
-            MediaContent::Image { data, .. } => data.len(),
-            MediaContent::Audio { data, .. } => data.len(),
-            MediaContent::Video { data, .. } => data.len(),
-            MediaContent::Binary { data, .. } => data.len(),
+            MediaContent::Image { data, .. }
+            | MediaContent::Audio { data, .. }
+            | MediaContent::Video { data, .. }
+            | MediaContent::Binary { data, .. } => data.len(),
         }
     }
 
     /// Get the media type of this content
+    #[must_use]
     pub fn media_type(&self) -> MediaType {
         match self {
             MediaContent::Text(_) => MediaType::Text,
@@ -378,6 +380,7 @@ impl MediaContent {
 
 impl ImageFormat {
     /// Get MIME type for the image format
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             ImageFormat::Png => "image/png",
@@ -390,6 +393,7 @@ impl ImageFormat {
     }
 
     /// Get common file extensions for the format
+    #[must_use]
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
             ImageFormat::Png => &["png"],
@@ -404,6 +408,7 @@ impl ImageFormat {
 
 impl AudioFormat {
     /// Get MIME type for the audio format
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             AudioFormat::Mp3 => "audio/mpeg",
@@ -415,6 +420,7 @@ impl AudioFormat {
     }
 
     /// Get common file extensions for the format
+    #[must_use]
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
             AudioFormat::Mp3 => &["mp3"],
@@ -428,6 +434,7 @@ impl AudioFormat {
 
 impl VideoFormat {
     /// Get MIME type for the video format
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             VideoFormat::Mp4 => "video/mp4",
@@ -439,6 +446,7 @@ impl VideoFormat {
     }
 
     /// Get common file extensions for the format
+    #[must_use]
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
             VideoFormat::Mp4 => &["mp4"],

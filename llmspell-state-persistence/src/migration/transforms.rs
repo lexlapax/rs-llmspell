@@ -502,15 +502,19 @@ impl DataTransformer {
             ("string", "number", "parse_float") => {
                 if let Some(s) = value.as_str() {
                     s.parse::<f64>()
-                        .and_then(|n| {
-                            serde_json::Number::from_f64(n)
-                                .map(Value::Number)
-                                .ok_or_else(|| "Invalid f64 for JSON Number".to_string())
-                        })
                         .map_err(|_| TransformationError::TypeConversionFailed {
                             field: "unknown".to_string(),
                             from_type: from_type.to_string(),
                             to_type: to_type.to_string(),
+                        })
+                        .and_then(|n| {
+                            serde_json::Number::from_f64(n)
+                                .map(Value::Number)
+                                .ok_or_else(|| TransformationError::TypeConversionFailed {
+                                    field: "unknown".to_string(),
+                                    from_type: from_type.to_string(),
+                                    to_type: to_type.to_string(),
+                                })
                         })
                 } else {
                     Err(TransformationError::TypeConversionFailed {
