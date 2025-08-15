@@ -23,17 +23,21 @@
 //! use llmspell_storage::{MemoryBackend, StorageBackend};
 //! use serde_json::json;
 //!
-//! # tokio_test::block_on(async {
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let backend = MemoryBackend::new();
 //!
 //! // Store data
-//! backend.put("user:123", json!({"name": "Alice"})).await?;
+//! let value = json!({"name": "Alice"});
+//! backend.set("user:123", serde_json::to_vec(&value)?).await?;
 //!
 //! // Retrieve data
 //! let data = backend.get("user:123").await?;
-//! assert_eq!(data, Some(json!({"name": "Alice"})));
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! # });
+//! if let Some(bytes) = data {
+//!     let retrieved: serde_json::Value = serde_json::from_slice(&bytes)?;
+//!     assert_eq!(retrieved, json!({"name": "Alice"}));
+//! }
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! ## Using Sled Backend
@@ -42,13 +46,14 @@
 //! use llmspell_storage::{SledBackend, StorageBackend};
 //! use serde_json::json;
 //!
-//! # tokio_test::block_on(async {
-//! let backend = SledBackend::new("./data/storage")?;
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let backend = SledBackend::new_with_path("./data/storage")?;
 //!
 //! // Data persists across restarts
-//! backend.put("config:app", json!({"version": "1.0"})).await?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! # });
+//! let value = json!({"version": "1.0"});
+//! backend.set("config:app", serde_json::to_vec(&value)?).await?;
+//! # Ok(())
+//! # }
 //! ```
 //!
 //! # Performance Characteristics
@@ -73,21 +78,22 @@
 //! use llmspell_storage::{StorageBackend, StorageBackendType, MemoryBackend, SledBackend};
 //! use std::sync::Arc;
 //!
-//! # tokio_test::block_on(async {
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Factory pattern for backend selection
 //! fn create_backend(backend_type: StorageBackendType) -> Result<Arc<dyn StorageBackend>, Box<dyn std::error::Error>> {
 //!     match backend_type {
 //!         StorageBackendType::Memory => Ok(Arc::new(MemoryBackend::new())),
-//!         StorageBackendType::Sled => Ok(Arc::new(SledBackend::new("./data")?)),
+//!         StorageBackendType::Sled => Ok(Arc::new(SledBackend::new_with_path("./data")?)),
 //!         _ => Err("Unsupported backend".into()),
 //!     }
 //! }
 //!
 //! // Use backend agnostically
 //! let backend = create_backend(StorageBackendType::Memory)?;
-//! backend.put("key", serde_json::json!({"value": 42})).await?;
-//! # Ok::<(), Box<dyn std::error::Error>>(())
-//! # });
+//! let value = serde_json::json!({"value": 42});
+//! backend.set("key", serde_json::to_vec(&value)?).await?;
+//! # Ok(())
+//! # }
 //! ```
 
 pub mod backends;

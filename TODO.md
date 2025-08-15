@@ -59,146 +59,9 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 #### Task 7.1.24: Hook Execution Standardization
 #### Task 7.1.25: Fix Test Infrastructure Failures Across All Crates
 #### Task 7.1.26: Fix all fixable clippy errors across all crates
-
----
-
-### Set 2: Rust API Documentation (Day 3-5)
-
 #### Task 7.2.1: Core Crate Documentation
-**Priority**: CRITICAL
-**Estimated Time**: 6 hours
-**Status**: COMPLETED ✅
-**Assigned To**: Documentation Team
-
-**Description**: Add comprehensive rustdoc to all public APIs in core crates.
-
-**Documentation Requirements**:
-1. [x] **Module Level** (2 hours):
-   ```rust
-   //! # Module Name
-   //! 
-   //! Brief description of module purpose.
-   //! 
-   //! ## Overview
-   //! 
-   //! Detailed explanation of module functionality.
-   //! 
-   //! ## Examples
-   //! 
-   //! ```rust
-   //! use llmspell_core::*;
-   //! 
-   //! // Example code
-   //! ```
-   ```
-
-2. [x] **Struct/Trait Level** (2 hours):
-   - [x] Purpose and use cases
-   - [x] Generic parameters explained
-   - [x] Lifetime requirements
-   - [x] Thread safety guarantees
-
-3. [x] **Method Level** (2 hours):
-   - [x] Parameters with constraints
-   - [x] Return values explained
-   - [x] Error conditions
-   - [x] Examples for complex methods
-
-**Target Crates**:
-- llmspell-core ✅
-- llmspell-agents ✅
-- llmspell-tools ✅
-- llmspell-workflows ✅
-
-**Acceptance Criteria**:
-- [x] All public items have doc comments
-- [x] Examples compile and run
-- [x] No rustdoc warnings
-- [x] Cross-references working
-
----
-
 #### Task 7.2.2: Infrastructure Crate Documentation
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Status**: COMPLETED ✅
-**Assigned To**: Documentation Team
-
-**Description**: Document all infrastructure crates with focus on integration patterns.
-
-**Target Crates**:
-- llmspell-storage ✅
-- llmspell-hooks ✅
-- llmspell-events ✅
-- llmspell-state-persistence ✅
-- llmspell-sessions ✅
-
-**Special Focus Areas**:
-1. [x] **Integration Examples**:
-   ```rust
-   //! ## Integration with State Persistence
-   //! 
-   //! ```rust
-   //! let state_manager = StateManager::new().await?;
-   //! let session_manager = SessionManager::builder()
-   //!     .state_manager(state_manager)
-   //!     .build()?;
-   //! ```
-   ```
-
-2. [x] **Performance Considerations**:
-   - [x] Document performance characteristics
-   - [x] Memory usage patterns
-   - [x] Concurrency limits
-
-**Acceptance Criteria**:
-- [x] All infrastructure APIs documented
-- [x] Integration patterns shown
-- [x] Performance notes included
-- [x] Troubleshooting sections added
-
----
-
 #### Task 7.2.3: Bridge and Scripting Documentation
-**Priority**: HIGH
-**Estimated Time**: 4 hours
-**Status**: COMPLETED ✅
-**Assigned To**: Bridge Team
-
-**Description**: Document scripting bridge APIs with language-specific examples.
-
-**Requirements**:
-1. [x] **Lua Integration** (2 hours):
-   ```rust
-   //! ## Lua Usage
-   //! 
-   //! ```lua
-   //! -- Creating an agent
-   //! local agent = Agent.create({
-   //!     name = "assistant",
-   //!     provider = "openai"
-   //! })
-   //! 
-   //! -- Using the agent
-   //! local response = agent:query("Hello!")
-   //! ```
-   ```
-
-2. [x] **JavaScript Integration** (1 hour):
-   - [x] Document planned JS API
-   - [x] Migration from Lua examples
-   - [x] Type definitions
-
-3. [x] **Global Objects** (1 hour):
-   - [x] Document all injected globals
-   - [x] Lifecycle and availability
-   - [x] Thread safety in scripts
-
-**Acceptance Criteria**:
-- [x] All bridge APIs documented
-- [x] Script examples working
-- [x] Language differences noted
-- [x] Security considerations documented
 
 ---
 
@@ -207,51 +70,51 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 #### Task 7.3.1: Example Audit and Categorization
 **Priority**: HIGH
 **Estimated Time**: 4 hours
-**Status**: TODO
+**Status**: COMPLETED ✅
 **Assigned To**: Documentation Team
 
 **Description**: Comprehensive audit of all 156+ examples to categorize by audience, scope, and purpose.
 
 **Implementation Steps**:
-1. [ ] **Discovery and Inventory** (1 hour):
-   - [ ] List all examples in `/examples/`: `find examples -name "*.lua" -o -name "*.rs" | sort`
-   - [ ] List per-crate examples: `find llmspell-*/examples -name "*.rs" | sort`
-   - [ ] Find test examples: `grep -r "fn main()" llmspell-*/tests/ | grep -v "test fn"`
-   - [ ] Document example count by location and type
-   - [ ] Create master inventory spreadsheet
+1. [x] **Discovery and Inventory** (1 hour):
+   - [x] List all examples in `/examples/`: `find examples -name "*.lua" -o -name "*.rs" | sort`
+   - [x] List per-crate examples: `find llmspell-*/examples -name "*.rs" | sort`
+   - [x] Find test examples: `grep -r "fn main()" llmspell-*/tests/ | grep -v "test fn"`
+   - [x] Document example count by location and type
+   - [x] Create master inventory spreadsheet
 
-2. [ ] **Categorization** (1.5 hours):
-   - [ ] Tag each example by audience: Script Users, Rust Developers, System Integrators
-   - [ ] Tag by scope: Learning, Integration, Production
-   - [ ] Tag by feature area: agents, tools, workflows, hooks, events, state
-   - [ ] Identify duplicate examples covering same functionality
-   - [ ] Note examples that serve multiple purposes
+2. [x] **Categorization** (1.5 hours):
+   - [x] Tag each example by audience: Script Users, Rust Developers, System Integrators
+   - [x] Tag by scope: Learning, Integration, Production
+   - [x] Tag by feature area: agents, tools, workflows, hooks, events, state
+   - [x] Identify duplicate examples covering same functionality
+   - [x] Note examples that serve multiple purposes
 
-3. [ ] **Gap Analysis** (1 hour):
-   - [ ] Identify missing getting-started examples
-   - [ ] Find feature areas lacking examples
-   - [ ] Note missing error handling examples
-   - [ ] List needed deployment/production examples
-   - [ ] Document testing pattern gaps
+3. [x] **Gap Analysis** (1 hour):
+   - [x] Identify missing getting-started examples
+   - [x] Find feature areas lacking examples
+   - [x] Note missing error handling examples
+   - [x] List needed deployment/production examples
+   - [x] Document testing pattern gaps
 
-4. [ ] **Quality Assessment** (30 min):
-   - [ ] Check which examples are broken/outdated
-   - [ ] Verify examples against current APIs
-   - [ ] Test example runnability
-   - [ ] Note examples needing updates
+4. [x] **Quality Assessment** (30 min):
+   - [x] Check which examples are broken/outdated
+   - [x] Verify examples against current APIs
+   - [x] Test example runnability
+   - [x] Note examples needing updates
 
 **Deliverables**:
-- [ ] Example inventory spreadsheet with categorization
-- [ ] Gap analysis report
-- [ ] Migration priority list
-- [ ] Quality issues list
+- [x] Example inventory spreadsheet with categorization (INVENTORY.md, inventory.csv)
+- [x] Gap analysis report (GAP_ANALYSIS.md)
+- [x] Migration priority list (MIGRATION_PLAN.md)
+- [x] Quality issues list (in GAP_ANALYSIS.md)
 
 **Acceptance Criteria**:
-- [ ] All 156+ examples inventoried
-- [ ] Each example categorized by audience and scope
-- [ ] Duplicates identified
-- [ ] Gaps documented
-- [ ] Migration plan created
+- [x] All 125 examples inventoried (94 Lua, 31 Rust)
+- [x] Each example categorized by audience and scope
+- [x] Duplicates identified (~15% duplicative)
+- [x] Gaps documented (critical gaps in getting started, error handling, production)
+- [x] Migration plan created (phased approach with priorities)
 
 ---
 

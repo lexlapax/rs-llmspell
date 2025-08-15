@@ -3127,3 +3127,140 @@ All code compiles cleanly with no warnings from cargo fmt or clippy.
 - [ ] Performance not degraded by fixes
 - [ ] All tests still passing
 ---
+### Set 2: Rust API Documentation (Day 3-5)
+
+#### Task 7.2.1: Core Crate Documentation
+**Priority**: CRITICAL
+**Estimated Time**: 6 hours
+**Status**: COMPLETED ✅
+**Assigned To**: Documentation Team
+
+**Description**: Add comprehensive rustdoc to all public APIs in core crates.
+
+**Documentation Requirements**:
+1. [x] **Module Level** (2 hours):
+   ```rust
+   //! # Module Name
+   //! 
+   //! Brief description of module purpose.
+   //! 
+   //! ## Overview
+   //! 
+   //! Detailed explanation of module functionality.
+   //! 
+   //! ## Examples
+   //! 
+   //! ```rust
+   //! use llmspell_core::*;
+   //! 
+   //! // Example code
+   //! ```
+   ```
+
+2. [x] **Struct/Trait Level** (2 hours):
+   - [x] Purpose and use cases
+   - [x] Generic parameters explained
+   - [x] Lifetime requirements
+   - [x] Thread safety guarantees
+
+3. [x] **Method Level** (2 hours):
+   - [x] Parameters with constraints
+   - [x] Return values explained
+   - [x] Error conditions
+   - [x] Examples for complex methods
+
+**Target Crates**:
+- llmspell-core ✅
+- llmspell-agents ✅
+- llmspell-tools ✅
+- llmspell-workflows ✅
+
+**Acceptance Criteria**:
+- [x] All public items have doc comments
+- [x] Examples compile and run
+- [x] No rustdoc warnings
+- [x] Cross-references working
+
+---
+
+#### Task 7.2.2: Infrastructure Crate Documentation
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Status**: COMPLETED ✅
+**Assigned To**: Documentation Team
+
+**Description**: Document all infrastructure crates with focus on integration patterns.
+
+**Target Crates**:
+- llmspell-storage ✅
+- llmspell-hooks ✅
+- llmspell-events ✅
+- llmspell-state-persistence ✅
+- llmspell-sessions ✅
+
+**Special Focus Areas**:
+1. [x] **Integration Examples**:
+   ```rust
+   //! ## Integration with State Persistence
+   //! 
+   //! ```rust
+   //! let state_manager = StateManager::new().await?;
+   //! let session_manager = SessionManager::builder()
+   //!     .state_manager(state_manager)
+   //!     .build()?;
+   //! ```
+   ```
+
+2. [x] **Performance Considerations**:
+   - [x] Document performance characteristics
+   - [x] Memory usage patterns
+   - [x] Concurrency limits
+
+**Acceptance Criteria**:
+- [x] All infrastructure APIs documented
+- [x] Integration patterns shown
+- [x] Performance notes included
+- [x] Troubleshooting sections added
+
+---
+
+#### Task 7.2.3: Bridge and Scripting Documentation
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Status**: COMPLETED ✅
+**Assigned To**: Bridge Team
+
+**Description**: Document scripting bridge APIs with language-specific examples.
+
+**Requirements**:
+1. [x] **Lua Integration** (2 hours):
+   ```rust
+   //! ## Lua Usage
+   //! 
+   //! ```lua
+   //! -- Creating an agent
+   //! local agent = Agent.create({
+   //!     name = "assistant",
+   //!     provider = "openai"
+   //! })
+   //! 
+   //! -- Using the agent
+   //! local response = agent:query("Hello!")
+   //! ```
+   ```
+
+2. [x] **JavaScript Integration** (1 hour):
+   - [x] Document planned JS API
+   - [x] Migration from Lua examples
+   - [x] Type definitions
+
+3. [x] **Global Objects** (1 hour):
+   - [x] Document all injected globals
+   - [x] Lifecycle and availability
+   - [x] Thread safety in scripts
+
+**Acceptance Criteria**:
+- [x] All bridge APIs documented
+- [x] Script examples working
+- [x] Language differences noted
+- [x] Security considerations documented

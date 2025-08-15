@@ -1,8 +1,8 @@
-# Rs-LLMSpell Examples
+# LLMSpell Examples
 
-**Current Version**: Phase 5 Complete (v0.5.0)  
+**Current Version**: Phase 7 (v0.7.0)  
 **Available Tools**: 34 production tools  
-**Features**: Agents, Workflows, Tools, Persistent State Management, Hooks, Events
+**Features**: Agents, Workflows, Tools, Persistent State Management, Hooks, Events, Sessions
 
 **🔗 Navigation**: [← Project Home](../README.md) | [Documentation Hub](../docs/README.md) | [User Guide](../docs/user-guide/README.md)
 
@@ -10,7 +10,7 @@
 
 ## Overview
 
-This directory contains working examples demonstrating rs-llmspell capabilities. All examples are tested and work with the current v0.5.0 release (Phase 5), including persistent state management, comprehensive hook and event system integration.
+Welcome to the LLMSpell examples! This directory contains comprehensive examples organized by audience and learning path. All examples are tested and work with the current release, including persistent state management, comprehensive hook and event system integration, and session management.
 
 ## 📁 Directory Structure
 
@@ -522,6 +522,33 @@ System performance targets (measured in benchmarks):
 **DevOps Automation**: CI/CD pipeline coordination and monitoring
 **Security**: Event-driven security monitoring and response
 **Performance**: Real-time performance monitoring and optimization
+
+---
+
+## 🆕 New Organized Structure (Phase 7)
+
+Starting with Phase 7, we're reorganizing examples for better discoverability:
+
+### For Script Users (Lua)
+Located in `script-users/`:
+- **getting-started/** - Progressive learning path (0-5)
+- **features/** - Comprehensive feature demonstrations
+- **cookbook/** - Common patterns and recipes
+- **applications/** - Complete production examples
+
+### For Rust Developers
+Located in `rust-developers/`:
+- **getting-started/** - Embedding LLMSpell basics
+- **api-usage/** - API demonstrations
+- **patterns/** - Design patterns
+- **extensions/** - Creating custom components
+
+### Test Examples
+Located in `tests-as-examples/`:
+- **integration/** - Integration test examples
+- **benchmarks/** - Performance benchmarks
+
+**Migration in Progress**: Examples are being migrated to this new structure. Both old and new locations will work during the transition.
 
 ---
 

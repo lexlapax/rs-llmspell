@@ -1,6 +1,6 @@
 //! Lua global objects for scripting
 //!
-//! This module provides Lua bindings for all LLMSpell functionality,
+//! This module provides Lua bindings for all `LLMSpell` functionality,
 //! making it accessible through global objects in Lua scripts.
 //!
 //! # Available Globals
