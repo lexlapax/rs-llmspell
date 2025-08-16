@@ -1,3 +1,10 @@
+-- Example: Agent Basics - Creating and Using Agents
+-- Purpose: Introduction to agent creation, listing, and basic execution
+-- Prerequisites: OpenAI API key (OPENAI_API_KEY) for best results
+-- Expected Output: Agent creation, invocation, listing, and discovery demo
+-- Version: 0.7.0
+-- Tags: getting-started, agents, api-required
+
 -- ABOUTME: Simple agent demonstration using only available Agent API methods
 -- ABOUTME: Shows basic agent creation, listing, and execution
 
@@ -7,11 +14,11 @@ print()
 -- Test 1: Create a basic agent
 print("1. Creating a basic agent...")
 local success1, agent1 = pcall(function()
-    return Agent.create({
-        name = "simple-agent",
-        model = "gpt-4o-mini",
-        system_prompt = "You are a helpful assistant. Keep responses brief."
-    })
+    return Agent.builder()
+        :name("simple-agent")
+        :model("gpt-4o-mini")
+        :system_prompt("You are a helpful assistant. Keep responses brief.")
+        :build()
 end)
 
 if success1 and agent1 then
@@ -47,11 +54,11 @@ local test_models = {
 local created_agents = 0
 for i, test in ipairs(test_models) do
     local success, agent = pcall(function()
-        return Agent.create({
-            name = "test-agent-" .. i,
-            model = test.model,
-            system_prompt = "You are a test agent."
-        })
+        return Agent.builder()
+            :name("test-agent-" .. i)
+            :model(test.model)
+            :system_prompt("You are a test agent.")
+            :build()
     end)
     
     if success and agent then
@@ -111,13 +118,13 @@ end
 -- Test 5: Agent with custom parameters
 print("\n6. Creating agent with custom parameters...")
 local success, custom_agent = pcall(function()
-    return Agent.create({
-        name = "custom-agent",
-        model = "gpt-4o-mini",
-        system_prompt = "You are a creative writer. Use vivid language.",
-        temperature = 0.9,
-        max_tokens = 150
-    })
+    return Agent.builder()
+        :name("custom-agent")
+        :model("gpt-4o-mini")
+        :system_prompt("You are a creative writer. Use vivid language.")
+        :temperature(0.9)
+        :max_tokens(150)
+        :build()
 end)
 
 if success and custom_agent then
@@ -147,7 +154,7 @@ print("- Missing API keys")
 print("- Network connectivity")
 print("- Model availability")
 print("\nThis demo uses the Agent API methods:")
-print("- Agent.create() - Create agents synchronously")
+print("- Agent.builder() - Create agents synchronously")
 print("- Agent.list() - List agent instances")
 print("- Agent.discover() - Discover agent types")
 print("- Agent.register() - Register new agents")

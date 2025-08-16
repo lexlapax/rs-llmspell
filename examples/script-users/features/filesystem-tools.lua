@@ -1,6 +1,12 @@
--- tools-filesystem.lua
--- Examples for file system tools with security sandboxing
--- Using direct Tool API
+-- Example: File System Tools 
+-- Purpose: Comprehensive demonstration of secure file operations, archiving, watching, and conversion
+-- Prerequisites: None (uses local filesystem)
+-- Expected Output: File operations with security features demonstrated
+-- Version: 0.7.0
+-- Tags: features, tools, filesystem, no-dependencies
+
+-- ABOUTME: Examples for file system tools with security sandboxing
+-- ABOUTME: Using direct Tool API for file operations, archiving, watching, and conversion
 
 print("📁 File System Tools Examples")
 print("=============================")

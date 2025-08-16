@@ -1,5 +1,12 @@
--- Simple performance benchmark for synchronous Agent API
--- Tests agent creation overhead only
+-- Example: Agent Performance Benchmark
+-- Purpose: Performance benchmark for synchronous Agent API testing creation overhead
+-- Prerequisites: API keys for best performance testing
+-- Expected Output: Performance metrics for agent creation operations
+-- Version: 0.7.0
+-- Tags: test, benchmark, agents, performance
+
+-- ABOUTME: Simple performance benchmark for synchronous Agent API
+-- ABOUTME: Tests agent creation overhead and synchronous behavior
 
 local function benchmark(name, func, iterations)
     iterations = iterations or 100
@@ -34,31 +41,37 @@ print("=== Agent API Performance Benchmark ===")
 print()
 
 -- Test 1: Basic agent creation overhead
+local iteration_counter = 0
 local creation_time = benchmark("Basic Agent Creation", function()
-    return Agent.create({
-        name = "benchmark-agent-1",
-        model = "gpt-4o-mini",
-        prompt = "You are a test assistant"
-    })
+    iteration_counter = iteration_counter + 1
+    return Agent.builder()
+        :name("benchmark-agent-1-" .. iteration_counter)
+        :model("gpt-4o-mini")
+        :system_prompt("You are a test assistant")
+        :build()
 end, 20)
 
 -- Test 2: Agent creation with provider/model syntax
+iteration_counter = 0
 benchmark("Provider/Model Syntax", function()
-    return Agent.create({
-        name = "benchmark-agent-2",
-        model = "anthropic/claude-3-sonnet",
-        prompt = "Test"
-    })
+    iteration_counter = iteration_counter + 1
+    return Agent.builder()
+        :name("benchmark-agent-2-" .. iteration_counter)
+        :model("anthropic/claude-3-sonnet")
+        :system_prompt("Test")
+        :build()
 end, 20)
 
 -- Test 3: Agent creation with tools
+iteration_counter = 0
 benchmark("Agent with Tools", function()
-    return Agent.create({
-        name = "benchmark-agent-3",
-        model = "gpt-4o-mini",
-        prompt = "Test assistant",
-        tools = {"calculator", "uuid_generator"}
-    })
+    iteration_counter = iteration_counter + 1
+    return Agent.builder()
+        :name("benchmark-agent-3-" .. iteration_counter)
+        :model("gpt-4o-mini")
+        :system_prompt("Test assistant")
+        :tools({"calculator", "uuid_generator"})
+        :build()
 end, 10)
 
 -- Summary
@@ -76,11 +89,11 @@ print("\n=== Synchronous API Test ===")
 -- This should work without any coroutine wrapping
 local start = os.clock()
 local sync_success = pcall(function()
-    local agent = Agent.create({
-        name = "sync-test-agent",
-        model = "gpt-4o-mini", 
-        prompt = "Sync test"
-    })
+    local agent = Agent.builder()
+        :name("sync-test-agent-" .. os.time())
+        :model("gpt-4o-mini")
+        :system_prompt("Sync test")
+        :build()
 end)
 local sync_time = (os.clock() - start) * 1000
 

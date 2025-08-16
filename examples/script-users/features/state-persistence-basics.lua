@@ -1,9 +1,12 @@
+-- Example: State Persistence Basics
+-- Purpose: Comprehensive demonstration of state persistence operations including save, load, delete, scopes, and patterns
+-- Prerequisites: State-enabled configuration (examples/configs/state-enabled.toml)
+-- Expected Output: State operations with scoping, error handling, and practical usage patterns
+-- Version: 0.7.0
+-- Tags: features, state, persistence, config-required
+
 -- ABOUTME: Basic state persistence operations demonstrating core State API
 -- ABOUTME: Shows save, load, delete operations with error handling and best practices
-
--- CONFIG: Use examples/configs/state-enabled.toml or examples/state_persistence/configs/basic.toml  
--- RUN: ./target/debug/llmspell -c examples/configs/state-enabled.toml run examples/state_persistence/basic_operations.lua
--- ALTERNATIVE: cargo run -- -c examples/configs/state-enabled.toml run examples/state_persistence/basic_operations.lua
 
 print("🗄️  State Persistence - Basic Operations Example")
 print("================================================")

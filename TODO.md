@@ -251,7 +251,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - Several agents use deprecated Agent.create() API
    - 5 duplicate workflow files to remove
 
-4. [ ] **Phase 2: Systematic Migration by Category** (4 hours)
+4. [x] **Phase 2: Systematic Migration by Category** (4 hours) - GROUP A COMPLETED ✅
    
    **Process for EACH file**:
    1. Verify baseline test result from Phase 1
@@ -270,23 +270,32 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    6. Mark status: ✅ Working | ⚠️ Needs Fix | ❌ Blocked
    
    **Also add metadata to already-moved files**:
-   - [ ] Add metadata header to `00-hello-world.lua`
-   - [ ] Add metadata header to `comprehensive-demo.lua`
-   - [ ] Add metadata header to `provider-info.lua`
-   - [ ] Add metadata header to `streaming-responses.lua`
-   - [ ] Add metadata header to `multimodal.lua`
+   - [x] Add metadata header to `00-hello-world.lua` ✅
+   - [x] Add metadata header to `comprehensive-demo.lua` ✅
+   - [x] Add metadata header to `provider-info.lua` ✅
+   - [x] Add metadata header to `streaming-responses.lua` ✅
+   - [x] Add metadata header to `multimodal.lua` ✅
+   - [x] Add metadata header to `debug-globals.lua` ✅
+   
+   **Key Changes Made During Group A Migration**:
+   - [x] Updated all Agent.create() calls to use Agent.builder() API
+   - [x] Fixed unique naming issues in benchmark tests
+   - [x] Added comprehensive metadata headers per STANDARDS.md
+   - [x] Tested each file in new location to ensure functionality
+   - [x] Verified proper categorization (features vs getting-started vs tests)
+   - [x] All files working and producing expected output
    
    **Migration Groups** (based on testing requirements):
    
-   - [ ] **Group A: No Dependencies** (8 files - migrate first):
-     - [ ] `debug_globals.lua` → script-users/features/
-     - [ ] `agent-async-example.lua` → script-users/features/
-     - [ ] `agent-processor.lua` → script-users/features/
-     - [ ] `agent-simple-demo.lua` → script-users/getting-started/
-     - [ ] `tools-filesystem.lua` → script-users/features/
-     - [ ] `tools-utility.lua` → script-users/features/
-     - [ ] `basic_operations.lua` → script-users/features/
-     - [ ] `agent-simple-benchmark.lua` → tests-as-examples/benchmarks/
+   - [x] **Group A: No Dependencies** (8 files - migrate first) ✅ COMPLETED:
+     - [x] `debug_globals.lua` → script-users/features/debug-globals.lua ✅
+     - [x] `agent-async-example.lua` → script-users/features/agent-creation.lua ✅
+     - [x] `agent-processor.lua` → script-users/features/agent-data-processor.lua ✅
+     - [x] `agent-simple-demo.lua` → script-users/getting-started/01-agent-basics.lua ✅
+     - [x] `tools-filesystem.lua` → script-users/features/filesystem-tools.lua ✅
+     - [x] `tools-utility.lua` → script-users/features/utility-tools.lua ✅
+     - [x] `basic_operations.lua` → script-users/features/state-persistence-basics.lua ✅
+     - [x] `agent-simple-benchmark.lua` → tests-as-examples/benchmarks/agent-performance.lua ✅
    
    - [ ] **Group B: Config Required** (7 files):
      - [ ] Move all .toml files from examples/configs/ → script-users/configs/

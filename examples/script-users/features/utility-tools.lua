@@ -1,12 +1,12 @@
--- tools-utility.lua
--- Examples for utility tools (refactored with llmspell-utils)
--- Using direct Tool API
--- NOTE: All utility tools have been migrated to use 'input' parameter in v0.3.0:
--- ✅ HashCalculatorTool: 'data' → 'input'
--- ✅ TextManipulatorTool: 'text' → 'input'
--- ✅ CalculatorTool: 'expression' → 'input'
--- ✅ TemplateEngineTool: 'template' → 'input'
--- ✅ DataValidationTool: 'data' → 'input'
+-- Example: Utility Tools
+-- Purpose: Comprehensive demonstration of utility tools (UUID, Base64, hashing, text manipulation, calculator, etc.)
+-- Prerequisites: None (all utilities work locally)
+-- Expected Output: Various utility operations including encoding, hashing, calculations, and data validation
+-- Version: 0.7.0
+-- Tags: features, tools, utilities, no-dependencies
+
+-- ABOUTME: Examples for utility tools (refactored with llmspell-utils)
+-- ABOUTME: Using direct Tool API for UUID, encoding, hashing, text ops, calculations, and validation
 
 print("🔧 Utility Tools Examples")
 print("=========================")

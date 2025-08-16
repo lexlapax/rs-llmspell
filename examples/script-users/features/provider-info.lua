@@ -1,3 +1,10 @@
+-- Example: Provider Information
+-- Purpose: Demonstrates Provider API for querying LLM provider capabilities
+-- Prerequisites: Optional - provider config file with API keys for full info
+-- Expected Output: Lists available providers and their capabilities
+-- Version: 0.7.0
+-- Tags: features, providers, configuration
+
 -- provider-info.lua
 -- Demonstrates provider API usage (Phase 1 - listing providers)
 

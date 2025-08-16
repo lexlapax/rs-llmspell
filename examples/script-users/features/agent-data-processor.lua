@@ -1,18 +1,22 @@
+-- Example: Agent Data Processor
+-- Purpose: Demonstrates intelligent data processing, transformation, and analysis using LLM agents
+-- Prerequisites: OpenAI API key (OPENAI_API_KEY)
+-- Expected Output: Data analysis, transformations, cleaning, and statistical insights
+-- Version: 0.7.0
+-- Tags: features, agents, data-processing, api-required
+
 -- ABOUTME: Agent data processor example demonstrating ETL and data transformation
 -- ABOUTME: Shows how agents can process, transform, and analyze complex data
-
--- Agent Data Processor Example
--- Demonstrates intelligent data processing, transformation, and analysis
 
 print("=== Agent Data Processor Example ===\n")
 
 -- Create a data processing agent directly
 print("Creating data processor agent...")
 local success, processor = pcall(function()
-    return Agent.create({
-        name = "data_processor",
-        model = "openai/gpt-4o-mini",
-        system_prompt = [[
+    return Agent.builder()
+        :name("data_processor")
+        :model("openai/gpt-4o-mini")
+        :system_prompt([[
 You are a data processing expert. You excel at:
 1. Extracting insights from raw data
 2. Transforming data between formats
@@ -21,10 +25,10 @@ You are a data processing expert. You excel at:
 5. Optimizing data structures
 
 Always ensure data quality and provide clear transformations.
-]],
-        temperature = 0.3,
-        max_tokens = 500
-    })
+]])
+        :temperature(0.3)
+        :max_tokens(500)
+        :build()
 end)
 
 if not success or not processor then

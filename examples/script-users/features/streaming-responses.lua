@@ -1,3 +1,10 @@
+-- Example: Streaming Responses
+-- Purpose: Demonstrates streaming response handling and coroutine-based streaming
+-- Prerequisites: None
+-- Expected Output: Shows stream processing with 5 chunks
+-- Version: 0.7.0
+-- Tags: features, streaming, coroutines, no-dependencies
+
 -- streaming-demo.lua
 -- Demonstrates streaming capabilities (Phase 1 - placeholder implementation)
 

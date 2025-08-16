@@ -1,3 +1,10 @@
+-- Example: Multimodal Support Stub
+-- Purpose: Demonstrates multimodal type structures and validation (stub implementation)
+-- Prerequisites: None
+-- Expected Output: Shows media types, size validation, and future API preview
+-- Version: 0.7.0
+-- Tags: features, multimodal, stub, no-dependencies
+
 -- multimodal-stub.lua
 -- Demonstrates multimodal type structures (Phase 1 - Types only, no actual processing)
 -- Full multimodal support coming in later phases

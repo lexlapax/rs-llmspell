@@ -1,18 +1,25 @@
--- Example: Using Agent.create for synchronous agent creation
--- This example demonstrates how to create and use agents in Lua scripts
+-- Example: Agent Creation and Basic Usage
+-- Purpose: Demonstrates how to create and use agents with different providers
+-- Prerequisites: API keys for providers (OPENAI_API_KEY, ANTHROPIC_API_KEY)
+-- Expected Output: Shows agent creation, invocation, and listing
+-- Version: 0.7.0
+-- Tags: features, agents, api-required
+
+-- ABOUTME: Demonstrates creating and using agents with various providers
+-- ABOUTME: Shows synchronous agent API with error handling
 
 print("=== Agent Synchronous Example ===\n")
 
--- 1. Create an agent using Agent.create
+-- 1. Create an agent using Agent.builder
 print("1. Creating a conversational agent...")
 local success, agent = pcall(function()
-    return Agent.create({
-        name = "assistant",
-        model = "openai/gpt-3.5-turbo",  -- Format: provider/model
-        system_prompt = "You are a helpful AI assistant. Be concise and friendly.",
-        temperature = 0.7,
-        max_tokens = 150
-    })
+    return Agent.builder()
+        :name("assistant")
+        :model("openai/gpt-3.5-turbo")  -- Format: provider/model
+        :system_prompt("You are a helpful AI assistant. Be concise and friendly.")
+        :temperature(0.7)
+        :max_tokens(150)
+        :build()
 end)
 if success and agent then
     print("   ✓ Agent created: " .. type(agent))
@@ -37,13 +44,13 @@ end
 -- 3. Create a specialized agent
 print("\n3. Creating a code expert agent...")
 local success3, codeAgent = pcall(function()
-    return Agent.create({
-        name = "code-expert",
-        model = "openai/gpt-3.5-turbo",
-        system_prompt = "You are a programming expert. Provide code examples when appropriate. Be concise.",
-        temperature = 0.3,  -- Lower temperature for more focused responses
-        max_tokens = 200
-    })
+    return Agent.builder()
+        :name("code-expert")
+        :model("openai/gpt-3.5-turbo")
+        :system_prompt("You are a programming expert. Provide code examples when appropriate. Be concise.")
+        :temperature(0.3)  -- Lower temperature for more focused responses
+        :max_tokens(200)
+        :build()
 end)
 
 if success3 and codeAgent then
@@ -74,12 +81,12 @@ local providers = {
 
 for i, config in ipairs(providers) do
     local success, agent = pcall(function()
-        return Agent.create({
-            name = config.provider .. "-agent-" .. i,
-            model = config.provider .. "/" .. config.model,
-            system_prompt = "You are a helpful assistant.",
-            temperature = 0.7
-        })
+        return Agent.builder()
+            :name(config.provider .. "-agent-" .. i)
+            :model(config.provider .. "/" .. config.model)
+            :system_prompt("You are a helpful assistant.")
+            :temperature(0.7)
+            :build()
     end)
     
     if success and agent then
@@ -100,7 +107,7 @@ end
 print("\n=== Example Complete ===")
 
 -- Important notes:
--- 1. Agent.create() is now synchronous - no coroutines needed
+-- 1. Agent.builder() creates agents synchronously - no coroutines needed
 -- 2. All agent methods like invoke() are synchronous
 -- 3. Set appropriate API keys in environment variables:
 --    - OPENAI_API_KEY for OpenAI

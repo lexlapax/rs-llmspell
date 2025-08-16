@@ -1,3 +1,10 @@
+-- Example: Comprehensive LLMSpell Demo
+-- Purpose: Demonstrates core LLMSpell functionality without requiring LLM providers
+-- Prerequisites: None (works without API keys)
+-- Expected Output: Shows tools, agent system, JSON ops, and tool inventory
+-- Version: 0.7.0
+-- Tags: features, demo, tools, no-dependencies
+
 -- LLMSpell Demo - Core Functionality
 -- This demo shows working features of LLMSpell without requiring LLM configuration
 
