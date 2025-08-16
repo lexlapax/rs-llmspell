@@ -706,8 +706,8 @@ impl UserData for WorkflowBuilder {
                     bridge
                         .create_workflow(workflow_type, config)
                         .await
-                        .map(|_| WorkflowInstance {
-                            workflow_id: workflow_name_clone.clone(),
+                        .map(|workflow_id| WorkflowInstance {
+                            workflow_id: workflow_id.clone(),
                             bridge: bridge.clone(),
                             name: workflow_name_clone,
                             workflow_type: workflow_type_clone,

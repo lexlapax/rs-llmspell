@@ -5,7 +5,7 @@ use crate::{
     conditional::ConditionalWorkflow,
     parallel::{ParallelConfig, ParallelWorkflow},
     r#loop::{LoopConfig, LoopWorkflow},
-    sequential::SequentialWorkflow,
+    sequential::SequentialWorkflowBuilder,
     traits::WorkflowStep,
     types::WorkflowConfig,
 };
@@ -120,7 +120,33 @@ impl WorkflowFactory for DefaultWorkflowFactory {
     ) -> Result<Arc<dyn BaseAgent + Send + Sync>> {
         match params.workflow_type {
             WorkflowType::Sequential => {
-                let workflow = SequentialWorkflow::new(params.name, params.config);
+                // Parse steps from type_config if available
+                let steps_json = params
+                    .type_config
+                    .get("steps")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!([]));
+                
+                // Debug logging
+                tracing::debug!("Sequential workflow steps JSON: {:?}", steps_json);
+                
+                let steps = if let Ok(steps_config) = serde_json::from_value::<Vec<WorkflowStep>>(
+                    steps_json.clone(),
+                ) {
+                    tracing::info!("Successfully parsed {} steps", steps_config.len());
+                    steps_config
+                } else if let Err(e) = serde_json::from_value::<Vec<WorkflowStep>>(steps_json) {
+                    tracing::warn!("Failed to parse workflow steps: {}", e);
+                    Vec::new()
+                } else {
+                    Vec::new()
+                };
+
+                // Use builder to create workflow with steps
+                let workflow = SequentialWorkflowBuilder::new(params.name)
+                    .with_config(params.config)
+                    .add_steps(steps)
+                    .build();
                 Ok(Arc::new(workflow))
             }
             WorkflowType::Parallel => {

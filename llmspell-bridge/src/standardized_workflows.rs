@@ -65,8 +65,14 @@ impl StandardizedWorkflowFactory {
         // Extract type-specific configuration
         let type_config = match workflow_type {
             "sequential" => {
-                // Sequential doesn't need special config beyond steps
-                serde_json::json!({})
+                // Sequential needs steps passed in type_config for the factory
+                let steps = params
+                    .get("steps")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!([]));
+                serde_json::json!({
+                    "steps": steps
+                })
             }
             "parallel" => {
                 serde_json::json!({

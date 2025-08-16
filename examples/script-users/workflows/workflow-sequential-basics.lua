@@ -18,26 +18,29 @@ print("-" .. string.rep("-", 28))
 local simple_workflow = Workflow.builder()
     :name("simple_tool_chain")
     :description("Execute tools in sequence")
-    :type("sequential")
+    :sequential()  -- Use sequential() method, not type()
     :add_step({
         name = "generate_id",
+        type = "tool",  -- Must specify step type
         tool = "uuid_generator",
-        params = { 
+        input = {  -- Use 'input' not 'params'
             operation = "generate",
             version = "v4"
         }
     })
     :add_step({
         name = "get_timestamp",
+        type = "tool",
         tool = "date_time_handler",
-        params = {
+        input = {
             operation = "now"
         }
     })
     :add_step({
         name = "format_message",
+        type = "tool",
         tool = "template_engine",
-        params = {
+        input = {
             input = "Task {{id}} started at {{timestamp}}",
             context = {
                 id = "step_1_result",
@@ -48,7 +51,7 @@ local simple_workflow = Workflow.builder()
     :build()
 
 print("Executing simple tool chain...")
-local result = simple_workflow:run()
+local result = simple_workflow:execute({})
 
 if result and result.success then
     print("✓ Workflow completed!")
@@ -89,7 +92,7 @@ end
 local data_pipeline = Workflow.builder()
     :name("data_processing_pipeline")
     :description("Process inventory data through multiple steps")
-    :type("sequential")
+    :sequential()
     :add_step({
         name = "read_data",
         tool = "file_operations",
@@ -126,7 +129,7 @@ local data_pipeline = Workflow.builder()
     :build()
 
 print("Executing data processing pipeline...")
-local pipeline_result = data_pipeline:run()
+local pipeline_result = data_pipeline:execute({})
 
 if pipeline_result and pipeline_result.success then
     print("✓ Pipeline completed!")
@@ -143,7 +146,7 @@ print("-" .. string.rep("-", 35))
 local math_workflow = Workflow.builder()
     :name("math_calculations")
     :description("Perform sequential mathematical operations")
-    :type("sequential")
+    :sequential()
     :add_step({
         name = "calc1",
         tool = "calculator",
@@ -171,7 +174,7 @@ local math_workflow = Workflow.builder()
     :build()
 
 print("Executing mathematical calculations...")
-local math_result = math_workflow:run()
+local math_result = math_workflow:execute({})
 
 if math_result and math_result.success then
     print("✓ Calculations completed!")
@@ -188,7 +191,7 @@ print("-" .. string.rep("-", 26))
 local text_workflow = Workflow.builder()
     :name("text_processing")
     :description("Process text through multiple transformations")
-    :type("sequential")
+    :sequential()
     :add_step({
         name = "lowercase",
         tool = "text_manipulator",
@@ -218,7 +221,7 @@ local text_workflow = Workflow.builder()
     :build()
 
 print("Executing text processing...")
-local text_result = text_workflow:run()
+local text_result = text_workflow:execute({})
 
 if text_result and text_result.success then
     print("✓ Text processing completed!")

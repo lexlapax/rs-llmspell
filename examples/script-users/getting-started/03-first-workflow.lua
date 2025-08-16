@@ -7,130 +7,122 @@ print("=== LLMSpell: Your First Workflow ===")
 print("This example shows how to create a workflow that chains multiple steps!")
 print()
 
--- Check providers first
-local providers = Provider.list()
-if #providers == 0 then
-    print("❌ No providers configured. Please check your configuration.")
-    return
-end
-
-print("1. Creating a multi-step workflow...")
+print("1. Creating a simple multi-step workflow...")
 print("   This workflow will:")
-print("   - Create a text file")
-print("   - Ask an agent to analyze it")
-print("   - Save the analysis to another file")
+print("   - Generate a unique ID")
+print("   - Get current timestamp")
+print("   - Calculate a hash")
+print("   - Create a summary file")
 
--- Create a sequential workflow
-local workflow_result = Workflow.sequential({
-    name = "first_workflow",
-    description = "My first workflow example"
-})
+-- Create a sequential workflow using the builder pattern
+-- The builder API allows method chaining for configuration
+local workflow = Workflow.builder()
+    :name("first_workflow")
+    :description("My first workflow example")
+    :sequential()  -- Sets the workflow type to sequential
+    :add_step({
+        name = "generate_id",
+        type = "tool",  -- Step type must be specified
+        tool = "uuid_generator",  -- Tool to invoke
+        input = {  -- Parameters for the tool
+            operation = "generate",
+            version = "v4"
+        }
+    })
+    :add_step({
+        name = "get_timestamp",
+        type = "tool",
+        tool = "date_time_handler",
+        input = {
+            operation = "now"
+        }
+    })
+    :add_step({
+        name = "calculate_hash",
+        type = "tool",
+        tool = "hash_calculator",
+        input = {
+            operation = "hash",
+            algorithm = "sha256",
+            input = "workflow_started"
+        }
+    })
+    :add_step({
+        name = "create_summary",
+        type = "tool",
+        tool = "file_operations",
+        input = {
+            operation = "write",
+            path = "/tmp/workflow_summary.txt",
+            input = "Workflow execution summary created by first_workflow"
+        }
+    })
+    :build()
 
-if not workflow_result.success then
-    print("❌ Error creating workflow: " .. (workflow_result.error or "Unknown error"))
+if not workflow then
+    print("❌ Error creating workflow")
     return
 end
 
-local workflow = workflow_result.result
-print("✅ Workflow created successfully!")
+print("✅ Workflow created with 4 steps!")
+print("   Workflow ID: " .. (workflow.id or "unknown"))
+print("   Workflow name: " .. (workflow.name or "unknown"))
+print("   Workflow type: " .. (workflow.type or "unknown"))
 
 print()
-print("2. Adding workflow steps...")
+print("2. Executing the workflow...")
 
--- Step 1: Create a test file
-local step1_result = workflow:add_step({
-    name = "create_file",
-    type = "tool",
-    tool_name = "file_operations",
-    parameters = {
-        operation = "write",
-        path = "/tmp/story.txt",
-        content = "Once upon a time, in a digital realm called LLMSpell, brave developers learned to command AI agents with the power of scripts."
-    }
-})
+-- Execute the workflow (workflows use execute() method, not run())
+local success, execution_result = pcall(function()
+    return workflow:execute({})  -- Pass empty table as input
+end)
 
--- Step 2: Create an agent to analyze the file
-local step2_result = workflow:add_step({
-    name = "create_agent",
-    type = "agent_creation",
-    provider = providers[1],
-    system_prompt = "You are a literary analyst. Analyze text files and provide brief insights."
-})
-
--- Step 3: Use the agent to analyze the story
-local step3_result = workflow:add_step({
-    name = "analyze_story",
-    type = "agent_invoke",
-    agent_step = "create_agent",
-    prompt = "Please analyze the story in /tmp/story.txt. Read it first using file operations, then provide a brief analysis."
-})
-
--- Step 4: Save the analysis
-local step4_result = workflow:add_step({
-    name = "save_analysis",
-    type = "tool",
-    tool_name = "file_operations",
-    parameters = {
-        operation = "write",
-        path = "/tmp/analysis.txt",
-        content = "{{analyze_story.result.content}}"  -- Reference previous step output
-    }
-})
-
-if step1_result.success and step2_result.success and step3_result.success and step4_result.success then
-    print("✅ All 4 workflow steps added successfully!")
-else
-    print("❌ Error adding workflow steps")
-    return
-end
-
-print()
-print("3. Executing the workflow...")
-local execution_result = workflow:execute()
-
-if execution_result.success then
+if success and execution_result then
     print("✅ Workflow executed successfully!")
     print("📊 Execution summary:")
     
-    -- Check if files were created
-    local story_check = Tool.invoke("file_operations", {
-        operation = "exists",
-        path = "/tmp/story.txt"
-    })
-    
-    local analysis_check = Tool.invoke("file_operations", {
-        operation = "exists", 
-        path = "/tmp/analysis.txt"
-    })
-    
-    if story_check.success and story_check.result.exists then
-        print("   ✅ Story file created: /tmp/story.txt")
+    -- Display execution results
+    if type(execution_result) == "table" then
+        for k, v in pairs(execution_result) do
+            local value_str = type(v) == "table" and "[table]" or tostring(v)
+            print("   " .. k .. ": " .. value_str)
+        end
     end
     
-    if analysis_check.success and analysis_check.result.exists then
-        print("   ✅ Analysis file created: /tmp/analysis.txt")
+    -- Check if the summary file was created
+    local file_check = Tool.invoke("file_operations", {
+        operation = "exists",
+        path = "/tmp/workflow_summary.txt"
+    })
+    
+    if file_check and file_check.text then
+        print("   ✅ Summary file created: /tmp/workflow_summary.txt")
         
-        -- Show a snippet of the analysis
-        local analysis_content = Tool.invoke("file_operations", {
+        -- Read and display the summary
+        local file_content = Tool.invoke("file_operations", {
             operation = "read",
-            path = "/tmp/analysis.txt"
+            path = "/tmp/workflow_summary.txt"
         })
         
-        if analysis_content.success then
-            local content = analysis_content.result.content
-            local snippet = string.sub(content, 1, 100) .. (string.len(content) > 100 and "..." or "")
-            print("   📝 Analysis preview: " .. snippet)
+        if file_content and file_content.text then
+            print("   📝 File content: " .. file_content.text)
         end
     end
 else
-    print("❌ Workflow execution failed: " .. (execution_result.error or "Unknown error"))
+    print("❌ Workflow execution failed: " .. tostring(execution_result))
 end
 
 print()
 print("🎉 Congratulations! You've successfully:")
-print("   - Created a sequential workflow")
-print("   - Added multiple steps (tool + agent)")
+print("   - Created a sequential workflow using builder pattern")
+print("   - Added multiple tool steps")
 print("   - Executed a complete workflow")
-print("   - Chained operations together")
+print("   - Chained tool operations together")
+print()
+print("💡 Key concepts learned:")
+print("   - Workflows automate multi-step processes")
+print("   - Sequential workflows execute steps in order")
+print("   - The builder pattern provides a fluent API")
+print("   - Each step can be a tool, agent, or custom function")
 print()
 print("Next: Try 04-save-state.lua to learn about state persistence!")
