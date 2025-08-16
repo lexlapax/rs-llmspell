@@ -1,738 +1,641 @@
-# Real-World Applications: Architectural Blueprints
+# llmspell Real-World Applications Blueprint v2.0
 
 ## Executive Summary
 
-This document presents comprehensive architectural blueprints for 7 real-world applications as part of Task 7.3.6. These applications demonstrate production-ready patterns using llmspell's capabilities.
+This blueprint defines 7 production-ready applications demonstrating llmspell's full capabilities. Each application uses proper component composition with minimal Lua code, preparing for future config-driven architecture.
+
+## Critical Requirements
+
+### 1. REAL LLM APIs ONLY - NO MOCKS
+- **Mandatory**: OpenAI or Anthropic API keys required
+- **Production**: These are real applications with real costs
+- **Environment**: Set `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY`
+- **Cost Warning**: Each execution incurs API charges
+
+### 2. Component Usage Principles
+
+| Component | Purpose | When to Use |
+|-----------|---------|-------------|
+| **Workflow + Tools** | Deterministic operations | Data processing, file operations, calculations |
+| **Agent + Tools** | Intelligent operations | Analysis, generation, decision-making |
+| **Sequential Workflow** | Step-by-step processing | Pipelines, ordered operations |
+| **Parallel Workflow** | Concurrent operations | Batch processing, multi-source aggregation |
+| **Conditional Workflow** | Branching logic | Decision trees, error handling |
+| **Loop Workflow** | Iterative processing | Batch operations, retries |
+| **State** | Persistence | Checkpointing, recovery, session data |
+| **Events** | Real-time monitoring | System events, notifications |
+| **Hooks** | Middleware | Rate limiting, logging, validation |
+
+### 3. Architecture Philosophy
+- **Minimal Lua**: Only orchestration logic, no business logic
+- **Maximum Composition**: Combine existing components
+- **Config-Ready**: Structure allows future TOML-only implementation
+- **Production-Grade**: Error handling, monitoring, persistence
+
+---
+
+## Application Architectures
+
+### 1. Customer Support System
+
+**Purpose**: Intelligent ticket routing and response generation with escalation
+
+**Component Architecture**:
+```yaml
+Main Workflow (Conditional):
+  Step 1: Load ticket (Tool: file_operations)
+  Step 2: Analyze ticket (Agent: classifier + sentiment_analyzer)
+  Step 3: Route decision (Conditional):
+    If urgent: Parallel Workflow
+      - Generate response (Agent: response_generator)
+      - Notify supervisor (Tool: webhook_caller)
+    Else: Sequential Workflow
+      - Generate response (Agent: response_generator)
+      - Save to queue (Tool: database_connector)
+  Step 4: Send response (Tool: email_sender)
+  Step 5: Update state (State: ticket_history)
+```
+
+**Agents**:
+- **ticket_classifier**: GPT-4, categorizes and prioritizes
+- **sentiment_analyzer**: GPT-3.5-turbo, detects escalation needs
+- **response_generator**: GPT-4, creates customer responses
+
+**Workflows**:
+- **Main**: Conditional workflow for routing logic
+- **Urgent Handler**: Parallel workflow for priority cases
+- **Standard Handler**: Sequential workflow for normal tickets
+
+**Tools Used**:
+- `email_sender`: Send responses
+- `database_connector`: Ticket storage
+- `webhook_caller`: Supervisor notifications
+- `file_operations`: Load ticket data
+
+**State Management**:
+- Ticket history persistence
+- Response templates caching
+- Customer context storage
+
+### 2. Data Pipeline
+
+**Purpose**: Production ETL with LLM-powered quality analysis and anomaly detection
+
+**Component Architecture**:
+```yaml
+Main Workflow (Sequential):
+  Step 1: Extract Phase (Parallel Workflow):
+    - Load from database (Tool: database_connector)
+    - Load from API (Tool: api_tester)
+    - Load from files (Tool: file_operations)
+  Step 2: Transform Phase (Loop Workflow):
+    For each batch:
+      - Validate data (Tool: json_processor)
+      - Clean data (Tool: text_manipulator)
+      - Enrich data (Agent: data_enricher)
+  Step 3: Analysis Phase (Parallel Workflow):
+    - Quality analysis (Agent: quality_analyzer)
+    - Anomaly detection (Agent: anomaly_detector)
+    - Pattern recognition (Agent: pattern_finder)
+  Step 4: Load Phase (Sequential):
+    - Save to database (Tool: database_connector)
+    - Generate report (Agent: report_generator)
+    - Send notifications (Tool: webhook_caller)
+```
+
+**Agents**:
+- **data_enricher**: GPT-3.5-turbo, adds contextual information
+- **quality_analyzer**: GPT-4, identifies data quality issues
+- **anomaly_detector**: GPT-4, finds outliers and anomalies
+- **pattern_finder**: Claude-3-haiku, discovers data patterns
+- **report_generator**: Claude-3-sonnet, creates insights report
+
+**Workflows**:
+- **Main Pipeline**: Sequential orchestration
+- **Extract Phase**: Parallel data loading
+- **Transform Loop**: Batch processing with Loop workflow
+- **Analysis Phase**: Parallel analysis workflows
+
+**Tools Used**:
+- `database_connector`: Data I/O
+- `api_tester`: API data fetching
+- `file_operations`: File handling
+- `json_processor`: JSON operations
+- `text_manipulator`: Data cleaning
+- `webhook_caller`: Notifications
+
+**State Management**:
+- Checkpoint after each phase
+- Batch processing state
+- Error recovery points
+
+### 3. Content Generation Platform
+
+**Purpose**: Multi-format content creation with SEO optimization and publishing
+
+**Component Architecture**:
+```yaml
+Main Workflow (Conditional):
+  Step 1: Content Planning (Sequential):
+    - Research topic (Agent: researcher)
+    - Generate outline (Agent: outliner)
+    - SEO analysis (Tool: web_search)
+  Step 2: Content Creation (Conditional):
+    If blog: Blog Workflow
+      - Write article (Agent: blog_writer)
+      - Add images (Tool: image_processor)
+    If social: Social Workflow
+      - Create posts (Agent: social_writer)
+      - Generate hashtags (Agent: hashtag_generator)
+    If email: Email Workflow
+      - Write newsletter (Agent: email_writer)
+      - Personalize content (Agent: personalizer)
+  Step 3: Optimization (Parallel):
+    - SEO optimize (Agent: seo_optimizer)
+    - Grammar check (Tool: text_manipulator)
+    - Plagiarism check (Tool: web_search)
+  Step 4: Publishing (Sequential):
+    - Format content (Tool: text_manipulator)
+    - Publish to CMS (Tool: api_tester)
+    - Track performance (State: content_metrics)
+```
+
+**Agents**:
+- **researcher**: GPT-4, deep topic research
+- **outliner**: GPT-4, content structure planning
+- **blog_writer**: Claude-3-opus, long-form content
+- **social_writer**: GPT-3.5-turbo, social media posts
+- **email_writer**: Claude-3-sonnet, newsletters
+- **seo_optimizer**: GPT-4, SEO improvements
+- **personalizer**: GPT-3.5-turbo, audience targeting
+
+**Workflows**:
+- **Main**: Conditional routing by content type
+- **Blog Workflow**: Sequential blog creation
+- **Social Workflow**: Parallel multi-platform posts
+- **Email Workflow**: Sequential newsletter creation
+- **Optimization**: Parallel quality checks
+
+**Tools Used**:
+- `web_search`: Research and plagiarism
+- `image_processor`: Visual content
+- `text_manipulator`: Formatting and grammar
+- `api_tester`: CMS publishing
+- `file_operations`: Content storage
+
+**State Management**:
+- Content drafts and versions
+- Publishing schedule
+- Performance metrics
+
+### 4. Code Review Assistant
+
+**Purpose**: Automated code review with security scanning and improvement suggestions
+
+**Component Architecture**:
+```yaml
+Main Workflow (Sequential):
+  Step 1: Code Analysis (Parallel):
+    - Load code files (Tool: file_operations)
+    - Parse structure (Tool: code_analyzer)
+    - Check syntax (Tool: syntax_validator)
+  Step 2: Review Process (Loop Workflow):
+    For each file:
+      Sub-workflow (Parallel):
+        - Security scan (Agent: security_reviewer)
+        - Code quality (Agent: quality_reviewer)
+        - Best practices (Agent: practices_reviewer)
+        - Performance check (Agent: performance_reviewer)
+  Step 3: Issue Aggregation (Sequential):
+    - Deduplicate findings (Tool: json_processor)
+    - Prioritize issues (Agent: issue_prioritizer)
+    - Generate fixes (Agent: fix_generator)
+  Step 4: Report Generation (Sequential):
+    - Create review report (Agent: report_writer)
+    - Generate PR comment (Tool: text_manipulator)
+    - Update tracking (State: review_history)
+```
+
+**Agents**:
+- **security_reviewer**: GPT-4, security vulnerability detection
+- **quality_reviewer**: Claude-3-sonnet, code quality analysis
+- **practices_reviewer**: GPT-4, best practices compliance
+- **performance_reviewer**: GPT-3.5-turbo, performance issues
+- **issue_prioritizer**: GPT-4, ranks issues by severity
+- **fix_generator**: Claude-3-opus, suggests code fixes
+- **report_writer**: GPT-4, comprehensive review report
+
+**Workflows**:
+- **Main**: Sequential review orchestration
+- **Code Analysis**: Parallel initial analysis
+- **File Review Loop**: Iterates through files
+- **Review Sub-workflow**: Parallel multi-aspect review
+
+**Tools Used**:
+- `file_operations`: Code file access
+- `code_analyzer`: AST parsing (custom tool)
+- `syntax_validator`: Syntax checking (custom tool)
+- `json_processor`: Finding aggregation
+- `text_manipulator`: Report formatting
+- `webhook_caller`: GitHub integration
+
+**State Management**:
+- Review history tracking
+- Issue pattern learning
+- Team preferences storage
+
+### 5. Document Intelligence System
+
+**Purpose**: Extract insights from documents with Q&A and knowledge management
+
+**Component Architecture**:
+```yaml
+Main Workflow (Sequential):
+  Step 1: Document Ingestion (Parallel):
+    - Load documents (Tool: file_operations)
+    - Extract text (Tool: pdf_processor)
+    - Parse metadata (Tool: json_processor)
+  Step 2: Processing Pipeline (Loop Workflow):
+    For each document:
+      - Chunk document (Tool: text_manipulator)
+      - Extract entities (Agent: entity_extractor)
+      - Identify topics (Agent: topic_analyzer)
+      - Generate summary (Agent: summarizer)
+  Step 3: Knowledge Building (Sequential):
+    - Create embeddings (Agent: embedding_generator)
+    - Build knowledge graph (Tool: graph_builder)
+    - Index for search (Tool: search_indexer)
+  Step 4: Q&A Interface (Conditional):
+    If question:
+      - Search knowledge (Tool: vector_search)
+      - Generate answer (Agent: qa_responder)
+      - Provide citations (Tool: citation_formatter)
+    If analysis:
+      - Compare documents (Agent: doc_comparer)
+      - Find patterns (Agent: pattern_analyzer)
+      - Generate insights (Agent: insight_generator)
+```
+
+**Agents**:
+- **entity_extractor**: GPT-4, named entity recognition
+- **topic_analyzer**: Claude-3-haiku, topic modeling
+- **summarizer**: Claude-3-sonnet, document summarization
+- **embedding_generator**: OpenAI-ada-002, vector embeddings
+- **qa_responder**: GPT-4, question answering
+- **doc_comparer**: Claude-3-opus, document comparison
+- **pattern_analyzer**: GPT-4, pattern discovery
+- **insight_generator**: Claude-3-opus, insight extraction
+
+**Workflows**:
+- **Main**: Sequential document processing
+- **Ingestion**: Parallel document loading
+- **Processing Loop**: Per-document processing
+- **Q&A Interface**: Conditional query handling
+
+**Tools Used**:
+- `file_operations`: Document access
+- `pdf_processor`: PDF extraction (custom tool)
+- `text_manipulator`: Chunking and formatting
+- `json_processor`: Metadata handling
+- `graph_builder`: Knowledge graph (custom tool)
+- `vector_search`: Similarity search (custom tool)
+- `citation_formatter`: Reference formatting (custom tool)
+
+**State Management**:
+- Document index persistence
+- Knowledge graph storage
+- Query history tracking
+
+### 6. Workflow Automation Hub
+
+**Purpose**: Visual workflow builder with complex automation capabilities
+
+**Component Architecture**:
+```yaml
+Main Workflow (Conditional):
+  Step 1: Workflow Definition (Sequential):
+    - Parse workflow spec (Tool: yaml_parser)
+    - Validate structure (Tool: schema_validator)
+    - Optimize execution plan (Agent: workflow_optimizer)
+  Step 2: Execution Engine (Conditional):
+    If simple: Sequential Execution
+      - Run steps in order
+    If complex: Dynamic Execution
+      Sub-workflow (Loop):
+        For each node:
+          If parallel: Spawn Parallel Workflow
+          If conditional: Evaluate Conditional Workflow
+          If loop: Create Loop Workflow
+          If agent: Execute Agent with tools
+  Step 3: Monitoring (Parallel):
+    - Track execution (Event: workflow_events)
+    - Log operations (Hook: logging_hook)
+    - Monitor resources (Tool: resource_monitor)
+  Step 4: Error Handling (Conditional):
+    If error:
+      - Capture context (State: error_context)
+      - Attempt recovery (Agent: error_resolver)
+      - Notify admin (Tool: webhook_caller)
+    Else:
+      - Save results (State: workflow_results)
+      - Trigger next workflow (Event: workflow_complete)
+```
+
+**Agents**:
+- **workflow_optimizer**: GPT-4, optimizes execution plan
+- **error_resolver**: Claude-3-sonnet, intelligent error recovery
+- **workflow_generator**: GPT-4, creates workflows from description
+- **dependency_analyzer**: GPT-3.5-turbo, analyzes step dependencies
+
+**Workflows**:
+- **Main Controller**: Conditional orchestration
+- **Sequential Execution**: Simple linear flows
+- **Dynamic Execution**: Complex nested workflows
+- **Parallel Spawner**: Concurrent execution
+- **Error Handler**: Recovery workflows
+
+**Tools Used**:
+- `yaml_parser`: Workflow spec parsing (custom tool)
+- `schema_validator`: Structure validation (custom tool)
+- `resource_monitor`: System monitoring (custom tool)
+- `webhook_caller`: External notifications
+- `database_connector`: Workflow storage
+
+**State Management**:
+- Workflow definitions
+- Execution history
+- Error recovery points
+
+**Event System**:
+- Workflow lifecycle events
+- Step completion tracking
+- Error event propagation
+
+**Hook System**:
+- Pre/post step hooks
+- Rate limiting hooks
+- Logging and metrics hooks
+
+### 7. AI Research Assistant
+
+**Purpose**: Academic research with paper analysis, synthesis, and knowledge extraction
+
+**Component Architecture**:
+```yaml
+Main Workflow (Sequential):
+  Step 1: Research Query (Sequential):
+    - Parse research question (Agent: query_parser)
+    - Expand search terms (Agent: term_expander)
+    - Search databases (Parallel):
+      - ArXiv search (Tool: web_search)
+      - Google Scholar (Tool: web_scraper)
+      - PubMed search (Tool: api_tester)
+  Step 2: Paper Processing (Loop Workflow):
+    For each paper:
+      Sub-workflow (Sequential):
+        - Download paper (Tool: file_operations)
+        - Extract text (Tool: pdf_processor)
+        - Analyze content (Parallel):
+          - Summarize (Agent: paper_summarizer)
+          - Extract methods (Agent: method_extractor)
+          - Identify findings (Agent: finding_extractor)
+          - Assess quality (Agent: quality_assessor)
+  Step 3: Synthesis (Sequential):
+    - Build knowledge graph (Tool: graph_builder)
+    - Find connections (Agent: connection_finder)
+    - Identify gaps (Agent: gap_analyzer)
+    - Generate review (Agent: review_writer)
+  Step 4: Output Generation (Parallel):
+    - Write literature review (Agent: literature_writer)
+    - Create bibliography (Tool: citation_formatter)
+    - Generate insights (Agent: insight_generator)
+    - Produce recommendations (Agent: recommendation_engine)
+```
+
+**Agents**:
+- **query_parser**: GPT-4, understands research questions
+- **term_expander**: GPT-3.5-turbo, expands search terms
+- **paper_summarizer**: Claude-3-sonnet, paper summarization
+- **method_extractor**: GPT-4, extracts methodologies
+- **finding_extractor**: GPT-4, identifies key findings
+- **quality_assessor**: Claude-3-opus, assesses paper quality
+- **connection_finder**: GPT-4, finds paper relationships
+- **gap_analyzer**: Claude-3-opus, identifies research gaps
+- **review_writer**: Claude-3-opus, writes literature reviews
+- **insight_generator**: GPT-4, generates research insights
+- **recommendation_engine**: GPT-4, suggests future research
+
+**Workflows**:
+- **Main Research**: Sequential orchestration
+- **Database Search**: Parallel multi-source search
+- **Paper Processing Loop**: Iterative paper analysis
+- **Analysis Sub-workflow**: Parallel content extraction
+- **Output Generation**: Parallel report creation
+
+**Tools Used**:
+- `web_search`: Academic database search
+- `web_scraper`: Paper metadata extraction
+- `api_tester`: Database API access
+- `file_operations`: Paper storage
+- `pdf_processor`: PDF text extraction
+- `graph_builder`: Knowledge graph construction
+- `citation_formatter`: Bibliography generation
+
+**State Management**:
+- Research session persistence
+- Paper analysis cache
+- Knowledge graph storage
+- Citation database
+
+---
 
 ## Implementation Strategy
 
-### Directory Structure Philosophy
+### Minimal Lua Approach
 
-The examples directory serves a clear learning progression:
-- **cookbook/** - Reusable patterns and techniques (educational recipes)
-- **advanced/** - Advanced feature demonstrations
-- **applications/** - Complete production-ready systems
+Each application follows this pattern:
 
-**Key Decision**: Create new production applications, NOT move existing files:
-- Preserves learning path integrity
-- Shows composition of patterns into real applications
-- Maintains separation between educational examples and production code
-
-### Application Structure
-
-Each application follows a consistent structure:
-```
-applications/
-├── [application-name]/
-│   ├── main.lua           # Main application entry point
-│   ├── config.lua         # Configuration management
-│   ├── lib/               # Application-specific modules
-│   │   ├── component1.lua
-│   │   ├── component2.lua
-│   │   └── component3.lua
-│   ├── tests/             # Application tests
-│   └── README.md          # Documentation and setup guide
-```
-
-### Pattern Reuse Strategy
-
-Applications reference and extend cookbook patterns rather than duplicating code:
 ```lua
--- Example: Extending cookbook patterns
-local cookbook_path = "../../cookbook/data-pipeline"
-local PipelinePatterns = require(cookbook_path)
+-- 1. Create agents (configuration)
+local agents = {
+    analyzer = Agent.builder():name("analyzer"):type("llm"):model("gpt-4"):build(),
+    generator = Agent.builder():name("generator"):type("llm"):model("claude-3"):build()
+}
 
--- Add production features
-local pipeline = PipelinePatterns.ETLPipeline:new()
-pipeline:add_monitoring(ProductionMonitoring.new())
-pipeline:add_recovery(FailureRecovery.new())
-```
-
-This demonstrates to users how to compose patterns into production systems.
-
-**Applications Overview:**
-
-**Build Upon Patterns (3 applications):**
-1. **AI Research Assistant** - NEW: Comprehensive research automation with knowledge synthesis
-2. **Data Pipeline** - BUILDS ON: cookbook/data-pipeline.lua patterns [✅ IMPLEMENTED]
-3. **Monitoring System** - BUILDS ON: advanced/agent-monitor.lua patterns
-
-**Create From Scratch (4 applications):**
-4. **Customer Support Bot** - Multi-channel customer service automation
-5. **Content Generation System** - Template-driven content creation at scale
-6. **Code Review Assistant** - Automated code analysis and improvement suggestions
-7. **Web Application Generation System** - Full-stack application generator
-
----
-
-## 1. AI Research Assistant
-
-### Architecture Overview
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Research      │    │   Knowledge     │    │   Output        │
-│   Orchestrator  │───▶│   Synthesis     │───▶│   Generation    │
-│   Agent         │    │   Agent         │    │   Agent         │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Data Sources  │    │   Knowledge     │    │   Citations &   │
-│   • Web Search  │    │   Base Storage  │    │   References    │
-│   • Documents   │    │   • Vector DB   │    │   • APA/MLA     │
-│   • APIs        │    │   • Cache       │    │   • Exports     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### Component Design
-
-**Research Orchestrator Agent:**
-- Query decomposition (complex → simple queries)
-- Source prioritization (academic > news > social)
-- Rate limiting & API management
-- Progress tracking & resumption
-
-**Knowledge Synthesis Agent:**
-- Fact verification across sources
-- Contradiction detection & resolution
-- Bias analysis & neutrality scoring
-- Evidence strength assessment
-
-**Output Generation Agent:**
-- Multi-format export (PDF, LaTeX, Markdown)
-- Citation management & validation
-- Executive summaries & abstracts
-- Visual timeline/graph generation
-
-### Data Flow
-1. **Input Processing**: Research query → decomposed sub-queries
-2. **Parallel Research**: Multiple agents gather from different sources
-3. **Quality Assessment**: Fact-checking, bias detection, reliability scoring
-4. **Synthesis**: Merge findings, resolve conflicts, build knowledge graph
-5. **Output**: Generate formatted report with citations
-
-### Production Features
-- **State Persistence**: Resume interrupted research sessions
-- **Rate Limiting**: Respect API limits across multiple sources
-- **Error Recovery**: Graceful handling of source failures
-- **Monitoring**: Research progress tracking & alerts
-
-### Implementation Plan
-```lua
--- Core components to implement:
--- 1. research-orchestrator.lua - Main coordination agent
--- 2. knowledge-synthesis.lua - Fact verification and merging
--- 3. output-generator.lua - Report generation with citations
--- 4. source-adapters.lua - Web search, document parsing, API access
--- 5. state-manager.lua - Session persistence and recovery
-```
-
----
-
-## 2. Production Data Pipeline
-
-### Architecture Overview (New application building on cookbook/data-pipeline.lua patterns)
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Ingestion     │    │   Processing    │    │   Output        │
-│   Layer         │───▶│   Engine        │───▶│   Layer         │
-│   • Sources     │    │   • ETL         │    │   • Sinks       │
-│   • Validation  │    │   • Stream      │    │   • Monitoring  │
-│   • Buffering   │    │   • Quality     │    │   • Alerting    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Monitoring    │    │   Failure       │    │   Performance   │
-│   Dashboard     │    │   Recovery      │    │   Optimization  │
-│   • Metrics     │    │   • Retry       │    │   • Caching     │
-│   • Alerts      │    │   • Dead Letter │    │   • Batching    │
-│   • Logs        │    │   • Rollback    │    │   • Scaling     │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### Enhanced Features (beyond existing)
-
-**Monitoring Hooks:**
-- Real-time metrics collection (throughput, latency, errors)
-- Custom metric definitions & alerting thresholds
-- Pipeline health dashboards
-- SLA monitoring & breach notifications
-
-**Failure Recovery:**
-- Dead letter queues for failed records
-- Automatic retry with exponential backoff
-- Circuit breakers for failing downstream systems
-- Transaction rollback & recovery procedures
-
-**Performance Tuning:**
-- Dynamic batching based on throughput
-- Intelligent caching strategies
-- Resource utilization optimization
-- Auto-scaling based on queue depth
-
-### Production Architecture
-- **Horizontal Scaling**: Multiple pipeline instances with load balancing
-- **Data Partitioning**: Intelligent data distribution strategies
-- **State Management**: Exactly-once processing guarantees
-- **Ops Integration**: Prometheus metrics, Grafana dashboards, PagerDuty alerts
-
-### Implementation Details
-```lua
--- New production application structure:
--- main.lua                 # Full production pipeline (COMPLETED ✅)
--- lib/monitoring-hooks.lua # Real-time metrics and alerting
--- lib/failure-recovery.lua # DLQ and checkpoint management  
--- lib/performance-tuner.lua # Dynamic batching and scaling
--- config.lua              # Production configuration
--- README.md               # Setup and deployment guide
-```
-
-The application demonstrates:
-- Production monitoring with alerts
-- Dead letter queue processing
-- Checkpoint and recovery mechanisms
-- Auto-scaling based on load
-- Real-time metrics collection
-
-**LLM Enhancement Required**:
-```lua
--- Add these LLM agents to existing pipeline:
-1. Data Quality Agent - Analyze data quality issues with LLM
-2. Anomaly Detection Agent - Identify patterns and anomalies
-3. Report Generation Agent - Generate insights and summaries
-
--- Example integration:
-local quality_agent = Agent.builder()
-    :name("data_quality_analyzer")
-    :model("openai/gpt-4o-mini")
-    :temperature(0.3)
+-- 2. Build workflow (orchestration)
+local workflow = Workflow.builder()
+    :name("main_workflow")
+    :conditional()  -- or sequential, parallel, loop
+    :add_step({type="agent", agent=agents.analyzer})
+    :add_step({type="tool", tool="file_operations"})
     :build()
 
--- Use in pipeline processing:
-local quality_report = quality_agent:invoke({
-    text = "Analyze this data for quality issues: " .. json_data
-})
+-- 3. Execute (single call)
+local result = workflow:execute(input_data)
+
+-- 4. Handle output (minimal processing)
+State.save("app", "result", result)
 ```
 
----
+### Configuration Evolution Path
 
-## 3. Production Monitoring System
-
-### Architecture Overview (New application building on advanced/agent-monitor.lua patterns)
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Data          │    │   Analysis      │    │   Response      │
-│   Collection    │───▶│   Engine        │───▶│   Engine        │
-│   • System      │    │   • Anomaly     │    │   • Alerting    │
-│   • Application │    │   • Prediction  │    │   • Auto-heal   │
-│   • Network     │    │   • Correlation │    │   • Escalation  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Dashboard     │    │   Alerting      │    │   Automation    │
-│   • Real-time   │    │   Integration   │    │   • Self-heal   │
-│   • Historical  │    │   • PagerDuty   │    │   • Scaling     │
-│   • Custom      │    │   • Slack       │    │   • Remediation │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### Enhanced Features (beyond existing)
-
-**Alerting Integration:**
-- Multi-channel notifications (email, Slack, PagerDuty, SMS)
-- Intelligent alert routing based on severity & team
-- Alert correlation & deduplication
-- Escalation policies with time-based triggers
-
-**Dashboard Setup:**
-- Real-time system health visualization
-- Custom metric dashboards per team/service
-- Historical trend analysis & capacity planning
-- Mobile-responsive monitoring views
-
-**Advanced Analytics:**
-- Machine learning-based anomaly detection
-- Predictive failure analysis
-- Cross-service correlation analysis
-- Business impact assessment
-
-### Production Integration
-- **Multi-Environment**: Dev/staging/prod monitoring with environment-specific rules
-- **Service Discovery**: Automatic monitoring of new services
-- **Compliance**: Security monitoring, audit logs, compliance reports
-- **Cost Optimization**: Resource usage optimization recommendations
-
-### Implementation Details
+Current (Lua + Config):
 ```lua
--- New production application structure:
--- main.lua                 # Full monitoring system
--- lib/alert-manager.lua   # Multi-channel alert routing
--- lib/dashboard-builder.lua # Real-time dashboard generation
--- lib/anomaly-detector.lua # ML-based anomaly detection
--- lib/service-discovery.lua # Auto-discovery of services
--- config.lua              # Monitoring configuration
--- README.md               # Operations guide
+-- main.lua
+local config = Config.load("application.toml")
+local workflow = Workflow.from_config(config.workflow)
+workflow:execute(input)
 ```
 
-The application provides:
-- Multi-channel alerting (Slack, PagerDuty, email)
-- Real-time dashboards with custom metrics
-- Anomaly detection and prediction
-- Automatic service discovery
-- Compliance and audit logging
+Future (Pure Config):
+```toml
+# application.toml
+[workflow.main]
+type = "conditional"
+steps = [
+    {type = "agent", name = "analyzer", model = "gpt-4"},
+    {type = "tool", name = "file_operations", operation = "read"}
+]
+```
 
 ---
 
-## 4. Customer Support Bot
+## Testing Framework
 
-### Architecture Overview
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Channel       │    │   Conversation  │    │   Knowledge     │
-│   Adapters      │───▶│   Engine        │───▶│   Management    │
-│   • Chat        │    │   • Intent      │    │   • FAQ         │
-│   • Email       │    │   • Context     │    │   • Procedures  │
-│   • Voice       │    │   • Memory      │    │   • Policies    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Escalation    │    │   Quality       │    │   Analytics     │
-│   Management    │    │   Assurance     │    │   • Sentiment   │
-│   • Human       │    │   • Response    │    │   • CSAT        │
-│   • Specialist │    │   • Accuracy    │    │   • Trends      │
-│   • Manager     │    │   • Tone        │    │   • Insights    │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+### Test Categories by Application
 
-### Core Components
+| Application | Unit Tests | Integration Tests | E2E Tests |
+|-------------|-----------|------------------|-----------|
+| Customer Support | Agent creation, State ops | Workflow + Agents | Full ticket flow |
+| Data Pipeline | Tool operations, Validation | Pipeline stages | Complete ETL |
+| Content Platform | Text processing, SEO | Agent + Tools | Article generation |
+| Code Review | Parser, Security checks | Review workflow | PR analysis |
+| Document Intelligence | Chunking, Embeddings | Q&A flow | Document ingestion |
+| Workflow Hub | Parser, Validator | Nested workflows | Complex automation |
+| Research Assistant | Search, Citation | Paper analysis | Full research |
 
-**Multi-Channel Support:**
-- Unified conversation interface across channels
-- Channel-specific formatting & capabilities
-- Cross-channel conversation continuity
-- Rich media support (images, files, links)
+### Cost-Aware Testing
 
-**Context Persistence:**
-- Customer history & preferences
-- Previous conversation context
-- Product/service relationship mapping
-- Escalation history & patterns
-
-**Escalation Workflows:**
-- Intelligent human handoff triggers
-- Specialist routing based on issue type
-- Manager escalation for high-value customers
-- SLA monitoring & breach prevention
-
-### AI Capabilities
-- **Intent Recognition**: Understanding customer needs from natural language
-- **Sentiment Analysis**: Emotional state detection & appropriate response
-- **Solution Matching**: Dynamic solution recommendation from knowledge base
-- **Personalization**: Tailored responses based on customer profile
-
-### Implementation Structure
 ```lua
--- Core files to create:
--- 1. customer-support-bot.lua - Main bot orchestration
--- 2. channel-adapters.lua - Multi-channel integration
--- 3. conversation-engine.lua - Intent and context management
--- 4. knowledge-base.lua - FAQ and solution database
--- 5. escalation-manager.lua - Human handoff workflows
+-- Use cost limits in tests
+local test_config = {
+    max_cost = 0.10,  -- $0.10 per test run
+    use_cheaper_models = true,  -- gpt-3.5 instead of gpt-4
+    cache_responses = true  -- Cache for repeated tests
+}
 ```
 
 ---
 
-## 5. Content Generation System
+## Production Deployment
 
-### Architecture Overview
+### Resource Requirements
+
+| Application | Memory | CPU | Storage | API Calls/hour |
+|-------------|--------|-----|---------|----------------|
+| Customer Support | 512MB | 1 core | 10GB | 100-500 |
+| Data Pipeline | 2GB | 2 cores | 50GB | 200-1000 |
+| Content Platform | 1GB | 2 cores | 20GB | 50-200 |
+| Code Review | 1GB | 2 cores | 10GB | 100-300 |
+| Document Intelligence | 4GB | 4 cores | 100GB | 200-500 |
+| Workflow Hub | 512MB | 1 core | 5GB | 50-100 |
+| Research Assistant | 2GB | 2 cores | 50GB | 100-400 |
+
+### Monitoring Metrics
+
+```yaml
+Key Metrics:
+  - workflow_execution_time
+  - agent_response_latency
+  - tool_success_rate
+  - api_cost_per_execution
+  - error_recovery_rate
+  - state_operation_latency
+  - memory_usage
+  - concurrent_workflows
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Template      │    │   Generation    │    │   Quality       │
-│   Management    │───▶│   Engine        │───▶│   Assurance     │
-│   • Structure   │    │   • AI Writers  │    │   • Grammar     │
-│   • Variables  │    │   • Style       │    │   • Brand       │
-│   • Rules       │    │   • Tone        │    │   • Compliance  │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Batch         │    │   Workflow      │    │   Asset         │
-│   Processing    │    │   Management    │    │   Management    │
-│   • Campaigns   │    │   • Approval    │    │   • Images      │
-│   • A/B Tests   │    │   • Publishing  │    │   • Videos      │
-│   • Scheduling │    │   • Analytics   │    │   • Documents   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
 
-### Core Features
+### Cost Optimization Strategies
 
-**Template Management:**
-- Dynamic template creation with variables
-- Brand guidelines enforcement
-- Multi-format support (web, email, social, print)
-- Template versioning & rollback
+1. **Model Selection**: Use appropriate models for each task
+   - Simple classification: gpt-3.5-turbo
+   - Complex analysis: gpt-4
+   - Long-form generation: claude-3-opus
+   - Quick responses: claude-3-haiku
 
-**Quality Checks:**
-- Grammar & spelling validation
-- Brand voice consistency analysis
-- Legal/compliance scanning
-- Plagiarism detection & originality scoring
+2. **Caching**: Cache frequently used responses
+   - State-based caching for repeated queries
+   - Embedding cache for document search
+   - Result cache for deterministic operations
 
-**Batch Processing:**
-- Campaign generation (email series, social posts)
-- Personalization at scale
-- A/B testing content variations
-- Automated publishing workflows
-
-### Advanced Capabilities
-- **SEO Optimization**: Keyword integration, meta descriptions, readability
-- **Localization**: Multi-language content generation
-- **Performance Analytics**: Content engagement tracking
-- **Content Optimization**: AI-driven improvement suggestions
-
-### Implementation Structure
-```lua
--- Core files to create:
--- 1. content-generation-system.lua - Main orchestration
--- 2. template-manager.lua - Template handling and variables
--- 3. generation-engine.lua - AI content creation
--- 4. quality-checker.lua - Grammar, brand, compliance checks
--- 5. batch-processor.lua - Campaign and bulk generation
-```
+3. **Batching**: Process multiple items together
+   - Batch API calls when possible
+   - Aggregate similar requests
+   - Use parallel workflows for efficiency
 
 ---
 
-## 6. Code Review Assistant
+## Migration Path to Config-Only
 
-### Architecture Overview
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Git           │    │   Analysis      │    │   Suggestion    │
-│   Integration   │───▶│   Engine        │───▶│   Engine        │
-│   • PR Hooks    │    │   • Static      │    │   • Fixes       │
-│   • Diff Parse  │    │   • Security    │    │   • Optimizations│
-│   • Comments    │    │   • Quality     │    │   • Best Practices│
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Learning      │    │   Team          │    │   Metrics       │
-│   System        │    │   Integration   │    │   • Quality     │
-│   • Patterns    │    │   • Standards   │    │   • Velocity    │
-│   • History     │    │   • Preferences │    │   • Technical   │
-│   • Feedback    │    │   • Training    │    │   • Debt        │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
+### Phase 1: Current State (Minimal Lua)
+- Lua handles orchestration
+- Agents and tools configured in code
+- Workflows built programmatically
 
-### Analysis Capabilities
+### Phase 2: Hybrid Approach
+- Workflows defined in TOML
+- Lua loads and executes configs
+- Custom logic still in Lua
 
-**Git Integration:**
-- Automated PR analysis on submission
-- Incremental review for updated PRs
-- Historical code quality tracking
-- Blame analysis for recurring issues
-
-**PR Analysis:**
-- Code complexity analysis
-- Security vulnerability scanning
-- Performance impact assessment
-- Breaking change detection
-
-**Suggestion Generation:**
-- Automated fix suggestions with diffs
-- Performance optimization recommendations
-- Code style enforcement
-- Best practice guidance
-
-### Advanced Features
-- **Learning System**: Improves recommendations based on team feedback
-- **Custom Rules**: Team-specific coding standards & preferences
-- **Knowledge Sharing**: Automatic documentation of patterns & decisions
-- **Onboarding**: New developer guidance & mentoring
-
-### Implementation Structure
-```lua
--- Core files to create:
--- 1. code-review-assistant.lua - Main review orchestration
--- 2. git-integration.lua - PR hooks and diff parsing
--- 3. analysis-engine.lua - Static analysis and quality checks
--- 4. suggestion-generator.lua - Fix and optimization suggestions
--- 5. learning-system.lua - Pattern recognition and improvement
-```
-
----
-
-## 7. Web Application Generation System
-
-### Architecture Overview
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Requirements  │    │   Architecture  │    │   Code          │
-│   Analysis      │───▶│   Design        │───▶│   Generation    │
-│   • UX Goals    │    │   • Tech Stack  │    │   • Frontend    │
-│   • Features    │    │   • Database    │    │   • Backend     │
-│   • Constraints │    │   • APIs        │    │   • Integration │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Testing       │    │   Deployment    │    │   Monitoring    │
-│   • Unit        │    │   • CI/CD       │    │   • Performance │
-│   • Integration │    │   • Infrastructure│  │   • Errors      │
-│   • E2E         │    │   • Scaling     │    │   • Analytics   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-```
-
-### Generation Capabilities
-
-**UX Guidelines Generation:**
-- User journey mapping & optimization
-- Accessibility compliance (WCAG)
-- Responsive design patterns
-- Performance optimization guidelines
-
-**Frontend UI Generation:**
-- Component library creation
-- Responsive layouts & styling
-- Interactive prototypes
-- Design system integration
-
-**Backend Code Generation:**
-- RESTful API generation
-- Database schema creation
-- Authentication/authorization systems
-- Business logic implementation
-
-**Integration & Testing:**
-- API integration testing
-- End-to-end test scenarios
-- Performance testing suites
-- Security testing automation
-
-### Advanced Features
-- **Technology Recommendations**: Best stack selection based on requirements
-- **Performance Optimization**: Automated code optimization
-- **Security Integration**: Built-in security best practices
-- **Maintenance Planning**: Update strategies & monitoring setup
-
-### Implementation Structure
-```lua
--- Core files to create:
--- 1. web-app-generator.lua - Main generation orchestration
--- 2. requirements-analyzer.lua - Parse and understand requirements
--- 3. architecture-designer.lua - Tech stack and structure design
--- 4. code-generator.lua - Frontend and backend code generation
--- 5. test-generator.lua - Testing suite creation
--- 6. deployment-generator.lua - CI/CD and infrastructure setup
-```
-
----
-
-## Production Readiness Framework
-
-### Deployment Configurations
-- **Containerization**: Docker images with optimized layers
-- **Orchestration**: Kubernetes manifests with health checks
-- **Configuration Management**: Environment-specific configs
-- **Secret Management**: Secure credential handling
-
-### Monitoring Setup
-- **Application Metrics**: Custom business metrics
-- **Infrastructure Monitoring**: Resource utilization tracking
-- **Log Aggregation**: Centralized logging with search
-- **Alerting**: Intelligent notification routing
-
-### Scaling Considerations
-- **Horizontal Scaling**: Auto-scaling based on demand
-- **Database Scaling**: Read replicas, sharding strategies
-- **Caching**: Multi-layer caching (Redis, CDN)
-- **Load Balancing**: Traffic distribution & failover
-
-### Operational Runbooks
-- **Incident Response**: Step-by-step troubleshooting guides
-- **Maintenance Procedures**: Update & deployment processes
-- **Disaster Recovery**: Backup & restore procedures
-- **Performance Tuning**: Optimization playbooks
-
----
-
-## Implementation Roadmap
-
-### Prerequisites
-- **API Keys Setup** (BEFORE starting any implementation):
-  ```bash
-  export OPENAI_API_KEY="sk-..."
-  export ANTHROPIC_API_KEY="sk-ant-..."
-  export GITHUB_TOKEN="ghp_..."
-  ```
-- Verify API keys work with simple test scripts
-- Set up cost monitoring and alerts
-
-### Phase 1: Foundation & LLM Integration (Week 1)
-- [x] Data Pipeline base implementation (DONE)
-- [ ] Add 3 LLM agents to Data Pipeline (quality, anomaly, reporting)
-- [ ] Monitoring System with 4 LLM agents
-- [ ] Verify real API integration works
-- [ ] Set up rate limiting infrastructure
-
-### Phase 2: Core Applications with LLMs (Week 2)
-- [ ] AI Research Assistant with 3+ agents (research, synthesis, output)
-- [ ] Customer Support Bot with 4+ agents (conversation, knowledge, escalation, sentiment)
-- [ ] Test multi-agent coordination
-- [ ] Implement conversation memory
-
-### Phase 3: Generation Systems with LLMs (Week 3)
-- [ ] Content Generation with 4+ agents (creation, quality, SEO, localization)
-- [ ] Code Review Assistant with 4+ agents (analysis, security, performance, practices)
-- [ ] Implement quality validation loops
-- [ ] Add feedback mechanisms
-
-### Phase 4: Advanced System (Week 4)
-- [ ] Web App Generator with 5+ agents (requirements, design, frontend, backend, testing)
-- [ ] Integration testing across all applications
-- [ ] Performance optimization for LLM calls
-- [ ] Cost optimization strategies
-
-### Phase 5: Testing & Production (Week 5)
-- [ ] Integration tests with real APIs for all apps
-- [ ] Load testing with cost controls
-- [ ] API error handling validation
-- [ ] Complete operational documentation
-- [ ] Cost estimation guides
-- [ ] Production deployment procedures
-
----
-
-## Technology Stack
-
-### Core Technologies
-- **Language**: Lua (all applications)
-- **LLM Providers**: **REAL OpenAI, Anthropic APIs** (NO MOCKS)
-  - Each application MUST use actual LLM agents
-  - Requires valid API keys in environment
-  - No simulated or mock responses allowed
-- **State Management**: llmspell state persistence
-- **Tools**: llmspell tool ecosystem
-- **Workflows**: llmspell workflow engine
-
-### API Key Requirements
-
-**CRITICAL**: All applications require real API keys for production functionality:
-
-```bash
-# Required environment variables
-export OPENAI_API_KEY="sk-..."          # For OpenAI models
-export ANTHROPIC_API_KEY="sk-ant-..."   # For Anthropic models
-export GITHUB_TOKEN="ghp_..."           # For Code Review Assistant
-```
-
-Each application uses LLM agents for core functionality:
-1. **AI Research Assistant**: 3+ agents for research, synthesis, generation
-2. **Data Pipeline**: 3+ agents for quality, anomaly detection, reporting
-3. **Monitoring System**: 4+ agents for analysis, prediction, remediation
-4. **Customer Support Bot**: 4+ agents for conversation, knowledge, sentiment
-5. **Content Generation**: 4+ agents for creation, quality, SEO, localization
-6. **Code Review**: 4+ agents for analysis, security, performance, best practices
-7. **Web App Generator**: 5+ agents for requirements, design, generation, testing
-
-### Integration Points
-- **Version Control**: Git integration for Code Review Assistant
-- **Monitoring**: Prometheus/Grafana compatible metrics
-- **Alerting**: PagerDuty, Slack, email integration
-- **Storage**: File system, databases via llmspell tools
-
-### Configuration
-- All applications will use the established config structure in `examples/script-users/configs/`
-- Environment-specific configurations for dev/staging/production
-- Secure credential management via environment variables
-
----
-
-## Quality Standards
-
-### Code Quality
-- **REAL LLM INTEGRATION**: No mocks, all agents use actual API calls
-- Comprehensive error handling for API failures and rate limits
-- Exponential backoff and retry logic for transient failures
-- State persistence for resumability of long-running tasks
-- Monitoring hooks for API usage and costs
-
-### Documentation
-- Each application with complete README including API key setup
-- LLM agent documentation (model selection, prompts, temperature)
-- Deployment guides with API key management
-- Cost estimation guides for LLM usage
-- Troubleshooting guides for API errors
-
-### Testing Strategy with Real LLMs
-
-**Unit Tests** (Mock allowed for isolated logic):
-- Test application logic independent of LLMs
-- Test error handling paths
-- Test data transformations
-
-**Integration Tests** (MUST use real APIs):
-```lua
--- Example integration test
-function test_research_assistant_real_query()
-    -- Requires OPENAI_API_KEY in environment
-    local assistant = ResearchAssistant:new({
-        model = "openai/gpt-4o-mini",  -- Use cheaper model for tests
-        max_tokens = 100  -- Limit tokens for cost control
-    })
-    
-    local result = assistant:research("What is Lua?")
-    assert(result.success, "Research should succeed with real API")
-    assert(result.citations, "Should include citations")
-end
-```
-
-**Load Tests** (Use with cost awareness):
-- Test with rate limiting
-- Monitor API costs during tests
-- Use smaller models for load testing
-- Implement cost caps
-
-### Security
-- API keys NEVER in code, only environment variables
-- Input validation before sending to LLMs
-- Output sanitization from LLMs
-- Rate limiting to prevent abuse and cost overruns
-- Audit logging for all LLM interactions
+### Phase 3: Full Config-Driven
+- Everything in TOML/YAML
+- No Lua code required
+- CLI executes configs directly
+- Custom logic via hooks/plugins
 
 ---
 
 ## Success Metrics
 
 ### Technical Metrics
-- Response time < 2 seconds for user interactions
-- 99.9% uptime for production applications
-- < 0.1% error rate in normal operation
-- Automatic recovery from transient failures
+- Workflow execution success rate > 95%
+- Agent response time < 5 seconds
+- State operation latency < 10ms
+- System uptime > 99.9%
 
 ### Business Metrics
-- Research Assistant: 80% accuracy in fact verification
-- Support Bot: 70% query resolution without escalation
-- Content System: 90% content passes quality checks
-- Code Review: 60% reduction in review time
+- Cost per operation within budget
+- User satisfaction > 90%
+- Time savings > 70% vs manual
+- Error reduction > 80%
 
-### Operational Metrics
-- Deployment time < 30 minutes
-- Mean time to recovery < 15 minutes
-- Alert noise < 5 false positives per day
-- Documentation coverage > 90%
+### Quality Metrics
+- LLM response accuracy > 85%
+- Tool execution reliability > 99%
+- State consistency 100%
+- Recovery success rate > 95%
 
 ---
 
 ## Next Steps
 
-1. **Review and Approval**: Review architectural blueprints with stakeholders
-2. **Priority Setting**: Determine implementation order based on business needs
-3. **Resource Allocation**: Assign team members to each application
-4. **Implementation Kickoff**: Begin with Phase 1 foundation work
-5. **Progress Tracking**: Weekly reviews of implementation progress
+1. **Immediate** (Week 1):
+   - Set up API keys and test connectivity
+   - Implement Customer Support System
+   - Validate cost projections
 
-Each application will be implemented following the established patterns from the cookbook, using real LLM providers with proper configuration management and comprehensive error handling. The focus is on production readiness with proper monitoring, scaling, and operational support.
+2. **Short-term** (Week 2-3):
+   - Complete Data Pipeline and Content Platform
+   - Add comprehensive error handling
+   - Implement state persistence
+
+3. **Medium-term** (Week 4-5):
+   - Build remaining 4 applications
+   - Add monitoring and metrics
+   - Create deployment scripts
+
+4. **Long-term** (Week 6+):
+   - Optimize for cost and performance
+   - Add config-driven capabilities
+   - Create user documentation
+   - Build example datasets

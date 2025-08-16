@@ -667,222 +667,205 @@ The examples directory is now fully organized, tested, and ready for users with 
 #### Task 7.3.6: Real-World Applications
 **Priority**: MEDIUM
 **Estimated Time**: 40 hours (expanded from 8 due to real LLM integration requirements)
-**Status**: IN PROGRESS (Data Pipeline base completed, LLM integration pending)
+**Status**: IN PROGRESS (Data Pipeline partially completed, needs blueprint alignment)
 **Assigned To**: Solutions Team
 **Dependencies**: Task 7.3.4
-**reference**: Follow the architecture and design in `examples/script-users/applications/blueprint.md` for each application.
+**Reference**: Follow the architecture and design in `examples/script-users/applications/blueprint.md` for each application.
 
-**Description**: Create production-ready applications that demonstrate real LLM usage. Everything in Lua, NO MOCK LLMs.
+**Description**: Create 7 production-ready applications demonstrating llmspell's full capabilities with REAL LLM APIs and proper component composition.
 
-**⚠️ COST WARNING**: Testing these applications will incur API costs. Use:
-- Smaller models (gpt-4o-mini) for development
-- Limited token counts in tests
-- Cost monitoring and alerts
-- Environment-specific API keys for dev/test/prod
+**⚠️ CRITICAL REQUIREMENTS**:
+- **NO MOCKS**: Real OpenAI/Anthropic API keys required (costs apply!)
+- **Component Composition**: Use Workflows + Agents + Tools properly
+- **Minimal Lua**: Only orchestration logic, no business logic
+- **Production Grade**: Error handling, monitoring, persistence
 
-**Implementation Steps**:
+**Implementation Steps (Per Blueprint v2.0)**:
 
-1. [ ] **AI Research Assistant** (Complete research automation with LLMs):
-   - [ ] **Core Agents** (REQUIRES: OpenAI/Anthropic API keys):
-     - [ ] Research Orchestrator Agent - Query decomposition and source prioritization
-     - [ ] Knowledge Synthesis Agent - Fact verification across sources
-     - [ ] Output Generation Agent - Multi-format report generation
-   - [ ] **Features**:
-     - [ ] Web search integration with Tool.invoke("web_search")
-     - [ ] Document parsing and analysis
-     - [ ] Citation management (APA/MLA formats)
-     - [ ] Knowledge graph construction
-     - [ ] Contradiction detection and resolution
-   - [ ] **Production Requirements**:
-     - [ ] Rate limiting for API calls
-     - [ ] State persistence for long research sessions
-     - [ ] Progress tracking and resumption
-     - [ ] Error handling with graceful degradation
-   - [ ] **Testing**:
-     - [ ] Unit tests for each agent component
-     - [ ] Integration test with mock research query
-     - [ ] End-to-end test with real research task
-     - [ ] Performance test for large document sets
-   - [ ] **Documentation**:
-     - [ ] README with setup instructions
-     - [ ] Example research queries
-     - [ ] API key configuration guide
-     - [ ] Deployment guide
+1. [ ] **Customer Support System** (8 hours):
+   - [ ] **Component Architecture**:
+     - [ ] Main Conditional Workflow for routing logic
+     - [ ] Urgent Handler (Parallel Workflow)
+     - [ ] Standard Handler (Sequential Workflow)
+   - [ ] **Agents** (3 required):
+     - [ ] ticket_classifier (GPT-4) - categorizes and prioritizes
+     - [ ] sentiment_analyzer (GPT-3.5-turbo) - detects escalation needs
+     - [ ] response_generator (GPT-4) - creates customer responses
+   - [ ] **Tools Integration**:
+     - [ ] email_sender, database_connector, webhook_caller, file_operations
+   - [ ] **State Management**:
+     - [ ] Ticket history persistence
+     - [ ] Response templates caching
+   - [ ] **Files to Create**:
+     - [ ] `customer-support/main.lua` - orchestration
+     - [ ] `customer-support/README.md` - setup and usage
+     - [ ] `customer-support/config.toml` - configuration
 
-2. [x] **Data Pipeline** (COMPLETED - main.lua implemented):
-   - [x] Core pipeline with monitoring and recovery
-   - [ ] **LLM Enhancement** (REQUIRES: OpenAI/Anthropic API keys):
-     - [ ] Data Quality Agent - Assess data quality with LLM
-     - [ ] Anomaly Detection Agent - Pattern recognition
-     - [ ] Report Generation Agent - Pipeline insights
-   - [ ] **Testing**:
-     - [ ] Unit tests for pipeline components
-     - [ ] Integration test with LLM agents
-     - [ ] Load test with 10K+ records
-     - [ ] Failure recovery test scenarios
-   - [ ] **Documentation Updates**:
-     - [ ] Add LLM configuration section
-     - [ ] Performance benchmarks with LLMs
+2. [x] **Data Pipeline** (6 hours) - COMPLETED v2.0 per blueprint:
+   - [x] **Component Architecture** (per blueprint):
+     - [x] Main Sequential Workflow
+     - [x] Extract Phase (Parallel Workflow) - multi-source loading
+     - [x] Transform Phase (Loop Workflow) - batch processing
+     - [x] Analysis Phase (Parallel Workflow) - concurrent analysis
+   - [x] **Agents** (5 required per blueprint):
+     - [x] data_enricher (GPT-3.5-turbo) - contextual enrichment
+     - [x] quality_analyzer (GPT-4) - quality issues
+     - [x] anomaly_detector (GPT-4) - outlier detection
+     - [x] pattern_finder (Claude-3-haiku) - pattern discovery
+     - [x] report_generator (Claude-3-sonnet) - insights report
+   - [x] **Workflow Restructure**:
+     - [x] Replace simple sequential with nested workflows
+     - [x] Add Parallel extraction from multiple sources
+     - [x] Add Loop workflow for batch transformation
+     - [x] Add Parallel analysis workflows
+   - [x] **Files to Update**:
+     - [x] `data-pipeline/main.lua` - match blueprint architecture
+     - [ ] `data-pipeline/README.md` - document new structure
+     - [ ] `data-pipeline/test.lua` - test scenarios
 
-3. [ ] **Monitoring System** (Advanced monitoring with LLM analysis):
-   - [ ] **Core Agents** (REQUIRES: OpenAI/Anthropic API keys):
-     - [ ] Log Analysis Agent - Pattern recognition in logs
-     - [ ] Predictive Analysis Agent - Failure prediction
-     - [ ] Incident Report Agent - Automated reporting
-     - [ ] Remediation Suggestion Agent - Fix recommendations
-   - [ ] **Features**:
-     - [ ] Real-time log analysis with LLM
-     - [ ] Anomaly detection with explanations
-     - [ ] Predictive alerts based on patterns
-     - [ ] Automated incident summaries
-     - [ ] Root cause analysis
-   - [ ] **Integrations**:
-     - [ ] Slack alerting with LLM summaries
-     - [ ] PagerDuty integration
-     - [ ] Dashboard generation
-     - [ ] Metric correlation analysis
-   - [ ] **Testing**:
-     - [ ] Unit tests for each monitoring component
-     - [ ] Integration test with sample logs
-     - [ ] Alert routing test scenarios
-     - [ ] Performance test with high log volume
-   - [ ] **Documentation**:
-     - [ ] Setup guide with API keys
-     - [ ] Alert configuration examples
-     - [ ] Dashboard templates
-     - [ ] Troubleshooting guide
+3. [ ] **Content Generation Platform** (6 hours):
+   - [ ] **Component Architecture**:
+     - [ ] Main Conditional Workflow (content type routing)
+     - [ ] Blog Workflow (Sequential)
+     - [ ] Social Workflow (Parallel multi-platform)
+     - [ ] Email Workflow (Sequential)
+     - [ ] Optimization Phase (Parallel)
+   - [ ] **Agents** (7 required):
+     - [ ] researcher (GPT-4) - topic research
+     - [ ] outliner (GPT-4) - content structure
+     - [ ] blog_writer (Claude-3-opus) - long-form
+     - [ ] social_writer (GPT-3.5-turbo) - social posts
+     - [ ] email_writer (Claude-3-sonnet) - newsletters
+     - [ ] seo_optimizer (GPT-4) - SEO improvements
+     - [ ] personalizer (GPT-3.5-turbo) - audience targeting
+   - [ ] **Files to Create**:
+     - [ ] `content-platform/main.lua` - orchestration
+     - [ ] `content-platform/README.md` - setup guide
+     - [ ] `content-platform/templates/` - content templates
 
-4. [ ] **Customer Support Bot** (Multi-channel support with LLMs):
-   - [ ] **Core Agents** (REQUIRES: OpenAI/Anthropic API keys):
-     - [ ] Conversation Agent - Intent understanding
-     - [ ] Knowledge Base Agent - Solution finding
-     - [ ] Escalation Agent - Complex issue handling
-     - [ ] Sentiment Analysis Agent - Customer emotion detection
-   - [ ] **Features**:
-     - [ ] Multi-channel adapters (chat, email, voice)
-     - [ ] Context persistence across conversations
-     - [ ] Dynamic FAQ generation
-     - [ ] Escalation to human agents
-     - [ ] Customer history integration
-   - [ ] **Testing**:
-     - [ ] Unit tests for conversation flows
-     - [ ] Integration test with knowledge base
-     - [ ] Multi-channel communication test
-     - [ ] Load test with concurrent conversations
-   - [ ] **Documentation**:
-     - [ ] Channel setup guides
-     - [ ] Knowledge base configuration
-     - [ ] Escalation workflow documentation
-     - [ ] Performance tuning guide
+4. [ ] **Code Review Assistant** (6 hours):
+   - [ ] **Component Architecture**:
+     - [ ] Main Sequential Workflow
+     - [ ] Code Analysis (Parallel initial analysis)
+     - [ ] File Review Loop (iterates through files)
+     - [ ] Review Sub-workflow (Parallel multi-aspect)
+   - [ ] **Agents** (7 required):
+     - [ ] security_reviewer (GPT-4) - vulnerability detection
+     - [ ] quality_reviewer (Claude-3-sonnet) - code quality
+     - [ ] practices_reviewer (GPT-4) - best practices
+     - [ ] performance_reviewer (GPT-3.5-turbo) - performance issues
+     - [ ] issue_prioritizer (GPT-4) - severity ranking
+     - [ ] fix_generator (Claude-3-opus) - fix suggestions
+     - [ ] report_writer (GPT-4) - review report
+   - [ ] **Custom Tools Needed**:
+     - [ ] code_analyzer - AST parsing
+     - [ ] syntax_validator - syntax checking
+   - [ ] **Files to Create**:
+     - [ ] `code-review/main.lua` - orchestration
+     - [ ] `code-review/README.md` - GitHub integration
+     - [ ] `code-review/rules.toml` - review rules
 
-5. [ ] **Content Generation System** (Scalable content creation):
-   - [ ] **Core Agents** (REQUIRES: OpenAI/Anthropic API keys):
-     - [ ] Content Creation Agent - Multi-format generation
-     - [ ] Quality Check Agent - Grammar and brand voice
-     - [ ] SEO Optimization Agent - Keyword integration
-     - [ ] Localization Agent - Multi-language support
-   - [ ] **Features**:
-     - [ ] Template management system
-     - [ ] Batch content generation
-     - [ ] A/B testing variations
-     - [ ] Brand voice consistency
-     - [ ] Plagiarism detection
-   - [ ] **Testing**:
-     - [ ] Unit tests for template system
-     - [ ] Integration test for batch generation
-     - [ ] Quality validation tests
-     - [ ] Performance test for 1000+ pieces
-   - [ ] **Documentation**:
-     - [ ] Template creation guide
-     - [ ] Brand voice configuration
-     - [ ] Batch processing examples
-     - [ ] API integration guide
+5. [ ] **Document Intelligence System** (6 hours):
+   - [ ] **Component Architecture**:
+     - [ ] Main Sequential Workflow
+     - [ ] Document Ingestion (Parallel)
+     - [ ] Processing Loop (per-document)
+     - [ ] Q&A Interface (Conditional)
+   - [ ] **Agents** (8 required):
+     - [ ] entity_extractor (GPT-4) - NER
+     - [ ] topic_analyzer (Claude-3-haiku) - topic modeling
+     - [ ] summarizer (Claude-3-sonnet) - summarization
+     - [ ] embedding_generator (OpenAI-ada-002) - vectors
+     - [ ] qa_responder (GPT-4) - Q&A
+     - [ ] doc_comparer (Claude-3-opus) - comparison
+     - [ ] pattern_analyzer (GPT-4) - patterns
+     - [ ] insight_generator (Claude-3-opus) - insights
+   - [ ] **Custom Tools Needed**:
+     - [ ] pdf_processor, graph_builder, vector_search, citation_formatter
+   - [ ] **Files to Create**:
+     - [ ] `document-intelligence/main.lua` - orchestration
+     - [ ] `document-intelligence/README.md` - usage guide
+     - [ ] `document-intelligence/indexer.lua` - search index
 
-6. [ ] **Code Review Assistant** (Automated code analysis):
-   - [ ] **Core Agents** (REQUIRES: OpenAI/Anthropic API keys + GitHub token):
-     - [ ] Code Analysis Agent - Static analysis
-     - [ ] Security Review Agent - Vulnerability detection
-     - [ ] Performance Analysis Agent - Optimization suggestions
-     - [ ] Best Practices Agent - Style and patterns
-   - [ ] **Features**:
-     - [ ] Git/GitHub integration
-     - [ ] PR diff analysis
-     - [ ] Automated fix suggestions
-     - [ ] Security vulnerability scanning
-     - [ ] Performance impact assessment
-   - [ ] **Testing**:
-     - [ ] Unit tests for analysis components
-     - [ ] Integration test with sample PRs
-     - [ ] Security scanning test cases
-     - [ ] Performance analysis validation
-   - [ ] **Documentation**:
-     - [ ] GitHub integration setup
-     - [ ] Custom rule configuration
-     - [ ] Security scanning guide
-     - [ ] CI/CD integration
+6. [ ] **Workflow Automation Hub** (5 hours):
+   - [ ] **Component Architecture**:
+     - [ ] Main Controller (Conditional)
+     - [ ] Sequential Execution engine
+     - [ ] Dynamic Execution engine (nested workflows)
+     - [ ] Monitoring (Parallel)
+     - [ ] Error Handler (Conditional)
+   - [ ] **Agents** (4 required):
+     - [ ] workflow_optimizer (GPT-4) - execution optimization
+     - [ ] error_resolver (Claude-3-sonnet) - error recovery
+     - [ ] workflow_generator (GPT-4) - workflow creation
+     - [ ] dependency_analyzer (GPT-3.5-turbo) - dependencies
+   - [ ] **Event & Hook Integration**:
+     - [ ] Workflow lifecycle events
+     - [ ] Pre/post step hooks
+     - [ ] Rate limiting hooks
+   - [ ] **Custom Tools Needed**:
+     - [ ] yaml_parser, schema_validator, resource_monitor
+   - [ ] **Files to Create**:
+     - [ ] `workflow-hub/main.lua` - orchestration
+     - [ ] `workflow-hub/README.md` - workflow DSL
+     - [ ] `workflow-hub/examples/` - workflow examples
 
-7. [ ] **Web Application Generator** (Full-stack app generation):
-   - [ ] **Core Agents** (REQUIRES: OpenAI/Anthropic API keys):
-     - [ ] Requirements Analysis Agent - Parse specifications
-     - [ ] Architecture Design Agent - Tech stack selection
-     - [ ] Frontend Generation Agent - UI/UX code
-     - [ ] Backend Generation Agent - API and logic
-     - [ ] Test Generation Agent - Test suite creation
-   - [ ] **Features**:
-     - [ ] Requirements to architecture mapping
-     - [ ] Component library generation
-     - [ ] API endpoint creation
-     - [ ] Database schema design
-     - [ ] Test suite generation
-     - [ ] CI/CD pipeline setup
-   - [ ] **Testing**:
-     - [ ] Unit tests for each generator
-     - [ ] Integration test for full app generation
-     - [ ] Generated code validation tests
-     - [ ] Performance benchmarks
-   - [ ] **Documentation**:
-     - [ ] Requirements format guide
-     - [ ] Supported tech stacks
-     - [ ] Customization options
-     - [ ] Deployment guides
+7. [ ] **AI Research Assistant** (7 hours):
+   - [ ] **Component Architecture**:
+     - [ ] Main Research Workflow (Sequential)
+     - [ ] Database Search (Parallel multi-source)
+     - [ ] Paper Processing Loop (iterative)
+     - [ ] Analysis Sub-workflow (Parallel)
+     - [ ] Output Generation (Parallel)
+   - [ ] **Agents** (11 required):
+     - [ ] query_parser (GPT-4)
+     - [ ] term_expander (GPT-3.5-turbo)
+     - [ ] paper_summarizer (Claude-3-sonnet)
+     - [ ] method_extractor (GPT-4)
+     - [ ] finding_extractor (GPT-4)
+     - [ ] quality_assessor (Claude-3-opus)
+     - [ ] connection_finder (GPT-4)
+     - [ ] gap_analyzer (Claude-3-opus)
+     - [ ] review_writer (Claude-3-opus)
+     - [ ] insight_generator (GPT-4)
+     - [ ] recommendation_engine (GPT-4)
+   - [ ] **Academic Integration**:
+     - [ ] ArXiv, Google Scholar, PubMed search
+     - [ ] PDF processing and analysis
+     - [ ] Citation management
+   - [ ] **Files to Create**:
+     - [ ] `research-assistant/main.lua` - orchestration
+     - [ ] `research-assistant/README.md` - research guide
+     - [ ] `research-assistant/citations.lua` - bibliography
 
-8. [ ] **Testing Framework for All Applications** (2 hours):
-   - [ ] Create test harness for applications
-   - [ ] Mock data generators
-   - [ ] Performance benchmarking suite
-   - [ ] API key validation tests
-   - [ ] Integration test scenarios
-   - [ ] Load testing framework
-   - [ ] Documentation of test coverage
+**Testing & Documentation** (2 hours):
+- [ ] **Test Framework**:
+  - [ ] Unit tests per application
+  - [ ] Integration tests with real APIs
+  - [ ] Cost-aware test configurations
+  - [ ] Load testing scenarios
+- [ ] **Documentation Requirements**:
+  - [ ] Setup instructions with API keys
+  - [ ] Cost projections per application
+  - [ ] Performance benchmarks
+  - [ ] Deployment guides
 
-9. [ ] **Production Readiness** (1 hour):
-   - [ ] Docker configurations for each app
-   - [ ] Kubernetes manifests
-   - [ ] Environment variable management
-   - [ ] Secret management for API keys
-   - [ ] Monitoring and logging setup
-   - [ ] Operational runbooks
-   - [ ] SLA definitions
-
-**Quality Standards**:
-- [ ] **NO MOCK LLMs** - All applications use REAL OpenAI/Anthropic APIs
-- [ ] Each application has 3-5 LLM agents performing actual tasks
-- [ ] Production-quality error handling for API failures
-- [ ] Comprehensive testing with real API calls (integration tests)
-- [ ] Rate limiting and retry logic for all LLM calls
-- [ ] Performance considerations documented (with API latency)
-- [ ] Security best practices for API key management
-- [ ] Operational guidance including cost monitoring
+**Production Readiness** (1 hour):
+- [ ] Docker configurations
+- [ ] Environment variable management
+- [ ] Monitoring metrics setup
+- [ ] Cost optimization strategies
+- [ ] Operational runbooks
 
 **Acceptance Criteria**:
-- [ ] 7 complete applications (1 partially done - Data Pipeline)
-- [ ] All use REAL LLM agents with actual API keys
-- [ ] Each application demonstrates unique LLM capabilities
-- [ ] All production-ready with error handling
-- [ ] Deployment documented with API key setup
-- [ ] Testing included (unit + integration with real APIs)
-- [ ] Operations guide with cost estimates
-- [ ] Performance benchmarks with real LLM latencies
+- [ ] All 7 applications match blueprint.md architectures exactly
+- [ ] Each uses proper component composition (Workflows + Agents + Tools)
+- [ ] Minimal Lua code (only orchestration)
+- [ ] All agents use REAL LLM APIs (no mocks)
+- [ ] Production-grade error handling
+- [ ] State persistence and recovery
+- [ ] Complete documentation
+- [ ] Cost estimates documented
 
 ---
 

@@ -1,323 +1,217 @@
-# Production Data Pipeline Application
+# Production Data Pipeline v2.0
+
+A production-ready ETL pipeline demonstrating llmspell's nested workflow architecture with LLM-powered analysis.
 
 ## Overview
 
-A production-ready data processing pipeline with enterprise features including monitoring, failure recovery, auto-scaling, and real-time alerting. This application demonstrates how to build robust data processing systems using llmspell.
-
-## Features
-
-### Core Capabilities
-- **Batch Processing**: Efficient processing of data in configurable batch sizes
-- **Stream Processing**: Real-time data processing with windowing support
-- **ETL Operations**: Extract, Transform, Load with validation
-- **Data Quality**: Automatic validation and quality checks
-
-### Production Features
-- **Monitoring & Alerting**
-  - Real-time metrics collection
-  - Configurable alert thresholds
-  - Multi-channel alerting support
-  - Performance dashboards
-
-- **Failure Recovery**
-  - Automatic retry with exponential backoff
-  - Dead Letter Queue (DLQ) for failed records
-  - Checkpoint-based recovery
-  - Transaction rollback capabilities
-
-- **Auto-Scaling**
-  - Dynamic worker scaling based on load
-  - Configurable min/max workers
-  - Cooldown periods to prevent thrashing
-  - Resource utilization optimization
-
-- **Observability**
-  - Detailed metrics and logging
-  - Performance profiling
-  - Error tracking and analysis
-  - Audit trails
+This application showcases proper component composition using:
+- **Sequential Workflow**: Main orchestration
+- **Parallel Workflows**: Multi-source extraction and concurrent analysis
+- **Loop Workflow**: Batch transformation processing
+- **5 LLM Agents**: Data enrichment, quality analysis, anomaly detection, pattern recognition, and report generation
+- **State Management**: Checkpointing and recovery
+- **Production Features**: Error handling, monitoring, notifications
 
 ## Architecture
 
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Data Sources  │───▶│   Pipeline      │───▶│   Data Sinks    │
-│   • Files       │    │   • Process     │    │   • Database    │
-│   • APIs        │    │   • Transform   │    │   • Files       │
-│   • Streams     │    │   • Validate    │    │   • APIs        │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         ▼                       ▼                       ▼
-    [Monitoring]           [Recovery]             [Scaling]
-    • Metrics              • Checkpoints          • Auto-scale
-    • Alerts               • DLQ                  • Load balance
-    • Dashboards           • Retry                • Resource mgmt
-```
-
-## Configuration
-
-The pipeline is configured through the `config` table in `main.lua`:
-
-```lua
-local config = {
-    pipeline_name = "ProductionDataPipeline",
-    batch_size = 100,
-    retry_attempts = 3,
-    monitoring = {
-        enabled = true,
-        metrics_interval = 60,  -- seconds
-        alert_thresholds = {
-            error_rate = 0.05,      -- 5% error rate
-            latency_ms = 5000,      -- 5 second latency
-            throughput_min = 10     -- 10 records/minute
-        }
-    },
-    recovery = {
-        dead_letter_queue = true,
-        checkpoint_interval = 100,  -- records
-        rollback_enabled = true
-    },
-    scaling = {
-        auto_scale = true,
-        min_workers = 1,
-        max_workers = 10,
-        scale_up_threshold = 0.8,   -- 80% capacity
-        scale_down_threshold = 0.2   -- 20% capacity
-    }
-}
+```yaml
+Main Pipeline (Sequential)
+├── Extract Phase (Parallel)
+│   ├── Database extraction
+│   ├── API extraction
+│   └── File extraction
+├── Transform Phase (Loop)
+│   ├── Batch validation
+│   ├── Data cleaning
+│   └── LLM enrichment
+├── Analysis Phase (Parallel)
+│   ├── Quality analysis (LLM)
+│   ├── Anomaly detection (LLM)
+│   └── Pattern recognition (LLM)
+└── Load Phase (Sequential)
+    ├── Save to database
+    ├── Generate report (LLM)
+    └── Send notifications
 ```
 
-## Usage
+## Prerequisites
 
-### Basic Usage
-
+### Required API Keys
+Set at least one of these environment variables:
 ```bash
-# Run the pipeline
+export OPENAI_API_KEY="your-openai-api-key"
+export ANTHROPIC_API_KEY="your-anthropic-api-key"
+```
+
+### Configuration File
+Use the provided `config.toml`:
+```bash
+export LLMSPELL_CONFIG=examples/script-users/applications/data-pipeline/config.toml
+```
+
+## Quick Start
+
+### 1. Basic Run (with mock data)
+```bash
+# From llmspell root directory
 ./target/debug/llmspell run examples/script-users/applications/data-pipeline/main.lua
 ```
 
-### With Configuration
-
+### 2. With Configuration
 ```bash
-# Use custom configuration
-LLMSPELL_CONFIG=examples/script-users/configs/production.toml \
-  ./target/debug/llmspell run examples/script-users/applications/data-pipeline/main.lua
+# Use the application config
+LLMSPELL_CONFIG=examples/script-users/applications/data-pipeline/config.toml \
+./target/debug/llmspell run examples/script-users/applications/data-pipeline/main.lua
 ```
 
-## Monitoring
+### 3. With API Keys (full LLM features)
+```bash
+# Set API keys for full functionality
+export OPENAI_API_KEY="sk-..."
+export ANTHROPIC_API_KEY="sk-ant-..."
 
-### Metrics Collected
-- **Throughput**: Records processed per minute
-- **Latency**: Average processing time per record
-- **Error Rate**: Percentage of failed records
-- **Worker Utilization**: Active vs idle workers
-- **Queue Depth**: Pending records and DLQ size
-
-### Alert Types
-- **HIGH**: Error rate exceeds threshold
-- **MEDIUM**: High latency detected
-- **LOW**: Low throughput warning
-
-### Dashboard Access
-Metrics are exposed for integration with monitoring systems:
-- Prometheus endpoint: `/metrics`
-- Grafana dashboards available
-- Custom metrics via API
-
-## Failure Recovery
-
-### Retry Strategy
-1. First failure: Retry after 1 second
-2. Second failure: Retry after 2 seconds
-3. Third failure: Retry after 4 seconds
-4. Final failure: Send to Dead Letter Queue
-
-### Checkpoint Recovery
-- Automatic checkpoints every N records (configurable)
-- Persisted to durable storage
-- Resume from last checkpoint on restart
-- Transaction-safe processing
-
-### Dead Letter Queue
-- Failed records after max retries
-- Manual review and reprocessing
-- Audit trail of failures
-- Export capabilities
-
-## Scaling
-
-### Auto-Scaling Rules
-- **Scale Up**: When load > 80% for 60 seconds
-- **Scale Down**: When load < 20% for 60 seconds
-- **Cooldown**: 60 seconds between scaling events
-- **Limits**: Min 1 worker, Max 10 workers
-
-### Manual Scaling
-```lua
--- Add workers
-pipeline:add_worker()
-pipeline:add_worker()
-
--- Remove workers
-pipeline:remove_worker()
+# Run with config
+LLMSPELL_CONFIG=examples/script-users/applications/data-pipeline/config.toml \
+./target/debug/llmspell run examples/script-users/applications/data-pipeline/main.lua
 ```
 
-## Performance
+## Features Demonstrated
 
-### Benchmarks
-- **Throughput**: 10,000+ records/minute
-- **Latency**: < 100ms average
-- **Error Recovery**: < 5 seconds
-- **Scale Time**: < 10 seconds
+### 1. Nested Workflows
+- Main sequential workflow orchestrates 4 phases
+- Each phase uses appropriate workflow type (Parallel, Loop, Sequential)
+- Workflows can be nested arbitrarily deep
 
-### Optimization Tips
-1. Adjust batch size based on record size
-2. Configure workers based on CPU cores
-3. Use checkpoints for large datasets
-4. Enable caching for repeated transformations
+### 2. LLM Integration (5 Agents)
+- **Data Enricher** (GPT-3.5-turbo): Adds contextual information
+- **Quality Analyzer** (GPT-4): Identifies data quality issues
+- **Anomaly Detector** (GPT-4): Finds outliers and anomalies
+- **Pattern Finder** (Claude-3-haiku): Discovers patterns and trends
+- **Report Generator** (Claude-3-sonnet): Creates executive reports
 
-## Integration
+### 3. Production Features
+- **Multi-source extraction**: Database, API, and file sources in parallel
+- **Batch processing**: Loop workflow processes data in chunks
+- **Error handling**: Validation and data cleaning
+- **State persistence**: Checkpointing for recovery
+- **Monitoring**: Metrics and progress tracking
+- **Notifications**: Pipeline completion alerts
 
-### Data Sources
-- File systems (CSV, JSON, XML)
-- Databases (PostgreSQL, MySQL, MongoDB)
-- Message queues (Kafka, RabbitMQ)
-- APIs (REST, GraphQL)
+## Configuration Options
 
-### Data Sinks
-- Databases with transaction support
-- Data warehouses (Snowflake, BigQuery)
-- Object storage (S3, GCS)
-- Analytics platforms
+Edit `config.toml` to customize:
 
-### Monitoring Integration
-- **Prometheus**: Metrics export
-- **Grafana**: Pre-built dashboards
-- **PagerDuty**: Alert routing
-- **Slack**: Notifications
+```toml
+[pipeline]
+batch_size = 100              # Total records to process
+batch_chunk_size = 10         # Records per batch in Loop workflow
+checkpoint_interval = 5       # Batches between checkpoints
 
-## Deployment
+[models]
+enricher = "openai/gpt-3.5-turbo"
+quality = "openai/gpt-4o-mini"
+anomaly = "openai/gpt-4o-mini"
+patterns = "anthropic/claude-3-haiku-20240307"
+report = "anthropic/claude-3-sonnet-20240229"
 
-### Docker
-```dockerfile
-FROM llmspell:latest
-COPY ./data-pipeline /app
-CMD ["llmspell", "run", "/app/main.lua"]
+[sources]
+database_url = "postgresql://localhost/data"
+api_endpoint = "https://api.example.com/data"
+file_directory = "/data/input"
 ```
 
-### Kubernetes
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: data-pipeline
-spec:
-  replicas: 3
-  template:
-    spec:
-      containers:
-      - name: pipeline
-        image: llmspell-pipeline:latest
-        resources:
-          requests:
-            memory: "256Mi"
-            cpu: "500m"
-          limits:
-            memory: "1Gi"
-            cpu: "2000m"
+## Output Files
+
+The pipeline generates several output files:
+- `/tmp/pipeline_db.json` - Database extraction
+- `/tmp/pipeline_api.json` - API extraction
+- `/tmp/pipeline_files.json` - File extraction
+- `/tmp/pipeline_output.json` - Processed data
+- `/tmp/pipeline_report.txt` - Executive report
+
+## Cost Considerations
+
+⚠️ **This application uses REAL LLM APIs that incur costs!**
+
+Estimated costs per run (with default settings):
+- Data Enricher: ~$0.01 (100 records @ GPT-3.5-turbo)
+- Quality Analyzer: ~$0.02 (GPT-4)
+- Anomaly Detector: ~$0.02 (GPT-4)
+- Pattern Finder: ~$0.01 (Claude-3-haiku)
+- Report Generator: ~$0.03 (Claude-3-sonnet)
+- **Total: ~$0.09 per full pipeline run**
+
+### Cost Optimization Tips
+1. Use smaller models for development (gpt-3.5-turbo instead of gpt-4)
+2. Reduce batch_size for testing
+3. Disable specific agents during development
+4. Use checkpoint recovery to avoid re-processing
+
+## Testing
+
+Run the test suite:
+```bash
+./target/debug/llmspell run examples/script-users/applications/data-pipeline/test.lua
 ```
 
 ## Troubleshooting
 
-### Common Issues
+### No API Keys
+Without API keys, the pipeline runs with simulated data and skips LLM analysis:
+- ✅ Workflow orchestration works
+- ✅ Data extraction and transformation work
+- ⚠️ LLM agents show as "skipped"
+- ⚠️ No enrichment or analysis performed
 
-1. **High Error Rate**
-   - Check data quality
-   - Review transformation logic
-   - Increase retry attempts
-   - Examine DLQ records
+### Partial API Keys
+With only one provider's API key:
+- Agents using available provider work normally
+- Agents using unavailable provider are skipped
+- Pipeline continues with degraded functionality
 
-2. **Low Throughput**
-   - Increase batch size
-   - Add more workers
-   - Check network latency
-   - Optimize transformations
+### Performance Issues
+- Reduce `batch_size` in config
+- Increase `batch_chunk_size` for fewer iterations
+- Use faster models (gpt-3.5-turbo, claude-3-haiku)
 
-3. **Memory Issues**
-   - Reduce batch size
-   - Enable streaming mode
-   - Configure memory limits
-   - Use lazy loading
-
-4. **Checkpoint Failures**
-   - Verify storage permissions
-   - Check disk space
-   - Review checkpoint frequency
-   - Enable backup storage
-
-## Advanced Features
-
-### Custom Transformers
+### Recovery from Failure
+The pipeline saves checkpoints automatically:
 ```lua
-pipeline:add_transformer("custom", function(record)
-    -- Custom transformation logic
-    record.processed = true
-    return record
-end)
+-- Load and examine last checkpoint
+local checkpoint = State.load("pipeline_v2", "last_run")
+print(checkpoint.records_processed)
 ```
 
-### Custom Metrics
-```lua
-pipeline:add_metric("custom_metric", function()
-    return calculate_custom_value()
-end)
-```
+## Blueprint Compliance
 
-### Hook Integration
-```lua
-pipeline:add_hook("pre_process", function(record)
-    -- Pre-processing logic
-end)
+This implementation follows the blueprint v2.0 architecture:
+- ✅ Component composition (Workflows + Agents + Tools)
+- ✅ Minimal Lua (only orchestration logic)
+- ✅ Production-grade error handling
+- ✅ State persistence and recovery
+- ✅ Real LLM integration (no mocks)
+- ✅ Proper workflow nesting (Sequential → Parallel → Loop)
 
-pipeline:add_hook("post_process", function(record)
-    -- Post-processing logic
-end)
-```
+## Next Steps
 
-## Testing
+1. **Customize for your data**:
+   - Modify `generate_sample_data()` to load real data
+   - Update validation rules for your schema
+   - Adjust batch sizes for your volume
 
-### Unit Tests
-```bash
-# Run unit tests
-cargo test -p data-pipeline
-```
+2. **Add integrations**:
+   - Replace file operations with real database connections
+   - Add webhook notifications
+   - Integrate with monitoring systems
 
-### Integration Tests
-```bash
-# Run with test data
-./scripts/test-pipeline.sh
-```
-
-### Load Testing
-```bash
-# Generate load
-./scripts/load-test.sh --records 100000 --workers 10
-```
-
-## Contributing
-
-See the main llmspell contribution guide. Key areas:
-- Additional data source adapters
-- Custom transformation functions
-- Monitoring integrations
-- Performance optimizations
-
-## License
-
-Same as llmspell project
+3. **Extend analysis**:
+   - Add custom analysis agents
+   - Implement domain-specific patterns
+   - Create specialized reports
 
 ## Support
 
-- Documentation: See blueprint.md for architecture details
-- Issues: Report via main llmspell repository
-- Examples: Check cookbook/data-pipeline.lua for patterns
+For issues or questions:
+- Check the [llmspell documentation](../../README.md)
+- Review the [blueprint specification](../blueprint.md)
+- See other [example applications](../README.md)
