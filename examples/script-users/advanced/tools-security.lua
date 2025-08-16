@@ -13,15 +13,17 @@ print("=============================")
 
 -- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    local result = Tool.invoke(tool_name, params)
+    local success, result = pcall(function()
+        return Tool.invoke(tool_name, params)
+    end)
     
-    -- Tool.invoke returns structured results directly
-    if result then
+    if success and result then
         return result
+    elseif success then
+        return {success = false, error = "Tool returned no result"}
+    else
+        return {success = false, error = tostring(result)}
     end
-    
-    -- Return error result if no result
-    return {success = false, error = "Tool returned no result"}
 end
 
 -- Helper to print security results

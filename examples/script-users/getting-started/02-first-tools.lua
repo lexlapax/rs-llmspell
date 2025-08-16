@@ -13,22 +13,24 @@ print("====================================")
 
 -- Helper function to execute tool and handle errors
 local function use_tool(tool_name, params)
-    -- Use the synchronous Tool API
-    local result = Tool.invoke(tool_name, params)
+    -- Use pcall to catch any errors
+    local success, result = pcall(function()
+        return Tool.invoke(tool_name, params)
+    end)
     
-    -- Tool.invoke now returns structured results directly (no JSON parsing needed)
-    if result then
+    if success and result then
         return result
+    elseif success then
+        return {success = false, error = "Tool returned no result"}
+    else
+        return {success = false, error = result}
     end
-    
-    -- Return error result if no result
-    return {success = false, error = "Tool returned no result"}
 end
 
 -- Helper to print tool results
 local function print_result(name, result)
     if result.error then
-        print("  ❌ Error: " .. result.error)
+        print("  ❌ Error: " .. tostring(result.error))
     elseif result.success == false then
         print("  ❌ Failed: " .. (result.message or "Unknown error"))
     else
@@ -199,8 +201,9 @@ print("===========================")
 print("\n📋 JSON Processor:")
 local json_data = '{"name": "LLMSpell", "version": "0.7.0", "tools": 25}'
 local json_result = use_tool("json_processor", {
-    operation = "parse",
-    input = json_data
+    operation = "query",
+    input = json_data,
+    query = "."
 })
 print_result("JSON Parse", json_result)
 
@@ -249,16 +252,16 @@ print("===============================")
 -- Image Processor Tool (basic operations only)
 print("\n🖼️ Image Processor:")
 local image_result = use_tool("image_processor", {
-    operation = "get_info",
-    input = "/tmp/test_image.jpg"  -- This will fail gracefully if file doesn't exist
+    operation = "metadata",
+    file_path = "/tmp/test_image.jpg"  -- This will fail gracefully if file doesn't exist
 })
 print_result("Image Info", image_result)
 
 -- Audio Processor Tool
 print("\n🔊 Audio Processor:")
 local audio_result = use_tool("audio_processor", {
-    operation = "get_info",
-    input = "/tmp/test_audio.mp3"  -- This will fail gracefully if file doesn't exist
+    operation = "metadata",
+    file_path = "/tmp/test_audio.mp3"  -- This will fail gracefully if file doesn't exist
 })
 print_result("Audio Info", audio_result)
 
@@ -268,8 +271,7 @@ print("=====================================")
 -- System Monitor Tool
 print("\n💻 System Monitor:")
 local system_result = use_tool("system_monitor", {
-    operation = "get_info",
-    component = "cpu"
+    operation = "cpu"
 })
 print_result("System Info", system_result)
 

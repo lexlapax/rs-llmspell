@@ -27,31 +27,19 @@ end
 -- Helper to print clean results
 local function print_result(label, result)
     if result.error then
-        print("  ❌ " .. label .. ": " .. result.error)
+        print("  ❌ " .. label .. ": " .. tostring(result.error))
     elseif result.success == false then
         print("  ❌ " .. label .. ": " .. (result.message or "Failed"))
     else
-        -- Result is already parsed by execute_tool, extract relevant field
-        local value = nil
-        if result.result then
-            -- Extract the most relevant field from result
-            value = result.result.uuid or 
-                    result.result.output or 
-                    result.result.hash or 
-                    result.result.result or 
-                    result.result.datetime or 
-                    result.result.formatted or 
-                    result.result.value or 
-                    result.result.valid or
-                    result.result.encoded or
-                    result.result.decoded or
-                    result.result.rendered
-        elseif result.message then
-            value = result.message
-        elseif result.output then
-            value = result.output
+        print("  ✅ " .. label .. ": Success")
+        -- Show specific result if available
+        if result and type(result) == "table" then
+            for k, v in pairs(result) do
+                if k ~= "success" and k ~= "error" and v ~= nil then
+                    print("    " .. k .. ": " .. tostring(v))
+                end
+            end
         end
-        print("  ✅ " .. label .. ": " .. tostring(value))
     end
 end
 

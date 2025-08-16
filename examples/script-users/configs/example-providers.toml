@@ -22,6 +22,9 @@ model = "claude-3-opus-20240229"
 [engines.lua]
 security_level = "safe"
 
+[engines.javascript]
+security_level = "safe"
+
 # Runtime configuration (optional)
 [runtime]
 log_level = "info"
