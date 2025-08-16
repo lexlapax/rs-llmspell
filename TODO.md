@@ -349,22 +349,26 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Remove `workflow-parallel.lua` (keep basics version) ✅
      - [x] Remove `workflow-sequential.lua` (keep basics version) ✅
    
-5. [ ] **Phase 3: Handle Special Cases** (1 hour)
-   - [ ] **Shell Scripts**:
-     - [ ] Migrate and update paths in shell scripts:
-       - `run-all-agent-examples.sh` → Update for new structure
-       - `run-all-tools-examples.sh` → Update for new structure
-       - `run-workflow-examples.sh` → Update for new structure
-       - `run-all-lua-examples.sh` → Update for new structure
-     - [ ] Create NEW runner scripts for organized structure
+5. [x] **Phase 3: Handle Special Cases** (1 hour) ✅ COMPLETED
+   - [x] **Shell Scripts**:
+     - [x] Migrate and update paths in shell scripts:
+       - `run-all-agent-examples.sh` → Updated for new structure (finds 8 agent examples) ✅
+       - `run-all-tools-examples.sh` → Updated for new structure (finds 10 tool examples) ✅
+       - `run-workflow-examples.sh` → Updated for new structure (finds 2 workflow examples) ✅
+       - `run-all-lua-examples.sh` → Updated master orchestrator script ✅
+       - `state_persistence/run_quick_start.sh` → Updated paths to new locations ✅
+     - [x] All scripts tested and working with organized structure ✅
    
-   - [ ] **Config Files**:
-     - [ ] Move all .toml configs to `script-users/configs/`
-     - [ ] Ensure configs work from new location
+   - [x] **Config Files**:
+     - [x] All .toml configs consolidated to `script-users/configs/` (8 files) ✅
+     - [x] Removed duplicate `examples/configs/` directory ✅
+     - [x] Configs tested and work from new location ✅
    
-   - [ ] **Duplicates to Remove**:
-     - [ ] Identify and remove duplicate examples (see MIGRATION_PLAN.md)
-     - [ ] Document which files were removed and why
+   - [x] **Duplicates and Cleanup**:
+     - [x] Removed entire `examples/state_persistence/` directory after migration ✅
+     - [x] Moved `basic_operations.rs` to `rust-developers/api-usage/state-persistence-basic.rs` ✅
+     - [x] Removed all duplicate config files ✅
+     - [x] Final structure validated - only 3 target directories + docs + working scripts remain ✅
 
 6. [ ] **Phase 4: Create Missing Examples** (1 hour)
    - [ ] Create `script-users/getting-started/01-first-tool.lua` (from tools-showcase.lua)

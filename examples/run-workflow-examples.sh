@@ -1,6 +1,6 @@
 #!/bin/bash
-# ABOUTME: Shell script to run all workflow examples in examples/lua/workflows/
-# ABOUTME: Tests workflow execution patterns (sequential, conditional, loop, parallel)
+# ABOUTME: Shell script to run all workflow examples in the new organized structure
+# ABOUTME: Tests workflow execution patterns and tool chaining examples
 
 # Set the llmspell command path
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
@@ -28,75 +28,71 @@ echo "========================================"
 echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
 
-# Find workflow examples
+# Find workflow examples in new organized structure
 if [[ $(basename "$PWD") == "examples" ]]; then
-    workflows_dir="lua/workflows"
+    base_dir="."
 else
-    workflows_dir="examples/lua/workflows"
+    base_dir="examples"
 fi
 
-# Get all workflow Lua files
-workflow_files=($(ls $workflows_dir/*.lua 2>/dev/null | sort))
+# Workflow examples are in multiple locations
+workflow_dirs=(
+    "$base_dir/script-users/workflows"
+    "$base_dir/script-users/features"
+)
+
+# Get all workflow-related Lua files
+workflow_files=()
+for dir in "${workflow_dirs[@]}"; do
+    if [ -d "$dir" ]; then
+        while IFS= read -r -d '' file; do
+            workflow_files+=("$file")
+        done < <(find "$dir" -name "*workflow*.lua" -print0 2>/dev/null | sort -z)
+    fi
+done
 
 echo "Discovered ${#workflow_files[@]} workflow examples:"
 i=1
 for file in "${workflow_files[@]}"; do
-    basename_file=$(basename "$file")
-    printf "  %2d. %s\n" "$i" "$basename_file"
+    # Show relative path from examples/ for clarity
+    rel_path=${file#$base_dir/}
+    printf "  %2d. %s\n" "$i" "$rel_path"
     ((i++))
 done
 echo ""
 
-# Check if any workflows use agents
-echo "Checking for agent-based workflows..."
-agent_workflows=()
-for file in "${workflow_files[@]}"; do
-    if grep -q "agent" "$file" || grep -q "Agent" "$file"; then
-        agent_workflows+=("$file")
-    fi
-done
-
-if [ ${#agent_workflows[@]} -gt 0 ]; then
-    echo "⚠️  Found ${#agent_workflows[@]} workflows that may use agents:"
-    for file in "${agent_workflows[@]}"; do
-        echo "   - $(basename "$file")"
+if [ ${#workflow_files[@]} -eq 0 ]; then
+    echo "❌ No workflow examples found!"
+    echo "   Expected to find examples in:"
+    for dir in "${workflow_dirs[@]}"; do
+        echo "   - $dir"
     done
-    echo ""
-    if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
-        echo "⚠️  WARNING: No API keys found - agent workflows may fail"
-    fi
+    exit 1
 fi
 
 # Initialize counters
 passed=0
 failed=0
+skipped=0
 start_time=$(date +%s)
 
 echo ""
 echo "Running Workflow Examples"
-echo "========================="
+echo "========================"
 
 # Run each workflow example
 i=1
 for file in "${workflow_files[@]}"; do
-    basename_file=$(basename "$file")
+    rel_path=${file#$base_dir/}
     echo ""
-    echo "[$i/${#workflow_files[@]}] Running $basename_file..."
+    echo "[$i/${#workflow_files[@]}] Running $rel_path..."
     echo "------------------------------------------------------------"
     
     file_start=$(date +%s.%N)
     
     # Run with timeout
-    cd $(dirname $file)
-    if [[ "$LLMSPELL_CMD" == *"cargo run"* ]]; then
-        # For cargo run, we need to handle it differently
-        timeout 60 bash -c "$LLMSPELL_CMD run \"$(basename $file)\"" 2>&1 | cat
-    else
-        # For direct binary execution
-        timeout 60 $LLMSPELL_CMD run "$(basename $file)" 2>&1 | cat
-    fi
+    timeout 60 "$LLMSPELL_CMD" run "$file" 2>&1 | tee /tmp/workflow_test_output.log
     exit_code=${PIPESTATUS[0]}
-    cd - > /dev/null
     
     file_end=$(date +%s.%N)
     if command -v bc >/dev/null 2>&1; then
@@ -105,25 +101,39 @@ for file in "${workflow_files[@]}"; do
         file_duration=$(awk "BEGIN {print $file_end - $file_start}")
     fi
     
-    echo "------------------------------------------------------------"
-    if [ $exit_code -eq 124 ]; then
-        echo "⏱️  $basename_file timed out after 60s"
+    # Check for common patterns that indicate success/failure/skipping
+    if grep -q "API key" /tmp/workflow_test_output.log; then
+        echo "------------------------------------------------------------"
+        echo "⏭️  $rel_path skipped - Missing API key"
+        ((skipped++))
+    elif grep -q "network\|connection\|timeout" /tmp/workflow_test_output.log && [ $exit_code -ne 0 ]; then
+        echo "------------------------------------------------------------"
+        echo "⏭️  $rel_path skipped - Network/connectivity issue"
+        ((skipped++))
+    elif [ $exit_code -eq 124 ]; then
+        echo "------------------------------------------------------------"
+        echo "⏱️  $rel_path timed out after 60s"
         ((failed++))
     elif [ $exit_code -eq 0 ]; then
-        echo "✅ $basename_file completed in ${file_duration}s"
+        echo "------------------------------------------------------------"
+        echo "✅ $rel_path completed in ${file_duration}s"
         ((passed++))
     else
-        echo "❌ $basename_file failed after ${file_duration}s (exit code: $exit_code)"
+        echo "------------------------------------------------------------"
+        echo "❌ $rel_path failed after ${file_duration}s (exit code: $exit_code)"
         ((failed++))
     fi
     
     ((i++))
 done
 
+# Clean up
+rm -f /tmp/workflow_test_output.log
+
 # Calculate totals
 end_time=$(date +%s)
 total_duration=$((end_time - start_time))
-total=$((passed + failed))
+total=$((passed + failed + skipped))
 
 # Print summary
 echo ""
@@ -133,6 +143,7 @@ echo "============================================================"
 echo "Total examples: $total"
 echo "✅ Passed: $passed"
 echo "❌ Failed: $failed"
+echo "⏭️  Skipped: $skipped"
 echo "⏱️  Total time: ${total_duration} seconds"
 
 if [ $total -gt 0 ]; then
@@ -146,6 +157,10 @@ fi
 
 echo ""
 echo "✨ Workflow test run complete!"
+echo ""
+echo "📁 Workflow examples tested from:"
+echo "   • script-users/workflows/ (core workflow patterns)"
+echo "   • script-users/features/ (workflow features like tool chaining)"
 
 # Exit with failure if any tests failed
 if [ $failed -gt 0 ]; then

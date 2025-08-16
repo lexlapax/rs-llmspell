@@ -1,5 +1,5 @@
 #!/bin/bash
-# ABOUTME: Shell script to run all agent examples in examples/lua/agents/
+# ABOUTME: Shell script to run all agent examples in the new organized structure
 # ABOUTME: Tests agent creation and execution with API calls
 
 # Set the llmspell command path
@@ -29,24 +29,48 @@ if [ -z "$OPENAI_API_KEY" ] && [ -z "$ANTHROPIC_API_KEY" ]; then
     fi
 fi
 
-# Find agent examples
+# Find agent examples in new organized structure
 if [[ $(basename "$PWD") == "examples" ]]; then
-    agents_dir="lua/agents"
+    base_dir="."
 else
-    agents_dir="examples/lua/agents"
+    base_dir="examples"
 fi
 
-# Get all agent Lua files
-agent_files=($(ls $agents_dir/*.lua 2>/dev/null | sort))
+# Agent examples are now organized by learning level
+agent_dirs=(
+    "$base_dir/script-users/getting-started"
+    "$base_dir/script-users/features" 
+    "$base_dir/script-users/advanced"
+)
+
+# Get all agent Lua files from all directories
+agent_files=()
+for dir in "${agent_dirs[@]}"; do
+    if [ -d "$dir" ]; then
+        while IFS= read -r -d '' file; do
+            agent_files+=("$file")
+        done < <(find "$dir" -name "*agent*.lua" -print0 2>/dev/null | sort -z)
+    fi
+done
 
 echo "Discovered ${#agent_files[@]} agent examples:"
 i=1
 for file in "${agent_files[@]}"; do
-    basename_file=$(basename "$file")
-    printf "  %2d. %s\n" "$i" "$basename_file"
+    # Show relative path from examples/ for clarity
+    rel_path=${file#$base_dir/}
+    printf "  %2d. %s\n" "$i" "$rel_path"
     ((i++))
 done
 echo ""
+
+if [ ${#agent_files[@]} -eq 0 ]; then
+    echo "❌ No agent examples found!"
+    echo "   Expected to find examples in:"
+    for dir in "${agent_dirs[@]}"; do
+        echo "   - $dir"
+    done
+    exit 1
+fi
 
 # Confirm API usage
 echo "⚠️  These tests will make real API calls and incur costs!"
@@ -70,9 +94,9 @@ echo "======================"
 # Run each agent example
 i=1
 for file in "${agent_files[@]}"; do
-    basename_file=$(basename "$file")
+    rel_path=${file#$base_dir/}
     echo ""
-    echo "[$i/${#agent_files[@]}] Running $basename_file..."
+    echo "[$i/${#agent_files[@]}] Running $rel_path..."
     echo "------------------------------------------------------------"
     
     file_start=$(date +%s.%N)
@@ -83,13 +107,9 @@ for file in "${agent_files[@]}"; do
         sleep 2
     fi
     
-    # Run with timeout and specific config
-    # Store absolute path to llmspell
-    LLMSPELL_ABS="$(cd "$(dirname "$LLMSPELL_CMD")" && pwd)/$(basename "$LLMSPELL_CMD")"
-    cd $(dirname $file)
-    timeout 30 "$LLMSPELL_ABS" run "$(basename $file)" 2>&1 | tee /tmp/agent_test_output.log
+    # Run with timeout - use the file path relative to working directory
+    timeout 30 "$LLMSPELL_CMD" run "$file" 2>&1 | tee /tmp/agent_test_output.log
     exit_code=${PIPESTATUS[0]}
-    cd - > /dev/null
     
     file_end=$(date +%s.%N)
     if command -v bc >/dev/null 2>&1; then
@@ -101,19 +121,19 @@ for file in "${agent_files[@]}"; do
     # Check for common error patterns
     if grep -q "API key" /tmp/agent_test_output.log; then
         echo "------------------------------------------------------------"
-        echo "⏭️  $basename_file skipped - Missing API key"
+        echo "⏭️  $rel_path skipped - Missing API key"
         ((skipped++))
     elif [ $exit_code -eq 124 ]; then
         echo "------------------------------------------------------------"
-        echo "⏱️  $basename_file timed out after 30s"
+        echo "⏱️  $rel_path timed out after 30s"
         ((failed++))
     elif [ $exit_code -eq 0 ]; then
         echo "------------------------------------------------------------"
-        echo "✅ $basename_file completed in ${file_duration}s"
+        echo "✅ $rel_path completed in ${file_duration}s"
         ((passed++))
     else
         echo "------------------------------------------------------------"
-        echo "❌ $basename_file failed after ${file_duration}s (exit code: $exit_code)"
+        echo "❌ $rel_path failed after ${file_duration}s (exit code: $exit_code)"
         ((failed++))
     fi
     
@@ -150,6 +170,11 @@ fi
 
 echo ""
 echo "✨ Agent test run complete!"
+echo ""
+echo "📁 Agent examples tested from:"
+echo "   • script-users/getting-started/ (basic examples)"
+echo "   • script-users/features/ (feature demonstrations)"
+echo "   • script-users/advanced/ (complex patterns)"
 
 # Exit with failure if any tests failed
 if [ $failed -gt 0 ]; then
