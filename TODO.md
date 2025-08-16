@@ -176,18 +176,73 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 
 **Implementation Steps**:
 
-1. [ ] **Phase 0: Validate Already-Moved Files** (30 min): IN PROGRESS
-   - [ ] Test 6 files moved without proper validation:
-     - [ ] `00-hello-world.lua` - Test output matches expected
-     - [ ] `comprehensive-demo.lua` - Test with API keys
-     - [ ] `provider-info.lua` - Test provider detection
-     - [ ] `streaming-responses.lua` - Test streaming capability
-     - [ ] `multimodal.lua` - Test multimodal features
-     - [ ] `performance-validation.rs` - Test benchmark runs
-   - [ ] Add metadata headers to these files
-   - [ ] Document any issues found
+1. [x] **Phase 0: Validate Already-Moved Files** (30 min): COMPLETE
+   - [x] Test 6 files moved without proper validation:
+     - [x] `00-hello-world.lua` - ✅ Works correctly, produces expected output
+     - [x] `comprehensive-demo.lua` - ✅ Fixed: added missing 'operation' parameter
+     - [x] `provider-info.lua` - ❌ Bug: Provider global not available (needs implementation)
+     - [x] `streaming-responses.lua` - ✅ Works correctly, demonstrates streaming
+     - [x] `multimodal.lua` - ✅ Works correctly (stub implementation as expected)
+     - [x] `performance-validation.rs` - ⚠️ Not a test file, needs different handling (standalone binary)
+   - [x] Fix bugs in `comprehensive-demo.lua` - DONE
+   - [ ] Fix `provider-info.lua` - Requires Provider global implementation (see Phase 0.5)
+   - [ ] Add metadata headers to working files
+   - [x] Document issues found (1 missing feature, 1 special case)
 
-2. [ ] **Phase 1: Baseline Testing Matrix** (1 hour)
+2. [ ] **Phase 0.5: Implement Provider Global** (2 hours): NEW - CRITICAL
+   **Why**: provider-info.lua and potentially other examples need Provider API
+   **Pattern**: Follow existing global implementation pattern (core global → Lua binding → registration)
+   
+   - [ ] **Core Provider Global Implementation**:
+     - [ ] Create `llmspell-bridge/src/globals/provider_global.rs`:
+       - [ ] Implement `ProviderGlobal` struct with ProviderManager access
+       - [ ] Implement `GlobalObject` trait with:
+         - `metadata()` - Return global metadata
+         - `inject_lua()` - Delegate to Lua implementation
+         - `inject_javascript()` - Delegate to JavaScript stub
+       - [ ] Store Arc<ProviderManager> for provider access
+       - [ ] Handle missing API keys gracefully (return empty/limited info)
+       - [ ] Security: Never expose actual API keys, only capabilities
+   
+   - [ ] **Lua Provider Binding**:
+     - [ ] Create `llmspell-bridge/src/lua/globals/provider.rs`:
+       - [ ] Implement `inject_provider_global()` function
+       - [ ] Create Provider table with methods:
+         - `Provider.list()` → List available providers
+         - `Provider.get(name)` → Get provider info
+         - `Provider.getCapabilities(name)` → Get capabilities
+         - `Provider.isAvailable(name)` → Check if configured
+       - [ ] Return structured data (tables) with provider info
+     - [ ] Add module export in `llmspell-bridge/src/lua/globals/mod.rs`
+   
+   - [ ] **JavaScript Provider Binding (Stub)**:
+     - [ ] Create `llmspell-bridge/src/javascript/globals/provider.rs`:
+       - [ ] Implement `inject_provider_global()` stub function
+       - [ ] Return "Not implemented" error for now
+       - [ ] Add TODO comment for Phase 2 implementation
+     - [ ] Add module export in `llmspell-bridge/src/javascript/globals/mod.rs`
+   
+   - [ ] **Registration and Integration**:
+     - [ ] Register in `create_standard_registry()` in `llmspell-bridge/src/globals/mod.rs`:
+       ```rust
+       builder.register(Arc::new(provider_global::ProviderGlobal::new(
+           context.providers.clone(),
+       )));
+       ```
+     - [ ] Add module declaration in `llmspell-bridge/src/globals/mod.rs`
+   
+   - [ ] **Testing and Validation**:
+     - [ ] Test `provider-info.lua` works with new Provider global
+     - [ ] Create unit tests for Provider global
+     - [ ] Verify security: API keys not exposed
+     - [ ] Document Provider API in user guide
+   
+   - [ ] **Update Examples**:
+     - [ ] Fix any other examples using Provider API
+     - [ ] Add example showing Provider.list() usage
+     - [ ] Add example showing capability detection
+
+3. [ ] **Phase 1: Baseline Testing Matrix** (1 hour)
    - [ ] Test ALL remaining examples in CURRENT locations
    - [ ] Create testing categories:
      - **No Dependencies**: Can run immediately

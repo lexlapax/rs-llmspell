@@ -89,6 +89,7 @@ if hasher then
     print("   Text: \"" .. text .. "\"")
     for _, algo in ipairs(algorithms) do
         local result = hasher:execute({ 
+            operation = "hash",
             input = text,
             algorithm = algo 
         })
@@ -118,8 +119,30 @@ end
 -- 6. AGENT SYSTEM
 print("\n6️⃣  AGENT SYSTEM")
 print("──────────────")
-print("   Templates: " .. table.concat(Agent.listTemplates(), ", "))
-print("   Active instances: " .. #Agent.list())
+-- Check if Agent API is available
+if Agent and Agent.discover then
+    local agent_types = Agent.discover()
+    if agent_types and #agent_types > 0 then
+        local type_names = {}
+        for _, agent_type in ipairs(agent_types) do
+            if type(agent_type) == "table" and agent_type.name then
+                table.insert(type_names, agent_type.name)
+            elseif type(agent_type) == "string" then
+                table.insert(type_names, agent_type)
+            end
+        end
+        if #type_names > 0 then
+            print("   Available types: " .. table.concat(type_names, ", "))
+        else
+            print("   Available types: (none discovered)")
+        end
+    else
+        print("   Available types: (none discovered)")
+    end
+    print("   Active instances: " .. #Agent.list())
+else
+    print("   Agent system not available")
+end
 
 -- 7. JSON OPERATIONS
 print("\n7️⃣  JSON OPERATIONS")
