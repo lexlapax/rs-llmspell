@@ -232,19 +232,26 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Verify compiles without errors
      - [x] Verify security: API keys not exposed (only capabilities returned)
 
-3. [ ] **Phase 1: Baseline Testing Matrix** (1 hour)
-   - [ ] Test ALL remaining examples in CURRENT locations
-   - [ ] Create testing categories:
-     - **No Dependencies**: Can run immediately
-     - **Config Required**: Need specific .toml files
-     - **API Keys Required**: Need OPENAI_API_KEY or ANTHROPIC_API_KEY
-     - **Special Setup**: Need database, network services, etc.
-     - **Test Files**: Should go to tests-as-examples/
-     - **Broken/Outdated**: Need fixes before migration
-   - [ ] Document expected output for each working example
-   - [ ] Create `TESTING_MATRIX.md` with results
+3. [x] **Phase 1: Baseline Testing Matrix** (1 hour): COMPLETE ✅
+   - [x] Test ALL remaining examples in CURRENT locations (103 files tested)
+   - [x] Create testing categories:
+     - **No Dependencies**: 8 working files ready to migrate
+     - **Config Required**: 7 config files (.toml)
+     - **API Keys Required**: ~10 files (mostly agents)
+     - **Test Files**: ~15 files (runners, benchmarks)
+     - **Broken/Outdated**: ~70 files need fixing
+     - **Duplicates**: ~5 files to remove
+   - [x] Document expected output for each working example
+   - [x] Create `TESTING_MATRIX.md` with comprehensive results
+   
+   **Key Findings**:
+   - Only 8 examples work without any fixes
+   - Most workflows are broken (API changes)
+   - Many tools have invocation errors
+   - Several agents use deprecated Agent.create() API
+   - 5 duplicate workflow files to remove
 
-3. [ ] **Phase 2: Systematic Migration by Category** (4 hours)
+4. [ ] **Phase 2: Systematic Migration by Category** (4 hours)
    
    **Process for EACH file**:
    1. Verify baseline test result from Phase 1
@@ -271,29 +278,39 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    
    **Migration Groups** (based on testing requirements):
    
-   - [ ] **Group A: No Dependencies** (test & migrate first):
-     - Tools that work without configs/APIs (filesystem, utility, system)
-     - Basic examples (hello world variants)
-     - Debug/diagnostic scripts
+   - [ ] **Group A: No Dependencies** (8 files - migrate first):
+     - [ ] `debug_globals.lua` → script-users/features/
+     - [ ] `agent-async-example.lua` → script-users/features/
+     - [ ] `agent-processor.lua` → script-users/features/
+     - [ ] `agent-simple-demo.lua` → script-users/getting-started/
+     - [ ] `tools-filesystem.lua` → script-users/features/
+     - [ ] `tools-utility.lua` → script-users/features/
+     - [ ] `basic_operations.lua` → script-users/features/
+     - [ ] `agent-simple-benchmark.lua` → tests-as-examples/benchmarks/
    
-   - [ ] **Group B: Config Required**:
-     - State persistence examples (need state-enabled.toml)
-     - Backup examples (need backup-enabled.toml)
-     - Migration examples (need migration-enabled.toml)
-     - Session examples (need session-enabled.toml)
+   - [ ] **Group B: Config Required** (7 files):
+     - [ ] Move all .toml files from examples/configs/ → script-users/configs/
+     - [ ] `state_persistence/configs/basic.toml` → script-users/configs/
    
-   - [ ] **Group C: API Keys Required**:
-     - All agent examples (need OPENAI_API_KEY or ANTHROPIC_API_KEY)
-     - AI-powered applications
-     - Examples using LLM features
+   - [ ] **Group C: Fix and Migrate** (~70 broken files):
+     - [ ] Fix deprecated Agent.create() → Agent.builder()
+     - [ ] Fix tool invocation APIs
+     - [ ] Fix workflow APIs
+     - [ ] Then migrate to appropriate locations
    
-   - [ ] **Group D: Test Files** (go to tests-as-examples/):
-     - Files with "test_" prefix
-     - Benchmark files (*-benchmark.lua, *-performance.lua)
-     - Test runners (run-*.lua)
-     - Validation scripts
+   - [ ] **Group D: Test Files** (15 files → tests-as-examples/):
+     - [ ] All run-*.lua files → tests-as-examples/runners/
+     - [ ] *-benchmark.lua files → tests-as-examples/benchmarks/
+     - [ ] *-performance.lua files → tests-as-examples/benchmarks/
    
-4. [ ] **Phase 3: Handle Special Cases** (1 hour)
+   - [ ] **Group E: Remove Duplicates** (5 files):
+     - [ ] Remove `agent-simple.lua` (keep agent-simple-demo.lua)
+     - [ ] Remove `workflow-conditional.lua` (keep basics version)
+     - [ ] Remove `workflow-loop.lua` (keep basics version)
+     - [ ] Remove `workflow-parallel.lua` (keep basics version)
+     - [ ] Remove `workflow-sequential.lua` (keep basics version)
+   
+5. [ ] **Phase 3: Handle Special Cases** (1 hour)
    - [ ] **Shell Scripts**:
      - [ ] Migrate and update paths in shell scripts:
        - `run-all-agent-examples.sh` → Update for new structure
@@ -310,7 +327,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [ ] Identify and remove duplicate examples (see MIGRATION_PLAN.md)
      - [ ] Document which files were removed and why
 
-5. [ ] **Phase 4: Create Missing Examples** (1 hour)
+6. [ ] **Phase 4: Create Missing Examples** (1 hour)
    - [ ] Create `script-users/getting-started/01-first-tool.lua` (from tools-showcase.lua)
    - [ ] Create `script-users/getting-started/02-first-agent.lua` (from agent-simple.lua)
    - [ ] Create `script-users/getting-started/03-first-workflow.lua` (from workflow-basics-sequential.lua)
@@ -323,7 +340,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [ ] Add example showing capability detection
    - [ ] Document Provider API in user guide
 
-6. [ ] **Phase 5: Cleanup and Validation** (1 hour)
+7. [ ] **Phase 5: Cleanup and Validation** (1 hour)
    - [ ] Remove empty directories (lua/, configs/, state_persistence/, etc.)
    - [ ] Remove identified duplicates
    - [ ] Final test of all migrated examples:
