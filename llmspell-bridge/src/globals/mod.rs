@@ -8,6 +8,7 @@ pub mod event_global;
 pub mod hook_global;
 pub mod injection;
 pub mod json_global;
+pub mod provider_global;
 pub mod registry;
 pub mod replay_global;
 pub mod session_global;
@@ -108,6 +109,11 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
 
     builder.register(Arc::new(tool_global::ToolGlobal::new(
         context.registry.clone(),
+    )));
+
+    // Register Provider global for LLM provider information
+    builder.register(Arc::new(provider_global::ProviderGlobal::new(
+        context.providers.clone(),
     )));
 
     // Create agent global with state manager if available

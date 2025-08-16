@@ -14,7 +14,7 @@ pub struct ProviderGlobal {
 impl ProviderGlobal {
     /// Create a new Provider global with access to provider manager
     #[must_use]
-    pub fn new(providers: Arc<ProviderManager>) -> Self {
+    pub const fn new(providers: Arc<ProviderManager>) -> Self {
         Self { providers }
     }
 }
@@ -47,16 +47,11 @@ impl GlobalObject for ProviderGlobal {
     ) -> Result<()> {
         // TODO: Implement JavaScript provider support in Phase 2
         // For now, return a stub implementation
-        crate::javascript::globals::provider::inject_provider_global_stub()
-            .map_err(|e| llmspell_core::LLMSpellError::Component {
+        crate::javascript::globals::provider::inject_provider_global_stub().map_err(|e| {
+            llmspell_core::LLMSpellError::Component {
                 message: format!("Failed to inject Provider global (JavaScript): {e}"),
                 source: None,
-            })
-    }
-
-    #[cfg(feature = "python")]
-    fn inject_python(&self, _py: &pyo3::Python, _context: &GlobalContext) -> Result<()> {
-        // TODO: Implement Python provider support in Phase 3
-        Ok(())
+            }
+        })
     }
 }

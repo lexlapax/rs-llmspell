@@ -1,6 +1,7 @@
 //! Tests agent messaging functionality
 
 #![allow(clippy::significant_drop_tightening)]
+#![allow(clippy::literal_string_with_formatting_args)]
 
 use llmspell_agents::testing::mocks;
 

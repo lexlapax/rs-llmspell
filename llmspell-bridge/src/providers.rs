@@ -206,19 +206,48 @@ impl ProviderManager {
         let mut infos = Vec::new();
 
         for provider_name in providers {
-            if let Ok(capabilities) = self
+            let capabilities = self
                 .core_manager
                 .query_capabilities(Some(&provider_name))
                 .await
-            {
-                infos.push(ProviderInfo {
-                    name: provider_name,
-                    capabilities,
-                });
-            }
+                .ok();
+
+            // Consider a provider enabled if we can query its capabilities
+            let enabled = capabilities.is_some();
+
+            infos.push(ProviderInfo {
+                name: provider_name,
+                enabled,
+                capabilities,
+            });
         }
 
         infos
+    }
+
+    /// Get information about a specific provider
+    pub async fn get_provider_info(&self, name: &str) -> Option<ProviderInfo> {
+        // Check if provider exists in configuration
+        let exists = self.config.providers.contains_key(name)
+            || self
+                .core_manager
+                .list_providers()
+                .await
+                .contains(&name.to_string());
+
+        if !exists {
+            return None;
+        }
+
+        let capabilities = self.core_manager.query_capabilities(Some(name)).await.ok();
+
+        let enabled = capabilities.is_some();
+
+        Some(ProviderInfo {
+            name: name.to_string(),
+            enabled,
+            capabilities,
+        })
     }
 
     /// Check if a provider supports a specific capability
@@ -292,7 +321,8 @@ impl ProviderManager {
 #[derive(Debug, Clone)]
 pub struct ProviderInfo {
     pub name: String,
-    pub capabilities: ProviderCapabilities,
+    pub enabled: bool,
+    pub capabilities: Option<ProviderCapabilities>,
 }
 
 /// Configuration for the provider manager
