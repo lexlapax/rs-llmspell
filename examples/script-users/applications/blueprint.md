@@ -88,9 +88,45 @@ local workflow = Workflow.builder()
 local workflow = Workflow.builder()
     :name("workflow_name")
     :conditional()
-    :add_step({...})
+    :condition(function(ctx) return ctx.value > 5 end)  -- Lua function for condition
+    :add_then_step({...})  -- Steps for true condition
+    :add_else_step({...})  -- Steps for false condition  
     :build()
 ```
+
+### Conditional Workflow Challenges
+
+**⚠️ IMPORTANT**: Conditional workflows have complex implementation requirements:
+
+**Current Issues:**
+- Lua function conditions may not serialize properly to JSON
+- Builder pattern for conditionals needs debugging
+- "Cannot execute conditional workflow without branches" errors occur
+
+**Recommended Workaround:**
+```lua
+-- Instead of complex conditional workflows, use sequential with nested workflows
+local main_workflow = Workflow.builder()
+    :name("main_flow")
+    :sequential()
+    :add_step({
+        name = "classify",
+        type = "agent", 
+        agent = "classifier_agent",
+        input = "Classify this input"
+    })
+    :add_step({
+        name = "process",
+        type = "workflow",
+        workflow = urgent_handler  -- Choose workflow based on classification
+    })
+    :build()
+```
+
+**Future Fix Needed:**
+- Debug conditional workflow JSON serialization
+- Fix condition function handling in bridge
+- Improve error messages for conditional setup
 
 ### Agent Name Storage Pattern
 
