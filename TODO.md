@@ -165,45 +165,151 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 
 #### Task 7.3.3: Core Example Migration
 **Priority**: HIGH
-**Estimated Time**: 6 hours
-**Status**: TODO
+**Estimated Time**: 8 hours
+**Status**: IN PROGRESS
 **Assigned To**: Documentation Team
 **Dependencies**: Task 7.3.2
 
-**Description**: Migrate existing examples to new structure with proper categorization and metadata.
+**Description**: Systematically migrate, test, and validate all examples with proper metadata and structure.
+
+**Migration Methodology**: Test → Document → Add Metadata → Update Paths → Move → Retest
 
 **Implementation Steps**:
-1. [ ] **Script User Examples** (2 hours):
-   - [ ] Move getting-started examples to `script-users/getting-started/`
-   - [ ] Organize feature demos in `script-users/features/`
-   - [ ] Place integration examples in `script-users/applications/`
-   - [ ] Add metadata headers to each file
-   - [ ] Update paths in examples
 
-2. [ ] **Rust Developer Examples** (2 hours):
-   - [ ] Move crate examples to `rust-developers/api-usage/`
-   - [ ] Organize patterns in `rust-developers/patterns/`
-   - [ ] Move extension examples to `rust-developers/extensions/`
-   - [ ] Ensure Cargo.toml files are correct
-   - [ ] Update documentation references
+1. [ ] **Phase 0: Validate Already-Moved Files** (30 min): IN PROGRESS
+   - [ ] Test 6 files moved without proper validation:
+     - [ ] `00-hello-world.lua` - Test output matches expected
+     - [ ] `comprehensive-demo.lua` - Test with API keys
+     - [ ] `provider-info.lua` - Test provider detection
+     - [ ] `streaming-responses.lua` - Test streaming capability
+     - [ ] `multimodal.lua` - Test multimodal features
+     - [ ] `performance-validation.rs` - Test benchmark runs
+   - [ ] Add metadata headers to these files
+   - [ ] Document any issues found
 
-3. [ ] **Cross-References** (1 hour):
-   - [ ] Update all README files with new paths
-   - [ ] Fix import statements in examples
-   - [ ] Update documentation links
-   - [ ] Create redirect guide for old paths
+2. [ ] **Phase 1: Baseline Testing Matrix** (1 hour)
+   - [ ] Test ALL remaining examples in CURRENT locations
+   - [ ] Create testing categories:
+     - **No Dependencies**: Can run immediately
+     - **Config Required**: Need specific .toml files
+     - **API Keys Required**: Need OPENAI_API_KEY or ANTHROPIC_API_KEY
+     - **Special Setup**: Need database, network services, etc.
+     - **Test Files**: Should go to tests-as-examples/
+     - **Broken/Outdated**: Need fixes before migration
+   - [ ] Document expected output for each working example
+   - [ ] Create `TESTING_MATRIX.md` with results
 
-4. [ ] **Consolidation** (1 hour):
-   - [ ] Merge duplicate examples
-   - [ ] Remove redundant examples
-   - [ ] Combine related examples
-   - [ ] Archive outdated examples
+3. [ ] **Phase 2: Systematic Migration by Category** (4 hours)
+   
+   **Process for EACH file**:
+   1. Verify baseline test result from Phase 1
+   2. Add metadata header BEFORE moving:
+      ```lua
+      -- Example: [Name]
+      -- Purpose: [What it demonstrates]
+      -- Prerequisites: [API keys, configs needed]
+      -- Expected Output: [What should happen]
+      -- Version: 0.7.0
+      -- Tags: [relevant tags]
+      ```
+   3. Update internal paths/requires for new structure
+   4. Move to appropriate new location
+   5. Test in new location - verify produces expected output
+   6. Mark status: ✅ Working | ⚠️ Needs Fix | ❌ Blocked
+   
+   **Migration Groups** (based on testing requirements):
+   
+   - [ ] **Group A: No Dependencies** (test & migrate first):
+     - Tools that work without configs/APIs (filesystem, utility, system)
+     - Basic examples (hello world variants)
+     - Debug/diagnostic scripts
+   
+   - [ ] **Group B: Config Required**:
+     - State persistence examples (need state-enabled.toml)
+     - Backup examples (need backup-enabled.toml)
+     - Migration examples (need migration-enabled.toml)
+     - Session examples (need session-enabled.toml)
+   
+   - [ ] **Group C: API Keys Required**:
+     - All agent examples (need OPENAI_API_KEY or ANTHROPIC_API_KEY)
+     - AI-powered applications
+     - Examples using LLM features
+   
+   - [ ] **Group D: Test Files** (go to tests-as-examples/):
+     - Files with "test_" prefix
+     - Benchmark files (*-benchmark.lua, *-performance.lua)
+     - Test runners (run-*.lua)
+     - Validation scripts
+   
+4. [ ] **Phase 3: Handle Special Cases** (1 hour)
+   - [ ] **Shell Scripts**:
+     - [ ] Migrate and update paths in shell scripts:
+       - `run-all-agent-examples.sh` → Update for new structure
+       - `run-all-tools-examples.sh` → Update for new structure
+       - `run-workflow-examples.sh` → Update for new structure
+       - `run-all-lua-examples.sh` → Update for new structure
+     - [ ] Create NEW runner scripts for organized structure
+   
+   - [ ] **Config Files**:
+     - [ ] Move all .toml configs to `script-users/configs/`
+     - [ ] Ensure configs work from new location
+   
+   - [ ] **Duplicates to Remove**:
+     - [ ] Identify and remove duplicate examples (see MIGRATION_PLAN.md)
+     - [ ] Document which files were removed and why
+
+5. [ ] **Phase 4: Create Missing Examples** (1 hour)
+   - [ ] Create `script-users/getting-started/01-first-tool.lua` (from tools-showcase.lua)
+   - [ ] Create `script-users/getting-started/02-first-agent.lua` (from agent-simple.lua)
+   - [ ] Create `script-users/getting-started/03-first-workflow.lua` (from workflow-basics-sequential.lua)
+   - [ ] Create `script-users/getting-started/04-save-state.lua` (from basic_persistence.lua)
+   - [ ] Create `script-users/getting-started/05-handle-errors.lua` (NEW - no existing example)
+
+6. [ ] **Phase 5: Cleanup and Validation** (1 hour)
+   - [ ] Remove empty directories (lua/, configs/, state_persistence/, etc.)
+   - [ ] Remove identified duplicates
+   - [ ] Final test of all migrated examples:
+     - [ ] Getting-started sequence (00-05) works
+     - [ ] Feature examples demonstrate features
+     - [ ] Cookbook patterns are self-contained
+     - [ ] Applications run with proper setup
+   - [ ] Update all documentation references to new paths
+   - [ ] Create MIGRATION_NOTES.md for users
+
+**Summary of Files Going to tests-as-examples** (21 files total):
+- **Benchmarks** (8 files):
+  - `agent-simple-benchmark.lua` → benchmarks/
+  - `tools-performance.lua` → benchmarks/
+  - `event-performance.lua` → benchmarks/
+  - `event-statistics.lua` → benchmarks/
+  - `run-performance-benchmarks.lua` → benchmarks/
+  - `performance_validation.rs` → benchmarks/
+- **Integration Tests** (13 files):
+  - `test_replay_basic.lua` → integration/
+  - `test_replay_minimal.lua` → integration/
+  - `test_state_api.lua` → integration/
+  - `test_migration_api.lua` → integration/
+  - `backup_validation.lua` → integration/
+  - `run-all-examples.lua` → integration/
+  - `run-integration-demos.lua` → integration/
+  - `debug_globals.lua` → integration/
 
 **Quality Assurance**:
-- [ ] Test all migrated examples run correctly
-- [ ] Verify metadata headers are complete
-- [ ] Check cross-references work
-- [ ] Ensure no examples lost in migration
+- [ ] **Testing Categories Summary**:
+  - [ ] Examples that run without dependencies: Test all
+  - [ ] Examples needing configs: Test with appropriate configs from script-users/configs/
+  - [ ] Examples needing API keys: Test with mock/real keys, ensure graceful failure
+  - [ ] Test files: Verify they're in tests-as-examples/ and run as tests
+- [ ] **File Integrity**:
+  - [ ] All files have metadata headers per STANDARDS.md
+  - [ ] Internal paths/requires are updated for new structure
+  - [ ] No broken cross-references
+  - [ ] No files lost in migration (check count: ~125 total)
+- [ ] **Functionality**:
+  - [ ] Getting-started examples 00-05 run in sequence
+  - [ ] Feature examples demonstrate their features
+  - [ ] Cookbook patterns are self-contained
+  - [ ] Applications run (with appropriate setup)
 
 **Acceptance Criteria**:
 - [ ] All examples migrated to new structure
