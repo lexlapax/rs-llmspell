@@ -4,6 +4,52 @@
 
 This blueprint defines 7 production-ready applications demonstrating llmspell's full capabilities. Each application uses proper component composition with minimal Lua code, preparing for future config-driven architecture.
 
+## CRITICAL: Workflow Step API Reference
+
+Based on `llmspell-bridge/src/lua/globals/workflow.rs`, workflow steps MUST follow this exact structure:
+
+### Tool Steps
+```lua
+{
+    name = "step_name",        -- Required: unique step name
+    type = "tool",              -- Required: step type
+    tool = "tool_name",         -- Required: tool name as string (NOT tool_name)
+    input = {                   -- Optional: parameters table (becomes JSON)
+        operation = "write",
+        path = "/tmp/file.txt",
+        input = "content"       -- Note: nested 'input' for file_operations
+    }
+}
+```
+
+### Agent Steps  
+```lua
+{
+    name = "step_name",         -- Required: unique step name
+    type = "agent",             -- Required: step type
+    agent = "agent_id_string",  -- Required: agent ID/name as string (NOT agent object)
+    input = "prompt text"       -- Optional: string input for the agent
+}
+```
+
+### Workflow Steps (Nested)
+```lua
+{
+    name = "step_name",         -- Required: unique step name
+    type = "workflow",          -- Required: step type
+    workflow = workflow_obj     -- Required: workflow object (from builder)
+}
+-- Note: Currently returns error "Workflow steps are not yet implemented"
+```
+
+### Common Mistakes to Avoid
+
+1. ❌ `tool_name = "file_operations"` → ✅ `tool = "file_operations"`
+2. ❌ `parameters = {...}` → ✅ `input = {...}` for tools
+3. ❌ `agent = agent_object` → ✅ `agent = "agent_id_string"`
+4. ❌ `text = "prompt"` → ✅ `input = "prompt"` for agents
+5. ❌ `type = "function"` → Not supported, use tools or agents
+
 ## Critical Requirements
 
 ### 1. REAL LLM APIs ONLY - NO MOCKS
@@ -466,8 +512,24 @@ local agents = {
 local workflow = Workflow.builder()
     :name("main_workflow")
     :conditional()  -- or sequential, parallel, loop
-    :add_step({type="agent", agent=agents.analyzer})
-    :add_step({type="tool", tool="file_operations"})
+    -- For agent steps: use 'agent' field with agent ID/name string, 'input' field for text
+    :add_step({
+        name = "analyze",
+        type = "agent", 
+        agent = "analyzer_agent_id",  -- String ID, not agent object
+        input = "Analyze this data"   -- String input for agent
+    })
+    -- For tool steps: use 'tool' field with tool name, 'input' field for parameters
+    :add_step({
+        name = "save_results",
+        type = "tool", 
+        tool = "file_operations",     -- Tool name as string
+        input = {                      -- Parameters as table (converted to JSON)
+            operation = "write",
+            path = "/tmp/results.txt",
+            input = "data to write"
+        }
+    })
     :build()
 
 -- 3. Execute (single call)
@@ -493,8 +555,10 @@ Future (Pure Config):
 [workflow.main]
 type = "conditional"
 steps = [
-    {type = "agent", name = "analyzer", model = "gpt-4"},
-    {type = "tool", name = "file_operations", operation = "read"}
+    # Agent step: 'agent' field is string ID, 'input' is the text prompt
+    {name = "analyze", type = "agent", agent = "analyzer_agent_id", input = "Analyze this"},
+    # Tool step: 'tool' field is tool name, 'input' contains parameters
+    {name = "read_file", type = "tool", tool = "file_operations", input = {operation = "read", path = "/tmp/data.txt"}}
 ]
 ```
 
