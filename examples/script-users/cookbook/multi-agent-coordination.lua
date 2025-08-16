@@ -1,6 +1,6 @@
 -- Example: Agent Coordinator  
 -- Purpose: Demonstrates multi-agent coordination and collaboration patterns
--- Prerequisites: API key set in environment (OPENAI_API_KEY)
+-- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable, cookbook.toml config, Tools: file_operations
 -- Expected Output: Multi-agent coordination examples including sequential pipelines and parallel execution
 -- Version: 0.7.0
 -- Tags: agent, coordination, advanced

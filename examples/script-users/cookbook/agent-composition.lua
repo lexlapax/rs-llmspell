@@ -1,6 +1,6 @@
 -- Example: Agent Composition Patterns
 -- Purpose: Demonstrates agent composition patterns, wrapping agents as tools, and discovering agents by capability
--- Prerequisites: API key set in environment (OPENAI_API_KEY)
+-- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable, cookbook.toml config
 -- Expected Output: Agent composition demonstrations including composite agents and agent-wrapped tools
 -- Version: 0.7.0
 -- Tags: agent, composition, advanced
@@ -101,7 +101,7 @@ print_result("LLM Agent Type Info", Agent.get_info("llm"))
 
 -- Wrap an agent as a tool
 print("\n=== Agent-as-Tool Composition ===")
-local research_tool_name = Agent.wrapAsTool(research_agent_name, {
+local research_tool_name = Agent.wrap_as_tool(research_agent_name, {
     tool_name = "research_tool",
     description = "Research agent wrapped as a tool for other agents to use"
 })
@@ -118,7 +118,7 @@ end
 
 -- Create a composite agent that delegates to multiple agents
 print("\n=== Creating Composite Agent ===")
-Agent.createComposite("composite_analyst", 
+Agent.create_composite("composite_analyst", 
     {research_agent_name, analysis_agent_name}, 
     {
         routing_strategy = "capability_based",
@@ -137,13 +137,13 @@ end
 -- Discover agents by capability
 print("\n=== Agent Discovery by Capability ===")
 
-local streaming_agents = Agent.discoverByCapability("streaming")
+local streaming_agents = Agent.discover_by_capability("streaming")
 print("\nAgents with streaming capability:")
 for _, agent in ipairs(streaming_agents) do
     print("  - " .. agent)
 end
 
-local composite_agents = Agent.discoverByCapability("composite")
+local composite_agents = Agent.discover_by_capability("composite")
 print("\nComposite agents:")
 for _, agent in ipairs(composite_agents) do
     print("  - " .. agent)
@@ -198,7 +198,7 @@ local enhanced_writer = Agent.builder()
         max_recursion_depth = 5
     })
     :build()
-local enhanced_writer_name = enhanced_writer.name
+local enhanced_writer_name = "enhanced_writer_comp_4"
 print("Created enhanced writer: " .. enhanced_writer_name)
 
 -- List tools to verify research_tool is available
@@ -214,7 +214,7 @@ end
 print("\n=== Nested Composition ===")
 
 -- Create a meta-coordinator that uses the composite agent
-Agent.createComposite("meta_coordinator",
+Agent.create_composite("meta_coordinator",
     {"composite_analyst", enhanced_writer_name},
     {
         routing_strategy = "task_based",

@@ -1,0 +1,33 @@
+# Configuration for Cookbook Examples - Real LLM Providers
+# Usage: LLMSPELL_CONFIG=examples/script-users/configs/cookbook.toml
+# 
+# Set your API keys in environment variables:
+# export OPENAI_API_KEY="your-key-here"
+# export ANTHROPIC_API_KEY="your-key-here"
+
+# Default script engine
+default_engine = "lua"
+
+# Provider configuration
+[providers]
+default_provider = "openai"
+
+# OpenAI provider for production cookbook examples
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-3.5-turbo"
+
+# Anthropic provider as fallback
+[providers.providers.anthropic]
+provider_type = "anthropic" 
+api_key_env = "ANTHROPIC_API_KEY"
+model = "claude-3-haiku-20240307"
+
+# Engine configuration
+[engines.lua]
+security_level = "safe"
+
+# Runtime configuration
+[runtime]
+log_level = "info"
