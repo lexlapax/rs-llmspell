@@ -693,33 +693,137 @@ impl UserData for WorkflowBuilder {
             // Add type-specific configuration
             match workflow_type.as_str() {
                 "conditional" => {
-                    // For conditional workflows, add then/else steps
-                    let then_steps_json: Vec<serde_json::Value> = this
-                        .then_steps
-                        .iter()
-                        .map(|step| {
-                            serde_json::json!({
-                                "name": &step.name,
-                                "type": "tool", // Simplified for now
-                                "tool": "placeholder"
+                    // For conditional workflows, convert then/else steps to proper branches format
+                    let mut branches = Vec::new();
+                    
+                    // Convert then_steps to first branch with appropriate condition
+                    if !this.then_steps.is_empty() {
+                        let then_steps_json: Vec<serde_json::Value> = this
+                            .then_steps
+                            .iter()
+                            .map(|step| {
+                                // Use same step conversion logic as main steps
+                                let step_id = uuid::Uuid::new_v4().to_string();
+                                let step_type = match &step.step_type {
+                                    StepType::Tool { tool_name, parameters } => {
+                                        serde_json::json!({
+                                            "Tool": {
+                                                "tool_name": tool_name,
+                                                "parameters": parameters
+                                            }
+                                        })
+                                    }
+                                    StepType::Agent { agent_id, input } => {
+                                        serde_json::json!({
+                                            "Agent": {
+                                                "agent_id": agent_id.to_string(),
+                                                "input": input
+                                            }
+                                        })
+                                    }
+                                    StepType::Custom { function_name, parameters } => {
+                                        serde_json::json!({
+                                            "Custom": {
+                                                "function_name": function_name,
+                                                "parameters": parameters
+                                            }
+                                        })
+                                    }
+                                    StepType::Workflow { workflow_id, input } => {
+                                        serde_json::json!({
+                                            "Workflow": {
+                                                "workflow_id": workflow_id.to_string(),
+                                                "input": input
+                                            }
+                                        })
+                                    }
+                                };
+                                
+                                serde_json::json!({
+                                    "id": step_id,
+                                    "name": &step.name,
+                                    "step_type": step_type,
+                                    "timeout": null,
+                                    "retry_attempts": 0
+                                })
                             })
-                        })
-                        .collect();
-
-                    let else_steps_json: Vec<serde_json::Value> = this
-                        .else_steps
-                        .iter()
-                        .map(|step| {
-                            serde_json::json!({
-                                "name": &step.name,
-                                "type": "tool", // Simplified for now
-                                "tool": "placeholder"
+                            .collect();
+                        
+                        let then_branch = serde_json::json!({
+                            "name": "then_branch",
+                            "condition": {
+                                "type": "always"  // Default condition, will be enhanced in Level 2
+                            },
+                            "steps": then_steps_json
+                        });
+                        branches.push(then_branch);
+                    }
+                    
+                    // Convert else_steps to second branch with fallback condition
+                    if !this.else_steps.is_empty() {
+                        let else_steps_json: Vec<serde_json::Value> = this
+                            .else_steps
+                            .iter()
+                            .map(|step| {
+                                // Use same step conversion logic as main steps
+                                let step_id = uuid::Uuid::new_v4().to_string();
+                                let step_type = match &step.step_type {
+                                    StepType::Tool { tool_name, parameters } => {
+                                        serde_json::json!({
+                                            "Tool": {
+                                                "tool_name": tool_name,
+                                                "parameters": parameters
+                                            }
+                                        })
+                                    }
+                                    StepType::Agent { agent_id, input } => {
+                                        serde_json::json!({
+                                            "Agent": {
+                                                "agent_id": agent_id.to_string(),
+                                                "input": input
+                                            }
+                                        })
+                                    }
+                                    StepType::Custom { function_name, parameters } => {
+                                        serde_json::json!({
+                                            "Custom": {
+                                                "function_name": function_name,
+                                                "parameters": parameters
+                                            }
+                                        })
+                                    }
+                                    StepType::Workflow { workflow_id, input } => {
+                                        serde_json::json!({
+                                            "Workflow": {
+                                                "workflow_id": workflow_id.to_string(),
+                                                "input": input
+                                            }
+                                        })
+                                    }
+                                };
+                                
+                                serde_json::json!({
+                                    "id": step_id,
+                                    "name": &step.name,
+                                    "step_type": step_type,
+                                    "timeout": null,
+                                    "retry_attempts": 0
+                                })
                             })
-                        })
-                        .collect();
-
-                    config["then_steps"] = serde_json::json!(then_steps_json);
-                    config["else_steps"] = serde_json::json!(else_steps_json);
+                            .collect();
+                        
+                        let else_branch = serde_json::json!({
+                            "name": "else_branch",
+                            "condition": {
+                                "type": "never"  // Fallback condition
+                            },
+                            "steps": else_steps_json
+                        });
+                        branches.push(else_branch);
+                    }
+                    
+                    // Use branches format expected by Rust conditional workflow
+                    config["branches"] = serde_json::json!(branches);
                 }
                 "loop" => {
                     if let Some(max_iter) = this.max_iterations {

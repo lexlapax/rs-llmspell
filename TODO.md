@@ -109,6 +109,73 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Test data pipeline with real nested workflows ✅ SUCCESS!
      - [x] Verify workflow types work as nested steps (Sequential + Parallel tested)
 
+0.1. [ ] **TRUE Conditional Workflow Enhancement & Test Rehabilitation** (24-28 hours) - BLOCKING:
+   - **Priority**: CRITICAL - Blocks all real-world applications using conditional workflows
+   - **Issue**: "Cannot execute conditional workflow without branches" error prevents Content Generation Platform
+   - **Root Cause**: Bridge serialization bugs + broken/inadequate tests + missing agent-based conditions
+   
+   - [ ] **Level 1: Bridge Serialization Fix + Test Updates (8 hours)**:
+     - [ ] 0.1.1 Fix then_steps/else_steps JSON Conversion (3 hours) 
+       - File: `llmspell-bridge/src/lua/globals/workflow.rs:696-723`
+       - Replace placeholder JSON with proper step conversion using existing conversion logic
+       - Convert `then_steps` → proper `branches[0]` with condition, `else_steps` → `branches[1]` with fallback
+     - [ ] 0.1.2 Update Broken Bridge Test (2 hours)
+       - File: `llmspell-bridge/tests/lua_workflow_api_tests.rs` 
+       - Fix `test_lua_workflow_conditional` to use builder API instead of direct config
+       - Category: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "bridge")]`
+     - [ ] 0.1.3 Clippy Compliance - Bridge Layer (3 hours)
+       - Files: `llmspell-bridge/src/lua/globals/workflow.rs`, `llmspell-bridge/src/workflows.rs`
+       - Fix unused variables in condition closures, deprecated JSON patterns
+       - Verify: `cargo clippy --package llmspell-bridge -- -D warnings`
+   
+   - [ ] **Level 2: Workflows Layer Fix + Test Rehabilitation (6 hours)**:
+     - [ ] 0.1.4 Add Agent-Based Condition Types (2 hours)
+       - File: `llmspell-workflows/src/conditions.rs`
+       - Add: `StepOutputContains{step_name, search_text}`, `AgentClassification{step_name, expected_type}`
+     - [ ] 0.1.5 Fix Broken Workflow Unit Tests (3 hours) 
+       - File: `llmspell-workflows/src/conditional.rs` test module
+       - Update 7 existing tests to use real conditions instead of `Condition::Always` stubs
+       - Tests: `test_conditional_workflow_execution_always_true`, `test_conditional_workflow_shared_data_condition`, etc.
+       - Category: `#[cfg_attr(test_category = "unit")] #[cfg_attr(test_category = "workflow")]`
+     - [ ] 0.1.6 Clippy Compliance - Workflows Layer (1 hour)
+       - Files: `llmspell-workflows/src/conditional.rs`, `llmspell-workflows/src/conditions.rs`
+       - Verify: `cargo clippy --package llmspell-workflows -- -D warnings`
+       
+   - [ ] **Level 3: Integration Test Creation (5 hours)**:
+     - [ ] 0.1.7 Bridge-to-Workflows Integration Tests (3 hours)
+       - File: `llmspell-bridge/tests/workflow_bridge_integration_tests.rs` (new section)
+       - Test Lua builder → Rust workflow conversion, agent classification condition parsing
+       - Category: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "workflow")] #[cfg_attr(test_category = "bridge")]`
+     - [ ] 0.1.8 End-to-End Content Routing Tests (2 hours)
+       - File: `llmspell-bridge/tests/content_routing_integration_test.rs` (new)
+       - Test full agent classification → workflow routing pipeline
+       - Category: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "agent")] #[cfg_attr(test_category = "workflow")]`
+       
+   - [ ] **Level 4: Documentation & Examples (3 hours)**:
+     - [ ] 0.1.9 Update Blueprint Documentation (1.5 hours)
+       - File: `examples/script-users/applications/blueprint.md`
+       - Remove conditional workflow warnings, add working patterns, migration guide
+     - [ ] 0.1.10 Create Working Example Files (1.5 hours)
+       - Files: `examples/script-users/workflows/conditional-content-routing.lua`, `conditional-multi-branch.lua`
+       
+   - [ ] **Level 5: Advanced Features + Final Compliance (5 hours)**:
+     - [ ] 0.1.11 Multi-Branch Support Enhancement (2 hours)
+       - File: `llmspell-bridge/src/lua/globals/workflow.rs`
+       - Add `add_branch(condition, steps)` API for N-branch routing beyond then/else
+     - [ ] 0.1.12 External API Tests (1.5 hours)
+       - File: `llmspell-bridge/tests/conditional_external_tests.rs` (new)
+       - Tests using real LLM agents for content classification
+       - Category: `#[cfg_attr(test_category = "external")] #[cfg_attr(test_category = "agent")] #[cfg_attr(test_category = "workflow")]`
+     - [ ] 0.1.13 Final Clippy & Test Compliance Verification (1.5 hours)
+       - Commands: `cargo clippy --workspace -- -D warnings`, `cargo test --workspace --all-features`
+       - Verify: All existing tests pass + new tests pass + 0 clippy warnings
+       
+   - **SUCCESS CRITERIA**:
+     - Level 1-2: Content Generation Platform executes without "Cannot execute conditional workflow without branches" error
+     - Level 3: Integration tests prove agent classification correctly routes to different workflows  
+     - Level 4: Documentation updated, examples work, migration path clear
+     - Level 5: Multi-branch routing + 0 clippy warnings + all test categories validated
+
 1. [x] **Customer Support System** (8 hours) - ✅ COMPLETED:
    - [x] **Component Architecture**:
      - [x] Main Sequential Workflow for routing logic (conditional workaround) ✅

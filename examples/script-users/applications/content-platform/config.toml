@@ -1,0 +1,53 @@
+# Content Generation Platform Configuration
+# Blueprint v2.0 Compliant Multi-Format Content Creation
+
+[system]
+name = "content_generation_platform"
+version = "1.0.0"
+default_engine = "openai"
+
+[providers.openai]
+base_url = "https://api.openai.com/v1"
+models = [
+    "gpt-4o-mini",
+    "gpt-3.5-turbo"
+]
+
+[providers.anthropic]
+base_url = "https://api.anthropic.com/v1"
+models = [
+    "claude-3-opus-20240229",
+    "claude-3-sonnet-20240229",
+    "claude-3-haiku-20240307"
+]
+
+[application]
+content_types = ["blog", "social", "email"]
+output_directory = "/tmp/content-platform"
+backup_enabled = true
+max_concurrent_agents = 7
+
+[content_generation]
+# Research and Planning
+research_depth = "comprehensive"
+outline_detail = "detailed"
+
+# Content Creation
+blog_max_words = 2000
+social_platforms = ["twitter", "linkedin", "facebook"]
+email_tone = "professional"
+
+# Optimization
+seo_keywords_max = 10
+grammar_check_enabled = true
+plagiarism_check_enabled = true
+
+[tools]
+web_search_provider = "duckduckgo"
+image_processing_enabled = true
+template_engine_enabled = true
+
+[hooks]
+rate_limiting_enabled = true
+logging_enabled = true
+metrics_collection = true
