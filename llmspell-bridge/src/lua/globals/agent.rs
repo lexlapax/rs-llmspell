@@ -991,12 +991,12 @@ impl UserData for AgentBuilder {
             if let Ok(prompt) = config.get::<_, String>("system_prompt") {
                 this.system_prompt = Some(prompt);
             }
-            
+
             // Extract max_conversation_length if present
             if let Ok(len) = config.get::<_, usize>("max_conversation_length") {
                 this.max_conversation_length = Some(len);
             }
-            
+
             Ok(this.clone())
         });
 
@@ -1005,19 +1005,19 @@ impl UserData for AgentBuilder {
             if let Ok(secs) = limits.get::<_, u64>("max_execution_time_secs") {
                 this.max_execution_time_secs = Some(secs);
             }
-            
+
             if let Ok(mb) = limits.get::<_, u32>("max_memory_mb") {
                 this.max_memory_mb = Some(mb);
             }
-            
+
             if let Ok(calls) = limits.get::<_, u32>("max_tool_calls") {
                 this.max_tool_calls = Some(calls);
             }
-            
+
             if let Ok(depth) = limits.get::<_, u32>("max_recursion_depth") {
                 this.max_recursion_depth = Some(depth);
             }
-            
+
             Ok(this.clone())
         });
 

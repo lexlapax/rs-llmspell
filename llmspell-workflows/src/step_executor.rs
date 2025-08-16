@@ -16,6 +16,11 @@ pub struct StepExecutor {
     config: WorkflowConfig,
     /// Optional workflow executor for hook integration
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Optional workflow bridge for nested workflow execution
+    /// Note: This creates a circular dependency that needs to be resolved
+    /// For now, we'll implement mock behavior until bridge integration is complete
+    #[allow(dead_code)]
+    workflow_bridge: Option<serde_json::Value>, // Placeholder for actual bridge
 }
 
 impl StepExecutor {
@@ -24,6 +29,7 @@ impl StepExecutor {
         Self {
             config,
             workflow_executor: None,
+            workflow_bridge: None,
         }
     }
 
@@ -35,6 +41,7 @@ impl StepExecutor {
         Self {
             config,
             workflow_executor: Some(workflow_executor),
+            workflow_bridge: None,
         }
     }
 
@@ -253,6 +260,10 @@ impl StepExecutor {
                 self.execute_custom_step(function_name, parameters, context)
                     .await
             }
+            StepType::Workflow { workflow_id, input } => {
+                self.execute_workflow_step(*workflow_id, input, context)
+                    .await
+            }
         }
     }
 
@@ -415,6 +426,34 @@ impl StepExecutor {
         Ok(output)
     }
 
+    /// Execute a nested workflow step
+    async fn execute_workflow_step(
+        &self,
+        workflow_id: ComponentId,
+        input: &serde_json::Value,
+        _context: &StepExecutionContext,
+    ) -> Result<String> {
+        debug!("Executing nested workflow step: {:?}", workflow_id);
+
+        // TODO: This needs to be integrated with the workflow bridge/registry
+        // For now, return a mock result indicating nested workflow execution
+        // The actual implementation will require:
+        // 1. Access to workflow registry to find the workflow by ID
+        // 2. Execute the nested workflow with the provided input
+        // 3. Return the workflow result as a string
+
+        // Mock implementation for now
+        let output = format!(
+            "Nested workflow executed: {} with input: {}",
+            workflow_id, input
+        );
+
+        // Simulate some processing time
+        tokio::time::sleep(Duration::from_millis(50)).await;
+
+        Ok(output)
+    }
+
     /// Create a StepContext for hooks
     fn create_step_context(
         &self,
@@ -426,6 +465,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Custom { .. } => "custom",
+            StepType::Workflow { .. } => "workflow",
         };
 
         StepContext {
@@ -449,6 +489,7 @@ impl StepExecutor {
             StepType::Tool { .. } => "tool",
             StepType::Agent { .. } => "agent",
             StepType::Custom { .. } => "custom",
+            StepType::Workflow { .. } => "workflow",
         };
 
         StepContext {

@@ -58,6 +58,11 @@ pub enum StepType {
         function_name: String,
         parameters: serde_json::Value,
     },
+    /// Execute a nested workflow
+    Workflow {
+        workflow_id: ComponentId,
+        input: serde_json::Value,
+    },
 }
 
 /// Workflow execution result

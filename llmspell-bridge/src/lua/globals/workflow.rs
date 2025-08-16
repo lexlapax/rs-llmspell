@@ -9,7 +9,7 @@ use crate::lua::sync_utils::block_on_async;
 use crate::workflows::{WorkflowBridge, WorkflowInfo};
 use llmspell_core::{ComponentId, LLMSpellError};
 use llmspell_workflows::{Condition, ErrorStrategy, StepType, WorkflowStep};
-use mlua::{Lua, Table, UserData, UserDataMethods, Value};
+use mlua::{AnyUserDataExt, Lua, Table, UserData, UserDataMethods, Value};
 use std::sync::Arc;
 // use std::time::Duration; // Unused for now
 use tracing::{debug, info};
@@ -52,10 +52,26 @@ fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowS
             )
         }
         "workflow" => {
-            // Workflow steps not supported yet in StepType
-            return Err(mlua::Error::RuntimeError(
-                "Workflow steps are not yet implemented".to_string(),
-            ));
+            let workflow: mlua::AnyUserData = step_table.get("workflow")?;
+
+            // Get workflow info from the workflow userdata
+            let workflow_info: Table = workflow.call_method("get_info", ())?;
+            let workflow_id: String = workflow_info.get("id")?;
+
+            let input: Option<Table> = step_table.get("input").ok();
+            let input_value = if let Some(input_table) = input {
+                lua_value_to_json(Value::Table(input_table))?
+            } else {
+                serde_json::json!({})
+            };
+
+            WorkflowStep::new(
+                name,
+                StepType::Workflow {
+                    workflow_id: ComponentId::from_name(&workflow_id),
+                    input: input_value,
+                },
+            )
         }
         "custom" => {
             let function_name: String = step_table.get("function")?;
@@ -648,6 +664,14 @@ impl UserData for WorkflowBuilder {
                                 "Custom": {
                                     "function_name": function_name,
                                     "parameters": parameters
+                                }
+                            })
+                        }
+                        StepType::Workflow { workflow_id, input } => {
+                            serde_json::json!({
+                                "Workflow": {
+                                    "workflow_id": workflow_id.to_string(),
+                                    "input": input
                                 }
                             })
                         }
