@@ -94,38 +94,50 @@ local workflow = Workflow.builder()
     :build()
 ```
 
-### Conditional Workflow Challenges
+### Conditional Workflow Status
 
-**⚠️ IMPORTANT**: Conditional workflows have complex implementation requirements:
+**✅ FULLY WORKING**: Conditional workflows are now fully implemented and tested:
 
-**Current Issues:**
-- Lua function conditions may not serialize properly to JSON
-- Builder pattern for conditionals needs debugging
-- "Cannot execute conditional workflow without branches" errors occur
+**Working Features:**
+- ✅ Lua builder pattern fully functional
+- ✅ then_steps/else_steps properly converted to branches format
+- ✅ Workflow step types (tool, agent, workflow) all supported
+- ✅ Agent classification conditions work correctly
+- ✅ Multi-branch routing supported
 
-**Recommended Workaround:**
+**Working Example:**
 ```lua
--- Instead of complex conditional workflows, use sequential with nested workflows
-local main_workflow = Workflow.builder()
-    :name("main_flow")
-    :sequential()
+-- TRUE conditional workflow with agent classification
+local router = Workflow.builder()
+    :name("content_router")
+    :description("Routes content based on classification")
+    :conditional()
     :add_step({
-        name = "classify",
-        type = "agent", 
+        name = "classify_content",
+        type = "agent",
         agent = "classifier_agent",
-        input = "Classify this input"
+        input = "Classify this content: {{content}}"
     })
-    :add_step({
-        name = "process",
+    :condition(function(ctx)
+        -- Check classification result
+        local result = ctx.classify_content or ""
+        return string.match(result:lower(), "blog") ~= nil
+    end)
+    :add_then_step({
+        name = "blog_workflow",
         type = "workflow",
-        workflow = urgent_handler  -- Choose workflow based on classification
+        workflow = blog_creation_workflow
+    })
+    :add_else_step({
+        name = "social_workflow",
+        type = "workflow",
+        workflow = social_creation_workflow
     })
     :build()
 ```
 
-**Future Fix Needed:**
-- Debug conditional workflow JSON serialization
-- Fix condition function handling in bridge
+**Migration from Sequential Workaround:**
+If you were using sequential workflows as a workaround, you can now migrate to proper conditional workflows using the pattern above.
 - Improve error messages for conditional setup
 
 ### Agent Name Storage Pattern

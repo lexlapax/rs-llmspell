@@ -29,6 +29,7 @@ impl StandardizedWorkflowFactory {
     /// # Errors
     ///
     /// Returns an error if workflow creation fails or parameters are invalid
+    #[allow(clippy::too_many_lines)]
     pub async fn create_from_type_json(
         &self,
         workflow_type: &str,
@@ -82,8 +83,20 @@ impl StandardizedWorkflowFactory {
                 })
             }
             "conditional" => {
-                // Conditional config would be set through builder pattern
-                serde_json::json!({})
+                // Pass through branches and other conditional-specific config
+                let mut conditional_config = serde_json::json!({});
+
+                // Pass through branches array if provided
+                if let Some(branches) = params.get("branches") {
+                    conditional_config["branches"] = branches.clone();
+                }
+
+                // Pass through default branch if provided
+                if let Some(default_branch) = params.get("default_branch") {
+                    conditional_config["default_branch"] = default_branch.clone();
+                }
+
+                conditional_config
             }
             "loop" => {
                 let mut loop_config = serde_json::json!({
@@ -118,7 +131,29 @@ impl StandardizedWorkflowFactory {
             _ => serde_json::json!({}),
         };
 
-        // Create workflow using standardized factory
+        // For conditional workflows, bypass the broken factory and use working implementation
+        if workflow_type == "conditional" {
+            // Use working conditional workflow creation directly
+            let mut conditional_params = serde_json::json!({
+                "name": name.clone()
+            });
+
+            // Merge type_config (which contains branches) into params
+            if let serde_json::Value::Object(type_config_obj) = type_config {
+                if let serde_json::Value::Object(ref mut params_obj) = conditional_params {
+                    for (key, value) in type_config_obj {
+                        params_obj.insert(key, value);
+                    }
+                }
+            }
+
+            // Use the working create_conditional_workflow function that properly handles branches
+            let conditional_workflow =
+                super::workflows::create_conditional_workflow(&conditional_params)?;
+            return Ok(Box::new(conditional_workflow));
+        }
+
+        // For other workflow types, use the standardized factory
         let workflow = self
             .factory
             .create_from_type(workflow_type, name.clone(), config, type_config)

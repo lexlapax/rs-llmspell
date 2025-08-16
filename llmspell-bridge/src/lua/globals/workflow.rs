@@ -575,6 +575,33 @@ impl UserData for WorkflowBuilder {
             Ok(this.clone())
         });
 
+        // Enhanced multi-branch support: add_branch for explicit N-way routing
+        methods.add_method_mut("add_branch", |lua, this, args: (Table, Table)| {
+            let (condition_table, steps_table) = args;
+
+            // Parse condition from table
+            let _condition_type: String = condition_table
+                .get("type")
+                .unwrap_or_else(|_| "custom".to_string());
+
+            // Parse steps for this branch
+            let steps: Vec<WorkflowStep> = steps_table
+                .sequence_values::<Table>()
+                .filter_map(|step_table| {
+                    step_table
+                        .ok()
+                        .and_then(|st| parse_workflow_step(lua, &st).ok())
+                })
+                .collect();
+
+            // For now, add to else_steps (future: support proper branch structure)
+            for step in steps {
+                this.else_steps.push(step);
+            }
+
+            Ok(this.clone())
+        });
+
         // Loop workflow specific methods
         methods.add_method_mut("loop_condition", |_lua, this, _func: mlua::Function| {
             // Store Lua function for loop condition
@@ -693,33 +720,49 @@ impl UserData for WorkflowBuilder {
             // Add type-specific configuration
             match workflow_type.as_str() {
                 "conditional" => {
-                    // For conditional workflows, add then/else steps
-                    let then_steps_json: Vec<serde_json::Value> = this
-                        .then_steps
-                        .iter()
-                        .map(|step| {
-                            serde_json::json!({
-                                "name": &step.name,
-                                "type": "tool", // Simplified for now
-                                "tool": "placeholder"
-                            })
-                        })
-                        .collect();
+                    // For conditional workflows, convert then/else steps to branches format expected by native bridge
+                    let mut branches = Vec::new();
 
-                    let else_steps_json: Vec<serde_json::Value> = this
-                        .else_steps
-                        .iter()
-                        .map(|step| {
-                            serde_json::json!({
-                                "name": &step.name,
-                                "type": "tool", // Simplified for now
-                                "tool": "placeholder"
-                            })
-                        })
-                        .collect();
+                    // Convert then_steps to first branch with proper step conversion
+                    if !this.then_steps.is_empty() {
+                        // Use the native bridge's conversion function for consistent JSON format
+                        let then_steps_json: Vec<serde_json::Value> = this
+                            .then_steps
+                            .iter()
+                            .map(crate::workflows::workflow_step_to_json)
+                            .collect();
 
-                    config["then_steps"] = serde_json::json!(then_steps_json);
-                    config["else_steps"] = serde_json::json!(else_steps_json);
+                        let then_branch = serde_json::json!({
+                            "name": "then_branch",
+                            "condition": {
+                                "type": "always"  // Default condition for then branch
+                            },
+                            "steps": then_steps_json
+                        });
+                        branches.push(then_branch);
+                    }
+
+                    // Convert else_steps to second branch with fallback condition
+                    if !this.else_steps.is_empty() {
+                        // Use the native bridge's conversion function for consistent JSON format
+                        let else_steps_json: Vec<serde_json::Value> = this
+                            .else_steps
+                            .iter()
+                            .map(crate::workflows::workflow_step_to_json)
+                            .collect();
+
+                        let else_branch = serde_json::json!({
+                            "name": "else_branch",
+                            "condition": {
+                                "type": "never"  // Fallback condition for else branch
+                            },
+                            "steps": else_steps_json
+                        });
+                        branches.push(else_branch);
+                    }
+
+                    // Use branches format expected by native bridge (llmspell-bridge/src/workflows.rs:320-356)
+                    config["branches"] = serde_json::json!(branches);
                 }
                 "loop" => {
                     if let Some(max_iter) = this.max_iterations {

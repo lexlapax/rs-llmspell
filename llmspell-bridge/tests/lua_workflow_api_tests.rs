@@ -100,31 +100,48 @@ async fn test_lua_workflow_conditional() {
     let mut engine = create_test_engine();
     engine.inject_apis(&registry, &providers).unwrap();
 
+    // Use builder API pattern as per fixed implementation
     let script = r#"
-        local workflow = Workflow.conditional({
-            name = "conditional_test",
-            branches = {
-                {
-                    name = "then_branch",
-                    condition = { type = "always" },
-                    steps = {{ name = "add", type = "tool", tool = "calculator", input = { input = "1 + 1" } }}
-                },
-                {
-                    name = "else_branch", 
-                    condition = { type = "never" },
-                    steps = {{ name = "subtract", type = "tool", tool = "calculator", input = { input = "5 - 3" } }}
-                }
-            }
-        })
+        local workflow = Workflow.builder()
+            :name("conditional_test")
+            :description("Test conditional workflow with builder API")
+            :conditional()
+            :add_step({
+                name = "initial_step",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "2 + 2" }
+            })
+            :condition(function(ctx)
+                -- Simple condition: always return true for then branch
+                return true
+            end)
+            :add_then_step({
+                name = "then_step",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "10 + 10" }
+            })
+            :add_else_step({
+                name = "else_step",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "5 - 3" }
+            })
+            :build()
         
         local info = workflow:get_info()
-        return { workflow_type = info.type }
+        return { 
+            workflow_type = info.type,
+            has_name = info.name == "conditional_test"
+        }
     "#;
 
     let result = engine.execute_script(script).await.unwrap();
     let value = result.output;
 
     assert_eq!(value["workflow_type"], "conditional");
+    assert_eq!(value["has_name"], true);
 }
 
 #[tokio::test(flavor = "multi_thread")]

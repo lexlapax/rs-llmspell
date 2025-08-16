@@ -1141,7 +1141,8 @@ mod tests {
     }
     #[tokio::test]
     async fn test_conditional_workflow_execution_always_true() {
-        let condition = Condition::Always;
+        // Use real condition instead of stub
+        let condition = Condition::shared_data_exists("always_present".to_string());
         let step = WorkflowStep::new(
             "test_step".to_string(),
             StepType::Tool {
@@ -1150,11 +1151,17 @@ mod tests {
             },
         );
 
-        let branch = ConditionalBranch::new("always_branch".to_string(), condition).with_step(step);
+        let branch = ConditionalBranch::new("exists_branch".to_string(), condition).with_step(step);
 
         let workflow = ConditionalWorkflow::builder("test_workflow".to_string())
             .add_branch(branch)
             .build();
+
+        // Set up the shared data to make condition true
+        workflow
+            .set_shared_data("always_present".to_string(), serde_json::json!("value"))
+            .await
+            .unwrap();
 
         let result = workflow.execute_workflow().await.unwrap();
         assert!(result.success);
@@ -1165,7 +1172,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_conditional_workflow_execution_never_condition() {
-        let condition = Condition::Never;
+        // Use real condition that will evaluate to false
+        let condition = Condition::shared_data_equals(
+            "missing_key".to_string(),
+            serde_json::json!("unexpected_value"),
+        );
         let step = WorkflowStep::new(
             "test_step".to_string(),
             StepType::Tool {
@@ -1189,7 +1200,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_conditional_workflow_default_branch() {
-        let condition = Condition::Never;
+        // Use real condition that won't match
+        let condition = Condition::step_output_contains(
+            "nonexistent_step".to_string(),
+            "will_not_match".to_string(),
+        );
         let step1 = WorkflowStep::new(
             "test_step1".to_string(),
             StepType::Tool {

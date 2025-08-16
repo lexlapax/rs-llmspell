@@ -299,7 +299,15 @@ fn create_sequential_workflow(params: &serde_json::Value) -> Result<impl Workflo
     Ok(SequentialWorkflowExecutor { workflow, name })
 }
 
-fn create_conditional_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
+/// Creates a conditional workflow from JSON parameters
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Required fields are missing from parameters
+/// - Branch configuration is invalid
+/// - Step parsing fails
+pub fn create_conditional_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{ConditionalBranch, ConditionalWorkflowBuilder};
 
     let name = params
@@ -524,6 +532,45 @@ fn create_parallel_workflow(params: &serde_json::Value) -> Result<impl WorkflowE
     Ok(ParallelWorkflowExecutor { workflow, name })
 }
 
+/// Convert a `WorkflowStep` to flat JSON format expected by the parser
+/// This is the single source of truth for step JSON format
+#[must_use]
+pub fn workflow_step_to_json(step: &llmspell_workflows::WorkflowStep) -> serde_json::Value {
+    use llmspell_workflows::StepType;
+
+    let mut json = serde_json::json!({
+        "name": &step.name
+    });
+
+    // Add type-specific fields in flat format
+    match &step.step_type {
+        StepType::Tool {
+            tool_name,
+            parameters,
+        } => {
+            json["tool"] = serde_json::json!(tool_name);
+            json["parameters"] = parameters.clone();
+        }
+        StepType::Agent { agent_id, input } => {
+            json["agent"] = serde_json::json!(agent_id.to_string());
+            json["input"] = serde_json::json!(input);
+        }
+        StepType::Custom {
+            function_name,
+            parameters,
+        } => {
+            json["function"] = serde_json::json!(function_name);
+            json["parameters"] = parameters.clone();
+        }
+        StepType::Workflow { workflow_id, input } => {
+            json["workflow"] = serde_json::json!(workflow_id.to_string());
+            json["input"] = input.clone();
+        }
+    }
+
+    json
+}
+
 fn parse_workflow_step(step_json: &serde_json::Value) -> Result<llmspell_workflows::WorkflowStep> {
     use llmspell_core::ComponentId;
     use llmspell_workflows::{StepType, WorkflowStep};
@@ -561,9 +608,18 @@ fn parse_workflow_step(step_json: &serde_json::Value) -> Result<llmspell_workflo
             function_name: func_name.to_string(),
             parameters: params,
         }
+    } else if let Some(workflow_id) = step_json.get("workflow").and_then(|v| v.as_str()) {
+        let input = step_json
+            .get("input")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+        StepType::Workflow {
+            workflow_id: ComponentId::from_name(workflow_id),
+            input,
+        }
     } else {
         return Err(llmspell_core::LLMSpellError::Configuration {
-            message: "Step must have 'tool', 'agent', or 'function' field".to_string(),
+            message: "Step must have 'tool', 'agent', 'function', or 'workflow' field".to_string(),
             source: None,
         });
     };

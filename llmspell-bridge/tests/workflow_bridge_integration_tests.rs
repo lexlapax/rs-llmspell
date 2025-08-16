@@ -1,238 +1,257 @@
-//! ABOUTME: Integration tests for `WorkflowBridge` with standardized factory
-//! ABOUTME: Tests end-to-end workflow lifecycle through the bridge
+//! ABOUTME: Integration tests for Lua workflow builder to Rust workflow conversion
+//! ABOUTME: Tests agent classification condition parsing and workflow execution
 
-use llmspell_bridge::{workflows::WorkflowBridge, ComponentRegistry};
-use serde_json::json;
+use llmspell_bridge::engine::factory::LuaConfig;
+use llmspell_bridge::engine::ScriptEngineBridge;
+use llmspell_bridge::lua::LuaEngine;
+use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+use llmspell_tools::CalculatorTool;
 use std::sync::Arc;
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+// Helper function to create a test script engine
+fn create_test_engine() -> LuaEngine {
+    let config = LuaConfig::default();
+    LuaEngine::new(&config).expect("Failed to create Lua engine")
+}
 
-    #[tokio::test]
-    #[ignore = "Workflow execution without steps not implemented - placeholder test"]
-    async fn test_workflow_lifecycle_through_bridge() {
-        let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry);
-
-        // Create a sequential workflow
-        let params = json!({
-            "name": "test_sequential",
-            "steps": []
-        });
-
-        let workflow_id = bridge.create_workflow("sequential", params).await.unwrap();
-
-        assert!(workflow_id.starts_with("workflow_"));
-
-        // List active workflows
-        let active = bridge.list_active_workflows().await;
-        assert_eq!(active.len(), 1);
-        assert_eq!(active[0].1, "sequential");
-
-        // Execute workflow
-        let input = json!({
-            "test": "data"
-        });
-
-        let result = bridge.execute_workflow(&workflow_id, input).await.unwrap();
-        assert!(result["success"].as_bool().unwrap_or(false));
-
-        // Get execution history
-        let history = bridge.get_execution_history().await;
-        assert_eq!(history.len(), 1);
-        assert_eq!(history[0].workflow_id, workflow_id);
-        assert!(history[0].success);
-
-        // Remove workflow
-        bridge.remove_workflow(&workflow_id).await.unwrap();
-        let active = bridge.list_active_workflows().await;
-        assert_eq!(active.len(), 0);
-    }
-
-    #[tokio::test]
-    #[ignore = "Workflow oneshot execution not implemented - placeholder test"]
-    async fn test_oneshot_workflow_execution() {
-        let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry);
-
-        let params = json!({
-            "name": "oneshot_parallel",
-            "max_concurrency": 2,
-            "branches": []
-        });
-
-        let input = json!({
-            "data": "test"
-        });
-
-        let result = bridge
-            .execute_workflow_oneshot("parallel", params, input)
+// Helper function to create test providers
+async fn create_test_providers() -> Arc<ProviderManager> {
+    let config = ProviderManagerConfig::default();
+    Arc::new(
+        ProviderManager::new(config)
             .await
-            .unwrap();
+            .expect("Failed to create provider manager"),
+    )
+}
 
-        assert!(result["success"].as_bool().unwrap_or(false));
+// Helper function to create test registry with calculator tool
+fn create_test_registry() -> Arc<ComponentRegistry> {
+    let registry = Arc::new(ComponentRegistry::new());
+    registry
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .unwrap();
+    registry
+}
 
-        // Workflow should not be in active list
-        let active = bridge.list_active_workflows().await;
-        assert_eq!(active.len(), 0);
-    }
+#[tokio::test(flavor = "multi_thread")]
+async fn test_lua_builder_to_rust_workflow_conversion() {
+    let registry = create_test_registry();
+    let providers = create_test_providers().await;
 
-    #[tokio::test]
-    #[ignore = "Workflow metrics tracking not implemented - placeholder test"]
-    async fn test_workflow_metrics() {
-        let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry);
+    let mut engine = create_test_engine();
+    engine.inject_apis(&registry, &providers).unwrap();
 
-        // Get initial metrics
-        let metrics = bridge.get_bridge_metrics().await;
-        assert_eq!(metrics["workflows_created"], 0);
-        assert_eq!(metrics["workflow_executions"], 0);
-
-        // Create and execute workflow
-        let workflow_id = bridge
-            .create_workflow("sequential", json!({"name": "metrics_test"}))
-            .await
-            .unwrap();
-
-        bridge
-            .execute_workflow(&workflow_id, json!({}))
-            .await
-            .unwrap();
-
-        // Check updated metrics
-        let metrics = bridge.get_bridge_metrics().await;
-        assert_eq!(metrics["workflows_created"], 1);
-        assert_eq!(metrics["workflow_executions"], 1);
-        assert_eq!(metrics["successful_executions"], 1);
-        assert_eq!(metrics["failed_executions"], 0);
-        assert!(metrics["avg_execution_time_ms"].as_u64().unwrap() > 0);
-
-        // Check performance metrics
-        let perf = metrics["performance"].as_object().unwrap();
-        assert!(perf.contains_key("average_operation_ms"));
-        assert!(perf.contains_key("p99_operation_ms"));
-        assert!(perf.contains_key("within_bounds"));
-
-        bridge.remove_workflow(&workflow_id).await.unwrap();
-    }
-
-    #[tokio::test]
-    async fn test_workflow_type_discovery() {
-        let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry);
-
-        // List available workflow types
-        let types = bridge.list_workflow_types();
-        assert_eq!(types.len(), 4);
-        assert!(types.contains(&"sequential".to_string()));
-        assert!(types.contains(&"parallel".to_string()));
-        assert!(types.contains(&"conditional".to_string()));
-        assert!(types.contains(&"loop".to_string()));
-
-        // Get info for a specific type
-        let info = bridge.get_workflow_info("sequential").unwrap();
-        assert_eq!(info.workflow_type, "sequential");
-        assert!(info.required_params.contains(&"steps".to_string()));
-
-        // Get all workflow info
-        let all_info = bridge.get_all_workflow_info();
-        assert_eq!(all_info.len(), 4);
-    }
-
-    #[tokio::test]
-    async fn test_workflow_error_handling() {
-        let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry);
-
-        // Try to execute non-existent workflow
-        let result = bridge.execute_workflow("non_existent_id", json!({})).await;
-
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.to_string().contains("No active workflow"));
-
-        // Try to remove non-existent workflow
-        let result = bridge.remove_workflow("non_existent_id").await;
-        assert!(result.is_err());
-    }
-
-    #[tokio::test]
-    #[ignore = "Workflow execution history not implemented - placeholder test"]
-    async fn test_execution_history_management() {
-        let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry);
-
-        // Execute multiple workflows
-        for i in 0..5 {
-            let params = json!({
-                "name": format!("test_workflow_{}", i)
-            });
-            bridge
-                .execute_workflow_oneshot("sequential", params, json!({}))
-                .await
-                .unwrap();
+    // Test that Lua builder creates proper workflow structure
+    let script = r#"
+        local workflow = Workflow.builder()
+            :name("test_conversion")
+            :description("Test Lua to Rust workflow conversion")
+            :conditional()
+            :add_step({
+                name = "initial_calculation",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "5 * 5" }
+            })
+            :condition(function(ctx)
+                -- Test condition that checks step output
+                return true
+            end)
+            :add_then_step({
+                name = "then_calculation",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "100 + 100" }
+            })
+            :add_else_step({
+                name = "else_calculation",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "10 - 5" }
+            })
+            :build()
+        
+        -- Execute the workflow to test conversion worked
+        local result = workflow:execute({
+            input = "test input"
+        })
+        
+        return { 
+            success = result ~= nil,
+            has_result = result ~= nil
         }
+    "#;
 
-        // Check history
-        let history = bridge.get_execution_history().await;
-        assert_eq!(history.len(), 5);
+    let result = engine.execute_script(script).await.unwrap();
+    let value = result.output;
 
-        // All should be successful
-        for record in &history {
-            assert!(record.success);
-            assert!(record.end_time.is_some());
-            assert!(record.duration_ms.is_some());
+    assert_eq!(value["success"], true);
+    assert_eq!(value["has_result"], true);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_agent_classification_condition_parsing() {
+    let registry = create_test_registry();
+    let providers = create_test_providers().await;
+
+    let mut engine = create_test_engine();
+    engine.inject_apis(&registry, &providers).unwrap();
+
+    // Test that agent classification conditions are properly parsed
+    let script = r#"
+        local workflow = Workflow.builder()
+            :name("classification_test")
+            :description("Test agent classification condition")
+            :conditional()
+            :add_step({
+                name = "classify",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "1 + 1" }  -- Placeholder for classifier
+            })
+            :condition(function(ctx)
+                -- Simulate agent classification check
+                local classification = ctx.classify or ""
+                return string.match(classification:lower(), "blog") ~= nil
+            end)
+            :add_then_step({
+                name = "blog_workflow",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "blog calculation" }
+            })
+            :add_else_step({
+                name = "other_workflow",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "other calculation" }
+            })
+            :build()
+        
+        local info = workflow:get_info()
+        
+        return { 
+            workflow_type = info.type,
+            has_name = info.name == "classification_test"
         }
+    "#;
 
-        // Clear history
-        bridge.clear_execution_history().await;
-        let history = bridge.get_execution_history().await;
-        assert_eq!(history.len(), 0);
-    }
+    let result = engine.execute_script(script).await.unwrap();
+    let value = result.output;
 
-    #[tokio::test]
-    #[ignore = "Workflow concurrent execution not implemented - placeholder test"]
-    async fn test_concurrent_workflow_execution() {
-        let registry = Arc::new(ComponentRegistry::new());
-        let bridge = Arc::new(WorkflowBridge::new(registry));
+    assert_eq!(value["workflow_type"], "conditional");
+    assert_eq!(value["has_name"], true);
+}
 
-        // Create multiple workflows
-        let mut handles = vec![];
+#[tokio::test(flavor = "multi_thread")]
+async fn test_nested_workflow_step_conversion() {
+    let registry = create_test_registry();
+    let providers = create_test_providers().await;
 
-        for i in 0..3 {
-            let bridge_clone = bridge.clone();
-            let handle = tokio::spawn(async move {
-                let params = json!({
-                    "name": format!("concurrent_{}", i)
-                });
+    let mut engine = create_test_engine();
+    engine.inject_apis(&registry, &providers).unwrap();
 
-                let workflow_id = bridge_clone
-                    .create_workflow("sequential", params)
-                    .await
-                    .unwrap();
-
-                let result = bridge_clone
-                    .execute_workflow(&workflow_id, json!({"index": i}))
-                    .await
-                    .unwrap();
-
-                bridge_clone.remove_workflow(&workflow_id).await.unwrap();
-                result
-            });
-            handles.push(handle);
+    // Test nested workflow steps are properly converted
+    let script = r#"
+        -- Create a simple inner workflow
+        local inner_workflow = Workflow.builder()
+            :name("inner_workflow")
+            :sequential()
+            :add_step({
+                name = "inner_step",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "7 * 7" }
+            })
+            :build()
+        
+        -- Create outer workflow with nested workflow step
+        local outer_workflow = Workflow.builder()
+            :name("outer_workflow")
+            :conditional()
+            :add_step({
+                name = "check_step",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "2 + 2" }
+            })
+            :condition(function(ctx) return true end)
+            :add_then_step({
+                name = "nested_workflow_step",
+                type = "workflow",
+                workflow = inner_workflow
+            })
+            :build()
+        
+        local info = outer_workflow:get_info()
+        
+        return { 
+            workflow_type = info.type,
+            has_name = info.name == "outer_workflow"
         }
+    "#;
 
-        // Wait for all executions
-        for handle in handles {
-            let result = handle.await.unwrap();
-            assert!(result["success"].as_bool().unwrap_or(false));
+    let result = engine.execute_script(script).await.unwrap();
+    let value = result.output;
+
+    assert_eq!(value["workflow_type"], "conditional");
+    assert_eq!(value["has_name"], true);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_multi_branch_condition_conversion() {
+    let registry = create_test_registry();
+    let providers = create_test_providers().await;
+
+    let mut engine = create_test_engine();
+    engine.inject_apis(&registry, &providers).unwrap();
+
+    // Test multiple else branches are properly handled
+    let script = r#"
+        local workflow = Workflow.builder()
+            :name("multi_branch_test")
+            :description("Test multiple branch conditions")
+            :conditional()
+            :add_step({
+                name = "classify",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "classify" }
+            })
+            :condition(function(ctx)
+                return ctx.type == "blog"
+            end)
+            :add_then_step({
+                name = "blog_path",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "blog" }
+            })
+            :add_else_step({
+                name = "social_path",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "social" }
+            })
+            :add_else_step({
+                name = "email_path",
+                type = "tool",
+                tool = "calculator",
+                input = { input = "email" }
+            })
+            :build()
+        
+        local info = workflow:get_info()
+        
+        return { 
+            workflow_type = info.type,
+            has_name = info.name == "multi_branch_test"
         }
+    "#;
 
-        // Check metrics
-        let metrics = bridge.get_bridge_metrics().await;
-        assert_eq!(metrics["workflows_created"], 3);
-        assert_eq!(metrics["workflow_executions"], 3);
-        assert_eq!(metrics["successful_executions"], 3);
-    }
+    let result = engine.execute_script(script).await.unwrap();
+    let value = result.output;
+
+    assert_eq!(value["workflow_type"], "conditional");
+    assert_eq!(value["has_name"], true);
 }

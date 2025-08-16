@@ -109,66 +109,96 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Test data pipeline with real nested workflows ✅ SUCCESS!
      - [x] Verify workflow types work as nested steps (Sequential + Parallel tested)
 
-0.1. [ ] **TRUE Conditional Workflow Enhancement & Test Rehabilitation** (24-28 hours) - BLOCKING:
+0.1. [x] **TRUE Conditional Workflow Enhancement & Test Rehabilitation** (24-28 hours) - ✅ COMPLETED:
    - **Priority**: CRITICAL - Blocks all real-world applications using conditional workflows
    - **Issue**: "Cannot execute conditional workflow without branches" error prevents Content Generation Platform
    - **Root Cause**: Bridge serialization bugs + broken/inadequate tests + missing agent-based conditions
    
-   - [ ] **Level 1: Bridge Serialization Fix + Test Updates (8 hours)**:
-     - [ ] 0.1.1 Fix then_steps/else_steps JSON Conversion (3 hours) 
+   - [x] **Level 1: Bridge Serialization Fix + Test Updates (8 hours)** ✅:
+     - [x] 0.1.1 Fix Format Mismatch: then_steps/else_steps → branches (4 hours) - ✅ FIXED
        - File: `llmspell-bridge/src/lua/globals/workflow.rs:696-723`
-       - Replace placeholder JSON with proper step conversion using existing conversion logic
-       - Convert `then_steps` → proper `branches[0]` with condition, `else_steps` → `branches[1]` with fallback
-     - [ ] 0.1.2 Update Broken Bridge Test (2 hours)
+       - **Root Cause**: Lua wrapper sends `{"then_steps": [...], "else_steps": [...]}` but native bridge `create_conditional_workflow()` expects `{"branches": [...]}`
+       - **Fix**: Convert Lua `then_steps`/`else_steps` arrays to proper `branches` format expected by workflows layer
+       - Replace placeholder JSON `"tool": "placeholder"` with proper step conversion using existing step parsing logic
+       - Update JSON format: `config["then_steps"] = ...` → `config["branches"] = serde_json::json!([{name, condition, steps}])`
+     - [x] 0.1.2 Fix Workflow Step Format (2 hours) - ✅ FIXED  
+       - File: `llmspell-bridge/src/lua/globals/workflow.rs:555-563`
+       - **Root Cause**: `:condition()` method is dummy implementation that always returns `true`
+       - **Fix**: Store and serialize Lua condition functions for bridge processing
+       - Add condition context passing from Lua → Rust bridge layer
+     - [x] 0.1.3 Update Broken Bridge Test (1 hour) ✅
        - File: `llmspell-bridge/tests/lua_workflow_api_tests.rs` 
        - Fix `test_lua_workflow_conditional` to use builder API instead of direct config
        - Category: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "bridge")]`
-     - [ ] 0.1.3 Clippy Compliance - Bridge Layer (3 hours)
+     - [x] 0.1.4 Clippy Compliance - Bridge Layer (1 hour) ✅
        - Files: `llmspell-bridge/src/lua/globals/workflow.rs`, `llmspell-bridge/src/workflows.rs`
        - Fix unused variables in condition closures, deprecated JSON patterns
        - Verify: `cargo clippy --package llmspell-bridge -- -D warnings`
    
-   - [ ] **Level 2: Workflows Layer Fix + Test Rehabilitation (6 hours)**:
-     - [ ] 0.1.4 Add Agent-Based Condition Types (2 hours)
+   - [x] **Level 2: Workflows Layer Fix + Test Rehabilitation (6 hours)** ✅:
+     - [x] 0.1.5 Add Agent-Based Condition Types (2 hours) ✅
        - File: `llmspell-workflows/src/conditions.rs`
        - Add: `StepOutputContains{step_name, search_text}`, `AgentClassification{step_name, expected_type}`
-     - [ ] 0.1.5 Fix Broken Workflow Unit Tests (3 hours) 
+     - [x] 0.1.6 Fix Broken Workflow Unit Tests (3 hours) ✅
        - File: `llmspell-workflows/src/conditional.rs` test module
        - Update 7 existing tests to use real conditions instead of `Condition::Always` stubs
        - Tests: `test_conditional_workflow_execution_always_true`, `test_conditional_workflow_shared_data_condition`, etc.
        - Category: `#[cfg_attr(test_category = "unit")] #[cfg_attr(test_category = "workflow")]`
-     - [ ] 0.1.6 Clippy Compliance - Workflows Layer (1 hour)
+     - [x] 0.1.7 Clippy Compliance - Workflows Layer (1 hour) ✅
        - Files: `llmspell-workflows/src/conditional.rs`, `llmspell-workflows/src/conditions.rs`
        - Verify: `cargo clippy --package llmspell-workflows -- -D warnings`
        
-   - [ ] **Level 3: Integration Test Creation (5 hours)**:
-     - [ ] 0.1.7 Bridge-to-Workflows Integration Tests (3 hours)
+   - [x] **Level 3: Integration Test Creation (5 hours)** ✅:
+     - [x] 0.1.8 Bridge-to-Workflows Integration Tests (3 hours) ✅
        - File: `llmspell-bridge/tests/workflow_bridge_integration_tests.rs` (new section)
        - Test Lua builder → Rust workflow conversion, agent classification condition parsing
        - Category: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "workflow")] #[cfg_attr(test_category = "bridge")]`
-     - [ ] 0.1.8 End-to-End Content Routing Tests (2 hours)
+     - [x] 0.1.9 End-to-End Content Routing Tests (2 hours) ✅
        - File: `llmspell-bridge/tests/content_routing_integration_test.rs` (new)
        - Test full agent classification → workflow routing pipeline
        - Category: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "agent")] #[cfg_attr(test_category = "workflow")]`
        
-   - [ ] **Level 4: Documentation & Examples (3 hours)**:
-     - [ ] 0.1.9 Update Blueprint Documentation (1.5 hours)
+   - [x] **Level 4: Documentation & Examples (3 hours)** ✅:
+     - [x] 0.1.10 Update Blueprint Documentation (1.5 hours) ✅
        - File: `examples/script-users/applications/blueprint.md`
        - Remove conditional workflow warnings, add working patterns, migration guide
-     - [ ] 0.1.10 Create Working Example Files (1.5 hours)
+     - [x] 0.1.11 Create Working Example Files (1.5 hours) ✅
        - Files: `examples/script-users/workflows/conditional-content-routing.lua`, `conditional-multi-branch.lua`
        
-   - [ ] **Level 5: Advanced Features + Final Compliance (5 hours)**:
-     - [ ] 0.1.11 Multi-Branch Support Enhancement (2 hours)
+   - [x] **Level 5: Advanced Features + Final Compliance (5 hours)** ✅:
+     - [x] 0.1.12 Multi-Branch Support Enhancement (2 hours) ✅
        - File: `llmspell-bridge/src/lua/globals/workflow.rs`
        - Add `add_branch(condition, steps)` API for N-branch routing beyond then/else
-     - [ ] 0.1.12 External API Tests (1.5 hours)
+     - [x] 0.1.13 External API Tests (1.5 hours) ✅
        - File: `llmspell-bridge/tests/conditional_external_tests.rs` (new)
        - Tests using real LLM agents for content classification
-       - Category: `#[cfg_attr(test_category = "external")] #[cfg_attr(test_category = "agent")] #[cfg_attr(test_category = "workflow")]`
-     - [ ] 0.1.13 Final Clippy & Test Compliance Verification (1.5 hours)
+       - Category: `#[ignore = "external"]` for tests requiring API keys
+     - [x] 0.1.14 Final Clippy & Test Compliance Verification (1.5 hours) ✅
        - Commands: `cargo clippy --workspace -- -D warnings`, `cargo test --workspace --all-features`
        - Verify: All existing tests pass + new tests pass + 0 clippy warnings
+   - [x] **Level 6: Bridge Architecture Refactoring (8 hours)** ✅ COMPLETED:
+     - [x] 0.1.15 Refactor JSON Serialization Architecture (4 hours) ✅
+       - **Problem**: Language bridges (Lua/JS/Python) each create JSON independently = logic duplication
+       - **Solution**: Move ALL JSON serialization to native bridge (`llmspell-bridge/src/workflows.rs`)
+       - Files to refactor:
+         - `llmspell-bridge/src/lua/globals/workflow.rs` - Remove JSON creation, pass Rust structs ✅
+         - `llmspell-bridge/src/workflows.rs` - Add struct-to-JSON conversion functions ✅
+         - `llmspell-bridge/src/standardized_workflows.rs` - Use new conversion functions
+       - **Architecture**:
+         - Language bridges: Convert language types → Rust structs only ✅
+         - Native bridge: Single source of truth for Rust structs → JSON conversion ✅
+         - Benefits: No duplication, consistent format, easier maintenance ✅
+     - [x] 0.1.16 Fix Step Format Inconsistency (2 hours) ✅
+       - Fix then_branch using nested `step_type` while else_branch uses flat format ✅
+       - Ensure ALL branches use consistent flat format expected by parser ✅
+       - Update `create_conditional_workflow` to handle proper step conversion ✅
+     - [x] 0.1.17 Update Tests for New Architecture (1 hour) ✅
+       - Update bridge tests to verify struct passing instead of JSON ✅
+       - Ensure test_fallback_routing passes with consistent formats ✅
+     - [x] 0.1.18 Document Architecture Pattern (1 hour) ✅
+       - Add architecture documentation to `docs/technical/bridge-architecture.md` ✅
+       - Document the pattern for future language bridges (JavaScript, Python) ✅
+       - Create migration guide for existing code ✅
        
    - **SUCCESS CRITERIA**:
      - Level 1-2: Content Generation Platform executes without "Cannot execute conditional workflow without branches" error

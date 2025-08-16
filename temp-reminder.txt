@@ -1,1 +1,2 @@
-
+all lua bridges should be just wrappers to rust native bridge.. not doing json conversion etc in lua engine.
+we just fixed workflow bridge to be that way.
