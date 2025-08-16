@@ -39,11 +39,11 @@ local priority_router = Workflow.builder()
             :add_step({
                 name = "notify_manager",
                 type = "tool",
-                tool = "webhook_caller",
-                input = {
-                    url = "https://example.com/critical",
+                tool = "webhook-caller",  -- Fixed tool name with hyphen
+                parameters = {
+                    input = "https://example.com/critical",
                     method = "POST",
-                    data = { priority = "CRITICAL", task = "{{task_description}}" }
+                    payload = { priority = "CRITICAL", task = "{{task_description}}" }
                 }
             })
             :add_step({

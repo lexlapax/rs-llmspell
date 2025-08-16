@@ -200,6 +200,50 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
        - Document the pattern for future language bridges (JavaScript, Python) ✅
        - Create migration guide for existing code ✅
        
+0.2. [x] **Tool Registration Fixes** (2 hours) - ✅ COMPLETED:
+   **Context**: Multiple examples were broken because webhook-caller tool wasn't accessible via scripts.
+   - [x] **Register Existing Unregistered Tools**:
+     - [x] ✅ Verified `WebhookCallerTool` already registered in `llmspell-bridge/src/tools.rs:269` as "webhook-caller"
+     - [x] ✅ Fixed webhook-caller usage in Content Generation Platform - replaced simulation with real webhook calls
+     - [x] ✅ Verified all 34+ tools properly registered and accessible via Tool.list()
+   - [x] **Testing**:
+     - [x] ✅ Fixed conditional-multi-branch.lua to use "webhook-caller" (hyphen) and correct parameter format
+     - [x] ✅ Verified webhook-caller tool works in script context: `Tool.invoke("webhook-caller", {...})`
+   
+0.3. **Phase 7 Appropriate Tool Implementation** (4 hours):
+   - [ ] **Create Basic Tools** (not Phase 8 advanced features):
+     - [ ] `PdfProcessorTool` - Basic PDF text extraction (use pdf-extract or similar)
+     - [ ] `CitationFormatterTool` - Format citations (APA, MLA, Chicago styles)
+     - [ ] `GraphBuilderTool` - Build JSON graph structures (nodes/edges)
+   - [ ] **Implementation Requirements**:
+     - [ ] Follow existing tool patterns in llmspell-tools
+     - [ ] Register in registry.rs
+     - [ ] Add proper tests for each tool
+     - [ ] Document parameter schemas
+   
+0.4. **Update Examples to Use Real Tools** (3 hours):
+   - [ ] **Code Review Assistant**:
+     - [ ] Replace simulated code_analyzer with actual implementation or alternative
+     - [ ] Replace simulated syntax_validator with actual validator
+   - [ ] **Document Intelligence System**:
+     - [ ] Replace simulated pdf_processor with real PdfProcessorTool
+     - [ ] Replace simulated graph_builder with real GraphBuilderTool
+     - [ ] Replace simulated vector_search with json_processor (until Phase 8)
+     - [ ] Replace simulated citation_formatter with real CitationFormatterTool
+   - [ ] **Testing All Applications**:
+     - [ ] Verify all 5 applications run without simulated tools
+     - [ ] Update READMEs to reflect real tool usage
+   
+0.5. **Tool Architecture Documentation** (1 hour):
+   - [ ] **Create Tool Development Guide**:
+     - [ ] Document when to create new tools vs use existing
+     - [ ] Document how to check if tools exist
+     - [ ] Document proper registration process
+     - [ ] Add to `/docs/developer-guide/tool-development.md`
+   - [ ] **Update Blueprint**:
+     - [ ] Add note about never simulating tools
+     - [ ] List all available tools for application developers
+   
    - **SUCCESS CRITERIA**:
      - Level 1-2: Content Generation Platform executes without "Cannot execute conditional workflow without branches" error
      - Level 3: Integration tests prove agent classification correctly routes to different workflows  
@@ -296,6 +340,10 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Successfully implemented TRUE conditional routing with classification step ✅
      - [x] Nested workflows work correctly within conditional branches ✅
      - [x] Multi-format content generation (blog, social, email) all functioning ✅
+   - [ ] **REQUIRED FIX - Enable WebhookCallerTool**:
+     - [ ] Uncomment webhook publishing code after tool registration (0.2)
+     - [ ] Test webhook functionality works properly
+     - [ ] Update README.md to reflect working webhook integration
 
 4. [x] **Code Review Assistant** (6 hours) - ✅ COMPLETED:
    - [x] **Component Architecture**:
@@ -331,6 +379,11 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Loop workflow iterating through 3 files ✅
      - [x] Parallel sub-workflows with 4 reviewers per file ✅
      - [x] 7 specialized agents all functioning ✅
+   - [ ] **REQUIRED FIX - Replace Simulated Tools**:
+     - [ ] Replace simulated code_analyzer with text_manipulator or new tool
+     - [ ] Replace simulated syntax_validator with actual validator tool
+     - [ ] Update main.lua to use real tool operations
+     - [ ] Test execution with real tools
 
 5. [x] **Document Intelligence System** (6 hours) - ✅ COMPLETED:
    - [x] **Component Architecture**:
@@ -361,6 +414,14 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] `document-intelligence/main.lua` - orchestration ✅
      - [x] `document-intelligence/README.md` - comprehensive documentation ✅
      - [x] `document-intelligence/config.toml` - configuration ✅
+   - [ ] **REQUIRED FIX - Replace Simulated Tools**:
+     - [ ] Replace simulated pdf_processor with real PdfProcessorTool (after 0.3)
+     - [ ] Replace simulated graph_builder with real GraphBuilderTool (after 0.3)
+     - [ ] Replace simulated vector_search with appropriate Phase 7 alternative
+     - [ ] Replace simulated citation_formatter with real CitationFormatterTool (after 0.3)
+     - [ ] Update main.lua to use real tool names and parameters
+     - [ ] Test execution with real tools
+     - [ ] Update README.md to reflect real tool capabilities
 
 6. [ ] **Workflow Automation Hub** (5 hours):
    - [ ] **Component Architecture**:

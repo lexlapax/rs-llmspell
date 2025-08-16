@@ -378,10 +378,37 @@ print("  ✅ Email newsletter generated and personalized")
 
 print("\n6. Publishing content and tracking analytics...")
 
--- Webhook publishing would go here in production
--- Tool.invoke("webhook-caller", {...}) 
--- Note: webhook-caller tool integration pending
-print("  ✅ Content publishing simulation (webhook integration pending)")
+-- Webhook publishing to configured endpoint
+local webhook_result = Tool.invoke("webhook-caller", {
+    input = config.endpoints.publishing_webhook,
+    payload = {
+        title = "AI-Generated Content Bundle",
+        timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+        contents = {
+            blog = "/tmp/blog-post.md",
+            social = "/tmp/social-posts.txt",
+            email = "/tmp/email-campaign.html"
+        },
+        metadata = {
+            source = "LLMSpell Content Generation Platform",
+            version = "1.0.0",
+            generation_time = os.time() - timestamp
+        }
+    },
+    method = "POST",
+    headers = {
+        ["Content-Type"] = "application/json",
+        ["X-API-Source"] = "llmspell-content-generator"
+    },
+    max_retries = 3,
+    timeout = 30
+})
+
+if webhook_result.success then
+    print("  ✅ Content published via webhook: " .. config.endpoints.publishing_webhook)
+else
+    print("  ⚠️ Webhook publishing failed (using httpbin.org for demo)")
+end
 
 -- Generate analytics report
 local analytics_text = "=== Content Generation Analytics ===\n" ..
@@ -399,6 +426,37 @@ Tool.invoke("file_operations", {
     input = analytics_text
 })
 print("  ✅ Analytics report saved: /tmp/content-analytics.txt")
+
+-- Send analytics to webhook endpoint
+local analytics_webhook_result = Tool.invoke("webhook-caller", {
+    input = config.endpoints.analytics_webhook,
+    payload = {
+        report_type = "content_generation",
+        timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+        metrics = {
+            execution_time = os.time() - timestamp,
+            agents_used = 7,
+            workflows_executed = 6,
+            content_formats = 3,
+            files_created = 6,
+            seo_optimized = true,
+            personalized = true
+        }
+    },
+    method = "POST",
+    headers = {
+        ["Content-Type"] = "application/json",
+        ["X-Analytics-Source"] = "llmspell-content-platform"
+    },
+    max_retries = 2,
+    timeout = 15
+})
+
+if analytics_webhook_result.success then
+    print("  ✅ Analytics sent to webhook: " .. config.endpoints.analytics_webhook)
+else
+    print("  ⚠️ Analytics webhook failed (httpbin.org demo endpoint)")
+end
 
 -- ============================================================
 -- Results Summary
