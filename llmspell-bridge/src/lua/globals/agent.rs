@@ -978,6 +978,49 @@ impl UserData for AgentBuilder {
             Ok(this.clone())
         });
 
+        // type method - for compatibility (always returns "llm" for now)
+        methods.add_method_mut("type", |_, this, _agent_type: String| {
+            // Currently only LLM agents are supported, so we ignore the input
+            // This method exists for API compatibility
+            Ok(this.clone())
+        });
+
+        // custom_config method - convenience method for setting multiple configs
+        methods.add_method_mut("custom_config", |_, this, config: Table| {
+            // Extract system_prompt if present
+            if let Ok(prompt) = config.get::<_, String>("system_prompt") {
+                this.system_prompt = Some(prompt);
+            }
+            
+            // Extract max_conversation_length if present
+            if let Ok(len) = config.get::<_, usize>("max_conversation_length") {
+                this.max_conversation_length = Some(len);
+            }
+            
+            Ok(this.clone())
+        });
+
+        // resource_limits method - convenience method for setting all resource limits
+        methods.add_method_mut("resource_limits", |_, this, limits: Table| {
+            if let Ok(secs) = limits.get::<_, u64>("max_execution_time_secs") {
+                this.max_execution_time_secs = Some(secs);
+            }
+            
+            if let Ok(mb) = limits.get::<_, u32>("max_memory_mb") {
+                this.max_memory_mb = Some(mb);
+            }
+            
+            if let Ok(calls) = limits.get::<_, u32>("max_tool_calls") {
+                this.max_tool_calls = Some(calls);
+            }
+            
+            if let Ok(depth) = limits.get::<_, u32>("max_recursion_depth") {
+                this.max_recursion_depth = Some(depth);
+            }
+            
+            Ok(this.clone())
+        });
+
         // build method - creates the agent
         methods.add_method("build", |_lua, this, ()| {
             // Validate required fields

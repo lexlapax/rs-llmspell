@@ -31,6 +31,7 @@ print("\n=== Creating Agents ===")
 local research_agent = Agent.builder()
     :name("research_agent_comp_1")
     :description("Research assistant for finding and summarizing information")
+    :type("llm")
     :model("openai/gpt-3.5-turbo")
     :temperature(0.3)
     :max_tokens(200)
@@ -45,13 +46,14 @@ local research_agent = Agent.builder()
         max_recursion_depth = 5
     })
     :build()
-local research_agent_name = research_agent.name
+local research_agent_name = "research_agent_comp_1"
 print("Registered research agent: " .. research_agent_name)
 
 -- Create an analysis agent using builder pattern
 local analysis_agent = Agent.builder()
     :name("analysis_agent_comp_2")
     :description("Data analyst for patterns and insights")
+    :type("llm")
     :model("openai/gpt-3.5-turbo")
     :temperature(0.5)
     :max_tokens(300)
@@ -66,13 +68,14 @@ local analysis_agent = Agent.builder()
         max_recursion_depth = 5
     })
     :build()
-local analysis_agent_name = analysis_agent.name
+local analysis_agent_name = "analysis_agent_comp_2"
 print("Registered analysis agent: " .. analysis_agent_name)
 
 -- Create a writer agent using builder pattern
 local writer_agent = Agent.builder()
     :name("writer_agent_comp_3")
     :description("Creative writer for content generation")
+    :type("llm")
     :model("openai/gpt-3.5-turbo")
     :temperature(0.8)
     :max_tokens(500)
@@ -87,7 +90,7 @@ local writer_agent = Agent.builder()
         max_recursion_depth = 3
     })
     :build()
-local writer_agent_name = writer_agent.name
+local writer_agent_name = "writer_agent_comp_3"
 print("Registered writer agent: " .. writer_agent_name)
 
 -- List all agent capabilities
@@ -180,6 +183,7 @@ print("\n=== Using Agent with Wrapped Tool ===")
 local enhanced_writer = Agent.builder()
     :name("enhanced_writer_comp_4")
     :description("Writer that uses research tools")
+    :type("llm")
     :model("openai/gpt-3.5-turbo")
     :temperature(0.7)
     :max_tokens(400)

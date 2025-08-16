@@ -17,61 +17,90 @@ local agents = {}
 agents.researcher = Agent.builder()
     :name("research_agent_coord_1")
     :description("Research specialist for information gathering")
+    :type("llm")
     :model("openai/gpt-4o-mini")
     :temperature(0.4)
     :max_tokens(500)
-    :system_prompt([[
+    :custom_config({
+        system_prompt = [[
 You are a research specialist. You:
 1. Gather relevant information on topics
 2. Verify facts and sources
 3. Summarize findings concisely
 4. Identify knowledge gaps
 5. Suggest areas for deeper investigation
-]])
+]]
+    })
+    :resource_limits({
+        max_execution_time_secs = 60,
+        max_memory_mb = 256,
+        max_tool_calls = 5,
+        max_recursion_depth = 3
+    })
     :build()
 
 -- Analysis Agent using builder pattern
 agents.analyst = Agent.builder()
     :name("analysis_agent_coord_2")
     :description("Data analyst for patterns and insights")
+    :type("llm")
     :model("openai/gpt-4o-mini")
     :temperature(0.3)
     :max_tokens(500)
-    :system_prompt([[
+    :custom_config({
+        system_prompt = [[
 You are a data analyst. You:
 1. Identify patterns and trends
 2. Perform statistical analysis
 3. Draw meaningful conclusions
 4. Create actionable insights
 5. Highlight risks and opportunities
-]])
+]]
+    })
+    :resource_limits({
+        max_execution_time_secs = 60,
+        max_memory_mb = 256,
+        max_tool_calls = 10,
+        max_recursion_depth = 3
+    })
     :build()
 
 -- Decision Agent using builder pattern
 agents.decision_maker = Agent.builder()
     :name("decision_agent_coord_3")
     :description("Decision-making specialist")
+    :type("llm")
     :model("openai/gpt-4o-mini")
     :temperature(0.2)
     :max_tokens(500)
-    :system_prompt([[
+    :custom_config({
+        system_prompt = [[
 You are a decision-making specialist. You:
 1. Evaluate multiple options
 2. Consider pros and cons
 3. Assess risks and benefits
 4. Make clear recommendations
 5. Provide implementation steps
-]])
+]]
+    })
+    :resource_limits({
+        max_execution_time_secs = 60,
+        max_memory_mb = 256,
+        max_tool_calls = 5,
+        max_recursion_depth = 3
+    })
     :build()
 
 -- Coordinator Agent using builder pattern (orchestrates others)
 agents.coordinator = Agent.builder()
     :name("coordinator_agent_coord_4")
     :description("Coordinates multiple agents to achieve complex goals")
+    :type("llm")
     :model("openai/gpt-4o-mini")
     :temperature(0.3)
     :max_tokens(800)
-    :system_prompt([[
+    :custom_config({
+        system_prompt = [[
 You are a multi-agent coordinator. You:
 1. Break down complex tasks into sub-tasks
 2. Assign tasks to appropriate specialist agents
@@ -83,7 +112,14 @@ You work with:
 - Research Agent: For information gathering
 - Analysis Agent: For data analysis
 - Decision Agent: For recommendations
-]])
+]]
+    })
+    :resource_limits({
+        max_execution_time_secs = 120,
+        max_memory_mb = 512,
+        max_tool_calls = 15,
+        max_recursion_depth = 5
+    })
     :build()
 
 -- Register all agents
