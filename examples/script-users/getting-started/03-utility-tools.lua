@@ -1,5 +1,10 @@
--- tools-utility-reference.lua
--- Reference implementation for utility tools using the correct Tool API
+-- Example: Utility Tools Reference
+-- Purpose: Reference implementation for utility tools using the correct Tool API
+-- Audience: Script Users
+-- Prerequisites: None (all tools work locally)
+-- Expected Output: Demonstrations of utility tool invocations
+-- Version: 0.7.0
+-- Tags: tools, utility, reference
 
 print("🔧 Utility Tools Working Examples")
 print("=================================")

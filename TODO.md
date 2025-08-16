@@ -441,7 +441,7 @@ The examples directory is now fully organized, tested, and ready for users with 
 - [ ] **Testing Categories Summary**:
   - [ ] Examples that run without dependencies: Test all
   - [ ] Examples needing configs: Test with appropriate configs from script-users/configs/
-  - [ ] Examples needing API keys: Test with mock/real keys, ensure graceful failure
+  - [ ] Examples needing API keys: Test with real keys, ensure graceful failure
   - [ ] Test files: Verify they're in tests-as-examples/ and run as tests
 - [ ] **File Integrity**:
   - [ ] All files have metadata headers per STANDARDS.md

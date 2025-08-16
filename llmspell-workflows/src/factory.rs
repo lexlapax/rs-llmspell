@@ -126,13 +126,13 @@ impl WorkflowFactory for DefaultWorkflowFactory {
                     .get("steps")
                     .cloned()
                     .unwrap_or_else(|| serde_json::json!([]));
-                
+
                 // Debug logging
                 tracing::debug!("Sequential workflow steps JSON: {:?}", steps_json);
-                
-                let steps = if let Ok(steps_config) = serde_json::from_value::<Vec<WorkflowStep>>(
-                    steps_json.clone(),
-                ) {
+
+                let steps = if let Ok(steps_config) =
+                    serde_json::from_value::<Vec<WorkflowStep>>(steps_json.clone())
+                {
                     tracing::info!("Successfully parsed {} steps", steps_config.len());
                     steps_config
                 } else if let Err(e) = serde_json::from_value::<Vec<WorkflowStep>>(steps_json) {

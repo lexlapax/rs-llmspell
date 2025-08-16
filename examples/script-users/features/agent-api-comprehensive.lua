@@ -15,7 +15,7 @@ print("1. Testing Agent.register()...")
 local agent_name = Agent.register({
     name = "demo-analyst",
     description = "Data analysis agent",
-    agent_type = "llm",
+    type = "llm",
     model = {
         provider = "openai",
         model_id = "gpt-3.5-turbo",

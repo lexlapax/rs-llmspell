@@ -31,14 +31,9 @@ print("\n=== Creating Agents ===")
 local research_agent = Agent.builder()
     :name("research_agent_comp_1")
     :description("Research assistant for finding and summarizing information")
-    :agent_type("llm")
-    :model({
-        provider = "openai",
-        model_id = "gpt-3.5-turbo",
-        temperature = 0.3,
-        max_tokens = 200,
-        settings = {}
-    })
+    :model("openai/gpt-3.5-turbo")
+    :temperature(0.3)
+    :max_tokens(200)
     :custom_config({
         system_prompt = "You are a research assistant. Focus on finding and summarizing information."
     })
@@ -57,14 +52,9 @@ print("Registered research agent: " .. research_agent_name)
 local analysis_agent = Agent.builder()
     :name("analysis_agent_comp_2")
     :description("Data analyst for patterns and insights")
-    :agent_type("llm")
-    :model({
-        provider = "openai",
-        model_id = "gpt-3.5-turbo",
-        temperature = 0.5,
-        max_tokens = 300,
-        settings = {}
-    })
+    :model("openai/gpt-3.5-turbo")
+    :temperature(0.5)
+    :max_tokens(300)
     :custom_config({
         system_prompt = "You are a data analyst. Focus on analyzing patterns and providing insights."
     })
@@ -83,14 +73,9 @@ print("Registered analysis agent: " .. analysis_agent_name)
 local writer_agent = Agent.builder()
     :name("writer_agent_comp_3")
     :description("Creative writer for content generation")
-    :agent_type("llm")
-    :model({
-        provider = "openai",
-        model_id = "gpt-3.5-turbo",
-        temperature = 0.8,
-        max_tokens = 500,
-        settings = {}
-    })
+    :model("openai/gpt-3.5-turbo")
+    :temperature(0.8)
+    :max_tokens(500)
     :custom_config({
         system_prompt = "You are a creative writer. Focus on producing well-written content."
     })
@@ -195,14 +180,9 @@ print("\n=== Using Agent with Wrapped Tool ===")
 local enhanced_writer = Agent.builder()
     :name("enhanced_writer_comp_4")
     :description("Writer that uses research tools")
-    :agent_type("llm")
-    :model({
-        provider = "openai",
-        model_id = "gpt-3.5-turbo",
-        temperature = 0.7,
-        max_tokens = 400,
-        settings = {}
-    })
+    :model("openai/gpt-3.5-turbo")
+    :temperature(0.7)
+    :max_tokens(400)
     :custom_config({
         system_prompt = "You are a writer who can use research tools to create well-informed content."
     })

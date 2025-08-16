@@ -14,14 +14,9 @@ print("=== Agent Monitor Example ===\n")
 local monitor = Agent.builder()
     :name("system_monitor_agent_1")
     :description("Monitors system health, processes, and data changes")
-    :agent_type("llm")
-    :model({
-        provider = "openai",
-        model_id = "gpt-4o-mini",
-        temperature = 0.2,
-        max_tokens = 600,
-        settings = {}
-    })
+    :model("openai/gpt-4o-mini")
+    :temperature(0.2)
+    :max_tokens(600)
     :custom_config({
         system_prompt = [[
 You are a system monitoring specialist. You:

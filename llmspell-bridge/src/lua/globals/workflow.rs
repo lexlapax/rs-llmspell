@@ -611,39 +611,55 @@ impl UserData for WorkflowBuilder {
                 config["timeout_ms"] = serde_json::json!(timeout);
             }
 
-            // Convert steps to JSON
+            // Convert steps to JSON matching WorkflowStep structure
             let steps_json: Vec<serde_json::Value> = this
                 .steps
                 .iter()
                 .map(|step| {
-                    serde_json::json!({
-                        "name": &step.name,
-                        "type": match &step.step_type {
-                            StepType::Tool { tool_name, parameters } => {
-                                let mut step_json = serde_json::json!({
-                                    "type": "tool",
-                                    "tool": tool_name
-                                });
-                                if !parameters.is_null() {
-                                    step_json["input"] = parameters.clone();
-                                }
-                                step_json
-                            },
-                            StepType::Agent { agent_id, input } => {
-                                serde_json::json!({
-                                    "type": "agent",
-                                    "agent": agent_id.to_string(),
-                                    "input": input
-                                })
-                            },
-                            StepType::Custom { function_name, parameters } => {
-                                serde_json::json!({
-                                    "type": "custom",
-                                    "function": function_name,
+                    // Generate a unique ID for each step (just the UUID without prefix)
+                    let step_id = uuid::Uuid::new_v4().to_string();
+
+                    // Build the step_type field based on the step type
+                    let step_type = match &step.step_type {
+                        StepType::Tool {
+                            tool_name,
+                            parameters,
+                        } => {
+                            serde_json::json!({
+                                "Tool": {
+                                    "tool_name": tool_name,
                                     "parameters": parameters
-                                })
-                            }
+                                }
+                            })
                         }
+                        StepType::Agent { agent_id, input } => {
+                            serde_json::json!({
+                                "Agent": {
+                                    "agent_id": agent_id.to_string(),
+                                    "input": input
+                                }
+                            })
+                        }
+                        StepType::Custom {
+                            function_name,
+                            parameters,
+                        } => {
+                            serde_json::json!({
+                                "Custom": {
+                                    "function_name": function_name,
+                                    "parameters": parameters
+                                }
+                            })
+                        }
+                    };
+
+                    // Build the complete WorkflowStep JSON
+                    serde_json::json!({
+                        "id": step_id,
+                        "name": &step.name,
+                        "step_type": step_type,
+                        "timeout": null,
+                        "retry_attempts": 0
                     })
                 })
                 .collect();
@@ -707,7 +723,7 @@ impl UserData for WorkflowBuilder {
                         .create_workflow(workflow_type, config)
                         .await
                         .map(|workflow_id| WorkflowInstance {
-                            workflow_id: workflow_id.clone(),
+                            workflow_id,
                             bridge: bridge.clone(),
                             name: workflow_name_clone,
                             workflow_type: workflow_type_clone,

@@ -14,14 +14,9 @@ print("=== Agent Orchestrator Example ===\n")
 local orchestrator = Agent.builder()
     :name("tool_orchestrator_1")
     :description("Orchestrates multiple tools to accomplish complex tasks")
-    :agent_type("llm")
-    :model({
-        provider = "openai",
-        model_id = "gpt-4o-mini",
-        temperature = 0.3,
-        max_tokens = 2000,
-        settings = {}
-    })
+    :model("openai/gpt-4o-mini")
+    :temperature(0.3)
+    :max_tokens(2000)
     :custom_config({
         system_prompt = [[
 You are a tool orchestration specialist. You coordinate multiple tools to accomplish complex tasks efficiently.
