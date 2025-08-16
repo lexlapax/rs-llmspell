@@ -138,7 +138,6 @@ local router = Workflow.builder()
 
 **Migration from Sequential Workaround:**
 If you were using sequential workflows as a workaround, you can now migrate to proper conditional workflows using the pattern above.
-- Improve error messages for conditional setup
 
 ### Agent Name Storage Pattern
 
