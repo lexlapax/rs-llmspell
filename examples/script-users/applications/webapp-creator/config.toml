@@ -1,0 +1,76 @@
+# WebApp Creator Application Configuration
+# AI-powered web application generator with comprehensive UX design phase
+
+# Default script engine
+default_engine = "lua"
+
+# Engine configuration
+[engines.lua]
+security_level = "safe"
+
+[engines.javascript]
+security_level = "safe"
+
+# Runtime configuration
+[runtime]
+log_level = "info"
+
+# Provider configuration
+[providers]
+default_provider = "openai"
+
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-4o-mini"
+
+[providers.providers.anthropic]
+provider_type = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+model = "claude-3-haiku-20240307"
+
+[state]
+backend = "memory"
+auto_save = true
+checkpoint_interval = 300
+
+[session]
+enabled = true
+persistence = true
+storage_path = "./webapp-sessions"
+
+[storage]
+enabled = true
+backend = "filesystem"
+base_path = "./webapp-artifacts"
+
+[events]
+enabled = true
+bus_type = "async"
+buffer_size = 10000
+
+[hooks]
+enabled = true
+rate_limiting = true
+cost_tracking = true
+validation = true
+
+[security]
+enabled = true
+sandboxing = true
+code_scanning = true
+
+[tools]
+enabled = [
+    "file_operations",
+    "json_processor",
+    "text_manipulator",
+    "web_search",
+    "code_analyzer",
+    "api_tester",
+    "webhook_caller"
+]
+
+[logging]
+level = "info"
+format = "pretty"
