@@ -839,31 +839,77 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [x] `llmspell-config/src/validation.rs` (580+ lines) - Comprehensive validation with security checks
    - [x] `llmspell-config/Cargo.toml` - Dependencies: serde, toml, anyhow, tracing, thiserror, tokio
 
-2. [ ] **CLI Configuration Integration** (2 hours):
-   - [ ] Update `llmspell-cli/src/config.rs` to use `llmspell-config::LLMSpellConfig`
-   - [ ] Remove inline TOML parsing from CLI - delegate to llmspell-config
-   - [ ] Update `load_runtime_config()` to return clean config objects
-   - [ ] Maintain all existing config file discovery paths and environment overrides
-   - [ ] Update main.rs to pass config objects to bridge
-   - [ ] Update validate command to use new config validation
+2. [ ] **CLI Configuration Integration and Bridge Dependencies** (4 hours):
+   **Phase A: Architecture Dependencies** (1 hour):
+   - [ ] Add `llmspell-config` dependency to `llmspell-bridge/Cargo.toml`
+   - [ ] Update all imports across CLI and bridge to use `llmspell-config::LLMSpellConfig`
+   - [ ] Remove `RuntimeConfig` struct completely from `llmspell-bridge/src/runtime.rs` (lines ~220-280)
+   - [ ] Remove duplicate config discovery logic from CLI (delegate to llmspell-config)
+   - [ ] Remove duplicate environment override logic from CLI (use llmspell-config's system)
+   - [ ] Remove duplicate validation logic from CLI (use llmspell-config's comprehensive validation)
+   
+   **Phase B: CLI Layer Updates** (1.5 hours):
+   - [ ] Update `llmspell-cli/src/config.rs`:
+     - [ ] Replace `load_runtime_config()` return type: `RuntimeConfig` → `LLMSpellConfig`
+     - [ ] Replace inline TOML parsing with `LLMSpellConfig::load_with_discovery()`
+     - [ ] Remove `discover_config_file()` (use llmspell-config's implementation)
+     - [ ] Remove `apply_environment_overrides()` (use llmspell-config's system)
+     - [ ] Update `validate_config()` to delegate to `config.validate()`
+     - [ ] Update `create_default_config()` to use `LLMSpellConfig::default()`
+   - [ ] Update `llmspell-cli/src/main.rs`:
+     - [ ] Change `load_runtime_config()` call to return `LLMSpellConfig`
+     - [ ] Update `execute_command()` call to pass `LLMSpellConfig`
+   - [ ] Update `llmspell-cli/src/commands/mod.rs`:
+     - [ ] Change `execute_command()` parameter: `RuntimeConfig` → `LLMSpellConfig`
+     - [ ] Update all command handler signatures and implementations
+   
+   **Phase C: Bridge Layer Interface Updates** (1.5 hours):
+   - [ ] Update `llmspell-bridge/src/runtime.rs`:
+     - [ ] Change `ScriptRuntime::new_with_config()` parameter: `RuntimeConfig` → `LLMSpellConfig`
+     - [ ] Update `ScriptRuntime::new_with_lua()` to accept `LLMSpellConfig`
+     - [ ] Update `ScriptRuntime::new_with_javascript()` to accept `LLMSpellConfig`
+     - [ ] Update internal field `_config: RuntimeConfig` → `_config: LLMSpellConfig`
+     - [ ] Update `supports_engine()` method to use `LLMSpellConfig`
+     - [ ] Remove all `RuntimeConfig` references and builders
+   - [ ] Update `llmspell-bridge/src/providers.rs`:
+     - [ ] Update provider initialization to extract from `config.providers`
+   - [ ] Update tool registration in `llmspell-bridge/src/tools.rs`:
+     - [ ] Update `register_all_tools()` to accept and pass `ToolsConfig`
+     - [ ] Pass `config.tools.file_operations` to FileOperationsTool
+     - [ ] Pass `config.tools.web_search` to WebSearchTool 
+     - [ ] Pass `config.tools.http_request` to HttpRequestTool
 
-3. [ ] **Bridge Layer Simplification** (2.5 hours):
-   - [ ] Remove all config structs from `llmspell-bridge/src/runtime.rs`
-   - [ ] Update `ScriptRuntime::new_with_config()` to receive `LLMSpellConfig`
-   - [ ] Update `register_all_tools()` to receive and use `ToolsConfig`
-   - [ ] Simplify bridge to focus on script execution, not config management
+3. [ ] **Tool Security Configuration Implementation** (2 hours):
+   - [ ] Update `llmspell-tools/src/fs/file_operations.rs`:
+     - [ ] Add `config: FileOperationsConfig` field to `FileOperationsTool` struct
+     - [ ] Update `FileOperationsTool::new()` to accept `FileOperationsConfig` parameter
+     - [ ] Update `security_requirements()` to use `self.config.allowed_paths` (remove hardcoded `vec!["/tmp"]`)
+     - [ ] Update all path validation to use `self.config.is_path_allowed()`
+     - [ ] Update file size validation to use `self.config.max_file_size`
+     - [ ] Update extension validation to use `self.config.is_extension_allowed()`
+   - [ ] Update other tool configurations:
+     - [ ] Update `WebSearchTool` to accept `WebSearchConfig` 
+     - [ ] Update `HttpRequestTool` to accept `HttpRequestConfig`
+     - [ ] Apply rate limiting, domain filtering, and size limits from configs
+   - [ ] Update bridge tool registration:
+     - [ ] Modify `register_all_tools()` to extract tool configs from `LLMSpellConfig`
+     - [ ] Pass individual tool configs to tool constructors
+     - [ ] Ensure tools receive their specific security configurations
+
+4. [ ] **Testing and Quality Assurance** (1.5 hours):
+   - [ ] Update all CLI tests to use `LLMSpellConfig` instead of `RuntimeConfig`
    - [ ] Update all bridge tests to use llmspell-config for test configurations
-   - [ ] Ensure clean separation: config parsing vs. script execution
+   - [ ] Ensure all new tests use proper categorization:
+     - [ ] Config tests: `#[cfg_attr(test_category = "unit")]`
+     - [ ] Integration tests: `#[cfg_attr(test_category = "integration")]`
+     - [ ] Tool security tests: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "tool")]`
+   - [ ] Run `cargo clean && cargo build --all-features` - must compile cleanly
+   - [ ] Run `cargo test --workspace` - all tests must pass
+   - [ ] Run `cargo clippy --workspace --all-features --all-targets -- -D warnings` - ZERO warnings
+   - [ ] Test config validation catches invalid configurations
+   - [ ] Test file operations security with various paths and configurations
 
-4. [ ] **Tool Security Configuration** (2 hours):
-   - [ ] Update `FileOperationsConfig` in llmspell-config to include `allowed_paths`
-   - [ ] Update `FileOperationsTool::new()` to accept `FileOperationsConfig`
-   - [ ] Update `FileOperationsTool::security_requirements()` to use `self.config.allowed_paths`
-   - [ ] Remove hardcoded `vec!["/tmp".to_string()]` from file_operations.rs:626
-   - [ ] Add builder pattern: `FileOperationsConfig::builder().with_allowed_paths(paths)`
-   - [ ] Update tool registration in bridge to pass tool configs
-
-5. [ ] **WebApp Creator Configuration** (1 hour):
+5. [ ] **WebApp Creator Configuration and End-to-End Validation** (1 hour):
    - [ ] Add tool configuration to `webapp-creator/config.toml`:
      ```toml
      [tools.file_operations]
@@ -871,21 +917,14 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      max_file_size = 52428800
      atomic_writes = true
      ```
-   - [ ] Test WebApp Creator with custom output directories
-   - [ ] Verify security boundaries work correctly
-   - [ ] Document new configuration options
-
-6. [ ] **Quality Assurance and Testing** (1.5 hours):
-   - [ ] Ensure all new tests use proper categorization:
-     - [ ] Config tests: `#[cfg_attr(test_category = "unit")]`
-     - [ ] Integration tests: `#[cfg_attr(test_category = "integration")]`
-     - [ ] Tool security tests: `#[cfg_attr(test_category = "integration")] #[cfg_attr(test_category = "tool")]`
-   - [ ] Run `cargo clean && cargo build --all-features` 
-   - [ ] Run `cargo test --workspace` - all tests must pass
-   - [ ] Run `./scripts/quality-check-minimal.sh` - ZERO clippy warnings
-   - [ ] Test WebApp Creator: `LLMSPELL_CONFIG=config.toml ./llmspell run main.lua --output /tmp/test-project`
-   - [ ] Verify config validation catches invalid configurations
-   - [ ] Test file operations security with various paths
+   - [ ] Test WebApp Creator with custom output directories:
+     - [ ] `LLMSPELL_CONFIG=config.toml ./llmspell run main.lua --output /tmp/test-project`
+     - [ ] `LLMSPELL_CONFIG=config.toml ./llmspell run main.lua --output /home/user/projects/webapp`
+   - [ ] Verify security boundaries work correctly:
+     - [ ] Test that `/etc/passwd` path is rejected
+     - [ ] Test that allowed paths work as expected
+     - [ ] Test file size limits are enforced
+   - [ ] Document new configuration options in WebApp Creator README
 
 **Configuration Schema Design**:
 ```toml
