@@ -93,6 +93,8 @@ impl std::str::FromStr for FileOperation {
 /// File operations configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOperationsConfig {
+    /// Allowed file paths for security (used in `SecurityRequirements`)
+    pub allowed_paths: Vec<String>,
     /// Enable atomic writes
     pub atomic_writes: bool,
     /// Maximum file size for operations (in bytes)
@@ -108,6 +110,7 @@ pub struct FileOperationsConfig {
 impl Default for FileOperationsConfig {
     fn default() -> Self {
         Self {
+            allowed_paths: vec!["/tmp".to_string()], // Default to /tmp only
             atomic_writes: true,
             max_file_size: 100 * 1024 * 1024, // 100MB
             max_dir_entries: 10000,
@@ -900,7 +903,7 @@ impl Tool for FileOperationsTool {
     fn security_requirements(&self) -> SecurityRequirements {
         SecurityRequirements {
             level: SecurityLevel::Privileged,
-            file_permissions: vec!["/tmp".to_string()], // Default to /tmp only
+            file_permissions: self.config.allowed_paths.clone(), // Use configured allowed paths
             network_permissions: vec![],
             env_permissions: vec![],
             custom_requirements: HashMap::new(),

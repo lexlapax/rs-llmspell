@@ -223,8 +223,8 @@ fn register_file_system_tools(
     let file_ops_config = file_ops_config.clone();
     register_tool(registry, "file_operations", move || {
         // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
-        // Note: allowed_paths are handled at the sandbox level, not in the tool config
         let tool_config = FileOperationsConfig {
+            allowed_paths: file_ops_config.allowed_paths.clone(),
             atomic_writes: file_ops_config.atomic_writes,
             max_file_size: file_ops_config.max_file_size,
             max_dir_entries: 1000,      // Default value
