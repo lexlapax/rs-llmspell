@@ -223,7 +223,7 @@ impl ScriptRuntime {
         }
         self.engine.execute_script_streaming(script).await
     }
-    
+
     /// Set script arguments to be passed to the script
     ///
     /// These arguments will be made available to the script in a language-specific way:
@@ -234,7 +234,10 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if the engine fails to set arguments
-    pub async fn set_script_args(&mut self, args: HashMap<String, String>) -> Result<(), LLMSpellError> {
+    pub async fn set_script_args(
+        &mut self,
+        args: HashMap<String, String>,
+    ) -> Result<(), LLMSpellError> {
         self.engine.set_script_args(args).await
     }
 

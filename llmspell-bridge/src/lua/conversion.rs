@@ -281,7 +281,10 @@ pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result
     if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&output.text) {
         // Check if this is a structured tool response with success/result/error format
         if let serde_json::Value::Object(obj) = &json_value {
-            if obj.contains_key("success") || obj.contains_key("result") || obj.contains_key("operation") {
+            if obj.contains_key("success")
+                || obj.contains_key("result")
+                || obj.contains_key("operation")
+            {
                 // This is a structured tool response - flatten it to top level for easy access
                 // e.g., result.success, result.result.text instead of parsing JSON in Lua
                 for (key, value) in obj {

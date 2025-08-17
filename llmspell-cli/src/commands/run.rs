@@ -18,19 +18,19 @@ fn parse_script_args(args: Vec<String>, script_path: &Path) -> HashMap<String, S
     let mut parsed = HashMap::new();
     let mut positional_index = 1;
     let mut i = 0;
-    
+
     // Add script name as arg[0] for Lua compatibility
     if let Some(script_name) = script_path.file_name() {
         parsed.insert("0".to_string(), script_name.to_string_lossy().to_string());
     }
-    
+
     while i < args.len() {
         let arg = &args[i];
-        
+
         if arg.starts_with("--") {
             // Named argument
             let key = arg.trim_start_matches("--");
-            
+
             // Check if there's a value following this flag
             if i + 1 < args.len() && !args[i + 1].starts_with("--") {
                 // --key value format
@@ -48,7 +48,7 @@ fn parse_script_args(args: Vec<String>, script_path: &Path) -> HashMap<String, S
             i += 1;
         }
     }
-    
+
     parsed
 }
 
@@ -68,7 +68,7 @@ pub async fn execute_script_file(
 
     // Read script content
     let script_content = fs::read_to_string(&script_path).await?;
-    
+
     // Parse script arguments
     let parsed_args = parse_script_args(args, &script_path);
     if !parsed_args.is_empty() {
@@ -77,7 +77,7 @@ pub async fn execute_script_file(
 
     // Create runtime for the selected engine
     let mut runtime = super::create_runtime(engine, runtime_config).await?;
-    
+
     // Pass script arguments to the runtime
     runtime.set_script_args(parsed_args).await?;
 

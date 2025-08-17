@@ -35,7 +35,7 @@ pub trait ScriptEngineBridge: Send + Sync {
         registry: &Arc<crate::ComponentRegistry>,
         providers: &Arc<crate::ProviderManager>,
     ) -> Result<(), LLMSpellError>;
-    
+
     /// Set script arguments to be made available in the script environment
     ///
     /// Arguments are passed as a HashMap and made available in a language-specific way:
@@ -46,7 +46,8 @@ pub trait ScriptEngineBridge: Send + Sync {
     /// # Errors
     ///
     /// Returns an error if arguments cannot be set in the engine
-    async fn set_script_args(&mut self, args: HashMap<String, String>) -> Result<(), LLMSpellError>;
+    async fn set_script_args(&mut self, args: HashMap<String, String>)
+        -> Result<(), LLMSpellError>;
 
     /// Get the name of this script engine
     fn get_engine_name(&self) -> &'static str;

@@ -115,8 +115,11 @@ impl ScriptEngineBridge for JSEngine {
         // TODO: Implement context setting
         Ok(())
     }
-    
-    async fn set_script_args(&mut self, _args: HashMap<String, String>) -> Result<(), LLMSpellError> {
+
+    async fn set_script_args(
+        &mut self,
+        _args: HashMap<String, String>,
+    ) -> Result<(), LLMSpellError> {
         // TODO (Phase 5): Implement JavaScript args injection
         // When implemented, this should:
         // 1. Create a global 'args' object with the provided arguments

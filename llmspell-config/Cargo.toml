@@ -9,7 +9,10 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
+serde_json.workspace = true
+toml.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
-config.workspace = true
+thiserror.workspace = true
+tokio.workspace = true

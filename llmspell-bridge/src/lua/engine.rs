@@ -106,7 +106,7 @@ impl ScriptEngineBridge for LuaEngine {
             // The async execution will happen within tool calls, not at the script level
             let result = {
                 let lua = self.lua.lock();
-                
+
                 // Inject ARGS global if script arguments were provided
                 if let Some(ref args) = self.script_args {
                     if let Err(e) = inject_args_global(&lua, args) {
@@ -116,7 +116,7 @@ impl ScriptEngineBridge for LuaEngine {
                         });
                     }
                 }
-                
+
                 let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
 
                 // Run garbage collection after script execution to prevent memory accumulation
@@ -311,8 +311,11 @@ impl ScriptEngineBridge for LuaEngine {
         self.execution_context = context;
         Ok(())
     }
-    
-    async fn set_script_args(&mut self, args: std::collections::HashMap<String, String>) -> Result<(), LLMSpellError> {
+
+    async fn set_script_args(
+        &mut self,
+        args: std::collections::HashMap<String, String>,
+    ) -> Result<(), LLMSpellError> {
         self.script_args = Some(args);
         Ok(())
     }

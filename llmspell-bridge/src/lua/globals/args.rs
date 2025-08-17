@@ -17,12 +17,15 @@ use std::hash::BuildHasher;
 /// # Errors
 ///
 /// Returns an error if ARGS global injection or table creation fails
-pub fn inject_args_global<S: BuildHasher>(lua: &Lua, args: &HashMap<String, String, S>) -> Result<(), LLMSpellError> {
+pub fn inject_args_global<S: BuildHasher>(
+    lua: &Lua,
+    args: &HashMap<String, String, S>,
+) -> Result<(), LLMSpellError> {
     let args_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create ARGS table: {e}"),
         source: None,
     })?;
-    
+
     // Add all arguments to the table
     for (key, value) in args {
         // Try to parse the key as a number for positional arguments
@@ -44,7 +47,7 @@ pub fn inject_args_global<S: BuildHasher>(lua: &Lua, args: &HashMap<String, Stri
                 })?;
         }
     }
-    
+
     // Set the ARGS global
     lua.globals()
         .set("ARGS", args_table)
@@ -52,13 +55,13 @@ pub fn inject_args_global<S: BuildHasher>(lua: &Lua, args: &HashMap<String, Stri
             message: format!("Failed to set ARGS global: {e}"),
             source: None,
         })?;
-    
+
     // Also create the traditional 'arg' table for compatibility
     let traditional_arg_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create arg table: {e}"),
         source: None,
     })?;
-    
+
     // Copy positional arguments to arg table
     for (key, value) in args {
         if let Ok(index) = key.parse::<i32>() {
@@ -70,7 +73,7 @@ pub fn inject_args_global<S: BuildHasher>(lua: &Lua, args: &HashMap<String, Stri
                 })?;
         }
     }
-    
+
     // Set the arg global (lowercase for traditional Lua compatibility)
     lua.globals()
         .set("arg", traditional_arg_table)
@@ -78,19 +81,19 @@ pub fn inject_args_global<S: BuildHasher>(lua: &Lua, args: &HashMap<String, Stri
             message: format!("Failed to set arg global: {e}"),
             source: None,
         })?;
-    
+
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_args_injection() {
         let lua = mlua::Lua::new();
         let mut args = HashMap::new();
-        
+
         // Add some test arguments
         args.insert("0".to_string(), "script.lua".to_string());
         args.insert("1".to_string(), "positional1".to_string());
@@ -98,10 +101,10 @@ mod tests {
         args.insert("input".to_string(), "input-file.lua".to_string());
         args.insert("debug".to_string(), "true".to_string());
         args.insert("max-cost".to_string(), "20".to_string());
-        
+
         // Inject the arguments
         inject_args_global(&lua, &args).unwrap();
-        
+
         // Test that we can access them from Lua
         lua.load(
             r#"
@@ -125,15 +128,15 @@ mod tests {
         .exec()
         .unwrap();
     }
-    
+
     #[test]
     fn test_empty_args() {
         let lua = mlua::Lua::new();
         let args = HashMap::new();
-        
+
         // Should work with empty args
         inject_args_global(&lua, &args).unwrap();
-        
+
         // ARGS and arg should exist but be empty
         lua.load(
             r#"
