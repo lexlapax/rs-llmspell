@@ -15,11 +15,11 @@ Tools are reusable components that perform specific tasks like file operations, 
 - Integrates with the agent and workflow systems
 
 ### **Current Tool Ecosystem**
-rs-llmspell has **37 production tools** across 10 categories:
+rs-llmspell has **37 production tools** across 10 categories (including 3 new Phase 7 tools):
 - **API Tools** (2): GraphQL, HTTP requests
 - **Communication** (2): Database, Email
-- **Data Processing** (3): CSV, JSON, Graph builder
-- **Document & Academic** (2): PDF processor, Citation formatter
+- **Data Processing** (4): CSV, JSON, Graph builder (Phase 7), Data validation
+- **Document & Academic** (2): PDF processor (Phase 7), Citation formatter (Phase 7)
 - **File System** (5): Operations, Search, Watch, Convert, Archive
 - **Media** (3): Audio, Image, Video processing
 - **Search** (1): Web search
@@ -457,6 +457,119 @@ async fn process_large_data(&self, data: &[u8]) -> Result<Vec<u8>, LLMError> {
     Ok(processed)
 }
 ```
+
+---
+
+## Phase 7 Tool Implementation Examples
+
+### **PDF Processor Tool**
+The PDF processor demonstrates handling synchronous libraries in async contexts:
+
+```rust
+// llmspell-tools/src/document/pdf_processor.rs
+use tokio::task::spawn_blocking;
+
+async fn extract_text(&self, file_path: &str) -> Result<ToolOutput> {
+    // pdf-extract is synchronous, so use spawn_blocking
+    let text = spawn_blocking(move || {
+        pdf_extract::extract_text(file_path)
+    })
+    .await
+    .context("Failed to spawn blocking task")?
+    .context("PDF extraction failed")?;
+    
+    tool_success(json!({
+        "operation": "extract_text",
+        "success": true,
+        "result": {
+            "text": text,
+            "page_count": text.lines().filter(|l| l.contains("Page")).count()
+        }
+    }))
+}
+```
+
+**Key lessons:**
+- Use `spawn_blocking` for synchronous libraries
+- Add timeout protection for long operations
+- Handle large files with resource limits
+
+### **Citation Formatter Tool**
+The citation formatter shows complex data validation and formatting:
+
+```rust
+// llmspell-tools/src/document/citation_formatter.rs
+async fn format_citation(&self, input: &CitationInput) -> Result<ToolOutput> {
+    // Validate citation data structure
+    self.validate_citation_data(&input.citation)?;
+    
+    // Use hayagriva for formatting
+    let formatted = match input.format.as_str() {
+        "apa" => self.format_apa(&input.citation),
+        "mla" => self.format_mla(&input.citation),
+        "chicago" => self.format_chicago(&input.citation),
+        _ => return Err(tool_error("Unsupported format", Some("validation")))
+    }?;
+    
+    tool_success(json!({
+        "operation": "format_citation",
+        "success": true,
+        "result": {
+            "formatted": formatted,
+            "format": input.format
+        }
+    }))
+}
+```
+
+**Key lessons:**
+- Validate complex input structures
+- Support multiple output formats
+- Return structured responses with metadata
+
+### **Graph Builder Tool**
+The graph builder demonstrates serializable data structures:
+
+```rust
+// llmspell-tools/src/data/graph_builder.rs
+use petgraph::{Graph, Directed, Undirected};
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct SerializableGraph {
+    graph_type: String,
+    nodes: Vec<Node>,
+    edges: Vec<Edge>,
+    metadata: Option<serde_json::Value>,
+}
+
+async fn build_graph(&self, input: &GraphInput) -> Result<ToolOutput> {
+    let mut graph = if input.directed {
+        Graph::<String, f64, Directed>::new()
+    } else {
+        Graph::<String, f64, Undirected>::new()
+    };
+    
+    // Add nodes and edges
+    for node in &input.nodes {
+        graph.add_node(node.label.clone());
+    }
+    
+    // Convert to serializable format
+    let serializable = self.to_serializable(&graph);
+    
+    tool_success(json!({
+        "operation": "build_graph",
+        "success": true,
+        "result": serializable
+    }))
+}
+```
+
+**Key lessons:**
+- Use serializable wrapper types for complex structures
+- Support multiple graph types (directed/undirected)
+- Provide analysis capabilities (shortest path, connectivity)
 
 ---
 

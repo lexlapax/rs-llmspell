@@ -961,6 +961,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
   - Support for accessible PDFs (tagged PDF, PDF/A compliance)
   - Alternative: `papermake` for high-volume document generation
   - **Architecture Note**: Intentionally separate from PdfProcessorTool (Phase 7) which uses `pdf-extract` for reading PDFs. Different libraries optimize for different use cases (reading vs writing)
+  - **CRITICAL TODO**: Replace Phase 7's `pdf-extract` with `lopdf` (async support) or `pdfium-render` (robust extraction) due to blocking/hanging issues on complex PDFs
 - Integration with multimodal workflows
 - **Hook-based parameter optimization for large media files**
 - **Progress hooks for long-running operations**

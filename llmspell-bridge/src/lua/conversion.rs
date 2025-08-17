@@ -276,8 +276,33 @@ fn parse_media_content(_lua: &Lua, table: &Table) -> mlua::Result<MediaContent> 
 pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table> {
     let table = lua.create_table()?;
 
-    // Set text
-    table.set("text", output.text)?;
+    // Check if text contains structured JSON response from tools
+    // This provides a better API where tools return structured data directly accessible in Lua
+    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&output.text) {
+        // Check if this is a structured tool response with success/result/error format
+        if let serde_json::Value::Object(obj) = &json_value {
+            if obj.contains_key("success") || obj.contains_key("result") || obj.contains_key("operation") {
+                // This is a structured tool response - flatten it to top level for easy access
+                // e.g., result.success, result.result.text instead of parsing JSON in Lua
+                for (key, value) in obj {
+                    table.set(key.as_str(), json_to_lua_value(lua, value)?)?;
+                }
+                // Also preserve original text for backward compatibility
+                table.set("_raw_text", output.text.clone())?;
+            } else {
+                // Generic JSON object - store both parsed and raw
+                table.set("data", json_to_lua_value(lua, &json_value)?)?;
+                table.set("text", output.text.clone())?;
+            }
+        } else {
+            // Non-object JSON (array, primitive) - store both parsed and raw
+            table.set("data", json_to_lua_value(lua, &json_value)?)?;
+            table.set("text", output.text.clone())?;
+        }
+    } else {
+        // Not JSON - set as plain text
+        table.set("text", output.text)?;
+    }
 
     // Set metadata
     let metadata_table = lua.create_table()?;

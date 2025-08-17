@@ -84,10 +84,11 @@ async fn test_tool_sync_behavior() {
         assert(calc, "Tool should be retrieved synchronously")
         
         -- Execute should be synchronous
-        local result = calc:execute({input = "2 + 2"})
+        local result = calc:execute({operation = "evaluate", input = "2 + 2"})
         assert(result, "Tool execute should return result synchronously")
-        assert(result.text, "Tool should return text")
-        assert(result.metadata, "Tool should return metadata")
+        -- Bridge now auto-parses JSON responses
+        assert(result.success ~= nil or result.text, "Tool should return parsed result or text")
+        assert(result.metadata or result.result, "Tool should return metadata or result")
         
         -- Test tool discovery is synchronous
         local tools = Tool.discover()

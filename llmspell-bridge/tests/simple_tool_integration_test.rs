@@ -83,20 +83,24 @@ async fn test_simple_tool_integration() {
             error("Tool execution failed: " .. (result.error or "unknown error"))
         end
         
-        -- The result from executeAsync should have text field with JSON
-        if not result.text then
-            error("Tool execution failed: no text in result. Fields: " .. table.concat(fields, ", "))
-        end
-        
-        -- Parse the JSON output from the text field
-        local parsed = JSON.parse(result.text)
-        if not parsed then
-            error("Failed to parse tool output: " .. tostring(result.text))
+        -- Handle both auto-parsed and raw text responses
+        local parsed
+        if result.success ~= nil and result.result then
+            -- Already parsed by bridge (new behavior)
+            parsed = result
+        elseif result.text then
+            -- Raw text response (old behavior)
+            parsed = JSON.parse(result.text)
+            if not parsed then
+                error("Failed to parse tool output: " .. tostring(result.text))
+            end
+        else
+            error("Tool execution failed: no usable result. Fields: " .. table.concat(fields, ", "))
         end
         
         -- Tool returns {success: true, result: {output: "...", variant: "standard", binary: false}}
         if not parsed.success then
-            error("Tool returned failure: " .. tostring(parsed.message or "unknown"))
+            error("Tool returned failure: " .. tostring(parsed.message or parsed.error or "unknown"))
         end
         
         return {
@@ -141,13 +145,20 @@ async fn test_simple_tool_integration() {
             error("Calculator failed: result is nil")
         end
         
-        if not result.text then
-            error("Calculator failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local parsed
+        if result.success ~= nil and result.result then
+            -- Already parsed by bridge (new behavior)
+            parsed = result
+        elseif result.text then
+            -- Raw text response (old behavior)
+            parsed = JSON.parse(result.text)
+        else
+            error("Calculator failed: no usable result")
         end
         
-        local parsed = JSON.parse(result.text)
         if not parsed.success then
-            error("Calculator tool failed: " .. tostring(parsed.message or "unknown"))
+            error("Calculator tool failed: " .. tostring(parsed.message or parsed.error or "unknown"))
         end
         
         return {
@@ -197,11 +208,21 @@ async fn test_simple_tool_integration() {
             error("UUID generation failed: " .. tostring(uuid_result))
         end
         
-        if not uuid_result.text then
-            error("UUID generation failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local uuid_parsed
+        if uuid_result.success ~= nil and uuid_result.result then
+            -- Already parsed by bridge (new behavior)
+            uuid_parsed = uuid_result
+        elseif uuid_result.text then
+            -- Raw text response (old behavior)
+            uuid_parsed = JSON.parse(uuid_result.text)
+            if not uuid_parsed then
+                error("UUID generation failed: could not parse result")
+            end
+        else
+            error("UUID generation failed: no usable result")
         end
         
-        local uuid_parsed = JSON.parse(uuid_result.text)
         if not uuid_parsed.success then
             error("UUID generation failed: " .. tostring(uuid_parsed.message or "unknown"))
         end
@@ -232,11 +253,21 @@ async fn test_simple_tool_integration() {
             error("Hash calculation failed: " .. tostring(hash_result))
         end
         
-        if not hash_result.text then
-            error("Hash calculation failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local hash_parsed
+        if hash_result.success ~= nil and hash_result.result then
+            -- Already parsed by bridge (new behavior)
+            hash_parsed = hash_result
+        elseif hash_result.text then
+            -- Raw text response (old behavior)
+            hash_parsed = JSON.parse(hash_result.text)
+            if not hash_parsed then
+                error("Hash calculation failed: could not parse result")
+            end
+        else
+            error("Hash calculation failed: no usable result")
         end
         
-        local hash_parsed = JSON.parse(hash_result.text)
         if not hash_parsed.success then
             error("Hash calculation failed: " .. tostring(hash_parsed.message or "unknown"))
         end
@@ -313,12 +344,18 @@ async fn test_simple_tool_integration() {
             error("Environment read failed: " .. tostring(env_result))
         end
         
-        if not env_result.text then
-            error("Environment read failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local env_parsed
+        if env_result.success ~= nil then
+            -- Already parsed by bridge (new behavior)
+            env_parsed = env_result
+        elseif env_result.text then
+            -- Raw text response (old behavior)
+            env_parsed = JSON.parse(env_result.text)
+        else
+            error("Environment read failed: no usable result")
         end
         
-        -- Parse result and check for success
-        local env_parsed = JSON.parse(env_result.text)
         local has_env_output = env_parsed and env_parsed.success
         
         -- Step 2: Test JSON processor with simple data
@@ -352,11 +389,17 @@ async fn test_simple_tool_integration() {
             error("JSON processing failed: " .. tostring(json_result))
         end
         
-        if not json_result.text then
-            error("JSON processing failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local json_parsed
+        if json_result.success ~= nil and json_result.result then
+            -- Already parsed by bridge (new behavior)
+            json_parsed = json_result
+        elseif json_result.text then
+            -- Raw text response (old behavior)
+            json_parsed = JSON.parse(json_result.text)
+        else
+            error("JSON processing failed: no usable result")
         end
-        
-        local json_parsed = JSON.parse(json_result.text)
         
         -- Debug: Print what we actually got
         print("DEBUG json_parsed type:", type(json_parsed))
@@ -408,11 +451,17 @@ async fn test_simple_tool_integration() {
             error("Template rendering failed: " .. tostring(template_result))
         end
         
-        if not template_result.text then
-            error("Template rendering failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local template_parsed
+        if template_result.success ~= nil and template_result.result then
+            -- Already parsed by bridge (new behavior)
+            template_parsed = template_result
+        elseif template_result.text then
+            -- Raw text response (old behavior)
+            template_parsed = JSON.parse(template_result.text)
+        else
+            error("Template rendering failed: no usable result")
         end
-        
-        local template_parsed = JSON.parse(template_result.text)
         local template_output = nil
         if template_parsed.success and template_parsed.result then
             template_output = template_parsed.result.output or template_parsed.result.rendered or template_parsed.result
@@ -625,11 +674,17 @@ async fn test_simple_tool_integration() {
             error("JSON query failed: " .. tostring(json_result))
         end
         
-        if not json_result.text then
-            error("JSON query failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local json_parsed
+        if json_result.success ~= nil and json_result.result then
+            -- Already parsed by bridge (new behavior)
+            json_parsed = json_result
+        elseif json_result.text then
+            -- Raw text response (old behavior)
+            json_parsed = JSON.parse(json_result.text)
+        else
+            error("JSON query failed: no usable result")
         end
-        
-        local json_parsed = JSON.parse(json_result.text)
         
         -- Handle JSON processor returning direct number result  
         local user_count = nil
@@ -669,11 +724,17 @@ async fn test_simple_tool_integration() {
             error("Environment read failed: " .. tostring(env_result))
         end
         
-        if not env_result.text then
-            error("Environment read failed: no text in result")
+        -- Handle both auto-parsed and raw text responses
+        local env_parsed
+        if env_result.success ~= nil then
+            -- Already parsed by bridge (new behavior)
+            env_parsed = env_result
+        elseif env_result.text then
+            -- Raw text response (old behavior)
+            env_parsed = JSON.parse(env_result.text)
+        else
+            error("Environment read failed: no usable result")
         end
-        
-        local env_parsed = JSON.parse(env_result.text)
         local system_checked = env_parsed and env_parsed.success
         
         -- Step 3: Save the results to a file

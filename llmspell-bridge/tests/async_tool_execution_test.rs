@@ -23,9 +23,18 @@ async fn test_basic_tool_execution() {
             input = "test data for execution"
         })
         
-        -- Parse the JSON result
-        assert(result.text, "Should have text field")
-        local parsed_result = JSON.parse(result.text)
+        -- The bridge now automatically parses structured tool responses
+        -- Check if we have the flattened structure or need to parse
+        local parsed_result
+        if result.success ~= nil then
+            -- Already parsed and flattened by bridge
+            parsed_result = result
+        elseif result.text then
+            -- Fallback to parsing if text field exists
+            parsed_result = JSON.parse(result.text)
+        else
+            error("Result has neither success field nor text field")
+        end
         
         -- Check the parsed result
         assert(parsed_result.success == true, "Hash calculation should succeed")
@@ -64,21 +73,21 @@ async fn test_multiple_tool_execution() {
             algorithm = "sha256",
             input = "test data"
         })
-        results.hash = JSON.parse(hash_raw.text)
+        results.hash = hash_raw.success and hash_raw or JSON.parse(hash_raw.text)
         
         -- Base64 encoding
         local base64_raw = base64Tool:execute({
             operation = "encode",
             input = "test data"
         })
-        results.base64 = JSON.parse(base64_raw.text)
+        results.base64 = base64_raw.success and base64_raw or JSON.parse(base64_raw.text)
         
         -- UUID generation
         local uuid_raw = uuidTool:execute({
             operation = "generate",
             version = "v4"
         })
-        results.uuid = JSON.parse(uuid_raw.text)
+        results.uuid = uuid_raw.success and uuid_raw or JSON.parse(uuid_raw.text or '{}')
         
         -- All should complete successfully
         assert(results.hash, "Hash result should exist")
@@ -122,9 +131,9 @@ async fn test_tool_with_coroutines() {
                     operation = "generate",
                     version = "v4"
                 })
-                -- Parse JSON result
-                local parsed = JSON.parse(result.text)
-                table.insert(uuids, parsed.result.uuid)
+                -- Use parsed result or parse JSON
+                local parsed = result.success and result or JSON.parse(result.text or '{}')
+                table.insert(uuids, parsed.result and parsed.result.uuid or nil)
                 coroutine.yield(i)
             end
             
@@ -181,7 +190,7 @@ async fn test_tool_error_handling() {
             algorithm = "sha256",
             input = "test data"
         })
-        local success_result = JSON.parse(success_raw.text)
+        local success_result = success_raw.success and success_raw or JSON.parse(success_raw.text or '{}')
         assert(success_result.success == true, "Valid operation should succeed")
         assert(success_result.result and success_result.result.hash, "Should have hash")
         
@@ -191,7 +200,7 @@ async fn test_tool_error_handling() {
             algorithm = "invalid_algorithm",
             input = "test data"
         })
-        local error_result = JSON.parse(error_raw.text)
+        local error_result = error_raw.success ~= nil and error_raw or JSON.parse(error_raw.text or '{}')
         -- SHA-3 algorithms are actually supported now, so let's use a truly invalid one
         assert(error_result.success == true or error_result.success == false, "Should have success field")
         -- If it fails, check error message
@@ -320,8 +329,8 @@ async fn test_tool_execution_performance() {
                 })
             end
             
-            -- Parse the result
-            local parsed = JSON.parse(result.text)
+            -- Use parsed result or parse JSON
+            local parsed = result.success and result or JSON.parse(result.text or '{}')
             table.insert(results, parsed)
         end
         
@@ -447,7 +456,7 @@ async fn test_tool_chaining() {
             algorithm = "sha256",
             input = original_data
         })
-        local hash_result = JSON.parse(hash_raw.text)
+        local hash_result = hash_raw.success and hash_raw or JSON.parse(hash_raw.text or '{}')
         assert(hash_result.success == true, "Hash should succeed")
         
         -- Base64 encode the hash
@@ -455,7 +464,7 @@ async fn test_tool_chaining() {
             operation = "encode",
             input = hash_result.result.hash
         })
-        local encode_result = JSON.parse(encode_raw.text)
+        local encode_result = encode_raw.success and encode_raw or JSON.parse(encode_raw.text or '{}')
         assert(encode_result.success == true, "Encoding should succeed")
         
         -- Decode it back
@@ -463,7 +472,7 @@ async fn test_tool_chaining() {
             operation = "decode",
             input = encode_result.result.output
         })
-        local decode_result = JSON.parse(decode_raw.text)
+        local decode_result = decode_raw.success and decode_raw or JSON.parse(decode_raw.text or '{}')
         assert(decode_result.success == true, "Decoding should succeed")
         
         -- Should get back the original hash

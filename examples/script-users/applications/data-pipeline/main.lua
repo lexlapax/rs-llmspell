@@ -214,28 +214,25 @@ local extract_workflow = Workflow.builder()
         }
     })
     
-    -- Source 2: Load from database (simulated)
+    -- Source 2: Load from database cache file
     :add_step({
         name = "load_from_database", 
         type = "tool",
-        tool = "database-connector",
+        tool = "file_operations",
         input = {
-            operation = "query",
-            connection_string = "file://" .. config.files.database_cache,
-            query = "SELECT * FROM records"
+            operation = "read",
+            path = config.files.database_cache
         }
     })
     
-    -- Source 3: Load from API (simulated)
+    -- Source 3: Load from API using http_request
     :add_step({
         name = "load_from_api",
         type = "tool", 
-        tool = "api-tester",
+        tool = "http_request",
         input = {
             operation = "get",
-            url = config.endpoints.api_url,
-            method = "GET",
-            fallback_file = config.files.api_cache
+            url = config.endpoints.api_url
         }
     })
     
@@ -253,25 +250,34 @@ local transform_workflow = Workflow.builder()
     :loop_workflow()
     :max_iterations(3)  -- Process 3 batches
     
-    -- Step 1: Validate data
+    -- Step 1: Validate data using data_validation tool
     :add_step({
         name = "validate_data",
         type = "tool",
-        tool = "json_processor",
+        tool = "data_validation",
         input = {
             operation = "validate",
-            input = "{{batch_data}}"  -- Will be replaced with actual batch data
+            input = "{{batch_data}}",  -- Will be replaced with actual batch data
+            schema = {
+                type = "object",
+                properties = {
+                    records = { type = "array" }
+                }
+            }
         }
     })
     
-    -- Step 2: Clean data
+    -- Step 2: Process data with JSON processor
     :add_step({
         name = "clean_data", 
         type = "tool",
-        tool = "text_manipulator",
+        tool = "json_processor",
         input = {
-            operation = "clean_json",
-            input = "{{validated_data}}"
+            operation = "transform",
+            input = "{{validated_data}}",
+            transformation = {
+                cleaned_records = "$.records[*]"
+            }
         }
     })
     
@@ -351,16 +357,15 @@ local load_workflow = Workflow.builder()
     :description("Sequential loading: database save, report generation, notifications")
     :sequential()
     
-    -- Step 1: Save to database
+    -- Step 1: Save to file (simulating database save)
     :add_step({
         name = "save_to_database",
         type = "tool",
-        tool = "database-connector",
+        tool = "file_operations",
         input = {
-            operation = "insert",
-            connection_string = "file:///tmp/pipeline_results.db",
-            table = "analysis_results",
-            data = "{{analysis_results}}"
+            operation = "write",
+            path = "/tmp/pipeline_results.json",
+            content = "{{analysis_results}}"
         }
     })
     
@@ -372,20 +377,19 @@ local load_workflow = Workflow.builder()
         input = "Generate a comprehensive executive report summarizing the ETL pipeline results, quality analysis, anomaly findings, and patterns discovered: {{analysis_results}}"
     })
     
-    -- Step 3: Send notifications
+    -- Step 3: Send notifications using webhook_caller
     :add_step({
         name = "send_notifications",
         type = "tool",
-        tool = "webhook-caller",
+        tool = "webhook_caller",
         input = {
-            operation = "post",
+            operation = "call",
             url = config.endpoints.webhook_url,
-            method = "POST",
             payload = {
                 pipeline = config.pipeline_name,
                 status = "completed",
-                timestamp = "{{current_time}}",
-                summary = "{{report_summary}}"
+                timestamp = os.time(),
+                summary = "Pipeline execution completed"
             }
         }
     })
@@ -571,6 +575,6 @@ print("\nArchitecture Demonstrated:")
 print("  📋 4-Phase ETL: Extract → Transform → Analysis → Load")  
 print("  🔄 Nested Workflows: Sequential(Parallel(Loop(Parallel(Sequential))))")
 print("  🤖 5 Specialized Agents: enricher, quality, anomaly, patterns, report")
-print("  🛠️  3 Tool Categories: database-connector, api-tester, webhook-caller")
+print("  🛠️  3 Tool Categories: file_operations, http_request, webhook_caller")
 print("  📊 Real Production Pattern: Scalable, monitored, persistent")
 print("  ✅ Blueprint Compliance: 100% architecture match")

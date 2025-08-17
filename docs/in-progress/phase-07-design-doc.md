@@ -898,4 +898,84 @@ let config = SessionManagerConfig::builder()
 
 ---
 
+## 10. Tool Development Guidelines (Phase 7 Addition)
+
+### Tool Implementation Standards
+
+#### Naming Conventions
+- **Primary data parameter**: Always use `input` (not: text, content, data, expression, query)
+- **File paths**: Use `path` for single files, `source_path`/`target_path` for operations
+- **Operations**: Always require explicit `operation` parameter for multi-function tools
+- **Tool names**: Use hyphens for web tools (e.g., `pdf-processor`, `citation-formatter`), underscores for others
+
+#### Response Format
+All tools MUST return responses in this standardized format:
+```json
+{
+  "operation": "operation_name",
+  "success": true,
+  "result": {...},
+  "error": null,
+  "metadata": {
+    "execution_time_ms": 123,
+    "tool_version": "1.0.0"
+  }
+}
+```
+
+#### Security Requirements
+- All tools must declare security level (Safe/Restricted/Privileged)
+- Input validation is mandatory
+- Resource limits must be enforced
+- Path traversal prevention for file operations
+- Command injection prevention for system operations
+
+#### Performance Targets
+- Tool initialization: < 10ms
+- Tool execution overhead: < 10ms  
+- Use spawn_blocking for synchronous libraries
+- Implement timeouts for long operations
+- Track resource usage with ResourceTracker
+
+#### Phase 7 Tools Implemented
+
+1. **PDF Processor** (`pdf-processor`)
+   - Library: `pdf-extract = "0.9"`
+   - Operations: extract_text, get_metadata
+   - Key feature: spawn_blocking for sync library
+   - Challenge: Complex PDFs require lopdf/pdfium (Phase 21)
+
+2. **Citation Formatter** (`citation-formatter`)
+   - Library: `hayagriva = "0.5"`
+   - Operations: format_citation, format_bibliography
+   - Formats: APA, MLA, Chicago, Harvard
+   - Key feature: Complex data validation
+
+3. **Graph Builder** (`graph-builder`)
+   - Library: `petgraph = "0.6"`
+   - Operations: build_graph, add_node, add_edge, analyze
+   - Key feature: Serializable graph structures
+   - Support: Directed and undirected graphs
+
+#### Integration with Bridge
+The bridge now auto-parses JSON responses from tools for better UX:
+```lua
+-- Tool responses are automatically parsed
+local result = Tool.invoke("pdf-processor", {
+    operation = "extract_text",
+    input = "/path/to/file.pdf"
+})
+-- Direct access to parsed fields
+print(result.result.text)  -- No need for JSON.parse
+```
+
+#### Testing Requirements
+- Unit tests with proper categorization
+- Integration tests through bridge
+- Performance benchmarks
+- Security edge case testing
+- >90% coverage required
+
+---
+
 This design document provides the complete blueprint for Phase 7 implementation, establishing the foundation for a stable, consistent, and well-documented 1.0 release of rs-llmspell.
