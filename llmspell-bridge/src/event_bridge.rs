@@ -243,7 +243,8 @@ impl EventBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     use llmspell_events::Language;
 
     async fn create_test_context() -> Arc<GlobalContext> {

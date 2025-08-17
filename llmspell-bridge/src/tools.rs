@@ -3,6 +3,7 @@
 
 use crate::discovery::BridgeDiscovery;
 use crate::ComponentRegistry;
+use llmspell_config::tools::ToolsConfig;
 use llmspell_core::traits::tool::{
     ResourceLimits, SecurityLevel, SecurityRequirements, ToolCategory, ToolSchema,
 };
@@ -46,9 +47,13 @@ use std::sync::Arc;
 /// Returns an error if tool registration fails
 pub fn register_all_tools(
     registry: &Arc<ComponentRegistry>,
+    tools_config: &ToolsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Create a shared file sandbox for file system tools
-    let security_requirements = SecurityRequirements::default().with_file_access("/tmp");
+    // Create a shared file sandbox for file system tools using configured allowed paths
+    let mut security_requirements = SecurityRequirements::default();
+    for path in &tools_config.file_operations.allowed_paths {
+        security_requirements = security_requirements.with_file_access(path);
+    }
     let sandbox_context = SandboxContext::new(
         "bridge-tools".to_string(),
         security_requirements,
@@ -56,14 +61,14 @@ pub fn register_all_tools(
     );
     let file_sandbox = Arc::new(FileSandbox::new(sandbox_context)?);
 
-    // Register different tool categories
+    // Register different tool categories with their specific configurations
     register_utility_tools(registry)?;
     register_data_processing_tools(registry)?;
-    register_file_system_tools(registry, file_sandbox)?;
+    register_file_system_tools(registry, file_sandbox, &tools_config.file_operations)?;
     register_system_tools(registry)?;
     register_media_tools(registry)?;
-    register_search_tools(registry)?;
-    register_web_tools(registry)?;
+    register_search_tools(registry, &tools_config.web_search)?;
+    register_web_tools(registry, &tools_config.http_request)?;
     register_communication_tools(registry)?;
 
     Ok(())
@@ -183,6 +188,7 @@ fn register_data_processing_tools(
 fn register_file_system_tools(
     registry: &Arc<ComponentRegistry>,
     file_sandbox: Arc<FileSandbox>,
+    file_ops_config: &llmspell_config::tools::FileOperationsConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "archive_handler", ArchiveHandlerTool::new)?;
 
@@ -195,8 +201,19 @@ fn register_file_system_tools(
         move || FileConverterTool::new(FileConverterConfig::default(), file_sandbox_converter),
     )?;
 
-    register_tool(registry, "file_operations", || {
-        FileOperationsTool::new(FileOperationsConfig::default())
+    // Use the provided configuration for FileOperationsTool instead of default
+    let file_ops_config = file_ops_config.clone();
+    register_tool(registry, "file_operations", move || {
+        // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
+        let tool_config = FileOperationsConfig {
+            allowed_paths: file_ops_config.allowed_paths.clone(),
+            max_file_size: file_ops_config.max_file_size,
+            atomic_writes: file_ops_config.atomic_writes,
+            max_directory_depth: file_ops_config.max_directory_depth,
+            allowed_extensions: file_ops_config.allowed_extensions.clone(),
+            denied_extensions: file_ops_config.denied_extensions.clone(),
+        };
+        FileOperationsTool::new(tool_config)
     })?;
 
     // File search with sandbox
@@ -257,15 +274,30 @@ fn register_media_tools(
 /// Register search tools
 fn register_search_tools(
     registry: &Arc<ComponentRegistry>,
+    web_search_config: &llmspell_config::tools::WebSearchConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool_result(registry, "web_search", || {
-        WebSearchTool::new(WebSearchConfig::default())
+    // Use the provided configuration for WebSearchTool
+    let web_search_config = web_search_config.clone();
+    register_tool_result(registry, "web_search", move || {
+        // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
+        let tool_config = WebSearchConfig {
+            provider: web_search_config.provider.clone(),
+            rate_limit: web_search_config.rate_limit,
+            timeout_seconds: web_search_config.timeout_seconds,
+            max_results: web_search_config.max_results,
+            allowed_domains: web_search_config.allowed_domains.clone(),
+            blocked_domains: web_search_config.blocked_domains.clone(),
+        };
+        WebSearchTool::new(tool_config)
     })?;
     Ok(())
 }
 
 /// Register web tools
-fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn std::error::Error>> {
+fn register_web_tools(
+    registry: &Arc<ComponentRegistry>,
+    http_request_config: &llmspell_config::tools::HttpRequestConfig,
+) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "url-analyzer", UrlAnalyzerTool::new)?;
     register_tool(registry, "web-scraper", || {
         WebScraperTool::new(WebScraperConfig::default())

@@ -5,7 +5,8 @@
 mod lua_globals {
     use async_trait::async_trait;
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
-    use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use llmspell_bridge::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
     use llmspell_core::{BaseAgent, ComponentMetadata, ExecutionContext, Result, Tool};
     use mlua::Lua;

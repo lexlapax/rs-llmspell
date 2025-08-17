@@ -4,7 +4,8 @@
 use llmspell_bridge::engine::factory::LuaConfig;
 use llmspell_bridge::engine::ScriptEngineBridge;
 use llmspell_bridge::lua::LuaEngine;
-use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+use llmspell_bridge::{ComponentRegistry, ProviderManager};
+use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_tools::CalculatorTool;
 use std::sync::Arc;
 

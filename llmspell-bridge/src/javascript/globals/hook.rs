@@ -38,10 +38,8 @@ mod tests {
     #[tokio::test]
     async fn test_hook_global_stub() {
         // Basic compilation test
-        let config = crate::ProviderManagerConfig {
-            default_provider: None,
-            providers: std::collections::HashMap::new(),
-        };
+        use llmspell_config::providers::ProviderManagerConfig;
+        let config = ProviderManagerConfig::default();
         let context = GlobalContext::new(
             std::sync::Arc::new(crate::ComponentRegistry::new()),
             std::sync::Arc::new(crate::ProviderManager::new(config).await.unwrap()),

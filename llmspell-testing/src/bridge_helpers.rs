@@ -54,7 +54,7 @@ pub fn create_test_registry() -> Arc<llmspell_bridge::registry::ComponentRegistr
 
 /// Create a test provider manager
 pub async fn create_test_provider_manager() -> Arc<llmspell_bridge::providers::ProviderManager> {
-    let config = llmspell_bridge::providers::ProviderManagerConfig::default();
+    let config = llmspell_config::providers::ProviderManagerConfig::default();
     Arc::new(
         llmspell_bridge::providers::ProviderManager::new(config)
             .await

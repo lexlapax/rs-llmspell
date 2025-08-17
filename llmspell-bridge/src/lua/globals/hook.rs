@@ -486,8 +486,8 @@ pub fn inject_hook_global(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::providers::ProviderManagerConfig;
     use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_lua_hook_injection() {

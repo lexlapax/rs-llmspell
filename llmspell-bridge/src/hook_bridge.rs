@@ -453,7 +453,7 @@ impl HookBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ProviderManagerConfig;
+    use llmspell_config::providers::ProviderManagerConfig;
     #[tokio::test]
     async fn test_hook_bridge_creation() {
         let context = Arc::new(GlobalContext::new(

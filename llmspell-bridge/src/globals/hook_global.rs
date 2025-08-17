@@ -59,7 +59,8 @@ impl GlobalObject for HookGlobal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     #[tokio::test]
     async fn test_hook_global_metadata() {
         let context = Arc::new(GlobalContext::new(

@@ -176,10 +176,8 @@ impl ScriptRuntime {
             source: None,
         })?;
 
-        // Create provider manager - use default config for now
-        // TODO: Convert llmspell-config ProviderManagerConfig to bridge ProviderManagerConfig
-        let provider_config = crate::providers::ProviderManagerConfig::default();
-        let provider_manager = Arc::new(ProviderManager::new(provider_config).await?);
+        // Create provider manager using config from llmspell-config
+        let provider_manager = Arc::new(ProviderManager::new(config.providers.clone()).await?);
 
         // Inject APIs into the engine
         engine.inject_apis(&registry, &provider_manager)?;

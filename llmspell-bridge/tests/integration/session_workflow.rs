@@ -3,9 +3,10 @@
 
 use llmspell_bridge::{
     engine::factory::{EngineFactory, LuaConfig},
-    providers::{ProviderManager, ProviderManagerConfig},
+    providers::ProviderManager,
     ComponentRegistry,
 };
+use llmspell_config::providers::ProviderManagerConfig;
 use std::convert::TryFrom;
 use std::sync::Arc;
 use std::time::Instant;

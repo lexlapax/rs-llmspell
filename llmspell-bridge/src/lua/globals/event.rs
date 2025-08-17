@@ -18,7 +18,8 @@ pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     use mlua::Lua;
     use std::sync::Arc;
 

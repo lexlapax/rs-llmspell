@@ -176,7 +176,8 @@ pub struct SessionInfrastructure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     #[tokio::test]
     async fn test_session_infrastructure_creation() {
         let context = GlobalContext::new(

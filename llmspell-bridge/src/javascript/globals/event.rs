@@ -53,16 +53,14 @@ mod tests {
     #[cfg(feature = "javascript")]
     #[test]
     fn test_javascript_event_injection() {
-        use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+        use crate::{ComponentRegistry, ProviderManager};
+        use llmspell_config::providers::ProviderManagerConfig;
         use std::sync::Arc;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let registry = Arc::new(ComponentRegistry::new());
-            let config = ProviderManagerConfig {
-                default_provider: None,
-                providers: std::collections::HashMap::new(),
-            };
+            let config = ProviderManagerConfig::default();
             let providers = Arc::new(ProviderManager::new(config).await.unwrap());
             let context = GlobalContext::new(registry, providers);
 

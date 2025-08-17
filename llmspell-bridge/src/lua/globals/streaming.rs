@@ -246,8 +246,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_streaming_global_injection() {
-        use crate::providers::{ProviderManager, ProviderManagerConfig};
+        use crate::providers::ProviderManager;
         use crate::registry::ComponentRegistry;
+        use llmspell_config::providers::ProviderManagerConfig;
         use std::sync::Arc;
 
         let lua = mlua::Lua::new();
@@ -273,8 +274,9 @@ mod tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_stream_creation() {
-        use crate::providers::{ProviderManager, ProviderManagerConfig};
+        use crate::providers::ProviderManager;
         use crate::registry::ComponentRegistry;
+        use llmspell_config::providers::ProviderManagerConfig;
         use std::sync::Arc;
 
         let lua = mlua::Lua::new();

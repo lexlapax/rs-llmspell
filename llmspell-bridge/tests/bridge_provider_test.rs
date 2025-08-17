@@ -3,9 +3,10 @@
 
 use llmspell_bridge::{
     engine::factory::{EngineFactory, LuaConfig},
-    providers::{ProviderConfig, ProviderManager, ProviderManagerConfig},
+    providers::ProviderManager,
     ComponentRegistry,
 };
+use llmspell_config::providers::{ProviderConfig, ProviderManagerConfig};
 use std::sync::Arc;
 
 /// Test provider manager creation
@@ -123,10 +124,14 @@ async fn test_provider_config_validation() {
         ProviderConfig {
             provider_type: "openai".to_string(),
             api_key_env: Some("OPENAI_API_KEY".to_string()),
+            api_key: None,
             base_url: None,
             model: Some("gpt-3.5-turbo".to_string()),
             max_tokens: Some(1000),
-            extra: std::collections::HashMap::new(),
+            timeout_seconds: Some(60),
+            rate_limit: None,
+            retry: None,
+            options: std::collections::HashMap::new(),
         },
     );
 

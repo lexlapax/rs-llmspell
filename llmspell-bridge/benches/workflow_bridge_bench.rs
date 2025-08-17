@@ -164,7 +164,8 @@ fn benchmark_bridge_overhead(c: &mut Criterion) {
 #[allow(clippy::too_many_lines)]
 fn benchmark_lua_workflow_api(c: &mut Criterion) {
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
-    use llmspell_bridge::providers::{ProviderManager, ProviderManagerConfig};
+    use llmspell_bridge::providers::ProviderManager;
+    use llmspell_config::providers::ProviderManagerConfig;
 
     let rt = Runtime::new().unwrap();
 

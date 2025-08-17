@@ -263,7 +263,8 @@ pub struct StateInfrastructure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     use llmspell_config::{CoreStateFlags, StatePersistenceFlags};
     #[tokio::test]
     async fn test_state_infrastructure_creation() {

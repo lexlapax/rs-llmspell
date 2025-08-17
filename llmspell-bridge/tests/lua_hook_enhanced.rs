@@ -4,7 +4,8 @@
 use llmspell_bridge::globals::types::GlobalContext;
 use llmspell_bridge::hook_bridge::HookBridge;
 use llmspell_bridge::lua::globals::hook::inject_hook_global;
-use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+use llmspell_bridge::{ComponentRegistry, ProviderManager};
+use llmspell_config::providers::ProviderManagerConfig;
 use mlua::Lua;
 use std::sync::Arc;
 

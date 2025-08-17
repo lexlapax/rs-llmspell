@@ -6,9 +6,10 @@ mod tests {
     use futures::StreamExt;
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
-        providers::{ProviderManager, ProviderManagerConfig},
+        providers::ProviderManager,
         registry::ComponentRegistry,
     };
+    use llmspell_config::providers::ProviderManagerConfig;
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]

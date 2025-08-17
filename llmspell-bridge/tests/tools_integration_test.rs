@@ -5,9 +5,10 @@
 async fn test_all_tools_integration() {
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
-        providers::{ProviderManager, ProviderManagerConfig},
+        providers::ProviderManager,
         ComponentRegistry,
     };
+    use llmspell_config::providers::ProviderManagerConfig;
     use std::sync::Arc;
 
     // Initialize components
@@ -97,9 +98,10 @@ async fn test_all_tools_integration() {
 async fn test_tool_performance_benchmarks() {
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
-        providers::{ProviderManager, ProviderManagerConfig},
+        providers::ProviderManager,
         ComponentRegistry,
     };
+    use llmspell_config::providers::ProviderManagerConfig;
     use std::sync::Arc;
     use std::time::Instant;
 

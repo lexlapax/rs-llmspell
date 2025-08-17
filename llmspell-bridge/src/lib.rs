@@ -27,11 +27,12 @@
 //! ## Quick Start
 //!
 //! ```rust,no_run
-//! use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
+//! use llmspell_bridge::ScriptRuntime;
+//! use llmspell_config::LLMSpellConfig;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! // Create a runtime with Lua engine
-//! let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
+//! let runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).await?;
 //!
 //! // Execute a simple script
 //! let output = runtime.execute_script(r#"
@@ -185,13 +186,14 @@
 //!
 //! ## Configuration
 //!
-//! The runtime can be configured through `RuntimeConfig`:
+//! The runtime can be configured through `LLMSpellConfig`:
 //!
 //! ```rust,no_run
-//! use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
+//! use llmspell_bridge::ScriptRuntime;
+//! use llmspell_config::LLMSpellConfig;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let mut config = RuntimeConfig::default();
+//! let mut config = LLMSpellConfig::default();
 //!
 //! // Configure security settings
 //! config.runtime.security.allow_file_access = false;
@@ -211,9 +213,10 @@
 //! Scripts can access LLM providers configured in the runtime:
 //!
 //! ```rust,no_run
-//! # use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
+//! # use llmspell_bridge::ScriptRuntime;
+//! # use llmspell_config::LLMSpellConfig;
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
+//! let runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).await?;
 //!
 //! let script = r#"
 //!     -- List available providers
@@ -231,6 +234,7 @@
 //! ```
 
 // Core modules
+pub mod config_bridge;
 pub mod conversion;
 pub mod discovery;
 pub mod engine;
@@ -282,6 +286,6 @@ pub use engine::{
 };
 
 pub use llmspell_config::LLMSpellConfig;
-pub use providers::{ProviderManager, ProviderManagerConfig};
+pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
 pub use runtime::ScriptRuntime;

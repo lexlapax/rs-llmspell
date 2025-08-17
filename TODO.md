@@ -756,7 +756,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 #### Task 7.3.7: Configuration Architecture Redesign and Tool Security Enhancement
 **Priority**: CRITICAL
 **Estimated Time**: 12 hours
-**Status**: ✅ SUB-TASK 1 COMPLETED | ✅ SUB-TASK 2 PHASE A COMPLETED | ✅ SUB-TASK 2 PHASE B COMPLETED
+**Status**: ✅ SUB-TASK 1 COMPLETED | ✅ SUB-TASK 2 PHASE A COMPLETED | ✅ SUB-TASK 2 PHASE B COMPLETED | 🔄 SUB-TASK 2 PHASE C IN PROGRESS
 **Assigned To**: Architecture Team
 **Dependencies**: Task 7.3.6 (WebApp Creator), Task 7.1.24 (Hook Execution Standardization)
 **Architecture Issue**: llmspell-config is empty stub while CLI does inline config parsing; tools hardcode security paths
@@ -923,21 +923,55 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] No backward compatibility layers maintained (per user directive)
      - [x] Zero compilation errors, all tests passing
    
-   **Phase C: Bridge Layer Interface Updates** (1.5 hours):
-   - [ ] Update `llmspell-bridge/src/runtime.rs`:
-     - [ ] Change `ScriptRuntime::new_with_config()` parameter: `RuntimeConfig` → `LLMSpellConfig`
-     - [ ] Update `ScriptRuntime::new_with_lua()` to accept `LLMSpellConfig`
-     - [ ] Update `ScriptRuntime::new_with_javascript()` to accept `LLMSpellConfig`
-     - [ ] Update internal field `_config: RuntimeConfig` → `_config: LLMSpellConfig`
-     - [ ] Update `supports_engine()` method to use `LLMSpellConfig`
-     - [ ] Remove all `RuntimeConfig` references and builders
-   - [ ] Update `llmspell-bridge/src/providers.rs`:
-     - [ ] Update provider initialization to extract from `config.providers`
-   - [ ] Update tool registration in `llmspell-bridge/src/tools.rs`:
-     - [ ] Update `register_all_tools()` to accept and pass `ToolsConfig`
-     - [ ] Pass `config.tools.file_operations` to FileOperationsTool
-     - [ ] Pass `config.tools.web_search` to WebSearchTool 
-     - [ ] Pass `config.tools.http_request` to HttpRequestTool
+   **Phase C: Bridge Layer Interface Updates** 🔄 **IN PROGRESS** (5+ hours invested):
+   
+   **✅ Comprehensive ConfigBridge System Implementation** (797 lines in `llmspell-bridge/src/config_bridge.rs`):
+   - [x] **Three-Layer Architecture Design**:
+     - [x] Core bridge layer: `ConfigBridge` struct with security controls
+     - [x] Global object layer: `ConfigBridgeGlobal` in `src/globals/config_global.rs`
+     - [x] Language-specific layer: Lua implementation in `src/lua/globals/config.rs`
+   - [x] **Granular Permission System**:
+     - [x] `ConfigPermissions` with fine-grained access control (not just ReadOnly/Modify/Full)
+     - [x] Per-section permissions: providers, tools, security, state, sessions
+     - [x] Immutable path protection for critical configuration
+   - [x] **Security Features**:
+     - [x] Secret redaction for sensitive data (API keys, credentials)
+     - [x] Path validation for file operations
+     - [x] Audit trail with `ConfigChangeType` enum
+     - [x] Configuration snapshots and restore functionality
+     - [x] Script-specific configuration sandboxing
+   - [x] **Runtime Configuration Manipulation**:
+     - [x] `get_value(path)` - Get config value by JSON path
+     - [x] `set_value(path, value)` - Set config value with validation
+     - [x] `add_provider()`, `remove_provider()` - Provider management
+     - [x] `add_allowed_path()`, `remove_allowed_path()` - Security boundaries
+     - [x] `snapshot()`, `restore()` - Configuration state management
+     - [x] `list_changes()` - Audit trail access
+   
+   **✅ Complete Clippy Warning Resolution** (60+ warnings fixed):
+   - [x] Fixed all missing `# Errors` and `# Panics` documentation sections
+   - [x] Fixed format strings: `format!("..{}", var)` → `format!("..{var}")`
+   - [x] Fixed redundant closures: `.map_err(|e| mlua::Error::external(e))` → `.map_err(mlua::Error::external)`
+   - [x] Fixed needless borrows: `&security` → `security`
+   - [x] Fixed temporary with significant Drop warnings by adding explicit `drop()` calls
+   - [x] Fixed all test import errors:
+     - [x] Changed `llmspell_bridge::ProviderManagerConfig` → `llmspell_config::providers::ProviderManagerConfig`
+     - [x] Fixed `ProviderConfig` field names: `extra` → `options`
+     - [x] Added missing struct fields: `api_key`, `rate_limit`, `retry`, `timeout_seconds`
+   - [x] **Achieved ZERO clippy warnings** in entire workspace with `--all-features --all-targets`
+   - [x] **Code formatting applied** with `cargo fmt --all` for consistent style
+   
+   **✅ Test Module Import Fixes** (15+ test files updated):
+   - [x] Fixed imports in `bridge_provider_test.rs`, `integration_test.rs`
+   - [x] Fixed imports in `lua/globals/hook.rs`, `lua/globals/streaming.rs`, `lua/globals/event.rs`
+   - [x] Fixed imports in `javascript/globals/event.rs`, `javascript/globals/hook.rs`
+   - [x] Fixed imports in `globals/state_infrastructure.rs`
+   - [x] Ensured all tests use correct `llmspell_config::providers` imports
+   
+   **🔄 Remaining Phase C Tasks**:
+   - [ ] Update `llmspell-bridge/src/runtime.rs` (already partially done in Phase A)
+   - [ ] Update `llmspell-bridge/src/providers.rs` for provider extraction
+   - [ ] Update tool registration in `llmspell-bridge/src/tools.rs`
 
 3. [ ] **Tool Security Configuration Implementation** (2 hours):
    - [ ] Update `llmspell-tools/src/fs/file_operations.rs`:

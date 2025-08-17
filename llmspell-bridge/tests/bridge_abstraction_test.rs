@@ -6,8 +6,9 @@ use llmspell_bridge::{
         bridge::{EngineFeatures, ExecutionContext, ScriptEngineBridge, SecurityContext},
         factory::{EngineFactory, EngineInfo, LuaConfig, StdlibLevel},
     },
-    ComponentRegistry, ProviderManager, ProviderManagerConfig,
+    ComponentRegistry, ProviderManager,
 };
+use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_core::error::LLMSpellError;
 use std::collections::HashMap;
 use std::sync::Arc;
