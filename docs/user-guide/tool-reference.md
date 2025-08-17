@@ -1,10 +1,10 @@
 # Tool Reference
 
-**Version**: Phase 3.3 Complete  
-**Status**: ✅ **CURRENT** - All 34 tools production-ready  
-**Last Updated**: July 2025
+**Version**: Phase 7 Complete  
+**Status**: ✅ **CURRENT** - All 37 tools production-ready  
+**Last Updated**: August 2025
 
-> **🔧 COMPREHENSIVE REFERENCE**: Complete documentation for all 34 built-in tools across 9 categories. Each tool includes usage examples, parameters, and security considerations.
+> **🔧 COMPREHENSIVE REFERENCE**: Complete documentation for all 37 built-in tools across 10 categories. Each tool includes usage examples, parameters, and security considerations.
 
 **🔗 Navigation**: [← User Guide](README.md) | [Documentation Hub](../README.md) | [Examples](../../examples/) | [External Tools Guide](external-tools-guide.md)
 
@@ -22,6 +22,7 @@
    - [System Integration Tools (4)](#system-integration-tools)
    - [Utility Tools (10)](#utility-tools)
    - [Media Processing Tools (3)](#media-processing-tools)
+   - [Document & Academic Tools (3)](#document--academic-tools)
    - [Search Tools (1)](#search-tools)
 5. [Security Considerations](#security-considerations)
 6. [Performance Characteristics](#performance-characteristics)
@@ -29,7 +30,7 @@
 
 ## Overview
 
-Rs-llmspell provides 34 production-ready tools that can be used standalone or integrated with agents and workflows. All tools follow consistent patterns:
+Rs-llmspell provides 37 production-ready tools that can be used standalone or integrated with agents and workflows. All tools follow consistent patterns:
 
 ```lua
 -- Basic tool usage pattern
@@ -66,8 +67,8 @@ print(JSON.stringify(schema, true))
 ### 📁 File System Tools (5)
 Tools for file and directory operations with security sandboxing.
 
-### 📊 Data Processing Tools (4)
-Tools for processing JSON, CSV, HTTP requests, and GraphQL queries.
+### 📊 Data Processing Tools (5)
+Tools for processing JSON, CSV, HTTP requests, GraphQL queries, and graph data structures.
 
 ### 🌐 Web & Network Tools (7)
 Tools for web scraping, API testing, webhooks, and web search.
@@ -80,6 +81,9 @@ General-purpose tools for text manipulation, calculations, and data validation.
 
 ### 🎬 Media Processing Tools (3)
 Tools for audio, video, and image file processing (metadata extraction).
+
+### 📚 Document & Academic Tools (3)
+Tools for PDF processing, citation formatting, and academic document handling.
 
 ### 🔍 Search Tools (1)
 Web search integration with multiple providers.
@@ -122,6 +126,9 @@ Web search integration with multiple providers.
 | `video_processor` | Media | get_info, extract_metadata | Safe |
 | `image_processor` | Media | get_info, extract_metadata | Safe |
 | `web_search` | Search | search | Restricted |
+| `pdf_processor` | Document | extract_text, extract_metadata, extract_pages | Restricted |
+| `citation_formatter` | Academic | format_citation, validate_bibliography, list_styles | Safe |
+| `graph_builder` | Data Processing | create_graph, add_node, add_edge, analyze, export_json | Safe |
 
 ## Detailed Tool Documentation
 
@@ -912,6 +919,90 @@ local result = search:execute({
     limit = 10
 })
 -- Returns: {results = [{title = "...", url = "...", snippet = "..."}, ...]}
+```
+
+### Document & Academic Tools
+
+#### `pdf_processor`
+Extract text and metadata from PDF documents with security controls.
+
+**Operations:**
+- `extract_text` - Extract all text from PDF
+- `extract_metadata` - Get PDF metadata (size, creation date, etc.)
+- `extract_pages` - Extract text from specific pages
+
+**Security:** Restricted (file system access)
+- Maximum file size: 10MB
+- Path validation and sandboxing
+- Timeout protection (30 seconds)
+
+**Example:**
+```lua
+local pdf = Tool.get("pdf_processor")
+local result = pdf:execute({
+    operation = "extract_text",
+    input = "/path/to/document.pdf"
+})
+-- Returns: {text = "extracted text...", file_path = "...", length = 12345}
+```
+
+#### `citation_formatter`
+Format citations and bibliographies in APA, MLA, Chicago and 2,600+ academic styles.
+
+**Operations:**
+- `format_citation` - Format citations in specified style
+- `validate_bibliography` - Validate bibliography format and entries
+- `list_styles` - List available citation styles
+
+**Security:** Safe (no file system or network access)
+- Maximum 1000 bibliography entries
+- Maximum 5KB per entry
+
+**Example:**
+```lua
+local citations = Tool.get("citation_formatter")
+local result = citations:execute({
+    operation = "format_citation",
+    input = "test-entry:\n  type: Article\n  author: Smith, John\n  title: Test Article\n  date: 2024",
+    format = "yaml",  -- or "bibtex"
+    style = "apa"      -- or "mla", "chicago", "harvard", "ieee", etc.
+})
+-- Returns: {citations = [...], reference_list = [...], style = "apa"}
+```
+
+#### `graph_builder`
+Build and analyze graph data structures with JSON serialization.
+
+**Operations:**
+- `create_graph` - Create new graph (directed/undirected)
+- `add_node` - Add node to existing graph
+- `add_edge` - Add edge between nodes
+- `analyze` - Analyze graph structure (degree, density, connectivity)
+- `export_json` - Export graph to JSON format
+- `import_json` - Import graph from JSON
+
+**Security:** Safe (no file system or network access)
+- Maximum 10,000 nodes
+- Maximum 50,000 edges
+- Maximum 10MB JSON size
+
+**Example:**
+```lua
+local graph = Tool.get("graph_builder")
+local result = graph:execute({
+    operation = "create_graph",
+    graph_type = "directed"  -- or "undirected"
+})
+-- Returns: {graph_type = "directed", nodes = [], edges = [], metadata = {...}}
+
+-- Add nodes and edges
+local updated = graph:execute({
+    operation = "add_node",
+    graph = JSON.stringify(result),
+    node_id = "node1",
+    label = "First Node",
+    data = {value = 42}
+})
 ```
 
 ## Security Considerations

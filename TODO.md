@@ -210,16 +210,42 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] ✅ Fixed conditional-multi-branch.lua to use "webhook-caller" (hyphen) and correct parameter format
      - [x] ✅ Verified webhook-caller tool works in script context: `Tool.invoke("webhook-caller", {...})`
    
-0.3. **Phase 7 Appropriate Tool Implementation** (4 hours):
-   - [ ] **Create Basic Tools** (not Phase 8 advanced features):
-     - [ ] `PdfProcessorTool` - Basic PDF text extraction (use pdf-extract or similar)
-     - [ ] `CitationFormatterTool` - Format citations (APA, MLA, Chicago styles)
-     - [ ] `GraphBuilderTool` - Build JSON graph structures (nodes/edges)
-   - [ ] **Implementation Requirements**:
-     - [ ] Follow existing tool patterns in llmspell-tools
-     - [ ] Register in registry.rs
-     - [ ] Add proper tests for each tool
-     - [ ] Document parameter schemas
+0.3. [x] **Phase 7 Appropriate Tool Implementation** (6 hours) - ✅ COMPLETED:
+   **Research Complete**: Identified best Rust libraries for each tool
+   
+   - [x] **1. PdfProcessorTool Implementation** (2 hours) ✅:
+     - **Library**: `pdf-extract = "0.9"` (most focused for text extraction)
+     - **Implementation**: `llmspell-tools/src/document/pdf_processor.rs` 
+     - **Operations**: extract_text, extract_metadata, extract_pages
+     - **Parameters**: `input` (file path), `operation`, `start_page` (optional)
+     - **Output**: JSON with text content, page count, metadata
+     - **Security**: File path validation, size limits (10MB), sandboxing
+     
+   - [x] **2. CitationFormatterTool Implementation** (2 hours) ✅:
+     - **Library**: `hayagriva = "0.5"` (Phase 7 basic implementation)
+     - **Implementation**: `llmspell-tools/src/academic/citation_formatter.rs`
+     - **Operations**: format_citation, validate_bibliography, list_styles
+     - **Parameters**: `input` (citation data), `style` (apa/mla/chicago/etc), `operation`, `format` (yaml/bibtex)
+     - **Output**: Basic formatted citations (Phase 7), full CSL processor for Phase 8
+     - **Note**: Phase 7 provides structure + basic validation, full hayagriva integration planned for Phase 8
+     
+   - [x] **3. GraphBuilderTool Implementation** (2 hours) ✅:
+     - **Library**: `petgraph = "0.6"` (with serde-1 feature for JSON serialization)
+     - **Implementation**: `llmspell-tools/src/data/graph_builder.rs`
+     - **Operations**: create_graph, add_node, add_edge, analyze, export_json, import_json
+     - **Parameters**: `input` (graph data), `operation`, `graph_type` (directed/undirected), `format` (json)
+     - **Output**: Graph structure as JSON, analysis results (node count, edge count, degree statistics)
+     - **Features**: 10K nodes, 50K edges limits, JSON import/export, basic connectivity analysis
+     
+   - [x] **Implementation Requirements**:
+     - [x] ✅ Add dependencies to `llmspell-tools/Cargo.toml` (pdf-extract, hayagriva, petgraph)
+     - [x] ✅ Follow existing tool patterns in `llmspell-tools/src/`
+     - [x] ✅ Create modules with proper directory structure and mod.rs files
+     - [x] ✅ Register in bridge: `llmspell-bridge/src/tools.rs` (pdf-processor, citation-formatter, graph-builder)
+     - [x] ✅ Update `llmspell-tools/src/lib.rs` re-exports
+     - [x] ✅ Add comprehensive tests with proper test categorization
+     - [x] ✅ Fix API mismatches for compilation (ResponseBuilder, SecurityRequirements, ResourceLimits field names)
+     - [x] ✅ Test tools in script context: `Tool.invoke("pdf-processor", {...})`
    
 0.4. **Update Examples to Use Real Tools** (3 hours):
    - [ ] **Code Review Assistant**:

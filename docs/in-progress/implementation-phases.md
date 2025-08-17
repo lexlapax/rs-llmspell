@@ -954,6 +954,13 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 - Video processing tools (frame extraction, thumbnail generation)
 - Audio transcription tool (stub with interface)
 - Media format conversion utilities
+- **PDF creation tools (separate from Phase 7 extraction)**:
+  - **PdfCreatorTool** using `krilla` library (high-level, ergonomic PDF creation)
+  - Operations: `create_document`, `render_from_html`, `add_text`, `add_image`, `merge_pdfs`
+  - Template-based PDF generation with JSON data
+  - Support for accessible PDFs (tagged PDF, PDF/A compliance)
+  - Alternative: `papermake` for high-volume document generation
+  - **Architecture Note**: Intentionally separate from PdfProcessorTool (Phase 7) which uses `pdf-extract` for reading PDFs. Different libraries optimize for different use cases (reading vs writing)
 - Integration with multimodal workflows
 - **Hook-based parameter optimization for large media files**
 - **Progress hooks for long-running operations**
@@ -964,6 +971,12 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 - [ ] OCR tool extracts text from images accurately
 - [ ] Video tools can extract frames and generate thumbnails
 - [ ] Audio transcription interface defined (implementation can be stub)
+- [ ] **PDF creation tools generate valid PDFs** (separate from Phase 7 PDF extraction):
+  - [ ] PdfCreatorTool creates PDFs from templates and JSON data
+  - [ ] HTML-to-PDF rendering works with CSS styling
+  - [ ] PDF merging combines multiple PDFs correctly
+  - [ ] Generated PDFs pass validation in multiple viewers
+  - [ ] Accessible PDF features work (tagged PDF, PDF/A)
 - [ ] Tools integrate smoothly with streaming workflows
 - [ ] Media type validation works correctly
 - [ ] **Hooks automatically optimize processing for large files**
@@ -973,6 +986,12 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 **Testing Requirements**:
 - Individual tool functionality tests
 - Media format compatibility tests
+- **PDF creation tests (separate from Phase 7 extraction tests)**:
+  - PDF generation from templates
+  - HTML-to-PDF rendering validation
+  - PDF merging functionality
+  - Cross-viewer compatibility tests (Adobe, Chrome, Firefox, Preview)
+  - Accessibility compliance validation (PDF/A, tagged PDF)
 - Integration tests with workflows
 - Performance benchmarks for media processing
 - Error handling for invalid media

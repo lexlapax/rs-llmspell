@@ -1,6 +1,6 @@
 # Tool Development Guide
 
-✅ **Current Implementation**: This guide reflects actual Phase 3.3 APIs and patterns used in the 34 existing tools.
+✅ **Current Implementation**: This guide reflects actual Phase 3.3 and Phase 7 APIs and patterns used in the 37 existing tools.
 
 This guide explains how to create new tools for rs-llmspell using current APIs and established patterns.
 
@@ -15,10 +15,11 @@ Tools are reusable components that perform specific tasks like file operations, 
 - Integrates with the agent and workflow systems
 
 ### **Current Tool Ecosystem**
-rs-llmspell has **34 production tools** across 9 categories:
+rs-llmspell has **37 production tools** across 10 categories:
 - **API Tools** (2): GraphQL, HTTP requests
 - **Communication** (2): Database, Email
-- **Data Processing** (2): CSV, JSON
+- **Data Processing** (3): CSV, JSON, Graph builder
+- **Document & Academic** (2): PDF processor, Citation formatter
 - **File System** (5): Operations, Search, Watch, Convert, Archive
 - **Media** (3): Audio, Image, Video processing
 - **Search** (1): Web search

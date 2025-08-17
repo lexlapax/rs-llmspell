@@ -10,13 +10,13 @@ use llmspell_core::Tool;
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
 use llmspell_tools::{
     ApiTesterTool, ArchiveHandlerTool, AudioProcessorTool, Base64EncoderTool, CalculatorTool,
-    CsvAnalyzerTool, DataValidationTool, DatabaseConnectorTool, DateTimeHandlerTool,
-    DiffCalculatorTool, EmailSenderTool, EnvironmentReaderTool, FileConverterTool,
-    FileOperationsTool, FileSearchTool, FileWatcherTool, GraphQLQueryTool, HashCalculatorTool,
-    HttpRequestTool, ImageProcessorTool, JsonProcessorTool, ProcessExecutorTool,
-    ServiceCheckerTool, SitemapCrawlerTool, SystemMonitorTool, TemplateEngineTool,
-    TextManipulatorTool, UrlAnalyzerTool, UuidGeneratorTool, VideoProcessorTool, WebScraperTool,
-    WebSearchTool, WebhookCallerTool, WebpageMonitorTool,
+    CitationFormatterTool, CsvAnalyzerTool, DataValidationTool, DatabaseConnectorTool,
+    DateTimeHandlerTool, DiffCalculatorTool, EmailSenderTool, EnvironmentReaderTool,
+    FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool, GraphBuilderTool,
+    GraphQLQueryTool, HashCalculatorTool, HttpRequestTool, ImageProcessorTool, JsonProcessorTool,
+    PdfProcessorTool, ProcessExecutorTool, ServiceCheckerTool, SitemapCrawlerTool,
+    SystemMonitorTool, TemplateEngineTool, TextManipulatorTool, UrlAnalyzerTool, UuidGeneratorTool,
+    VideoProcessorTool, WebScraperTool, WebSearchTool, WebhookCallerTool, WebpageMonitorTool,
 };
 
 // Import Config types from submodules
@@ -152,6 +152,8 @@ fn register_utility_tools(
     register_tool(registry, "uuid_generator", || {
         UuidGeneratorTool::new(UuidGeneratorConfig::default())
     })?;
+    // Phase 7 tools
+    register_tool(registry, "citation-formatter", CitationFormatterTool::new)?;
     Ok(())
 }
 
@@ -171,6 +173,9 @@ fn register_data_processing_tools(
     register_tool_result(registry, "http_request", || {
         HttpRequestTool::new(HttpRequestConfig::default())
     })?;
+    // Phase 7 tools
+    register_tool(registry, "pdf-processor", PdfProcessorTool::new)?;
+    register_tool(registry, "graph-builder", GraphBuilderTool::new)?;
     Ok(())
 }
 

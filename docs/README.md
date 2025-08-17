@@ -13,7 +13,7 @@
 Rs-LLMSpell is a **focused scripting framework** for LLM interactions. It provides:
 
 ✅ **What it delivers:**
-- 34 production-ready tools across 9 categories (file, network, data processing, etc.)
+- 37 production-ready tools across 10 categories (file, network, data processing, documents, etc.)
 - Embedded Lua and JavaScript runtimes with zero-configuration global APIs
 - Agent creation and coordination through scripts
 - Workflow orchestration (Sequential, Conditional, Loop, Parallel patterns)
@@ -92,7 +92,7 @@ Rs-LLMSpell is a **focused scripting framework** for LLM interactions. It provid
 ### 🚀 **I want to use rs-llmspell**
 1. **[Getting Started Guide](user-guide/getting-started.md)** - 5-minute setup and first script
 2. **[Tutorial: Agents & Workflows](user-guide/tutorial-agents-workflows.md)** - Step-by-step learning
-3. **[Tool Reference](user-guide/tool-reference.md)** - Browse all 34 available tools  
+3. **[Tool Reference](user-guide/tool-reference.md)** - Browse all 37 available tools  
 4. **[Agent API Guide](user-guide/agent-api.md)** - Create and coordinate LLM agents
 5. **[Workflow Patterns](user-guide/workflow-api.md)** - Build complex multi-step processes
 6. **[Examples](../examples/)** - Working code examples
@@ -131,7 +131,7 @@ Rs-LLMSpell is a **focused scripting framework** for LLM interactions. It provid
 
 ### ✅ **Previous Phases Complete**
 - **Phase 4**: Hook & Event System (40+ hooks, 90K events/sec)
-- **Phase 3**: 34 Production Tools & Workflow Patterns
+- **Phase 3**: 34 Production Tools & Workflow Patterns (Extended to 37 in Phase 7)
 - **Phase 2**: Agent Infrastructure & Bridge Architecture
 - **Phase 1**: Core Foundation & Script Execution
 

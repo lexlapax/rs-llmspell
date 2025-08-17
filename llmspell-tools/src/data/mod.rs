@@ -2,7 +2,9 @@
 // ABOUTME: Provides tools for structured data processing with validation and transformation capabilities
 
 pub mod csv_analyzer;
+pub mod graph_builder;
 pub mod json_processor;
 
 pub use csv_analyzer::CsvAnalyzerTool;
+pub use graph_builder::GraphBuilderTool;
 pub use json_processor::JsonProcessorTool;
