@@ -8,6 +8,7 @@ use crate::engine::{
     factory::LuaConfig, EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata,
     ScriptOutput, ScriptStream,
 };
+use crate::lua::globals::args::inject_args_global;
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
@@ -30,6 +31,7 @@ pub struct LuaEngine {
     _config: LuaConfig,
     execution_context: ExecutionContext,
     runtime_config: Option<Arc<crate::runtime::RuntimeConfig>>,
+    script_args: Option<std::collections::HashMap<String, String>>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -60,6 +62,7 @@ impl LuaEngine {
                 _config: config.clone(),
                 execution_context: ExecutionContext::default(),
                 runtime_config: None,
+                script_args: None,
             })
         }
 
@@ -103,6 +106,17 @@ impl ScriptEngineBridge for LuaEngine {
             // The async execution will happen within tool calls, not at the script level
             let result = {
                 let lua = self.lua.lock();
+                
+                // Inject ARGS global if script arguments were provided
+                if let Some(ref args) = self.script_args {
+                    if let Err(e) = inject_args_global(&lua, args) {
+                        return Err(LLMSpellError::Component {
+                            message: format!("Failed to inject ARGS global: {e}"),
+                            source: None,
+                        });
+                    }
+                }
+                
                 let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
 
                 // Run garbage collection after script execution to prevent memory accumulation
@@ -295,6 +309,11 @@ impl ScriptEngineBridge for LuaEngine {
 
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError> {
         self.execution_context = context;
+        Ok(())
+    }
+    
+    async fn set_script_args(&mut self, args: std::collections::HashMap<String, String>) -> Result<(), LLMSpellError> {
+        self.script_args = Some(args);
         Ok(())
     }
 }

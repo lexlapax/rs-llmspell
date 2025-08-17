@@ -60,6 +60,7 @@
 //! simultaneously. The underlying Rust implementations handle synchronization.
 
 pub mod agent;
+pub mod args;
 pub mod artifact;
 pub mod event;
 pub mod hook;
@@ -73,6 +74,7 @@ pub mod tool;
 pub mod workflow;
 
 pub use agent::inject_agent_global;
+pub use args::inject_args_global;
 pub use artifact::inject_artifact_global;
 pub use event::inject_event_global;
 pub use hook::inject_hook_global;

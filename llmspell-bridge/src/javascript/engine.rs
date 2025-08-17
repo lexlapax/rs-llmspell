@@ -7,6 +7,7 @@ use crate::engine::{
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// JavaScript script engine implementation
@@ -112,6 +113,17 @@ impl ScriptEngineBridge for JSEngine {
 
     fn set_execution_context(&mut self, _context: ExecutionContext) -> Result<(), LLMSpellError> {
         // TODO: Implement context setting
+        Ok(())
+    }
+    
+    async fn set_script_args(&mut self, _args: HashMap<String, String>) -> Result<(), LLMSpellError> {
+        // TODO (Phase 5): Implement JavaScript args injection
+        // When implemented, this should:
+        // 1. Create a global 'args' object with the provided arguments
+        // 2. Support both named access (args.input) and array-like access (args[0])
+        // 3. Provide process.argv equivalent for Node.js compatibility
+        // Example future implementation:
+        // self.js_context.set_global("args", convert_to_js_object(args))?;
         Ok(())
     }
 }

@@ -9,6 +9,7 @@ use crate::{
 };
 use llmspell_core::error::LLMSpellError;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
 /// Central script runtime that uses `ScriptEngineBridge` abstraction
@@ -221,6 +222,20 @@ impl ScriptRuntime {
             });
         }
         self.engine.execute_script_streaming(script).await
+    }
+    
+    /// Set script arguments to be passed to the script
+    ///
+    /// These arguments will be made available to the script in a language-specific way:
+    /// - Lua: Available as global `ARGS` table
+    /// - JavaScript: Available as global `args` object
+    /// - Python: Available as `sys.argv` equivalent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine fails to set arguments
+    pub async fn set_script_args(&mut self, args: HashMap<String, String>) -> Result<(), LLMSpellError> {
+        self.engine.set_script_args(args).await
     }
 
     /// Get the name of the current engine

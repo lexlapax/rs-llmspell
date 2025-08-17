@@ -10,6 +10,10 @@
 -- 2. With config: LLMSPELL_CONFIG=examples/script-users/applications/webapp-creator/config.toml ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua
 -- 3. Full features: export OPENAI_API_KEY="sk-..." && export ANTHROPIC_API_KEY="sk-ant-..." && ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua
 --
+-- NEW: Command-line argument support:
+-- ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua --input user-input-ecommerce.lua
+-- ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua --input user-input-ecommerce.lua --debug true --max-cost 20
+--
 -- ABOUTME: Blueprint v2.0 compliant webapp creator demonstrating ALL llmspell crates
 -- ABOUTME: Features UX design, research-driven development, and complete code generation
 
@@ -20,8 +24,12 @@ print("Interactive web application generator with full UX design\n")
 -- Load User Input Configuration
 -- ============================================================
 
--- Allow specifying different input files via environment variable
-local input_file = os.getenv("WEBAPP_INPUT_FILE") or "user-input.lua"
+-- Load user input configuration - supports multiple methods:
+-- 1. Command-line argument (recommended): --input user-input-ecommerce.lua
+-- 2. Positional argument: ./llmspell run main.lua user-input-ecommerce.lua
+-- 3. Environment variable (backward compatible): WEBAPP_INPUT_FILE=user-input-ecommerce.lua
+-- 4. Default: user-input.lua
+local input_file = ARGS and ARGS.input or ARGS and ARGS[1] or os.getenv("WEBAPP_INPUT_FILE") or "user-input.lua"
 local input_path = "examples/script-users/applications/webapp-creator/" .. input_file
 
 print("Loading user requirements from " .. input_file .. "...")
