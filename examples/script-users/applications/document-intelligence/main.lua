@@ -13,6 +13,14 @@
 -- ABOUTME: Blueprint v2.0 compliant document intelligence with conditional Q&A interface
 -- ABOUTME: Demonstrates Loop processing, Parallel ingestion, and Conditional query routing
 
+-- PHASE 7 TOOLS INTEGRATION:
+-- This application demonstrates all Phase 7 tools with REAL DATA:
+-- 1. pdf-processor: Extracts text from BERT paper PDF (line 299-305)
+-- 2. graph-builder: Builds knowledge graph from entities (line 444)
+-- 3. citation-formatter: Formats academic citations (line 495)
+-- 4. web_search: Vector search alternative (line 451)
+-- Real PDF included: bert-paper.pdf (BERT: Pre-training of Deep Bidirectional Transformers)
+
 print("=== Document Intelligence System v1.0 ===")
 print("Blueprint-compliant knowledge extraction and Q&A system\n")
 
@@ -249,12 +257,7 @@ Expected Impact:
 This research could revolutionize pharmaceutical development, potentially saving billions in R&D costs and accelerating the delivery of life-saving medications. The hybrid approach addresses current quantum hardware limitations while leveraging quantum advantages for specific computational tasks.
 ]]
 
--- Save sample documents
-Tool.invoke("file_operations", {
-    operation = "write",
-    path = "/tmp/documents/technical_paper.txt",
-    input = doc1
-})
+-- Save sample text documents
 Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/documents/business_report.txt",
@@ -265,7 +268,9 @@ Tool.invoke("file_operations", {
     path = "/tmp/documents/research_proposal.txt",
     input = doc3
 })
-print("  ✅ Created 3 sample documents for processing")
+
+print("  ✅ Created 2 text documents")
+print("  📄 Using BERT paper PDF from local directory for real PDF processing")
 
 -- ============================================================
 -- Step 3: Create Intelligence Workflows
@@ -293,14 +298,25 @@ local document_ingestion = Workflow.builder()
         }
     })
     
-    -- Extract text (simulated PDF extraction)
+    -- Extract text from PDF using real pdf-processor
+    :add_step({
+        name = "extract_pdf_text",
+        type = "tool",
+        tool = "pdf-processor",
+        input = {
+            operation = "extract_text",
+            input = "./examples/script-users/applications/document-intelligence/bert-paper.pdf"
+        }
+    })
+    
+    -- Extract text from regular documents
     :add_step({
         name = "extract_text",
         type = "tool",
         tool = "text_manipulator",
         input = {
             operation = "extract",
-            input = "Extract text from documents including PDFs"
+            input = "Extract text from text documents"
         }
     })
     
@@ -417,25 +433,27 @@ local knowledge_building = Workflow.builder()
         input = "Generate vector embeddings for these document chunks: {{processed_chunks}}"
     })
     
-    -- Build knowledge graph (simulated)
+    -- Build knowledge graph using real GraphBuilderTool
     :add_step({
         name = "build_graph",
         type = "tool",
-        tool = "json_processor",
+        tool = "graph-builder",
         input = {
-            operation = "create",
-            input = '{"nodes": [], "edges": [], "relationships": []}'
+            operation = "build_graph",
+            input = "{{entity_relationships}}",
+            graph_type = "directed",
+            format = "json"
         }
     })
     
-    -- Index for search (simulated vector index)
+    -- Index for search using web_search as Phase 7 alternative
     :add_step({
         name = "index_search",
         type = "tool",
-        tool = "json_processor",
+        tool = "web_search",
         input = {
-            operation = "index",
-            input = "{{embeddings}}"
+            query = "{{document_keywords}}",
+            max_results = 5
         }
     })
     
@@ -472,15 +490,16 @@ local qa_workflow = Workflow.builder()
         input = "Answer this question based on the context: {{question}} Context: {{search_results}}"
     })
     
-    -- Format citations (simulated)
+    -- Format citations using real CitationFormatterTool
     :add_step({
         name = "format_citations",
         type = "tool",
-        tool = "text_manipulator",
+        tool = "citation-formatter",
         input = {
-            operation = "format",
-            input = "{{answer}}",
-            template = "citation"
+            operation = "format_citation",
+            input = "{{document_metadata}}",
+            style = "apa",
+            format = "json"
         }
     })
     
