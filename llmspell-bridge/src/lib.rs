@@ -281,6 +281,7 @@ pub use engine::{
     ScriptStream, SecurityContext,
 };
 
+pub use llmspell_config::LLMSpellConfig;
 pub use providers::{ProviderManager, ProviderManagerConfig};
 pub use registry::ComponentRegistry;
-pub use runtime::{RuntimeConfig, ScriptRuntime};
+pub use runtime::ScriptRuntime;

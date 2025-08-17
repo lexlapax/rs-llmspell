@@ -1,12 +1,13 @@
 //! ABOUTME: Tests for migration API availability in runtime configuration
 //! ABOUTME: Verifies that migration functionality is properly enabled via configuration
 
-use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
+use llmspell_bridge::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_migration_api_available_when_configured() -> Result<(), Box<dyn std::error::Error>> {
     // Create config with state persistence and migration enabled
-    let mut config = RuntimeConfig::default();
+    let mut config = LLMSpellConfig::default();
     config.runtime.state_persistence.flags.core.enabled = true;
     config.runtime.state_persistence.backend_type = "memory".to_string();
     config
@@ -55,7 +56,7 @@ async fn test_migration_api_available_when_configured() -> Result<(), Box<dyn st
 async fn test_migration_api_not_available_when_disabled() -> Result<(), Box<dyn std::error::Error>>
 {
     // Create config with state persistence disabled
-    let mut config = RuntimeConfig::default();
+    let mut config = LLMSpellConfig::default();
     config.runtime.state_persistence.flags.core.enabled = false;
 
     // Create runtime
@@ -90,7 +91,7 @@ async fn test_migration_api_not_available_when_disabled() -> Result<(), Box<dyn 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_state_persistence_without_migration() -> Result<(), Box<dyn std::error::Error>> {
     // Create config with state persistence enabled but migration disabled
-    let mut config = RuntimeConfig::default();
+    let mut config = LLMSpellConfig::default();
     config.runtime.state_persistence.flags.core.enabled = true;
     config.runtime.state_persistence.backend_type = "memory".to_string();
     config

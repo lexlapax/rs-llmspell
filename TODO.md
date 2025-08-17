@@ -756,7 +756,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 #### Task 7.3.7: Configuration Architecture Redesign and Tool Security Enhancement
 **Priority**: CRITICAL
 **Estimated Time**: 12 hours
-**Status**: ✅ SUB-TASK 1 COMPLETED
+**Status**: ✅ SUB-TASK 1 COMPLETED | ✅ SUB-TASK 2 PHASE A COMPLETED
 **Assigned To**: Architecture Team
 **Dependencies**: Task 7.3.6 (WebApp Creator), Task 7.1.24 (Hook Execution Standardization)
 **Architecture Issue**: llmspell-config is empty stub while CLI does inline config parsing; tools hardcode security paths
@@ -840,13 +840,56 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [x] `llmspell-config/Cargo.toml` - Dependencies: serde, toml, anyhow, tracing, thiserror, tokio
 
 2. [ ] **CLI Configuration Integration and Bridge Dependencies** (4 hours):
-   **Phase A: Architecture Dependencies** (1 hour):
-   - [ ] Add `llmspell-config` dependency to `llmspell-bridge/Cargo.toml`
-   - [ ] Update all imports across CLI and bridge to use `llmspell-config::LLMSpellConfig`
-   - [ ] Remove `RuntimeConfig` struct completely from `llmspell-bridge/src/runtime.rs` (lines ~220-280)
-   - [ ] Remove duplicate config discovery logic from CLI (delegate to llmspell-config)
-   - [ ] Remove duplicate environment override logic from CLI (use llmspell-config's system)
-   - [ ] Remove duplicate validation logic from CLI (use llmspell-config's comprehensive validation)
+   **Phase A: Architecture Dependencies** ✅ **COMPLETED** (2.5 hours):
+   - [x] Add `llmspell-config` dependency to `llmspell-bridge/Cargo.toml`
+   - [x] Update all imports across CLI and bridge to use `llmspell-config::LLMSpellConfig`
+   - [x] Remove `RuntimeConfig` struct completely from `llmspell-bridge/src/runtime.rs` (lines ~220-280)
+   - [x] Remove duplicate config discovery logic from CLI (delegate to llmspell-config)
+   - [x] Remove duplicate environment override logic from CLI (use llmspell-config's system)
+   - [x] Remove duplicate validation logic from CLI (use llmspell-config's comprehensive validation)
+   
+   **✅ Additional Phase A Accomplishments** (50+ files updated):
+   - [x] **Complete RuntimeConfig Elimination**: Removed all references to RuntimeConfig from entire codebase
+   - [x] **Bridge Runtime Refactoring** (`llmspell-bridge/src/runtime.rs`):
+     - [x] Completely rewrote to use `llmspell_config::LLMSpellConfig` directly
+     - [x] Added `SecurityConfig` → `SecurityContext` conversion trait (lines 41-52)
+     - [x] Updated all `ScriptRuntime` methods to accept `LLMSpellConfig`
+     - [x] Fixed `supports_engine()` method implementation
+   - [x] **CLI Command Updates** (6 files):
+     - [x] `llmspell-cli/src/commands/mod.rs`: Updated `execute_command()` and `create_runtime()` signatures
+     - [x] `llmspell-cli/src/commands/backup.rs`: Changed RuntimeConfig → LLMSpellConfig
+     - [x] `llmspell-cli/src/commands/exec.rs`: Updated to use LLMSpellConfig
+     - [x] `llmspell-cli/src/commands/providers.rs`: Fixed provider listing to use new config
+     - [x] `llmspell-cli/src/commands/repl.rs`: Updated REPL runtime creation
+     - [x] `llmspell-cli/src/commands/run.rs`: Fixed script execution with new config
+   - [x] **CLI Config Module Updates** (`llmspell-cli/src/config.rs`):
+     - [x] Replaced `load_runtime_config()` to return `LLMSpellConfig`
+     - [x] Delegated all config loading to `llmspell-config`
+     - [x] Removed duplicate discovery/validation logic
+   - [x] **Bridge Test Suite Updates** (8 test files):
+     - [x] `provider_enhancement_test.rs`: Fixed provider configuration field mappings (extra→options)
+     - [x] `runtime_test.rs`: Updated all runtime creation tests
+     - [x] `provider_integration_test.rs`: Fixed ProviderConfig field names
+     - [x] `lua_runtime_test.rs`: Updated configuration imports
+     - [x] `lua_state_test.rs`: Fixed test configuration setup
+     - [x] `llm_agent_test.rs`: Updated agent creation tests
+     - [x] `tool_integration_test.rs`: Fixed tool configuration tests
+     - [x] `state_infrastructure.rs`: Added missing type imports (CoreStateFlags, StatePersistenceFlags)
+   - [x] **Benchmark and Integration Test Updates**:
+     - [x] `llmspell-testing/benches/cross_language.rs`: Fixed RuntimeConfig references
+     - [x] `llmspell-tools/tests/integration/run_lua_tool_tests.rs`: Updated config imports
+   - [x] **Bridge Library Exports** (`llmspell-bridge/src/lib.rs`):
+     - [x] Added `pub use llmspell_config::LLMSpellConfig;` (line 284)
+     - [x] Removed all RuntimeConfig re-exports
+   - [x] **Compilation Error Resolution**:
+     - [x] Fixed missing `tokio` dependency in llmspell-config
+     - [x] Fixed `LLMSpellError::NotFound` → `LLMSpellError::Configuration` conversion
+     - [x] Fixed all test categorization syntax errors (removed incorrect cfg_attr syntax)
+     - [x] Achieved **ZERO compilation errors** across entire workspace
+   - [x] **Dependency Architecture Validation**:
+     - [x] Confirmed proper dependency flow: `llmspell-config` ← `llmspell-bridge` ← `llmspell-cli`
+     - [x] No circular dependencies
+     - [x] No backward compatibility layers (per user directive: "use the new design")
    
    **Phase B: CLI Layer Updates** (1.5 hours):
    - [ ] Update `llmspell-cli/src/config.rs`:

@@ -2,7 +2,7 @@
 // ABOUTME: Provides get_or_create pattern for session management following state infrastructure pattern
 
 use crate::globals::GlobalContext;
-use crate::runtime::SessionConfig;
+use llmspell_config::SessionConfig;
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};

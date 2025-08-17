@@ -13,15 +13,18 @@ pub mod validate;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
 use anyhow::Result;
-use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
+use llmspell_bridge::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
 
 /// Execute a command with the given runtime configuration
 pub async fn execute_command(
     command: Commands,
     engine: ScriptEngine,
-    runtime_config: RuntimeConfig,
+    runtime_config: LLMSpellConfig,
     output_format: OutputFormat,
 ) -> Result<()> {
+    // Use LLMSpellConfig directly now that bridge accepts it
+
     match command {
         Commands::Run {
             script,
@@ -49,7 +52,7 @@ pub async fn execute_command(
 }
 
 /// Create a script runtime for the specified engine
-pub async fn create_runtime(engine: ScriptEngine, config: RuntimeConfig) -> Result<ScriptRuntime> {
+pub async fn create_runtime(engine: ScriptEngine, config: LLMSpellConfig) -> Result<ScriptRuntime> {
     match engine {
         ScriptEngine::Lua => ScriptRuntime::new_with_lua(config)
             .await

@@ -29,7 +29,7 @@ impl EngineFactory {
     /// Returns an error if Lua feature is not enabled or engine creation fails
     pub fn create_lua_engine_with_runtime(
         config: &LuaConfig,
-        runtime_config: Option<Arc<crate::runtime::RuntimeConfig>>,
+        runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
         #[cfg(feature = "lua")]
         {

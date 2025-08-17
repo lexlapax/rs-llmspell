@@ -46,7 +46,7 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
 
     // Create StateGlobal with migration support if configured
     let state_global = if let Some(runtime_config) =
-        context.get_bridge::<crate::runtime::RuntimeConfig>("runtime_config")
+        context.get_bridge::<llmspell_config::LLMSpellConfig>("runtime_config")
     {
         if runtime_config.runtime.state_persistence.flags.core.enabled {
             // Initialize state infrastructure

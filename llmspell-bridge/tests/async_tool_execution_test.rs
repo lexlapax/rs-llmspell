@@ -1,11 +1,12 @@
 // ABOUTME: Integration tests for tool execution from Lua scripts
 // ABOUTME: Tests synchronous tool API and validates tool functionality
 
-use llmspell_bridge::runtime::{RuntimeConfig, ScriptRuntime};
+use llmspell_bridge::runtime::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_basic_tool_execution() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");
@@ -52,7 +53,7 @@ async fn test_basic_tool_execution() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_multiple_tool_execution() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");
@@ -113,7 +114,7 @@ async fn test_multiple_tool_execution() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tool_with_coroutines() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");
@@ -174,7 +175,7 @@ async fn test_tool_with_coroutines() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tool_error_handling() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");
@@ -232,7 +233,7 @@ async fn test_tool_error_handling() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_file_operations() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");
@@ -287,7 +288,7 @@ async fn test_file_operations() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tool_execution_performance() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");
@@ -370,7 +371,7 @@ async fn test_tool_execution_performance() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tool_metadata_and_discovery() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");
@@ -436,7 +437,7 @@ async fn test_tool_metadata_and_discovery() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_tool_chaining() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create runtime");

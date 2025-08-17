@@ -1,7 +1,8 @@
 // ABOUTME: Rust test runner for Lua tool integration tests
 // ABOUTME: Executes Lua scripts to validate tool functionality from scripts
 
-use llmspell_bridge::runtime::{RuntimeConfig, ScriptRuntime};
+use llmspell_bridge::runtime::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
 use llmspell_tools::registry::ToolRegistry;
 use std::path::PathBuf;
 #[tokio::test]
@@ -11,7 +12,7 @@ async fn test_lua_tool_integration() {
     registry.register_default_tools().expect("Failed to register tools");
     
     // Create runtime with Lua
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
         .expect("Failed to create Lua runtime");

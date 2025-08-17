@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
-use llmspell_bridge::RuntimeConfig;
+use llmspell_config::LLMSpellConfig;
 use llmspell_state_persistence::backup::{BackupManager, RestoreOptions};
 use llmspell_state_persistence::manager::StateManager;
 use serde_json::json;
@@ -88,7 +88,7 @@ pub enum BackupSubcommand {
 /// Execute backup command
 pub async fn execute_backup(
     cmd: BackupCommand,
-    config: &RuntimeConfig,
+    config: &LLMSpellConfig,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Initialize state infrastructure if needed
@@ -132,7 +132,7 @@ pub async fn execute_backup(
 
 /// Initialize backup infrastructure
 async fn initialize_backup_infrastructure(
-    _config: &RuntimeConfig,
+    _config: &LLMSpellConfig,
 ) -> Result<(Arc<StateManager>, Arc<BackupManager>)> {
     use llmspell_state_persistence::config::{BackupConfig, StorageBackendType};
 

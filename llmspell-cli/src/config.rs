@@ -2,7 +2,7 @@
 //! ABOUTME: Handles loading runtime configuration from files and environment
 
 use anyhow::{Context, Result};
-use llmspell_bridge::RuntimeConfig;
+use llmspell_config::LLMSpellConfig;
 use std::env;
 use std::path::{Path, PathBuf};
 use tokio::fs;
@@ -19,7 +19,7 @@ const CONFIG_SEARCH_PATHS: &[&str] = &[
 const ENV_PREFIX: &str = "LLMSPELL_";
 
 /// Load runtime configuration from file or use defaults
-pub async fn load_runtime_config(config_path: Option<&Path>) -> Result<RuntimeConfig> {
+pub async fn load_runtime_config(config_path: Option<&Path>) -> Result<LLMSpellConfig> {
     // If explicit path provided, use it
     if let Some(path) = config_path {
         if path.exists() {
@@ -41,7 +41,7 @@ pub async fn load_runtime_config(config_path: Option<&Path>) -> Result<RuntimeCo
     }
 
     // No config file found, use defaults with environment overrides
-    let mut config = RuntimeConfig::default();
+    let mut config = LLMSpellConfig::default();
     apply_environment_overrides(&mut config)?;
 
     Ok(config)
@@ -81,7 +81,7 @@ async fn discover_config_file() -> Result<Option<PathBuf>> {
 }
 
 /// Load configuration from TOML file
-async fn load_from_file(path: &Path) -> Result<RuntimeConfig> {
+async fn load_from_file(path: &Path) -> Result<LLMSpellConfig> {
     let content = fs::read_to_string(path)
         .await
         .with_context(|| format!("Failed to read config file: {}", path.display()))?;
@@ -93,7 +93,7 @@ async fn load_from_file(path: &Path) -> Result<RuntimeConfig> {
 }
 
 /// Apply environment variable overrides
-fn apply_environment_overrides(config: &mut RuntimeConfig) -> Result<()> {
+fn apply_environment_overrides(config: &mut LLMSpellConfig) -> Result<()> {
     // Override default engine
     if let Ok(engine) = env::var(format!("{}DEFAULT_ENGINE", ENV_PREFIX)) {
         config.default_engine = engine;
@@ -154,7 +154,7 @@ fn apply_environment_overrides(config: &mut RuntimeConfig) -> Result<()> {
 
 /// Create default configuration file
 pub async fn create_default_config(path: &Path) -> Result<()> {
-    let default_config = RuntimeConfig::default();
+    let default_config = LLMSpellConfig::default();
     let toml_content = toml::to_string_pretty(&default_config)
         .context("Failed to serialize default configuration")?;
 
@@ -175,7 +175,7 @@ pub async fn create_default_config(path: &Path) -> Result<()> {
 }
 
 /// Validate configuration
-pub fn validate_config(config: &RuntimeConfig) -> Result<()> {
+pub fn validate_config(config: &LLMSpellConfig) -> Result<()> {
     // Validate engine is supported
     if !config.supports_engine(&config.default_engine) {
         anyhow::bail!(

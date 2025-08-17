@@ -2,9 +2,7 @@
 // ABOUTME: Provides get_or_create pattern for state persistence infrastructure following EventBridge pattern
 
 use crate::globals::GlobalContext;
-use crate::runtime::StatePersistenceConfig;
-#[cfg(test)]
-use crate::runtime::{CoreStateFlags, StatePersistenceFlags};
+use llmspell_config::StatePersistenceConfig;
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::{EventBus, EventCorrelationTracker};
 use llmspell_hooks::HookExecutor;
@@ -266,6 +264,7 @@ pub struct StateInfrastructure {
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use llmspell_config::{CoreStateFlags, StatePersistenceFlags};
     #[tokio::test]
     async fn test_state_infrastructure_creation() {
         let context = GlobalContext::new(

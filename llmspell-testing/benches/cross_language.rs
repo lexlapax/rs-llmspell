@@ -4,7 +4,8 @@
 // Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
+use llmspell_bridge::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
 use llmspell_events::{Language, UniversalEvent};
 use mlua::{Lua, Result as LuaResult};
 use tokio::runtime::Runtime;
@@ -86,7 +87,7 @@ fn bench_script_runtime_initialization(c: &mut Criterion) {
     c.bench_function("script_runtime_initialization", |b| {
         b.iter(|| {
             let _ = rt.block_on(async {
-                let config = RuntimeConfig::default();
+                let config = LLMSpellConfig::default();
                 let runtime_result = ScriptRuntime::new_with_lua(config).await;
                 black_box(runtime_result)
             });
@@ -237,7 +238,7 @@ fn calculate_cross_language_overhead(_c: &mut Criterion) {
 
         let start = tokio::time::Instant::now();
         for _ in 0..10 {
-            let config = RuntimeConfig::default();
+            let config = LLMSpellConfig::default();
             let _ = ScriptRuntime::new_with_lua(config).await;
         }
         let runtime_init = start.elapsed();

@@ -1,11 +1,12 @@
 //! ABOUTME: Integration tests for agent bridge functionality
 //! ABOUTME: Tests script-to-agent communication and parameter conversion
 
-use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
+use llmspell_bridge::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_discovery_from_lua() {
-    let config = RuntimeConfig {
+    let config = LLMSpellConfig {
         default_engine: "lua".to_string(),
         ..Default::default()
     };
@@ -32,7 +33,7 @@ async fn test_agent_discovery_from_lua() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_templates_from_lua() {
-    let config = RuntimeConfig {
+    let config = LLMSpellConfig {
         default_engine: "lua".to_string(),
         ..Default::default()
     };
@@ -59,7 +60,7 @@ async fn test_agent_templates_from_lua() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_creation_and_execution() {
-    let config = RuntimeConfig {
+    let config = LLMSpellConfig {
         default_engine: "lua".to_string(),
         ..Default::default()
     };
@@ -97,7 +98,7 @@ async fn test_agent_creation_and_execution() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_parameter_conversion() {
-    let config = RuntimeConfig {
+    let config = LLMSpellConfig {
         default_engine: "lua".to_string(),
         ..Default::default()
     };
@@ -142,7 +143,7 @@ async fn test_agent_parameter_conversion() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_tool_integration() {
-    let config = RuntimeConfig {
+    let config = LLMSpellConfig {
         default_engine: "lua".to_string(),
         ..Default::default()
     };

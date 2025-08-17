@@ -30,7 +30,7 @@ pub struct LuaEngine {
     lua: Arc<parking_lot::Mutex<mlua::Lua>>,
     _config: LuaConfig,
     execution_context: ExecutionContext,
-    runtime_config: Option<Arc<crate::runtime::RuntimeConfig>>,
+    runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
     script_args: Option<std::collections::HashMap<String, String>>,
 }
 
@@ -90,7 +90,7 @@ impl LuaEngine {
     }
 
     /// Set the runtime configuration
-    pub fn set_runtime_config(&mut self, config: Arc<crate::runtime::RuntimeConfig>) {
+    pub fn set_runtime_config(&mut self, config: Arc<llmspell_config::LLMSpellConfig>) {
         self.runtime_config = Some(config);
     }
 }

@@ -1,13 +1,14 @@
 // ABOUTME: Integration tests for provider enhancement features (ModelSpecifier, base URL overrides)
 // ABOUTME: Tests Agent.create with "provider/model" syntax and provider configuration
 
-use llmspell_bridge::providers::ProviderManagerConfig;
-use llmspell_bridge::runtime::{RuntimeConfig, ScriptRuntime};
+use llmspell_bridge::runtime::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
+use llmspell_config::ProviderManagerConfig;
 
 // Helper to create a runtime without any provider configuration
-fn create_test_runtime_config() -> RuntimeConfig {
+fn create_test_runtime_config() -> LLMSpellConfig {
     // Ensure no providers are configured
-    RuntimeConfig {
+    LLMSpellConfig {
         providers: ProviderManagerConfig {
             default_provider: None,
             providers: std::collections::HashMap::new(),

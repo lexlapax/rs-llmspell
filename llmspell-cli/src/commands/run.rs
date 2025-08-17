@@ -4,7 +4,7 @@
 use crate::cli::{OutputFormat, ScriptEngine};
 use crate::output::{format_output, print_stream};
 use anyhow::Result;
-use llmspell_bridge::RuntimeConfig;
+use llmspell_config::LLMSpellConfig;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs;
@@ -56,7 +56,7 @@ fn parse_script_args(args: Vec<String>, script_path: &Path) -> HashMap<String, S
 pub async fn execute_script_file(
     script_path: PathBuf,
     engine: ScriptEngine,
-    runtime_config: RuntimeConfig,
+    runtime_config: LLMSpellConfig,
     stream: bool,
     args: Vec<String>,
     output_format: OutputFormat,

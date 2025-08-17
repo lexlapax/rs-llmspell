@@ -2,7 +2,8 @@
 //! ABOUTME: Tests artifact storage, retrieval, and query functionality
 
 use llmspell_bridge::lua::engine::LuaEngine;
-use llmspell_bridge::runtime::GlobalRuntimeConfig;
+use llmspell_bridge::runtime::Global;
+use llmspell_config::LLMSpellConfig;
 use llmspell_bridge::ComponentRegistry;
 use llmspell_core::test_utils::TestLogger;
 use std::sync::Arc;
@@ -14,7 +15,7 @@ use tokio;
 async fn test_artifact_storage_and_retrieval() {
     TestLogger::init();
     
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
@@ -64,7 +65,7 @@ async fn test_artifact_storage_and_retrieval() {
 async fn test_artifact_listing_and_query() {
     TestLogger::init();
     
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
@@ -135,7 +136,7 @@ async fn test_artifact_file_storage() {
     let test_file = temp_dir.path().join("test.txt");
     std::fs::write(&test_file, "Test file content").unwrap();
 
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
@@ -179,7 +180,7 @@ async fn test_artifact_file_storage() {
 async fn test_artifact_deletion() {
     TestLogger::init();
     
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
@@ -237,7 +238,7 @@ async fn test_artifact_deletion() {
 async fn test_artifact_error_conditions() {
     TestLogger::init();
     
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
