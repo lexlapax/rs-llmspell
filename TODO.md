@@ -539,6 +539,83 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Parallel output generation with 4 concurrent tasks ✅
      - [x] 100% Blueprint v2.0 compliance achieved ✅
 
+8. [ ] **WebApp Creator** (10 hours):
+   - [ ] **Component Architecture**:
+     - [ ] Main Controller (Conditional + Session + Events + Hooks)
+     - [ ] Requirements Discovery Loop (iterative UX interview)
+     - [ ] UX/UI Design Phase (Sequential with research)
+     - [ ] Code Generation Loop (max 3 iterations with validation)
+     - [ ] Documentation & Deployment (Parallel generation)
+   - [ ] **Agents** (15+ required - most complex system):
+     - [ ] requirements_analyst (GPT-4) - user needs understanding
+     - [ ] ux_researcher (GPT-4) - user personas
+     - [ ] ux_designer (Claude-3-opus) - user journeys
+     - [ ] ux_interviewer (GPT-4) - UX questions
+     - [ ] ia_architect (Claude-3-sonnet) - information architecture
+     - [ ] wireframe_designer (GPT-3.5-turbo) - wireframes
+     - [ ] ui_architect (GPT-4) - component libraries
+     - [ ] design_system_expert (Claude-3-sonnet) - design tokens
+     - [ ] responsive_designer (GPT-3.5-turbo) - breakpoints
+     - [ ] prototype_builder (GPT-4) - interactive prototypes
+     - [ ] stack_advisor (Claude-3-opus) - tech selection
+     - [ ] frontend_developer (GPT-4) - UI implementation
+     - [ ] backend_developer (Claude-3-opus) - server logic
+     - [ ] database_architect (Claude-3-sonnet) - data modeling
+     - [ ] api_designer (GPT-4) - API specifications
+     - [ ] devops_engineer (GPT-3.5-turbo) - deployment
+     - [ ] security_auditor (Claude-3-opus) - vulnerability scanning
+     - [ ] performance_analyst (GPT-4) - optimization
+     - [ ] accessibility_auditor (GPT-3.5-turbo) - WCAG
+     - [ ] doc_writer (GPT-3.5-turbo) - documentation
+   - [ ] **Advanced Features** (ALL crates exercised):
+     - [ ] Events: Real-time progress streaming
+     - [ ] Hooks: Rate limiting, validation, cost tracking
+     - [ ] Security: Code scanning, sandboxing, OWASP
+     - [ ] Sessions: Conversation memory, project persistence
+     - [ ] State: Checkpoints after each phase
+     - [ ] Providers: Dynamic selection for optimization
+     - [ ] Storage: Versioned artifact management
+   - [ ] **Web Search Integration** (10+ points):
+     - [ ] Competitor UX analysis
+     - [ ] Design trends and patterns
+     - [ ] Technology comparisons
+     - [ ] Security best practices
+     - [ ] Performance optimization techniques
+     - [ ] Accessibility standards (WCAG)
+     - [ ] Library and framework research
+     - [ ] Deployment options
+     - [ ] API design patterns
+     - [ ] Database optimization strategies
+   - [ ] **Implementation Patterns** (CRITICAL):
+     - [ ] Agent name storage with timestamps
+     - [ ] Session-based conversation memory
+     - [ ] Event-driven progress updates
+     - [ ] Hook-based rate limiting
+     - [ ] Security sandboxing for code execution
+     - [ ] Provider switching for cost optimization
+     - [ ] Graceful degradation without API keys
+   - [ ] **Testing Requirements** (MANDATORY):
+     - [ ] Test all workflow types (conditional, loop, parallel, sequential)
+     - [ ] Test session persistence and recovery
+     - [ ] Test event streaming for real-time updates
+     - [ ] Test hook execution (rate limiting, validation)
+     - [ ] Test security scanning on generated code
+     - [ ] Test provider fallback mechanisms
+     - [ ] Verify with: `LLMSPELL_CONFIG=config.toml ./target/debug/llmspell run main.lua`
+   - [ ] **Files to Create**:
+     - [ ] `webapp-creator/main.lua` - orchestration (1000+ lines expected)
+     - [ ] `webapp-creator/config.toml` - advanced configuration
+     - [ ] `webapp-creator/README.md` - comprehensive guide
+     - [ ] `webapp-creator/examples/` - sample generated apps
+   - [ ] **Unique Capabilities**:
+     - [ ] Interactive clarification process
+     - [ ] Research-driven development at every stage
+     - [ ] Multi-stack support (JS/Python/Lua backends)
+     - [ ] Full UX design phase with personas and journeys
+     - [ ] Iterative refinement through loop workflows
+     - [ ] Complete code generation with tests and docs
+     - [ ] Production-ready output with deployment configs
+
 **Testing & Documentation** (2 hours):
 - [ ] **Test Framework**:
   - [ ] Unit tests per application
@@ -559,7 +636,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 - [ ] Operational runbooks
 
 **Acceptance Criteria**:
-- [ ] All 7 applications match blueprint.md architectures exactly
+- [ ] All 8 applications match blueprint.md architectures exactly
 - [ ] Each uses proper component composition (Workflows + Agents + Tools)
 - [ ] Minimal Lua code (only orchestration)
 - [ ] All agents use REAL LLM APIs (no mocks)
