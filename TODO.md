@@ -756,7 +756,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 #### Task 7.3.7: Configuration Architecture Redesign and Tool Security Enhancement
 **Priority**: CRITICAL
 **Estimated Time**: 12 hours
-**Status**: ✅ SUB-TASK 1 COMPLETED | ✅ SUB-TASK 2 PHASE A COMPLETED | ✅ SUB-TASK 2 PHASE B COMPLETED | 🔄 SUB-TASK 2 PHASE C IN PROGRESS
+**Status**: ✅ SUB-TASK 1 COMPLETED | ✅ SUB-TASK 2 PHASE A COMPLETED | ✅ SUB-TASK 2 PHASE B COMPLETED | ✅ SUB-TASK 2 PHASE C COMPLETED
 **Assigned To**: Architecture Team
 **Dependencies**: Task 7.3.6 (WebApp Creator), Task 7.1.24 (Hook Execution Standardization)
 **Architecture Issue**: llmspell-config is empty stub while CLI does inline config parsing; tools hardcode security paths
@@ -923,7 +923,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] No backward compatibility layers maintained (per user directive)
      - [x] Zero compilation errors, all tests passing
    
-   **Phase C: Bridge Layer Interface Updates** 🔄 **IN PROGRESS** (5+ hours invested):
+   **Phase C: Bridge Layer Interface Updates** ✅ **COMPLETED** (6+ hours invested):
    
    **✅ Comprehensive ConfigBridge System Implementation** (797 lines in `llmspell-bridge/src/config_bridge.rs`):
    - [x] **Three-Layer Architecture Design**:
@@ -968,10 +968,25 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [x] Fixed imports in `globals/state_infrastructure.rs`
    - [x] Ensured all tests use correct `llmspell_config::providers` imports
    
-   **🔄 Remaining Phase C Tasks**:
-   - [ ] Update `llmspell-bridge/src/runtime.rs` (already partially done in Phase A)
-   - [ ] Update `llmspell-bridge/src/providers.rs` for provider extraction
-   - [ ] Update tool registration in `llmspell-bridge/src/tools.rs`
+   **✅ Completed Phase C Tasks**:
+   - [x] Updated `llmspell-bridge/src/runtime.rs` to pass `config.tools` to `register_all_tools`
+   - [x] Updated `llmspell-bridge/src/providers.rs` - already using `ProviderManagerConfig` from llmspell_config
+   - [x] Updated tool registration in `llmspell-bridge/src/tools.rs`:
+     - [x] `register_all_tools` now accepts `&ToolsConfig` parameter
+     - [x] Passes `file_ops_config` to `FileOperationsTool`
+     - [x] Passes `http_request_config` to `HttpRequestTool`
+     - [x] Passes `web_search_config` to `WebSearchTool`
+     - [x] Security requirements use `allowed_paths` from config instead of hardcoded `/tmp`
+   - [x] Updated all test files to pass `ToolsConfig::default()` to `register_all_tools`:
+     - [x] `tools_integration_test.rs` (2 occurrences)
+     - [x] `simple_tool_integration_test.rs` (2 occurrences)
+     - [x] `streaming_test.rs` (2 occurrences)
+     - [x] `workflow_tool_integration_test.rs` (2 occurrences)
+   - [x] Fixed config structure mismatches between llmspell_config and llmspell_tools:
+     - [x] `FileOperationsConfig`: Mapped available fields (atomic_writes, max_file_size)
+     - [x] `HttpRequestConfig`: Mapped available fields (timeout_seconds, max_redirects, user_agent)
+     - [x] `WebSearchConfig`: Used defaults for different structure (default_provider, providers)
+   - [x] **All quality checks passed**: Zero errors, zero warnings, properly formatted
 
 3. [ ] **Tool Security Configuration Implementation** (2 hours):
    - [ ] Update `llmspell-tools/src/fs/file_operations.rs`:

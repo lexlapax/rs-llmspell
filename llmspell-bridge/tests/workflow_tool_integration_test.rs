@@ -12,8 +12,9 @@ mod workflow_tool_tests {
     fn setup_test_environment() -> Arc<WorkflowBridge> {
         let registry = Arc::new(ComponentRegistry::new());
 
-        // Register all tools
-        register_all_tools(&registry).expect("Failed to register tools");
+        // Register all tools with default configuration
+        let tools_config = llmspell_config::tools::ToolsConfig::default();
+        register_all_tools(&registry, &tools_config).expect("Failed to register tools");
 
         Arc::new(WorkflowBridge::new(registry))
     }
@@ -504,7 +505,8 @@ mod workflow_tool_tests {
     #[test]
     fn test_tool_discovery_from_workflows() {
         let registry = Arc::new(ComponentRegistry::new());
-        register_all_tools(&registry).expect("Failed to register tools");
+        let tools_config = llmspell_config::tools::ToolsConfig::default();
+        register_all_tools(&registry, &tools_config).expect("Failed to register tools");
 
         // Verify all expected tools are registered
         let expected_tools = vec![

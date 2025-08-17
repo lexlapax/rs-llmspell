@@ -22,7 +22,7 @@ use llmspell_tools::{
 
 // Import Config types from submodules
 use llmspell_tools::api::graphql_query::GraphQLConfig;
-use llmspell_tools::api::http_request::HttpRequestConfig;
+use llmspell_tools::api::http_request::{HttpRequestConfig, RetryConfig};
 use llmspell_tools::communication::database_connector::DatabaseConnectorConfig;
 use llmspell_tools::communication::email_sender::EmailSenderConfig;
 use llmspell_tools::data::csv_analyzer::CsvAnalyzerConfig;
@@ -38,6 +38,7 @@ use llmspell_tools::system::{
 use llmspell_tools::util::{HashCalculatorConfig, TextManipulatorConfig, UuidGeneratorConfig};
 use llmspell_tools::web::web_scraper::WebScraperConfig;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Initialize and register all Phase 2 tools with the bridge registry
@@ -63,12 +64,12 @@ pub fn register_all_tools(
 
     // Register different tool categories with their specific configurations
     register_utility_tools(registry)?;
-    register_data_processing_tools(registry)?;
+    register_data_processing_tools(registry, &tools_config.http_request)?;
     register_file_system_tools(registry, file_sandbox, &tools_config.file_operations)?;
     register_system_tools(registry)?;
     register_media_tools(registry)?;
     register_search_tools(registry, &tools_config.web_search)?;
-    register_web_tools(registry, &tools_config.http_request)?;
+    register_web_tools(registry)?;
     register_communication_tools(registry)?;
 
     Ok(())
@@ -165,6 +166,7 @@ fn register_utility_tools(
 /// Register data processing tools
 fn register_data_processing_tools(
     registry: &Arc<ComponentRegistry>,
+    http_request_config: &llmspell_config::tools::HttpRequestConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "csv_analyzer", || {
         CsvAnalyzerTool::new(CsvAnalyzerConfig::default())
@@ -175,8 +177,24 @@ fn register_data_processing_tools(
     register_tool_result(registry, "graphql_query", || {
         GraphQLQueryTool::new(GraphQLConfig::default())
     })?;
-    register_tool_result(registry, "http_request", || {
-        HttpRequestTool::new(HttpRequestConfig::default())
+    // Use the provided configuration for HttpRequestTool
+    let http_request_config = http_request_config.clone();
+    register_tool_result(registry, "http_request", move || {
+        // Convert from llmspell_config HttpRequestConfig to llmspell_tools HttpRequestConfig
+        // Note: Some fields in llmspell_config don't exist in tool config yet
+        let tool_config = HttpRequestConfig {
+            timeout_seconds: http_request_config.timeout_seconds,
+            follow_redirects: true, // Default to following redirects
+            max_redirects: http_request_config.max_redirects as usize,
+            retry_config: RetryConfig::default(), // TODO: Add retry config to llmspell_config
+            rate_limit_per_minute: None,          // TODO: Add rate limiting to llmspell_config
+            user_agent: http_request_config
+                .default_headers
+                .get("User-Agent")
+                .cloned()
+                .unwrap_or_else(|| "llmspell-http/1.0".to_string()),
+        };
+        HttpRequestTool::new(tool_config)
     })?;
     // Phase 7 tools
     register_tool(registry, "pdf-processor", PdfProcessorTool::new)?;
@@ -205,13 +223,13 @@ fn register_file_system_tools(
     let file_ops_config = file_ops_config.clone();
     register_tool(registry, "file_operations", move || {
         // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
+        // Note: allowed_paths are handled at the sandbox level, not in the tool config
         let tool_config = FileOperationsConfig {
-            allowed_paths: file_ops_config.allowed_paths.clone(),
-            max_file_size: file_ops_config.max_file_size,
             atomic_writes: file_ops_config.atomic_writes,
-            max_directory_depth: file_ops_config.max_directory_depth,
-            allowed_extensions: file_ops_config.allowed_extensions.clone(),
-            denied_extensions: file_ops_config.denied_extensions.clone(),
+            max_file_size: file_ops_config.max_file_size,
+            max_dir_entries: 1000,      // Default value
+            allow_recursive: true,      // Default value
+            default_permissions: 0o644, // Default permissions
         };
         FileOperationsTool::new(tool_config)
     })?;
@@ -280,13 +298,14 @@ fn register_search_tools(
     let web_search_config = web_search_config.clone();
     register_tool_result(registry, "web_search", move || {
         // Convert from llmspell_config WebSearchConfig to llmspell_tools WebSearchConfig
+        // Note: Config structures have different fields - using defaults for missing ones
         let tool_config = WebSearchConfig {
-            provider: web_search_config.provider.clone(),
-            rate_limit: web_search_config.rate_limit,
-            timeout_seconds: web_search_config.timeout_seconds,
+            default_provider: "duckduckgo".to_string(), // Default provider
+            providers: HashMap::new(),                  // TODO: Add provider configuration
             max_results: web_search_config.max_results,
-            allowed_domains: web_search_config.allowed_domains.clone(),
-            blocked_domains: web_search_config.blocked_domains.clone(),
+            safe_search: true, // Default to safe search
+            language: None,    // Default language
+            fallback_chain: vec!["duckduckgo".to_string()], // Default fallback
         };
         WebSearchTool::new(tool_config)
     })?;
@@ -294,10 +313,7 @@ fn register_search_tools(
 }
 
 /// Register web tools
-fn register_web_tools(
-    registry: &Arc<ComponentRegistry>,
-    http_request_config: &llmspell_config::tools::HttpRequestConfig,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "url-analyzer", UrlAnalyzerTool::new)?;
     register_tool(registry, "web-scraper", || {
         WebScraperTool::new(WebScraperConfig::default())
