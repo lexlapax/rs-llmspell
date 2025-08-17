@@ -17,20 +17,34 @@ A powerful web application generator that uses AI agents to design, architect, a
 The WebApp Creator now supports command-line arguments for easier configuration:
 
 ```bash
-# Using named arguments
-./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
+# Basic usage (note the -- before arguments)
+./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua -- \
+  --input user-input-ecommerce.lua
+
+# Specify custom output directory
+./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua -- \
   --input user-input-ecommerce.lua \
+  --output ~/my-projects
+
+# Using all options
+./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua -- \
+  --input user-input-ecommerce.lua \
+  --output-dir ./generated \
   --debug true \
   --max-cost 20
 
 # Using positional arguments
-./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
+./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua -- \
   user-input-ecommerce.lua
-
-# Mix of positional and named
-./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
-  user-input-ecommerce.lua --debug true
 ```
+
+#### Output Directory Structure
+
+The output directory parameter controls where projects are generated:
+- Default: `/tmp/<project-name>` (e.g., `/tmp/shopeasy/`)
+- Custom: `<output-dir>/<project-name>` (e.g., `~/projects/shopeasy/`)
+
+The project name is automatically converted to a filesystem-safe format (lowercase, spaces replaced with hyphens).
 
 ### Environment Variables (Backward Compatible)
 
@@ -103,6 +117,7 @@ Both methods work, so you can migrate at your convenience.
 When using command-line arguments, the following are available in the Lua script as `ARGS`:
 
 - `ARGS.input` - Input file to use (e.g., "user-input-ecommerce.lua")
+- `ARGS.output` or `ARGS["output-dir"]` - Base output directory for generated projects
 - `ARGS.debug` - Enable debug mode ("true" or "false")
 - `ARGS["max-cost"]` - Maximum API cost limit
 - `ARGS[1], ARGS[2], ...` - Positional arguments
@@ -110,6 +125,7 @@ When using command-line arguments, the following are available in the Lua script
 Example usage in Lua:
 ```lua
 local input_file = ARGS and ARGS.input or "user-input.lua"
+local base_output_dir = ARGS and (ARGS.output or ARGS["output-dir"]) or "/tmp"
 local debug_mode = ARGS and ARGS.debug == "true"
 local max_cost = tonumber(ARGS and ARGS["max-cost"] or "10")
 ```
@@ -117,8 +133,18 @@ local max_cost = tonumber(ARGS and ARGS["max-cost"] or "10")
 ## Output
 
 Generated applications are saved to:
-- `/tmp/webapp-creator-generated/` - Temporary output directory
-- `generated/` - Saved examples (e.g., `generated/ecommerce-app/`)
+- Default: `/tmp/<project-name>/` (e.g., `/tmp/shopeasy/` for ShopEasy project)
+- Custom: `<output-dir>/<project-name>/` when using `--output` or `--output-dir`
+- Examples: `./generated/shopeasy/`, `~/projects/taskflow/`, etc.
+
+Each project directory contains:
+- `requirements.json` - Analyzed requirements
+- `ux-design.json` - UX research and design decisions
+- `architecture.json` - System architecture
+- `frontend-code.tar.gz` - Frontend application code
+- `backend-code.tar.gz` - Backend API code
+- `deployment.yaml` - Deployment configuration
+- `documentation.md` - Complete project documentation
 
 ## Requirements
 
@@ -135,22 +161,35 @@ If the script doesn't recognize arguments:
 
 ## Examples
 
-### Basic Task Management App
+### Basic Task Management App (default output to /tmp)
 ```bash
 ./target/debug/llmspell run main.lua
 ```
 
-### E-commerce Platform
+### E-commerce Platform with Custom Output Directory
 ```bash
-./target/debug/llmspell run main.lua --input user-input-ecommerce.lua
+./target/debug/llmspell run main.lua -- \
+  --input user-input-ecommerce.lua \
+  --output ./my-projects
 ```
 
-### With Debug Output
+### Generate in Current Directory's 'generated' Folder
 ```bash
-./target/debug/llmspell run main.lua --input user-input-ecommerce.lua --debug true
+./target/debug/llmspell run main.lua -- \
+  --input user-input-ecommerce.lua \
+  --output-dir ./generated
 ```
 
-### With Cost Limit
+### With All Options
 ```bash
-./target/debug/llmspell run main.lua --input user-input-ecommerce.lua --max-cost 25
+./target/debug/llmspell run main.lua -- \
+  --input user-input-ecommerce.lua \
+  --output ~/web-apps \
+  --debug true \
+  --max-cost 25
+```
+
+### Using Environment Variables (backward compatible)
+```bash
+WEBAPP_INPUT_FILE=user-input-ecommerce.lua ./target/debug/llmspell run main.lua
 ```

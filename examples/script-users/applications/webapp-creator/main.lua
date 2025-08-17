@@ -11,8 +11,9 @@
 -- 3. Full features: export OPENAI_API_KEY="sk-..." && export ANTHROPIC_API_KEY="sk-ant-..." && ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua
 --
 -- NEW: Command-line argument support:
--- ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua --input user-input-ecommerce.lua
--- ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua --input user-input-ecommerce.lua --debug true --max-cost 20
+-- ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua -- --input user-input-ecommerce.lua
+-- ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua -- --input user-input-ecommerce.lua --output ~/projects
+-- ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua -- --input user-input-ecommerce.lua --output-dir ./generated
 --
 -- ABOUTME: Blueprint v2.0 compliant webapp creator demonstrating ALL llmspell crates
 -- ABOUTME: Features UX design, research-driven development, and complete code generation
@@ -39,9 +40,23 @@ if not user_input or not user_input.requirements then
     error("Failed to load user input. Please check user-input.lua")
 end
 
-print("  📋 Project: " .. (user_input.project.name or "Unnamed Project"))
+-- Determine output directory structure
+-- Base directory from command-line argument: --output or --output-dir (default: /tmp)
+-- Full path will be: <base_output_dir>/<project_name>/
+local project_name = user_input.project.name or "webapp_project"
+-- Convert project name to filesystem-safe format (lowercase, replace spaces with hyphens)
+local safe_project_name = project_name:lower():gsub("%s+", "-"):gsub("[^%w%-_]", "")
+
+-- Get base output directory from args or use /tmp as default
+local base_output_dir = ARGS and (ARGS.output or ARGS["output-dir"]) or "/tmp"
+-- Full project directory path
+local project_dir = base_output_dir .. "/" .. safe_project_name
+
+print("  📋 Project: " .. project_name)
 print("  📝 Description: " .. (user_input.project.description or "No description"))
 print("  🎯 Target Users: " .. (user_input.ux.target_users or "General users"))
+print("  📁 Output Directory: " .. project_dir)
+print("     (Base: " .. base_output_dir .. ", Project: " .. safe_project_name .. ")")
 print()
 
 -- ============================================================
@@ -58,7 +73,7 @@ end
 
 local config = {
     system_name = "webapp_creator_v1",
-    project_name = user_input.project.name or "webapp_project",
+    project_name = project_name,
     models = {
         -- UX/Requirements agents (with user overrides)
         requirements_analyst = get_model("requirements_analyst", "openai/gpt-4o-mini"),
@@ -89,14 +104,14 @@ local config = {
         doc_writer = "openai/gpt-3.5-turbo"
     },
     files = {
-        project_dir = "/tmp/webapp-creator-generated",
-        requirements = "/tmp/webapp-creator-generated/requirements.json",
-        ux_design = "/tmp/webapp-creator-generated/ux-design.json",
-        architecture = "/tmp/webapp-creator-generated/architecture.json",
-        frontend_code = "/tmp/webapp-creator-generated/frontend-code.tar.gz",
-        backend_code = "/tmp/webapp-creator-generated/backend-code.tar.gz",
-        deployment = "/tmp/webapp-creator-generated/deployment.yaml",
-        documentation = "/tmp/webapp-creator-generated/documentation.md"
+        project_dir = project_dir,
+        requirements = project_dir .. "/requirements.json",
+        ux_design = project_dir .. "/ux-design.json",
+        architecture = project_dir .. "/architecture.json",
+        frontend_code = project_dir .. "/frontend-code.tar.gz",
+        backend_code = project_dir .. "/backend-code.tar.gz",
+        deployment = project_dir .. "/deployment.yaml",
+        documentation = project_dir .. "/documentation.md"
     },
     limits = {
         max_iterations = user_input.advanced and user_input.advanced.max_iterations or 3,
@@ -527,12 +542,19 @@ print("  📋 Requirements loaded: " .. string.len(project_request) .. " charact
 add_conversation("user", project_request)
 save_to_session("initial_request", project_request)
 
+-- Create project directory structure
+print("\n  📁 Creating project directory: " .. config.files.project_dir)
+Tool.invoke("file_operations", {
+    operation = "create_dir",
+    path = config.files.project_dir
+})
+
 Tool.invoke("file_operations", {
     operation = "write",
     path = config.files.requirements,
     input = project_request
 })
-print("  ✅ Project request saved")
+print("  ✅ Project request saved to " .. config.files.requirements)
 
 -- ============================================================
 -- Step 3: Create Workflow Components with ALL Features
