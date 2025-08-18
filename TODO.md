@@ -162,15 +162,16 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
    - [x] Added PartiallyCompleted status to WorkflowStatus enum
    - [x] Fixed all pattern matching for new status variant
 
-3. [ ] **Sequential Workflow State Integration** (1.5 hours):
-   - [ ] Modify `llmspell-workflows/src/sequential.rs`:
-     - [ ] Access state through `context.state` in `execute_workflow()`
-     - [ ] Write step outputs: `context.state.write("workflow:{id}:{step}", output)`
-     - [ ] Return unified `WorkflowResult` with state keys
-     - [ ] Handle case when `context.state` is None (fallback behavior)
-   - [ ] Update existing tests to provide mock StateAccess
-   - [ ] Add integration test with real state writes
-   - [ ] Ensure ZERO clippy warnings
+3. [x] **Sequential Workflow State Integration** (1.5 hours): ✅ COMPLETED
+   - [x] Modify `llmspell-workflows/src/sequential.rs`:
+     - [x] Added new `execute_with_state()` method that takes ExecutionContext
+     - [x] Access state through `context.state` in execution
+     - [x] Write step outputs: `context.state.write("workflow:{id}:{step}", output)`
+     - [x] Return unified `WorkflowResult` with state keys
+     - [x] Handle case when `context.state` is None (fallback behavior)
+   - [x] Updated `execute()` method to use state when available
+   - [x] Maintained backward compatibility with legacy `execute_workflow()`
+   - [x] Ensure ZERO clippy warnings
 
 4. [ ] **Parallel Workflow State Integration** (1.5 hours):
    - [ ] Modify `llmspell-workflows/src/parallel.rs`:

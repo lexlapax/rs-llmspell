@@ -3,6 +3,7 @@
 
 use super::error_handling::{ErrorAction, ErrorHandler};
 use super::hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
+use super::result::{WorkflowError, WorkflowResult, WorkflowType};
 use super::state::{ExecutionStats, StateManager};
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, StepResult, WorkflowStatus, WorkflowStep};
@@ -134,7 +135,239 @@ impl SequentialWorkflow {
         self.steps.len()
     }
 
-    /// Execute the workflow
+    /// Execute the workflow with state-based outputs
+    /// 
+    /// This is the new state-based execution method that writes outputs to state
+    /// and returns only metadata in the WorkflowResult.
+    pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
+        let start_time = Instant::now();
+        let execution_id = uuid::Uuid::new_v4().to_string();
+        info!("Starting sequential workflow: {} (execution: {})", self.name, execution_id);
+
+        // Execute workflow start hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "sequential".to_string(),
+                WorkflowExecutionPhase::WorkflowStart,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
+        // Start execution tracking
+        self.state_manager.start_execution().await?;
+
+        let mut state_keys = Vec::new();
+        let mut steps_executed = 0usize;
+        let mut steps_failed = 0usize;
+        let mut steps_skipped = 0usize;
+
+        for (index, step) in self.steps.iter().enumerate() {
+            // Check for execution timeout
+            if self.state_manager.check_execution_timeout().await? {
+                error!("Workflow '{}' exceeded maximum execution time", self.name);
+                self.state_manager.complete_execution(false).await?;
+                
+                return Ok(WorkflowResult::failure(
+                    execution_id,
+                    WorkflowType::Sequential,
+                    self.name.clone(),
+                    WorkflowError::Timeout {
+                        duration: start_time.elapsed(),
+                        message: format!("Workflow '{}' exceeded maximum execution time", self.name),
+                    },
+                    state_keys,
+                    steps_executed,
+                    steps_failed,
+                    start_time.elapsed(),
+                ));
+            }
+
+            debug!(
+                "Executing step {} of {}: {}",
+                index + 1,
+                self.steps.len(),
+                step.name
+            );
+
+            // Create execution context for step
+            let shared_data = self.state_manager.get_all_shared_data().await?;
+            let mut workflow_state = crate::types::WorkflowState::new();
+            workflow_state.shared_data = shared_data;
+            workflow_state.current_step = index;
+            let step_context = StepExecutionContext::new(workflow_state.clone(), None);
+
+            // Execute step with retry logic
+            let step_result = if self.workflow_executor.is_some() {
+                self.step_executor
+                    .execute_step_with_retry_and_metadata(
+                        step,
+                        step_context,
+                        &self.error_strategy,
+                        Some(self.metadata.clone()),
+                        Some("sequential".to_string()),
+                    )
+                    .await?
+            } else {
+                self.step_executor
+                    .execute_step_with_retry(step, step_context, &self.error_strategy)
+                    .await?
+            };
+
+            // Record the result
+            self.state_manager
+                .record_step_result(step_result.clone())
+                .await?;
+
+            if step_result.success {
+                steps_executed += 1;
+                
+                // Write step output to state if state is available
+                if let Some(ref state) = context.state {
+                    let state_key = WorkflowResult::generate_state_key(&execution_id, &step.name);
+                    let output_value = serde_json::json!({
+                        "step_name": step.name,
+                        "step_id": step_result.step_id.to_string(),
+                        "output": step_result.output,
+                        "duration_ms": step_result.duration.as_millis(),
+                        "retry_count": step_result.retry_count,
+                    });
+                    
+                    state.write(&state_key, output_value).await
+                        .map_err(|e| LLMSpellError::Component {
+                            message: format!("Failed to write step output to state: {}", e),
+                            source: None,
+                        })?;
+                    
+                    state_keys.push(state_key);
+                    debug!("Wrote step output to state for step: {}", step.name);
+                }
+                
+                self.state_manager.advance_step().await?;
+            } else {
+                steps_failed += 1;
+
+                // Handle the failure based on error strategy
+                let error_action = self
+                    .error_handler
+                    .handle_step_failure(&step_result, Some(&self.error_strategy))
+                    .await?;
+
+                match error_action {
+                    ErrorAction::StopWorkflow => {
+                        warn!("Stopping workflow '{}' due to step failure", self.name);
+                        self.state_manager.complete_execution(false).await?;
+                        
+                        return Ok(WorkflowResult::failure(
+                            execution_id,
+                            WorkflowType::Sequential,
+                            self.name.clone(),
+                            WorkflowError::StepExecutionFailed {
+                                step_name: step.name.clone(),
+                                reason: step_result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                            },
+                            state_keys,
+                            steps_executed,
+                            steps_failed,
+                            start_time.elapsed(),
+                        ));
+                    }
+                    ErrorAction::ContinueToNext => {
+                        warn!(
+                            "Continuing to next step after failure in step: {}",
+                            step.name
+                        );
+                        steps_skipped += 1;
+                        self.state_manager.advance_step().await?;
+                    }
+                    ErrorAction::RetryStep => {
+                        // This is handled by execute_step_with_retry, so if we're here,
+                        // all retries have been exhausted and we should continue based on strategy
+                        if matches!(self.error_strategy, ErrorStrategy::Continue) {
+                            warn!("All retries exhausted for step {}, continuing", step.name);
+                            steps_skipped += 1;
+                            self.state_manager.advance_step().await?;
+                            continue;
+                        } else {
+                            warn!(
+                                "All retries exhausted for step {}, stopping workflow",
+                                step.name
+                            );
+                            self.state_manager.complete_execution(false).await?;
+                            
+                            return Ok(WorkflowResult::failure(
+                                execution_id,
+                                WorkflowType::Sequential,
+                                self.name.clone(),
+                                WorkflowError::StepExecutionFailed {
+                                    step_name: step.name.clone(),
+                                    reason: format!("All retries exhausted for step {}", step.name),
+                                },
+                                state_keys,
+                                steps_executed,
+                                steps_failed,
+                                start_time.elapsed(),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        // All steps completed
+        let duration = start_time.elapsed();
+        self.state_manager.complete_execution(true).await?;
+
+        // Execute workflow completion hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "sequential".to_string(),
+                WorkflowExecutionPhase::WorkflowComplete,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
+        // Return metadata-only result
+        if steps_failed > 0 {
+            Ok(WorkflowResult::partial(
+                execution_id,
+                WorkflowType::Sequential,
+                self.name.clone(),
+                state_keys,
+                steps_executed,
+                steps_failed,
+                steps_skipped,
+                duration,
+                None,
+            ))
+        } else {
+            Ok(WorkflowResult::success(
+                execution_id,
+                WorkflowType::Sequential,
+                self.name.clone(),
+                state_keys,
+                steps_executed,
+                duration,
+            ))
+        }
+    }
+
+    /// Execute the workflow (legacy method for backward compatibility)
     pub async fn execute_workflow(&self) -> Result<SequentialWorkflowResult> {
         let start_time = Instant::now();
         info!("Starting sequential workflow: {}", self.name);
@@ -344,7 +577,7 @@ impl BaseAgent for SequentialWorkflow {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
         // Convert AgentInput to workflow execution
         // The workflow will use the input text as an execution trigger
         // and parameters for workflow configuration
@@ -352,8 +585,33 @@ impl BaseAgent for SequentialWorkflow {
         // Validate input first
         self.validate_input(&input).await?;
 
-        // Execute the workflow using existing implementation
-        let workflow_result = self.execute_workflow().await?;
+        // Execute the workflow using state-based implementation if state is available
+        let workflow_result = if context.state.is_some() {
+            // Use new state-based execution
+            let result = self.execute_with_state(&context).await?;
+            
+            // Convert to legacy result for backward compatibility
+            // This will be removed once all callers are updated
+            if result.success {
+                SequentialWorkflowResult::success(
+                    result.workflow_name,
+                    vec![], // Step details are in state, not in result
+                    vec![],
+                    result.duration,
+                )
+            } else {
+                SequentialWorkflowResult::failure(
+                    result.workflow_name,
+                    vec![],
+                    vec![],
+                    result.duration,
+                    result.error.map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string()),
+                )
+            }
+        } else {
+            // Fall back to legacy implementation when no state is available
+            self.execute_workflow().await?
+        };
 
         // Convert SequentialWorkflowResult to AgentOutput
         let output_text = if workflow_result.success {
