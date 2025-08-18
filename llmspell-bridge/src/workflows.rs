@@ -7,7 +7,7 @@ use crate::discovery::BridgeDiscovery;
 use crate::standardized_workflows::StandardizedWorkflowFactory;
 use crate::workflow_performance::{ExecutionCache, OptimizedConverter, PerformanceMetrics};
 use crate::ComponentRegistry;
-use llmspell_core::{LLMSpellError, Result};
+use llmspell_core::{traits::base_agent::BaseAgent, LLMSpellError, Result};
 use llmspell_workflows::conditional::ConditionalConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -717,10 +717,25 @@ struct SequentialWorkflowExecutor {
 
 #[async_trait::async_trait]
 impl WorkflowExecutor for SequentialWorkflowExecutor {
-    async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute_workflow().await?;
-        let script_result = crate::conversion::transform_sequential_result(&result);
-        Ok(serde_json::to_value(&script_result)?)
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value> {
+        // Create execution context with state support
+        let context = create_execution_context_with_state().await?;
+
+        // Convert input to AgentInput
+        let agent_input = if let Ok(deserialized) =
+            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
+        {
+            deserialized
+        } else {
+            // Fallback to text input
+            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
+        };
+
+        // Execute through BaseAgent interface with state
+        let agent_output = self.workflow.execute(agent_input, context).await?;
+
+        // Convert AgentOutput to JSON
+        Ok(serde_json::to_value(&agent_output)?)
     }
 
     fn name(&self) -> &str {
@@ -739,10 +754,25 @@ struct ConditionalWorkflowExecutor {
 
 #[async_trait::async_trait]
 impl WorkflowExecutor for ConditionalWorkflowExecutor {
-    async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute_workflow().await?;
-        let script_result = crate::conversion::transform_conditional_result(&result);
-        Ok(serde_json::to_value(&script_result)?)
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value> {
+        // Create execution context with state support
+        let context = create_execution_context_with_state().await?;
+
+        // Convert input to AgentInput
+        let agent_input = if let Ok(deserialized) =
+            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
+        {
+            deserialized
+        } else {
+            // Fallback to text input
+            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
+        };
+
+        // Execute through BaseAgent interface with state
+        let agent_output = self.workflow.execute(agent_input, context).await?;
+
+        // Convert AgentOutput to JSON
+        Ok(serde_json::to_value(&agent_output)?)
     }
 
     fn name(&self) -> &str {
@@ -761,10 +791,25 @@ struct LoopWorkflowExecutor {
 
 #[async_trait::async_trait]
 impl WorkflowExecutor for LoopWorkflowExecutor {
-    async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute_workflow().await?;
-        let script_result = crate::conversion::transform_loop_result(&result);
-        Ok(serde_json::to_value(&script_result)?)
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value> {
+        // Create execution context with state support
+        let context = create_execution_context_with_state().await?;
+
+        // Convert input to AgentInput
+        let agent_input = if let Ok(deserialized) =
+            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
+        {
+            deserialized
+        } else {
+            // Fallback to text input
+            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
+        };
+
+        // Execute through BaseAgent interface with state
+        let agent_output = self.workflow.execute(agent_input, context).await?;
+
+        // Convert AgentOutput to JSON
+        Ok(serde_json::to_value(&agent_output)?)
     }
 
     fn name(&self) -> &str {
@@ -783,10 +828,25 @@ struct ParallelWorkflowExecutor {
 
 #[async_trait::async_trait]
 impl WorkflowExecutor for ParallelWorkflowExecutor {
-    async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute_workflow().await?;
-        let script_result = crate::conversion::transform_parallel_result(&result);
-        Ok(serde_json::to_value(&script_result)?)
+    async fn execute(&self, input: serde_json::Value) -> Result<serde_json::Value> {
+        // Create execution context with state support
+        let context = create_execution_context_with_state().await?;
+
+        // Convert input to AgentInput
+        let agent_input = if let Ok(deserialized) =
+            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
+        {
+            deserialized
+        } else {
+            // Fallback to text input
+            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
+        };
+
+        // Execute through BaseAgent interface with state
+        let agent_output = self.workflow.execute(agent_input, context).await?;
+
+        // Convert AgentOutput to JSON
+        Ok(serde_json::to_value(&agent_output)?)
     }
 
     fn name(&self) -> &str {
@@ -796,6 +856,29 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
     fn workflow_type(&self) -> &'static str {
         "parallel"
     }
+}
+
+/// Helper function to create an ExecutionContext with state support
+///
+/// This function creates an ExecutionContext with state persistence enabled
+/// based on the current configuration. It uses in-memory state by default
+/// but can be configured for persistent backends.
+async fn create_execution_context_with_state(
+) -> Result<llmspell_core::execution_context::ExecutionContext> {
+    // For now, create in-memory state adapter
+    // TODO: Read from global config once available
+    let state_adapter = crate::state_adapter::StateManagerAdapter::in_memory()
+        .await
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create state adapter: {}", e),
+            source: None,
+        })?;
+
+    Ok(
+        llmspell_core::execution_context::ExecutionContextBuilder::new()
+            .state(Arc::new(state_adapter))
+            .build(),
+    )
 }
 
 #[cfg(test)]

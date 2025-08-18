@@ -20,7 +20,7 @@ pub struct PersistenceConfig {
 impl Default for PersistenceConfig {
     fn default() -> Self {
         Self {
-            enabled: false, // Disabled by default for backward compatibility
+            enabled: true, // Enabled by default with in-memory backend
             backend_type: StorageBackendType::Memory,
             flush_interval: Duration::from_secs(5),
             compression: true,

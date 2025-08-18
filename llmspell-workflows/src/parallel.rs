@@ -4,6 +4,7 @@
 use crate::{
     error_handling::{ErrorAction, ErrorHandler},
     hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext},
+    result::{WorkflowError, WorkflowResult, WorkflowType},
     state::StateManager,
     step_executor::StepExecutor,
     traits::{StepResult, WorkflowStep as TraitWorkflowStep},
@@ -568,7 +569,314 @@ impl ParallelWorkflow {
         result
     }
 
-    /// Execute the parallel workflow
+    /// Execute the parallel workflow with state-based outputs
+    ///
+    /// This method executes branches concurrently and writes their outputs to state.
+    /// Returns only metadata in the WorkflowResult.
+    pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
+        let start_time = Instant::now();
+        let execution_id = uuid::Uuid::new_v4().to_string();
+        info!(
+            "Starting parallel workflow: {} (execution: {}) with {} branches",
+            self.name,
+            execution_id,
+            self.branches.len()
+        );
+
+        // Execute workflow start hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "parallel".to_string(),
+                WorkflowExecutionPhase::WorkflowStart,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
+        self.state_manager.start_execution().await?;
+
+        let semaphore = Arc::new(Semaphore::new(self.config.max_concurrency));
+        let results = Arc::new(Mutex::new(Vec::<BranchResult>::new()));
+        let should_stop = Arc::new(tokio::sync::RwLock::new(false));
+        let state_keys = Arc::new(Mutex::new(Vec::<String>::new()));
+
+        let mut branch_handles: Vec<tokio::task::JoinHandle<Result<BranchResult>>> = Vec::new();
+        let mut steps_executed = 0usize;
+        let mut steps_failed = 0usize;
+
+        for branch in &self.branches {
+            let branch = branch.clone();
+            let semaphore = semaphore.clone();
+            let _results = results.clone();
+            let should_stop = should_stop.clone();
+            let state_keys = state_keys.clone();
+            let step_executor = self.step_executor.clone();
+            let error_handler = self.error_handler.clone();
+            let fail_fast = self.config.fail_fast;
+            let workflow_executor = self.workflow_executor.clone();
+            let metadata = self.metadata.clone();
+            let context_state = context.state.clone();
+            let exec_id = execution_id.clone();
+
+            let handle = tokio::spawn(async move {
+                // Check if we should stop before starting
+                if *should_stop.read().await {
+                    return Ok(BranchResult {
+                        branch_name: branch.name.clone(),
+                        success: false,
+                        step_results: Vec::new(),
+                        duration: Duration::from_secs(0),
+                        error: Some("Workflow stopped before branch could start".to_string()),
+                        required: branch.required,
+                    });
+                }
+
+                // Acquire semaphore permit
+                let _permit = semaphore
+                    .acquire()
+                    .await
+                    .map_err(|e| LLMSpellError::Component {
+                        message: format!("Failed to acquire semaphore: {}", e),
+                        source: None,
+                    })?;
+
+                let branch_start = Instant::now();
+                debug!("Starting branch: {}", branch.name);
+
+                let mut branch_step_results = Vec::new();
+                let mut branch_failed = false;
+
+                for step in branch.steps.iter() {
+                    // Check if we should stop
+                    if *should_stop.read().await {
+                        debug!("Branch {} stopping due to fail-fast", branch.name);
+                        break;
+                    }
+
+                    // Execute step
+                    let workflow_state = WorkflowState::new();
+                    let step_context = StepExecutionContext::new(workflow_state, None);
+
+                    let step_result = if workflow_executor.is_some() {
+                        step_executor
+                            .execute_step_with_retry_and_metadata(
+                                step,
+                                step_context,
+                                &crate::traits::ErrorStrategy::FailFast,
+                                Some(metadata.clone()),
+                                Some("parallel".to_string()),
+                            )
+                            .await?
+                    } else {
+                        step_executor
+                            .execute_step_with_retry(
+                                step,
+                                step_context,
+                                &crate::traits::ErrorStrategy::FailFast,
+                            )
+                            .await?
+                    };
+
+                    if step_result.success {
+                        // Write step output to state if available
+                        if let Some(ref state) = context_state {
+                            let state_key = WorkflowResult::generate_branch_key(
+                                &exec_id,
+                                &branch.name,
+                                &step.name,
+                            );
+                            let output_value = serde_json::json!({
+                                "branch_name": branch.name,
+                                "step_name": step.name,
+                                "step_id": step_result.step_id.to_string(),
+                                "output": step_result.output,
+                                "duration_ms": step_result.duration.as_millis(),
+                                "retry_count": step_result.retry_count,
+                            });
+
+                            state.write(&state_key, output_value).await.map_err(|e| {
+                                LLMSpellError::Component {
+                                    message: format!(
+                                        "Failed to write branch output to state: {}",
+                                        e
+                                    ),
+                                    source: None,
+                                }
+                            })?;
+
+                            let mut keys = state_keys.lock().await;
+                            keys.push(state_key);
+                            debug!(
+                                "Wrote branch {} step {} output to state",
+                                branch.name, step.name
+                            );
+                        }
+                    } else {
+                        branch_failed = true;
+
+                        // Handle failure
+                        let error_action = error_handler
+                            .handle_step_failure(&step_result, None)
+                            .await?;
+
+                        if fail_fast && branch.required {
+                            warn!(
+                                "Required branch {} failed at step {}, triggering fail-fast",
+                                branch.name, step.name
+                            );
+                            *should_stop.write().await = true;
+                        }
+
+                        if matches!(error_action, ErrorAction::StopWorkflow) {
+                            break;
+                        }
+                    }
+
+                    branch_step_results.push(step_result);
+                }
+
+                let branch_duration = branch_start.elapsed();
+
+                Ok(BranchResult {
+                    branch_name: branch.name.clone(),
+                    success: !branch_failed,
+                    step_results: branch_step_results,
+                    duration: branch_duration,
+                    error: if branch_failed {
+                        Some(format!("Branch {} failed", branch.name))
+                    } else {
+                        None
+                    },
+                    required: branch.required,
+                })
+            });
+
+            branch_handles.push(handle);
+        }
+
+        // Wait for all branches to complete
+        let mut branch_results = Vec::new();
+        let mut _successful_branches = 0usize;
+        let mut failed_branches = 0usize;
+
+        for handle in branch_handles {
+            match handle.await {
+                Ok(Ok(result)) => {
+                    if result.success {
+                        _successful_branches += 1;
+                        steps_executed += result.step_results.len();
+                    } else {
+                        failed_branches += 1;
+                        steps_failed += result.step_results.iter().filter(|r| !r.success).count();
+                    }
+                    branch_results.push(result);
+                }
+                Ok(Err(e)) => {
+                    error!("Branch execution failed: {}", e);
+                    failed_branches += 1;
+                }
+                Err(e) => {
+                    error!("Branch task panicked: {}", e);
+                    failed_branches += 1;
+                }
+            }
+        }
+
+        let duration = start_time.elapsed();
+        let stopped_early = *should_stop.read().await;
+
+        // Update state manager
+        self.state_manager
+            .complete_execution(failed_branches == 0)
+            .await?;
+
+        // Execute workflow completion hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "parallel".to_string(),
+                WorkflowExecutionPhase::WorkflowComplete,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
+        // Get the collected state keys
+        let final_state_keys = {
+            let keys = state_keys.lock().await;
+            keys.clone()
+        };
+
+        // Return unified result
+        if failed_branches > 0 {
+            let required_failed = branch_results.iter().any(|r| {
+                !r.success
+                    && self
+                        .branches
+                        .iter()
+                        .any(|b| b.name == r.branch_name && b.required)
+            });
+
+            if required_failed {
+                Ok(WorkflowResult::failure(
+                    execution_id,
+                    WorkflowType::Parallel,
+                    self.name.clone(),
+                    WorkflowError::General {
+                        message: format!(
+                            "{} required branches failed{}",
+                            failed_branches,
+                            if stopped_early {
+                                " (fail-fast triggered)"
+                            } else {
+                                ""
+                            }
+                        ),
+                    },
+                    final_state_keys,
+                    steps_executed,
+                    steps_failed,
+                    duration,
+                ))
+            } else {
+                Ok(WorkflowResult::partial(
+                    execution_id,
+                    WorkflowType::Parallel,
+                    self.name.clone(),
+                    final_state_keys,
+                    steps_executed,
+                    steps_failed,
+                    0,
+                    duration,
+                    None,
+                ))
+            }
+        } else {
+            Ok(WorkflowResult::success(
+                execution_id,
+                WorkflowType::Parallel,
+                self.name.clone(),
+                final_state_keys,
+                steps_executed,
+                duration,
+            ))
+        }
+    }
+
+    /// Execute the parallel workflow (legacy method for backward compatibility)
     pub async fn execute_workflow(&self) -> Result<ParallelWorkflowResult> {
         let start_time = Instant::now();
         info!(
@@ -822,15 +1130,40 @@ impl BaseAgent for ParallelWorkflow {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
         // Convert AgentInput to workflow execution
         // The workflow will use the input text as an execution trigger
 
         // Validate input first
         self.validate_input(&input).await?;
 
-        // Execute the workflow using existing implementation
-        let workflow_result = self.execute_workflow().await?;
+        // Execute the workflow using state-based implementation if state is available
+        let workflow_result = if context.state.is_some() {
+            // Use new state-based execution
+            let result = self.execute_with_state(&context).await?;
+
+            // Convert to legacy result for backward compatibility
+            // This will be removed once all callers are updated
+            let branch_results = vec![]; // Branch details are in state now
+
+            ParallelWorkflowResult {
+                workflow_name: result.workflow_name,
+                success: result.success,
+                branch_results,
+                duration: result.duration,
+                successful_branches: if result.success {
+                    self.branches.len()
+                } else {
+                    0
+                },
+                failed_branches: result.steps_failed,
+                stopped_early: false,
+                error: result.error.map(|e| e.to_string()),
+            }
+        } else {
+            // Fall back to legacy implementation when no state is available
+            self.execute_workflow().await?
+        };
 
         // Convert ParallelWorkflowResult to AgentOutput
         let output_text = if workflow_result.success {

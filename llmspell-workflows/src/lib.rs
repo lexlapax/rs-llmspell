@@ -77,4 +77,6 @@ pub use executor::{
 };
 
 // Re-export unified result types
-pub use result::{WorkflowError, WorkflowResult, WorkflowResultExt, WorkflowType as ResultWorkflowType};
+pub use result::{
+    WorkflowError, WorkflowResult, WorkflowResultExt, WorkflowType as ResultWorkflowType,
+};

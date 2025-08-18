@@ -4,6 +4,7 @@
 use crate::{
     error_handling::{ErrorAction, ErrorHandler},
     hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext},
+    result::{WorkflowError, WorkflowResult, WorkflowType},
     state::StateManager,
     step_executor::StepExecutor,
     traits::{ErrorStrategy, StepResult, WorkflowStep as TraitWorkflowStep},
@@ -649,6 +650,297 @@ impl LoopWorkflow {
         }
     }
 
+    /// Execute the loop workflow with state-based output
+    ///
+    /// This method executes the loop workflow and writes all outputs directly to state.
+    /// Each iteration's outputs are stored with keys following the pattern:
+    /// - `workflow:{execution_id}:iteration_{n}:{step_name}` for individual step outputs
+    /// - `workflow:{execution_id}:aggregated` for aggregated results (if applicable)
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The execution context containing state access
+    ///
+    /// # Returns
+    ///
+    /// A `WorkflowResult` containing only execution metadata, with state keys
+    /// indicating where the actual outputs have been written.
+    pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
+        let start_time = Instant::now();
+        let execution_id = format!("loop_{}", uuid::Uuid::new_v4());
+
+        // Get state access or return error
+        let state = context
+            .state
+            .as_ref()
+            .ok_or_else(|| LLMSpellError::Workflow {
+                message: "State access not available in context".to_string(),
+                step: None,
+                source: None,
+            })?;
+
+        info!(
+            "Starting state-based loop workflow: {} with execution_id: {}",
+            self.name, execution_id
+        );
+
+        // Initialize workflow state
+        self.state_manager.start_execution().await?;
+
+        // Track state keys where we write outputs
+        let mut state_keys = Vec::new();
+
+        // Generate iterator values
+        let iterator_values = self.generate_iterator_values().await?;
+        let total_iterations = iterator_values.len();
+
+        let mut completed_iterations = 0;
+        let mut failed_iterations = 0;
+        let mut skipped_iterations = 0;
+        let mut aggregated_results = HashMap::new();
+        let mut break_reason = None;
+        let mut last_error = None;
+
+        for (iteration, value) in iterator_values {
+            debug!(
+                "Loop workflow '{}' iteration {}: Processing",
+                self.name, iteration
+            );
+
+            // Add iteration context to workflow state
+            self.state_manager
+                .set_shared_data("iteration".to_string(), Value::Number(iteration.into()))
+                .await?;
+            self.state_manager
+                .set_shared_data("iteration_value".to_string(), value.clone())
+                .await?;
+            self.state_manager
+                .set_shared_data(
+                    "total_iterations".to_string(),
+                    Value::Number(total_iterations.into()),
+                )
+                .await?;
+
+            // Get current workflow state for evaluation
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+
+            // Check break conditions
+            for break_condition in &self.config.break_conditions {
+                if self
+                    .evaluate_condition(&break_condition.expression, &workflow_state, iteration)
+                    .await?
+                {
+                    let reason = break_condition.message.clone().unwrap_or_else(|| {
+                        format!("Break condition met: {}", break_condition.expression)
+                    });
+                    debug!(
+                        "Loop workflow '{}' breaking at iteration {}: {}",
+                        self.name, iteration, reason
+                    );
+                    break_reason = Some(reason);
+                    skipped_iterations = total_iterations.saturating_sub(iteration + 1);
+                    break;
+                }
+            }
+
+            if break_reason.is_some() {
+                break;
+            }
+
+            // Check timeout if configured
+            if let Some(timeout) = self.config.timeout {
+                if start_time.elapsed() > timeout {
+                    let error = WorkflowError::Timeout {
+                        duration: timeout,
+                        message: format!("Loop workflow timed out after {} iterations", iteration),
+                    };
+                    last_error = Some(error.clone());
+                    failed_iterations += 1;
+                    break;
+                }
+            }
+
+            // Execute loop body steps
+            let mut iteration_succeeded = true;
+            let mut last_step_output = value.clone();
+
+            for (step_idx, step) in self.config.body.iter().enumerate() {
+                let step_name = format!("step_{}", step_idx);
+                let state_key =
+                    WorkflowResult::generate_iteration_key(&execution_id, iteration, &step_name);
+
+                // Create execution context for the step
+                let step_context =
+                    StepExecutionContext::new(workflow_state.clone(), self.config.timeout);
+
+                match self.step_executor.execute_step(step, step_context).await {
+                    Ok(result) => {
+                        // Write step output to state
+                        let output_value =
+                            serde_json::to_value(&result.output).unwrap_or_else(|_| {
+                                Value::String("Failed to serialize output".to_string())
+                            });
+
+                        if let Err(e) = state.write(&state_key, output_value.clone()).await {
+                            warn!("Failed to write step output to state: {}", e);
+                            if !self.config.continue_on_error {
+                                last_error = Some(WorkflowError::StateAccessFailed {
+                                    operation: "write".to_string(),
+                                    error: e.to_string(),
+                                });
+                                iteration_succeeded = false;
+                                break;
+                            }
+                        } else {
+                            state_keys.push(state_key.clone());
+                            debug!(
+                                "Loop workflow '{}' iteration {} step {} output written to: {}",
+                                self.name, iteration, step_idx, state_key
+                            );
+                        }
+
+                        // Update last step output for aggregation
+                        last_step_output = output_value;
+
+                        // Update workflow state with step result
+                        self.state_manager
+                            .record_step_result(result.clone())
+                            .await?;
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Loop workflow '{}' iteration {} step {} failed: {}",
+                            self.name, iteration, step_idx, e
+                        );
+
+                        if !self.config.continue_on_error {
+                            last_error = Some(WorkflowError::StepExecutionFailed {
+                                step_name: step_name.clone(),
+                                reason: e.to_string(),
+                            });
+                            iteration_succeeded = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if iteration_succeeded {
+                completed_iterations += 1;
+
+                // Aggregate results based on strategy
+                match &self.config.aggregation {
+                    ResultAggregation::CollectAll => {
+                        aggregated_results
+                            .insert(format!("iteration_{}", iteration), last_step_output);
+                    }
+                    ResultAggregation::LastOnly => {
+                        aggregated_results.clear();
+                        aggregated_results.insert("last".to_string(), last_step_output);
+                    }
+                    ResultAggregation::FirstN(n) if completed_iterations <= *n => {
+                        aggregated_results
+                            .insert(format!("iteration_{}", iteration), last_step_output);
+                    }
+                    ResultAggregation::LastN(n) => {
+                        // Keep only last N results
+                        if aggregated_results.len() >= *n {
+                            // Remove oldest
+                            let oldest_key = format!("iteration_{}", iteration.saturating_sub(*n));
+                            aggregated_results.remove(&oldest_key);
+                        }
+                        aggregated_results
+                            .insert(format!("iteration_{}", iteration), last_step_output);
+                    }
+                    ResultAggregation::None => {
+                        // No aggregation
+                    }
+                    _ => {}
+                }
+            } else {
+                failed_iterations += 1;
+                if !self.config.continue_on_error {
+                    break;
+                }
+            }
+
+            // Apply iteration delay if configured
+            if let Some(delay) = self.config.iteration_delay {
+                tokio::time::sleep(delay).await;
+            }
+        }
+
+        // Write aggregated results to state if we have any
+        if !aggregated_results.is_empty() {
+            let aggregated_key = WorkflowResult::generate_aggregated_key(&execution_id);
+            let aggregated_value = Value::Object(
+                aggregated_results
+                    .into_iter()
+                    .map(|(k, v)| (k, v))
+                    .collect(),
+            );
+
+            if let Err(e) = state.write(&aggregated_key, aggregated_value).await {
+                warn!("Failed to write aggregated results to state: {}", e);
+            } else {
+                state_keys.push(aggregated_key.clone());
+                debug!(
+                    "Loop workflow '{}' aggregated results written to: {}",
+                    self.name, aggregated_key
+                );
+            }
+        }
+
+        let duration = start_time.elapsed();
+
+        // Determine overall success
+        let success = failed_iterations == 0 && last_error.is_none();
+
+        if success {
+            if let Some(reason) = break_reason {
+                info!(
+                    "Loop workflow '{}' completed with early break: {} ({}/{} iterations, {:?})",
+                    self.name, reason, completed_iterations, total_iterations, duration
+                );
+            } else {
+                info!(
+                    "Loop workflow '{}' completed successfully: {}/{} iterations in {:?}",
+                    self.name, completed_iterations, total_iterations, duration
+                );
+            }
+
+            Ok(WorkflowResult::partial(
+                execution_id,
+                WorkflowType::Loop,
+                self.name.clone(),
+                state_keys,
+                completed_iterations,
+                failed_iterations,
+                skipped_iterations,
+                duration,
+                None,
+            ))
+        } else {
+            warn!(
+                "Loop workflow '{}' failed: {}/{} iterations completed, {} failed in {:?}",
+                self.name, completed_iterations, total_iterations, failed_iterations, duration
+            );
+
+            Ok(WorkflowResult::failure(
+                execution_id,
+                WorkflowType::Loop,
+                self.name.clone(),
+                last_error.unwrap_or_else(|| WorkflowError::General {
+                    message: "Loop workflow failed".to_string(),
+                }),
+                state_keys,
+                completed_iterations,
+                failed_iterations,
+                duration,
+            ))
+        }
+    }
+
     /// Execute the loop workflow
     pub async fn execute_workflow(&self) -> Result<LoopWorkflowResult> {
         let start_time = Instant::now();
@@ -892,41 +1184,93 @@ impl BaseAgent for LoopWorkflow {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
         // Convert AgentInput to workflow execution
         // The workflow will use the input text as an execution trigger
 
         // Validate input first
         self.validate_input(&input).await?;
 
-        // Execute the workflow using existing implementation
-        let workflow_result = self.execute_workflow().await?;
+        // Check if we should use state-based execution
+        let (workflow_result, output_text) = if context.state.is_some() {
+            // Use state-based execution
+            let result = self.execute_with_state(&context).await?;
 
-        // Convert LoopWorkflowResult to AgentOutput
-        let output_text = if workflow_result.success {
-            let break_info = if let Some(reason) = &workflow_result.break_reason {
-                format!(" (broke early: {})", reason)
+            let text = if result.success {
+                let break_info = if result.steps_skipped > 0 {
+                    format!(" ({} iterations skipped)", result.steps_skipped)
+                } else {
+                    String::new()
+                };
+
+                format!(
+                    "Loop workflow '{}' completed successfully. {} iterations executed, {} failed{}. Duration: {:?}. Outputs written to {} state keys.",
+                    result.workflow_name,
+                    result.steps_executed,
+                    result.steps_failed,
+                    break_info,
+                    result.duration,
+                    result.state_keys.len()
+                )
             } else {
-                String::new()
+                format!(
+                    "Loop workflow '{}' failed: {}. {} iterations executed, {} failed. Duration: {:?}",
+                    result.workflow_name,
+                    result.error.as_ref().map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string()),
+                    result.steps_executed,
+                    result.steps_failed,
+                    result.duration
+                )
             };
 
-            format!(
-                "Loop workflow '{}' completed successfully. {} of {} iterations completed{}. Duration: {:?}",
-                workflow_result.workflow_name,
-                workflow_result.completed_iterations,
-                workflow_result.total_iterations,
-                break_info,
-                workflow_result.duration
-            )
+            // Convert WorkflowResult to legacy format for compatibility
+            let legacy_result = LoopWorkflowResult {
+                workflow_name: result.workflow_name.clone(),
+                success: result.success,
+                total_iterations: result.steps_executed + result.steps_skipped,
+                completed_iterations: result.steps_executed,
+                aggregated_results: HashMap::new(), // Not used in state-based execution
+                break_reason: if result.steps_skipped > 0 {
+                    Some("Early termination".to_string())
+                } else {
+                    None
+                },
+                duration: result.duration,
+                error: result.error.as_ref().map(|e| e.to_string()),
+            };
+
+            (legacy_result, text)
         } else {
-            format!(
-                "Loop workflow '{}' failed: {}. {} of {} iterations completed. Duration: {:?}",
-                workflow_result.workflow_name,
-                workflow_result.error.as_deref().unwrap_or("Unknown error"),
-                workflow_result.completed_iterations,
-                workflow_result.total_iterations,
-                workflow_result.duration
-            )
+            // Use legacy execution
+            let workflow_result = self.execute_workflow().await?;
+
+            let text = if workflow_result.success {
+                let break_info = if let Some(reason) = &workflow_result.break_reason {
+                    format!(" (broke early: {})", reason)
+                } else {
+                    String::new()
+                };
+
+                format!(
+                    "Loop workflow '{}' completed successfully. {} of {} iterations completed{}. Duration: {:?}",
+                    workflow_result.workflow_name,
+                    workflow_result.completed_iterations,
+                    workflow_result.total_iterations,
+                    break_info,
+                    workflow_result.duration
+                )
+            } else {
+                format!(
+                    "Loop workflow '{}' failed: {}. {} of {} iterations completed. Duration: {:?}",
+                    workflow_result.workflow_name,
+                    workflow_result.error.as_deref().unwrap_or("Unknown error"),
+                    workflow_result.completed_iterations,
+                    workflow_result.total_iterations,
+                    workflow_result.duration
+                )
+            };
+
+            (workflow_result, text)
         };
 
         // Build AgentOutput with execution metadata

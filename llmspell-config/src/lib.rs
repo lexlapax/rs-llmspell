@@ -421,13 +421,22 @@ impl Default for SecurityConfig {
 }
 
 /// Core state persistence flags
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct CoreStateFlags {
     /// Enable state persistence
     pub enabled: bool,
     /// Enable migration functionality
     pub migration_enabled: bool,
+}
+
+impl Default for CoreStateFlags {
+    fn default() -> Self {
+        Self {
+            enabled: true, // Changed from false - in-memory state by default
+            migration_enabled: false,
+        }
+    }
 }
 
 /// Backup-related flags

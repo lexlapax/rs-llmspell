@@ -6,6 +6,7 @@ use super::conditions::{
 };
 use super::error_handling::{ErrorAction, ErrorHandler};
 use super::hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
+use super::result::{WorkflowError, WorkflowResult, WorkflowType};
 use super::state::{ExecutionStats, StateManager};
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, StepResult, WorkflowStatus, WorkflowStep};
@@ -350,7 +351,313 @@ impl ConditionalWorkflow {
         self.branches.len()
     }
 
-    /// Execute the workflow
+    /// Execute the conditional workflow with state-based outputs
+    ///
+    /// This method evaluates conditions and executes the matching branch,
+    /// writing outputs to state and returning only metadata.
+    pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
+        let start_time = Instant::now();
+        let execution_id = uuid::Uuid::new_v4().to_string();
+        info!(
+            "Starting conditional workflow: {} (execution: {})",
+            self.name, execution_id
+        );
+
+        // Execute workflow start hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "conditional".to_string(),
+                WorkflowExecutionPhase::WorkflowStart,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
+        // Start execution tracking
+        self.state_manager.start_execution().await?;
+
+        let mut state_keys = Vec::new();
+        let mut steps_executed = 0usize;
+        let mut steps_failed = 0usize;
+
+        // Prepare condition evaluation context
+        let shared_data = self.state_manager.get_all_shared_data().await?;
+        let component_id = ComponentId::new();
+        let evaluation_context =
+            ConditionEvaluationContext::new(component_id.clone()).with_shared_data(shared_data);
+
+        // Find the branch to execute
+        let mut selected_branch = None;
+        let mut default_branch = None;
+
+        for branch in &self.branches {
+            if branch.is_default {
+                default_branch = Some(branch);
+                continue;
+            }
+
+            let condition_result = self
+                .condition_evaluator
+                .evaluate(&branch.condition, &evaluation_context)
+                .await?;
+
+            if condition_result.is_true {
+                debug!("Branch '{}' condition evaluated to true", branch.name);
+                selected_branch = Some(branch);
+                break;
+            }
+        }
+
+        // Use default branch if no conditions matched
+        if selected_branch.is_none() && default_branch.is_some() {
+            debug!("No conditions matched, using default branch");
+            selected_branch = default_branch;
+        }
+
+        // Execute the selected branch
+        if let Some(branch) = selected_branch {
+            info!("Executing branch: {}", branch.name);
+
+            for (index, step) in branch.steps.iter().enumerate() {
+                // Check for execution timeout
+                if self.state_manager.check_execution_timeout().await? {
+                    error!("Workflow '{}' exceeded maximum execution time", self.name);
+                    self.state_manager.complete_execution(false).await?;
+
+                    return Ok(WorkflowResult::failure(
+                        execution_id,
+                        WorkflowType::Conditional,
+                        self.name.clone(),
+                        WorkflowError::Timeout {
+                            duration: start_time.elapsed(),
+                            message: format!(
+                                "Workflow '{}' exceeded maximum execution time",
+                                self.name
+                            ),
+                        },
+                        state_keys,
+                        steps_executed,
+                        steps_failed,
+                        start_time.elapsed(),
+                    ));
+                }
+
+                debug!(
+                    "Executing step {} of {} in branch '{}': {}",
+                    index + 1,
+                    branch.steps.len(),
+                    branch.name,
+                    step.name
+                );
+
+                // Create execution context for step
+                let mut workflow_state = crate::types::WorkflowState::new();
+                workflow_state.shared_data = self.state_manager.get_all_shared_data().await?;
+                workflow_state.current_step = index;
+                let step_context = StepExecutionContext::new(workflow_state, None);
+
+                // Execute step with retry logic
+                let step_result = if self.workflow_executor.is_some() {
+                    self.step_executor
+                        .execute_step_with_retry_and_metadata(
+                            step,
+                            step_context,
+                            &self.error_strategy,
+                            Some(self.metadata.clone()),
+                            Some("conditional".to_string()),
+                        )
+                        .await?
+                } else {
+                    self.step_executor
+                        .execute_step_with_retry(step, step_context, &self.error_strategy)
+                        .await?
+                };
+
+                // Record the result
+                self.state_manager
+                    .record_step_result(step_result.clone())
+                    .await?;
+
+                if step_result.success {
+                    steps_executed += 1;
+
+                    // Write step output to state if state is available
+                    if let Some(ref state) = context.state {
+                        let state_key = WorkflowResult::generate_branch_key(
+                            &execution_id,
+                            &branch.name,
+                            &step.name,
+                        );
+                        let output_value = serde_json::json!({
+                            "branch_name": branch.name,
+                            "step_name": step.name,
+                            "step_id": step_result.step_id.to_string(),
+                            "output": step_result.output,
+                            "duration_ms": step_result.duration.as_millis(),
+                            "retry_count": step_result.retry_count,
+                        });
+
+                        state.write(&state_key, output_value).await.map_err(|e| {
+                            LLMSpellError::Component {
+                                message: format!("Failed to write step output to state: {}", e),
+                                source: None,
+                            }
+                        })?;
+
+                        state_keys.push(state_key);
+                        debug!(
+                            "Wrote step output to state for branch '{}' step: {}",
+                            branch.name, step.name
+                        );
+                    }
+
+                    self.state_manager.advance_step().await?;
+                } else {
+                    steps_failed += 1;
+
+                    // Handle the failure based on error strategy
+                    let error_action = self
+                        .error_handler
+                        .handle_step_failure(&step_result, Some(&self.error_strategy))
+                        .await?;
+
+                    match error_action {
+                        ErrorAction::StopWorkflow => {
+                            warn!("Stopping workflow '{}' due to step failure", self.name);
+                            self.state_manager.complete_execution(false).await?;
+
+                            return Ok(WorkflowResult::failure(
+                                execution_id,
+                                WorkflowType::Conditional,
+                                self.name.clone(),
+                                WorkflowError::StepExecutionFailed {
+                                    step_name: step.name.clone(),
+                                    reason: step_result
+                                        .error
+                                        .unwrap_or_else(|| "Unknown error".to_string()),
+                                },
+                                state_keys,
+                                steps_executed,
+                                steps_failed,
+                                start_time.elapsed(),
+                            ));
+                        }
+                        ErrorAction::ContinueToNext => {
+                            warn!(
+                                "Continuing to next step after failure in step: {}",
+                                step.name
+                            );
+                            self.state_manager.advance_step().await?;
+                        }
+                        ErrorAction::RetryStep => {
+                            // Retries are handled by execute_step_with_retry
+                            if matches!(self.error_strategy, ErrorStrategy::Continue) {
+                                warn!("All retries exhausted for step {}, continuing", step.name);
+                                self.state_manager.advance_step().await?;
+                            } else {
+                                warn!(
+                                    "All retries exhausted for step {}, stopping workflow",
+                                    step.name
+                                );
+                                self.state_manager.complete_execution(false).await?;
+
+                                return Ok(WorkflowResult::failure(
+                                    execution_id,
+                                    WorkflowType::Conditional,
+                                    self.name.clone(),
+                                    WorkflowError::StepExecutionFailed {
+                                        step_name: step.name.clone(),
+                                        reason: format!(
+                                            "All retries exhausted for step {}",
+                                            step.name
+                                        ),
+                                    },
+                                    state_keys,
+                                    steps_executed,
+                                    steps_failed,
+                                    start_time.elapsed(),
+                                ));
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Branch execution completed
+            let duration = start_time.elapsed();
+            self.state_manager
+                .complete_execution(steps_failed == 0)
+                .await?;
+
+            // Execute workflow completion hooks
+            if let Some(workflow_executor) = &self.workflow_executor {
+                let component_id = llmspell_hooks::ComponentId::new(
+                    llmspell_hooks::ComponentType::Workflow,
+                    format!("workflow_{}", self.name),
+                );
+                let workflow_state = self.state_manager.get_state_snapshot().await?;
+                let hook_ctx = WorkflowHookContext::new(
+                    component_id,
+                    self.metadata.clone(),
+                    workflow_state,
+                    "conditional".to_string(),
+                    WorkflowExecutionPhase::WorkflowComplete,
+                );
+                let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+            }
+
+            if steps_failed > 0 {
+                Ok(WorkflowResult::partial(
+                    execution_id,
+                    WorkflowType::Conditional,
+                    self.name.clone(),
+                    state_keys,
+                    steps_executed,
+                    steps_failed,
+                    0,
+                    duration,
+                    None,
+                ))
+            } else {
+                Ok(WorkflowResult::success(
+                    execution_id,
+                    WorkflowType::Conditional,
+                    self.name.clone(),
+                    state_keys,
+                    steps_executed,
+                    duration,
+                ))
+            }
+        } else {
+            // No branch matched and no default branch
+            let duration = start_time.elapsed();
+            self.state_manager.complete_execution(false).await?;
+
+            warn!("No conditions matched and no default branch available");
+            Ok(WorkflowResult::failure(
+                execution_id,
+                WorkflowType::Conditional,
+                self.name.clone(),
+                WorkflowError::ConditionFailed {
+                    condition_name: "all".to_string(),
+                    error: "No conditions matched and no default branch available".to_string(),
+                },
+                state_keys,
+                0,
+                0,
+                duration,
+            ))
+        }
+    }
+
+    /// Execute the workflow (legacy method for backward compatibility)
     pub async fn execute_workflow(&self) -> Result<ConditionalWorkflowResult> {
         let start_time = Instant::now();
         info!("Starting conditional workflow: {}", self.name);
@@ -703,7 +1010,7 @@ impl BaseAgent for ConditionalWorkflow {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
         // Convert AgentInput to workflow execution
         // The workflow will use the input text as an execution trigger
         // and parameters for condition evaluation context
@@ -711,35 +1018,75 @@ impl BaseAgent for ConditionalWorkflow {
         // Validate input first
         self.validate_input(&input).await?;
 
-        // Execute the workflow using existing implementation
-        let workflow_result = self.execute_workflow().await?;
+        // Check if we should use state-based execution
+        let (workflow_result, output_text) = if context.state.is_some() {
+            // Use state-based execution
+            let result = self.execute_with_state(&context).await?;
 
-        // Convert ConditionalWorkflowResult to AgentOutput
-        let output_text = if workflow_result.success {
-            format!(
-                "Conditional workflow '{}' completed successfully. {} branches matched out of {}, {} executed. {} steps total, {} succeeded, {} failed. Duration: {:?}",
-                workflow_result.workflow_name,
-                workflow_result.matched_branches,
-                workflow_result.total_branches,
-                workflow_result.executed_branches.len(),
-                workflow_result.total_steps(),
-                workflow_result.successful_steps(),
-                workflow_result.failed_steps(),
-                workflow_result.duration
-            )
+            let text = if result.success {
+                format!(
+                    "Conditional workflow '{}' completed successfully. {} steps executed, {} failed. Duration: {:?}. Outputs written to {} state keys.",
+                    result.workflow_name,
+                    result.steps_executed,
+                    result.steps_failed,
+                    result.duration,
+                    result.state_keys.len()
+                )
+            } else {
+                format!(
+                    "Conditional workflow '{}' failed: {}. {} steps executed, {} failed. Duration: {:?}",
+                    result.workflow_name,
+                    result.error.as_ref().map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string()),
+                    result.steps_executed,
+                    result.steps_failed,
+                    result.duration
+                )
+            };
+
+            // Convert WorkflowResult to legacy format for compatibility
+            let legacy_result = ConditionalWorkflowResult {
+                workflow_name: result.workflow_name.clone(),
+                success: result.success,
+                matched_branches: result.steps_executed.saturating_sub(result.steps_skipped),
+                total_branches: self.branches.len(),
+                executed_branches: vec![], // Not used in state-based execution - would need BranchExecutionResult conversion
+                duration: result.duration,
+                error_message: result.error.as_ref().map(|e| e.to_string()),
+            };
+
+            (legacy_result, text)
         } else {
-            format!(
-                "Conditional workflow '{}' failed: {}. {} branches matched out of {}, {} executed. {} steps total, {} succeeded, {} failed. Duration: {:?}",
-                workflow_result.workflow_name,
-                workflow_result.error_message.as_deref().unwrap_or("Unknown error"),
-                workflow_result.matched_branches,
-                workflow_result.total_branches,
-                workflow_result.executed_branches.len(),
-                workflow_result.total_steps(),
-                workflow_result.successful_steps(),
-                workflow_result.failed_steps(),
-                workflow_result.duration
-            )
+            // Use legacy execution
+            let workflow_result = self.execute_workflow().await?;
+
+            let text = if workflow_result.success {
+                format!(
+                    "Conditional workflow '{}' completed successfully. {} branches matched out of {}, {} executed. {} steps total, {} succeeded, {} failed. Duration: {:?}",
+                    workflow_result.workflow_name,
+                    workflow_result.matched_branches,
+                    workflow_result.total_branches,
+                    workflow_result.executed_branches.len(),
+                    workflow_result.total_steps(),
+                    workflow_result.successful_steps(),
+                    workflow_result.failed_steps(),
+                    workflow_result.duration
+                )
+            } else {
+                format!(
+                    "Conditional workflow '{}' failed: {}. {} branches matched out of {}, {} executed. {} steps total, {} succeeded, {} failed. Duration: {:?}",
+                    workflow_result.workflow_name,
+                    workflow_result.error_message.as_deref().unwrap_or("Unknown error"),
+                    workflow_result.matched_branches,
+                    workflow_result.total_branches,
+                    workflow_result.executed_branches.len(),
+                    workflow_result.total_steps(),
+                    workflow_result.successful_steps(),
+                    workflow_result.failed_steps(),
+                    workflow_result.duration
+                )
+            };
+
+            (workflow_result, text)
         };
 
         // Build AgentOutput with execution metadata

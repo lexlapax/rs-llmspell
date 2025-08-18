@@ -10,33 +10,20 @@ use std::time::Duration;
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WorkflowError {
     /// A step in the workflow failed to execute
-    StepExecutionFailed {
-        step_name: String,
-        reason: String,
-    },
+    StepExecutionFailed { step_name: String, reason: String },
     /// The workflow timed out
-    Timeout {
-        duration: Duration,
-        message: String,
-    },
+    Timeout { duration: Duration, message: String },
     /// A condition evaluation failed
     ConditionFailed {
         condition_name: String,
         error: String,
     },
     /// State access failed
-    StateAccessFailed {
-        operation: String,
-        error: String,
-    },
+    StateAccessFailed { operation: String, error: String },
     /// Configuration error
-    ConfigurationError {
-        message: String,
-    },
+    ConfigurationError { message: String },
     /// General workflow error
-    General {
-        message: String,
-    },
+    General { message: String },
 }
 
 impl fmt::Display for WorkflowError {
@@ -48,7 +35,10 @@ impl fmt::Display for WorkflowError {
             WorkflowError::Timeout { duration, message } => {
                 write!(f, "Workflow timed out after {:?}: {}", duration, message)
             }
-            WorkflowError::ConditionFailed { condition_name, error } => {
+            WorkflowError::ConditionFailed {
+                condition_name,
+                error,
+            } => {
                 write!(f, "Condition '{}' failed: {}", condition_name, error)
             }
             WorkflowError::StateAccessFailed { operation, error } => {
@@ -89,24 +79,24 @@ impl std::fmt::Display for WorkflowType {
 }
 
 /// Unified workflow result containing only execution metadata
-/// 
+///
 /// This structure represents the outcome of any workflow execution.
 /// Actual data outputs are written to state during execution, and this
 /// result contains the keys where outputs can be found.
-/// 
+///
 /// # Design Philosophy
-/// 
+///
 /// Following patterns from Google ADK, Temporal, and Airflow:
 /// - Workflows are data processors, not data containers
 /// - State is the primary data bus between components
 /// - Results contain metadata for tracking and debugging
 /// - Memory efficiency through state-based storage
-/// 
+///
 /// # Example
-/// 
+///
 /// ```ignore
 /// let result = workflow.execute(input, context).await?;
-/// 
+///
 /// if result.success {
 ///     // Access outputs from state using the provided keys
 ///     for key in &result.state_keys {
@@ -119,41 +109,41 @@ impl std::fmt::Display for WorkflowType {
 pub struct WorkflowResult {
     /// Unique execution ID for this workflow run
     pub execution_id: String,
-    
+
     /// Type of workflow that was executed
     pub workflow_type: WorkflowType,
-    
+
     /// Name of the workflow instance
     pub workflow_name: String,
-    
+
     /// Overall success status
     pub success: bool,
-    
+
     /// Current workflow status
     pub status: WorkflowStatus,
-    
+
     /// Human-readable summary of the execution
     pub summary: String,
-    
+
     /// State keys where outputs were written
     /// Format: "workflow:{execution_id}:{step_name}"
     pub state_keys: Vec<String>,
-    
+
     /// Number of steps successfully executed
     pub steps_executed: usize,
-    
+
     /// Number of steps that failed
     pub steps_failed: usize,
-    
+
     /// Number of steps that were skipped
     pub steps_skipped: usize,
-    
+
     /// Total execution duration
     pub duration: Duration,
-    
+
     /// Error information if the workflow failed
     pub error: Option<WorkflowError>,
-    
+
     /// Additional metadata for debugging
     #[serde(default)]
     pub metadata: serde_json::Map<String, serde_json::Value>,
@@ -188,7 +178,7 @@ impl WorkflowResult {
             metadata: serde_json::Map::new(),
         }
     }
-    
+
     /// Create a new failed workflow result
     #[allow(clippy::too_many_arguments)]
     pub fn failure(
@@ -220,7 +210,7 @@ impl WorkflowResult {
             metadata: serde_json::Map::new(),
         }
     }
-    
+
     /// Create a partially successful result
     #[allow(clippy::too_many_arguments)]
     pub fn partial(
@@ -242,7 +232,7 @@ impl WorkflowResult {
         } else {
             WorkflowStatus::Failed
         };
-        
+
         let summary = if success {
             format!(
                 "{} workflow '{}' completed with {} steps executed, {} skipped",
@@ -254,7 +244,7 @@ impl WorkflowResult {
                 workflow_type, workflow_name, steps_executed, steps_failed, steps_skipped
             )
         };
-        
+
         Self {
             execution_id,
             workflow_type,
@@ -271,39 +261,45 @@ impl WorkflowResult {
             metadata: serde_json::Map::new(),
         }
     }
-    
+
     /// Add metadata to the result
     pub fn with_metadata(mut self, key: String, value: serde_json::Value) -> Self {
         self.metadata.insert(key, value);
         self
     }
-    
+
     /// Generate a state key for a workflow step
-    /// 
+    ///
     /// Standard format: "workflow:{execution_id}:{step_name}"
     pub fn generate_state_key(execution_id: &str, step_name: &str) -> String {
         format!("workflow:{}:{}", execution_id, step_name)
     }
-    
+
     /// Generate a state key for aggregated results
-    /// 
+    ///
     /// Standard format: "workflow:{execution_id}:aggregated"
     pub fn generate_aggregated_key(execution_id: &str) -> String {
         format!("workflow:{}:aggregated", execution_id)
     }
-    
+
     /// Generate a state key for a parallel branch
-    /// 
+    ///
     /// Standard format: "workflow:{execution_id}:branch_{branch_name}:{step_name}"
     pub fn generate_branch_key(execution_id: &str, branch_name: &str, step_name: &str) -> String {
-        format!("workflow:{}:branch_{}:{}", execution_id, branch_name, step_name)
+        format!(
+            "workflow:{}:branch_{}:{}",
+            execution_id, branch_name, step_name
+        )
     }
-    
+
     /// Generate a state key for a loop iteration
-    /// 
+    ///
     /// Standard format: "workflow:{execution_id}:iteration_{n}:{step_name}"
     pub fn generate_iteration_key(execution_id: &str, iteration: usize, step_name: &str) -> String {
-        format!("workflow:{}:iteration_{}:{}", execution_id, iteration, step_name)
+        format!(
+            "workflow:{}:iteration_{}:{}",
+            execution_id, iteration, step_name
+        )
     }
 }
 
@@ -316,7 +312,7 @@ pub trait WorkflowResultExt {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_workflow_result_success() {
         let result = WorkflowResult::success(
@@ -327,21 +323,21 @@ mod tests {
             5,
             Duration::from_secs(10),
         );
-        
+
         assert!(result.success);
         assert_eq!(result.status, WorkflowStatus::Completed);
         assert_eq!(result.steps_executed, 5);
         assert_eq!(result.steps_failed, 0);
         assert!(result.error.is_none());
     }
-    
+
     #[test]
     fn test_workflow_result_failure() {
         let error = WorkflowError::StepExecutionFailed {
             step_name: "transform".to_string(),
             reason: "Invalid data format".to_string(),
         };
-        
+
         let result = WorkflowResult::failure(
             "exec-456".to_string(),
             WorkflowType::Parallel,
@@ -352,43 +348,46 @@ mod tests {
             1,
             Duration::from_secs(5),
         );
-        
+
         assert!(!result.success);
         assert_eq!(result.status, WorkflowStatus::Failed);
         assert_eq!(result.steps_executed, 2);
         assert_eq!(result.steps_failed, 1);
         assert!(result.error.is_some());
     }
-    
+
     #[test]
     fn test_state_key_generation() {
         assert_eq!(
             WorkflowResult::generate_state_key("exec-123", "step1"),
             "workflow:exec-123:step1"
         );
-        
+
         assert_eq!(
             WorkflowResult::generate_aggregated_key("exec-123"),
             "workflow:exec-123:aggregated"
         );
-        
+
         assert_eq!(
             WorkflowResult::generate_branch_key("exec-123", "branch_a", "transform"),
             "workflow:exec-123:branch_branch_a:transform"
         );
-        
+
         assert_eq!(
             WorkflowResult::generate_iteration_key("exec-123", 5, "process"),
             "workflow:exec-123:iteration_5:process"
         );
     }
-    
+
     #[test]
     fn test_workflow_type_display() {
         assert_eq!(WorkflowType::Sequential.to_string(), "sequential");
         assert_eq!(WorkflowType::Parallel.to_string(), "parallel");
         assert_eq!(WorkflowType::Conditional.to_string(), "conditional");
         assert_eq!(WorkflowType::Loop.to_string(), "loop");
-        assert_eq!(WorkflowType::Custom("etl".to_string()).to_string(), "custom:etl");
+        assert_eq!(
+            WorkflowType::Custom("etl".to_string()).to_string(),
+            "custom:etl"
+        );
     }
 }

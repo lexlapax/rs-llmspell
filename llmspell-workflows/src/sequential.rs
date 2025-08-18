@@ -136,13 +136,16 @@ impl SequentialWorkflow {
     }
 
     /// Execute the workflow with state-based outputs
-    /// 
+    ///
     /// This is the new state-based execution method that writes outputs to state
     /// and returns only metadata in the WorkflowResult.
     pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
         let start_time = Instant::now();
         let execution_id = uuid::Uuid::new_v4().to_string();
-        info!("Starting sequential workflow: {} (execution: {})", self.name, execution_id);
+        info!(
+            "Starting sequential workflow: {} (execution: {})",
+            self.name, execution_id
+        );
 
         // Execute workflow start hooks
         if let Some(workflow_executor) = &self.workflow_executor {
@@ -174,14 +177,17 @@ impl SequentialWorkflow {
             if self.state_manager.check_execution_timeout().await? {
                 error!("Workflow '{}' exceeded maximum execution time", self.name);
                 self.state_manager.complete_execution(false).await?;
-                
+
                 return Ok(WorkflowResult::failure(
                     execution_id,
                     WorkflowType::Sequential,
                     self.name.clone(),
                     WorkflowError::Timeout {
                         duration: start_time.elapsed(),
-                        message: format!("Workflow '{}' exceeded maximum execution time", self.name),
+                        message: format!(
+                            "Workflow '{}' exceeded maximum execution time",
+                            self.name
+                        ),
                     },
                     state_keys,
                     steps_executed,
@@ -228,7 +234,7 @@ impl SequentialWorkflow {
 
             if step_result.success {
                 steps_executed += 1;
-                
+
                 // Write step output to state if state is available
                 if let Some(ref state) = context.state {
                     let state_key = WorkflowResult::generate_state_key(&execution_id, &step.name);
@@ -239,17 +245,18 @@ impl SequentialWorkflow {
                         "duration_ms": step_result.duration.as_millis(),
                         "retry_count": step_result.retry_count,
                     });
-                    
-                    state.write(&state_key, output_value).await
-                        .map_err(|e| LLMSpellError::Component {
+
+                    state.write(&state_key, output_value).await.map_err(|e| {
+                        LLMSpellError::Component {
                             message: format!("Failed to write step output to state: {}", e),
                             source: None,
-                        })?;
-                    
+                        }
+                    })?;
+
                     state_keys.push(state_key);
                     debug!("Wrote step output to state for step: {}", step.name);
                 }
-                
+
                 self.state_manager.advance_step().await?;
             } else {
                 steps_failed += 1;
@@ -264,14 +271,16 @@ impl SequentialWorkflow {
                     ErrorAction::StopWorkflow => {
                         warn!("Stopping workflow '{}' due to step failure", self.name);
                         self.state_manager.complete_execution(false).await?;
-                        
+
                         return Ok(WorkflowResult::failure(
                             execution_id,
                             WorkflowType::Sequential,
                             self.name.clone(),
                             WorkflowError::StepExecutionFailed {
                                 step_name: step.name.clone(),
-                                reason: step_result.error.unwrap_or_else(|| "Unknown error".to_string()),
+                                reason: step_result
+                                    .error
+                                    .unwrap_or_else(|| "Unknown error".to_string()),
                             },
                             state_keys,
                             steps_executed,
@@ -301,7 +310,7 @@ impl SequentialWorkflow {
                                 step.name
                             );
                             self.state_manager.complete_execution(false).await?;
-                            
+
                             return Ok(WorkflowResult::failure(
                                 execution_id,
                                 WorkflowType::Sequential,
@@ -589,7 +598,7 @@ impl BaseAgent for SequentialWorkflow {
         let workflow_result = if context.state.is_some() {
             // Use new state-based execution
             let result = self.execute_with_state(&context).await?;
-            
+
             // Convert to legacy result for backward compatibility
             // This will be removed once all callers are updated
             if result.success {
@@ -605,7 +614,10 @@ impl BaseAgent for SequentialWorkflow {
                     vec![],
                     vec![],
                     result.duration,
-                    result.error.map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string()),
+                    result
+                        .error
+                        .map(|e| e.to_string())
+                        .unwrap_or_else(|| "Unknown error".to_string()),
                 )
             }
         } else {

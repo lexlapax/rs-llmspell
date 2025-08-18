@@ -214,7 +214,7 @@ impl ExecutionContext {
             session_id: self.session_id.clone(),
             data: HashMap::new(),
             shared_memory: self.shared_memory.clone(), // Shared across hierarchy
-            state: self.state.clone(), // State is shared across hierarchy
+            state: self.state.clone(),                 // State is shared across hierarchy
             metadata: self.metadata.clone(),
             security_context: self.security_context.clone(),
         };
