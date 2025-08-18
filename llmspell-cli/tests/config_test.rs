@@ -10,12 +10,10 @@ use tempfile::tempdir;
 // Helper function to clean all LLMSPELL env vars
 fn clean_env_vars() {
     env::remove_var("LLMSPELL_DEFAULT_ENGINE");
-    env::remove_var("LLMSPELL_SCRIPT_TIMEOUT");
-    env::remove_var("LLMSPELL_ENABLE_STREAMING");
+    env::remove_var("LLMSPELL_SCRIPT_TIMEOUT_SECONDS");
     env::remove_var("LLMSPELL_ALLOW_FILE_ACCESS");
-    env::remove_var("LLMSPELL_MAX_MEMORY_MB");
-    env::remove_var("LLMSPELL_DEFAULT_PROVIDER");
     env::remove_var("LLMSPELL_ALLOW_NETWORK_ACCESS");
+    env::remove_var("LLMSPELL_MAX_CONCURRENT_SCRIPTS");
 }
 #[tokio::test]
 #[serial]
@@ -57,22 +55,17 @@ async fn test_environment_overrides() {
 
     // Set environment variables
     env::set_var("LLMSPELL_DEFAULT_ENGINE", "javascript");
-    env::set_var("LLMSPELL_SCRIPT_TIMEOUT", "600");
-    env::set_var("LLMSPELL_ENABLE_STREAMING", "false");
+    env::set_var("LLMSPELL_SCRIPT_TIMEOUT_SECONDS", "600");
     env::set_var("LLMSPELL_ALLOW_FILE_ACCESS", "true");
-    env::set_var("LLMSPELL_MAX_MEMORY_MB", "100");
+    env::set_var("LLMSPELL_ALLOW_NETWORK_ACCESS", "false");
 
     // Load config with environment overrides
     let config = load_runtime_config(None).await.unwrap();
 
     assert_eq!(config.default_engine, "javascript");
     assert_eq!(config.runtime.script_timeout_seconds, 600);
-    assert!(!config.runtime.enable_streaming);
     assert!(config.runtime.security.allow_file_access);
-    assert_eq!(
-        config.runtime.security.max_memory_bytes,
-        Some(100 * 1024 * 1024)
-    );
+    assert!(!config.runtime.security.allow_network_access);
 
     // Clean up - use helper
     clean_env_vars();

@@ -113,8 +113,8 @@ pub enum ConfigChangeType {
 pub struct ImmutableSettings {
     /// Paths that are always immutable
     pub immutable_paths: HashSet<String>,
-    /// Whether to allow any security modifications
-    pub lock_security: bool,
+    /// Security settings that are locked at boot-time (cannot be changed at runtime)
+    pub boot_locked_security: HashSet<String>,
     /// Whether to allow provider deletions
     pub lock_provider_deletion: bool,
     /// Maximum memory that can be set
@@ -126,13 +126,18 @@ pub struct ImmutableSettings {
 impl Default for ImmutableSettings {
     fn default() -> Self {
         let mut immutable_paths = HashSet::new();
-        // Core security settings should be immutable by default
-        immutable_paths.insert("runtime.security.allow_process_spawn".to_string());
+        // Core configuration paths should be immutable by default
         immutable_paths.insert("runtime.max_concurrent_scripts".to_string());
+
+        let mut boot_locked_security = HashSet::new();
+        // Critical security settings that cannot be changed after boot
+        boot_locked_security.insert("allow_process_spawn".to_string());
+        boot_locked_security.insert("allow_network_access".to_string());
+        boot_locked_security.insert("allow_file_access".to_string());
 
         Self {
             immutable_paths,
-            lock_security: true,
+            boot_locked_security,
             lock_provider_deletion: true,
             max_memory_limit: Some(1024 * 1024 * 1024), // 1GB max
             min_timeout_seconds: Some(1),               // At least 1 second timeout
@@ -232,7 +237,11 @@ impl ConfigBridge {
     /// Check if a path is immutable
     fn is_immutable(&self, path: &str) -> bool {
         self.immutable.immutable_paths.contains(path)
-            || (self.immutable.lock_security && path.starts_with("runtime.security"))
+    }
+
+    /// Check if a security setting is boot-locked (cannot be changed at runtime)
+    fn is_security_setting_locked(&self, setting_name: &str) -> bool {
+        self.immutable.boot_locked_security.contains(setting_name)
     }
 
     /// Redact sensitive information from a value
@@ -745,7 +754,7 @@ impl ConfigBridge {
     ///
     /// Returns an error if:
     /// - User lacks `modify_security` permission
-    /// - Security settings are locked
+    /// - Specific security settings are boot-locked
     /// - Memory limit exceeds maximum allowed
     /// - Configuration write fails
     pub fn set_security(&self, security: &SecurityConfig) -> Result<(), LLMSpellError> {
@@ -764,9 +773,36 @@ impl ConfigBridge {
             });
         }
 
-        if self.immutable.lock_security {
+        // Get current security config to check what's changing
+        let current_config = self.get_effective_config()?;
+        let current_security = &current_config.runtime.security;
+
+        // Check for changes to boot-locked security settings
+        if current_security.allow_process_spawn != security.allow_process_spawn
+            && self.is_security_setting_locked("allow_process_spawn")
+        {
             return Err(LLMSpellError::Configuration {
-                message: "Security settings are locked".to_string(),
+                message: "Process spawn permission is boot-locked and cannot be changed"
+                    .to_string(),
+                source: None,
+            });
+        }
+
+        if current_security.allow_network_access != security.allow_network_access
+            && self.is_security_setting_locked("allow_network_access")
+        {
+            return Err(LLMSpellError::Configuration {
+                message: "Network access permission is boot-locked and cannot be changed"
+                    .to_string(),
+                source: None,
+            });
+        }
+
+        if current_security.allow_file_access != security.allow_file_access
+            && self.is_security_setting_locked("allow_file_access")
+        {
+            return Err(LLMSpellError::Configuration {
+                message: "File access permission is boot-locked and cannot be changed".to_string(),
                 source: None,
             });
         }
@@ -915,11 +951,32 @@ mod tests {
     #[test]
     fn test_config_bridge_full() {
         let config = LLMSpellConfig::default();
+        let mut bridge = ConfigBridge::new(config, ConfigPermissions::full());
+
+        // Unlock specific security settings for this test
+        bridge.immutable.boot_locked_security.clear();
+
+        // Should be able to modify security settings (when not boot-locked)
+        let security = SecurityConfig::default();
+        match bridge.set_security(&security) {
+            Ok(()) => {}
+            Err(e) => panic!("set_security failed: {e}"),
+        }
+    }
+
+    #[test]
+    fn test_config_bridge_boot_locked_security() {
+        let config = LLMSpellConfig::default();
         let bridge = ConfigBridge::new(config, ConfigPermissions::full());
 
-        // Should be able to modify everything
-        let security = SecurityConfig::default();
-        assert!(bridge.set_security(&security).is_ok());
+        // Try to modify boot-locked security settings - should fail
+        let mut security = SecurityConfig::default();
+        security.allow_process_spawn = !security.allow_process_spawn; // Try to flip this setting
+
+        match bridge.set_security(&security) {
+            Ok(()) => panic!("Expected boot-locked security to prevent changes"),
+            Err(e) => assert!(e.to_string().contains("boot-locked")),
+        }
     }
 
     #[test]
