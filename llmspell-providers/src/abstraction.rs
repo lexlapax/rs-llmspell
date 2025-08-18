@@ -112,6 +112,10 @@ impl ProviderConfig {
     }
 
     /// Load configuration from environment variables
+    ///
+    /// NOTE: This is a fallback mechanism for provider discovery.
+    /// The main configuration loading should use the centralized config system
+    /// with the environment variable registry (llmspell-config).
     pub fn from_env(name: &str) -> Result<Self, LLMSpellError> {
         let env_prefix = format!("LLMSPELL_{}_", name.to_uppercase());
 

@@ -4,16 +4,62 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Tools configuration
+fn default_true() -> bool {
+    true
+}
+
+/// Tools configuration - Single source of truth for ALL tool settings
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ToolsConfig {
+    /// Enable tool system globally
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub enabled: Option<bool>,
+
+    /// Global rate limit for tools (requests per minute)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub rate_limit_per_minute: Option<u32>,
+
+    // Core tool categories
     /// File operations tool configuration
     pub file_operations: FileOperationsConfig,
     /// Web search tool configuration  
     pub web_search: WebSearchConfig,
     /// HTTP request tool configuration
     pub http_request: HttpRequestConfig,
-    /// Additional tool configurations
+    /// Network settings for tools
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub network: Option<NetworkConfig>,
+
+    // Additional tool categories
+    /// Web tools configuration (scraping, monitoring, etc.)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub web_tools: Option<WebToolsConfig>,
+    /// Media processing tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub media: Option<MediaToolsConfig>,
+    /// Database tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub database: Option<DatabaseToolsConfig>,
+    /// Email tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub email: Option<EmailToolsConfig>,
+    /// System tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub system: Option<SystemToolsConfig>,
+    /// Data processing tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub data: Option<DataToolsConfig>,
+    /// Academic tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub academic: Option<AcademicToolsConfig>,
+    /// Document processing tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub document: Option<DocumentToolsConfig>,
+    /// Search tools configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub search: Option<SearchToolsConfig>,
+
+    /// Additional tool configurations (for custom/external tools)
     #[serde(flatten)]
     pub custom: HashMap<String, serde_json::Value>,
 }
@@ -93,9 +139,23 @@ impl Default for ToolsConfigBuilder {
     }
 }
 
+/// Network configuration for tools
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct NetworkConfig {
+    /// Default timeout for network operations in seconds
+    pub timeout_seconds: u64,
+    /// Maximum retries for network failures
+    pub max_retries: u32,
+    /// Enable SSL verification
+    pub verify_ssl: bool,
+}
+
 /// File operations tool configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct FileOperationsConfig {
+    /// Whether file operations are enabled
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Allowed file paths for security
     pub allowed_paths: Vec<String>,
     /// Maximum file size in bytes
@@ -115,6 +175,7 @@ pub struct FileOperationsConfig {
 impl Default for FileOperationsConfig {
     fn default() -> Self {
         Self {
+            enabled: true,
             allowed_paths: vec!["/tmp".to_string()],
             max_file_size: 50_000_000, // 50MB
             atomic_writes: true,
@@ -530,6 +591,146 @@ impl Default for HttpRequestConfigBuilder {
     fn default() -> Self {
         Self::new()
     }
+}
+
+/// Web tools configuration (scraping, monitoring, API testing)
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct WebToolsConfig {
+    /// User agent string for web requests
+    pub user_agent: Option<String>,
+    /// Allowed domains (comma-separated or list)
+    pub allowed_domains: Option<String>,
+    /// Blocked domains (comma-separated or list)
+    pub blocked_domains: Option<String>,
+    /// Maximum redirects to follow
+    pub max_redirects: Option<u32>,
+    /// Scraping rate limit
+    pub scraping_delay_ms: Option<u64>,
+}
+
+/// Media processing tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct MediaToolsConfig {
+    /// Maximum file size for media processing
+    pub max_file_size: Option<usize>,
+    /// Processing timeout in seconds
+    pub processing_timeout: Option<u64>,
+    /// Maximum image dimensions (e.g., "4096x4096")
+    pub image_max_dimensions: Option<String>,
+    /// Video processing quality (0-100)
+    pub video_quality: Option<u8>,
+    /// Audio processing sample rate
+    pub audio_sample_rate: Option<u32>,
+}
+
+/// Database tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DatabaseToolsConfig {
+    /// Connection timeout in seconds
+    pub connection_timeout: Option<u64>,
+    /// Maximum concurrent connections
+    pub max_connections: Option<u32>,
+    /// Allowed database hosts (comma-separated)
+    pub allowed_hosts: Option<String>,
+    /// Query timeout in seconds
+    pub query_timeout: Option<u64>,
+    /// Enable query logging
+    pub enable_query_logging: Option<bool>,
+}
+
+/// Email tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct EmailToolsConfig {
+    /// SMTP server host
+    pub smtp_host: Option<String>,
+    /// SMTP server port
+    pub smtp_port: Option<u16>,
+    /// SMTP username
+    pub smtp_username: Option<String>,
+    /// SMTP password (should use env var)
+    #[serde(skip_serializing)]
+    pub smtp_password: Option<String>,
+    /// Default from address
+    pub from_address: Option<String>,
+    /// Rate limit (emails per hour)
+    pub rate_limit_per_hour: Option<u32>,
+    /// Enable TLS/SSL
+    pub enable_tls: Option<bool>,
+}
+
+/// System tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct SystemToolsConfig {
+    /// Allow process execution
+    pub allow_process_execution: Option<bool>,
+    /// Allowed system commands (comma-separated)
+    pub allowed_commands: Option<String>,
+    /// Maximum output size in bytes
+    pub max_output_size: Option<usize>,
+    /// Command timeout in seconds
+    pub command_timeout: Option<u64>,
+    /// Environment variables to pass through
+    pub allowed_env_vars: Option<String>,
+}
+
+/// Data processing tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DataToolsConfig {
+    /// Maximum CSV file size
+    pub max_csv_size: Option<usize>,
+    /// Maximum JSON nesting depth
+    pub max_json_depth: Option<u32>,
+    /// Maximum XML file size
+    pub max_xml_size: Option<usize>,
+    /// Enable data validation
+    pub enable_validation: Option<bool>,
+    /// Processing timeout in seconds
+    pub processing_timeout: Option<u64>,
+}
+
+/// Academic tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct AcademicToolsConfig {
+    /// API key for citation services
+    #[serde(skip_serializing)]
+    pub citation_api_key: Option<String>,
+    /// Maximum references to process
+    pub max_references: Option<u32>,
+    /// Default citation style (APA, MLA, Chicago, etc.)
+    pub default_citation_style: Option<String>,
+    /// Enable DOI resolution
+    pub enable_doi_resolution: Option<bool>,
+}
+
+/// Document processing tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct DocumentToolsConfig {
+    /// Maximum PDF file size
+    pub max_pdf_size: Option<usize>,
+    /// Extract images from documents
+    pub extract_images: Option<bool>,
+    /// OCR enable for scanned documents
+    pub enable_ocr: Option<bool>,
+    /// Maximum pages to process
+    pub max_pages: Option<u32>,
+    /// Extract metadata
+    pub extract_metadata: Option<bool>,
+}
+
+/// Search tools configuration
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct SearchToolsConfig {
+    /// Default search engine
+    pub default_engine: Option<String>,
+    /// Maximum results to return
+    pub max_results: Option<u32>,
+    /// Search API key
+    #[serde(skip_serializing)]
+    pub api_key: Option<String>,
+    /// Safe search mode
+    pub safe_search: Option<bool>,
+    /// Search timeout in seconds
+    pub timeout: Option<u64>,
 }
 
 #[cfg(test)]

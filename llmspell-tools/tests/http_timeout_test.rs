@@ -63,26 +63,27 @@ async fn test_http_no_timeout_with_long_timeout() {
         Ok(output) => {
             // The response is a JSON string, let's parse it to check the status
             eprintln!("Debug: Response text: {}", output.text);
-            
+
             // The tool returns a JSON response with status_code in the result field
-            let response_json: serde_json::Value = serde_json::from_str(&output.text)
-                .expect("Failed to parse response JSON");
-            
+            let response_json: serde_json::Value =
+                serde_json::from_str(&output.text).expect("Failed to parse response JSON");
+
             // Check if the response indicates success
-            let is_success = response_json.get("success")
-                .and_then(|v| v.as_bool())
+            let is_success = response_json
+                .get("success")
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false);
-            
+
             // Check the status code in the result
-            let status_code = response_json.get("result")
+            let status_code = response_json
+                .get("result")
                 .and_then(|r| r.get("status_code"))
-                .and_then(|s| s.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
-            
+
             assert!(
                 is_success && status_code == 200,
-                "Expected successful response with status 200, got success={}, status_code={}",
-                is_success, status_code
+                "Expected successful response with status 200, got success={is_success}, status_code={status_code}"
             );
         }
         Err(e) => {

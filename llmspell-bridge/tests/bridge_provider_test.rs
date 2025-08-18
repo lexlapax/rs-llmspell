@@ -114,21 +114,24 @@ async fn test_provider_config_validation() {
         "Default provider should be None"
     );
     assert!(
-        config.providers.is_empty(),
+        config.configs.is_empty(),
         "Providers should be empty by default"
     );
 
     // Test that we can add provider configurations
-    config.providers.insert(
+    config.configs.insert(
         "test-provider".to_string(),
         ProviderConfig {
+            name: "test-provider".to_string(),
             provider_type: "openai".to_string(),
+            enabled: true,
             api_key_env: Some("OPENAI_API_KEY".to_string()),
             api_key: None,
             base_url: None,
-            model: Some("gpt-3.5-turbo".to_string()),
+            default_model: Some("gpt-3.5-turbo".to_string()),
             max_tokens: Some(1000),
             timeout_seconds: Some(60),
+            max_retries: None,
             rate_limit: None,
             retry: None,
             options: std::collections::HashMap::new(),

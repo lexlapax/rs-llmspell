@@ -10,13 +10,16 @@ async fn test_lua_agent_creation_with_mock_provider() {
     provider_config.insert(
         "test".to_string(),
         ProviderConfig {
+            name: "test".to_string(),
             provider_type: "mock".to_string(),
+            enabled: true,
             base_url: None,
             api_key_env: None,
             api_key: None,
-            model: Some("test-model".to_string()),
+            default_model: Some("test-model".to_string()),
             max_tokens: None,
             timeout_seconds: None,
+            max_retries: None,
             rate_limit: None,
             retry: None,
             options: HashMap::new(),
@@ -27,7 +30,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
         default_engine: "lua".to_string(),
         providers: ProviderManagerConfig {
             default_provider: Some("test".to_string()),
-            providers: provider_config,
+            configs: provider_config,
         },
         ..Default::default()
     };

@@ -1,2 +1,4 @@
-all lua bridges should be just wrappers to rust native bridge.. not doing json conversion etc in lua engine.
-we just fixed workflow bridge to be that way.
+- all lua bridges should be just wrappers to rust native bridge.. not doing json conversion etc in lua engine. we just fixed workflow bridge to be that way.
+- all tool functions should be consistent for two word functions either like-this or like_this, but not both.
+
+

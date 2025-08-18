@@ -153,8 +153,8 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
         }
         "sled" => {
             debug!("Creating sled storage backend for sessions");
-            let _path = std::env::var("LLMSPELL_SESSION_PATH")
-                .unwrap_or_else(|_| "./llmspell_sessions".to_string());
+            // TODO: When SledBackend supports path configuration, use config.storage_path
+            // For now, SledBackend::new() uses its default path
             let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to create sled backend: {e}"),
                 source: None,

@@ -461,7 +461,7 @@ impl ConfigBridge {
         }
 
         let config = self.get_effective_config()?;
-        let provider = config.providers.providers.get(name).cloned();
+        let provider = config.providers.configs.get(name).cloned();
 
         let result = provider.map(|p| {
             let json = serde_json::to_value(&p).unwrap_or(serde_json::Value::Null);
@@ -494,7 +494,7 @@ impl ConfigBridge {
         }
 
         let config = self.get_effective_config()?;
-        let providers: Vec<String> = config.providers.providers.keys().cloned().collect();
+        let providers: Vec<String> = config.providers.configs.keys().cloned().collect();
 
         self.audit(
             ConfigChangeType::Read,
@@ -657,13 +657,13 @@ impl ConfigBridge {
 
         let old_value = config
             .providers
-            .providers
+            .configs
             .get(name)
             .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null));
 
         config
             .providers
-            .providers
+            .configs
             .insert(name.to_string(), provider.clone());
         drop(config);
 
@@ -908,13 +908,16 @@ mod tests {
 
         // Writing should fail
         let provider = ProviderConfig {
+            name: "test".to_string(),
             provider_type: "test".to_string(),
+            enabled: true,
             api_key_env: None,
             api_key: None,
             base_url: None,
-            model: None,
+            default_model: None,
             max_tokens: None,
             timeout_seconds: Some(60),
+            max_retries: None,
             rate_limit: None,
             retry: None,
             options: HashMap::default(),
@@ -930,13 +933,16 @@ mod tests {
 
         // Should be able to modify providers
         let provider = ProviderConfig {
+            name: "test".to_string(),
             provider_type: "test".to_string(),
+            enabled: true,
             api_key_env: None,
             api_key: None,
             base_url: None,
-            model: None,
+            default_model: None,
             max_tokens: None,
             timeout_seconds: Some(60),
+            max_retries: None,
             rate_limit: None,
             retry: None,
             options: HashMap::default(),

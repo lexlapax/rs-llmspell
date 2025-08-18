@@ -4,20 +4,25 @@
 use anyhow::{Context, Result};
 use llmspell_core::error::LLMSpellError;
 use serde::{Deserialize, Serialize};
-use std::env;
+use std::env as std_env;
 use std::path::{Path, PathBuf};
 use tokio::fs;
 use tracing::debug;
 
 // Re-export engine configurations from bridge
 pub use crate::engines::{EngineConfigs, JSConfig, LuaConfig};
+pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, IsolationMode};
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
 pub use crate::tools::{FileOperationsConfig, ToolsConfig};
 
 pub mod engines;
+pub mod env;
+pub mod env_registry;
 pub mod providers;
 pub mod tools;
 pub mod validation;
+
+use crate::env_registry::register_standard_vars;
 
 /// Configuration file discovery order
 const CONFIG_SEARCH_PATHS: &[&str] = &[
@@ -27,7 +32,8 @@ const CONFIG_SEARCH_PATHS: &[&str] = &[
     ".config/llmspell.toml",
 ];
 
-/// Environment variable prefix
+/// Environment variable prefix (kept for documentation)
+#[allow(dead_code)]
 const ENV_PREFIX: &str = "LLMSPELL_";
 
 /// Central LLMSpell configuration
@@ -43,6 +49,38 @@ pub struct LLMSpellConfig {
     pub runtime: GlobalRuntimeConfig,
     /// Tool-specific configurations
     pub tools: ToolsConfig,
+    /// Hook system configuration
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub hooks: Option<HookConfig>,
+
+    // New fields for environment variable support (optional)
+    /// State persistence enabled
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub state_enabled: Option<bool>,
+    /// State backend type
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub state_backend: Option<String>,
+    /// State storage path
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub state_path: Option<String>,
+    /// Sessions enabled
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub sessions_enabled: Option<bool>,
+    /// Hooks enabled
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub hooks_enabled: Option<bool>,
+    /// Config file path (set when loaded)
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub config_path: Option<String>,
+    /// Home directory
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub home_dir: Option<String>,
+    /// Data directory for application data
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub data_dir: Option<String>,
+    /// Log directory for application logs
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub log_dir: Option<String>,
 }
 
 impl Default for LLMSpellConfig {
@@ -53,6 +91,16 @@ impl Default for LLMSpellConfig {
             providers: ProviderManagerConfig::default(),
             runtime: GlobalRuntimeConfig::default(),
             tools: ToolsConfig::default(),
+            hooks: None,
+            state_enabled: None,
+            state_backend: None,
+            state_path: None,
+            sessions_enabled: None,
+            hooks_enabled: None,
+            config_path: None,
+            home_dir: None,
+            data_dir: None,
+            log_dir: None,
         }
     }
 }
@@ -78,51 +126,231 @@ impl LLMSpellConfig {
         let mut config: LLMSpellConfig =
             toml::from_str(content).with_context(|| "Failed to parse TOML configuration")?;
 
-        config.apply_env_overrides()?;
+        // Use registry for environment overrides
+        config.apply_env_registry()?;
         config.validate()?;
 
         Ok(config)
     }
 
-    /// Apply environment variable overrides
-    pub fn apply_env_overrides(&mut self) -> Result<(), ConfigError> {
-        // Override default engine if specified
-        if let Ok(engine) = env::var(format!("{}DEFAULT_ENGINE", ENV_PREFIX)) {
+    /// Apply environment variable overrides using the centralized registry
+    pub fn apply_env_registry(&mut self) -> Result<(), ConfigError> {
+        // Create registry and load standard variables
+        let registry = EnvRegistry::new();
+        register_standard_vars(&registry).map_err(|e| ConfigError::Environment { message: e })?;
+
+        // Load environment variables
+        registry
+            .load_from_env()
+            .map_err(|e| ConfigError::Environment { message: e })?;
+
+        // Build config from registry
+        let env_config = registry
+            .build_config()
+            .map_err(|e| ConfigError::Environment { message: e })?;
+
+        // Merge environment config into self
+        self.merge_from_json(&env_config)?;
+
+        Ok(())
+    }
+
+    /// Merge values from JSON config (from registry)
+    fn merge_from_json(&mut self, json: &serde_json::Value) -> Result<(), ConfigError> {
+        // Merge top-level values
+        if let Some(engine) = json.get("default_engine").and_then(|v| v.as_str()) {
             debug!("Overriding default engine from env: {}", engine);
-            self.default_engine = engine;
+            self.default_engine = engine.to_string();
         }
 
-        // Override runtime settings
-        if let Ok(max_scripts) = env::var(format!("{}MAX_CONCURRENT_SCRIPTS", ENV_PREFIX)) {
-            if let Ok(val) = max_scripts.parse::<usize>() {
-                debug!("Overriding max_concurrent_scripts from env: {}", val);
-                self.runtime.max_concurrent_scripts = val;
+        // Merge runtime values
+        if let Some(runtime) = json.get("runtime").and_then(|v| v.as_object()) {
+            if let Some(max_scripts) = runtime
+                .get("max_concurrent_scripts")
+                .and_then(|v| v.as_u64())
+            {
+                debug!(
+                    "Overriding max_concurrent_scripts from env: {}",
+                    max_scripts
+                );
+                self.runtime.max_concurrent_scripts = max_scripts as usize;
+            }
+
+            if let Some(timeout) = runtime
+                .get("script_timeout_seconds")
+                .and_then(|v| v.as_u64())
+            {
+                debug!("Overriding script_timeout_seconds from env: {}", timeout);
+                self.runtime.script_timeout_seconds = timeout;
+            }
+
+            // Merge security settings
+            if let Some(security) = runtime.get("security").and_then(|v| v.as_object()) {
+                if let Some(allow_file) =
+                    security.get("allow_file_access").and_then(|v| v.as_bool())
+                {
+                    debug!("Overriding allow_file_access from env: {}", allow_file);
+                    self.runtime.security.allow_file_access = allow_file;
+                }
+
+                if let Some(allow_network) = security
+                    .get("allow_network_access")
+                    .and_then(|v| v.as_bool())
+                {
+                    debug!(
+                        "Overriding allow_network_access from env: {}",
+                        allow_network
+                    );
+                    self.runtime.security.allow_network_access = allow_network;
+                }
+
+                if let Some(allow_spawn) = security
+                    .get("allow_process_spawn")
+                    .and_then(|v| v.as_bool())
+                {
+                    self.runtime.security.allow_process_spawn = allow_spawn;
+                }
+
+                if let Some(max_memory) = security.get("max_memory_bytes").and_then(|v| v.as_u64())
+                {
+                    self.runtime.security.max_memory_bytes = Some(max_memory as usize);
+                }
+
+                if let Some(max_time) = security
+                    .get("max_execution_time_ms")
+                    .and_then(|v| v.as_u64())
+                {
+                    self.runtime.security.max_execution_time_ms = Some(max_time);
+                }
+            }
+
+            // Merge state persistence settings
+            if let Some(state) = runtime.get("state_persistence").and_then(|v| v.as_object()) {
+                if let Some(backend) = state.get("backend_type").and_then(|v| v.as_str()) {
+                    self.runtime.state_persistence.backend_type = backend.to_string();
+                }
+
+                if let Some(flags) = state.get("flags").and_then(|v| v.as_object()) {
+                    if let Some(core) = flags.get("core").and_then(|v| v.as_object()) {
+                        if let Some(enabled) = core.get("enabled").and_then(|v| v.as_bool()) {
+                            self.runtime.state_persistence.flags.core.enabled = enabled;
+                        }
+                        if let Some(migration) =
+                            core.get("migration_enabled").and_then(|v| v.as_bool())
+                        {
+                            self.runtime.state_persistence.flags.core.migration_enabled = migration;
+                        }
+                    }
+                }
+            }
+
+            // Merge session settings
+            if let Some(sessions) = runtime.get("sessions").and_then(|v| v.as_object()) {
+                if let Some(enabled) = sessions.get("enabled").and_then(|v| v.as_bool()) {
+                    self.runtime.sessions.enabled = enabled;
+                }
+                if let Some(backend) = sessions.get("storage_backend").and_then(|v| v.as_str()) {
+                    self.runtime.sessions.storage_backend = backend.to_string();
+                }
             }
         }
 
-        if let Ok(timeout) = env::var(format!("{}SCRIPT_TIMEOUT_SECONDS", ENV_PREFIX)) {
-            if let Ok(val) = timeout.parse::<u64>() {
-                debug!("Overriding script_timeout_seconds from env: {}", val);
-                self.runtime.script_timeout_seconds = val;
+        // Merge provider configurations
+        if let Some(providers) = json.get("providers").and_then(|v| v.as_object()) {
+            if let Some(configs) = providers.get("configs").and_then(|v| v.as_object()) {
+                for (name, config) in configs {
+                    if let Some(provider_obj) = config.as_object() {
+                        // Update or create provider config
+                        let mut provider_config = self
+                            .providers
+                            .configs
+                            .get(name)
+                            .cloned()
+                            .unwrap_or_else(|| ProviderConfig {
+                                name: name.clone(),
+                                provider_type: name.clone(),
+                                enabled: true,
+                                ..Default::default()
+                            });
+
+                        if let Some(api_key) = provider_obj.get("api_key").and_then(|v| v.as_str())
+                        {
+                            provider_config.api_key = Some(api_key.to_string());
+                        }
+                        if let Some(base_url) =
+                            provider_obj.get("base_url").and_then(|v| v.as_str())
+                        {
+                            provider_config.base_url = Some(base_url.to_string());
+                        }
+                        if let Some(model) =
+                            provider_obj.get("default_model").and_then(|v| v.as_str())
+                        {
+                            provider_config.default_model = Some(model.to_string());
+                        }
+
+                        self.providers.configs.insert(name.clone(), provider_config);
+                    }
+                }
             }
         }
 
-        // Override security settings
-        if let Ok(allow_file) = env::var(format!("{}ALLOW_FILE_ACCESS", ENV_PREFIX)) {
-            if let Ok(val) = allow_file.parse::<bool>() {
-                debug!("Overriding allow_file_access from env: {}", val);
-                self.runtime.security.allow_file_access = val;
+        // Merge tool configurations
+        if let Some(tools) = json.get("tools").and_then(|v| v.as_object()) {
+            if let Some(file_ops) = tools.get("file_operations").and_then(|v| v.as_object()) {
+                if let Some(enabled) = file_ops.get("enabled").and_then(|v| v.as_bool()) {
+                    self.tools.file_operations.enabled = enabled;
+                }
+                if let Some(max_size) = file_ops.get("max_file_size").and_then(|v| v.as_u64()) {
+                    self.tools.file_operations.max_file_size = max_size as usize;
+                }
+                if let Some(paths) = file_ops.get("allowed_paths").and_then(|v| v.as_str()) {
+                    self.tools.file_operations.allowed_paths =
+                        paths.split(',').map(|s| s.trim().to_string()).collect();
+                }
+            }
+            if let Some(network) = tools.get("network").and_then(|v| v.as_object()) {
+                let net_config = self.tools.network.get_or_insert(Default::default());
+                if let Some(timeout) = network.get("timeout_seconds").and_then(|v| v.as_u64()) {
+                    net_config.timeout_seconds = timeout;
+                }
+            }
+            if let Some(rate_limit) = tools.get("rate_limit_per_minute").and_then(|v| v.as_u64()) {
+                self.tools.rate_limit_per_minute = Some(rate_limit as u32);
             }
         }
 
-        if let Ok(allow_network) = env::var(format!("{}ALLOW_NETWORK_ACCESS", ENV_PREFIX)) {
-            if let Ok(val) = allow_network.parse::<bool>() {
-                debug!("Overriding allow_network_access from env: {}", val);
-                self.runtime.security.allow_network_access = val;
+        // Merge hook configuration
+        if let Some(hooks) = json.get("hooks").and_then(|v| v.as_object()) {
+            let hook_config = self.hooks.get_or_insert(Default::default());
+            if let Some(enabled) = hooks.get("enabled").and_then(|v| v.as_bool()) {
+                hook_config.enabled = enabled;
             }
+            if let Some(rate_limit) = hooks.get("rate_limit_per_minute").and_then(|v| v.as_u64()) {
+                hook_config.rate_limit_per_minute = Some(rate_limit as u32);
+            }
+        }
+
+        // Merge path configurations
+        if let Some(config_path) = json.get("config_path").and_then(|v| v.as_str()) {
+            self.config_path = Some(config_path.to_string());
+        }
+        if let Some(home_dir) = json.get("home_dir").and_then(|v| v.as_str()) {
+            self.home_dir = Some(home_dir.to_string());
+        }
+        if let Some(data_dir) = json.get("data_dir").and_then(|v| v.as_str()) {
+            self.data_dir = Some(data_dir.to_string());
+        }
+        if let Some(log_dir) = json.get("log_dir").and_then(|v| v.as_str()) {
+            self.log_dir = Some(log_dir.to_string());
         }
 
         Ok(())
+    }
+
+    /// Apply environment variable overrides (DEPRECATED - use apply_env_registry)
+    #[deprecated(note = "Use apply_env_registry() for centralized environment handling")]
+    pub fn apply_env_overrides(&mut self) -> Result<(), ConfigError> {
+        self.apply_env_registry()
     }
 
     /// Validate configuration
@@ -168,7 +396,7 @@ impl LLMSpellConfig {
         }
 
         // Check home directory
-        if let Ok(home_dir) = env::var("HOME").or_else(|_| env::var("USERPROFILE")) {
+        if let Ok(home_dir) = std_env::var("HOME").or_else(|_| std_env::var("USERPROFILE")) {
             let home_path = PathBuf::from(home_dir);
 
             for filename in &[".llmspell.toml", ".config/llmspell.toml"] {
@@ -180,7 +408,7 @@ impl LLMSpellConfig {
         }
 
         // Check system config directories (Linux/macOS style)
-        if let Ok(xdg_config) = env::var("XDG_CONFIG_HOME") {
+        if let Ok(xdg_config) = std_env::var("XDG_CONFIG_HOME") {
             let path = PathBuf::from(xdg_config)
                 .join("llmspell")
                 .join("config.toml");
@@ -213,7 +441,7 @@ impl LLMSpellConfig {
 
         // No config file found, use defaults with environment overrides
         let mut config = Self::default();
-        config.apply_env_overrides()?;
+        config.apply_env_registry()?;
         config.validate()?;
 
         Ok(config)
@@ -528,6 +756,31 @@ impl Default for BackupConfig {
             incremental_enabled: true,
             max_backups: Some(10),
             max_backup_age: Some(2_592_000), // 30 days
+        }
+    }
+}
+
+/// Hook system configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct HookConfig {
+    /// Enable hook system
+    pub enabled: bool,
+    /// Rate limiting for hooks (executions per minute)
+    pub rate_limit_per_minute: Option<u32>,
+    /// Hook timeout in milliseconds
+    pub timeout_ms: Option<u64>,
+    /// Circuit breaker threshold
+    pub circuit_breaker_threshold: Option<f64>,
+}
+
+impl Default for HookConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            rate_limit_per_minute: Some(100),
+            timeout_ms: Some(5000),
+            circuit_breaker_threshold: Some(0.01), // 1% overhead threshold
         }
     }
 }

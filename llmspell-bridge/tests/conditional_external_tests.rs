@@ -214,7 +214,7 @@ async fn test_production_content_pipeline() {
             email_writer = Agent.builder()
                 :name("email_writer")
                 :type("llm")
-                :model("anthropic/claude-3-sonnet-20240229")
+                :model("anthropic/claude-3-5-haiku-latest")
                 :temperature(0.5)
                 :max_tokens(1000)
                 :build()

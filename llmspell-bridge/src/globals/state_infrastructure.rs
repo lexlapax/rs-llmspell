@@ -201,8 +201,11 @@ fn create_backend_type(config: &StatePersistenceConfig) -> StorageBackendType {
         }
         "sled" => {
             debug!("Creating sled storage backend type");
-            let path = std::env::var("LLMSPELL_STATE_PATH")
-                .unwrap_or_else(|_| "./llmspell_state".to_string());
+            // Use schema_directory from config (mapped from LLMSPELL_STATE_PATH)
+            let path = config
+                .schema_directory
+                .clone()
+                .unwrap_or_else(|| "./llmspell_state".to_string());
             StorageBackendType::Sled(SledConfig {
                 path: std::path::PathBuf::from(path),
                 cache_capacity: 64 * 1024 * 1024, // 64MB

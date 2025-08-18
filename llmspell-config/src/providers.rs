@@ -4,13 +4,18 @@
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
+fn default_true() -> bool {
+    true
+}
+
 /// Provider manager configuration
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ProviderManagerConfig {
     /// Default provider to use
     pub default_provider: Option<String>,
-    /// Provider-specific configurations
-    pub providers: HashMap<String, ProviderConfig>,
+    /// Provider-specific configurations (renamed from providers to configs for env mapping)
+    #[serde(alias = "providers")]
+    pub configs: HashMap<String, ProviderConfig>,
 }
 
 impl ProviderManagerConfig {
@@ -23,17 +28,17 @@ impl ProviderManagerConfig {
     /// Get a provider configuration by name
     #[must_use]
     pub fn get_provider(&self, name: &str) -> Option<&ProviderConfig> {
-        self.providers.get(name)
+        self.configs.get(name)
     }
 
     /// Add a provider configuration
     pub fn add_provider(&mut self, name: String, config: ProviderConfig) {
-        self.providers.insert(name, config);
+        self.configs.insert(name, config);
     }
 
     /// Remove a provider configuration
     pub fn remove_provider(&mut self, name: &str) -> Option<ProviderConfig> {
-        self.providers.remove(name)
+        self.configs.remove(name)
     }
 
     /// Get the default provider configuration
@@ -41,7 +46,7 @@ impl ProviderManagerConfig {
     pub fn get_default_provider(&self) -> Option<&ProviderConfig> {
         self.default_provider
             .as_ref()
-            .and_then(|name| self.providers.get(name))
+            .and_then(|name| self.configs.get(name))
     }
 }
 
@@ -70,14 +75,14 @@ impl ProviderManagerConfigBuilder {
     /// Add a provider configuration
     #[must_use]
     pub fn add_provider(mut self, name: impl Into<String>, config: ProviderConfig) -> Self {
-        self.config.providers.insert(name.into(), config);
+        self.config.configs.insert(name.into(), config);
         self
     }
 
     /// Set all providers at once
     #[must_use]
     pub fn providers(mut self, providers: HashMap<String, ProviderConfig>) -> Self {
-        self.config.providers = providers;
+        self.config.configs = providers;
         self
     }
 
@@ -97,16 +102,22 @@ impl Default for ProviderManagerConfigBuilder {
 /// Individual provider configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProviderConfig {
+    /// Provider name identifier
+    pub name: String,
     /// Provider type (e.g., "openai", "anthropic", "ollama")
     pub provider_type: String,
+    /// Whether this provider is enabled
+    #[serde(default = "default_true")]
+    pub enabled: bool,
     /// Base URL for the provider API
     pub base_url: Option<String>,
     /// Environment variable name for API key
     pub api_key_env: Option<String>,
     /// Direct API key (not recommended for production)
     pub api_key: Option<String>,
-    /// Default model to use
-    pub model: Option<String>,
+    /// Default model to use (aliased from model for compatibility)
+    #[serde(alias = "model")]
+    pub default_model: Option<String>,
     /// Maximum tokens per request
     pub max_tokens: Option<u32>,
     /// Request timeout in seconds
@@ -115,9 +126,31 @@ pub struct ProviderConfig {
     pub rate_limit: Option<RateLimitConfig>,
     /// Retry configuration
     pub retry: Option<RetryConfig>,
+    /// Maximum retries (shorthand, overrides retry.max_retries if set)
+    pub max_retries: Option<u32>,
     /// Provider-specific options
     #[serde(flatten)]
     pub options: HashMap<String, serde_json::Value>,
+}
+
+impl Default for ProviderConfig {
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            provider_type: String::new(),
+            enabled: true,
+            base_url: None,
+            api_key_env: None,
+            api_key: None,
+            default_model: None,
+            max_tokens: None,
+            timeout_seconds: None,
+            rate_limit: None,
+            retry: None,
+            max_retries: None,
+            options: HashMap::new(),
+        }
+    }
 }
 
 impl ProviderConfig {
@@ -164,15 +197,18 @@ impl ProviderConfigBuilder {
     pub fn new() -> Self {
         Self {
             config: ProviderConfig {
+                name: String::new(),
                 provider_type: String::new(),
+                enabled: true,
                 base_url: None,
                 api_key_env: None,
                 api_key: None,
-                model: None,
+                default_model: None,
                 max_tokens: None,
                 timeout_seconds: Some(60),
                 rate_limit: None,
                 retry: None,
+                max_retries: None,
                 options: HashMap::new(),
             },
         }
@@ -209,7 +245,14 @@ impl ProviderConfigBuilder {
     /// Set the default model
     #[must_use]
     pub fn model(mut self, model: impl Into<String>) -> Self {
-        self.config.model = Some(model.into());
+        self.config.default_model = Some(model.into());
+        self
+    }
+
+    /// Set the default model (explicit name)
+    #[must_use]
+    pub fn default_model(mut self, model: impl Into<String>) -> Self {
+        self.config.default_model = Some(model.into());
         self
     }
 
@@ -321,7 +364,7 @@ mod tests {
 
         assert_eq!(config.provider_type, "openai");
         assert_eq!(config.api_key_env, Some("OPENAI_API_KEY".to_string()));
-        assert_eq!(config.model, Some("gpt-4".to_string()));
+        assert_eq!(config.default_model, Some("gpt-4".to_string()));
         assert_eq!(config.max_tokens, Some(4096));
     }
 
@@ -338,7 +381,7 @@ mod tests {
             .build();
 
         assert_eq!(config.default_provider, Some("openai".to_string()));
-        assert!(config.providers.contains_key("openai"));
+        assert!(config.configs.contains_key("openai"));
     }
 
     #[test]
@@ -397,7 +440,7 @@ mod tests {
         let config = ProviderConfig::builder()
             .provider_type("anthropic")
             .api_key_env("ANTHROPIC_API_KEY")
-            .model("claude-3-sonnet-20240229")
+            .model("claude-3-5-haiku-latest")
             .option("temperature".to_string(), serde_json::json!(0.7))
             .build();
 
@@ -407,8 +450,8 @@ mod tests {
 
         assert_eq!(deserialized.provider_type, "anthropic");
         assert_eq!(
-            deserialized.model,
-            Some("claude-3-sonnet-20240229".to_string())
+            deserialized.default_model,
+            Some("claude-3-5-haiku-latest".to_string())
         );
         assert!(deserialized.options.contains_key("temperature"));
     }

@@ -86,11 +86,11 @@ impl ProviderDiscovery {
                 supports_streaming: true,
                 supports_multimodal: true,
                 common_models: vec![
-                    "claude-3-opus-20240229".to_string(),
-                    "claude-3-sonnet-20240229".to_string(),
-                    "claude-3-haiku-20240307".to_string(),
-                    "claude-2.1".to_string(),
-                    "claude-instant-1.2".to_string(),
+                    "claude-3-5-haiku-latest".to_string(),
+                    "claude-3-7-sonnet-latest".to_string(),
+                    "claude-sonnet-4-20250514".to_string(),
+                    "claude-3-5-haiku-20241022".to_string(),
+                    "claude-opus-4-20250514".to_string(),
                 ],
                 required_config: vec!["api_key_env".to_string(), "model".to_string()],
                 optional_config: vec![

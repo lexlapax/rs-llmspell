@@ -132,16 +132,19 @@ async fn test_provider_integration() {
 
     // Note: This test will fail if OPENAI_API_KEY is not set
     // In a real test, we'd use a mock provider
-    provider_config.providers.insert(
+    provider_config.configs.insert(
         "test-openai".to_string(),
         ProviderConfig {
+            name: "test-openai".to_string(),
             provider_type: "openai".to_string(),
+            enabled: true,
             api_key_env: Some("OPENAI_API_KEY".to_string()),
             api_key: None,
             base_url: None,
-            model: Some("gpt-3.5-turbo".to_string()),
+            default_model: Some("gpt-3.5-turbo".to_string()),
             max_tokens: Some(100),
             timeout_seconds: Some(60),
+            max_retries: None,
             rate_limit: None,
             retry: None,
             options: HashMap::new(),

@@ -37,7 +37,7 @@ pub async fn validate_config(
             match config::validate_config(&config) {
                 Ok(_) => {
                     // Additional checks
-                    if config.providers.providers.is_empty() {
+                    if config.providers.configs.is_empty() {
                         warnings.push("No providers configured".to_string());
                     }
 

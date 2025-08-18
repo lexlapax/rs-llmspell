@@ -48,29 +48,29 @@ impl ProviderManager {
     /// Initialize providers from configuration
     async fn initialize_providers(&self) -> Result<(), LLMSpellError> {
         // Initialize each configured provider
-        for (name, config) in &self.config.providers {
+        for (name, config) in &self.config.configs {
             let provider_config = Self::create_provider_config(name, config)?;
             self.core_manager.init_provider(provider_config).await?;
         }
 
         // Set default provider if specified
         if let Some(ref default) = self.config.default_provider {
-            if !self.config.providers.contains_key(default) {
+            if !self.config.configs.contains_key(default) {
                 return Err(LLMSpellError::Validation {
                     field: Some("default_provider".to_string()),
                     message: format!("Default provider '{default}' not found in configuration"),
                 });
             }
             // The default will be set based on the provider:model format
-            let model = self.config.providers[default]
-                .model
+            let model = self.config.configs[default]
+                .default_model
                 .as_ref()
                 .ok_or_else(|| LLMSpellError::Validation {
                     field: Some("model".to_string()),
                     message: format!("Model not specified for provider '{default}'"),
                 })?;
             // Get the provider config to determine the actual provider name
-            let provider_config = &self.config.providers[default];
+            let provider_config = &self.config.configs[default];
             let provider_name = match provider_config.provider_type.as_str() {
                 "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together"
                 | "gemini" | "mistral" | "replicate" | "fireworks" => "rig",
@@ -102,7 +102,7 @@ impl ProviderManager {
         };
 
         let model = config
-            .model
+            .default_model
             .as_ref()
             .ok_or_else(|| LLMSpellError::Validation {
                 field: Some("model".to_string()),
@@ -113,8 +113,11 @@ impl ProviderManager {
         let mut provider_config =
             ProviderInstanceConfig::new_with_type(provider_name, &config.provider_type, model);
 
-        // Set API key from environment if specified
-        if let Some(ref api_key_env) = config.api_key_env {
+        // Set API key from config (already loaded from environment by registry if needed)
+        if let Some(ref api_key) = config.api_key {
+            provider_config.api_key = Some(api_key.clone());
+        } else if let Some(ref api_key_env) = config.api_key_env {
+            // Fallback: read from environment if not in config (for backward compatibility)
             provider_config.api_key =
                 Some(
                     std::env::var(api_key_env).map_err(|_| LLMSpellError::Configuration {
@@ -227,7 +230,7 @@ impl ProviderManager {
     /// Get information about a specific provider
     pub async fn get_provider_info(&self, name: &str) -> Option<ProviderInfo> {
         // Check if provider exists in configuration
-        let exists = self.config.providers.contains_key(name)
+        let exists = self.config.configs.contains_key(name)
             || self
                 .core_manager
                 .list_providers()
@@ -283,22 +286,20 @@ impl ProviderManager {
             .await;
 
         // Initialize providers from our configuration
-        for (name, config) in &self.config.providers {
+        for (name, config) in &self.config.configs {
             let provider_config = Self::create_provider_config(name, config)?;
             core_manager.init_provider(provider_config).await?;
         }
 
         // Set default provider if specified
         if let Some(ref default) = self.config.default_provider {
-            if let Some(provider_config) = self.config.providers.get(default) {
-                let model =
-                    provider_config
-                        .model
-                        .as_ref()
-                        .ok_or_else(|| LLMSpellError::Validation {
-                            field: Some("model".to_string()),
-                            message: format!("Model not specified for provider '{default}'"),
-                        })?;
+            if let Some(provider_config) = self.config.configs.get(default) {
+                let model = provider_config.default_model.as_ref().ok_or_else(|| {
+                    LLMSpellError::Validation {
+                        field: Some("model".to_string()),
+                        message: format!("Model not specified for provider '{default}'"),
+                    }
+                })?;
                 let provider_name = match provider_config.provider_type.as_str() {
                     "openai" | "anthropic" | "cohere" => "rig",
                     other => other,
