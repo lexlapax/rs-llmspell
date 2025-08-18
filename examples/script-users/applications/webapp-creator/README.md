@@ -146,11 +146,76 @@ Each project directory contains:
 - `deployment.yaml` - Deployment configuration
 - `documentation.md` - Complete project documentation
 
+## Configuration
+
+### Tool Security Configuration (config.toml)
+
+The WebApp Creator uses the llmspell configuration system to control tool behavior and security settings. The `config.toml` file allows you to configure:
+
+#### File Operations Security
+```toml
+[tools.file_operations]
+allowed_paths = [
+    "/tmp",
+    "/tmp/webapp-projects", 
+    "/Users/username/projects",
+    "/home/user/web-projects"
+]
+max_file_size = 52428800  # 50MB
+atomic_writes = true
+```
+
+#### Web Tools Configuration
+```toml
+[tools.web_search]
+rate_limit_per_minute = 30
+max_results = 10
+timeout_seconds = 30
+
+[tools.http_request]
+timeout_seconds = 30
+max_redirects = 5
+[tools.http_request.default_headers]
+"User-Agent" = "llmspell-webapp-creator/1.0"
+```
+
+#### Usage with Configuration
+```bash
+# Use custom configuration file
+LLMSPELL_CONFIG=examples/script-users/applications/webapp-creator/config.toml \
+  ./target/debug/llmspell run main.lua -- \
+  --input user-input-ecommerce.lua \
+  --output /home/user/projects
+```
+
+**Security Note**: The `allowed_paths` setting controls where the WebApp Creator can write files. Only directories listed in `allowed_paths` will be accessible for output. This prevents accidental writes to system directories.
+
+### Provider Configuration
+
+Configure AI providers in your config.toml:
+
+```toml
+[providers]
+default_provider = "openai"
+
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-4o-mini"
+timeout_seconds = 60
+
+[providers.providers.anthropic]
+provider_type = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+model = "claude-3-haiku-20240307"
+timeout_seconds = 60
+```
+
 ## Requirements
 
 - llmspell CLI with Lua support
 - Optional: API keys for OpenAI/Anthropic for full AI features
-- Optional: Configuration file for advanced settings
+- Optional: Configuration file (config.toml) for security and tool settings
 
 ## Troubleshooting
 

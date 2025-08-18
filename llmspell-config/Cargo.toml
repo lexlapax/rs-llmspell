@@ -7,6 +7,13 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[features]
+default = []
+# Test categories (aligned with project-wide feature-based test organization)
+unit-tests = []
+integration-tests = []
+config-tests = []
+
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
 serde = { workspace = true, features = ["derive"] }
