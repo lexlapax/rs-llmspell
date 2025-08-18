@@ -11,7 +11,7 @@ fn create_test_runtime_config() -> LLMSpellConfig {
     LLMSpellConfig {
         providers: ProviderManagerConfig {
             default_provider: None,
-            configs: std::collections::HashMap::new(),
+            providers: std::collections::HashMap::new(),
         },
         ..Default::default()
     }

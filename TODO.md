@@ -497,6 +497,118 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
      - [x] Eliminated scattered env::var() calls in config system
      - [x] Optimal design: registry builds JSON config from environment
 
+   **G.8. Provider Config Hierarchy Optimization (User Experience Refactor)** (3 hours):
+   
+   **CRITICAL UX ISSUE DISCOVERED**: Current config hierarchy creates redundant and confusing nesting:
+   ```
+   [providers]
+     [providers.configs]      # ← Redundant "configs" level
+       [providers.configs.openai]
+       api_key = "..."
+   ```
+   **Root Cause**: `ProviderManagerConfig` contains `configs: HashMap<String, ProviderConfig>` which forces 
+   the confusing `providers.configs.provider_name` structure instead of intuitive `providers.provider_name`.
+   
+   **User Experience Problems**:
+   1. **Cognitive Load**: Why `providers.configs.openai` instead of `providers.openai`?
+   2. **Redundancy**: "configs" adds no semantic value, just complexity
+   3. **Non-intuitive**: Users expect direct provider access
+   4. **Verbose**: Extra nesting for no benefit
+   5. **Environment Variables**: Forces `providers.configs.openai.api_key` mapping
+   
+   **SOLUTION**: Flatten ProviderManagerConfig to eliminate redundant "configs" level:
+   ```rust
+   pub struct ProviderManagerConfig {
+       pub default_provider: Option<String>,
+       #[serde(flatten)]                    // ← KEY: Flatten the HashMap
+       pub providers: HashMap<String, ProviderConfig>,  // ← Direct provider access
+   }
+   ```
+   
+   **Result**: Clean, intuitive structure:
+   ```toml
+   [providers]
+     default = "openai"
+     [providers.openai]       # ← Direct, intuitive
+     api_key = "..."
+     model = "gpt-4"
+   ```
+   
+   **Environment Variables**: Clean mapping:
+   ```
+   LLMSPELL_PROVIDER_OPENAI_API_KEY → providers.openai.api_key    # ← No "configs"
+   LLMSPELL_PROVIDER_OPENAI_MODEL   → providers.openai.model     # ← Intuitive
+   ```
+   
+   **G.8.1. Update ProviderManagerConfig structure** (1 hour):
+   - [ ] Modify `llmspell-config/src/providers.rs`:
+     ```rust
+     pub struct ProviderManagerConfig {
+         pub default_provider: Option<String>,
+         // Remove the "configs" wrapper, flatten the HashMap
+         #[serde(flatten)]
+         pub providers: HashMap<String, ProviderConfig>,
+     }
+     ```
+   - [ ] Update all field access: `self.configs.get(name)` → `self.providers.get(name)`
+   - [ ] Update builder methods: `.add_provider()` uses providers field
+   - [ ] Add serde alias for backward compatibility: `#[serde(alias = "configs")]`
+   - [ ] Run compile check: `cargo check -p llmspell-config`
+   
+   **G.8.2. Update environment variable registry mappings** (45 minutes):
+   - [ ] Update `llmspell-config/src/env_registry.rs`:
+     - Change all `providers.configs.openai.*` → `providers.openai.*`
+     - Change all `providers.configs.anthropic.*` → `providers.anthropic.*`
+     - Update config paths to match flattened structure
+   - [ ] Test environment variable building: cargo test test_build_config_from_registry
+   - [ ] Verify JSON config structure matches expectation
+   
+   **G.8.3. Update all provider field references** (45 minutes):
+   - [ ] Update `llmspell-bridge/src/providers.rs`:
+     - Change `self.config.configs` → `self.config.providers`
+   - [ ] Update all test files:
+     - Change `config.configs.insert()` → `config.providers.insert()` 
+     - Update test assertions to expect new structure
+   - [ ] Update `llmspell-config/src/lib.rs` merge logic:
+     - Change JSON path from `providers.configs` → `providers`
+   - [ ] Run full test suite: `cargo test -p llmspell-config`
+   
+   **G.8.4. Update example configuration files** (30 minutes):
+   - [ ] Update or recreate with commented out options (all config options) `examples/script-users/configs/applications.toml`:
+     ```toml
+     [providers]
+     default = "openai"
+       [providers.openai]      # ← Remove "configs" level
+       enabled = true
+       model = "gpt-4o-mini"
+     ```
+   - [ ] Update all application config files to use clean structure
+   - [ ] Test example applications still work with new config format
+   - [ ] Update any inline documentation showing config examples
+   
+   **Rationale for G.8**:
+   1. **Perfect Timing**: Step 9 requires updating examples anyway - no extra disruption
+   2. **User Experience**: Makes config intuitive and clean for users
+   3. **No Backward Compatibility**: We explicitly have no requirements to maintain old patterns
+   4. **Long-term Design**: Clean hierarchy scales better for future provider types
+   5. **Environment Variables**: Cleaner mapping without "configs" in paths
+   6. **Documentation**: Examples become more readable and logical
+   
+   **Long-term Benefits**:
+   - Users write what they expect: `[providers.openai]`
+   - Environment variables are intuitive: `providers.openai.api_key`  
+   - Config files are more readable and professional
+   - No redundant nesting levels confuse new users
+   - Architecture is cleaner and more maintainable
+   
+   **Quality Requirements**:
+   - [ ] Zero compilation errors after changes
+   - [ ] All provider tests passing
+   - [ ] Environment variable registry tests passing
+   - [ ] Example applications work with new config format
+   - [ ] No clippy warnings
+   - [ ] Backward compatibility maintained via serde alias (if needed)
+
 
 8. [x] **Testing Suite** (1.5 hours): ✅ COMPLETED - UPDATED EXISTING TESTS
    - [x] Create mock StateAccess for testing in `llmspell-workflows/src/test_utils.rs` ✅

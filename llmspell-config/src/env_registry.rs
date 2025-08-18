@@ -234,7 +234,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("OPENAI_API_KEY")
             .description("OpenAI API key")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.openai.api_key")
+            .config_path("providers.openai.api_key")
             .sensitive()
             .build(),
     )?;
@@ -244,7 +244,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("ANTHROPIC_API_KEY")
             .description("Anthropic API key")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.anthropic.api_key")
+            .config_path("providers.anthropic.api_key")
             .sensitive()
             .build(),
     )?;
@@ -254,7 +254,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_OPENAI_API_KEY")
             .description("OpenAI API key (LLMSpell format)")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.openai.api_key")
+            .config_path("providers.openai.api_key")
             .sensitive()
             .build(),
     )?;
@@ -263,7 +263,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_ANTHROPIC_API_KEY")
             .description("Anthropic API key (LLMSpell format)")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.anthropic.api_key")
+            .config_path("providers.anthropic.api_key")
             .sensitive()
             .build(),
     )?;
@@ -273,7 +273,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_OPENAI_BASE_URL")
             .description("OpenAI API base URL")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.openai.base_url")
+            .config_path("providers.openai.base_url")
             .default("https://api.openai.com/v1")
             .build(),
     )?;
@@ -282,7 +282,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_ANTHROPIC_BASE_URL")
             .description("Anthropic API base URL")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.anthropic.base_url")
+            .config_path("providers.anthropic.base_url")
             .default("https://api.anthropic.com")
             .build(),
     )?;
@@ -292,7 +292,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_OPENAI_MODEL")
             .description("Default OpenAI model")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.openai.default_model")
+            .config_path("providers.openai.default_model")
             .default("gpt-3.5-turbo")
             .build(),
     )?;
@@ -301,7 +301,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_ANTHROPIC_MODEL")
             .description("Default Anthropic model")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.anthropic.default_model")
+            .config_path("providers.anthropic.default_model")
             .default("claude-3-5-haiku-latest")
             .build(),
     )?;
@@ -310,7 +310,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_OPENAI_TIMEOUT")
             .description("OpenAI request timeout (seconds)")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.openai.timeout_seconds")
+            .config_path("providers.openai.timeout_seconds")
             .default("30")
             .validator(|v| {
                 v.parse::<u64>()
@@ -324,7 +324,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_ANTHROPIC_TIMEOUT")
             .description("Anthropic request timeout (seconds)")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.anthropic.timeout_seconds")
+            .config_path("providers.anthropic.timeout_seconds")
             .default("30")
             .validator(|v| {
                 v.parse::<u64>()
@@ -338,7 +338,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_OPENAI_MAX_RETRIES")
             .description("OpenAI maximum retry count")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.openai.max_retries")
+            .config_path("providers.openai.max_retries")
             .default("3")
             .validator(|v| {
                 v.parse::<u32>()
@@ -352,7 +352,7 @@ fn register_provider_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_PROVIDER_ANTHROPIC_MAX_RETRIES")
             .description("Anthropic maximum retry count")
             .category(EnvCategory::Provider)
-            .config_path("providers.configs.anthropic.max_retries")
+            .config_path("providers.anthropic.max_retries")
             .default("3")
             .validator(|v| {
                 v.parse::<u32>()
@@ -1084,9 +1084,6 @@ mod tests {
             config["runtime"]["state_persistence"]["flags"]["core"]["enabled"],
             true
         );
-        assert_eq!(
-            config["providers"]["configs"]["openai"]["api_key"],
-            "test-key"
-        );
+        assert_eq!(config["providers"]["openai"]["api_key"], "test-key");
     }
 }

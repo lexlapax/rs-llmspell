@@ -13,9 +13,9 @@ fn default_true() -> bool {
 pub struct ProviderManagerConfig {
     /// Default provider to use
     pub default_provider: Option<String>,
-    /// Provider-specific configurations (renamed from providers to configs for env mapping)
-    #[serde(alias = "providers")]
-    pub configs: HashMap<String, ProviderConfig>,
+    /// Provider-specific configurations (flattened for intuitive config structure)
+    #[serde(flatten, alias = "configs")]
+    pub providers: HashMap<String, ProviderConfig>,
 }
 
 impl ProviderManagerConfig {
@@ -28,17 +28,17 @@ impl ProviderManagerConfig {
     /// Get a provider configuration by name
     #[must_use]
     pub fn get_provider(&self, name: &str) -> Option<&ProviderConfig> {
-        self.configs.get(name)
+        self.providers.get(name)
     }
 
     /// Add a provider configuration
     pub fn add_provider(&mut self, name: String, config: ProviderConfig) {
-        self.configs.insert(name, config);
+        self.providers.insert(name, config);
     }
 
     /// Remove a provider configuration
     pub fn remove_provider(&mut self, name: &str) -> Option<ProviderConfig> {
-        self.configs.remove(name)
+        self.providers.remove(name)
     }
 
     /// Get the default provider configuration
@@ -46,7 +46,7 @@ impl ProviderManagerConfig {
     pub fn get_default_provider(&self) -> Option<&ProviderConfig> {
         self.default_provider
             .as_ref()
-            .and_then(|name| self.configs.get(name))
+            .and_then(|name| self.providers.get(name))
     }
 }
 
@@ -75,14 +75,14 @@ impl ProviderManagerConfigBuilder {
     /// Add a provider configuration
     #[must_use]
     pub fn add_provider(mut self, name: impl Into<String>, config: ProviderConfig) -> Self {
-        self.config.configs.insert(name.into(), config);
+        self.config.providers.insert(name.into(), config);
         self
     }
 
     /// Set all providers at once
     #[must_use]
     pub fn providers(mut self, providers: HashMap<String, ProviderConfig>) -> Self {
-        self.config.configs = providers;
+        self.config.providers = providers;
         self
     }
 
@@ -381,7 +381,7 @@ mod tests {
             .build();
 
         assert_eq!(config.default_provider, Some("openai".to_string()));
-        assert!(config.configs.contains_key("openai"));
+        assert!(config.providers.contains_key("openai"));
     }
 
     #[test]

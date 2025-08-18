@@ -257,13 +257,52 @@ impl LLMSpellConfig {
 
         // Merge provider configurations
         if let Some(providers) = json.get("providers").and_then(|v| v.as_object()) {
+            // Handle flattened structure - provider configs are direct children
+            for (name, config) in providers {
+                // Skip default_provider field, only process provider configs
+                if name == "default_provider" {
+                    continue;
+                }
+
+                if let Some(provider_obj) = config.as_object() {
+                    // Update or create provider config
+                    let mut provider_config = self
+                        .providers
+                        .providers
+                        .get(name)
+                        .cloned()
+                        .unwrap_or_else(|| ProviderConfig {
+                            name: name.clone(),
+                            provider_type: name.clone(),
+                            enabled: true,
+                            ..Default::default()
+                        });
+
+                    if let Some(api_key) = provider_obj.get("api_key").and_then(|v| v.as_str()) {
+                        provider_config.api_key = Some(api_key.to_string());
+                    }
+                    if let Some(base_url) = provider_obj.get("base_url").and_then(|v| v.as_str()) {
+                        provider_config.base_url = Some(base_url.to_string());
+                    }
+                    if let Some(model) = provider_obj.get("default_model").and_then(|v| v.as_str())
+                    {
+                        provider_config.default_model = Some(model.to_string());
+                    }
+
+                    self.providers
+                        .providers
+                        .insert(name.clone(), provider_config);
+                }
+            }
+
+            // Also handle backward compatibility for configs structure
             if let Some(configs) = providers.get("configs").and_then(|v| v.as_object()) {
                 for (name, config) in configs {
                     if let Some(provider_obj) = config.as_object() {
                         // Update or create provider config
                         let mut provider_config = self
                             .providers
-                            .configs
+                            .providers
                             .get(name)
                             .cloned()
                             .unwrap_or_else(|| ProviderConfig {
@@ -288,7 +327,9 @@ impl LLMSpellConfig {
                             provider_config.default_model = Some(model.to_string());
                         }
 
-                        self.providers.configs.insert(name.clone(), provider_config);
+                        self.providers
+                            .providers
+                            .insert(name.clone(), provider_config);
                     }
                 }
             }

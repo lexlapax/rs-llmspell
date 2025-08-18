@@ -114,12 +114,12 @@ async fn test_provider_config_validation() {
         "Default provider should be None"
     );
     assert!(
-        config.configs.is_empty(),
+        config.providers.is_empty(),
         "Providers should be empty by default"
     );
 
     // Test that we can add provider configurations
-    config.configs.insert(
+    config.providers.insert(
         "test-provider".to_string(),
         ProviderConfig {
             name: "test-provider".to_string(),

@@ -30,7 +30,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
         default_engine: "lua".to_string(),
         providers: ProviderManagerConfig {
             default_provider: Some("test".to_string()),
-            configs: provider_config,
+            providers: provider_config,
         },
         ..Default::default()
     };

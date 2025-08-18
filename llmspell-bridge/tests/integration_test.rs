@@ -132,7 +132,7 @@ async fn test_provider_integration() {
 
     // Note: This test will fail if OPENAI_API_KEY is not set
     // In a real test, we'd use a mock provider
-    provider_config.configs.insert(
+    provider_config.providers.insert(
         "test-openai".to_string(),
         ProviderConfig {
             name: "test-openai".to_string(),

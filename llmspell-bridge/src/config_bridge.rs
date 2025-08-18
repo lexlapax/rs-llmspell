@@ -461,7 +461,7 @@ impl ConfigBridge {
         }
 
         let config = self.get_effective_config()?;
-        let provider = config.providers.configs.get(name).cloned();
+        let provider = config.providers.providers.get(name).cloned();
 
         let result = provider.map(|p| {
             let json = serde_json::to_value(&p).unwrap_or(serde_json::Value::Null);
@@ -494,7 +494,7 @@ impl ConfigBridge {
         }
 
         let config = self.get_effective_config()?;
-        let providers: Vec<String> = config.providers.configs.keys().cloned().collect();
+        let providers: Vec<String> = config.providers.providers.keys().cloned().collect();
 
         self.audit(
             ConfigChangeType::Read,
@@ -657,13 +657,13 @@ impl ConfigBridge {
 
         let old_value = config
             .providers
-            .configs
+            .providers
             .get(name)
             .map(|p| serde_json::to_value(p).unwrap_or(serde_json::Value::Null));
 
         config
             .providers
-            .configs
+            .providers
             .insert(name.to_string(), provider.clone());
         drop(config);
 

@@ -114,7 +114,7 @@ fn validate_engine_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
 fn validate_provider_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
     // Check if default provider exists
     if let Some(default_provider) = &config.providers.default_provider {
-        if !config.providers.configs.contains_key(default_provider) {
+        if !config.providers.providers.contains_key(default_provider) {
             return Err(ConfigError::Validation {
                 field: Some("providers.default_provider".to_string()),
                 message: format!("Default provider '{}' is not configured", default_provider),
@@ -123,10 +123,10 @@ fn validate_provider_config(config: &LLMSpellConfig) -> Result<(), ConfigError> 
     }
 
     // Validate individual provider configurations
-    for (name, provider_config) in &config.providers.configs {
+    for (name, provider_config) in &config.providers.providers {
         if provider_config.provider_type.is_empty() {
             return Err(ConfigError::Validation {
-                field: Some(format!("providers.configs.{}.provider_type", name)),
+                field: Some(format!("providers.{}.provider_type", name)),
                 message: "Provider type cannot be empty".to_string(),
             });
         }
@@ -140,7 +140,7 @@ fn validate_provider_config(config: &LLMSpellConfig) -> Result<(), ConfigError> 
         if let Some(timeout) = provider_config.timeout_seconds {
             if timeout == 0 {
                 return Err(ConfigError::Validation {
-                    field: Some(format!("providers.configs.{}.timeout_seconds", name)),
+                    field: Some(format!("providers.{}.timeout_seconds", name)),
                     message: "Provider timeout cannot be zero".to_string(),
                 });
             }
@@ -631,7 +631,7 @@ mod tests {
         let mut config = LLMSpellConfig::default();
         config
             .providers
-            .configs
+            .providers
             .insert("openai".to_string(), provider_config);
 
         // Should pass validation but may generate warnings
