@@ -76,11 +76,18 @@ impl StandardizedWorkflowFactory {
                 })
             }
             "parallel" => {
-                serde_json::json!({
+                let mut parallel_config = serde_json::json!({
                     "max_concurrency": params.get("max_concurrency").and_then(serde_json::Value::as_u64).unwrap_or(4),
                     "fail_fast": params.get("fail_fast").and_then(serde_json::Value::as_bool).unwrap_or(false),
                     "continue_on_optional_failure": params.get("continue_on_optional_failure").and_then(serde_json::Value::as_bool).unwrap_or(true),
-                })
+                });
+
+                // Pass through branches array if provided - CRITICAL for parallel workflows
+                if let Some(branches) = params.get("branches") {
+                    parallel_config["branches"] = branches.clone();
+                }
+
+                parallel_config
             }
             "conditional" => {
                 // Pass through branches and other conditional-specific config
@@ -151,6 +158,14 @@ impl StandardizedWorkflowFactory {
             let conditional_workflow =
                 super::workflows::create_conditional_workflow(&conditional_params)?;
             return Ok(Box::new(conditional_workflow));
+        }
+
+        // For parallel workflows, also bypass the factory and use working implementation
+        if workflow_type == "parallel" {
+            // Use working parallel workflow creation directly
+            // Pass through the original params which already contains branches
+            let parallel_workflow = super::workflows::create_parallel_workflow(&params)?;
+            return Ok(Box::new(parallel_workflow));
         }
 
         // For other workflow types, use the standardized factory
@@ -269,6 +284,16 @@ mod tests {
         let factory = StandardizedWorkflowFactory::new();
         let params = serde_json::json!({
             "name": "test_parallel",
+            "branches": [
+                {
+                    "name": "branch1",
+                    "steps": []
+                },
+                {
+                    "name": "branch2",
+                    "steps": []
+                }
+            ],
             "max_concurrency": 8,
             "fail_fast": true,
         });

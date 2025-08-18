@@ -873,12 +873,7 @@ impl LoopWorkflow {
         // Write aggregated results to state if we have any
         if !aggregated_results.is_empty() {
             let aggregated_key = WorkflowResult::generate_aggregated_key(&execution_id);
-            let aggregated_value = Value::Object(
-                aggregated_results
-                    .into_iter()
-                    .map(|(k, v)| (k, v))
-                    .collect(),
-            );
+            let aggregated_value = Value::Object(aggregated_results.into_iter().collect());
 
             if let Err(e) = state.write(&aggregated_key, aggregated_value).await {
                 warn!("Failed to write aggregated results to state: {}", e);

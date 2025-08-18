@@ -237,6 +237,7 @@ impl ScriptEngineBridge for LuaEngine {
         }
     }
 
+    #[allow(clippy::cognitive_complexity)]
     fn inject_apis(
         &mut self,
         registry: &Arc<ComponentRegistry>,
@@ -248,8 +249,40 @@ impl ScriptEngineBridge for LuaEngine {
 
             // API surface no longer needed - using globals system
 
-            // Inject globals using the new system
-            let global_context = Arc::new(GlobalContext::new(registry.clone(), providers.clone()));
+            // Create GlobalContext with state support if configured
+            let mut state_access: Option<Arc<dyn llmspell_core::traits::state::StateAccess>> = None;
+
+            // Check if state persistence is enabled and create state access
+            if let Some(runtime_config) = &self.runtime_config {
+                if runtime_config.runtime.state_persistence.flags.core.enabled {
+                    // Try to create StateManagerAdapter for state access
+                    match futures::executor::block_on(
+                        crate::state_adapter::StateManagerAdapter::from_config(
+                            &runtime_config.runtime.state_persistence,
+                        ),
+                    ) {
+                        Ok(adapter) => {
+                            state_access = Some(Arc::new(adapter)
+                                as Arc<dyn llmspell_core::traits::state::StateAccess>);
+                        }
+                        Err(e) => {
+                            tracing::warn!("Failed to create state adapter: {}, state will not be available in context", e);
+                        }
+                    }
+                }
+            }
+
+            // Create global context with or without state
+            let global_context = state_access.map_or_else(
+                || Arc::new(GlobalContext::new(registry.clone(), providers.clone())),
+                |state| {
+                    Arc::new(GlobalContext::with_state(
+                        registry.clone(),
+                        providers.clone(),
+                        state,
+                    ))
+                },
+            );
 
             // Pass runtime config through global context if available
             if let Some(runtime_config) = &self.runtime_config {

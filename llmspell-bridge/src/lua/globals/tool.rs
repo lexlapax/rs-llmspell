@@ -5,6 +5,7 @@ use crate::globals::GlobalContext;
 use crate::lua::conversion::json_to_lua_value;
 use crate::lua::sync_utils::block_on_async_lua;
 use crate::ComponentRegistry;
+use llmspell_core::execution_context::{ContextScope, ExecutionContextBuilder};
 use mlua::{Lua, Table, Value};
 use std::sync::Arc;
 
@@ -18,7 +19,7 @@ use std::sync::Arc;
 #[allow(clippy::too_many_lines)]
 pub fn inject_tool_global(
     lua: &Lua,
-    _context: &GlobalContext,
+    context: &GlobalContext,
     registry: Arc<ComponentRegistry>,
 ) -> mlua::Result<()> {
     let tool_table = lua.create_table()?;
@@ -43,6 +44,7 @@ pub fn inject_tool_global(
 
     // Create Tool.get() function
     let registry_clone = registry.clone();
+    let context_clone = Arc::new(context.clone());
     let get_fn = lua.create_function(move |lua, name: String| {
         if let Some(tool) = registry_clone.get_tool(&name) {
             let metadata = tool.metadata();
@@ -76,11 +78,13 @@ pub fn inject_tool_global(
             // Add execute method to the returned tool
             let tool_arc = tool.clone();
             let tool_name = name.clone();
+            let global_context = context_clone.clone();
             tool_table.set(
                 "execute",
                 lua.create_function(move |lua, (_self, params): (Table, Table)| {
                     let tool_instance = tool_arc.clone();
                     let name = tool_name.clone();
+                    let context_for_exec = global_context.clone();
 
                     // Use shared sync utility to execute async code
                     let result = block_on_async_lua(
@@ -102,9 +106,18 @@ pub fn inject_tool_global(
                             )?;
 
                             // Execute the tool
-                            let context = llmspell_core::ExecutionContext::default();
+                            // Create ExecutionContext with state if available
+                            let exec_context = context_for_exec.state_access.as_ref().map_or_else(
+                                llmspell_core::ExecutionContext::default,
+                                |state_access| {
+                                    ExecutionContextBuilder::new()
+                                        .scope(ContextScope::Global) // Tools operate at global scope
+                                        .state(state_access.clone())
+                                        .build()
+                                },
+                            );
                             let output = tool_instance
-                                .execute(agent_input, context)
+                                .execute(agent_input, exec_context)
                                 .await
                                 .map_err(|e| {
                                     mlua::Error::RuntimeError(format!(
@@ -132,8 +145,10 @@ pub fn inject_tool_global(
 
     // Create Tool.invoke() function - synchronous wrapper
     let registry_clone = registry.clone();
+    let context_clone2 = Arc::new(context.clone());
     let invoke_fn = lua.create_function(move |lua, (name, input): (String, Table)| {
         let registry = registry_clone.clone();
+        let global_context = context_clone2.clone();
 
         // Use shared sync utility to execute async code
         let result = block_on_async_lua(
@@ -157,9 +172,19 @@ pub fn inject_tool_global(
                 let agent_input =
                     crate::lua::conversion::lua_table_to_agent_input(lua, &params_table)?;
 
+                // Create ExecutionContext with state if available
+                let exec_context = global_context.state_access.as_ref().map_or_else(
+                    llmspell_core::ExecutionContext::default,
+                    |state_access| {
+                        ExecutionContextBuilder::new()
+                            .scope(ContextScope::Global) // Tools operate at global scope
+                            .state(state_access.clone())
+                            .build()
+                    },
+                );
+
                 // Execute the tool
-                let context = llmspell_core::ExecutionContext::default();
-                let output = tool.execute(agent_input, context).await.map_err(|e| {
+                let output = tool.execute(agent_input, exec_context).await.map_err(|e| {
                     mlua::Error::RuntimeError(format!("Tool execution failed: {e}"))
                 })?;
 
@@ -206,6 +231,7 @@ pub fn inject_tool_global(
 
     // Add direct tool access via Tool.tool_name pattern
     let registry_for_index = registry.clone();
+    let context_for_index = Arc::new(context.clone());
     let tool_metatable = lua.create_table()?;
     tool_metatable.set(
         "__index",
@@ -235,11 +261,13 @@ pub fn inject_tool_global(
                 // Add execute method
                 let tool_arc = tool.clone();
                 let tool_name = key.clone();
+                let global_context = context_for_index.clone();
                 tool_instance.set(
                     "execute",
                     lua.create_async_function(move |lua, (_self, params): (Table, Table)| {
                         let tool_instance = tool_arc.clone();
                         let name = tool_name.clone();
+                        let context_for_exec = global_context.clone();
                         async move {
                             // Create AgentInput with parameters wrapped correctly for extract_parameters
                             let params_table = lua.create_table()?;
@@ -257,9 +285,18 @@ pub fn inject_tool_global(
                             )?;
 
                             // Execute the tool
-                            let context = llmspell_core::ExecutionContext::default();
+                            // Create ExecutionContext with state if available
+                            let exec_context = context_for_exec.state_access.as_ref().map_or_else(
+                                llmspell_core::ExecutionContext::default,
+                                |state_access| {
+                                    ExecutionContextBuilder::new()
+                                        .scope(ContextScope::Global) // Tools operate at global scope
+                                        .state(state_access.clone())
+                                        .build()
+                                },
+                            );
                             let output = tool_instance
-                                .execute(agent_input, context)
+                                .execute(agent_input, exec_context)
                                 .await
                                 .map_err(|e| {
                                     mlua::Error::RuntimeError(format!(

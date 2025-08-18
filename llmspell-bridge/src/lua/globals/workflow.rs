@@ -238,6 +238,8 @@ struct WorkflowInstance {
     workflow_id: String,
     name: String,
     workflow_type: String,
+    /// Store the last execution ID for output access
+    last_execution_id: Arc<parking_lot::RwLock<Option<String>>>,
 }
 
 impl UserData for WorkflowInstance {
@@ -259,6 +261,9 @@ impl UserData for WorkflowInstance {
 
             info!("Executing {} workflow: {}", this.workflow_type, this.name);
 
+            // Clone for async block
+            let last_execution_id = this.last_execution_id.clone();
+
             // Use shared sync utility for async operation
             let result = block_on_async::<_, serde_json::Value, LLMSpellError>(
                 &format!("workflow_execute_{}", this.workflow_id),
@@ -269,6 +274,11 @@ impl UserData for WorkflowInstance {
                 },
                 None,
             )?;
+
+            // Extract and store execution_id if present
+            if let Some(execution_id) = result.get("execution_id").and_then(|v| v.as_str()) {
+                *last_execution_id.write() = Some(execution_id.to_string());
+            }
 
             // Convert result to Lua table
             let result_value = json_to_lua_value(lua, &result)?;
@@ -369,6 +379,144 @@ impl UserData for WorkflowInstance {
             result_table.set("workflow_id", this.workflow_id.clone())?;
             result_table.set("hook_type", "on_error")?;
             Ok(result_table)
+        });
+
+        // NEW: get_output method - retrieves output from state for a specific step
+        methods.add_method("get_output", |lua, this, step_name: String| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to read the output
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(load_fn) = globals.get::<_, mlua::Function>("load") {
+                    let state_key = format!("workflow:{execution_id}:{step_name}");
+                    let scope = "Global".to_string();
+                    return load_fn.call::<_, mlua::Value>((scope, state_key));
+                }
+            }
+
+            Err(mlua::Error::RuntimeError(
+                "State global not available".to_string(),
+            ))
+        });
+
+        // NEW: get_all_outputs method - retrieves all outputs from the last execution
+        methods.add_method("get_all_outputs", |lua, this, ()| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to list and retrieve outputs
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(list_fn) = globals.get::<_, mlua::Function>("list_keys") {
+                    let prefix = format!("workflow:{execution_id}");
+
+                    // Get all keys for this workflow execution
+                    if let Ok(Value::Table(keys_table)) =
+                        list_fn.call::<_, mlua::Value>(prefix.clone())
+                    {
+                        let outputs_table = lua.create_table()?;
+
+                        // Get load function
+                        if let Ok(load_fn) = globals.get::<_, mlua::Function>("load") {
+                            // Iterate through keys and load each output
+                            for (_, key) in keys_table.pairs::<i32, String>().flatten() {
+                                // Extract step name from key
+                                if let Some(step_name) = key.strip_prefix(&format!("{prefix}:")) {
+                                    let full_key = format!("workflow:{execution_id}:{step_name}");
+                                    if let Ok(value) = load_fn
+                                        .call::<_, mlua::Value>(("Global".to_string(), full_key))
+                                    {
+                                        outputs_table.set(step_name, value)?;
+                                    }
+                                }
+                            }
+                        }
+
+                        return Ok(outputs_table);
+                    }
+                }
+            }
+
+            // Return empty table if State not available
+            lua.create_table()
+        });
+
+        // NEW: list_outputs method - lists available output keys from last execution
+        methods.add_method("list_outputs", |lua, this, ()| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to list keys
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(list_fn) = globals.get::<_, mlua::Function>("list_keys") {
+                    let prefix = format!("workflow:{execution_id}");
+                    return list_fn.call::<_, Table>(prefix);
+                }
+            }
+
+            // Return empty table if State not available
+            lua.create_table()
+        });
+
+        // NEW: clear_outputs method - cleans up state from last execution
+        methods.add_method("clear_outputs", |lua, this, ()| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to delete outputs
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(list_fn) = globals.get::<_, mlua::Function>("list_keys") {
+                    if let Ok(delete_fn) = globals.get::<_, mlua::Function>("delete") {
+                        let prefix = format!("workflow:{execution_id}");
+
+                        // Get all keys for this workflow execution
+                        if let Ok(Value::Table(keys_table)) = list_fn.call::<_, mlua::Value>(prefix)
+                        {
+                            let mut deleted_count = 0;
+
+                            // Delete each key
+                            for (_, key) in keys_table.pairs::<i32, String>().flatten() {
+                                let full_key = format!("workflow:{execution_id}:{key}");
+                                if delete_fn
+                                    .call::<_, ()>(("Global".to_string(), full_key))
+                                    .is_ok()
+                                {
+                                    deleted_count += 1;
+                                }
+                            }
+
+                            let result = lua.create_table()?;
+                            result.set("deleted", deleted_count)?;
+                            return Ok(result);
+                        }
+                    }
+                }
+            }
+
+            let result = lua.create_table()?;
+            result.set("deleted", 0)?;
+            Ok(result)
+        });
+
+        // NEW: get_execution_id method - returns the last execution ID
+        methods.add_method("get_execution_id", |_, this, ()| {
+            this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })
         });
 
         // emit method (Event integration)
@@ -794,6 +942,7 @@ impl UserData for WorkflowBuilder {
                             bridge: bridge.clone(),
                             name: workflow_name_clone,
                             workflow_type: workflow_type_clone,
+                            last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                         })
                 },
                 None,
@@ -918,6 +1067,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "sequential".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -1014,6 +1164,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "conditional".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -1193,6 +1344,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "loop".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -1292,6 +1444,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "parallel".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -1408,6 +1561,7 @@ pub fn inject_workflow_global(
                         workflow_id: workflow_id.clone(),
                         name: workflow_id, // Use workflow_id as name for now
                         workflow_type: workflow_info.workflow_type,
+                        last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                     })
                 } else {
                     Err(mlua::Error::RuntimeError("Workflow not found".to_string()))

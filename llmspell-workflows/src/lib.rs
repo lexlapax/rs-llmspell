@@ -20,6 +20,10 @@ pub mod step_executor;
 pub mod traits;
 pub mod types;
 
+// Test utilities (only available during testing)
+#[cfg(test)]
+pub mod test_utils;
+
 // Re-export main functionality for convenience
 pub use types::{
     StepExecutionContext, WorkflowConfig, WorkflowInput, WorkflowOutput, WorkflowState,

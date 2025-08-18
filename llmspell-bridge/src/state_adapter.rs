@@ -11,10 +11,10 @@ use std::fmt;
 use std::sync::Arc;
 use tracing::{debug, warn};
 
-/// Adapter that bridges StateManager to the StateAccess trait
+/// Adapter that bridges `StateManager` to the `StateAccess` trait
 ///
-/// This adapter allows workflows to use the full-featured StateManager
-/// through the simplified StateAccess interface, providing state persistence
+/// This adapter allows workflows to use the full-featured `StateManager`
+/// through the simplified `StateAccess` interface, providing state persistence
 /// capabilities to all workflow executions.
 #[derive(Clone)]
 pub struct StateManagerAdapter {
@@ -27,6 +27,7 @@ pub struct StateManagerAdapter {
 impl fmt::Debug for StateManagerAdapter {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("StateManagerAdapter")
+            .field("state_manager", &"Arc<StateManager>")
             .field("default_scope", &self.default_scope)
             .finish()
     }
@@ -34,7 +35,7 @@ impl fmt::Debug for StateManagerAdapter {
 
 impl StateManagerAdapter {
     /// Create a new adapter with the given state manager and scope
-    pub fn new(state_manager: Arc<StateManager>, default_scope: StateScope) -> Self {
+    pub const fn new(state_manager: Arc<StateManager>, default_scope: StateScope) -> Self {
         Self {
             state_manager,
             default_scope,
@@ -42,6 +43,10 @@ impl StateManagerAdapter {
     }
 
     /// Create an adapter from configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state manager fails to initialize
     pub async fn from_config(
         config: &llmspell_config::StatePersistenceConfig,
     ) -> anyhow::Result<Self> {
@@ -78,11 +83,7 @@ impl StateManagerAdapter {
             enabled: config.flags.core.enabled,
             backend_type,
             flush_interval: std::time::Duration::from_secs(5),
-            compression: config
-                .backup
-                .as_ref()
-                .map(|b| b.compression_enabled)
-                .unwrap_or(true),
+            compression: config.backup.as_ref().is_none_or(|b| b.compression_enabled),
             encryption: None, // TODO: Add encryption config if needed
             backup_retention: std::time::Duration::from_secs(7 * 24 * 60 * 60), // 7 days
             backup: config.backup.as_ref().map(|b| {
@@ -97,9 +98,7 @@ impl StateManagerAdapter {
                     compression_level: b.compression_level,
                     encryption_enabled: false,
                     max_backups: b.max_backups,
-                    max_backup_age: b
-                        .max_backup_age
-                        .map(|secs| std::time::Duration::from_secs(secs)),
+                    max_backup_age: b.max_backup_age.map(std::time::Duration::from_secs),
                     incremental_enabled: b.incremental_enabled,
                     full_backup_interval: std::time::Duration::from_secs(86400), // 1 day
                 }
@@ -119,6 +118,10 @@ impl StateManagerAdapter {
     }
 
     /// Create an in-memory adapter (useful for testing)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state manager fails to initialize
     pub async fn in_memory() -> anyhow::Result<Self> {
         let state_manager = StateManager::new().await?;
         Ok(Self {
@@ -128,13 +131,15 @@ impl StateManagerAdapter {
     }
 
     /// Set the default scope for operations
+    #[must_use]
     pub fn with_scope(mut self, scope: StateScope) -> Self {
         self.default_scope = scope;
         self
     }
 
     /// Get the underlying state manager (for advanced operations)
-    pub fn state_manager(&self) -> &Arc<StateManager> {
+    #[must_use]
+    pub const fn state_manager(&self) -> &Arc<StateManager> {
         &self.state_manager
     }
 }
@@ -150,7 +155,7 @@ impl StateAccess for StateManagerAdapter {
             .get(self.default_scope.clone(), key)
             .await
             .map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to read state: {}", e),
+                message: format!("Failed to read state: {e}"),
                 operation: Some("read".to_string()),
                 source: None,
             })
@@ -165,7 +170,7 @@ impl StateAccess for StateManagerAdapter {
             .set(self.default_scope.clone(), key, value)
             .await
             .map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to write state: {}", e),
+                message: format!("Failed to write state: {e}"),
                 operation: Some("write".to_string()),
                 source: None,
             })
@@ -180,7 +185,7 @@ impl StateAccess for StateManagerAdapter {
             .delete(self.default_scope.clone(), key)
             .await
             .map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to delete state: {}", e),
+                message: format!("Failed to delete state: {e}"),
                 operation: Some("delete".to_string()),
                 source: None,
             })
@@ -196,7 +201,7 @@ impl StateAccess for StateManagerAdapter {
             .list_keys(self.default_scope.clone())
             .await
             .map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to list keys: {}", e),
+                message: format!("Failed to list keys: {e}"),
                 operation: Some("list_keys".to_string()),
                 source: None,
             })?;
@@ -209,7 +214,7 @@ impl StateAccess for StateManagerAdapter {
     }
 }
 
-/// Builder for creating StateManagerAdapter with custom configuration
+/// Builder for creating `StateManagerAdapter` with custom configuration
 pub struct StateManagerAdapterBuilder {
     backend_type: StorageBackendType,
     scope: StateScope,
@@ -218,7 +223,8 @@ pub struct StateManagerAdapterBuilder {
 
 impl StateManagerAdapterBuilder {
     /// Create a new builder with memory backend
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             backend_type: StorageBackendType::Memory,
             scope: StateScope::Global,
@@ -227,24 +233,31 @@ impl StateManagerAdapterBuilder {
     }
 
     /// Set the storage backend type
+    #[must_use]
     pub fn backend(mut self, backend: StorageBackendType) -> Self {
         self.backend_type = backend;
         self
     }
 
     /// Set the default scope
+    #[must_use]
     pub fn scope(mut self, scope: StateScope) -> Self {
         self.scope = scope;
         self
     }
 
     /// Set custom persistence configuration
+    #[must_use]
     pub fn persistence_config(mut self, config: PersistenceConfig) -> Self {
         self.persistence_config = Some(config);
         self
     }
 
     /// Build the adapter
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state manager fails to initialize
     pub async fn build(self) -> anyhow::Result<StateManagerAdapter> {
         let persistence_config = self
             .persistence_config

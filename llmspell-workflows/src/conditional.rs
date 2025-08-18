@@ -391,7 +391,7 @@ impl ConditionalWorkflow {
         let shared_data = self.state_manager.get_all_shared_data().await?;
         let component_id = ComponentId::new();
         let evaluation_context =
-            ConditionEvaluationContext::new(component_id.clone()).with_shared_data(shared_data);
+            ConditionEvaluationContext::new(component_id).with_shared_data(shared_data);
 
         // Find the branch to execute
         let mut selected_branch = None;

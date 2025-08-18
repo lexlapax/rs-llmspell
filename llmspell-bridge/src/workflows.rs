@@ -460,62 +460,140 @@ fn create_loop_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecu
     Ok(LoopWorkflowExecutor { workflow, name })
 }
 
-fn create_parallel_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
-    use llmspell_workflows::{ParallelBranch, ParallelWorkflowBuilder};
+/// Creates a parallel workflow from JSON parameters
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Required 'branches' or 'steps' field is missing
+/// - Branch configuration is invalid
+/// - Step parsing fails
+pub fn create_parallel_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
+    use llmspell_workflows::ParallelWorkflowBuilder;
 
-    let name = params
-        .get("name")
-        .and_then(|v| v.as_str())
-        .unwrap_or("parallel_workflow")
-        .to_string();
-
+    let name = extract_workflow_name(params, "parallel_workflow");
     let mut builder = ParallelWorkflowBuilder::new(name.clone());
 
-    // Parse branches - support both "branches" and "steps" for API compatibility
-    let branches = if let Some(branches) = params.get("branches").and_then(|v| v.as_array()) {
-        branches
-    } else if let Some(steps) = params.get("steps").and_then(|v| v.as_array()) {
-        steps
-    } else {
-        return Err(llmspell_core::LLMSpellError::Configuration {
+    // Get branches array from params
+    let branches = extract_parallel_branches(params)?;
+
+    // Process each branch
+    builder = process_parallel_branches(builder, branches)?;
+
+    // Apply configuration options
+    builder = apply_parallel_config(builder, params);
+
+    // Build and return the workflow
+    let workflow = builder.build()?;
+    debug!("Successfully built parallel workflow '{}'", name);
+    Ok(ParallelWorkflowExecutor { workflow, name })
+}
+
+/// Extract workflow name from params with default fallback
+fn extract_workflow_name(params: &serde_json::Value, default: &str) -> String {
+    params
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or(default)
+        .to_string()
+}
+
+/// Extract branches array from params, supporting both "branches" and "steps" fields
+fn extract_parallel_branches(params: &serde_json::Value) -> Result<&Vec<serde_json::Value>> {
+    params
+        .get("branches")
+        .and_then(|v| v.as_array())
+        .inspect(|branches| {
+            debug!("Found {} branches in params", branches.len());
+        })
+        .or_else(|| {
+            params
+                .get("steps")
+                .and_then(|v| v.as_array())
+                .inspect(|steps| {
+                    debug!("Found {} steps (as branches) in params", steps.len());
+                })
+        })
+        .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
             message: "Parallel workflow requires either 'branches' or 'steps' field".to_string(),
             source: None,
-        });
-    };
+        })
+}
 
+/// Process branches and add them to the builder
+fn process_parallel_branches(
+    mut builder: llmspell_workflows::ParallelWorkflowBuilder,
+    branches: &[serde_json::Value],
+) -> Result<llmspell_workflows::ParallelWorkflowBuilder> {
+    let mut branch_count = 0;
     for branch_json in branches {
-        let branch_name = branch_json
-            .get("name")
-            .and_then(|v| v.as_str())
-            .unwrap_or("branch")
-            .to_string();
-
-        let mut branch = ParallelBranch::new(branch_name);
-
-        if let Some(desc) = branch_json.get("description").and_then(|v| v.as_str()) {
-            branch = branch.with_description(desc.to_string());
-        }
-
-        if let Some(optional) = branch_json
-            .get("optional")
-            .and_then(serde_json::Value::as_bool)
-        {
-            if optional {
-                branch = branch.optional();
-            }
-        }
-
-        if let Some(steps) = branch_json.get("steps").and_then(|v| v.as_array()) {
-            for step_json in steps {
-                let step = parse_workflow_step(step_json)?;
-                branch = branch.add_step(step);
-            }
-        }
-
+        let branch = create_parallel_branch(branch_json)?;
         builder = builder.add_branch(branch);
+        branch_count += 1;
+    }
+    debug!("Added {} branches to parallel workflow", branch_count);
+    Ok(builder)
+}
+
+/// Create a single parallel branch from JSON
+fn create_parallel_branch(
+    branch_json: &serde_json::Value,
+) -> Result<llmspell_workflows::ParallelBranch> {
+    use llmspell_workflows::ParallelBranch;
+
+    let branch_name = branch_json
+        .get("name")
+        .and_then(|v| v.as_str())
+        .unwrap_or("branch")
+        .to_string();
+
+    debug!("Processing branch: {}", branch_name);
+    let mut branch = ParallelBranch::new(branch_name.clone());
+
+    // Add description if present
+    if let Some(desc) = branch_json.get("description").and_then(|v| v.as_str()) {
+        branch = branch.with_description(desc.to_string());
     }
 
-    // Parse config options
+    // Mark as optional if specified
+    if let Some(optional) = branch_json
+        .get("optional")
+        .and_then(serde_json::Value::as_bool)
+    {
+        if optional {
+            branch = branch.optional();
+        }
+    }
+
+    // Add steps to branch
+    branch = add_steps_to_branch(branch, branch_json, &branch_name)?;
+    Ok(branch)
+}
+
+/// Add steps to a parallel branch
+fn add_steps_to_branch(
+    mut branch: llmspell_workflows::ParallelBranch,
+    branch_json: &serde_json::Value,
+    branch_name: &str,
+) -> Result<llmspell_workflows::ParallelBranch> {
+    let mut step_count = 0;
+    if let Some(steps) = branch_json.get("steps").and_then(|v| v.as_array()) {
+        for step_json in steps {
+            let step = parse_workflow_step(step_json)?;
+            branch = branch.add_step(step);
+            step_count += 1;
+        }
+    }
+    debug!("Branch '{}' has {} steps", branch_name, step_count);
+    Ok(branch)
+}
+
+/// Apply configuration options to parallel workflow builder
+fn apply_parallel_config(
+    mut builder: llmspell_workflows::ParallelWorkflowBuilder,
+    params: &serde_json::Value,
+) -> llmspell_workflows::ParallelWorkflowBuilder {
+    // Set max concurrency if specified
     if let Some(max_concurrency) = params
         .get("max_concurrency")
         .and_then(serde_json::Value::as_u64)
@@ -524,12 +602,35 @@ fn create_parallel_workflow(params: &serde_json::Value) -> Result<impl WorkflowE
             builder.with_max_concurrency(usize::try_from(max_concurrency).unwrap_or(usize::MAX));
     }
 
+    // Set fail fast if specified
     if let Some(fail_fast) = params.get("fail_fast").and_then(serde_json::Value::as_bool) {
         builder = builder.fail_fast(fail_fast);
     }
 
-    let workflow = builder.build()?;
-    Ok(ParallelWorkflowExecutor { workflow, name })
+    builder
+}
+
+/// Convert JSON input to `AgentInput` with fallback logic
+fn json_to_agent_input(input: &serde_json::Value) -> llmspell_core::types::AgentInput {
+    // Try to deserialize directly first
+    if let Ok(agent_input) =
+        serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
+    {
+        return agent_input;
+    }
+
+    // Fallback: try to extract text field from JSON object
+    if let Some(text) = input.get("text").and_then(|v| v.as_str()) {
+        return llmspell_core::types::AgentInput::text(text.to_string());
+    }
+
+    // Fallback: treat entire value as string if it is one
+    if let Some(text_str) = input.as_str() {
+        return llmspell_core::types::AgentInput::text(text_str.to_string());
+    }
+
+    // Last resort: empty input
+    llmspell_core::types::AgentInput::text("")
 }
 
 /// Convert a `WorkflowStep` to flat JSON format expected by the parser
@@ -722,14 +823,7 @@ impl WorkflowExecutor for SequentialWorkflowExecutor {
         let context = create_execution_context_with_state().await?;
 
         // Convert input to AgentInput
-        let agent_input = if let Ok(deserialized) =
-            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
-        {
-            deserialized
-        } else {
-            // Fallback to text input
-            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
-        };
+        let agent_input = json_to_agent_input(&input);
 
         // Execute through BaseAgent interface with state
         let agent_output = self.workflow.execute(agent_input, context).await?;
@@ -759,14 +853,7 @@ impl WorkflowExecutor for ConditionalWorkflowExecutor {
         let context = create_execution_context_with_state().await?;
 
         // Convert input to AgentInput
-        let agent_input = if let Ok(deserialized) =
-            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
-        {
-            deserialized
-        } else {
-            // Fallback to text input
-            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
-        };
+        let agent_input = json_to_agent_input(&input);
 
         // Execute through BaseAgent interface with state
         let agent_output = self.workflow.execute(agent_input, context).await?;
@@ -796,14 +883,7 @@ impl WorkflowExecutor for LoopWorkflowExecutor {
         let context = create_execution_context_with_state().await?;
 
         // Convert input to AgentInput
-        let agent_input = if let Ok(deserialized) =
-            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
-        {
-            deserialized
-        } else {
-            // Fallback to text input
-            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
-        };
+        let agent_input = json_to_agent_input(&input);
 
         // Execute through BaseAgent interface with state
         let agent_output = self.workflow.execute(agent_input, context).await?;
@@ -833,14 +913,7 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
         let context = create_execution_context_with_state().await?;
 
         // Convert input to AgentInput
-        let agent_input = if let Ok(deserialized) =
-            serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
-        {
-            deserialized
-        } else {
-            // Fallback to text input
-            llmspell_core::types::AgentInput::text(input.as_str().unwrap_or("").to_string())
-        };
+        let agent_input = json_to_agent_input(&input);
 
         // Execute through BaseAgent interface with state
         let agent_output = self.workflow.execute(agent_input, context).await?;
@@ -858,9 +931,9 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
     }
 }
 
-/// Helper function to create an ExecutionContext with state support
+/// Helper function to create an `ExecutionContext` with state support
 ///
-/// This function creates an ExecutionContext with state persistence enabled
+/// This function creates an `ExecutionContext` with state persistence enabled
 /// based on the current configuration. It uses in-memory state by default
 /// but can be configured for persistent backends.
 async fn create_execution_context_with_state(
@@ -870,7 +943,7 @@ async fn create_execution_context_with_state(
     let state_adapter = crate::state_adapter::StateManagerAdapter::in_memory()
         .await
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create state adapter: {}", e),
+            message: format!("Failed to create state adapter: {e}"),
             source: None,
         })?;
 

@@ -1,10 +1,10 @@
 //! ABOUTME: State global object providing persistent state management
-//! ABOUTME: Integrates with `StateManager` for full persistent state functionality
+//! ABOUTME: Integrates with `StateAccess` trait for flexible state backend support
 
 #![allow(clippy::significant_drop_tightening)]
 
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
-use llmspell_core::error::LLMSpellError;
+use llmspell_core::{error::LLMSpellError, traits::state::StateAccess};
 use llmspell_state_persistence::{
     migration::MigrationEngine,
     schema::{SchemaRegistry, SemanticVersion},
@@ -16,12 +16,14 @@ use std::sync::Arc;
 
 /// State global object providing persistent state management
 ///
-/// Integrates with `StateManager` for full persistent state functionality.
-/// Falls back to in-memory storage when `StateManager` is not available.
+/// Integrates with `StateAccess` trait for flexible state backend support.
+/// Falls back to in-memory storage when `StateAccess` is not available.
 pub struct StateGlobal {
-    /// `StateManager` for persistent storage (optional for backward compatibility)
+    /// `StateAccess` implementation for persistent storage (optional for backward compatibility)
+    pub state_access: Option<Arc<dyn StateAccess>>,
+    /// Original `StateManager` for migration/backup features (optional)
     pub state_manager: Option<Arc<StateManager>>,
-    /// Fallback in-memory state storage (when `StateManager` is not available)
+    /// Fallback in-memory state storage (when `StateAccess` is not available)
     pub fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
     /// Migration engine for schema transitions (optional)
     pub migration_engine: Option<Arc<MigrationEngine>>,
@@ -32,10 +34,11 @@ pub struct StateGlobal {
 }
 
 impl StateGlobal {
-    /// Create a new State global without `StateManager` (fallback mode)
+    /// Create a new State global without state backend (fallback mode)
     #[must_use]
     pub fn new() -> Self {
         Self {
+            state_access: None,
             state_manager: None,
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
             migration_engine: None,
@@ -44,9 +47,29 @@ impl StateGlobal {
         }
     }
 
-    /// Create a new State global with `StateManager` integration
-    pub fn with_state_manager(state_manager: Arc<StateManager>) -> Self {
+    /// Create a new State global with `StateAccess` integration
+    pub fn with_state_access(state_access: Arc<dyn StateAccess>) -> Self {
         Self {
+            state_access: Some(state_access),
+            state_manager: None,
+            fallback_state: Arc::new(RwLock::new(HashMap::new())),
+            migration_engine: None,
+            schema_registry: None,
+            backup_manager: None,
+        }
+    }
+
+    /// Create a new State global with `StateManager` integration (for migration/backup support)
+    pub fn with_state_manager(state_manager: Arc<StateManager>) -> Self {
+        // Create StateManagerAdapter to provide StateAccess interface
+        let state_access: Arc<dyn StateAccess> =
+            Arc::new(crate::state_adapter::StateManagerAdapter::new(
+                state_manager.clone(),
+                StateScope::Global,
+            ));
+
+        Self {
+            state_access: Some(state_access),
             state_manager: Some(state_manager),
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
             migration_engine: None,
@@ -61,7 +84,15 @@ impl StateGlobal {
         migration_engine: Arc<MigrationEngine>,
         schema_registry: Arc<SchemaRegistry>,
     ) -> Self {
+        // Create StateManagerAdapter to provide StateAccess interface
+        let state_access: Arc<dyn StateAccess> =
+            Arc::new(crate::state_adapter::StateManagerAdapter::new(
+                state_manager.clone(),
+                StateScope::Global,
+            ));
+
         Self {
+            state_access: Some(state_access),
             state_manager: Some(state_manager),
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
             migration_engine: Some(migration_engine),
@@ -77,7 +108,15 @@ impl StateGlobal {
         schema_registry: Option<Arc<SchemaRegistry>>,
         backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
     ) -> Self {
+        // Create StateManagerAdapter to provide StateAccess interface
+        let state_access: Arc<dyn StateAccess> =
+            Arc::new(crate::state_adapter::StateManagerAdapter::new(
+                state_manager.clone(),
+                StateScope::Global,
+            ));
+
         Self {
+            state_access: Some(state_access),
             state_manager: Some(state_manager),
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
             migration_engine,
@@ -127,7 +166,7 @@ impl StateGlobal {
 
 impl GlobalObject for StateGlobal {
     fn metadata(&self) -> GlobalMetadata {
-        let description = if self.state_manager.is_some() {
+        let description = if self.state_access.is_some() {
             "State management system with persistent storage".to_string()
         } else {
             "State management system (in-memory fallback)".to_string()
@@ -135,9 +174,9 @@ impl GlobalObject for StateGlobal {
 
         GlobalMetadata {
             name: "State".to_string(),
-            version: "1.0.0".to_string(), // Phase 5 version with StateManager
+            version: "2.0.0".to_string(), // Phase 7 version with StateAccess trait
             description,
-            dependencies: vec![], // StateManager is optional - gracefully falls back to in-memory
+            dependencies: vec![], // StateAccess is optional - gracefully falls back to in-memory
             required: false,
         }
     }
@@ -825,7 +864,7 @@ mod tests {
         let global = StateGlobal::new();
         let metadata = global.metadata();
         assert_eq!(metadata.name, "State");
-        assert_eq!(metadata.version, "1.0.0"); // Phase 5 version with StateManager
+        assert_eq!(metadata.version, "2.0.0"); // Phase 7 version with StateAccess trait
     }
     #[test]
     fn test_state_in_memory_storage() {

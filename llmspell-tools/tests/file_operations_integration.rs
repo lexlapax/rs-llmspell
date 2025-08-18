@@ -407,8 +407,9 @@ async fn test_file_size_limits() {
         }),
     );
 
-    let result = tool.execute(write_input, context).await;
-    assert!(result.is_err());
+    let result = tool.execute(write_input, context).await.unwrap();
+    // The tool returns errors as successful responses with error information
+    assert!(result.text.contains("validation_error") || result.text.contains("exceeds maximum allowed size"));
 
     cleanup_test_dir(&test_dir);
 }

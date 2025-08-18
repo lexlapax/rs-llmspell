@@ -2,7 +2,7 @@
 //! ABOUTME: Defines `GlobalObject` trait and supporting types
 
 use crate::{ComponentRegistry, ProviderManager};
-use llmspell_core::Result;
+use llmspell_core::{traits::state::StateAccess, Result};
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,6 +35,8 @@ pub struct GlobalContext {
     pub registry: Arc<ComponentRegistry>,
     /// Provider manager for LLM access
     pub providers: Arc<ProviderManager>,
+    /// State access for persistent storage (optional)
+    pub state_access: Option<Arc<dyn StateAccess>>,
     /// Bridge references for cross-global communication
     pub bridge_refs: Arc<parking_lot::RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
 }
@@ -46,6 +48,22 @@ impl GlobalContext {
         Self {
             registry,
             providers,
+            state_access: None,
+            bridge_refs: Arc::new(parking_lot::RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Create a new global context with state access
+    #[must_use]
+    pub fn with_state(
+        registry: Arc<ComponentRegistry>,
+        providers: Arc<ProviderManager>,
+        state_access: Arc<dyn StateAccess>,
+    ) -> Self {
+        Self {
+            registry,
+            providers,
+            state_access: Some(state_access),
             bridge_refs: Arc::new(parking_lot::RwLock::new(HashMap::new())),
         }
     }

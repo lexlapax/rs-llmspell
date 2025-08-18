@@ -74,7 +74,7 @@ async fn test_lua_builder_to_rust_workflow_conversion() {
         
         -- Execute the workflow to test conversion worked
         local result = workflow:execute({
-            input = "test input"
+            text = "test input"
         })
         
         return { 

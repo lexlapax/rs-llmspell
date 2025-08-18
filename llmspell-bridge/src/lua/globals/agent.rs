@@ -9,6 +9,8 @@ use crate::lua::conversion::{
     agent_output_to_lua_table, json_to_lua_value, lua_table_to_agent_input, lua_table_to_json,
 };
 use crate::lua::sync_utils::block_on_async;
+use llmspell_core::execution_context::{ContextScope, ExecutionContextBuilder};
+use llmspell_core::types::ComponentId;
 use mlua::{Lua, Table, UserData, UserDataMethods, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,6 +19,7 @@ use std::sync::Arc;
 struct LuaAgentInstance {
     agent_instance_name: String,
     bridge: Arc<AgentBridge>,
+    global_context: Arc<GlobalContext>,
 }
 
 impl UserData for LuaAgentInstance {
@@ -27,11 +30,24 @@ impl UserData for LuaAgentInstance {
             let agent_input = lua_table_to_agent_input(lua, &input)?;
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
+            let global_context = this.global_context.clone();
+
+            // Create ExecutionContext with state if available
+            let context = global_context.state_access.as_ref().map(|state_access| {
+                ExecutionContextBuilder::new()
+                    .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                    .state(state_access.clone())
+                    .build()
+            });
 
             // Use shared sync utility to execute async code
             let result = block_on_async(
                 "agent_invoke",
-                async move { bridge.execute_agent(&agent_name, agent_input, None).await },
+                async move {
+                    bridge
+                        .execute_agent(&agent_name, agent_input, context)
+                        .await
+                },
                 None,
             )?;
 
@@ -43,11 +59,24 @@ impl UserData for LuaAgentInstance {
             let agent_input = lua_table_to_agent_input(lua, &input)?;
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
+            let global_context = this.global_context.clone();
+
+            // Create ExecutionContext with state if available
+            let context = global_context.state_access.as_ref().map(|state_access| {
+                ExecutionContextBuilder::new()
+                    .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                    .state(state_access.clone())
+                    .build()
+            });
 
             // Use shared sync utility to execute async code
             let result = block_on_async(
                 "agent_execute",
-                async move { bridge.execute_agent(&agent_name, agent_input, None).await },
+                async move {
+                    bridge
+                        .execute_agent(&agent_name, agent_input, context)
+                        .await
+                },
                 None,
             )?;
 
@@ -61,13 +90,22 @@ impl UserData for LuaAgentInstance {
                 let agent_input = lua_table_to_agent_input(lua, &input)?;
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();
+                let global_context = this.global_context.clone();
+
+                // Create ExecutionContext with state if available
+                let context = global_context.state_access.as_ref().map(|state_access| {
+                    ExecutionContextBuilder::new()
+                        .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                        .state(state_access.clone())
+                        .build()
+                });
 
                 // Use block_on to handle the streaming operation
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async move {
                         // Get streaming receiver
                         let mut rx = bridge
-                            .execute_agent_streaming(&agent_name, agent_input, None)
+                            .execute_agent_streaming(&agent_name, agent_input, context)
                             .await
                             .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
@@ -215,13 +253,22 @@ impl UserData for LuaAgentInstance {
 
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();
+                let global_context = this.global_context.clone();
+
+                // Create ExecutionContext with state if available
+                let context = global_context.state_access.as_ref().map(|state_access| {
+                    ExecutionContextBuilder::new()
+                        .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                        .state(state_access.clone())
+                        .build()
+                });
 
                 // Invoke the tool through the bridge
                 let result = block_on_async(
                     "agent_invokeTool",
                     async move {
                         bridge
-                            .invoke_tool_for_agent(&agent_name, &tool_name, agent_input, None)
+                            .invoke_tool_for_agent(&agent_name, &tool_name, agent_input, context)
                             .await
                     },
                     None,
@@ -833,6 +880,7 @@ impl UserData for LuaAgentInstance {
 #[derive(Clone)]
 struct AgentBuilder {
     bridge: Arc<AgentBridge>,
+    global_context: Arc<GlobalContext>,
     name: Option<String>,
     description: Option<String>,
     model: Option<String>,
@@ -851,9 +899,10 @@ struct AgentBuilder {
 }
 
 impl AgentBuilder {
-    const fn new(bridge: Arc<AgentBridge>) -> Self {
+    const fn new(bridge: Arc<AgentBridge>, global_context: Arc<GlobalContext>) -> Self {
         Self {
             bridge,
+            global_context,
             name: None,
             description: None,
             model: None,
@@ -1119,6 +1168,7 @@ impl UserData for AgentBuilder {
             Ok(LuaAgentInstance {
                 agent_instance_name: agent_name_clone,
                 bridge: this.bridge.clone(),
+                global_context: this.global_context.clone(),
             })
         });
     }
@@ -1347,9 +1397,11 @@ pub fn inject_agent_global(
 
     // Create Agent.get() function
     let bridge_clone = bridge.clone();
+    let context_clone = Arc::new(context.clone());
     let get_fn = lua.create_function(move |_lua, agent_name: String| {
         let bridge = bridge_clone.clone();
         let name = agent_name.clone();
+        let global_context = context_clone.clone();
 
         // Use sync wrapper to call async method
         let agent_exists = tokio::task::block_in_place(|| {
@@ -1362,6 +1414,7 @@ pub fn inject_agent_global(
             let agent_instance = LuaAgentInstance {
                 agent_instance_name: agent_name,
                 bridge,
+                global_context,
             };
             Ok(Some(agent_instance))
         } else {
@@ -1382,10 +1435,12 @@ pub fn inject_agent_global(
 
     // Create Agent.create_from_template() function
     let bridge_clone = bridge.clone();
+    let context_clone2 = Arc::new(context.clone());
     let create_from_template_fn =
         lua.create_function(move |_lua, args: (String, String, Table)| {
             let (instance_name, template_name, params) = args;
             let bridge = bridge_clone.clone();
+            let global_context = context_clone2.clone();
 
             // Convert Lua table to HashMap
             let mut parameters = HashMap::new();
@@ -1410,6 +1465,7 @@ pub fn inject_agent_global(
             let agent_instance = LuaAgentInstance {
                 agent_instance_name: instance_name,
                 bridge,
+                global_context,
             };
             Ok(agent_instance)
         })?;
@@ -1582,8 +1638,13 @@ pub fn inject_agent_global(
 
     // Add builder() method
     let bridge_for_builder = bridge;
-    let builder_fn =
-        lua.create_function(move |_lua, ()| Ok(AgentBuilder::new(bridge_for_builder.clone())))?;
+    let context_for_builder = Arc::new(context.clone());
+    let builder_fn = lua.create_function(move |_lua, ()| {
+        Ok(AgentBuilder::new(
+            bridge_for_builder.clone(),
+            context_for_builder.clone(),
+        ))
+    })?;
     agent_table.set("builder", builder_fn)?;
 
     // Replace create() with deprecation notice
