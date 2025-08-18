@@ -35,7 +35,7 @@ use std::sync::{Arc, RwLock};
 /// let output = runtime.execute_script("return 42").await?;
 /// println!("Result: {:?}", output.output);
 /// # Ok(())
-/// # }\
+/// # }
 /// ```
 ///
 /// ## Working with Agents (Placeholder - Phase 2)
@@ -127,7 +127,10 @@ impl ScriptRuntime {
     pub async fn new_with_lua(config: LLMSpellConfig) -> Result<Self, LLMSpellError> {
         // Convert llmspell-config LuaConfig to bridge LuaConfig
         let lua_config = LuaConfig::default(); // For now, use defaults - TODO: proper conversion
-        let engine = EngineFactory::create_lua_engine_with_runtime(&lua_config, None)?;
+        let engine = EngineFactory::create_lua_engine_with_runtime(
+            &lua_config,
+            Some(Arc::new(config.clone())),
+        )?;
         Self::new_with_engine(engine, config).await
     }
 
@@ -155,9 +158,9 @@ impl ScriptRuntime {
         match engine_name {
             "lua" => Self::new_with_lua(config).await,
             "javascript" | "js" => Self::new_with_javascript(config).await,
-            _ => Err(LLMSpellError::Configuration {
-                message: format!("Unsupported engine: {engine_name}"),
-                source: None,
+            _ => Err(LLMSpellError::Validation {
+                field: Some("engine".to_string()),
+                message: format!("Unsupported engine: {engine_name}. Available: lua, javascript"),
             }),
         }
     }

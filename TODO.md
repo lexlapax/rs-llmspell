@@ -1032,9 +1032,31 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [x] **Bridge Configuration Integration**:
      - [x] All bridge tests already using correct llmspell-config imports ✅
      - [x] All bridge tests pass: 92/92 lib tests + all integration tests ✅
+   - [x] **CRITICAL FIX - Migration Runtime API Architecture**:
+     - [x] **Root Cause**: `ScriptRuntime::new_with_lua` was passing `None` instead of runtime config to engine factory
+     - [x] **Fix**: Changed `llmspell-bridge/src/runtime.rs:130` to pass `Some(Arc::new(config.clone()))`
+     - [x] **Architecture Chain Verified**:
+       - [x] `ScriptRuntime` → `LuaEngine` → `GlobalContext` → `create_standard_registry` → `StateGlobal` migration methods
+       - [x] Migration APIs now properly exposed to Lua when `migration_enabled = true`
+       - [x] Migration APIs properly hidden when `migration_enabled = false`
+     - [x] **End-to-End Migration Testing**:
+       - [x] `test_migration_api_available_when_configured` - Migration APIs available when enabled ✅
+       - [x] `test_migration_api_not_available_when_disabled` - APIs hidden when disabled ✅
+       - [x] `test_state_persistence_without_migration` - Basic state works without migration ✅
+   - [x] **Error Type Consistency Fix**:
+     - [x] **Issue**: `new_with_engine_name` returned `Configuration` error while factory returned `Validation` error
+     - [x] **Fix**: Aligned error types - runtime now returns `Validation` error for consistency
+     - [x] **Test Fix**: `test_runtime_with_custom_engine_name` now passes ✅
+   - [x] **Documentation Fix**:
+     - [x] **Issue**: Doctest compilation error due to malformed closing brace `}\` in documentation
+     - [x] **Fix**: Corrected doctest syntax in `llmspell-bridge/src/runtime.rs:38`
+     - [x] **Verification**: All 9/9 doctests now compile successfully ✅
    - [x] **Quality Assurance Results**:
      - [x] `cargo build --all-features` - compiles cleanly ✅
      - [x] `cargo test -p llmspell-config -p llmspell-bridge -p llmspell-cli` - all pass ✅
+     - [x] `cargo test --doc -p llmspell-bridge` - all 9 doctests pass ✅
+     - [x] `cargo test -p llmspell-bridge --test runtime_test` - all 9 runtime tests pass ✅
+     - [x] `cargo test -p llmspell-bridge --test migration_runtime_test` - all 3 migration tests pass ✅
      - [x] `cargo clippy -p llmspell-bridge --lib --tests -- -D warnings` - ZERO warnings ✅
      - [x] **Clippy Issues Fixed**:
        - [x] Fixed `clippy::ignored_unit_patterns`: `Ok(_)` → `Ok(())`
@@ -1043,12 +1065,13 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Config validation works correctly with new architecture ✅
      - [x] File operations security properly configured with allowed_paths ✅
      - [x] All security settings validated at boot time ✅
+     - [x] Migration API architecture working end-to-end with proper configuration chain ✅
 
 5. [ ] **WebApp Creator Configuration and End-to-End Validation** (1 hour):
    - [ ] Add tool configuration to `webapp-creator/config.toml`:
      ```toml
      [tools.file_operations]
-     allowed_paths = ["/tmp", "/tmp/webapp-projects", "/home/user/projects"]
+     allowed_paths = ["/tmp", "/tmp/webapp-projects", "/users/spuri/projects/lexlapax/rs-llmspell/examples/script-users/applications/webapp-creator/generated"]
      max_file_size = 52428800
      atomic_writes = true
      ```
