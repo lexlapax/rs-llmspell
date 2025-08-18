@@ -648,15 +648,32 @@ impl BaseAgent for FileOperationsTool {
                     message: "Write operation requires 'input' parameter".to_string(),
                     field: Some("input".to_string()),
                 })?;
-                self.write_file(&path, &write_content, &sandbox).await?;
-                ResponseBuilder::success("write")
-                    .with_message(format!(
-                        "Wrote {} bytes to {}",
-                        write_content.len(),
-                        path.display()
-                    ))
-                    .with_file_info(path.to_string_lossy(), Some(write_content.len() as u64))
-                    .build_for_output()
+
+                // Handle write operation with graceful error handling
+                match self.write_file(&path, &write_content, &sandbox).await {
+                    Ok(()) => ResponseBuilder::success("write")
+                        .with_message(format!(
+                            "Wrote {} bytes to {}",
+                            write_content.len(),
+                            path.display()
+                        ))
+                        .with_file_info(path.to_string_lossy(), Some(write_content.len() as u64))
+                        .build_for_output(),
+                    Err(e) => {
+                        // Return graceful error response instead of propagating error
+                        ResponseBuilder::error("write", e.to_string())
+                            .with_message(format!("Write operation failed: {e}"))
+                            .with_result(json!({
+                                "path": path.display().to_string(),
+                                "error_type": match &e {
+                                    LLMSpellError::Security { .. } => "security_violation",
+                                    LLMSpellError::Validation { .. } => "validation_error",
+                                    _ => "execution_error"
+                                }
+                            }))
+                            .build_for_output()
+                    }
+                }
             }
             FileOperation::Append => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
