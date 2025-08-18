@@ -121,6 +121,7 @@ pub mod types;
 pub mod traits {
     pub mod agent;
     pub mod base_agent;
+    pub mod state;
     pub mod tool;
     pub mod tool_capable;
     pub mod workflow;
@@ -130,6 +131,7 @@ pub mod traits {
 pub use error::{LLMSpellError, Result};
 pub use execution_context::{ContextScope, ExecutionContext, InheritancePolicy};
 pub use traits::{
-    agent::Agent, base_agent::BaseAgent, tool::Tool, tool_capable::ToolCapable, workflow::Workflow,
+    agent::Agent, base_agent::BaseAgent, state::StateAccess, tool::Tool, 
+    tool_capable::ToolCapable, workflow::Workflow,
 };
 pub use types::{ComponentId, ComponentMetadata, EventMetadata, Version};

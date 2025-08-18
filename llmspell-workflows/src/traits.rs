@@ -122,6 +122,7 @@ pub enum WorkflowStatus {
     Completed,
     Failed,
     Cancelled,
+    PartiallyCompleted,
 }
 
 /// Error handling strategies for workflows

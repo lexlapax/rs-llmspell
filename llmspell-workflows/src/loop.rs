@@ -1154,6 +1154,7 @@ impl Workflow for LoopWorkflow {
             WorkflowStatus::Completed => CoreWorkflowStatus::Completed,
             WorkflowStatus::Failed => CoreWorkflowStatus::Failed,
             WorkflowStatus::Cancelled => CoreWorkflowStatus::Cancelled,
+            WorkflowStatus::PartiallyCompleted => CoreWorkflowStatus::Completed,
         };
 
         Ok(core_status)

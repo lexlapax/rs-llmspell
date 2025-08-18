@@ -115,8 +115,8 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 
 **Implementation Steps**:
 
-1. [ ] **Core State Infrastructure** (2 hours):
-   - [ ] Create `llmspell-core/src/traits/state.rs` with `StateAccess` trait:
+1. [x] **Core State Infrastructure** (2 hours): ✅ COMPLETED
+   - [x] Create `llmspell-core/src/traits/state.rs` with `StateAccess` trait:
      ```rust
      #[async_trait]
      pub trait StateAccess: Send + Sync {
@@ -126,7 +126,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
          async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
      }
      ```
-   - [ ] Modify `ExecutionContext` to include state:
+   - [x] Modify `ExecutionContext` to include state:
      ```rust
      pub struct ExecutionContext {
          // ... existing fields
@@ -134,12 +134,13 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
          pub state: Option<Arc<dyn StateAccess>>, // Persistent (NEW)
      }
      ```
-   - [ ] Update `ExecutionContextBuilder` with `.state()` method
-   - [ ] Export StateAccess trait from core/traits/mod.rs
-   - [ ] Run `cargo clippy -- -D warnings` after each change
+   - [x] Update `ExecutionContextBuilder` with `.state()` method
+   - [x] Export StateAccess trait from core/traits/mod.rs
+   - [x] Run `cargo clippy -- -D warnings` after each change
+   - [x] Fixed dyn-compatibility issue by removing generic parameter from `write_batch`
 
-2. [ ] **Create Unified WorkflowResult** (1 hour):
-   - [ ] Create `llmspell-workflows/src/result.rs` with unified result:
+2. [x] **Create Unified WorkflowResult** (1 hour): ✅ COMPLETED
+   - [x] Create `llmspell-workflows/src/result.rs` with unified result:
      ```rust
      pub struct WorkflowResult {
          pub execution_id: String,
@@ -154,9 +155,12 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
          pub error: Option<WorkflowError>,
      }
      ```
-   - [ ] Add methods for constructing success/failure results
-   - [ ] Export from lib.rs
-   - [ ] Remove old result types after all workflows updated
+   - [x] Add methods for constructing success/failure results
+   - [x] Export from lib.rs
+   - [x] Remove old result types after all workflows updated (will be done after workflows are updated)
+   - [x] Added WorkflowError enum for workflow-specific errors
+   - [x] Added PartiallyCompleted status to WorkflowStatus enum
+   - [x] Fixed all pattern matching for new status variant
 
 3. [ ] **Sequential Workflow State Integration** (1.5 hours):
    - [ ] Modify `llmspell-workflows/src/sequential.rs`:

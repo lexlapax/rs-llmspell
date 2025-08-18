@@ -1,6 +1,7 @@
 //! ABOUTME: Enhanced `ExecutionContext` with hierarchical support and service bundle architecture
 //! ABOUTME: Provides comprehensive runtime services for agents, tools, and workflows
 
+use crate::traits::state::StateAccess;
 use crate::types::{ComponentId, EventMetadata};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -147,9 +148,14 @@ pub struct ExecutionContext {
     /// Local context data
     pub data: HashMap<String, Value>,
 
-    /// Shared memory for inter-agent communication
+    /// Shared memory for inter-agent communication (transient data)
     #[serde(skip)]
     pub shared_memory: SharedMemory,
+
+    /// State access for persistent data (first-class citizen for component communication)
+    /// Uses StateAccess trait to avoid direct dependency on llmspell-state-persistence
+    #[serde(skip)]
+    pub state: Option<Arc<dyn StateAccess>>,
 
     /// Event metadata for correlation
     pub metadata: EventMetadata,
@@ -181,6 +187,7 @@ impl ExecutionContext {
             session_id: None,
             data: HashMap::new(),
             shared_memory: SharedMemory::new(),
+            state: None,
             metadata: EventMetadata::default(),
             security_context: None,
         }
@@ -207,6 +214,7 @@ impl ExecutionContext {
             session_id: self.session_id.clone(),
             data: HashMap::new(),
             shared_memory: self.shared_memory.clone(), // Shared across hierarchy
+            state: self.state.clone(), // State is shared across hierarchy
             metadata: self.metadata.clone(),
             security_context: self.security_context.clone(),
         };
@@ -283,6 +291,12 @@ impl ExecutionContext {
     /// Set the inheritance policy
     pub fn with_inheritance(mut self, inheritance: InheritancePolicy) -> Self {
         self.inheritance = inheritance;
+        self
+    }
+
+    /// Set the state access provider
+    pub fn with_state(mut self, state: Arc<dyn StateAccess>) -> Self {
+        self.state = Some(state);
         self
     }
 
@@ -385,6 +399,12 @@ impl ExecutionContextBuilder {
     /// Set security context
     pub fn security(mut self, security: SecurityContext) -> Self {
         self.context.security_context = Some(security);
+        self
+    }
+
+    /// Set state access provider
+    pub fn state(mut self, state: Arc<dyn StateAccess>) -> Self {
+        self.context.state = Some(state);
         self
     }
 

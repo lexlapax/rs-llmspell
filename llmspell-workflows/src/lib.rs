@@ -12,6 +12,7 @@ pub mod hooks;
 pub mod r#loop;
 /// Parallel workflow for concurrent execution of multiple steps
 pub mod parallel;
+pub mod result;
 pub mod sequential;
 pub mod shared_state;
 pub mod state;
@@ -74,3 +75,6 @@ pub use factory::{
 pub use executor::{
     DefaultWorkflowExecutor, ExecutionContext, ExecutionHook, ExecutionMetrics, WorkflowExecutor,
 };
+
+// Re-export unified result types
+pub use result::{WorkflowError, WorkflowResult, WorkflowResultExt, WorkflowType as ResultWorkflowType};
