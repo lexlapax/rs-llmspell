@@ -10,7 +10,7 @@ stdlib = "full"
 strict_mode = true
 
 [providers]
-providers = {}
+# No providers configured for migration examples
 
 [runtime]
 max_concurrent_scripts = 10

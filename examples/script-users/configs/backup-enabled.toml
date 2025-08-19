@@ -23,7 +23,7 @@ jsx = false
 
 # No providers configured - tools don't need LLM access
 [providers]
-providers = {}
+# Empty section - no providers needed
 
 # Runtime settings
 [runtime]

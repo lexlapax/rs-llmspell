@@ -7,13 +7,13 @@ default_engine = "lua"
 # Engine configurations
 [engines.lua]
 stdlib = "Safe"
-max_memory = 100000000
+max_memory_bytes = 100000000
 debug = false
 package_paths = []
 
 [engines.javascript]
 strict_mode = true
-max_heap_size = 100000000
+max_heap_size_bytes = 100000000
 enable_console = true
 module_resolution = "Node"
 
@@ -21,12 +21,12 @@ module_resolution = "Node"
 [providers]
 default_provider = "openai"
 
-[providers.providers.openai]
+[providers.openai]
 provider_type = "openai"
 api_key_env = "OPENAI_API_KEY"
 model = "gpt-4o-mini"
 
-[providers.providers.anthropic]
+[providers.anthropic]
 provider_type = "anthropic"
 api_key_env = "ANTHROPIC_API_KEY"
 model = "claude-3-haiku-20240307"

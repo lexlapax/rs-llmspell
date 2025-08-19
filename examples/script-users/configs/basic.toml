@@ -1,22 +1,31 @@
 # Basic State Persistence Configuration
 # Purpose: Minimal configuration for basic state operations examples
-# Usage: ./llmspell -c examples/state_persistence/configs/basic.toml run <script>
+# Usage: ./llmspell -c examples/script-users/configs/basic.toml run <script>
 
-[state]
+# Default script engine
+default_engine = "lua"
+
+# Engine configuration
+[engines.lua]
+stdlib_level = "full"
+
+# No providers configured for basic examples
+[providers]
+# Empty section - no providers needed
+
+# Runtime configuration
+[runtime]
+log_level = "info"
+
+# State persistence configuration
+[runtime.state_persistence]
 enabled = true
-backend = "memory"  # In-memory for quick examples
+backend_type = "memory"  # In-memory for quick examples
+max_state_size_bytes = 10_000_000  # 10MB
+migration_enabled = false
+backup_enabled = false
 
-[state.performance]
-cache_size = 10_000_000  # 10MB cache
-fast_path_enabled = true
-async_hooks = true
-
-# Logging configuration for examples
-[logging]
-level = "info"
-format = "pretty"
-
-# Example metadata
+# Example metadata (non-standard section, ignored by runtime)
 [example]
 name = "Basic State Operations"
 description = "Demonstrates core state persistence functionality"

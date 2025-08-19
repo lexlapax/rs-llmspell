@@ -4,32 +4,32 @@
 # Default script engine
 default_engine = "lua"
 
-# Engine configurations - exact field names from engines.rs
+# Engine configurations - updated field names from engines.rs
 [engines.lua]
 stdlib = "Standard"
-max_memory = 100000000
+max_memory_bytes = 100000000
 enable_debug = false
 timeout_ms = 30000
 security_level = "Safe"
 
 [engines.javascript]
 strict_mode = true
-max_heap_size = 100000000
+max_heap_size_bytes = 100000000
 enable_console = true
 timeout_ms = 30000
 security_level = "Safe"
 
-# Provider configurations - exact structure from providers.rs
+# Provider configurations - clean hierarchy
 [providers]
 default_provider = "openai"
 
-[providers.providers.openai]
+[providers.openai]
 provider_type = "openai"
 api_key_env = "OPENAI_API_KEY"
 model = "gpt-4o-mini"
 timeout_seconds = 60
 
-[providers.providers.anthropic]
+[providers.anthropic]
 provider_type = "anthropic"
 api_key_env = "ANTHROPIC_API_KEY"
 model = "claude-3-haiku-20240307"
@@ -48,16 +48,12 @@ allow_process_spawn = false
 max_memory_bytes = 104857600
 max_execution_time_ms = 300000
 
-# State persistence - exact field names from lib.rs
+# State persistence - flattened structure
 [runtime.state_persistence]
+enabled = true
 backend_type = "memory"
 max_state_size_bytes = 10000000
-
-[runtime.state_persistence.flags.core]
-enabled = true
 migration_enabled = false
-
-[runtime.state_persistence.flags.backup]
 backup_enabled = false
 backup_on_migration = false
 

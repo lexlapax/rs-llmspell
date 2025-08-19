@@ -23,7 +23,7 @@ jsx = false
 
 # No providers configured - session examples don't need LLM access for basic operations
 [providers]
-providers = {}
+# Empty section - no providers needed
 
 # Runtime settings
 [runtime]
