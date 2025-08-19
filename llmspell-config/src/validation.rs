@@ -24,6 +24,9 @@ pub fn validate_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
     // Validate runtime configuration
     validate_runtime_config(config)?;
 
+    // Validate events configuration
+    validate_events_config(config)?;
+
     debug!("Configuration validation completed successfully");
     Ok(())
 }
@@ -430,6 +433,139 @@ fn validate_runtime_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
     Ok(())
 }
 
+/// Validate events configuration
+fn validate_events_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
+    let events = &config.events;
+
+    // Validate buffer size
+    if events.buffer_size == 0 {
+        return Err(ConfigError::Validation {
+            field: Some("events.buffer_size".to_string()),
+            message: "Events buffer size cannot be zero".to_string(),
+        });
+    }
+
+    if events.buffer_size > 1_000_000 {
+        warn!(
+            "Events buffer size is very high: {} - this may consume significant memory",
+            events.buffer_size
+        );
+    }
+
+    // Validate rate limiting
+    if let Some(max_events_per_second) = events.max_events_per_second {
+        if max_events_per_second == 0 {
+            return Err(ConfigError::Validation {
+                field: Some("events.max_events_per_second".to_string()),
+                message: "Events max events per second cannot be zero".to_string(),
+            });
+        }
+
+        if max_events_per_second > 100_000 {
+            warn!(
+                "Events max events per second is very high: {} - this may impact performance",
+                max_events_per_second
+            );
+        }
+    }
+
+    // Validate filtering configuration
+    let filtering = &events.filtering;
+
+    // Check for conflicting include/exclude patterns
+    for include_pattern in &filtering.include_types {
+        for exclude_pattern in &filtering.exclude_types {
+            if include_pattern == exclude_pattern {
+                return Err(ConfigError::Validation {
+                    field: Some("events.filtering".to_string()),
+                    message: format!(
+                        "Event type pattern '{}' is both included and excluded",
+                        include_pattern
+                    ),
+                });
+            }
+        }
+    }
+
+    for include_pattern in &filtering.include_components {
+        for exclude_pattern in &filtering.exclude_components {
+            if include_pattern == exclude_pattern {
+                return Err(ConfigError::Validation {
+                    field: Some("events.filtering".to_string()),
+                    message: format!(
+                        "Component pattern '{}' is both included and excluded",
+                        include_pattern
+                    ),
+                });
+            }
+        }
+    }
+
+    // Warn if all event types are disabled
+    if !events.emit_timing_events && !events.emit_state_events && !events.emit_debug_events {
+        warn!("All event types are disabled - event system will emit no events");
+    }
+
+    // Validate export configuration
+    let export = &events.export;
+
+    // Check if any export method is configured when events are enabled
+    if events.enabled && !export.stdout && export.file.is_none() && export.webhook.is_none() {
+        warn!("Events are enabled but no export method is configured - events will be generated but not output");
+    }
+
+    // Validate file path if specified
+    if let Some(file_path) = &export.file {
+        if file_path.is_empty() {
+            return Err(ConfigError::Validation {
+                field: Some("events.export.file".to_string()),
+                message: "Event export file path cannot be empty".to_string(),
+            });
+        }
+
+        // Check if parent directory exists
+        if let Some(parent) = std::path::Path::new(file_path).parent() {
+            if !parent.exists() {
+                warn!(
+                    "Event export file parent directory does not exist: {}",
+                    parent.display()
+                );
+            }
+        }
+    }
+
+    // Validate webhook URL if specified
+    if let Some(webhook_url) = &export.webhook {
+        if webhook_url.is_empty() {
+            return Err(ConfigError::Validation {
+                field: Some("events.export.webhook".to_string()),
+                message: "Event export webhook URL cannot be empty".to_string(),
+            });
+        }
+
+        // Basic URL validation
+        if !webhook_url.starts_with("http://") && !webhook_url.starts_with("https://") {
+            return Err(ConfigError::Validation {
+                field: Some("events.export.webhook".to_string()),
+                message: "Event export webhook URL must start with http:// or https://".to_string(),
+            });
+        }
+
+        // Warn about http (non-secure) webhooks
+        if webhook_url.starts_with("http://")
+            && !webhook_url.contains("localhost")
+            && !webhook_url.contains("127.0.0.1")
+        {
+            warn!(
+                "Event export webhook uses insecure HTTP: {} - consider using HTTPS",
+                webhook_url
+            );
+        }
+    }
+
+    Ok(())
+}
+
 /// Validate security configuration for risky settings
 pub fn validate_security_requirements(config: &LLMSpellConfig) -> Result<(), ConfigError> {
     debug!("Validating security requirements");
@@ -664,5 +800,219 @@ mod tests {
             assert!(field.unwrap().contains("compression_level"));
             assert!(message.contains("between 1 and 9"));
         }
+    }
+
+    #[test]
+    fn test_validate_events_config_zero_buffer_size() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                buffer_size: 0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert_eq!(field, Some("events.buffer_size".to_string()));
+            assert!(message.contains("cannot be zero"));
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_zero_rate_limit() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                max_events_per_second: Some(0),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert_eq!(field, Some("events.max_events_per_second".to_string()));
+            assert!(message.contains("cannot be zero"));
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_conflicting_filters() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                filtering: crate::EventFilterConfig {
+                    include_types: vec!["workflow.*".to_string()],
+                    exclude_types: vec!["workflow.*".to_string()],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert_eq!(field, Some("events.filtering".to_string()));
+            assert!(message.contains("both included and excluded"));
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_conflicting_component_filters() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                filtering: crate::EventFilterConfig {
+                    include_components: vec!["agent-*".to_string()],
+                    exclude_components: vec!["agent-*".to_string()],
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert_eq!(field, Some("events.filtering".to_string()));
+            assert!(message.contains("both included and excluded"));
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_empty_file_path() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                export: crate::EventExportConfig {
+                    file: Some(String::new()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert_eq!(field, Some("events.export.file".to_string()));
+            assert!(message.contains("cannot be empty"));
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_empty_webhook_url() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                export: crate::EventExportConfig {
+                    webhook: Some(String::new()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert_eq!(field, Some("events.export.webhook".to_string()));
+            assert!(message.contains("cannot be empty"));
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_invalid_webhook_url() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                export: crate::EventExportConfig {
+                    webhook: Some("invalid-url".to_string()),
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_err());
+
+        if let Err(ConfigError::Validation { field, message }) = result {
+            assert_eq!(field, Some("events.export.webhook".to_string()));
+            assert!(message.contains("must start with http:// or https://"));
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_valid_webhook_urls() {
+        let valid_urls = vec![
+            "https://example.com/webhook",
+            "http://localhost:8080/events",
+            "http://127.0.0.1:3000/webhook",
+        ];
+
+        for url in valid_urls {
+            let config = LLMSpellConfig {
+                events: crate::EventsConfig {
+                    export: crate::EventExportConfig {
+                        webhook: Some(url.to_string()),
+                        ..Default::default()
+                    },
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+
+            let result = validate_events_config(&config);
+            assert!(result.is_ok(), "URL {} should be valid", url);
+        }
+    }
+
+    #[test]
+    fn test_validate_events_config_success() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                enabled: true,
+                buffer_size: 10000,
+                max_events_per_second: Some(1000),
+                export: crate::EventExportConfig {
+                    stdout: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_events_config(&config);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_full_config_with_events() {
+        let config = LLMSpellConfig {
+            events: crate::EventsConfig {
+                enabled: true,
+                buffer_size: 10000,
+                export: crate::EventExportConfig {
+                    stdout: true,
+                    ..Default::default()
+                },
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let result = validate_config(&config);
+        assert!(result.is_ok());
     }
 }

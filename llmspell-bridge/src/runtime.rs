@@ -170,8 +170,28 @@ impl ScriptRuntime {
         mut engine: Box<dyn ScriptEngineBridge>,
         config: LLMSpellConfig,
     ) -> Result<Self, LLMSpellError> {
-        // Create component registry
-        let registry = Arc::new(ComponentRegistry::new());
+        // Create component registry with event support based on config
+        let registry = if config.events.enabled {
+            // Create EventBus with default configuration
+            // Note: Buffer size is hardcoded to 10000 in EventBus implementation
+            let event_bus = Arc::new(llmspell_events::EventBus::new());
+
+            // Convert config to EventConfig for llmspell-core
+            let event_config = llmspell_core::traits::event::EventConfig {
+                enabled: config.events.enabled,
+                include_types: config.events.filtering.include_types.clone(),
+                exclude_types: config.events.filtering.exclude_types.clone(),
+                emit_timing_events: config.events.emit_timing_events,
+                emit_state_events: config.events.emit_state_events,
+                emit_debug_events: config.events.emit_debug_events,
+                max_events_per_second: config.events.max_events_per_second,
+            };
+
+            Arc::new(ComponentRegistry::with_event_bus(event_bus, event_config))
+        } else {
+            // Events disabled, create registry without event bus
+            Arc::new(ComponentRegistry::new())
+        };
 
         // Register all Phase 2 tools with the registry using configuration
         register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {

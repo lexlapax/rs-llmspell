@@ -248,6 +248,7 @@ pub mod tools;
 
 // Event bridge modules
 pub mod event_bridge;
+pub mod event_bus_adapter;
 pub mod event_serialization;
 
 // Global injection infrastructure

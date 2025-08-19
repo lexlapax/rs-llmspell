@@ -1,11 +1,16 @@
 // ABOUTME: Test utilities for event system testing including event creation and fixtures
 // ABOUTME: Provides reusable helpers for event bus, correlation, and stream tests
 
+use async_trait::async_trait;
+use llmspell_core::{
+    traits::event::{EventConfig, EventData, EventEmitter},
+    Result,
+};
 use llmspell_events::{
     bus::EventBus, correlation::EventCorrelationTracker, EventMetadata, Language, UniversalEvent,
 };
 use serde_json::Value;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 /// Create a test event with default values
@@ -103,6 +108,280 @@ pub mod event_data {
     }
 }
 
+/// Test event collector for testing EventEmitter implementations
+///
+/// This collector implements the EventEmitter trait and stores all emitted events
+/// in memory for later assertion. It's designed to be used in unit and integration
+/// tests to verify that components are correctly emitting events.
+///
+/// # Example
+/// ```rust
+/// use llmspell_testing::event_helpers::TestEventCollector;
+/// use serde_json::json;
+///
+/// #[tokio::test]
+/// async fn test_component_emits_events() {
+///     let collector = TestEventCollector::new();
+///     
+///     // Emit some test events
+///     collector.emit("test.started", json!({"id": "test-123"})).await.unwrap();
+///     collector.emit("test.completed", json!({"result": "success"})).await.unwrap();
+///     
+///     // Assert events were captured
+///     assert_event_emitted(&collector, "test.started");
+///     assert_event_count(&collector, 2);
+///     assert_event_data_contains(&collector, "test.started", "id", &json!("test-123"));
+/// }
+/// ```
+#[derive(Debug, Default)]
+pub struct TestEventCollector {
+    /// All events captured by this collector
+    events: Arc<RwLock<Vec<EventData>>>,
+    /// Configuration for this test emitter
+    config: EventConfig,
+    /// Whether events are enabled (for testing is_enabled behavior)
+    enabled: bool,
+}
+
+impl TestEventCollector {
+    /// Create a new test event collector with default configuration
+    pub fn new() -> Self {
+        Self {
+            events: Arc::new(RwLock::new(Vec::new())),
+            config: EventConfig::default(),
+            enabled: true,
+        }
+    }
+
+    /// Create a test event collector with custom configuration
+    pub fn with_config(config: EventConfig) -> Self {
+        Self {
+            events: Arc::new(RwLock::new(Vec::new())),
+            enabled: config.enabled,
+            config,
+        }
+    }
+
+    /// Create a disabled test event collector (for testing disabled behavior)
+    pub fn disabled() -> Self {
+        let config = EventConfig {
+            enabled: false,
+            ..EventConfig::default()
+        };
+        Self {
+            events: Arc::new(RwLock::new(Vec::new())),
+            enabled: false,
+            config,
+        }
+    }
+
+    /// Get all captured events
+    pub fn get_events(&self) -> Vec<EventData> {
+        self.events.read().unwrap().clone()
+    }
+
+    /// Get the number of captured events
+    pub fn event_count(&self) -> usize {
+        self.events.read().unwrap().len()
+    }
+
+    /// Clear all captured events
+    pub fn clear(&self) {
+        self.events.write().unwrap().clear();
+    }
+
+    /// Check if a specific event type was emitted
+    pub fn has_event_type(&self, event_type: &str) -> bool {
+        self.events
+            .read()
+            .unwrap()
+            .iter()
+            .any(|event| event.event_type == event_type)
+    }
+
+    /// Get all events of a specific type
+    pub fn get_events_of_type(&self, event_type: &str) -> Vec<EventData> {
+        self.events
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|event| event.event_type == event_type)
+            .cloned()
+            .collect()
+    }
+
+    /// Get the latest event
+    pub fn latest_event(&self) -> Option<EventData> {
+        self.events.read().unwrap().last().cloned()
+    }
+
+    /// Get events with a specific correlation ID
+    pub fn get_correlated_events(&self, correlation_id: &str) -> Vec<EventData> {
+        self.events
+            .read()
+            .unwrap()
+            .iter()
+            .filter(|event| event.correlation_id.as_ref() == Some(&correlation_id.to_string()))
+            .cloned()
+            .collect()
+    }
+
+    /// Add an event directly to the collector (for testing purposes)
+    pub fn add_event(&self, event: EventData) {
+        self.events.write().unwrap().push(event);
+    }
+}
+
+#[async_trait]
+impl EventEmitter for TestEventCollector {
+    async fn emit(&self, event_type: &str, data: Value) -> Result<()> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        let event = EventData {
+            event_type: event_type.to_string(),
+            component_id: llmspell_core::ComponentId::new(),
+            data,
+            ..Default::default()
+        };
+
+        self.events.write().unwrap().push(event);
+        Ok(())
+    }
+
+    async fn emit_structured(&self, event: EventData) -> Result<()> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        self.events.write().unwrap().push(event);
+        Ok(())
+    }
+
+    fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
+    fn config(&self) -> EventConfig {
+        self.config.clone()
+    }
+}
+
+/// Helper function to assert that an event of a specific type was emitted
+pub fn assert_event_emitted(collector: &TestEventCollector, event_type: &str) {
+    assert!(
+        collector.has_event_type(event_type),
+        "Expected event '{}' to be emitted, but it was not found. Emitted events: {:?}",
+        event_type,
+        collector
+            .get_events()
+            .iter()
+            .map(|e| &e.event_type)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// Helper function to assert the number of events emitted
+pub fn assert_event_count(collector: &TestEventCollector, expected_count: usize) {
+    let actual_count = collector.event_count();
+    assert_eq!(
+        actual_count,
+        expected_count,
+        "Expected {} events, but found {}. Events: {:?}",
+        expected_count,
+        actual_count,
+        collector
+            .get_events()
+            .iter()
+            .map(|e| &e.event_type)
+            .collect::<Vec<_>>()
+    );
+}
+
+/// Helper function to assert that an event contains specific data
+pub fn assert_event_data_contains(
+    collector: &TestEventCollector,
+    event_type: &str,
+    key: &str,
+    expected_value: &Value,
+) {
+    let events = collector.get_events_of_type(event_type);
+    assert!(
+        !events.is_empty(),
+        "No events of type '{}' found",
+        event_type
+    );
+
+    let found = events
+        .iter()
+        .any(|event| event.data.get(key) == Some(expected_value));
+
+    assert!(
+        found,
+        "Expected event '{}' to contain '{}': {:?}, but it was not found. Event data: {:?}",
+        event_type,
+        key,
+        expected_value,
+        events.iter().map(|e| &e.data).collect::<Vec<_>>()
+    );
+}
+
+/// Helper function to assert that events were emitted in a specific order
+pub fn assert_event_sequence(collector: &TestEventCollector, expected_sequence: &[&str]) {
+    let events = collector.get_events();
+    let actual_sequence: Vec<&str> = events.iter().map(|e| e.event_type.as_str()).collect();
+
+    assert_eq!(
+        actual_sequence, expected_sequence,
+        "Event sequence mismatch. Expected: {:?}, Actual: {:?}",
+        expected_sequence, actual_sequence
+    );
+}
+
+/// Helper function to assert that correlated events exist
+pub fn assert_correlated_events(
+    collector: &TestEventCollector,
+    correlation_id: &str,
+    expected_count: usize,
+) {
+    let correlated = collector.get_correlated_events(correlation_id);
+    assert_eq!(
+        correlated.len(),
+        expected_count,
+        "Expected {} correlated events for ID '{}', but found {}. Events: {:?}",
+        expected_count,
+        correlation_id,
+        correlated.len(),
+        correlated.iter().map(|e| &e.event_type).collect::<Vec<_>>()
+    );
+}
+
+/// Helper function to create a test EventData with minimal setup
+pub fn create_test_event_data(event_type: &str, data: Value) -> EventData {
+    EventData {
+        event_type: event_type.to_string(),
+        component_id: llmspell_core::ComponentId::new(),
+        data,
+        ..Default::default()
+    }
+}
+
+/// Helper function to create a test EventData with correlation
+pub fn create_correlated_event_data(
+    event_type: &str,
+    data: Value,
+    correlation_id: &str,
+) -> EventData {
+    EventData {
+        event_type: event_type.to_string(),
+        component_id: llmspell_core::ComponentId::new(),
+        data,
+        correlation_id: Some(correlation_id.to_string()),
+        ..Default::default()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -174,5 +453,187 @@ mod tests {
         let error_data = event_data::error_data("ValidationError", "Invalid input");
         assert_eq!(error_data["error_type"], "ValidationError");
         assert_eq!(error_data["message"], "Invalid input");
+    }
+
+    #[tokio::test]
+    async fn test_event_collector_basic_functionality() {
+        let collector = TestEventCollector::new();
+
+        // Initially empty
+        assert_eq!(collector.event_count(), 0);
+        assert!(!collector.has_event_type("test.event"));
+
+        // Emit an event
+        collector
+            .emit("test.started", serde_json::json!({"id": "test-123"}))
+            .await
+            .unwrap();
+
+        // Verify it was captured
+        assert_eq!(collector.event_count(), 1);
+        assert!(collector.has_event_type("test.started"));
+        assert_event_emitted(&collector, "test.started");
+
+        // Emit another event
+        collector
+            .emit("test.completed", serde_json::json!({"result": "success"}))
+            .await
+            .unwrap();
+
+        // Verify both events
+        assert_eq!(collector.event_count(), 2);
+        assert_event_count(&collector, 2);
+        assert_event_emitted(&collector, "test.completed");
+    }
+
+    #[tokio::test]
+    async fn test_event_collector_structured_events() {
+        let collector = TestEventCollector::new();
+
+        let event = create_test_event_data(
+            "structured.test",
+            serde_json::json!({"complex": {"nested": "data"}}),
+        );
+
+        collector.emit_structured(event).await.unwrap();
+
+        assert_eq!(collector.event_count(), 1);
+        assert_event_emitted(&collector, "structured.test");
+
+        let captured = collector.get_events_of_type("structured.test");
+        assert_eq!(captured.len(), 1);
+        assert_eq!(captured[0].data["complex"]["nested"], "data");
+    }
+
+    #[tokio::test]
+    async fn test_event_collector_disabled() {
+        let collector = TestEventCollector::disabled();
+
+        assert!(!collector.is_enabled());
+
+        // Events should not be captured when disabled
+        collector
+            .emit("test.event", serde_json::json!({}))
+            .await
+            .unwrap();
+        assert_eq!(collector.event_count(), 0);
+
+        let event = create_test_event_data("structured.event", serde_json::json!({}));
+        collector.emit_structured(event).await.unwrap();
+        assert_eq!(collector.event_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_event_collector_correlation() {
+        let collector = TestEventCollector::new();
+        let correlation_id = "test-correlation-123";
+
+        // Emit correlated events
+        let event1 = create_correlated_event_data(
+            "process.started",
+            serde_json::json!({"step": 1}),
+            correlation_id,
+        );
+        let event2 = create_correlated_event_data(
+            "process.completed",
+            serde_json::json!({"step": 2}),
+            correlation_id,
+        );
+
+        collector.emit_structured(event1).await.unwrap();
+        collector.emit_structured(event2).await.unwrap();
+
+        // Also emit a non-correlated event
+        collector
+            .emit("other.event", serde_json::json!({}))
+            .await
+            .unwrap();
+
+        // Verify correlation queries
+        let correlated = collector.get_correlated_events(correlation_id);
+        assert_eq!(correlated.len(), 2);
+        assert_correlated_events(&collector, correlation_id, 2);
+
+        // Verify sequence
+        assert_eq!(correlated[0].event_type, "process.started");
+        assert_eq!(correlated[1].event_type, "process.completed");
+    }
+
+    #[test]
+    fn test_event_helper_functions() {
+        let collector = TestEventCollector::new();
+
+        // Test assertion helpers with mock data
+        let events = vec![
+            create_test_event_data("first", serde_json::json!({"key": "value1"})),
+            create_test_event_data("second", serde_json::json!({"key": "value2"})),
+            create_test_event_data("first", serde_json::json!({"key": "value3"})),
+        ];
+
+        // Manually add events for testing helper functions
+        for event in events {
+            collector.events.write().unwrap().push(event);
+        }
+
+        // Test helper functions
+        assert_event_count(&collector, 3);
+        assert_event_emitted(&collector, "first");
+        assert_event_emitted(&collector, "second");
+        assert_event_data_contains(&collector, "first", "key", &serde_json::json!("value1"));
+        assert_event_data_contains(&collector, "second", "key", &serde_json::json!("value2"));
+
+        // Test sequence assertion
+        assert_event_sequence(&collector, &["first", "second", "first"]);
+
+        // Test type filtering
+        let first_events = collector.get_events_of_type("first");
+        assert_eq!(first_events.len(), 2);
+
+        let second_events = collector.get_events_of_type("second");
+        assert_eq!(second_events.len(), 1);
+    }
+
+    #[test]
+    fn test_event_collector_clear() {
+        let collector = TestEventCollector::new();
+
+        // Add some events manually
+        collector
+            .events
+            .write()
+            .unwrap()
+            .push(create_test_event_data("test", serde_json::json!({})));
+        collector
+            .events
+            .write()
+            .unwrap()
+            .push(create_test_event_data("test2", serde_json::json!({})));
+
+        assert_eq!(collector.event_count(), 2);
+
+        // Clear and verify
+        collector.clear();
+        assert_eq!(collector.event_count(), 0);
+        assert!(!collector.has_event_type("test"));
+    }
+
+    #[test]
+    fn test_create_event_data_helpers() {
+        let basic_event = create_test_event_data("test.basic", serde_json::json!({"key": "value"}));
+        assert_eq!(basic_event.event_type, "test.basic");
+        assert_eq!(basic_event.data["key"], "value");
+        assert!(basic_event.correlation_id.is_none());
+
+        let correlated_event = create_correlated_event_data(
+            "test.correlated",
+            serde_json::json!({"key": "value"}),
+            "corr-123",
+        );
+        assert_eq!(correlated_event.event_type, "test.correlated");
+        assert_eq!(correlated_event.data["key"], "value");
+        assert_eq!(
+            correlated_event.correlation_id,
+            Some("corr-123".to_string())
+        );
     }
 }

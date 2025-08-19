@@ -53,6 +53,8 @@ pub struct LLMSpellConfig {
     /// Hook system configuration
     #[serde(skip_serializing_if = "Option::is_none")]
     pub hooks: Option<HookConfig>,
+    /// Event system configuration
+    pub events: EventsConfig,
 }
 
 impl Default for LLMSpellConfig {
@@ -64,6 +66,7 @@ impl Default for LLMSpellConfig {
             runtime: GlobalRuntimeConfig::default(),
             tools: ToolsConfig::default(),
             hooks: None,
+            events: EventsConfig::default(),
         }
     }
 }
@@ -358,6 +361,148 @@ impl LLMSpellConfig {
             }
         }
 
+        // Merge events configuration
+        if let Some(events) = json.get("events").and_then(|v| v.as_object()) {
+            if let Some(enabled) = events.get("enabled").and_then(|v| v.as_bool()) {
+                debug!("Overriding events.enabled from env: {}", enabled);
+                self.events.enabled = enabled;
+            }
+
+            if let Some(buffer_size) = events.get("buffer_size").and_then(|v| v.as_u64()) {
+                debug!("Overriding events.buffer_size from env: {}", buffer_size);
+                self.events.buffer_size = buffer_size as usize;
+            }
+
+            if let Some(emit_timing) = events.get("emit_timing_events").and_then(|v| v.as_bool()) {
+                debug!(
+                    "Overriding events.emit_timing_events from env: {}",
+                    emit_timing
+                );
+                self.events.emit_timing_events = emit_timing;
+            }
+
+            if let Some(emit_state) = events.get("emit_state_events").and_then(|v| v.as_bool()) {
+                debug!(
+                    "Overriding events.emit_state_events from env: {}",
+                    emit_state
+                );
+                self.events.emit_state_events = emit_state;
+            }
+
+            if let Some(emit_debug) = events.get("emit_debug_events").and_then(|v| v.as_bool()) {
+                debug!(
+                    "Overriding events.emit_debug_events from env: {}",
+                    emit_debug
+                );
+                self.events.emit_debug_events = emit_debug;
+            }
+
+            if let Some(max_events) = events.get("max_events_per_second").and_then(|v| v.as_u64()) {
+                debug!(
+                    "Overriding events.max_events_per_second from env: {}",
+                    max_events
+                );
+                self.events.max_events_per_second = Some(max_events as u32);
+            }
+
+            // Merge filtering configuration
+            if let Some(filtering) = events.get("filtering").and_then(|v| v.as_object()) {
+                if let Some(include_types_value) = filtering.get("include_types") {
+                    if let Some(include_types_str) = include_types_value.as_str() {
+                        // From environment variable - comma-separated string
+                        self.events.filtering.include_types = include_types_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .collect();
+                    } else if let Some(include_types_array) = include_types_value.as_array() {
+                        // From JSON - array of strings
+                        self.events.filtering.include_types = include_types_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect();
+                    }
+                }
+
+                if let Some(exclude_types_value) = filtering.get("exclude_types") {
+                    if let Some(exclude_types_str) = exclude_types_value.as_str() {
+                        // From environment variable - comma-separated string
+                        self.events.filtering.exclude_types = exclude_types_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .collect();
+                    } else if let Some(exclude_types_array) = exclude_types_value.as_array() {
+                        // From JSON - array of strings
+                        self.events.filtering.exclude_types = exclude_types_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect();
+                    }
+                }
+
+                if let Some(include_components_value) = filtering.get("include_components") {
+                    if let Some(include_components_str) = include_components_value.as_str() {
+                        // From environment variable - comma-separated string
+                        self.events.filtering.include_components = include_components_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .collect();
+                    } else if let Some(include_components_array) =
+                        include_components_value.as_array()
+                    {
+                        // From JSON - array of strings
+                        self.events.filtering.include_components = include_components_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect();
+                    }
+                }
+
+                if let Some(exclude_components_value) = filtering.get("exclude_components") {
+                    if let Some(exclude_components_str) = exclude_components_value.as_str() {
+                        // From environment variable - comma-separated string
+                        self.events.filtering.exclude_components = exclude_components_str
+                            .split(',')
+                            .map(|s| s.trim().to_string())
+                            .collect();
+                    } else if let Some(exclude_components_array) =
+                        exclude_components_value.as_array()
+                    {
+                        // From JSON - array of strings
+                        self.events.filtering.exclude_components = exclude_components_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect();
+                    }
+                }
+            }
+
+            // Merge export configuration
+            if let Some(export) = events.get("export").and_then(|v| v.as_object()) {
+                if let Some(stdout) = export.get("stdout").and_then(|v| v.as_bool()) {
+                    debug!("Overriding events.export.stdout from env: {}", stdout);
+                    self.events.export.stdout = stdout;
+                }
+
+                if let Some(file) = export.get("file").and_then(|v| v.as_str()) {
+                    debug!("Overriding events.export.file from env: {}", file);
+                    self.events.export.file = Some(file.to_string());
+                }
+
+                if let Some(webhook) = export.get("webhook").and_then(|v| v.as_str()) {
+                    debug!("Overriding events.export.webhook from env: {}", webhook);
+                    self.events.export.webhook = Some(webhook.to_string());
+                }
+
+                if let Some(pretty_json) = export.get("pretty_json").and_then(|v| v.as_bool()) {
+                    debug!(
+                        "Overriding events.export.pretty_json from env: {}",
+                        pretty_json
+                    );
+                    self.events.export.pretty_json = pretty_json;
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -509,6 +654,13 @@ impl LLMSpellConfigBuilder {
     #[must_use]
     pub fn tools(mut self, tools: ToolsConfig) -> Self {
         self.config.tools = tools;
+        self
+    }
+
+    /// Set the events configuration
+    #[must_use]
+    pub fn events(mut self, events: EventsConfig) -> Self {
+        self.config.events = events;
         self
     }
 
@@ -786,6 +938,82 @@ impl Default for SessionConfig {
             storage_backend: "memory".to_string(),
         }
     }
+}
+
+/// Event system configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct EventsConfig {
+    /// Enable event system globally
+    pub enabled: bool,
+    /// EventBus buffer size for queuing events
+    pub buffer_size: usize,
+    /// Enable timing/performance events
+    pub emit_timing_events: bool,
+    /// Enable state change events
+    pub emit_state_events: bool,
+    /// Enable debug-level events
+    pub emit_debug_events: bool,
+    /// Maximum events per second (rate limiting)
+    pub max_events_per_second: Option<u32>,
+    /// Event filtering configuration
+    pub filtering: EventFilterConfig,
+    /// Event export configuration
+    pub export: EventExportConfig,
+}
+
+impl Default for EventsConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            buffer_size: 10000,
+            emit_timing_events: true,
+            emit_state_events: false,
+            emit_debug_events: false,
+            max_events_per_second: None,
+            filtering: EventFilterConfig::default(),
+            export: EventExportConfig::default(),
+        }
+    }
+}
+
+/// Event filtering configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct EventFilterConfig {
+    /// Event types to include (glob patterns)
+    pub include_types: Vec<String>,
+    /// Event types to exclude (glob patterns)
+    pub exclude_types: Vec<String>,
+    /// Component IDs to include (glob patterns)
+    pub include_components: Vec<String>,
+    /// Component IDs to exclude (glob patterns)
+    pub exclude_components: Vec<String>,
+}
+
+impl Default for EventFilterConfig {
+    fn default() -> Self {
+        Self {
+            include_types: vec!["*".to_string()], // Include all by default
+            exclude_types: Vec::new(),
+            include_components: vec!["*".to_string()],
+            exclude_components: Vec::new(),
+        }
+    }
+}
+
+/// Event export configuration
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
+#[serde(default)]
+pub struct EventExportConfig {
+    /// Export events to stdout (for debugging)
+    pub stdout: bool,
+    /// Export events to file
+    pub file: Option<String>,
+    /// Export events to webhook
+    pub webhook: Option<String>,
+    /// Pretty-print JSON output
+    pub pretty_json: bool,
 }
 
 /// Configuration errors

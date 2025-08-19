@@ -2,9 +2,12 @@
 //! ABOUTME: Provides core functionality for agents, tools, and workflows
 
 use crate::execution_context::ExecutionContext;
+use crate::traits::event::EventData;
 use crate::types::{AgentInput, AgentOutput, AgentStream, MediaType};
 use crate::{ComponentMetadata, Result};
 use async_trait::async_trait;
+use serde_json::json;
+use std::time::Instant;
 
 /// Base trait for all components in the LLMSpell system.
 ///
@@ -191,6 +194,108 @@ pub trait BaseAgent: Send + Sync {
     /// Returns only `MediaType::Text` by default.
     fn supported_media_types(&self) -> Vec<MediaType> {
         vec![MediaType::Text]
+    }
+
+    /// Execute with automatic event emission.
+    ///
+    /// This wrapper method automatically emits lifecycle events before and after
+    /// execution. It's provided as a default implementation that components
+    /// should NOT override. Instead, they should implement the `execute` method.
+    ///
+    /// Events emitted:
+    /// - `{component_type}.started` - Before execution begins
+    /// - `{component_type}.completed` - After successful execution
+    /// - `{component_type}.failed` - If execution fails
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input to process
+    /// * `context` - Execution context with optional event emitter
+    ///
+    /// # Example
+    ///
+    /// ```ignore
+    /// // Components automatically emit events when called through this method
+    /// let output = agent.execute_with_events(input, context).await?;
+    /// ```
+    async fn execute_with_events(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        let metadata = self.metadata();
+        let component_type = metadata.component_type();
+        let component_id = metadata.id;
+
+        // Emit start event if events are enabled
+        if let Some(ref events) = context.events {
+            if events.is_enabled() {
+                let event_data = EventData::new(format!("{}.started", component_type))
+                    .with_component(component_id)
+                    .with_data(json!({
+                        "component_name": metadata.name,
+                        "component_version": metadata.version,
+                        "input_text_length": input.text.len(),
+                        "has_context": input.context.is_some(),
+                        "parameter_keys": input.parameters.keys().collect::<Vec<_>>(),
+                        "session_id": context.session_id.clone(),
+                        "conversation_id": context.conversation_id.clone(),
+                    }))
+                    .with_correlation(context.metadata.correlation_id().unwrap_or("").to_string());
+
+                // Fire and forget - don't fail execution if event emission fails
+                let _ = events.emit_structured(event_data).await;
+            }
+        }
+
+        // Execute the actual component
+        let result = self.execute(input.clone(), context.clone()).await;
+
+        // Emit completion or error event
+        if let Some(ref events) = context.events {
+            if events.is_enabled() {
+                let elapsed_ms = start.elapsed().as_millis();
+
+                match &result {
+                    Ok(output) => {
+                        let event_data = EventData::new(format!("{}.completed", component_type))
+                            .with_component(component_id)
+                            .with_data(json!({
+                                "component_name": metadata.name,
+                                "duration_ms": elapsed_ms,
+                                "output_text_length": output.text.len(),
+                                "has_tool_calls": !output.tool_calls.is_empty(),
+                                "tool_call_count": output.tool_calls.len(),
+                                "confidence": output.metadata.confidence,
+                                "model_used": output.metadata.model.clone(),
+                            }))
+                            .with_correlation(
+                                context.metadata.correlation_id().unwrap_or("").to_string(),
+                            );
+
+                        let _ = events.emit_structured(event_data).await;
+                    }
+                    Err(e) => {
+                        let event_data = EventData::new(format!("{}.failed", component_type))
+                            .with_component(component_id)
+                            .with_data(json!({
+                                "component_name": metadata.name,
+                                "duration_ms": elapsed_ms,
+                                "error": e.to_string(),
+                                "error_type": format!("{:?}", e),
+                            }))
+                            .with_correlation(
+                                context.metadata.correlation_id().unwrap_or("").to_string(),
+                            );
+
+                        let _ = events.emit_structured(event_data).await;
+                    }
+                }
+            }
+        }
+
+        result
     }
 }
 

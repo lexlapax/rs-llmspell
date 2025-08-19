@@ -23,6 +23,9 @@ pub fn register_standard_vars(registry: &EnvRegistry) -> Result<(), String> {
     // Path Discovery Variables
     register_path_vars(registry)?;
 
+    // Event System Variables
+    register_event_vars(registry)?;
+
     Ok(())
 }
 
@@ -949,6 +952,175 @@ fn register_path_vars(registry: &EnvRegistry) -> Result<(), String> {
             .description("XDG configuration directory (system)")
             .category(EnvCategory::Path)
             // No config_path - used directly by discovery logic
+            .build(),
+    )?;
+
+    Ok(())
+}
+
+/// Register event system environment variables
+fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_ENABLED")
+            .description("Enable event system globally")
+            .category(EnvCategory::Runtime)
+            .config_path("events.enabled")
+            .default("true")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_BUFFER_SIZE")
+            .description("Event bus buffer size for queuing events")
+            .category(EnvCategory::Runtime)
+            .config_path("events.buffer_size")
+            .default("10000")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid buffer size: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_TIMING")
+            .description("Enable timing/performance events")
+            .category(EnvCategory::Runtime)
+            .config_path("events.emit_timing_events")
+            .default("true")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_STATE")
+            .description("Enable state change events")
+            .category(EnvCategory::Runtime)
+            .config_path("events.emit_state_events")
+            .default("false")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_DEBUG")
+            .description("Enable debug-level events")
+            .category(EnvCategory::Runtime)
+            .config_path("events.emit_debug_events")
+            .default("false")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_MAX_PER_SECOND")
+            .description("Maximum events per second (rate limiting)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.max_events_per_second")
+            .validator(|v| {
+                v.parse::<u32>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid rate limit: {}", e))
+            })
+            .build(),
+    )?;
+
+    // Filtering configuration
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_INCLUDE_TYPES")
+            .description("Event types to include (comma-separated glob patterns)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.filtering.include_types")
+            .default("*")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXCLUDE_TYPES")
+            .description("Event types to exclude (comma-separated glob patterns)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.filtering.exclude_types")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_INCLUDE_COMPONENTS")
+            .description("Component IDs to include (comma-separated glob patterns)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.filtering.include_components")
+            .default("*")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXCLUDE_COMPONENTS")
+            .description("Component IDs to exclude (comma-separated glob patterns)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.filtering.exclude_components")
+            .build(),
+    )?;
+
+    // Export configuration
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXPORT_STDOUT")
+            .description("Export events to stdout (for debugging)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.export.stdout")
+            .default("false")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXPORT_FILE")
+            .description("Export events to file (path)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.export.file")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXPORT_WEBHOOK")
+            .description("Export events to webhook (URL)")
+            .category(EnvCategory::Runtime)
+            .config_path("events.export.webhook")
+            .validator(|v| {
+                if v.starts_with("http://") || v.starts_with("https://") {
+                    Ok(())
+                } else {
+                    Err("Webhook URL must start with http:// or https://".to_string())
+                }
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_PRETTY_JSON")
+            .description("Pretty-print JSON output")
+            .category(EnvCategory::Runtime)
+            .config_path("events.export.pretty_json")
+            .default("false")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
             .build(),
     )?;
 

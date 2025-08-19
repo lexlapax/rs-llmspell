@@ -22,6 +22,7 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 ### Code Quality Standards
 - **Zero Warnings Policy**: All code must compile without warnings (`cargo clippy --workspace --all-target --all-features`)
+- **Writing Rust code**: Follow clippy warning syntax, don't introduce new clippy errors
 - **Test Coverage**: >90% coverage required (enforced in CI)
 - **Documentation**: >95% API documentation coverage required
 - **Formatting**: Run `cargo fmt --all` before every commit

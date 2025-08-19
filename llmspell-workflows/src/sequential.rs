@@ -179,6 +179,21 @@ impl SequentialWorkflow {
             self.name, execution_id
         );
 
+        // Emit workflow started event
+        if let Some(ref events) = context.events {
+            let _ = events
+                .emit(
+                    "workflow.started",
+                    serde_json::json!({
+                        "workflow_id": execution_id,
+                        "workflow_name": self.name,
+                        "workflow_type": "sequential",
+                        "total_steps": self.steps.len(),
+                    }),
+                )
+                .await;
+        }
+
         // Execute workflow start hooks
         if let Some(workflow_executor) = &self.workflow_executor {
             let component_id = llmspell_hooks::ComponentId::new(
@@ -210,6 +225,24 @@ impl SequentialWorkflow {
                 error!("Workflow '{}' exceeded maximum execution time", self.name);
                 self.state_manager.complete_execution(false).await?;
 
+                // Emit workflow failed event
+                if let Some(ref events) = context.events {
+                    let _ = events
+                        .emit(
+                            "workflow.failed",
+                            serde_json::json!({
+                                "workflow_id": execution_id,
+                                "workflow_name": self.name,
+                                "workflow_type": "sequential",
+                                "error": "timeout",
+                                "duration_ms": start_time.elapsed().as_millis(),
+                                "steps_executed": steps_executed,
+                                "steps_failed": steps_failed,
+                            }),
+                        )
+                        .await;
+                }
+
                 return Ok(WorkflowResult::failure(
                     execution_id,
                     WorkflowType::Sequential,
@@ -240,7 +273,12 @@ impl SequentialWorkflow {
             let mut workflow_state = crate::types::WorkflowState::new();
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = index;
-            let step_context = StepExecutionContext::new(workflow_state.clone(), None);
+            let mut step_context = StepExecutionContext::new(workflow_state.clone(), None);
+
+            // Pass events to step context if available
+            if let Some(ref events) = context.events {
+                step_context = step_context.with_events(events.clone());
+            }
 
             // Execute step with retry logic
             let step_result = if self.workflow_executor.is_some() {
@@ -343,6 +381,25 @@ impl SequentialWorkflow {
                             );
                             self.state_manager.complete_execution(false).await?;
 
+                            // Emit workflow failed event
+                            if let Some(ref events) = context.events {
+                                let _ = events
+                                    .emit(
+                                        "workflow.failed",
+                                        serde_json::json!({
+                                            "workflow_id": execution_id,
+                                            "workflow_name": self.name,
+                                            "workflow_type": "sequential",
+                                            "error": "step_failed",
+                                            "failed_step": step.name,
+                                            "duration_ms": start_time.elapsed().as_millis(),
+                                            "steps_executed": steps_executed,
+                                            "steps_failed": steps_failed,
+                                        }),
+                                    )
+                                    .await;
+                            }
+
                             return Ok(WorkflowResult::failure(
                                 execution_id,
                                 WorkflowType::Sequential,
@@ -365,6 +422,25 @@ impl SequentialWorkflow {
         // All steps completed
         let duration = start_time.elapsed();
         self.state_manager.complete_execution(true).await?;
+
+        // Emit workflow completed event
+        if let Some(ref events) = context.events {
+            let _ = events
+                .emit(
+                    "workflow.completed",
+                    serde_json::json!({
+                        "workflow_id": execution_id,
+                        "workflow_name": self.name,
+                        "workflow_type": "sequential",
+                        "duration_ms": duration.as_millis(),
+                        "steps_executed": steps_executed,
+                        "steps_failed": steps_failed,
+                        "steps_skipped": steps_skipped,
+                        "state_keys": state_keys.len(),
+                    }),
+                )
+                .await;
+        }
 
         // Execute workflow completion hooks
         if let Some(workflow_executor) = &self.workflow_executor {

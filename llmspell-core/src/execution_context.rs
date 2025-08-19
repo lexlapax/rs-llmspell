@@ -1,6 +1,7 @@
 //! ABOUTME: Enhanced `ExecutionContext` with hierarchical support and service bundle architecture
 //! ABOUTME: Provides comprehensive runtime services for agents, tools, and workflows
 
+use crate::traits::event::EventEmitter;
 use crate::traits::state::StateAccess;
 use crate::types::{ComponentId, EventMetadata};
 use serde::{Deserialize, Serialize};
@@ -157,6 +158,11 @@ pub struct ExecutionContext {
     #[serde(skip)]
     pub state: Option<Arc<dyn StateAccess>>,
 
+    /// Event emitter for component lifecycle events (observability and coordination)
+    /// Uses EventEmitter trait to avoid direct dependency on llmspell-events
+    #[serde(skip)]
+    pub events: Option<Arc<dyn EventEmitter>>,
+
     /// Event metadata for correlation
     pub metadata: EventMetadata,
 
@@ -188,6 +194,7 @@ impl ExecutionContext {
             data: HashMap::new(),
             shared_memory: SharedMemory::new(),
             state: None,
+            events: None,
             metadata: EventMetadata::default(),
             security_context: None,
         }
@@ -215,6 +222,7 @@ impl ExecutionContext {
             data: HashMap::new(),
             shared_memory: self.shared_memory.clone(), // Shared across hierarchy
             state: self.state.clone(),                 // State is shared across hierarchy
+            events: self.events.clone(),               // Events are shared across hierarchy
             metadata: self.metadata.clone(),
             security_context: self.security_context.clone(),
         };
@@ -405,6 +413,12 @@ impl ExecutionContextBuilder {
     /// Set state access provider
     pub fn state(mut self, state: Arc<dyn StateAccess>) -> Self {
         self.context.state = Some(state);
+        self
+    }
+
+    /// Set event emitter provider
+    pub fn events(mut self, events: Arc<dyn EventEmitter>) -> Self {
+        self.context.events = Some(events);
         self
     }
 

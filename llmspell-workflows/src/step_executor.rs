@@ -109,9 +109,15 @@ impl StepExecutor {
 
         // Execute with timeout
         let result = timeout(
-            step_timeout, 
-            self.execute_step_internal(step, &context, workflow_metadata.clone(), workflow_type.clone())
-        ).await;
+            step_timeout,
+            self.execute_step_internal(
+                step,
+                &context,
+                workflow_metadata.clone(),
+                workflow_type.clone(),
+            ),
+        )
+        .await;
 
         let duration = start_time.elapsed();
 
@@ -270,15 +276,41 @@ impl StepExecutor {
         workflow_metadata: Option<ComponentMetadata>,
         workflow_type: Option<String>,
     ) -> Result<String> {
+        // Get step type name for events
+        let step_type_name = match &step.step_type {
+            StepType::Tool { .. } => "tool",
+            StepType::Agent { .. } => "agent",
+            StepType::Custom { .. } => "custom",
+            StepType::Workflow { .. } => "workflow",
+        };
+
+        // Emit step started event if events are available
+        // Note: We only use this for reading events, actual execution context is created per step
+        let exec_context_for_events = context.to_execution_context();
+        if let Some(ref events) = exec_context_for_events.events {
+            let _ = events
+                .emit(
+                    "workflow.step.started",
+                    serde_json::json!({
+                        "workflow_id": context.workflow_state.execution_id.to_string(),
+                        "step_name": step.name,
+                        "step_type": step_type_name,
+                        "step_index": context.workflow_state.current_step,
+                        "retry_attempt": context.retry_attempt,
+                    }),
+                )
+                .await;
+        }
+
         // Execute pre-execution hooks at the internal level (fine-grained hooks)
-        if let (Some(ref workflow_executor), Some(ref metadata), Some(ref wf_type)) = 
-            (&self.workflow_executor, &workflow_metadata, &workflow_type) 
+        if let (Some(ref workflow_executor), Some(ref metadata), Some(ref wf_type)) =
+            (&self.workflow_executor, &workflow_metadata, &workflow_type)
         {
             let component_id = llmspell_hooks::ComponentId::new(
                 llmspell_hooks::ComponentType::Workflow,
                 format!("workflow_{}", metadata.name),
             );
-            
+
             let mut hook_ctx = WorkflowHookContext::new(
                 component_id,
                 metadata.clone(),
@@ -286,21 +318,22 @@ impl StepExecutor {
                 wf_type.clone(),
                 WorkflowExecutionPhase::StepBoundary,
             );
-            
+
             // Add step context to differentiate from outer hooks
             let step_ctx = self.create_step_context(step, context, None);
             hook_ctx = hook_ctx.with_step_context(step_ctx);
-            
+
             // Add pattern context to indicate this is internal execution
             hook_ctx = hook_ctx.with_pattern_context(
                 "execution_level".to_string(),
                 serde_json::json!("internal_pre"),
             );
-            
+
             let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
         }
-        
+
         // Execute the actual step based on its type
+        let start_time = std::time::Instant::now();
         let result = match &step.step_type {
             StepType::Tool {
                 tool_name,
@@ -321,16 +354,56 @@ impl StepExecutor {
                     .await
             }
         };
-        
+
+        let duration = start_time.elapsed();
+
+        // Emit step completed or failed event
+        if let Some(ref events) = exec_context_for_events.events {
+            match &result {
+                Ok(output) => {
+                    let _ = events
+                        .emit(
+                            "workflow.step.completed",
+                            serde_json::json!({
+                                "workflow_id": context.workflow_state.execution_id.to_string(),
+                                "step_name": step.name,
+                                "step_type": step_type_name,
+                                "step_index": context.workflow_state.current_step,
+                                "duration_ms": duration.as_millis(),
+                                "output_size": output.len(),
+                                "retry_attempt": context.retry_attempt,
+                            }),
+                        )
+                        .await;
+                }
+                Err(e) => {
+                    let _ = events
+                        .emit(
+                            "workflow.step.failed",
+                            serde_json::json!({
+                                "workflow_id": context.workflow_state.execution_id.to_string(),
+                                "step_name": step.name,
+                                "step_type": step_type_name,
+                                "step_index": context.workflow_state.current_step,
+                                "error": e.to_string(),
+                                "duration_ms": duration.as_millis(),
+                                "retry_attempt": context.retry_attempt,
+                            }),
+                        )
+                        .await;
+                }
+            }
+        }
+
         // Execute post-execution hooks at the internal level
-        if let (Some(ref workflow_executor), Some(ref metadata), Some(ref wf_type)) = 
-            (&self.workflow_executor, &workflow_metadata, &workflow_type) 
+        if let (Some(ref workflow_executor), Some(ref metadata), Some(ref wf_type)) =
+            (&self.workflow_executor, &workflow_metadata, &workflow_type)
         {
             let component_id = llmspell_hooks::ComponentId::new(
                 llmspell_hooks::ComponentType::Workflow,
                 format!("workflow_{}", metadata.name),
             );
-            
+
             // Create hook context with result information
             let mut hook_ctx = WorkflowHookContext::new(
                 component_id,
@@ -339,7 +412,7 @@ impl StepExecutor {
                 wf_type.clone(),
                 WorkflowExecutionPhase::StepBoundary,
             );
-            
+
             // Include step context with result or error
             let step_ctx = if let Err(ref e) = result {
                 self.create_step_context(step, context, Some(e.to_string()))
@@ -347,16 +420,16 @@ impl StepExecutor {
                 self.create_step_context(step, context, None)
             };
             hook_ctx = hook_ctx.with_step_context(step_ctx);
-            
+
             // Add pattern context to indicate this is internal post-execution
             hook_ctx = hook_ctx.with_pattern_context(
                 "execution_level".to_string(),
                 serde_json::json!("internal_post"),
             );
-            
+
             let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
         }
-        
+
         result
     }
 
@@ -381,17 +454,21 @@ impl StepExecutor {
         // Get registry or fall back to mock execution
         let Some(ref registry) = self.registry else {
             // Fall back to mock execution for backward compatibility in tests
-            warn!("No registry available, using mock execution for tool: {}", tool_name);
+            warn!(
+                "No registry available, using mock execution for tool: {}",
+                tool_name
+            );
             return self.execute_tool_step_mock(tool_name, parameters).await;
         };
 
         // Lookup tool from registry
-        let tool = registry.get_tool(tool_name).await.ok_or_else(|| {
-            LLMSpellError::Component {
+        let tool = registry
+            .get_tool(tool_name)
+            .await
+            .ok_or_else(|| LLMSpellError::Component {
                 message: format!("Tool '{}' not found in registry", tool_name),
                 source: None,
-            }
-        })?;
+            })?;
 
         // Create AgentInput from parameters
         // Tools typically expect parameters as a JSON object or specific fields
@@ -420,16 +497,34 @@ impl StepExecutor {
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
             let workflow_id = context.workflow_state.execution_id.to_string();
-            
+
             // Use standardized state key functions
             let output_key = crate::types::state_keys::step_output(&workflow_id, tool_name);
             let metadata_key = crate::types::state_keys::step_metadata(&workflow_id, tool_name);
-            
+
             // Store the output in state
             state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
-            
+
             // Store metadata
             state_accessor.set(&metadata_key, serde_json::to_value(&output.metadata)?);
+
+            // Emit state change event if events are available
+            let exec_context = context.to_execution_context();
+            if let Some(ref events) = exec_context.events {
+                if events.config().emit_state_events {
+                    let _ = events
+                        .emit(
+                            "workflow.state.updated",
+                            serde_json::json!({
+                                "workflow_id": workflow_id,
+                                "keys": [output_key, metadata_key],
+                                "operation": "write",
+                                "component": tool_name,
+                            }),
+                        )
+                        .await;
+                }
+            }
         }
 
         Ok(output.text)
@@ -497,25 +592,30 @@ impl StepExecutor {
         // Get registry or fall back to mock execution
         let Some(ref registry) = self.registry else {
             // Fall back to mock execution for backward compatibility in tests
-            warn!("No registry available, using mock execution for agent: {:?}", agent_id);
+            warn!(
+                "No registry available, using mock execution for agent: {:?}",
+                agent_id
+            );
             return self.execute_agent_step_mock(agent_id, input).await;
         };
 
         // Try to lookup agent by ID string representation
         let agent_name = agent_id.to_string();
-        let agent = registry.get_agent(&agent_name).await.ok_or_else(|| {
-            LLMSpellError::Component {
-                message: format!("Agent '{}' not found in registry", agent_name),
-                source: None,
-            }
-        })?;
+        let agent =
+            registry
+                .get_agent(&agent_name)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent '{}' not found in registry", agent_name),
+                    source: None,
+                })?;
 
         // Create AgentInput from the provided input string
         let agent_input = llmspell_core::types::AgentInput::text(input);
 
         // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
         let mut exec_context = context.to_execution_context();
-        
+
         // Override scope to Agent for this execution
         exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
 
@@ -525,36 +625,52 @@ impl StepExecutor {
         }
 
         // Execute through BaseAgent trait
-        let output = agent.execute(agent_input, exec_context).await?;
+        let output = agent.execute(agent_input, exec_context.clone()).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
             let workflow_id = context.workflow_state.execution_id.to_string();
-            
+
             // Use standardized state key functions
             let output_key = crate::types::state_keys::agent_output(&workflow_id, &agent_name);
             let metadata_key = crate::types::state_keys::agent_metadata(&workflow_id, &agent_name);
-            
+
             // Store the output in state
             state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
-            
+
             // Store metadata including tool calls
             let mut metadata = output.metadata;
             if !output.tool_calls.is_empty() {
-                metadata.extra.insert("tool_calls".to_string(), serde_json::to_value(&output.tool_calls)?);
+                metadata.extra.insert(
+                    "tool_calls".to_string(),
+                    serde_json::to_value(&output.tool_calls)?,
+                );
             }
             state_accessor.set(&metadata_key, serde_json::to_value(&metadata)?);
+
+            // Emit state change event if events are available
+            if let Some(ref events) = exec_context.events {
+                if events.config().emit_state_events {
+                    let _ = events
+                        .emit(
+                            "workflow.state.updated",
+                            serde_json::json!({
+                                "workflow_id": workflow_id,
+                                "keys": [output_key, metadata_key],
+                                "operation": "write",
+                                "component": agent_name,
+                            }),
+                        )
+                        .await;
+                }
+            }
         }
 
         Ok(output.text)
     }
 
     /// Mock execution fallback for agents (used when no registry is available)
-    async fn execute_agent_step_mock(
-        &self,
-        agent_id: ComponentId,
-        input: &str,
-    ) -> Result<String> {
+    async fn execute_agent_step_mock(&self, agent_id: ComponentId, input: &str) -> Result<String> {
         // Mock agent execution
         let output = format!("Agent {:?} processed: {}", agent_id, input);
 
@@ -650,7 +766,10 @@ impl StepExecutor {
         // Get registry or fall back to mock execution
         let Some(ref registry) = self.registry else {
             // Fall back to mock execution for backward compatibility in tests
-            warn!("No registry available, using mock execution for workflow: {:?}", workflow_id);
+            warn!(
+                "No registry available, using mock execution for workflow: {:?}",
+                workflow_id
+            );
             return self.execute_workflow_step_mock(workflow_id, input).await;
         };
 
@@ -672,21 +791,21 @@ impl StepExecutor {
         } else {
             // Use the entire input as text if it's an object
             let mut agent_input = llmspell_core::types::AgentInput::text(input.to_string());
-            
+
             // Add any object fields as parameters
             if let Some(obj) = input.as_object() {
                 for (key, value) in obj {
                     agent_input = agent_input.with_parameter(key.clone(), value.clone());
                 }
             }
-            
+
             agent_input
         };
 
         // Create child context for nested workflow execution with inheritance
         let exec_context = context.create_child_context(
             &workflow_name,
-            llmspell_core::execution_context::InheritancePolicy::Inherit
+            llmspell_core::execution_context::InheritancePolicy::Inherit,
         );
 
         // Execute through BaseAgent trait
@@ -695,20 +814,45 @@ impl StepExecutor {
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
             let workflow_id = context.workflow_state.execution_id.to_string();
-            
+
             // Use standardized state key functions
-            let output_key = crate::types::state_keys::nested_workflow_output(&workflow_id, &workflow_name);
-            let metadata_key = crate::types::state_keys::nested_workflow_metadata(&workflow_id, &workflow_name);
-            
+            let output_key =
+                crate::types::state_keys::nested_workflow_output(&workflow_id, &workflow_name);
+            let metadata_key =
+                crate::types::state_keys::nested_workflow_metadata(&workflow_id, &workflow_name);
+
             // Store the output in state
             state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
-            
+
             // Store combined metadata including execution details
             let mut metadata = output.metadata;
-            metadata.extra.insert("workflow_id".to_string(), serde_json::json!(workflow_name));
+            metadata
+                .extra
+                .insert("workflow_id".to_string(), serde_json::json!(workflow_name));
             metadata.extra.insert("input".to_string(), input.clone());
-            metadata.extra.insert("completed_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+            metadata.extra.insert(
+                "completed_at".to_string(),
+                serde_json::json!(chrono::Utc::now().to_rfc3339()),
+            );
             state_accessor.set(&metadata_key, serde_json::to_value(&metadata)?);
+
+            // Emit state change event if events are available
+            let child_exec_context = context.to_execution_context();
+            if let Some(ref events) = child_exec_context.events {
+                if events.config().emit_state_events {
+                    let _ = events
+                        .emit(
+                            "workflow.state.updated",
+                            serde_json::json!({
+                                "workflow_id": workflow_id,
+                                "keys": [output_key, metadata_key],
+                                "operation": "write",
+                                "component": workflow_name,
+                            }),
+                        )
+                        .await;
+                }
+            }
         }
 
         Ok(output.text)

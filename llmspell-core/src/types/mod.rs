@@ -188,6 +188,32 @@ impl ComponentMetadata {
         self.version = version;
         self.updated_at = chrono::Utc::now();
     }
+
+    /// Get the component type as a string for event emission
+    ///
+    /// Infers the component type from the name or ID pattern.
+    /// Returns "agent", "tool", "workflow", or "component" as appropriate.
+    pub fn component_type(&self) -> &str {
+        // Try to infer from name patterns
+        let name_lower = self.name.to_lowercase();
+
+        if name_lower.contains("agent") {
+            "agent"
+        } else if name_lower.contains("tool") {
+            "tool"
+        } else if name_lower.contains("workflow") {
+            "workflow"
+        } else if name_lower.ends_with("_agent") {
+            "agent"
+        } else if name_lower.ends_with("_tool") {
+            "tool"
+        } else if name_lower.ends_with("_workflow") {
+            "workflow"
+        } else {
+            // Default to generic component
+            "component"
+        }
+    }
 }
 
 /// Metadata for events in the `LLMSpell` system.

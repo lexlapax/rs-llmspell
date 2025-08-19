@@ -1,8 +1,13 @@
 //! ABOUTME: Component registry for managing agents, tools, and workflows
 //! ABOUTME: Central registry for all scriptable components accessible from engines
 
+use crate::event_bus_adapter::EventBusAdapter;
 use async_trait::async_trait;
-use llmspell_core::{Agent, BaseAgent, ComponentLookup, LLMSpellError, Tool, Workflow};
+use llmspell_core::traits::event::EventConfig;
+use llmspell_core::{
+    Agent, BaseAgent, ComponentLookup, ExecutionContext, LLMSpellError, Tool, Workflow,
+};
+use llmspell_events::EventBus;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -11,6 +16,8 @@ pub struct ComponentRegistry {
     agents: Arc<RwLock<HashMap<String, Arc<dyn Agent>>>>,
     tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
     workflows: Arc<RwLock<HashMap<String, Arc<dyn Workflow>>>>,
+    event_bus: Option<Arc<EventBus>>,
+    event_config: EventConfig,
 }
 
 impl ComponentRegistry {
@@ -21,7 +28,41 @@ impl ComponentRegistry {
             agents: Arc::new(RwLock::new(HashMap::new())),
             tools: Arc::new(RwLock::new(HashMap::new())),
             workflows: Arc::new(RwLock::new(HashMap::new())),
+            event_bus: None,
+            event_config: EventConfig::default(),
         }
+    }
+
+    /// Create a new registry with `EventBus` support
+    #[must_use]
+    pub fn with_event_bus(event_bus: Arc<EventBus>, config: EventConfig) -> Self {
+        Self {
+            agents: Arc::new(RwLock::new(HashMap::new())),
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            workflows: Arc::new(RwLock::new(HashMap::new())),
+            event_bus: Some(event_bus),
+            event_config: config,
+        }
+    }
+
+    /// Create an `ExecutionContext` with registry services (state, events, etc.)
+    #[must_use]
+    pub fn create_execution_context(&self, base_context: ExecutionContext) -> ExecutionContext {
+        let mut ctx = base_context;
+
+        // Add events if available and enabled
+        if let Some(ref event_bus) = self.event_bus {
+            if self.event_config.enabled {
+                let adapter =
+                    EventBusAdapter::with_config(event_bus.clone(), self.event_config.clone());
+                ctx.events = Some(Arc::new(adapter));
+            }
+        }
+
+        // Note: State would be added here too if ComponentRegistry had state_manager
+        // For now, state is managed separately
+
+        ctx
     }
 
     /// Register an agent
