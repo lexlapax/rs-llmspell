@@ -4,17 +4,24 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 ## Primary Documentation
 
-- **Architecture**: `/docs/technical/master-architecture-vision.md` - Complete system architecture
+- **Architecture**: `/docs/technical/master-architecture-vision.md` - Complete system architecture vision (not actual architecture)
 - **Implementation Phases**: `/docs/in-progress/implementation-phases.md` - 16-phase roadmap
 - **Current Status**: Phase 6 COMPLETE (39/39 tasks) ✅ - Session and Artifact Management ready for production
 - **User Guide**: `/docs/user-guide/README.md` - For end users
 - **Developer Guide**: `/docs/developer-guide/README.md` - For contributors
+- **Current TODOs**: always read `/TODO.md` for current work. we follow check boxes with tasks and subtasks in a numbered hierarchical way.
+
+## Planning, architecture, design and implementation Norms
+- **Always Megathink**: look at and analyze existing code instead of guessing.
+- **Future based**: think about how things/components fit together for future work in implementation-phases.md
+- **No Backward Compatibility**: Prioritize correctness and less code instead of backward compatibility until 1.0 release
+- **Modularity and Traits**: Use the power of Traits in rust for modularity, separation of concerns, clean code and building blocks instead of direct dependencies
+- **Update TODO.md**: update as you accomplish sub-tasks not after everything in the task is complete. new insights, architecture decisions should be updated in the relevant sections as we make them.
 
 ## Development Norms
 
 ### Code Quality Standards
-
-- **Zero Warnings Policy**: All code must compile without warnings (`cargo clippy -- -D warnings`)
+- **Zero Warnings Policy**: All code must compile without warnings (`cargo clippy --workspace --all-target --all-features`)
 - **Test Coverage**: >90% coverage required (enforced in CI)
 - **Documentation**: >95% API documentation coverage required
 - **Formatting**: Run `cargo fmt --all` before every commit
@@ -75,122 +82,113 @@ SKIP_SLOW_TESTS=true ./scripts/quality-check.sh  # Skip slow tests
    - Script bindings in `llmspell-bridge/src/lua/globals/`
    - Examples in `examples/` with working code
 
-### Testing Guidelines (CRITICAL - MAINTAIN 7.1.6 ARCHITECTURE)
+### Testing Guidelines (PHASE 7 FEATURE-BASED ARCHITECTURE)
 
-**⚠️ IMPORTANT**: Always follow the test categorization system established in Task 7.1.6. Improper categorization breaks CI and causes flaky tests.
+**⚠️ IMPORTANT**: Use feature-based testing system established in Task 7.1.6. The `cfg_attr` attribute system was deprecated due to syntax issues and replaced with Cargo feature flags.
 
-#### Test Placement Rules
+#### Test Organization
 
-**Unit Tests**: Place in `src/` files with `#[cfg(test)]` module
-- Fast, isolated component tests 
-- No external dependencies, no network calls, no file I/O
-- Should complete in <5 seconds total per crate
-- Test individual functions, methods, and small components
+Tests are organized through the centralized `llmspell-testing` crate using Cargo feature flags:
 
-**Integration Tests**: Place in `tests/` directories as separate files
-- Cross-component, cross-crate tests
-- External dependencies MUST be mocked (use llmspell-testing helpers)
-- Should complete in <30 seconds total per crate
-- Test interaction between multiple components
+**Test Categories (via features):**
+- `unit-tests` - Fast, isolated component tests in `src/` files
+- `integration-tests` - Cross-component tests in `tests/` directories  
+- `external-tests` - Tests requiring external services (APIs, network)
+- `benchmark-tests` - Performance benchmarks
 
-**External Tests**: Place in `tests/` directories with `#[ignore = "external"]`
-- Real API calls, network requests, LLM providers
-- Require credentials/environment setup (env vars, API keys)
-- Can be slow, skipped in CI by default
-- Test real integrations (OpenAI, Anthropic, web requests)
-- For documentation, do not add new folders to docs/. Instead, use one of the existing folders: technical/, developer-guide/, or user-guide/
-#### Test Categorization (MANDATORY)
+**Component Categories:**
+- `tool-tests`, `agent-tests`, `workflow-tests` - Component-specific tests
+- `bridge-tests`, `hook-tests`, `event-tests` - System-specific tests  
+- `session-tests`, `state-tests`, `core-tests` - Infrastructure tests
+- `security-tests`, `performance-tests` - Specialty categories
 
-**Basic Categories** (always required - choose one):
-```rust
-#[test]
-#[cfg_attr(test_category = "unit")]        // Fast, isolated
-#[cfg_attr(test_category = "integration")] // Cross-component  
-#[cfg_attr(test_category = "external")]    // External dependencies
+**Test Suites:**
+- `fast-tests` = `unit-tests` + `integration-tests` 
+- `comprehensive-tests` = All non-external tests
+- `all-tests` = Everything including external tests
+
+#### Test Execution
+
+**Primary Method - Script-based:**
+```bash
+# Run specific test categories
+./scripts/test-by-tag.sh unit         # Unit tests only
+./scripts/test-by-tag.sh integration  # Integration tests only  
+./scripts/test-by-tag.sh tool         # Tool tests via llmspell-tools
+./scripts/test-by-tag.sh external     # External service tests
+./scripts/test-by-tag.sh all          # All tests including ignored
+
+# Quality gates (use in development)
+./scripts/quality-check-minimal.sh    # Format + clippy + compile (seconds)
+./scripts/quality-check-fast.sh       # Above + unit tests (1 min)
+./scripts/quality-check.sh            # Full validation (5+ min)
 ```
 
-**Component Categories** (add one that matches your functionality):
-```rust
-#[cfg_attr(test_category = "tool")]        // Tool-related functionality
-#[cfg_attr(test_category = "agent")]       // Agent-related functionality  
-#[cfg_attr(test_category = "workflow")]    // Workflow-related functionality
-#[cfg_attr(test_category = "bridge")]      // Script bridge functionality
-#[cfg_attr(test_category = "hook")]        // Hook system functionality
-#[cfg_attr(test_category = "event")]       // Event system functionality
-#[cfg_attr(test_category = "session")]     // Session management functionality
-#[cfg_attr(test_category = "state")]       // State management functionality
-#[cfg_attr(test_category = "core")]        // Core trait/type functionality
-#[cfg_attr(test_category = "util")]        // Utility functionality
+**Alternative - Direct feature usage:**
+```bash
+# Feature-based execution (if scripts unavailable)
+cargo test -p llmspell-testing --features unit-tests
+cargo test -p llmspell-testing --features integration-tests
+cargo test -p llmspell-testing --features all-tests
 ```
 
-**Specialized Categories** (when applicable):
+#### Test Structure & Helpers
+
+**MANDATORY - Use centralized helpers:**
 ```rust
-#[cfg_attr(test_category = "security")]    // Security-related tests
-#[cfg_attr(test_category = "performance")] // Performance/benchmark tests
-```
-
-**Example Test Structure**:
-```rust
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    #[cfg_attr(test_category = "unit")]
-    #[cfg_attr(test_category = "tool")]
-    fn test_file_reader_basic_functionality() {
-        // Unit test for file reader tool
-    }
-    
-    #[test]
-    #[cfg_attr(test_category = "integration")]
-    #[cfg_attr(test_category = "tool")]
-    fn test_file_reader_with_agent() {
-        // Integration test: file reader + agent
-    }
-    
-    #[test]
-    #[cfg_attr(test_category = "external")]
-    #[cfg_attr(test_category = "tool")]
-    #[ignore = "external"]
-    fn test_file_reader_with_real_filesystem() {
-        // External test: real file operations
-    }
-}
-```
-
-#### Test Helper Usage (MANDATORY - NO DUPLICATES)
-
-**ALWAYS use llmspell-testing helpers instead of creating your own:**
-
-```rust
+// Import from llmspell-testing (NOT individual crates)
 use llmspell_testing::{
-    // Tool testing
-    tool_helpers::{create_test_tool, create_test_tool_input, MockTool},
+    // Component helpers
+    tool_helpers::{create_test_tool, MockTool},
+    agent_helpers::{AgentTestBuilder, create_mock_provider_agent},
+    workflow_helpers::{create_test_workflow_step},
     
-    // Agent testing  
-    agent_helpers::{AgentTestBuilder, create_mock_provider_agent, TestProviderAgent},
-    
-    // Event testing
-    event_helpers::{create_test_event, create_test_event_bus},
-    
-    // Workflow testing
-    workflow_helpers::{create_test_workflow_step, create_test_sequential_workflow},
-    
-    // Common test infrastructure
+    // Infrastructure helpers  
     mocks::{MockBaseAgent, MockProvider},
+    fixtures::{TempFixture, create_test_state},
+    generators::{component_id_strategy, random_workflow_config},
 };
-
-// Example: Tool testing
-#[test]
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "tool")]
-fn test_my_tool() {
-    let tool = create_test_tool("my-tool", "Test tool", vec![("param1", "string")]);
-    let input = create_test_tool_input(vec![("param1", "value")]);
-    // ... test logic
-}
 ```
+
+**Test Placement Rules:**
+- **Unit tests**: Place in `src/` files with `#[cfg(test)]` modules
+- **Integration tests**: Place in `tests/` directories as separate files
+- **External tests**: Add `#[ignore = "external"]` attribute for credential-required tests
+
+**NO cfg_attr attributes** - These were removed in Phase 7 refactoring
+
+#### Development Workflow
+
+1. **Write Tests First:**
+   - Create failing test in appropriate location (`src/` or `tests/`)
+   - Use `llmspell-testing` helpers, never create custom mocks
+   - Run: `./scripts/test-by-tag.sh unit` (for unit tests)
+
+2. **Implementation:**
+   - Write minimal code to pass tests
+   - Run: `./scripts/quality-check-fast.sh` (format + clippy + unit tests)
+
+3. **Before Commit (MANDATORY):**
+   ```bash
+   ./scripts/quality-check-fast.sh     # Essential checks (1 min)
+   # OR for thorough validation:
+   ./scripts/quality-check.sh          # Full validation (5+ min)
+   ```
+
+#### External Test Requirements
+
+For tests requiring credentials/network access:
+- Add `#[ignore = "external"]` attribute
+- Document required environment variables
+- Provide mock alternatives for CI
+- Run via `./scripts/test-by-tag.sh external`
+
+#### Performance Targets
+
+- Unit tests: <5 seconds total per crate
+- Integration tests: <30 seconds total per crate  
+- Quality check scripts: <1 min (fast), <5 min (full)
+- Test initialization: <10ms per test helper
 
 #### Test Coverage Requirements
 
@@ -209,7 +207,7 @@ fn test_my_tool() {
    - Run full quality check to ensure clean baseline: `./scripts/quality-check.sh`
 
 2. **During Development (TDD Process)**:
-   - **Write failing test** with proper categorization (see Test Guidelines above)
+   - **Write failing test** in appropriate location (`src/` or `tests/`)
    - **Run fast test suite**: `./scripts/quality-check-fast.sh` 
    - **Write minimal implementation** to make test pass
    - **Run fast tests again** to confirm: `./scripts/test-by-tag.sh unit`
@@ -225,7 +223,7 @@ fn test_my_tool() {
      ./scripts/quality-check-fast.sh        # Fast check (~1 min) - adds unit tests & docs
      ./scripts/quality-check.sh             # Full check (5+ min) - all tests & coverage
      ```
-   - Ensure all tests pass with proper categorization
+   - Ensure all tests pass
    - Update CHANGELOG.md if adding features
    - Keep commits focused and atomic
 
@@ -237,11 +235,11 @@ fn test_my_tool() {
    ./scripts/test-by-tag.sh external     # Run external/network tests
    SKIP_SLOW_TESTS=true ./scripts/quality-check.sh  # Skip slow tests
 
-   # Feature-based test execution
-   cargo test --features unit-tests              # Fast unit tests only
-   cargo test --features integration-tests       # Integration tests only  
-   cargo test --features external-tests --ignored # External tests only
-   cargo test --features all-tests               # All tests (slow)
+   # Feature-based test execution (alternative)
+   cargo test -p llmspell-testing --features unit-tests       # Fast unit tests only
+   cargo test -p llmspell-testing --features integration-tests # Integration tests only  
+   cargo test -p llmspell-testing --features external-tests   # External tests only
+   cargo test -p llmspell-testing --features all-tests        # All tests (slow)
    ```
 
 4. **Definition of Done**:

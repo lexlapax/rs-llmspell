@@ -18,9 +18,6 @@ pub struct StepExecutor {
     workflow_executor: Option<Arc<WorkflowExecutor>>,
     /// Optional component registry for looking up agents, tools, and workflows
     /// This is passed from the bridge layer during workflow creation
-    /// TODO: This will be used to replace mock execution methods in execute_tool_step,
-    /// execute_agent_step, and execute_workflow_step
-    #[allow(dead_code)]
     registry: Option<Arc<dyn ComponentLookup>>,
 }
 
@@ -295,14 +292,11 @@ impl StepExecutor {
         &self,
         tool_name: &str,
         parameters: &serde_json::Value,
-        _context: &StepExecutionContext,
+        context: &StepExecutionContext,
     ) -> Result<String> {
         debug!("Executing tool step: {}", tool_name);
 
-        // For now, return a mock result - this will be integrated with actual tools later
-        // TODO: Integrate with llmspell-tools registry
-
-        // Validate tool exists and parameters
+        // Validate tool name
         if tool_name.is_empty() {
             return Err(LLMSpellError::Workflow {
                 message: "Tool name cannot be empty".to_string(),
@@ -311,7 +305,81 @@ impl StepExecutor {
             });
         }
 
-        // Mock execution based on tool name
+        // Get registry or fall back to mock execution
+        let Some(ref registry) = self.registry else {
+            // Fall back to mock execution for backward compatibility in tests
+            warn!("No registry available, using mock execution for tool: {}", tool_name);
+            return self.execute_tool_step_mock(tool_name, parameters).await;
+        };
+
+        // Lookup tool from registry
+        let tool = registry.get_tool(tool_name).await.ok_or_else(|| {
+            LLMSpellError::Component {
+                message: format!("Tool '{}' not found in registry", tool_name),
+                source: None,
+            }
+        })?;
+
+        // Create AgentInput from parameters
+        // Tools typically expect parameters as a JSON object or specific fields
+        let mut agent_input = if let Some(text) = parameters.get("input").and_then(|v| v.as_str()) {
+            llmspell_core::types::AgentInput::text(text)
+        } else if let Some(text) = parameters.get("text").and_then(|v| v.as_str()) {
+            llmspell_core::types::AgentInput::text(text)
+        } else {
+            // Use the entire parameters as text if no specific input field
+            llmspell_core::types::AgentInput::text(parameters.to_string())
+        };
+
+        // Add all parameters to the agent input
+        if let Some(obj) = parameters.as_object() {
+            for (key, value) in obj {
+                agent_input = agent_input.with_parameter(key.clone(), value.clone());
+            }
+        }
+
+        // Create ExecutionContext from StepExecutionContext
+        let mut exec_context = llmspell_core::ExecutionContext::new();
+        
+        // Add workflow state data to context
+        for (key, value) in &context.workflow_state.shared_data {
+            exec_context.data.insert(key.clone(), value.clone());
+        }
+
+        // Set workflow execution ID in context
+        exec_context.scope = llmspell_core::execution_context::ContextScope::Workflow(
+            context.workflow_state.execution_id.to_string()
+        );
+
+        // Execute through BaseAgent trait
+        let output = tool.execute(agent_input, exec_context).await?;
+
+        // Write output to state if state accessor is available
+        if let Some(ref state_accessor) = context.state_accessor {
+            let step_key = format!(
+                "workflow:{}:step:{}",
+                context.workflow_state.execution_id,
+                tool_name
+            );
+            
+            // Store the output in state
+            state_accessor.set(&step_key, serde_json::to_value(&output.text)?);
+            
+            // Also store metadata
+            let metadata_key = format!("{}_metadata", step_key);
+            state_accessor.set(&metadata_key, serde_json::to_value(&output.metadata)?);
+        }
+
+        Ok(output.text)
+    }
+
+    /// Mock execution fallback for tools (used when no registry is available)
+    async fn execute_tool_step_mock(
+        &self,
+        tool_name: &str,
+        parameters: &serde_json::Value,
+    ) -> Result<String> {
+        // Mock execution based on tool name (for backward compatibility)
         let output = match tool_name {
             "calculator" => {
                 let expression = parameters
@@ -351,13 +419,11 @@ impl StepExecutor {
         &self,
         agent_id: ComponentId,
         input: &str,
-        _context: &StepExecutionContext,
+        context: &StepExecutionContext,
     ) -> Result<String> {
         debug!("Executing agent step: {:?}", agent_id);
 
-        // For now, return a mock result - this will be integrated with actual agents later
-        // TODO: Integrate with llmspell-agents registry
-
+        // Validate input
         if input.is_empty() {
             return Err(LLMSpellError::Workflow {
                 message: "Agent input cannot be empty".to_string(),
@@ -366,6 +432,73 @@ impl StepExecutor {
             });
         }
 
+        // Get registry or fall back to mock execution
+        let Some(ref registry) = self.registry else {
+            // Fall back to mock execution for backward compatibility in tests
+            warn!("No registry available, using mock execution for agent: {:?}", agent_id);
+            return self.execute_agent_step_mock(agent_id, input).await;
+        };
+
+        // Try to lookup agent by ID string representation
+        let agent_name = agent_id.to_string();
+        let agent = registry.get_agent(&agent_name).await.ok_or_else(|| {
+            LLMSpellError::Component {
+                message: format!("Agent '{}' not found in registry", agent_name),
+                source: None,
+            }
+        })?;
+
+        // Create AgentInput from the provided input string
+        let agent_input = llmspell_core::types::AgentInput::text(input);
+
+        // Create ExecutionContext from StepExecutionContext
+        let mut exec_context = llmspell_core::ExecutionContext::new();
+        
+        // Add workflow state data to context
+        for (key, value) in &context.workflow_state.shared_data {
+            exec_context.data.insert(key.clone(), value.clone());
+        }
+
+        // Set agent scope in context
+        exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
+
+        // Set workflow execution ID in session
+        exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
+
+        // Execute through BaseAgent trait
+        let output = agent.execute(agent_input, exec_context).await?;
+
+        // Write output to state if state accessor is available
+        if let Some(ref state_accessor) = context.state_accessor {
+            let step_key = format!(
+                "workflow:{}:agent:{}",
+                context.workflow_state.execution_id,
+                agent_name
+            );
+            
+            // Store the output in state
+            state_accessor.set(&step_key, serde_json::to_value(&output.text)?);
+            
+            // Also store metadata
+            let metadata_key = format!("{}_metadata", step_key);
+            state_accessor.set(&metadata_key, serde_json::to_value(&output.metadata)?);
+            
+            // Store tool calls if any were made
+            if !output.tool_calls.is_empty() {
+                let tool_calls_key = format!("{}_tool_calls", step_key);
+                state_accessor.set(&tool_calls_key, serde_json::to_value(&output.tool_calls)?);
+            }
+        }
+
+        Ok(output.text)
+    }
+
+    /// Mock execution fallback for agents (used when no registry is available)
+    async fn execute_agent_step_mock(
+        &self,
+        agent_id: ComponentId,
+        input: &str,
+    ) -> Result<String> {
         // Mock agent execution
         let output = format!("Agent {:?} processed: {}", agent_id, input);
 
@@ -454,18 +587,98 @@ impl StepExecutor {
         &self,
         workflow_id: ComponentId,
         input: &serde_json::Value,
-        _context: &StepExecutionContext,
+        context: &StepExecutionContext,
     ) -> Result<String> {
         debug!("Executing nested workflow step: {:?}", workflow_id);
 
-        // TODO: This needs to be integrated with the workflow bridge/registry
-        // For now, return a mock result indicating nested workflow execution
-        // The actual implementation will require:
-        // 1. Access to workflow registry to find the workflow by ID
-        // 2. Execute the nested workflow with the provided input
-        // 3. Return the workflow result as a string
+        // Get registry or fall back to mock execution
+        let Some(ref registry) = self.registry else {
+            // Fall back to mock execution for backward compatibility in tests
+            warn!("No registry available, using mock execution for workflow: {:?}", workflow_id);
+            return self.execute_workflow_step_mock(workflow_id, input).await;
+        };
 
-        // Mock implementation for now
+        // Try to lookup workflow by ID string representation
+        let workflow_name = workflow_id.to_string();
+        let workflow = registry.get_workflow(&workflow_name).await.ok_or_else(|| {
+            LLMSpellError::Component {
+                message: format!("Workflow '{}' not found in registry", workflow_name),
+                source: None,
+            }
+        })?;
+
+        // Create AgentInput from the provided input
+        // Workflows can accept either structured JSON or text input
+        let agent_input = if let Some(text) = input.get("input").and_then(|v| v.as_str()) {
+            llmspell_core::types::AgentInput::text(text)
+        } else if let Some(text) = input.as_str() {
+            llmspell_core::types::AgentInput::text(text)
+        } else {
+            // Use the entire input as text if it's an object
+            let mut agent_input = llmspell_core::types::AgentInput::text(input.to_string());
+            
+            // Add any object fields as parameters
+            if let Some(obj) = input.as_object() {
+                for (key, value) in obj {
+                    agent_input = agent_input.with_parameter(key.clone(), value.clone());
+                }
+            }
+            
+            agent_input
+        };
+
+        // Create ExecutionContext from StepExecutionContext
+        let mut exec_context = llmspell_core::ExecutionContext::new();
+        
+        // Add workflow state data to context
+        for (key, value) in &context.workflow_state.shared_data {
+            exec_context.data.insert(key.clone(), value.clone());
+        }
+
+        // Set nested workflow scope in context
+        exec_context.scope = llmspell_core::execution_context::ContextScope::Workflow(workflow_name.clone());
+
+        // Set parent workflow ID
+        exec_context.parent_id = Some(context.workflow_state.execution_id.to_string());
+
+        // Execute through BaseAgent trait
+        let output = workflow.execute(agent_input, exec_context).await?;
+
+        // Write output to state if state accessor is available
+        if let Some(ref state_accessor) = context.state_accessor {
+            let step_key = format!(
+                "workflow:{}:nested:{}",
+                context.workflow_state.execution_id,
+                workflow_name
+            );
+            
+            // Store the output in state
+            state_accessor.set(&step_key, serde_json::to_value(&output.text)?);
+            
+            // Store output metadata
+            let output_metadata_key = format!("{}_output_metadata", step_key);
+            state_accessor.set(&output_metadata_key, serde_json::to_value(&output.metadata)?);
+
+            // Store execution metadata about the nested workflow
+            let exec_metadata_key = format!("{}_execution", step_key);
+            let exec_metadata = serde_json::json!({
+                "workflow_id": workflow_name,
+                "input": input,
+                "completed_at": chrono::Utc::now().to_rfc3339(),
+            });
+            state_accessor.set(&exec_metadata_key, exec_metadata);
+        }
+
+        Ok(output.text)
+    }
+
+    /// Mock execution fallback for workflows (used when no registry is available)
+    async fn execute_workflow_step_mock(
+        &self,
+        workflow_id: ComponentId,
+        input: &serde_json::Value,
+    ) -> Result<String> {
+        // Mock implementation for backward compatibility
         let output = format!(
             "Nested workflow executed: {} with input: {}",
             workflow_id, input

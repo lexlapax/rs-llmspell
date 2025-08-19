@@ -1211,7 +1211,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 #### Task 7.3.10: WebApp Creator Complete Rebuild (Production-Ready)
 **Priority**: CRITICAL - CORE ARCHITECTURE BROKEN
 **Estimated Time**: 36 hours (16h core + 8h webapp + 4h integration + 8h testing/docs)
-**Status**: IN PROGRESS (10.1 a COMPLETED - Registry threading through workflow creation chain)
+**Status**: IN PROGRESS (10.1 a & b COMPLETED - Registry threading + BaseAgent execution unified)
 **Assigned To**: Core Team (infrastructure) + Solutions Team (webapp)
 **Dependencies**: Task 7.1.7 (BaseAgent implementation), Task 7.3.8 (State-Based Workflows), Task 7.3.9 (Mandatory Sandbox)
 
@@ -1224,7 +1224,14 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 - ✅ Updated all workflow constructors (Sequential, Parallel, Conditional, Loop) with:
   - `new_with_registry()` - Registry only
   - `new_with_hooks_and_registry()` - Both hooks and registry
-- 🔄 Next: Update WorkflowBridge and WorkflowFactory to pass registry down
+- ✅ Updated WorkflowBridge and WorkflowFactory to pass registry down
+- ✅ Unified component execution through BaseAgent trait:
+  - `execute_tool_step()` now looks up tools from registry and executes via BaseAgent
+  - `execute_agent_step()` now looks up agents from registry and executes via BaseAgent
+  - `execute_workflow_step()` now looks up workflows from registry and executes via BaseAgent
+  - All outputs are written to state using WorkflowStateAccessor
+  - Fallback to mock execution for backward compatibility when no registry available
+- 🔄 Next: Task 10.1 c - Leverage existing ExecutionContext infrastructure
 
 **REGISTRY ARCHITECTURE DECISION**:
 - Registry is treated as runtime infrastructure (like DB connection), not configuration
@@ -1321,9 +1328,9 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     - Both builders now select correct constructor based on registry and hooks presence
     - Static WorkflowFactory::create_workflow() passes None for backward compatibility
   
-- b. [ ] **Unify Component Execution Through BaseAgent**:
+- b. [x] **Unify Component Execution Through BaseAgent** (COMPLETED):
   - [x] Registry field already added to StepExecutor (completed above)
-  - [ ] Replace mock `execute_tool_step()` (~line 270-324):
+  - [x] Replace mock `execute_tool_step()` (COMPLETED - using real registry lookup and BaseAgent execution):
     ```rust
     async fn execute_tool_step(
         &self,
@@ -1360,8 +1367,8 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
         Ok(output.content.text.unwrap_or_default())
     }
     ```
-  - [ ] Apply same pattern to `execute_agent_step()` (~line 326-353)
-  - [ ] Apply same pattern to `execute_workflow_step()` (~line 410-430)
+  - [x] Apply same pattern to `execute_agent_step()` (COMPLETED - using real registry lookup and BaseAgent execution)
+  - [x] Apply same pattern to `execute_workflow_step()` (COMPLETED - using real registry lookup and BaseAgent execution)
   
 - c. [ ] **Leverage Existing ExecutionContext Infrastructure**:
   - [ ] In `llmspell-workflows/src/types.rs`, add conversion method (~line 100):
