@@ -1208,7 +1208,586 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 
 ---
 
-#### Task 7.3.10: Example Testing Framework
+#### Task 7.3.10: WebApp Creator Complete Rebuild (Production-Ready)
+**Priority**: CRITICAL - CORE ARCHITECTURE BROKEN
+**Estimated Time**: 36 hours (16h core + 8h webapp + 4h integration + 8h testing/docs)
+**Status**: TODO
+**Assigned To**: Core Team (infrastructure) + Solutions Team (webapp)
+**Dependencies**: Task 7.1.7 (BaseAgent implementation), Task 7.3.8 (State-Based Workflows), Task 7.3.9 (Mandatory Sandbox)
+
+**Description**: Fix fundamental architectural disconnect where StepExecutor cannot execute ANY components (agents, tools, workflows) due to missing ComponentRegistry access. All workflow step executions return mock data. This affects ALL workflow-based applications, not just WebApp Creator. Requires threading registry through the entire execution chain and unifying component execution through the BaseAgent trait.
+
+**CRITICAL ISSUES IDENTIFIED**:
+- **No actual LLM integration** - Agents created but never execute LLM calls
+- **Workflows return metadata only** - No actual content generation, just timing/status
+- **Only 1 file generated** - requirements.json only, missing 20+ promised files
+- **Agent execution broken** - StepType::Agent doesn't properly execute agents
+- **State pattern not implemented** - Task 7.3.8 state-based outputs not used
+- **Security sandbox not integrated** - Task 7.3.9 mandatory sandbox not applied
+
+**Architecture Requirements**:
+1. **State-Based Workflow Outputs** (Task 7.3.8):
+   - Workflows write outputs to state during execution
+   - Main orchestrator reads from state keys
+   - Each step writes to `workflow:{id}:{step_name}` key
+   
+2. **Mandatory Sandbox Architecture** (Task 7.3.9):
+   - All file operations use bridge-provided sandbox
+   - Security configuration from config.toml enforced
+   - No tool-created sandboxes allowed
+
+3. **Configuration Architecture** (Task 7.3.7):
+   - Use centralized llmspell-config for all settings
+   - Environment registry for overrides
+   - Tool-specific security configuration
+
+**Implementation Steps**:
+
+**10.1: Core Rust Infrastructure Updates** (16 hours) - ARCHITECTURAL OVERHAUL:
+
+**CRITICAL ARCHITECTURAL ISSUE**: The StepExecutor cannot execute ANY components (agents, tools, workflows) because it lacks access to the ComponentRegistry. All execution methods are mocked. WorkflowBridge HAS the registry but doesn't pass it through.
+
+**EXISTING INFRASTRUCTURE CONTEXT**:
+- ExecutionContext already has `state: Option<Arc<dyn StateAccess>>` ✅
+- ExecutionContext has `session_id`, `conversation_id`, `user_id` ✅
+- WorkflowExecutor already integrates HookExecutor and HookRegistry ✅
+- WorkflowBridge has `_registry: Arc<ComponentRegistry>` but unused ❌
+- All components implement BaseAgent trait (Task 7.1.7) ✅
+
+**ARCHITECTURAL SEPARATION OF CONCERNS**:
+- **llmspell-workflows**: Contains all workflow execution logic
+- **llmspell-bridge**: Provides language-agnostic bridging layer
+- **lua/globals**: Injects bridge functionality into script engines
+- Implementation logic MUST be in crates, NOT in bridge
+
+- [ ] **Fix Registry Threading Through Workflow Creation**:
+  - [ ] In `llmspell-workflows/src/types.rs` (~line 50), add to WorkflowConfig:
+    ```rust
+    pub struct WorkflowConfig {
+        // existing fields...
+        pub registry: Option<Arc<ComponentRegistry>>, // Add this
+    }
+    ```
+  - [ ] In `llmspell-bridge/src/workflows.rs` (~line 1100), modify WorkflowBridge methods:
+    ```rust
+    // In create_sequential(), create_parallel(), etc.
+    let params_with_registry = {
+        let mut p = params.clone();
+        p["_registry"] = serde_json::to_value(&self._registry)?;
+        p
+    };
+    WorkflowFactory::create_workflow("sequential", &params_with_registry)
+    ```
+  - [ ] In `llmspell-workflows/src/sequential.rs` (~line 50), update constructor:
+    ```rust
+    pub fn new(name: String, config: WorkflowConfig) -> Self {
+        let step_executor = if let Some(ref registry) = config.registry {
+            StepExecutor::new_with_registry(config.clone(), registry.clone())
+        } else {
+            StepExecutor::new(config.clone()) // fallback for tests
+        };
+        // rest of constructor...
+    }
+    ```
+  - [ ] Apply same pattern to parallel.rs, conditional.rs, loop.rs
+  
+- [ ] **Unify Component Execution Through BaseAgent**:
+  - [ ] In `llmspell-workflows/src/step_executor.rs`, add new struct field (~line 15):
+    ```rust
+    pub struct StepExecutor {
+        config: WorkflowConfig,
+        workflow_executor: Option<Arc<WorkflowExecutor>>,
+        workflow_bridge: Option<serde_json::Value>, // Remove this
+        registry: Option<Arc<ComponentRegistry>>,    // Add this
+    }
+    ```
+  - [ ] Replace mock `execute_tool_step()` (~line 270-324):
+    ```rust
+    async fn execute_tool_step(
+        &self,
+        tool_name: &str,
+        parameters: &serde_json::Value,
+        context: &StepExecutionContext,
+    ) -> Result<String> {
+        let registry = self.registry.as_ref()
+            .ok_or_else(|| LLMSpellError::Configuration { 
+                message: "No registry available".into() 
+            })?;
+        
+        // Lookup tool and execute as BaseAgent
+        let tool = registry.get_tool(tool_name)
+            .ok_or_else(|| LLMSpellError::NotFound {
+                resource: format!("tool:{}", tool_name)
+            })?;
+            
+        // Create AgentInput from parameters
+        let agent_input = AgentInput::from_json(parameters.clone())
+            .with_context_data(context.current_data.clone());
+            
+        // Execute through BaseAgent trait
+        let exec_context = context.to_execution_context(); // Convert StepExecutionContext
+        let output = tool.execute(agent_input, exec_context).await?;
+        
+        // Write to state if available
+        if let Some(ref state) = context.execution_context.state {
+            let key = format!("workflow:{}:step:{}:output", 
+                context.workflow_id, context.step_name);
+            state.set(&key, &output.to_json()).await?;
+        }
+        
+        Ok(output.content.text.unwrap_or_default())
+    }
+    ```
+  - [ ] Apply same pattern to `execute_agent_step()` (~line 326-353)
+  - [ ] Apply same pattern to `execute_workflow_step()` (~line 410-430)
+  
+- [ ] **Leverage Existing ExecutionContext Infrastructure**:
+  - [ ] In `llmspell-workflows/src/types.rs`, add conversion method (~line 100):
+    ```rust
+    impl StepExecutionContext {
+        pub fn to_execution_context(&self) -> ExecutionContext {
+            let mut ctx = ExecutionContext::new();
+            ctx.session_id = self.session_id.clone();
+            ctx.conversation_id = self.conversation_id.clone();
+            ctx.state = self.state.clone(); // State is already Option<Arc<dyn StateAccess>>
+            ctx.data.insert("workflow_id", json!(self.workflow_id));
+            ctx.data.insert("step_index", json!(self.step_index));
+            ctx.data.insert("current_data", self.current_data.clone());
+            ctx
+        }
+    }
+    ```
+  - [ ] State key naming convention for outputs:
+    ```
+    workflow:{workflow_id}:step:{step_name}:output     // Step output
+    workflow:{workflow_id}:step:{step_name}:metadata   // Step metadata
+    workflow:{workflow_id}:final_output                // Final workflow output
+    workflow:{workflow_id}:state                       // Workflow state
+    ```
+  - [ ] For nested workflows, use parent context:
+    ```rust
+    let child_context = parent_context.create_child(
+        ContextScope::Workflow(workflow_id),
+        InheritancePolicy::Inherit
+    );
+    ```
+  
+- [ ] **Hook Integration Enhancements**:
+  - [ ] StepExecutor already has `workflow_executor: Option<Arc<WorkflowExecutor>>` ✅
+  - [ ] Add hook calls in execute_step_internal() (~line 243):
+    ```rust
+    // Before execution
+    if let Some(ref executor) = self.workflow_executor {
+        let hook_context = WorkflowHookContext::new(
+            component_id, workflow_metadata, workflow_state,
+            step.step_type.to_string(), WorkflowExecutionPhase::StepBoundary
+        );
+        executor.execute_workflow_hooks(hook_context).await?;
+    }
+    
+    // Execute step...
+    let result = match &step.step_type { ... }
+    
+    // After execution
+    if let Some(ref executor) = self.workflow_executor {
+        // Similar hook for StepComplete phase
+    }
+    ```
+  - [ ] Circuit breaker is already in WorkflowExecutor::execute_workflow_hooks() ✅
+  
+- [ ] **Event Bus Integration** (if needed):
+  - [ ] Add `event_bus: Option<Arc<EventBus>>` to WorkflowConfig
+  - [ ] Emit events for step start/complete/fail
+  - [ ] Use context.metadata for event correlation
+  - [ ] Enable workflow coordination through events
+
+**10.2: WebApp Creator Lua Rebuild** (8 hours):
+- [ ] **State-Based Output Collection Implementation**:
+  - [ ] After workflow execution, read from state instead of result:
+    ```lua
+    -- OLD (broken):
+    local result = workflow:execute(input)
+    print(result.output) -- Just metadata
+    
+    -- NEW (working):
+    local result = workflow:execute(input)
+    local workflow_id = result.workflow_id
+    
+    -- Read actual outputs from state
+    local requirements = State.get("workflow:" .. workflow_id .. ":step:requirements_analyst:output")
+    local ux_design = State.get("workflow:" .. workflow_id .. ":step:ux_researcher:output")
+    local architecture = State.get("workflow:" .. workflow_id .. ":step:system_architect:output")
+    ```
+  - [ ] Helper function to aggregate all step outputs:
+    ```lua
+    function collect_workflow_outputs(workflow_id, step_names)
+        local outputs = {}
+        for _, step_name in ipairs(step_names) do
+            local key = string.format("workflow:%s:step:%s:output", workflow_id, step_name)
+            outputs[step_name] = State.get(key) or ""
+        end
+        return outputs
+    end
+    ```
+
+- [ ] **Agent Configuration with Real Models** (20 agents with specific roles):
+  - [ ] **Research & Analysis Phase** (5 agents):
+    ```lua
+    -- 1. Requirements Analyst (parses user input into structured requirements)
+    local requirements_analyst = Agent.builder()
+        :name("requirements_analyst")
+        :type("llm")
+        :model("openai/gpt-4") -- Best for understanding complex requirements
+        :system_prompt("Extract and structure software requirements...")
+        :build()
+    
+    -- 2. UX Researcher (generates UX/UI recommendations)
+    -- 3. Market Researcher (analyzes similar products)
+    -- 4. Tech Stack Advisor (recommends technologies)
+    -- 5. Feasibility Analyst (evaluates technical feasibility)
+    ```
+  - [ ] **Architecture & Design Phase** (5 agents):
+    ```lua
+    -- 6. System Architect (creates high-level architecture)
+    -- 7. Database Architect (designs database schema)
+    -- 8. API Designer (creates API specifications)
+    -- 9. Security Architect (adds security requirements)
+    -- 10. Frontend Designer (creates UI mockups/structure)
+    ```
+  - [ ] **Implementation Phase** (5 agents):
+    ```lua
+    -- 11. Backend Developer (generates backend code)
+    -- 12. Frontend Developer (generates frontend code)
+    -- 13. Database Developer (creates schema/migrations)
+    -- 14. API Developer (implements API endpoints)
+    -- 15. Integration Developer (connects components)
+    ```
+  - [ ] **Quality & Deployment Phase** (5 agents):
+    ```lua
+    -- 16. Test Engineer (generates test suites)
+    -- 17. DevOps Engineer (creates deployment configs)
+    -- 18. Documentation Writer (generates README/docs)
+    -- 19. Performance Optimizer (optimizes code)
+    -- 20. Code Reviewer (reviews and improves code)
+    ```
+
+- [ ] **File Generation Pipeline**:
+  - [ ] File writer function that maps state outputs to files:
+    ```lua
+    function generate_project_files(workflow_id, output_dir)
+        local outputs = collect_workflow_outputs(workflow_id, AGENT_NAMES)
+        
+        -- Map agent outputs to specific files
+        local file_mappings = {
+            -- Research outputs
+            ["requirements.json"] = outputs.requirements_analyst,
+            ["ux-design.json"] = outputs.ux_researcher,
+            ["market-analysis.json"] = outputs.market_researcher,
+            ["tech-stack.json"] = outputs.tech_stack_advisor,
+            
+            -- Architecture outputs
+            ["architecture.json"] = outputs.system_architect,
+            ["database/schema.sql"] = outputs.database_architect,
+            ["api-spec.yaml"] = outputs.api_designer,
+            ["security-requirements.json"] = outputs.security_architect,
+            
+            -- Frontend code
+            ["frontend/src/App.jsx"] = outputs.frontend_developer,
+            ["frontend/src/components/"] = parse_components(outputs.frontend_developer),
+            ["frontend/package.json"] = extract_dependencies(outputs.frontend_developer),
+            
+            -- Backend code
+            ["backend/src/server.js"] = outputs.backend_developer,
+            ["backend/src/routes/"] = parse_routes(outputs.api_developer),
+            ["backend/package.json"] = extract_dependencies(outputs.backend_developer),
+            
+            -- Database
+            ["database/migrations/"] = outputs.database_developer,
+            
+            -- Tests
+            ["tests/unit/"] = outputs.test_engineer,
+            ["tests/integration/"] = outputs.test_engineer,
+            
+            -- Documentation
+            ["README.md"] = outputs.documentation_writer,
+            ["docs/"] = parse_documentation(outputs.documentation_writer),
+            
+            -- DevOps
+            ["Dockerfile"] = outputs.devops_engineer,
+            ["docker-compose.yml"] = outputs.devops_engineer,
+            [".github/workflows/ci.yml"] = outputs.devops_engineer
+        }
+        
+        -- Write each file
+        for filepath, content in pairs(file_mappings) do
+            Tool.invoke("file-writer", {
+                path = output_dir .. "/" .. filepath,
+                content = content,
+                operation = "write"
+            })
+        end
+    end
+    ```
+
+- [ ] **Error Handling and Recovery**:
+  - [ ] Wrap each agent execution with error handling:
+    ```lua
+    function safe_agent_execute(agent, input, max_retries)
+        max_retries = max_retries or 3
+        local delay = 1000 -- Start with 1 second
+        
+        for attempt = 1, max_retries do
+            local success, result = pcall(function()
+                return agent:execute(input)
+            end)
+            
+            if success then
+                return result
+            end
+            
+            -- Log error and retry with exponential backoff
+            print(string.format("Attempt %d failed: %s", attempt, tostring(result)))
+            
+            if attempt < max_retries then
+                Tool.invoke("timer", { operation = "sleep", ms = delay })
+                delay = delay * 2 -- Exponential backoff
+            else
+                -- Save partial results to state for recovery
+                State.set("workflow:partial:" .. agent.name, input)
+                error(string.format("Agent %s failed after %d attempts: %s", 
+                    agent.name, max_retries, tostring(result)))
+            end
+        end
+    end
+    ```
+  - [ ] Recovery mechanism to resume from partial state:
+    ```lua
+    function recover_partial_workflow(workflow_id)
+        local partial_keys = State.list("workflow:partial:*")
+        for _, key in ipairs(partial_keys) do
+            print("Found partial result: " .. key)
+            -- Allow user to resume from this point
+        end
+    end
+    ```
+
+**10.3: Integration and Testing** (4 hours):
+- [ ] **Pre-Implementation Validation** (verify existing infrastructure):
+  - [ ] Check `llmspell-core/src/execution_context.rs:158` - Confirm state field exists:
+    ```rust
+    pub state: Option<Arc<dyn StateAccess>>, // Should be at line ~158
+    ```
+  - [ ] Check `llmspell-workflows/src/hooks/integration.rs:176` - Confirm WorkflowExecutor exists
+  - [ ] Check `llmspell-bridge/src/workflows.rs:995` - Confirm `_registry` field exists:
+    ```rust
+    _registry: Arc<ComponentRegistry>, // Currently unused, we'll use it
+    ```
+  - [ ] Verify trait implementations with test command:
+    ```bash
+    grep -r "impl BaseAgent for" llmspell-tools/ llmspell-agents/ | wc -l
+    # Should show 50+ implementations
+    ```
+
+- [ ] **Core Infrastructure Testing**:
+  - [ ] Test single component execution:
+    ```bash
+    # Test that StepExecutor can execute a real tool
+    cargo test -p llmspell-workflows test_step_executor_with_real_tool -- --nocapture
+    ```
+  - [ ] Test registry threading:
+    ```bash
+    # Verify registry is passed through workflow creation
+    RUST_LOG=debug cargo test -p llmspell-bridge test_workflow_registry_access
+    ```
+  - [ ] Test state writing from steps:
+    ```bash
+    # Confirm step outputs are written to state
+    cargo test -p llmspell-workflows test_step_state_output
+    ```
+
+- [ ] **WebApp Creator Integration Tests**:
+  - [ ] Test with minimal input (just project name):
+    ```bash
+    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
+      -- --input minimal-input.lua --output /tmp/test-minimal
+    ls -la /tmp/test-minimal/ # Should have 20+ files
+    ```
+  - [ ] Test with full e-commerce input:
+    ```bash
+    OPENAI_API_KEY=$KEY ./target/debug/llmspell run \
+      examples/script-users/applications/webapp-creator/main.lua \
+      -- --input user-input-ecommerce.lua --output /tmp/test-ecommerce
+    ```
+  - [ ] Verify all expected files are generated:
+    ```bash
+    # Check for key files
+    test -f /tmp/test-ecommerce/frontend/src/App.jsx || echo "FAIL: No frontend"
+    test -f /tmp/test-ecommerce/backend/src/server.js || echo "FAIL: No backend"
+    test -f /tmp/test-ecommerce/database/schema.sql || echo "FAIL: No database"
+    test -f /tmp/test-ecommerce/README.md || echo "FAIL: No README"
+    ```
+
+**10.5: Documentation and Examples** (4 hours):
+- [ ] **Update Configuration Documentation**:
+  - [ ] Create `examples/script-users/applications/webapp-creator/CONFIG.md`:
+    ```markdown
+    # WebApp Creator Configuration Guide
+    
+    ## Required Provider Configuration
+    - OpenAI API key for GPT-4 (primary model)
+    - Anthropic API key for Claude (fallback model)
+    
+    ## config.toml Structure
+    [providers.openai]
+    api_key = "${OPENAI_API_KEY}"
+    models = ["gpt-4", "gpt-3.5-turbo"]
+    
+    [state]
+    enabled = true
+    path = ".llmspell/state"
+    
+    [tools.file_operations]
+    allowed_paths = ["./generated", "/tmp"]
+    max_file_size = "10MB"
+    ```
+  - [ ] Add troubleshooting section:
+    ```markdown
+    ## Common Issues
+    1. "No registry available" - Core infrastructure issue, see Task 7.3.10
+    2. "Agent execution failed" - Check API keys and model availability
+    3. "Path not allowed" - Update allowed_paths in config.toml
+    ```
+
+- [ ] **Create Working Examples**:
+  - [ ] Minimal input example (`minimal-input.lua`):
+    ```lua
+    return {
+        project = { name = "SimpleApp", description = "A basic web app" },
+        requirements = "Create a simple task tracker",
+        technical = { frontend = { framework = "React" } }
+    }
+    ```
+  - [ ] Full example with expected outputs documented:
+    ```markdown
+    ## Expected Output Structure
+    generated/
+    ├── frontend/
+    │   ├── src/
+    │   │   ├── App.jsx         (Main React component)
+    │   │   └── components/     (UI components)
+    │   └── package.json        (Dependencies)
+    ├── backend/
+    │   ├── src/
+    │   │   ├── server.js       (Express server)
+    │   │   └── routes/         (API endpoints)
+    │   └── package.json
+    ├── database/
+    │   └── schema.sql          (PostgreSQL schema)
+    ├── tests/                  (Test suites)
+    ├── docs/                   (Documentation)
+    └── README.md              (Project documentation)
+    ```
+
+- [ ] **Performance Metrics Documentation**:
+  - [ ] Document expected execution times:
+    ```
+    Research Phase: ~30 seconds (5 agents in parallel)
+    Architecture Phase: ~45 seconds (5 agents sequential)
+    Implementation Phase: ~60 seconds (5 agents parallel)
+    Quality Phase: ~30 seconds (5 agents parallel)
+    Total: ~3 minutes for full webapp generation
+    ```
+  - [ ] Memory usage expectations: ~500MB peak
+  - [ ] API token usage: ~50K tokens per full generation
+
+**Success Criteria**:
+- [ ] StepExecutor can execute real components via ComponentRegistry
+- [ ] All component types (Tool, Agent, Workflow) execute through BaseAgent trait
+- [ ] Component outputs are written to state during execution
+- [ ] WebApp Creator generates all 20+ promised files with real content
+- [ ] All workflow-based example applications function correctly
+- [ ] State-based output pattern fully implemented (Task 7.3.8)
+- [ ] Security sandbox properly enforced (Task 7.3.9)
+- [ ] Nested workflows can execute sub-workflows properly
+- [ ] Registry is properly threaded through bridge → workflows → StepExecutor
+
+**Files to Modify**:
+- **Workflow Crate - Core Execution Logic** (llmspell-workflows):
+  - `src/types.rs` - Add `registry: Arc<ComponentRegistry>` to WorkflowConfig
+  - `src/step_executor.rs` - Add registry field, implement real component execution
+  - `src/sequential.rs` - Thread registry through to StepExecutor
+  - `src/parallel.rs` - Thread registry through to StepExecutor
+  - `src/conditional.rs` - Thread registry through to StepExecutor
+  - `src/loop.rs` - Thread registry through to StepExecutor
+  - `src/factory.rs` - Accept registry in factory methods
+  
+- **Bridge Layer - Language-Agnostic Interface** (llmspell-bridge):
+  - `src/workflows.rs` - Pass registry from WorkflowBridge to WorkflowFactory
+  - `src/standardized_workflows.rs` - Thread registry through standardized factory
+  - `src/runtime.rs` - Ensure registry is available to workflow bridge
+  
+- **No Changes Needed** (already have required infrastructure):
+  - `llmspell-core/src/execution_context.rs` - Already has state, session_id ✅
+  - `llmspell-workflows/src/hooks/integration.rs` - Hook system already integrated ✅
+  - `llmspell-bridge/src/lua/globals/workflow.rs` - Just calls bridge methods ✅
+
+- **Lua Application**:
+  - `examples/script-users/applications/webapp-creator/main.lua` - Complete rebuild
+  - `examples/script-users/applications/webapp-creator/config.toml` - Provider config
+  - `examples/script-users/applications/webapp-creator/README.md` - Usage docs
+
+**Architectural Notes**:
+
+This rebuild addresses a fundamental architectural disconnect where the registry exists but isn't threaded through:
+
+1. **The Missing Link Problem**: 
+   - WorkflowBridge HAS ComponentRegistry (`_registry` field) ✅
+   - WorkflowFactory creates workflows WITHOUT registry access ❌
+   - StepExecutor has NO WAY to lookup components ❌
+   - Solution: Thread registry from WorkflowBridge → WorkflowFactory → Workflows → StepExecutor
+
+2. **The BaseAgent Unification Opportunity**:
+   - All components already implement BaseAgent trait ✅
+   - Registry stores them in separate collections (tools, agents, workflows) ✅
+   - StepExecutor currently has separate mock handlers ❌
+   - Solution: Unified execution through BaseAgent::execute() for ALL types
+
+3. **Existing Infrastructure Leverage**:
+   - ExecutionContext ALREADY has state access (`state: Option<Arc<dyn StateAccess>>`) ✅
+   - ExecutionContext has session tracking (`session_id`, `conversation_id`) ✅
+   - WorkflowExecutor already integrates hooks (HookExecutor, HookRegistry) ✅
+   - Solution: Use existing infrastructure instead of reimplementing
+
+4. **Architectural Separation of Concerns**:
+   - **llmspell-workflows crate**: ALL execution logic (StepExecutor with real execution)
+   - **llmspell-bridge crate**: Language-agnostic bridging (just passes registry through)
+   - **lua/globals modules**: Script injection (calls bridge methods)
+   - Principle: Implementation in crates, bridging in bridge, injection in globals
+
+5. **Impact and Scope**:
+   - Affects ALL workflow-based applications (webapp-creator, research-assistant, etc.)
+   - Currently ALL workflow steps return mock data
+   - Fix enables ALL example applications to function properly
+   - No new infrastructure needed - just proper wiring
+
+**Testing Commands**:
+```bash
+# Test with real API keys
+OPENAI_API_KEY=xxx ANTHROPIC_API_KEY=xxx \
+  LLMSPELL_CONFIG=examples/script-users/applications/webapp-creator/config.toml \
+  ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
+  -- --input user-input-ecommerce.lua --output generated/
+
+# Verify all files generated
+ls -la examples/script-users/applications/webapp-creator/generated/shopeasy/
+
+# Check state persistence
+./target/debug/llmspell state list | grep workflow
+```
+
+---
+
+#### Task 7.3.11: Example Testing Framework
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
