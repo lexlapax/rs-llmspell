@@ -1917,10 +1917,15 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
   
   **Sub-task 3 - Bridge Implementation**:
   - **Planned**: EventBusEmitter as simple wrapper
-  - **Actual**: EventBusAdapter with full mapping logic
+  - **Actual**: EventBusAdapter with full mapping logic + ComponentRegistry-EventBridge integration
   - **Challenge**: EventMetadata in llmspell-events has Vec<String> tags, not HashMap
   - **Solution**: Map EventData fields to tags using "key:value" format
   - **Fixed**: EventConfig Default trait implementation for proper defaults
+  - **CRITICAL FIX**: Connected ComponentRegistry EventBus to Event global EventBridge
+    - Added `event_bus()` getter to ComponentRegistry to expose shared EventBus
+    - Modified `get_or_create_event_bridge()` to use ComponentRegistry's EventBus when available
+    - **Result**: Components → ComponentRegistry EventBus → EventBridge → Lua scripts ✅
+    - **Verified**: Integration tests confirm component events reach script Event global
   
   **Sub-task 4 - Workflow Integration**:
   - **Planned**: Simple event emission in workflows
@@ -1936,6 +1941,10 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
   - Fire-and-forget semantics prevent event failures from breaking execution
   - Perfect alignment with existing StateAccess pattern
   - Events propagate cleanly through workflow execution hierarchy
+  - **UNIFIED EVENT SYSTEM**: ComponentRegistry EventBus connects to Event global EventBridge
+    - Components emit events → ComponentRegistry EventBus → EventBridge → Lua scripts
+    - No more separate event systems - single shared EventBus for complete event flow
+    - Scripts can now receive real component lifecycle events (agent.started, tool.completed, etc.)
   
   **SUCCESS CRITERIA**:
   - [x] Zero dependencies added to llmspell-core ✅ ACHIEVED
@@ -1943,7 +1952,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
   - [x] No performance impact when disabled ✅ is_enabled() check short-circuits
   - [x] All component types emit lifecycle events ✅ execute_with_events() wrapper
   - [x] Workflows emit detailed step and lifecycle events ✅ StepExecutor integration  
-  - [ ] Events flow through EventBridge to scripts (TODO - needs Lua/JS global integration)
+  - [x] Events flow through EventBridge to scripts ✅ ComponentRegistry-EventBridge integration
   - [x] Test coverage for event emission ✅ All integration tests passing
 
 **10.2: WebApp Creator Lua Rebuild** (8 hours):

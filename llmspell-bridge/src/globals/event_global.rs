@@ -29,13 +29,19 @@ fn get_or_create_event_bridge(context: &GlobalContext) -> Result<Arc<EventBridge
         return Ok(bridge);
     }
 
-    // Create new bridge and store it in context
-    let new_bridge = Arc::new(EventBridge::new(Arc::new(context.clone())).map_err(|e| {
-        LLMSpellError::Component {
-            message: format!("Failed to initialize EventBridge: {e}"),
-            source: None,
-        }
-    })?);
+    // Try to get EventBus from ComponentRegistry for shared event system
+    let new_bridge = if let Some(event_bus) = context.registry.event_bus() {
+        // Use the same EventBus as ComponentRegistry - this connects component events to scripts!
+        Arc::new(EventBridge::with_event_bus(Arc::new(context.clone()), event_bus))
+    } else {
+        // Fallback: Create new bridge with its own EventBus (events disabled in ComponentRegistry)
+        Arc::new(EventBridge::new(Arc::new(context.clone())).map_err(|e| {
+            LLMSpellError::Component {
+                message: format!("Failed to initialize EventBridge: {e}"),
+                source: None,
+            }
+        })?)
+    };
 
     // Store for future use
     context.set_bridge("event_bridge", new_bridge.clone());

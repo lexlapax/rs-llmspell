@@ -45,6 +45,12 @@ impl ComponentRegistry {
         }
     }
 
+    /// Get the EventBus if available
+    #[must_use]
+    pub fn event_bus(&self) -> Option<Arc<EventBus>> {
+        self.event_bus.clone()
+    }
+
     /// Create an `ExecutionContext` with registry services (state, events, etc.)
     #[must_use]
     pub fn create_execution_context(&self, base_context: ExecutionContext) -> ExecutionContext {
