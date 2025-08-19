@@ -19,7 +19,7 @@ use llmspell_core::{
         Workflow, WorkflowStep as CoreWorkflowStep,
     },
     types::{AgentInput, AgentOutput},
-    ComponentId, ComponentMetadata, LLMSpellError, Result,
+    ComponentId, ComponentLookup, ComponentMetadata, LLMSpellError, Result,
 };
 use serde::{Deserialize, Serialize};
 use std::{
@@ -388,6 +388,95 @@ impl ParallelWorkflow {
             StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
         let step_executor =
             StepExecutor::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+
+        let metadata =
+            ComponentMetadata::new(name.clone(), "Parallel workflow with hooks".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(config.max_concurrency))
+            .with_continue_on_error(!config.fail_fast)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
+
+        Self {
+            name,
+            branches,
+            config,
+            workflow_config,
+            state_manager,
+            step_executor,
+            error_handler,
+            workflow_executor: Some(workflow_executor),
+            metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Create with registry for component lookup
+    pub fn new_with_registry(
+        name: String,
+        branches: Vec<ParallelBranch>,
+        config: ParallelConfig,
+        workflow_config: WorkflowConfig,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy);
+        let state_manager = StateManager::new(workflow_config.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_registry(workflow_config.clone(), reg)
+        } else {
+            StepExecutor::new(workflow_config.clone())
+        };
+
+        let metadata = ComponentMetadata::new(name.clone(), "Parallel workflow".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(config.max_concurrency))
+            .with_continue_on_error(!config.fail_fast)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
+
+        Self {
+            name,
+            branches,
+            config,
+            workflow_config,
+            state_manager,
+            step_executor,
+            error_handler,
+            workflow_executor: None,
+            metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Create with both hooks and registry
+    pub fn new_with_hooks_and_registry(
+        name: String,
+        branches: Vec<ParallelBranch>,
+        config: ParallelConfig,
+        workflow_config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy);
+        let state_manager =
+            StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_hooks_and_registry(
+                workflow_config.clone(),
+                workflow_executor.clone(),
+                reg,
+            )
+        } else {
+            StepExecutor::new_with_hooks(workflow_config.clone(), workflow_executor.clone())
+        };
 
         let metadata =
             ComponentMetadata::new(name.clone(), "Parallel workflow with hooks".to_string());
@@ -1355,6 +1444,7 @@ pub struct ParallelWorkflowBuilder {
     config: ParallelConfig,
     workflow_config: WorkflowConfig,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    registry: Option<Arc<dyn ComponentLookup>>,
 }
 
 impl ParallelWorkflowBuilder {
@@ -1366,6 +1456,7 @@ impl ParallelWorkflowBuilder {
             config: ParallelConfig::default(),
             workflow_config: WorkflowConfig::default(),
             workflow_executor: None,
+            registry: None,
         }
     }
 
@@ -1410,6 +1501,12 @@ impl ParallelWorkflowBuilder {
         self
     }
 
+    /// Set the component registry for component lookup
+    pub fn with_registry(mut self, registry: Arc<dyn ComponentLookup>) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
     pub fn build(self) -> Result<ParallelWorkflow> {
         if self.branches.is_empty() {
             return Err(llmspell_core::LLMSpellError::Configuration {
@@ -1425,21 +1522,37 @@ impl ParallelWorkflowBuilder {
             });
         }
 
-        if let Some(workflow_executor) = self.workflow_executor {
-            Ok(ParallelWorkflow::new_with_hooks(
+        match (self.workflow_executor, self.registry) {
+            (Some(workflow_executor), Some(registry)) => {
+                Ok(ParallelWorkflow::new_with_hooks_and_registry(
+                    self.name,
+                    self.branches,
+                    self.config,
+                    self.workflow_config,
+                    workflow_executor,
+                    Some(registry),
+                ))
+            }
+            (Some(workflow_executor), None) => Ok(ParallelWorkflow::new_with_hooks(
                 self.name,
                 self.branches,
                 self.config,
                 self.workflow_config,
                 workflow_executor,
-            ))
-        } else {
-            Ok(ParallelWorkflow::new(
+            )),
+            (None, Some(registry)) => Ok(ParallelWorkflow::new_with_registry(
                 self.name,
                 self.branches,
                 self.config,
                 self.workflow_config,
-            ))
+                Some(registry),
+            )),
+            (None, None) => Ok(ParallelWorkflow::new(
+                self.name,
+                self.branches,
+                self.config,
+                self.workflow_config,
+            )),
         }
     }
 }

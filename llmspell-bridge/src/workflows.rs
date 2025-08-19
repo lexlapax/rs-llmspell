@@ -236,7 +236,7 @@ impl WorkflowFactory {
                 Ok(Box::new(workflow))
             }
             "conditional" => {
-                let workflow = create_conditional_workflow(params)?;
+                let workflow = create_conditional_workflow(params, None)?;
                 Ok(Box::new(workflow))
             }
             "loop" => {
@@ -244,7 +244,7 @@ impl WorkflowFactory {
                 Ok(Box::new(workflow))
             }
             "parallel" => {
-                let workflow = create_parallel_workflow(params)?;
+                let workflow = create_parallel_workflow(params, None)?;
                 Ok(Box::new(workflow))
             }
             _ => Err(llmspell_core::LLMSpellError::Configuration {
@@ -307,7 +307,11 @@ fn create_sequential_workflow(params: &serde_json::Value) -> Result<impl Workflo
 /// - Required fields are missing from parameters
 /// - Branch configuration is invalid
 /// - Step parsing fails
-pub fn create_conditional_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
+pub fn create_conditional_workflow(
+    params: &serde_json::Value,
+    registry: Option<Arc<ComponentRegistry>>,
+) -> Result<impl WorkflowExecutor> {
+    use llmspell_core::ComponentLookup;
     use llmspell_workflows::{ConditionalBranch, ConditionalWorkflowBuilder};
 
     let name = params
@@ -419,6 +423,11 @@ pub fn create_conditional_workflow(params: &serde_json::Value) -> Result<impl Wo
         builder = builder.add_branch(default_branch);
     }
 
+    // Add registry if provided
+    if let Some(reg) = registry {
+        builder = builder.with_registry(reg as Arc<dyn ComponentLookup>);
+    }
+
     let workflow = builder.build();
     Ok(ConditionalWorkflowExecutor { workflow, name })
 }
@@ -468,7 +477,11 @@ fn create_loop_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecu
 /// - Required 'branches' or 'steps' field is missing
 /// - Branch configuration is invalid
 /// - Step parsing fails
-pub fn create_parallel_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
+pub fn create_parallel_workflow(
+    params: &serde_json::Value,
+    registry: Option<Arc<ComponentRegistry>>,
+) -> Result<impl WorkflowExecutor> {
+    use llmspell_core::ComponentLookup;
     use llmspell_workflows::ParallelWorkflowBuilder;
 
     let name = extract_workflow_name(params, "parallel_workflow");
@@ -482,6 +495,11 @@ pub fn create_parallel_workflow(params: &serde_json::Value) -> Result<impl Workf
 
     // Apply configuration options
     builder = apply_parallel_config(builder, params);
+
+    // Add registry if provided
+    if let Some(reg) = registry {
+        builder = builder.with_registry(reg as Arc<dyn ComponentLookup>);
+    }
 
     // Build and return the workflow
     let workflow = builder.build()?;
@@ -991,8 +1009,9 @@ type ActiveWorkflowMap = HashMap<String, Arc<Box<dyn WorkflowExecutor>>>;
 pub struct WorkflowBridge {
     /// Workflow discovery service
     discovery: Arc<WorkflowDiscovery>,
-    /// Component registry for script access
-    _registry: Arc<ComponentRegistry>,
+    /// Component registry for script access (used for component lookup)
+    #[allow(dead_code)] // Used when creating StandardizedWorkflowFactory
+    registry: Arc<ComponentRegistry>,
     /// Active workflow instances
     active_workflows: Arc<RwLock<ActiveWorkflowMap>>,
     /// Workflow execution history
@@ -1047,14 +1066,16 @@ impl WorkflowBridge {
     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
         Self {
             discovery: Arc::new(WorkflowDiscovery::new()),
-            _registry: registry,
+            registry: registry.clone(),
             active_workflows: Arc::new(RwLock::new(HashMap::new())),
             execution_history: Arc::new(RwLock::new(Vec::new())),
             metrics: Arc::new(BridgeMetrics::default()),
             _converter: Arc::new(OptimizedConverter::new()),
             execution_cache: Arc::new(ExecutionCache::new(1000)),
             perf_metrics: Arc::new(PerformanceMetrics::new()),
-            standardized_factory: Arc::new(StandardizedWorkflowFactory::new()),
+            standardized_factory: Arc::new(StandardizedWorkflowFactory::new_with_registry(
+                registry,
+            )),
         }
     }
 

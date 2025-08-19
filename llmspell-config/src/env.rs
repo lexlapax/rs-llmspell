@@ -188,7 +188,7 @@ impl EnvRegistry {
             if overrides.contains_key(name) {
                 continue;
             }
-            
+
             if let Some(def) = defs.get(name) {
                 // Validate the value
                 (def.validator)(value)?;

@@ -12,6 +12,7 @@ use async_trait::async_trait;
 use llmspell_core::{
     execution_context::ExecutionContext,
     traits::base_agent::BaseAgent,
+    traits::component_lookup::ComponentLookup,
     traits::workflow::{
         Config as CoreWorkflowConfig, Status as CoreWorkflowStatus, StepResult as CoreStepResult,
         Workflow, WorkflowStep as CoreWorkflowStep,
@@ -47,10 +48,23 @@ pub struct SequentialWorkflow {
 impl SequentialWorkflow {
     /// Create a new sequential workflow
     pub fn new(name: String, config: WorkflowConfig) -> Self {
+        Self::new_with_registry(name, config, None)
+    }
+
+    /// Create a new sequential workflow with registry for component lookup
+    pub fn new_with_registry(
+        name: String,
+        config: WorkflowConfig,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
         let error_strategy = config.default_error_strategy.clone();
         let error_handler = ErrorHandler::new(error_strategy.clone());
         let state_manager = StateManager::new(config.clone());
-        let step_executor = StepExecutor::new(config.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_registry(config.clone(), reg)
+        } else {
+            StepExecutor::new(config.clone())
+        };
 
         let metadata = ComponentMetadata::new(name.clone(), "Sequential workflow".to_string());
 
@@ -81,10 +95,28 @@ impl SequentialWorkflow {
         config: WorkflowConfig,
         workflow_executor: Arc<WorkflowExecutor>,
     ) -> Self {
+        Self::new_with_hooks_and_registry(name, config, workflow_executor, None)
+    }
+
+    /// Create with hook integration and registry
+    pub fn new_with_hooks_and_registry(
+        name: String,
+        config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
         let error_strategy = config.default_error_strategy.clone();
         let error_handler = ErrorHandler::new(error_strategy.clone());
         let state_manager = StateManager::new_with_hooks(config.clone(), workflow_executor.clone());
-        let step_executor = StepExecutor::new_with_hooks(config.clone(), workflow_executor.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_hooks_and_registry(
+                config.clone(),
+                workflow_executor.clone(),
+                reg,
+            )
+        } else {
+            StepExecutor::new_with_hooks(config.clone(), workflow_executor.clone())
+        };
 
         let metadata =
             ComponentMetadata::new(name.clone(), "Sequential workflow with hooks".to_string());

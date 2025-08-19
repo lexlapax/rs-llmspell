@@ -20,7 +20,7 @@ use llmspell_core::{
         Workflow, WorkflowStep as CoreWorkflowStep,
     },
     types::{AgentInput, AgentOutput},
-    ComponentId, ComponentMetadata, LLMSpellError, Result,
+    ComponentId, ComponentLookup, ComponentMetadata, LLMSpellError, Result,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -296,6 +296,101 @@ impl ConditionalWorkflow {
             StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
         let step_executor =
             StepExecutor::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+        let condition_evaluator = ConditionEvaluator::new(Duration::from_millis(
+            config.condition_evaluation_timeout_ms,
+        ));
+
+        let metadata =
+            ComponentMetadata::new(name.clone(), "Conditional workflow with hooks".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Conditional execution is sequential by nature
+            .with_continue_on_error(false) // Let conditional logic handle errors
+            .with_timeout(workflow_config.max_execution_time);
+
+        Self {
+            name,
+            branches: Vec::new(),
+            config,
+            state_manager,
+            step_executor,
+            error_handler,
+            condition_evaluator,
+            error_strategy,
+            workflow_executor: Some(workflow_executor),
+            metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Create with registry for component lookup
+    pub fn new_with_registry(
+        name: String,
+        workflow_config: WorkflowConfig,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
+        let config = ConditionalWorkflowConfig::default();
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy.clone());
+        let state_manager = StateManager::new(workflow_config.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_registry(workflow_config.clone(), reg)
+        } else {
+            StepExecutor::new(workflow_config.clone())
+        };
+        let condition_evaluator = ConditionEvaluator::new(Duration::from_millis(
+            config.condition_evaluation_timeout_ms,
+        ));
+
+        let metadata = ComponentMetadata::new(name.clone(), "Conditional workflow".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Conditional execution is sequential by nature
+            .with_continue_on_error(false) // Let conditional logic handle errors
+            .with_timeout(workflow_config.max_execution_time);
+
+        Self {
+            name,
+            branches: Vec::new(),
+            config,
+            state_manager,
+            step_executor,
+            error_handler,
+            condition_evaluator,
+            error_strategy,
+            workflow_executor: None,
+            metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Create with both hooks and registry
+    pub fn new_with_hooks_and_registry(
+        name: String,
+        workflow_config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
+        let config = ConditionalWorkflowConfig::default();
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy.clone());
+        let state_manager =
+            StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_hooks_and_registry(
+                workflow_config.clone(),
+                workflow_executor.clone(),
+                reg,
+            )
+        } else {
+            StepExecutor::new_with_hooks(workflow_config.clone(), workflow_executor.clone())
+        };
         let condition_evaluator = ConditionEvaluator::new(Duration::from_millis(
             config.condition_evaluation_timeout_ms,
         ));
@@ -1269,6 +1364,7 @@ pub struct ConditionalWorkflowBuilder {
     branches: Vec<ConditionalBranch>,
     error_strategy: Option<ErrorStrategy>,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    registry: Option<Arc<dyn ComponentLookup>>,
 }
 
 impl ConditionalWorkflowBuilder {
@@ -1281,6 +1377,7 @@ impl ConditionalWorkflowBuilder {
             branches: Vec::new(),
             error_strategy: None,
             workflow_executor: None,
+            registry: None,
         }
     }
 
@@ -1320,6 +1417,12 @@ impl ConditionalWorkflowBuilder {
         self
     }
 
+    /// Set the component registry for component lookup
+    pub fn with_registry(mut self, registry: Arc<dyn ComponentLookup>) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
     /// Build the conditional workflow
     pub fn build(mut self) -> ConditionalWorkflow {
         // Apply error strategy if provided
@@ -1327,10 +1430,26 @@ impl ConditionalWorkflowBuilder {
             self.workflow_config.default_error_strategy = strategy;
         }
 
-        let mut workflow = if let Some(workflow_executor) = self.workflow_executor {
-            ConditionalWorkflow::new_with_hooks(self.name, self.workflow_config, workflow_executor)
-        } else {
-            ConditionalWorkflow::new(self.name, self.workflow_config)
+        let mut workflow = match (self.workflow_executor, self.registry) {
+            (Some(workflow_executor), Some(registry)) => {
+                ConditionalWorkflow::new_with_hooks_and_registry(
+                    self.name,
+                    self.workflow_config,
+                    workflow_executor,
+                    Some(registry),
+                )
+            }
+            (Some(workflow_executor), None) => ConditionalWorkflow::new_with_hooks(
+                self.name,
+                self.workflow_config,
+                workflow_executor,
+            ),
+            (None, Some(registry)) => ConditionalWorkflow::new_with_registry(
+                self.name,
+                self.workflow_config,
+                Some(registry),
+            ),
+            (None, None) => ConditionalWorkflow::new(self.name, self.workflow_config),
         };
         workflow.config = self.conditional_config;
         workflow.add_branches(self.branches);

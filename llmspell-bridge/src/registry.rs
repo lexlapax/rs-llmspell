@@ -1,7 +1,8 @@
 //! ABOUTME: Component registry for managing agents, tools, and workflows
 //! ABOUTME: Central registry for all scriptable components accessible from engines
 
-use llmspell_core::{Agent, LLMSpellError, Tool, Workflow};
+use async_trait::async_trait;
+use llmspell_core::{Agent, BaseAgent, ComponentLookup, LLMSpellError, Tool, Workflow};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -163,6 +164,44 @@ impl ComponentRegistry {
 impl Default for ComponentRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Implementation of ComponentLookup trait for ComponentRegistry
+/// This allows the registry to be used from llmspell-workflows without circular deps
+#[async_trait]
+impl ComponentLookup for ComponentRegistry {
+    async fn get_agent(&self, name: &str) -> Option<Arc<dyn Agent>> {
+        self.get_agent(name)
+    }
+
+    async fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
+        self.get_tool(name)
+    }
+
+    async fn get_workflow(&self, name: &str) -> Option<Arc<dyn Workflow>> {
+        self.get_workflow(name)
+    }
+
+    async fn get_component(&self, component_type: &str, name: &str) -> Option<Arc<dyn BaseAgent>> {
+        match component_type {
+            "agent" => self.get_agent(name).map(|a| a as Arc<dyn BaseAgent>),
+            "tool" => self.get_tool(name).map(|t| t as Arc<dyn BaseAgent>),
+            "workflow" => self.get_workflow(name).map(|w| w as Arc<dyn BaseAgent>),
+            _ => None,
+        }
+    }
+
+    async fn list_agents(&self) -> Vec<String> {
+        self.list_agents()
+    }
+
+    async fn list_tools(&self) -> Vec<String> {
+        self.list_tools()
+    }
+
+    async fn list_workflows(&self) -> Vec<String> {
+        self.list_workflows()
     }
 }
 

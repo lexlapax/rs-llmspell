@@ -1211,11 +1211,27 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 #### Task 7.3.10: WebApp Creator Complete Rebuild (Production-Ready)
 **Priority**: CRITICAL - CORE ARCHITECTURE BROKEN
 **Estimated Time**: 36 hours (16h core + 8h webapp + 4h integration + 8h testing/docs)
-**Status**: TODO
+**Status**: IN PROGRESS (10.1 a COMPLETED - Registry threading through workflow creation chain)
 **Assigned To**: Core Team (infrastructure) + Solutions Team (webapp)
 **Dependencies**: Task 7.1.7 (BaseAgent implementation), Task 7.3.8 (State-Based Workflows), Task 7.3.9 (Mandatory Sandbox)
 
 **Description**: Fix fundamental architectural disconnect where StepExecutor cannot execute ANY components (agents, tools, workflows) due to missing ComponentRegistry access. All workflow step executions return mock data. This affects ALL workflow-based applications, not just WebApp Creator. Requires threading registry through the entire execution chain and unifying component execution through the BaseAgent trait.
+
+**ACTUAL IMPLEMENTATION PROGRESS**:
+- ✅ Created ComponentLookup trait in llmspell-core to avoid circular dependencies
+- ✅ Updated StepExecutor to accept registry via constructor injection
+- ✅ Implemented ComponentLookup for ComponentRegistry in bridge
+- ✅ Updated all workflow constructors (Sequential, Parallel, Conditional, Loop) with:
+  - `new_with_registry()` - Registry only
+  - `new_with_hooks_and_registry()` - Both hooks and registry
+- 🔄 Next: Update WorkflowBridge and WorkflowFactory to pass registry down
+
+**REGISTRY ARCHITECTURE DECISION**:
+- Registry is treated as runtime infrastructure (like DB connection), not configuration
+- Passed through constructors, not in serializable config
+- Arc chosen for thread-safe sharing, cheap cloning, immutable access
+- ComponentLookup trait provides abstraction layer avoiding circular dependencies
+- Performance: Arc clone = 1 atomic increment (nanoseconds)
 
 **CRITICAL ISSUES IDENTIFIED**:
 - **No actual LLM integration** - Agents created but never execute LLM calls
@@ -1260,47 +1276,53 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 - **lua/globals**: Injects bridge functionality into script engines
 - Implementation logic MUST be in crates, NOT in bridge
 
-- [ ] **Fix Registry Threading Through Workflow Creation**:
-  - [ ] In `llmspell-workflows/src/types.rs` (~line 50), add to WorkflowConfig:
-    ```rust
-    pub struct WorkflowConfig {
-        // existing fields...
-        pub registry: Option<Arc<ComponentRegistry>>, // Add this
-    }
-    ```
-  - [ ] In `llmspell-bridge/src/workflows.rs` (~line 1100), modify WorkflowBridge methods:
-    ```rust
-    // In create_sequential(), create_parallel(), etc.
-    let params_with_registry = {
-        let mut p = params.clone();
-        p["_registry"] = serde_json::to_value(&self._registry)?;
-        p
-    };
-    WorkflowFactory::create_workflow("sequential", &params_with_registry)
-    ```
-  - [ ] In `llmspell-workflows/src/sequential.rs` (~line 50), update constructor:
-    ```rust
-    pub fn new(name: String, config: WorkflowConfig) -> Self {
-        let step_executor = if let Some(ref registry) = config.registry {
-            StepExecutor::new_with_registry(config.clone(), registry.clone())
-        } else {
-            StepExecutor::new(config.clone()) // fallback for tests
-        };
-        // rest of constructor...
-    }
-    ```
-  - [ ] Apply same pattern to parallel.rs, conditional.rs, loop.rs
-  
-- [ ] **Unify Component Execution Through BaseAgent**:
-  - [ ] In `llmspell-workflows/src/step_executor.rs`, add new struct field (~line 15):
+**REGISTRY ARCHITECTURE DECISION (CHANGED FROM ORIGINAL PLAN)**:
+- **Original Plan**: Add registry to WorkflowConfig
+- **Problem**: Would break serialization and create circular dependencies
+- **Solution**: ComponentLookup trait + constructor injection pattern
+- Registry is **runtime infrastructure**, NOT configuration (like a DB connection)
+- Keep WorkflowConfig serializable (no trait objects)
+- Pass registry via constructors as `Arc<dyn ComponentLookup>`
+- Arc chosen for: thread-safety (multiple async tasks), cheap cloning (ref count), immutable sharing
+- ComponentLookup trait in llmspell-core avoids circular dependencies
+
+- a. [x] **Fix Registry Threading Through Workflow Creation** (COMPLETED):
+  - [x] **Created ComponentLookup trait** in `llmspell-core/src/traits/component_lookup.rs`:
+    - Avoids circular dependency (workflows can't depend on bridge)
+    - Defines async methods for component lookup
+    - Allows any registry implementation to be used
+  - [x] **Updated StepExecutor** in `llmspell-workflows/src/step_executor.rs`:
     ```rust
     pub struct StepExecutor {
-        config: WorkflowConfig,
-        workflow_executor: Option<Arc<WorkflowExecutor>>,
-        workflow_bridge: Option<serde_json::Value>, // Remove this
-        registry: Option<Arc<ComponentRegistry>>,    // Add this
+        config: WorkflowConfig,  // Stays serializable - no trait objects
+        registry: Option<Arc<dyn ComponentLookup>>, // Runtime infrastructure
+        workflow_executor: Option<Arc<WorkflowExecutor>>, // For hooks
     }
+    // Added constructors:
+    new_with_registry(config, registry)
+    new_with_hooks_and_registry(config, executor, registry)
     ```
+  - [x] **Implemented ComponentLookup for ComponentRegistry** in bridge:
+    - ComponentRegistry now implements the trait
+    - Can be passed to workflows as Arc<dyn ComponentLookup>
+  - [x] **Updated ALL workflow constructors** to accept registry parameter:
+    - ✅ Sequential workflow: Added `new_with_registry()` and `new_with_hooks_and_registry()`
+    - ✅ Parallel workflow: Added `new_with_registry()` and `new_with_hooks_and_registry()`
+    - ✅ Conditional workflow: Added `new_with_registry()` and `new_with_hooks_and_registry()`
+    - ✅ Loop workflow: Added `new_with_registry()` and `new_with_hooks_and_registry()`
+    - All workflows now properly thread registry to their StepExecutor
+  - [x] **Updated WorkflowBridge** to pass its registry when creating workflows:
+    - WorkflowBridge now stores registry (not _registry)
+    - Passes registry to StandardizedWorkflowFactory via new_with_registry()
+    - StandardizedWorkflowFactory passes registry to create_conditional_workflow() and create_parallel_workflow()
+  - [x] **Updated WorkflowFactory** and builders to accept registry:
+    - ConditionalWorkflowBuilder: Added registry field and with_registry() method
+    - ParallelWorkflowBuilder: Added registry field and with_registry() method
+    - Both builders now select correct constructor based on registry and hooks presence
+    - Static WorkflowFactory::create_workflow() passes None for backward compatibility
+  
+- b. [ ] **Unify Component Execution Through BaseAgent**:
+  - [x] Registry field already added to StepExecutor (completed above)
   - [ ] Replace mock `execute_tool_step()` (~line 270-324):
     ```rust
     async fn execute_tool_step(
@@ -1341,7 +1363,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
   - [ ] Apply same pattern to `execute_agent_step()` (~line 326-353)
   - [ ] Apply same pattern to `execute_workflow_step()` (~line 410-430)
   
-- [ ] **Leverage Existing ExecutionContext Infrastructure**:
+- c. [ ] **Leverage Existing ExecutionContext Infrastructure**:
   - [ ] In `llmspell-workflows/src/types.rs`, add conversion method (~line 100):
     ```rust
     impl StepExecutionContext {
@@ -1372,7 +1394,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     );
     ```
   
-- [ ] **Hook Integration Enhancements**:
+- d. [ ] **Hook Integration Enhancements**:
   - [ ] StepExecutor already has `workflow_executor: Option<Arc<WorkflowExecutor>>` ✅
   - [ ] Add hook calls in execute_step_internal() (~line 243):
     ```rust
@@ -1395,14 +1417,14 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     ```
   - [ ] Circuit breaker is already in WorkflowExecutor::execute_workflow_hooks() ✅
   
-- [ ] **Event Bus Integration** (if needed):
+- e. [ ] **Event Bus Integration** (if needed):
   - [ ] Add `event_bus: Option<Arc<EventBus>>` to WorkflowConfig
   - [ ] Emit events for step start/complete/fail
   - [ ] Use context.metadata for event correlation
   - [ ] Enable workflow coordination through events
 
 **10.2: WebApp Creator Lua Rebuild** (8 hours):
-- [ ] **State-Based Output Collection Implementation**:
+- a. [ ] **State-Based Output Collection Implementation**:
   - [ ] After workflow execution, read from state instead of result:
     ```lua
     -- OLD (broken):
@@ -1430,7 +1452,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     end
     ```
 
-- [ ] **Agent Configuration with Real Models** (20 agents with specific roles):
+- b. [ ] **Agent Configuration with Real Models** (20 agents with specific roles):
   - [ ] **Research & Analysis Phase** (5 agents):
     ```lua
     -- 1. Requirements Analyst (parses user input into structured requirements)
@@ -1471,7 +1493,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     -- 20. Code Reviewer (reviews and improves code)
     ```
 
-- [ ] **File Generation Pipeline**:
+- c. [ ] **File Generation Pipeline**:
   - [ ] File writer function that maps state outputs to files:
     ```lua
     function generate_project_files(workflow_id, output_dir)
@@ -1529,7 +1551,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     end
     ```
 
-- [ ] **Error Handling and Recovery**:
+- d. [ ] **Error Handling and Recovery**:
   - [ ] Wrap each agent execution with error handling:
     ```lua
     function safe_agent_execute(agent, input, max_retries)
@@ -1560,7 +1582,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
         end
     end
     ```
-  - [ ] Recovery mechanism to resume from partial state:
+  - e. [ ] Recovery mechanism to resume from partial state:
     ```lua
     function recover_partial_workflow(workflow_id)
         local partial_keys = State.list("workflow:partial:*")
@@ -1572,7 +1594,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     ```
 
 **10.3: Integration and Testing** (4 hours):
-- [ ] **Pre-Implementation Validation** (verify existing infrastructure):
+- a. [ ] **Pre-Implementation Validation** (verify existing infrastructure):
   - [ ] Check `llmspell-core/src/execution_context.rs:158` - Confirm state field exists:
     ```rust
     pub state: Option<Arc<dyn StateAccess>>, // Should be at line ~158
@@ -1588,7 +1610,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     # Should show 50+ implementations
     ```
 
-- [ ] **Core Infrastructure Testing**:
+- b. [ ] **Core Infrastructure Testing**:
   - [ ] Test single component execution:
     ```bash
     # Test that StepExecutor can execute a real tool
@@ -1605,7 +1627,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     cargo test -p llmspell-workflows test_step_state_output
     ```
 
-- [ ] **WebApp Creator Integration Tests**:
+- c. [ ] **WebApp Creator Integration Tests**:
   - [ ] Test with minimal input (just project name):
     ```bash
     ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
@@ -1628,7 +1650,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     ```
 
 **10.5: Documentation and Examples** (4 hours):
-- [ ] **Update Configuration Documentation**:
+- a. [ ] **Update Configuration Documentation**:
   - [ ] Create `examples/script-users/applications/webapp-creator/CONFIG.md`:
     ```markdown
     # WebApp Creator Configuration Guide
@@ -1658,7 +1680,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     3. "Path not allowed" - Update allowed_paths in config.toml
     ```
 
-- [ ] **Create Working Examples**:
+- b. [ ] **Create Working Examples**:
   - [ ] Minimal input example (`minimal-input.lua`):
     ```lua
     return {
@@ -1688,7 +1710,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     └── README.md              (Project documentation)
     ```
 
-- [ ] **Performance Metrics Documentation**:
+- c. [ ] **Performance Metrics Documentation**:
   - [ ] Document expected execution times:
     ```
     Research Phase: ~30 seconds (5 agents in parallel)

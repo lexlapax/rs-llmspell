@@ -19,7 +19,7 @@ use llmspell_core::{
         Workflow, WorkflowStep as CoreWorkflowStep,
     },
     types::{AgentInput, AgentOutput},
-    ComponentId, ComponentMetadata, LLMSpellError, Result,
+    ComponentId, ComponentLookup, ComponentMetadata, LLMSpellError, Result,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -337,6 +337,90 @@ impl LoopWorkflow {
             StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
         let step_executor =
             StepExecutor::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+
+        let metadata = ComponentMetadata::new(name.clone(), "Loop workflow with hooks".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Loop execution is sequential by nature
+            .with_continue_on_error(config.continue_on_error)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
+
+        Self {
+            name,
+            config,
+            state_manager,
+            step_executor,
+            error_handler,
+            error_strategy,
+            workflow_executor: Some(workflow_executor),
+            metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Create with registry for component lookup
+    pub fn new_with_registry(
+        name: String,
+        config: LoopConfig,
+        workflow_config: WorkflowConfig,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy.clone());
+        let state_manager = StateManager::new(workflow_config.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_registry(workflow_config.clone(), reg)
+        } else {
+            StepExecutor::new(workflow_config.clone())
+        };
+
+        let metadata = ComponentMetadata::new(name.clone(), "Loop workflow".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig::new()
+            .with_max_parallel(Some(1)) // Loop execution is sequential by nature
+            .with_continue_on_error(config.continue_on_error)
+            .with_timeout(config.timeout.or(workflow_config.max_execution_time));
+
+        Self {
+            name,
+            config,
+            state_manager,
+            step_executor,
+            error_handler,
+            error_strategy,
+            workflow_executor: None,
+            metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    /// Create with both hooks and registry
+    pub fn new_with_hooks_and_registry(
+        name: String,
+        config: LoopConfig,
+        workflow_config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+        registry: Option<Arc<dyn ComponentLookup>>,
+    ) -> Self {
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy.clone());
+        let state_manager =
+            StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+        let step_executor = if let Some(reg) = registry {
+            StepExecutor::new_with_hooks_and_registry(
+                workflow_config.clone(),
+                workflow_executor.clone(),
+                reg,
+            )
+        } else {
+            StepExecutor::new_with_hooks(workflow_config.clone(), workflow_executor.clone())
+        };
 
         let metadata = ComponentMetadata::new(name.clone(), "Loop workflow with hooks".to_string());
 

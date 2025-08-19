@@ -13,6 +13,7 @@ use std::time::Duration;
 /// Standardized workflow factory using llmspell-workflows
 pub struct StandardizedWorkflowFactory {
     factory: Arc<DefaultWorkflowFactory>,
+    registry: Option<Arc<super::ComponentRegistry>>,
 }
 
 impl StandardizedWorkflowFactory {
@@ -20,6 +21,15 @@ impl StandardizedWorkflowFactory {
     pub fn new() -> Self {
         Self {
             factory: Arc::new(DefaultWorkflowFactory::new()),
+            registry: None,
+        }
+    }
+
+    #[must_use]
+    pub fn new_with_registry(registry: Arc<super::ComponentRegistry>) -> Self {
+        Self {
+            factory: Arc::new(DefaultWorkflowFactory::new()),
+            registry: Some(registry),
         }
     }
 
@@ -155,8 +165,10 @@ impl StandardizedWorkflowFactory {
             }
 
             // Use the working create_conditional_workflow function that properly handles branches
-            let conditional_workflow =
-                super::workflows::create_conditional_workflow(&conditional_params)?;
+            let conditional_workflow = super::workflows::create_conditional_workflow(
+                &conditional_params,
+                self.registry.clone(),
+            )?;
             return Ok(Box::new(conditional_workflow));
         }
 
@@ -164,7 +176,8 @@ impl StandardizedWorkflowFactory {
         if workflow_type == "parallel" {
             // Use working parallel workflow creation directly
             // Pass through the original params which already contains branches
-            let parallel_workflow = super::workflows::create_parallel_workflow(&params)?;
+            let parallel_workflow =
+                super::workflows::create_parallel_workflow(&params, self.registry.clone())?;
             return Ok(Box::new(parallel_workflow));
         }
 

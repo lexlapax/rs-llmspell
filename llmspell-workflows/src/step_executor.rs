@@ -4,7 +4,7 @@
 use super::hooks::{StepContext, WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
 use super::traits::{ErrorStrategy, StepResult, StepType, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
-use llmspell_core::{ComponentId, ComponentMetadata, LLMSpellError, Result};
+use llmspell_core::{ComponentId, ComponentLookup, ComponentMetadata, LLMSpellError, Result};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
@@ -16,11 +16,12 @@ pub struct StepExecutor {
     config: WorkflowConfig,
     /// Optional workflow executor for hook integration
     workflow_executor: Option<Arc<WorkflowExecutor>>,
-    /// Optional workflow bridge for nested workflow execution
-    /// Note: This creates a circular dependency that needs to be resolved
-    /// For now, we'll implement mock behavior until bridge integration is complete
+    /// Optional component registry for looking up agents, tools, and workflows
+    /// This is passed from the bridge layer during workflow creation
+    /// TODO: This will be used to replace mock execution methods in execute_tool_step,
+    /// execute_agent_step, and execute_workflow_step
     #[allow(dead_code)]
-    workflow_bridge: Option<serde_json::Value>, // Placeholder for actual bridge
+    registry: Option<Arc<dyn ComponentLookup>>,
 }
 
 impl StepExecutor {
@@ -29,7 +30,16 @@ impl StepExecutor {
         Self {
             config,
             workflow_executor: None,
-            workflow_bridge: None,
+            registry: None,
+        }
+    }
+
+    /// Create a new step executor with registry for component lookup
+    pub fn new_with_registry(config: WorkflowConfig, registry: Arc<dyn ComponentLookup>) -> Self {
+        Self {
+            config,
+            workflow_executor: None,
+            registry: Some(registry),
         }
     }
 
@@ -41,7 +51,20 @@ impl StepExecutor {
         Self {
             config,
             workflow_executor: Some(workflow_executor),
-            workflow_bridge: None,
+            registry: None,
+        }
+    }
+
+    /// Create a new step executor with both hooks and registry
+    pub fn new_with_hooks_and_registry(
+        config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+        registry: Arc<dyn ComponentLookup>,
+    ) -> Self {
+        Self {
+            config,
+            workflow_executor: Some(workflow_executor),
+            registry: Some(registry),
         }
     }
 
