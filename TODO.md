@@ -1440,28 +1440,62 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
   - **State Key Consistency**: Centralized naming prevents drift between writers and readers
   - **Context Inheritance**: Nested workflows properly inherit parent context with conflict prevention (prefixing)
   
-- d. [ ] **Hook Integration Enhancements**:
-  - [ ] StepExecutor already has `workflow_executor: Option<Arc<WorkflowExecutor>>` ✅
-  - [ ] Add hook calls in execute_step_internal() (~line 243):
+- d. [x] **Hook Integration Enhancements** (COMPLETED):
+  
+  **PLANNED vs ACTUAL IMPLEMENTATION**:
+  - **Planned**: Add hooks directly in execute_step_internal without parameters
+  - **Challenge**: execute_step_internal didn't have workflow metadata/type
+  - **Solution**: Updated signature to pass metadata through from execute_step
+  
+  - [x] StepExecutor already has `workflow_executor: Option<Arc<WorkflowExecutor>>` ✅
+  - [x] Updated `execute_step_internal` signature to accept metadata (lines 266-272):
     ```rust
-    // Before execution
-    if let Some(ref executor) = self.workflow_executor {
-        let hook_context = WorkflowHookContext::new(
-            component_id, workflow_metadata, workflow_state,
-            step.step_type.to_string(), WorkflowExecutionPhase::StepBoundary
-        );
-        executor.execute_workflow_hooks(hook_context).await?;
-    }
-    
-    // Execute step...
-    let result = match &step.step_type { ... }
-    
-    // After execution
-    if let Some(ref executor) = self.workflow_executor {
-        // Similar hook for StepComplete phase
+    async fn execute_step_internal(
+        &self,
+        step: &WorkflowStep,
+        context: &StepExecutionContext,
+        workflow_metadata: Option<ComponentMetadata>,  // Added
+        workflow_type: Option<String>,                // Added
+    ) -> Result<String>
+    ```
+  
+  - [x] Added pre-execution hooks (lines 273-301):
+    ```rust
+    // Execute pre-execution hooks at the internal level
+    if let (Some(ref executor), Some(ref metadata), Some(ref wf_type)) = 
+        (&self.workflow_executor, &workflow_metadata, &workflow_type) 
+    {
+        let hook_ctx = WorkflowHookContext::new(
+            component_id, metadata.clone(), context.workflow_state.clone(),
+            wf_type.clone(), WorkflowExecutionPhase::StepBoundary
+        ).with_step_context(step_ctx)
+         .with_pattern_context("execution_level", json!("internal_pre"));
+        
+        executor.execute_workflow_hooks(hook_ctx).await;
     }
     ```
-  - [ ] Circuit breaker is already in WorkflowExecutor::execute_workflow_hooks() ✅
+  
+  - [x] Added post-execution hooks (lines 325-358):
+    ```rust
+    // Execute post-execution hooks with error context if present
+    let step_ctx = if let Err(ref e) = result {
+        self.create_step_context(step, context, Some(e.to_string()))
+    } else {
+        self.create_step_context(step, context, None)
+    };
+    hook_ctx.with_pattern_context("execution_level", json!("internal_post"));
+    ```
+  
+  - [x] Circuit breaker is already in WorkflowExecutor::execute_workflow_hooks() ✅
+  
+  **ARCHITECTURE INSIGHTS**:
+  - **Hook Layering**: Now have 3 levels of hooks:
+    1. Outer hooks in `execute_step` (around timeout/retry)
+    2. Internal hooks in `execute_step_internal` (around actual execution)
+    3. Error hooks in error handling paths
+  - **Context Differentiation**: Used `pattern_context` with "execution_level" to distinguish internal hooks
+  - **Metadata Threading**: Passed workflow metadata through call chain to maintain proper context
+  - **Error Propagation**: Post-execution hook includes error information when step fails
   
 - e. [ ] **Event Bus Integration** (if needed):
   - [ ] Add `event_bus: Option<Arc<EventBus>>` to WorkflowConfig

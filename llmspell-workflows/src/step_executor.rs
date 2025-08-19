@@ -108,7 +108,10 @@ impl StepExecutor {
         }
 
         // Execute with timeout
-        let result = timeout(step_timeout, self.execute_step_internal(step, &context)).await;
+        let result = timeout(
+            step_timeout, 
+            self.execute_step_internal(step, &context, workflow_metadata.clone(), workflow_type.clone())
+        ).await;
 
         let duration = start_time.elapsed();
 
@@ -259,13 +262,46 @@ impl StepExecutor {
         Ok(final_result)
     }
 
-    /// Internal step execution logic
+    /// Internal step execution logic with hook integration
     async fn execute_step_internal(
         &self,
         step: &WorkflowStep,
         context: &StepExecutionContext,
+        workflow_metadata: Option<ComponentMetadata>,
+        workflow_type: Option<String>,
     ) -> Result<String> {
-        match &step.step_type {
+        // Execute pre-execution hooks at the internal level (fine-grained hooks)
+        if let (Some(ref workflow_executor), Some(ref metadata), Some(ref wf_type)) = 
+            (&self.workflow_executor, &workflow_metadata, &workflow_type) 
+        {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", metadata.name),
+            );
+            
+            let mut hook_ctx = WorkflowHookContext::new(
+                component_id,
+                metadata.clone(),
+                context.workflow_state.clone(),
+                wf_type.clone(),
+                WorkflowExecutionPhase::StepBoundary,
+            );
+            
+            // Add step context to differentiate from outer hooks
+            let step_ctx = self.create_step_context(step, context, None);
+            hook_ctx = hook_ctx.with_step_context(step_ctx);
+            
+            // Add pattern context to indicate this is internal execution
+            hook_ctx = hook_ctx.with_pattern_context(
+                "execution_level".to_string(),
+                serde_json::json!("internal_pre"),
+            );
+            
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+        
+        // Execute the actual step based on its type
+        let result = match &step.step_type {
             StepType::Tool {
                 tool_name,
                 parameters,
@@ -284,7 +320,44 @@ impl StepExecutor {
                 self.execute_workflow_step(*workflow_id, input, context)
                     .await
             }
+        };
+        
+        // Execute post-execution hooks at the internal level
+        if let (Some(ref workflow_executor), Some(ref metadata), Some(ref wf_type)) = 
+            (&self.workflow_executor, &workflow_metadata, &workflow_type) 
+        {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", metadata.name),
+            );
+            
+            // Create hook context with result information
+            let mut hook_ctx = WorkflowHookContext::new(
+                component_id,
+                metadata.clone(),
+                context.workflow_state.clone(),
+                wf_type.clone(),
+                WorkflowExecutionPhase::StepBoundary,
+            );
+            
+            // Include step context with result or error
+            let step_ctx = if let Err(ref e) = result {
+                self.create_step_context(step, context, Some(e.to_string()))
+            } else {
+                self.create_step_context(step, context, None)
+            };
+            hook_ctx = hook_ctx.with_step_context(step_ctx);
+            
+            // Add pattern context to indicate this is internal post-execution
+            hook_ctx = hook_ctx.with_pattern_context(
+                "execution_level".to_string(),
+                serde_json::json!("internal_post"),
+            );
+            
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
         }
+        
+        result
     }
 
     /// Execute a tool step
