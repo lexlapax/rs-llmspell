@@ -19,7 +19,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
     extract_required_string, response::ResponseBuilder,
@@ -168,14 +168,13 @@ impl Default for ImageProcessorConfig {
 pub struct ImageProcessorTool {
     metadata: ComponentMetadata,
     config: ImageProcessorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl ImageProcessorTool {
     /// Create a new image processor tool
     #[must_use]
-    pub fn new(config: ImageProcessorConfig) -> Self {
+    pub fn new(config: ImageProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "image_processor".to_string(),
@@ -183,24 +182,7 @@ impl ImageProcessorTool {
                     .to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new image processor tool with sandbox context
-    #[must_use]
-    pub fn with_sandbox(
-        config: ImageProcessorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "image_processor".to_string(),
-                "Image file processing for format conversion, resizing, and metadata extraction"
-                    .to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
@@ -226,9 +208,16 @@ impl ImageProcessorTool {
     }
 
     /// Extract metadata from image file
-    async fn extract_metadata(&self, file_path: &Path) -> LLMResult<ImageMetadata> {
+    async fn extract_metadata(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<ImageMetadata> {
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
         // Get file size
-        let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
+        let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("image_processor".to_string()),
             source: None,
@@ -477,7 +466,7 @@ impl BaseAgent for ImageProcessorTool {
                 let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
-                let metadata = self.extract_metadata(path).await?;
+                let metadata = self.extract_metadata(path, &self.sandbox).await?;
 
                 let mut message = format!("Image file: {:?} format", metadata.format);
 
@@ -856,9 +845,29 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    fn create_test_image_processor_with_temp_dir() -> (ImageProcessorTool, TempDir) {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_image".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        let tool = ImageProcessorTool::new(ImageProcessorConfig::default(), sandbox);
+        (tool, temp_dir)
+    }
+
     fn create_test_image_processor() -> ImageProcessorTool {
-        let config = ImageProcessorConfig::default();
-        ImageProcessorTool::new(config)
+        create_test_image_processor_with_temp_dir().0
     }
     #[tokio::test]
     async fn test_format_detection_by_extension() {
@@ -919,8 +928,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_image_processor();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_image_processor_with_temp_dir();
         let file_path = temp_dir.path().join("image.png");
 
         fs::write(&file_path, b"dummy png content").unwrap();
@@ -961,13 +969,28 @@ mod tests {
     }
     #[tokio::test]
     async fn test_file_size_limit() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_image_size_limit".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ImageProcessorConfig {
             max_file_size: 10, // Very small limit
             ..Default::default()
         };
-        let tool = ImageProcessorTool::new(config);
+        let tool = ImageProcessorTool::new(config, sandbox);
 
-        let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("large.png");
 
         // Create a file larger than the limit
@@ -1107,8 +1130,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_image_processor();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_image_processor_with_temp_dir();
         let file_path = temp_dir.path().join("test.png");
 
         fs::write(&file_path, b"dummy").unwrap();

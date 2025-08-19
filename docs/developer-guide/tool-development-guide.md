@@ -238,31 +238,71 @@ mod tests {
 
 ## Common Tool Patterns
 
-### **File Operations Tool Pattern**
+### **File Operations Tool Pattern (Mandatory Sandbox Architecture)**
+
+**CRITICAL**: All filesystem-accessing tools MUST use the bridge-provided sandbox. Never create your own sandbox.
 
 ```rust
-use llmspell_security::{SandboxContext, FileSandbox};
+use llmspell_security::sandbox::FileSandbox;
 use std::path::Path;
+use std::sync::Arc;
+
+#[derive(Clone)]
+pub struct YourFileTool {
+    metadata: ComponentMetadata,
+    config: YourFileToolConfig,
+    sandbox: Arc<FileSandbox>,  // ✅ MANDATORY: Bridge-provided sandbox
+}
 
 impl YourFileTool {
+    /// Create a new file tool - MUST accept sandbox parameter
+    #[must_use]
+    pub fn new(config: YourFileToolConfig, sandbox: Arc<FileSandbox>) -> Self {
+        Self {
+            metadata: ComponentMetadata::new(
+                "your_file_tool".to_string(),
+                "Description of your file tool".to_string(),
+            ),
+            config,
+            sandbox,  // ✅ Store bridge-provided sandbox
+        }
+    }
+
+    /// Safe file operation using bridge-provided sandbox
     async fn safe_file_operation(&self, path: &str) -> Result<String, LLMError> {
-        // Create sandbox context
-        let context = SandboxContext::new(
-            "file-operation".to_string(),
-            self.security_requirements(),
-            self.resource_limits(),
-        );
+        // ✅ Use bridge-provided sandbox (never create your own)
+        let validated_path = self.sandbox.validate_path(Path::new(path))?;
         
-        // Validate path using file sandbox
-        let file_sandbox = FileSandbox::new(context)?;
-        let validated_path = file_sandbox.validate_path(Path::new(path))?;
-        
-        // Perform file operation
+        // Perform file operation on validated path
         let content = tokio::fs::read_to_string(validated_path).await?;
         Ok(content)
     }
 }
 ```
+
+**Bridge Registration Pattern**:
+```rust
+// In llmspell-bridge/src/tools.rs
+fn register_file_system_tools(
+    registry: &Arc<ComponentRegistry>,
+    file_sandbox: Arc<FileSandbox>,  // Bridge creates shared sandbox
+) -> Result<(), Box<dyn std::error::Error>> {
+    let your_tool_sandbox = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "your_file_tool",
+        your_tool_sandbox.clone(),
+        move || YourFileTool::new(YourFileToolConfig::default(), your_tool_sandbox),
+    )?;
+    Ok(())
+}
+```
+
+**Security Benefits**:
+- ✅ Consistent security policy across ALL tools
+- ✅ Bridge configures sandbox with user's allowed paths
+- ✅ No tool can bypass security restrictions
+- ✅ Shared sandbox reduces memory overhead
 
 ### **Network Tool Pattern**
 

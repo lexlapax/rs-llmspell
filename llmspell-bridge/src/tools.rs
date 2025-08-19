@@ -65,9 +65,13 @@ pub fn register_all_tools(
     // Register different tool categories with their specific configurations
     register_utility_tools(registry)?;
     register_data_processing_tools(registry, &tools_config.http_request)?;
-    register_file_system_tools(registry, file_sandbox, &tools_config.file_operations)?;
-    register_system_tools(registry)?;
-    register_media_tools(registry)?;
+    register_file_system_tools(
+        registry,
+        file_sandbox.clone(),
+        &tools_config.file_operations,
+    )?;
+    register_system_tools(registry, &file_sandbox)?;
+    register_media_tools(registry, &file_sandbox)?;
     register_search_tools(registry, &tools_config.web_search)?;
     register_web_tools(registry)?;
     register_communication_tools(registry)?;
@@ -219,20 +223,26 @@ fn register_file_system_tools(
         move || FileConverterTool::new(FileConverterConfig::default(), file_sandbox_converter),
     )?;
 
-    // Use the provided configuration for FileOperationsTool instead of default
+    // Use the provided configuration for FileOperationsTool with sandbox
     let file_ops_config = file_ops_config.clone();
-    register_tool(registry, "file_operations", move || {
-        // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
-        let tool_config = FileOperationsConfig {
-            allowed_paths: file_ops_config.allowed_paths.clone(),
-            atomic_writes: file_ops_config.atomic_writes,
-            max_file_size: file_ops_config.max_file_size,
-            max_dir_entries: 1000,      // Default value
-            allow_recursive: true,      // Default value
-            default_permissions: 0o644, // Default permissions
-        };
-        FileOperationsTool::new(tool_config)
-    })?;
+    let file_sandbox_ops = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "file_operations",
+        file_sandbox_ops.clone(),
+        move || {
+            // Convert from llmspell_config FileOperationsConfig to llmspell_tools FileOperationsConfig
+            let tool_config = FileOperationsConfig {
+                allowed_paths: file_ops_config.allowed_paths.clone(),
+                atomic_writes: file_ops_config.atomic_writes,
+                max_file_size: file_ops_config.max_file_size,
+                max_dir_entries: 1000,      // Default value
+                allow_recursive: true,      // Default value
+                default_permissions: 0o644, // Default permissions
+            };
+            FileOperationsTool::new(tool_config, file_sandbox_ops)
+        },
+    )?;
 
     // File search with sandbox
     let file_sandbox_search = file_sandbox.clone();
@@ -257,35 +267,62 @@ fn register_file_system_tools(
 /// Register system integration tools
 fn register_system_tools(
     registry: &Arc<ComponentRegistry>,
+    file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "environment_reader", || {
         EnvironmentReaderTool::new(EnvironmentReaderConfig::default())
     })?;
-    register_tool(registry, "process_executor", || {
-        ProcessExecutorTool::new(ProcessExecutorConfig::default())
-    })?;
+    // ProcessExecutorTool needs sandbox for working directory validation
+    let process_executor_sandbox = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "process_executor",
+        process_executor_sandbox.clone(),
+        move || {
+            ProcessExecutorTool::new(ProcessExecutorConfig::default(), process_executor_sandbox)
+        },
+    )?;
     register_tool(registry, "service_checker", || {
         ServiceCheckerTool::new(ServiceCheckerConfig::default())
     })?;
-    register_tool(registry, "system_monitor", || {
-        SystemMonitorTool::new(SystemMonitorConfig::default())
-    })?;
+
+    // SystemMonitorTool needs sandbox for /proc file access
+    let system_monitor_sandbox = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "system_monitor",
+        system_monitor_sandbox.clone(),
+        move || SystemMonitorTool::new(SystemMonitorConfig::default(), system_monitor_sandbox),
+    )?;
     Ok(())
 }
 
 /// Register media processing tools
 fn register_media_tools(
     registry: &Arc<ComponentRegistry>,
+    file_sandbox: &Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry, "audio_processor", || {
-        AudioProcessorTool::new(AudioProcessorConfig::default())
-    })?;
-    register_tool(registry, "image_processor", || {
-        ImageProcessorTool::new(ImageProcessorConfig::default())
-    })?;
-    register_tool(registry, "video_processor", || {
-        VideoProcessorTool::new(VideoProcessorConfig::default())
-    })?;
+    let audio_sandbox = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "audio_processor",
+        audio_sandbox.clone(),
+        move || AudioProcessorTool::new(AudioProcessorConfig::default(), audio_sandbox),
+    )?;
+    let image_sandbox = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "image_processor",
+        image_sandbox.clone(),
+        move || ImageProcessorTool::new(ImageProcessorConfig::default(), image_sandbox),
+    )?;
+    let video_sandbox = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "video_processor",
+        video_sandbox.clone(),
+        move || VideoProcessorTool::new(VideoProcessorConfig::default(), video_sandbox),
+    )?;
     Ok(())
 }
 

@@ -1,9 +1,10 @@
 //! Comprehensive tests for tool hook integration
 //! Tests all 8 hook points with various tools and scenarios
 
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
 use llmspell_tools::{
     data::json_processor::JsonProcessorTool,
-    fs::file_operations::FileOperationsTool,
+    fs::file_operations::{FileOperationsConfig, FileOperationsTool},
     lifecycle::{
         hook_integration::{AuditConfig, HookFeatures, ToolExecutor, ToolLifecycleConfig},
         HookableToolExecution,
@@ -96,7 +97,8 @@ async fn test_security_validation_with_restricted_tool() {
 
     // ProcessExecutor is Restricted level
     let process_config = ProcessExecutorConfig::default();
-    let process_tool = ProcessExecutorTool::new(process_config);
+    let sandbox = create_default_test_sandbox();
+    let process_tool = ProcessExecutorTool::new(process_config, sandbox);
 
     assert_eq!(process_tool.security_level(), SecurityLevel::Restricted);
 
@@ -452,11 +454,17 @@ async fn test_different_security_levels() {
             SecurityLevel::Safe,
         ),
         (
-            Box::new(FileOperationsTool::default()) as Box<dyn Tool>,
+            Box::new(FileOperationsTool::new(
+                FileOperationsConfig::default(),
+                create_default_test_sandbox(),
+            )) as Box<dyn Tool>,
             SecurityLevel::Privileged,
         ),
         (
-            Box::new(ProcessExecutorTool::new(ProcessExecutorConfig::default())) as Box<dyn Tool>,
+            Box::new(ProcessExecutorTool::new(
+                ProcessExecutorConfig::default(),
+                create_default_test_sandbox(),
+            )) as Box<dyn Tool>,
             SecurityLevel::Restricted,
         ),
     ];

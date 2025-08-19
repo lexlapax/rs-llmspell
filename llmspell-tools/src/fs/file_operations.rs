@@ -13,7 +13,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
-use llmspell_security::sandbox::{FileSandbox, SandboxContext};
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_bool, extract_optional_string, extract_parameters, extract_required_string,
     file_utils, response::ResponseBuilder,
@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// File operation types
@@ -124,32 +125,20 @@ impl Default for FileOperationsConfig {
 pub struct FileOperationsTool {
     metadata: ComponentMetadata,
     config: FileOperationsConfig,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl FileOperationsTool {
     #[must_use]
-    pub fn new(config: FileOperationsConfig) -> Self {
+    pub fn new(config: FileOperationsConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "file-operations-tool".to_string(),
                 "Safe file system operations with sandboxing".to_string(),
             ),
             config,
+            sandbox,
         }
-    }
-
-    /// Create a file sandbox from context
-    fn create_sandbox(&self, context: &ExecutionContext) -> Result<FileSandbox> {
-        let sandbox_context = SandboxContext::new(
-            format!(
-                "file_ops_{}",
-                context.session_id.as_deref().unwrap_or("default")
-            ),
-            self.security_requirements(),
-            self.resource_limits(),
-        );
-
-        FileSandbox::new(sandbox_context)
     }
 
     /// Perform read operation
@@ -595,12 +584,6 @@ struct FileParameters {
     recursive: bool,
 }
 
-impl Default for FileOperationsTool {
-    fn default() -> Self {
-        Self::new(FileOperationsConfig::default())
-    }
-}
-
 #[async_trait]
 impl BaseAgent for FileOperationsTool {
     fn metadata(&self) -> &ComponentMetadata {
@@ -608,13 +591,13 @@ impl BaseAgent for FileOperationsTool {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
         let parameters = self.parse_parameters(params)?;
 
-        // Create sandbox
-        let sandbox = self.create_sandbox(&context)?;
+        // Use provided sandbox from bridge
+        let sandbox = &self.sandbox;
 
         info!("Executing file operation: {}", parameters.operation);
 
@@ -624,7 +607,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Read operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let file_content = self.read_file(&path, &sandbox).await?;
+                let file_content = self.read_file(&path, sandbox).await?;
                 let response = ResponseBuilder::success("read")
                     .with_message(format!(
                         "Read {} bytes from {}",
@@ -650,7 +633,7 @@ impl BaseAgent for FileOperationsTool {
                 })?;
 
                 // Handle write operation with graceful error handling
-                match self.write_file(&path, &write_content, &sandbox).await {
+                match self.write_file(&path, &write_content, sandbox).await {
                     Ok(()) => ResponseBuilder::success("write")
                         .with_message(format!(
                             "Wrote {} bytes to {}",
@@ -684,7 +667,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Append operation requires 'input' parameter".to_string(),
                     field: Some("input".to_string()),
                 })?;
-                self.append_file(&path, &append_content, &sandbox).await?;
+                self.append_file(&path, &append_content, sandbox).await?;
                 ResponseBuilder::success("append")
                     .with_message(format!(
                         "Appended {} bytes to {}",
@@ -702,7 +685,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Delete operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                self.delete_file(&path, &sandbox).await?;
+                self.delete_file(&path, sandbox).await?;
                 ResponseBuilder::success("delete")
                     .with_message(format!("Deleted file: {}", path.display()))
                     .with_file_info(path.to_string_lossy(), None)
@@ -713,7 +696,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "CreateDir operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                self.create_dir(&path, parameters.recursive, &sandbox)
+                self.create_dir(&path, parameters.recursive, sandbox)
                     .await?;
                 ResponseBuilder::success("create_dir")
                     .with_message(format!("Created directory: {}", path.display()))
@@ -728,7 +711,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "ListDir operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let entries = self.list_dir(&path, &sandbox).await?;
+                let entries = self.list_dir(&path, sandbox).await?;
                 ResponseBuilder::success("list_dir")
                     .with_message(format!(
                         "Found {} entries in {}",
@@ -755,7 +738,7 @@ impl BaseAgent for FileOperationsTool {
                         message: "Copy operation requires 'target_path' parameter".to_string(),
                         field: Some("target_path".to_string()),
                     })?;
-                self.copy_file(&from, &to, &sandbox).await?;
+                self.copy_file(&from, &to, sandbox).await?;
                 ResponseBuilder::success("copy")
                     .with_message(format!("Copied {} to {}", from.display(), to.display()))
                     .with_result(json!({
@@ -777,7 +760,7 @@ impl BaseAgent for FileOperationsTool {
                         message: "Move operation requires 'target_path' parameter".to_string(),
                         field: Some("target_path".to_string()),
                     })?;
-                self.move_file(&from, &to, &sandbox).await?;
+                self.move_file(&from, &to, sandbox).await?;
                 ResponseBuilder::success("move")
                     .with_message(format!("Moved {} to {}", from.display(), to.display()))
                     .with_result(json!({
@@ -791,7 +774,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Metadata operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let metadata = Self::get_metadata(&path, &sandbox)?;
+                let metadata = Self::get_metadata(&path, sandbox)?;
                 ResponseBuilder::success("metadata")
                     .with_message(format!("Retrieved metadata for {}", path.display()))
                     .with_result(metadata)
@@ -802,7 +785,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Exists operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let exists = Self::file_exists(&path, &sandbox)?;
+                let exists = Self::file_exists(&path, sandbox)?;
                 ResponseBuilder::success("exists")
                     .with_message(format!(
                         "Path {} {}",
@@ -1020,6 +1003,25 @@ impl FileOperationsTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+    use llmspell_security::sandbox::SandboxContext;
+    use serde_json::json;
+    use std::sync::Arc;
+    use tempfile::TempDir;
+
+    /// Create a test `FileOperationsTool` with a default sandbox
+    fn create_test_file_operations_tool() -> FileOperationsTool {
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context =
+            SandboxContext::new("test".to_string(), security_requirements, resource_limits);
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        FileOperationsTool::new(FileOperationsConfig::default(), sandbox)
+    }
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -1042,14 +1044,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_file_operations_tool_creation() {
-        let config = FileOperationsConfig::default();
-        let tool = FileOperationsTool::new(config);
-
+        let tool = create_test_file_operations_tool();
         assert_eq!(tool.metadata().name, "file-operations-tool");
     }
     #[test]
     fn test_parse_parameters_standardized() {
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         // Test write operation with new 'input' parameter
         let params = json!({
@@ -1075,7 +1075,7 @@ mod tests {
     }
     #[test]
     fn test_hook_integration_metadata() {
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         // Test that the tool supports hooks
         assert!(tool.supports_hooks());
@@ -1095,7 +1095,7 @@ mod tests {
     #[tokio::test]
     async fn test_file_operations_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         let config = ToolLifecycleConfig::default();
         let tool_executor = ToolExecutor::new(config, None, None);
@@ -1117,7 +1117,7 @@ mod tests {
     #[tokio::test]
     async fn test_hookable_tool_execution_trait() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         // Verify the tool implements HookableToolExecution
         // This is automatic via the blanket implementation

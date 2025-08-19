@@ -131,5 +131,9 @@ async fn test_malformed_config_file() {
     // Should fail with parse error
     let result = load_runtime_config(Some(&config_path)).await;
     assert!(result.is_err());
-    assert!(result.unwrap_err().to_string().contains("Failed to parse"));
+    // The error message contains "TOML parsing error" when parsing fails
+    assert!(result
+        .unwrap_err()
+        .to_string()
+        .contains("TOML parsing error"));
 }

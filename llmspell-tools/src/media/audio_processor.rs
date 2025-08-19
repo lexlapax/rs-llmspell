@@ -18,7 +18,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_string, extract_parameters, extract_required_string, response::ResponseBuilder,
 };
@@ -117,14 +117,13 @@ impl Default for AudioProcessorConfig {
 pub struct AudioProcessorTool {
     metadata: ComponentMetadata,
     config: AudioProcessorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl AudioProcessorTool {
     /// Create a new audio processor tool
     #[must_use]
-    pub fn new(config: AudioProcessorConfig) -> Self {
+    pub fn new(config: AudioProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "audio_processor".to_string(),
@@ -132,24 +131,7 @@ impl AudioProcessorTool {
                     .to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new audio processor tool with sandbox context
-    #[must_use]
-    pub fn with_sandbox(
-        config: AudioProcessorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "audio_processor".to_string(),
-                "Audio file processing for format detection, metadata extraction, and conversions"
-                    .to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
@@ -171,9 +153,16 @@ impl AudioProcessorTool {
     }
 
     /// Extract metadata from audio file
-    async fn extract_metadata(&self, file_path: &Path) -> LLMResult<AudioMetadata> {
+    async fn extract_metadata(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<AudioMetadata> {
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
         // Get file size
-        let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
+        let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("audio_processor".to_string()),
             source: None,
@@ -212,7 +201,7 @@ impl AudioProcessorTool {
 
         // For WAV files, we can extract some basic information
         if format == AudioFormat::Wav && self.config.analyze_properties {
-            if let Ok(wav_info) = self.analyze_wav_file(file_path).await {
+            if let Ok(wav_info) = self.analyze_wav_file(file_path, sandbox).await {
                 metadata.sample_rate = Some(wav_info.sample_rate);
                 metadata.channels = Some(wav_info.channels);
                 metadata.duration_seconds = wav_info.duration_seconds;
@@ -239,11 +228,18 @@ impl AudioProcessorTool {
 
     /// Analyze WAV file structure
     #[allow(clippy::unused_async)]
-    async fn analyze_wav_file(&self, file_path: &Path) -> LLMResult<WavInfo> {
+    async fn analyze_wav_file(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<WavInfo> {
         use std::fs::File;
         use std::io::{Read, Seek, SeekFrom};
 
-        let mut file = File::open(file_path).map_err(|e| LLMSpellError::Tool {
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
+        let mut file = File::open(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to open WAV file: {e}"),
             tool_name: Some("audio_processor".to_string()),
             source: None,
@@ -519,7 +515,7 @@ impl BaseAgent for AudioProcessorTool {
                 let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
-                let metadata = self.extract_metadata(path).await?;
+                let metadata = self.extract_metadata(path, &self.sandbox).await?;
 
                 let mut message = format!(
                     "Audio file: {} ({:?})",
@@ -663,9 +659,29 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    fn create_test_audio_processor_with_temp_dir() -> (AudioProcessorTool, TempDir) {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_audio".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        let tool = AudioProcessorTool::new(AudioProcessorConfig::default(), sandbox);
+        (tool, temp_dir)
+    }
+
     fn create_test_audio_processor() -> AudioProcessorTool {
-        let config = AudioProcessorConfig::default();
-        AudioProcessorTool::new(config)
+        create_test_audio_processor_with_temp_dir().0
     }
 
     fn create_test_wav_file(path: &Path) -> std::io::Result<()> {
@@ -719,13 +735,15 @@ mod tests {
     }
     #[tokio::test]
     async fn test_wav_file_analysis() {
-        let tool = create_test_audio_processor();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_audio_processor_with_temp_dir();
         let wav_path = temp_dir.path().join("test.wav");
 
         create_test_wav_file(&wav_path).unwrap();
 
-        let metadata = tool.extract_metadata(&wav_path).await.unwrap();
+        let metadata = tool
+            .extract_metadata(&wav_path, &tool.sandbox)
+            .await
+            .unwrap();
 
         assert_eq!(metadata.format, AudioFormat::Wav);
         assert_eq!(metadata.sample_rate, Some(44100));
@@ -734,8 +752,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_audio_processor();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_audio_processor_with_temp_dir();
         let file_path = temp_dir.path().join("audio.mp3");
 
         fs::write(&file_path, b"dummy mp3 content").unwrap();
@@ -775,13 +792,28 @@ mod tests {
     }
     #[tokio::test]
     async fn test_file_size_limit() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_size_limit".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = AudioProcessorConfig {
             max_file_size: 10, // Very small limit
             ..Default::default()
         };
-        let tool = AudioProcessorTool::new(config);
+        let tool = AudioProcessorTool::new(config, sandbox);
 
-        let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("large.wav");
 
         // Create a file larger than the limit
@@ -890,8 +922,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_audio_processor();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_audio_processor_with_temp_dir();
         let file_path = temp_dir.path().join("test.wav");
 
         create_test_wav_file(&file_path).unwrap();

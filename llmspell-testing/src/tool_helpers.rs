@@ -39,12 +39,17 @@
 
 use llmspell_core::{
     execution_context::ExecutionContext,
-    traits::tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
+    traits::tool::{
+        ParameterDef, ParameterType, ResourceLimits, SecurityLevel, SecurityRequirements, Tool,
+        ToolCategory, ToolSchema,
+    },
     types::{AgentInput, AgentOutput, ToolOutput},
     ComponentMetadata, LLMSpellError,
 };
+use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Type alias for test tool handler function
 type TestToolHandler = Box<dyn Fn(&AgentInput) -> Result<ToolOutput, LLMSpellError> + Send + Sync>;
@@ -242,6 +247,38 @@ pub fn create_test_tool_input_json(
     }
 
     input
+}
+
+/// Create a test sandbox with basic permissions
+pub fn create_test_sandbox(name: &str, allowed_paths: Vec<&str>) -> Arc<FileSandbox> {
+    let mut security_requirements = SecurityRequirements::default();
+    for path in allowed_paths {
+        security_requirements = security_requirements.with_file_access(path);
+    }
+    let resource_limits = ResourceLimits::default();
+
+    let context = SandboxContext::new(
+        format!("test_{}", name),
+        security_requirements,
+        resource_limits,
+    );
+
+    Arc::new(FileSandbox::new(context).expect("Failed to create test sandbox"))
+}
+
+/// Create a test sandbox with temporary directory access
+pub fn create_test_sandbox_with_temp_dir(name: &str, temp_dir_path: &str) -> Arc<FileSandbox> {
+    create_test_sandbox(name, vec!["/tmp", "/usr/bin", "/bin", temp_dir_path])
+}
+
+/// Create a default test sandbox for general testing
+pub fn create_default_test_sandbox() -> Arc<FileSandbox> {
+    create_test_sandbox(
+        "default",
+        vec![
+            "/tmp", "/usr/bin", "/bin", "/proc", // For system monitoring tests
+        ],
+    )
 }
 
 /// Create a mock tool using mockall
@@ -547,5 +584,33 @@ mod tests {
         assert!(assertions::assert_tool_success(&output).is_ok());
         assert!(assertions::assert_tool_output_contains(&output, vec!["result"]).is_ok());
         assert!(assertions::assert_tool_output_structure(&output, "processed").is_ok());
+    }
+
+    #[test]
+    fn test_sandbox_helpers() {
+        // Test default sandbox creation
+        let default_sandbox = create_default_test_sandbox();
+        assert!(default_sandbox
+            .validate_path("/tmp/test.txt".as_ref())
+            .is_ok());
+        assert!(default_sandbox
+            .validate_path("/proc/loadavg".as_ref())
+            .is_ok());
+
+        // Test custom sandbox creation
+        let custom_sandbox = create_test_sandbox("custom", vec!["/custom/path"]);
+        assert!(custom_sandbox
+            .validate_path("/custom/path/file.txt".as_ref())
+            .is_ok());
+        assert!(custom_sandbox
+            .validate_path("/tmp/test.txt".as_ref())
+            .is_err());
+
+        // Test temp dir sandbox creation
+        let temp_sandbox = create_test_sandbox_with_temp_dir("temp", "/var/folders/test");
+        assert!(temp_sandbox
+            .validate_path("/var/folders/test/file.txt".as_ref())
+            .is_ok());
+        assert!(temp_sandbox.validate_path("/tmp/file.txt".as_ref()).is_ok());
     }
 }

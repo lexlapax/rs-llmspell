@@ -2,6 +2,7 @@
 // ABOUTME: Tests that tools are protected against various injection attacks
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
 use llmspell_tools::{
     api::{graphql_query::GraphQLConfig, http_request::HttpRequestConfig},
     data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
@@ -197,7 +198,8 @@ async fn test_graphql_query_injection() {
 }
 #[tokio::test]
 async fn test_process_executor_argument_injection() {
-    let process_tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
+    let sandbox = create_default_test_sandbox();
+    let process_tool = ProcessExecutorTool::new(ProcessExecutorConfig::default(), sandbox);
 
     // Command argument injection attempts
     let dangerous_args = vec![

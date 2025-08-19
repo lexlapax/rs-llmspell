@@ -6,6 +6,7 @@ use llmspell_core::types::AgentInput;
 use llmspell_core::ExecutionContext;
 use llmspell_security::sandbox::file_sandbox::FileSandbox;
 use llmspell_security::sandbox::SandboxContext;
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
 use llmspell_tools::{
     fs::{
         file_converter::FileConverterConfig, file_search::FileSearchConfig,
@@ -77,7 +78,10 @@ fn test_system_integration_tools_creation() {
     assert!(!schema.description.is_empty());
 
     // ProcessExecutorTool
-    let tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
+    let tool = ProcessExecutorTool::new(
+        ProcessExecutorConfig::default(),
+        create_default_test_sandbox(),
+    );
     let schema = tool.schema();
     assert_eq!(schema.name, "process_executor");
     assert!(!schema.description.is_empty());
@@ -89,7 +93,10 @@ fn test_system_integration_tools_creation() {
     assert!(!schema.description.is_empty());
 
     // SystemMonitorTool
-    let tool = SystemMonitorTool::new(SystemMonitorConfig::default());
+    let tool = SystemMonitorTool::new(
+        SystemMonitorConfig::default(),
+        create_default_test_sandbox(),
+    );
     let schema = tool.schema();
     assert_eq!(schema.name, "system_monitor");
     assert!(!schema.description.is_empty());
@@ -97,19 +104,28 @@ fn test_system_integration_tools_creation() {
 #[test]
 fn test_media_processing_tools_creation() {
     // AudioProcessorTool
-    let tool = AudioProcessorTool::new(AudioProcessorConfig::default());
+    let tool = AudioProcessorTool::new(
+        AudioProcessorConfig::default(),
+        create_default_test_sandbox(),
+    );
     let schema = tool.schema();
     assert_eq!(schema.name, "audio_processor");
     assert!(!schema.description.is_empty());
 
     // VideoProcessorTool
-    let tool = VideoProcessorTool::new(VideoProcessorConfig::default());
+    let tool = VideoProcessorTool::new(
+        VideoProcessorConfig::default(),
+        create_default_test_sandbox(),
+    );
     let schema = tool.schema();
     assert_eq!(schema.name, "video_processor");
     assert!(!schema.description.is_empty());
 
     // ImageProcessorTool
-    let tool = ImageProcessorTool::new(ImageProcessorConfig::default());
+    let tool = ImageProcessorTool::new(
+        ImageProcessorConfig::default(),
+        create_default_test_sandbox(),
+    );
     let schema = tool.schema();
     assert_eq!(schema.name, "image_processor");
     assert!(!schema.description.is_empty());
@@ -157,16 +173,34 @@ fn test_tool_schemas_have_required_fields() {
             FileConverterConfig::default(),
             sandbox.clone(),
         )),
-        Box::new(FileSearchTool::new(FileSearchConfig::default(), sandbox)),
+        Box::new(FileSearchTool::new(
+            FileSearchConfig::default(),
+            sandbox.clone(),
+        )),
         Box::new(EnvironmentReaderTool::new(
             EnvironmentReaderConfig::default(),
         )),
-        Box::new(ProcessExecutorTool::new(ProcessExecutorConfig::default())),
+        Box::new(ProcessExecutorTool::new(
+            ProcessExecutorConfig::default(),
+            sandbox.clone(),
+        )),
         Box::new(ServiceCheckerTool::new(ServiceCheckerConfig::default())),
-        Box::new(SystemMonitorTool::new(SystemMonitorConfig::default())),
-        Box::new(AudioProcessorTool::new(AudioProcessorConfig::default())),
-        Box::new(VideoProcessorTool::new(VideoProcessorConfig::default())),
-        Box::new(ImageProcessorTool::new(ImageProcessorConfig::default())),
+        Box::new(SystemMonitorTool::new(
+            SystemMonitorConfig::default(),
+            sandbox.clone(),
+        )),
+        Box::new(AudioProcessorTool::new(
+            AudioProcessorConfig::default(),
+            sandbox.clone(),
+        )),
+        Box::new(VideoProcessorTool::new(
+            VideoProcessorConfig::default(),
+            sandbox.clone(),
+        )),
+        Box::new(ImageProcessorTool::new(
+            ImageProcessorConfig::default(),
+            sandbox,
+        )),
         Box::new(WebSearchTool::new(WebSearchConfig::default()).unwrap()),
         Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
         Box::new(TextManipulatorTool::new(TextManipulatorConfig::default())),
@@ -275,14 +309,14 @@ fn test_tool_creation_performance() {
         let sandbox = create_file_sandbox();
         let _ = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
         let _ = FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
-        let _ = FileSearchTool::new(FileSearchConfig::default(), sandbox);
+        let _ = FileSearchTool::new(FileSearchConfig::default(), sandbox.clone());
         let _ = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
-        let _ = ProcessExecutorTool::new(ProcessExecutorConfig::default());
+        let _ = ProcessExecutorTool::new(ProcessExecutorConfig::default(), sandbox.clone());
         let _ = ServiceCheckerTool::new(ServiceCheckerConfig::default());
-        let _ = SystemMonitorTool::new(SystemMonitorConfig::default());
-        let _ = AudioProcessorTool::new(AudioProcessorConfig::default());
-        let _ = VideoProcessorTool::new(VideoProcessorConfig::default());
-        let _ = ImageProcessorTool::new(ImageProcessorConfig::default());
+        let _ = SystemMonitorTool::new(SystemMonitorConfig::default(), sandbox.clone());
+        let _ = AudioProcessorTool::new(AudioProcessorConfig::default(), sandbox.clone());
+        let _ = VideoProcessorTool::new(VideoProcessorConfig::default(), sandbox.clone());
+        let _ = ImageProcessorTool::new(ImageProcessorConfig::default(), sandbox.clone());
         let _ = WebSearchTool::new(WebSearchConfig::default()).unwrap();
         let _ = HashCalculatorTool::new(HashCalculatorConfig::default());
         let _ = TextManipulatorTool::new(TextManipulatorConfig::default());

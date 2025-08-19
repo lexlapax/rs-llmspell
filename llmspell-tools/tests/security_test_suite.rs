@@ -7,6 +7,7 @@ use llmspell_core::{
     BaseAgent, ExecutionContext, LLMSpellError,
 };
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
 use llmspell_tools::communication::database_connector::DatabaseConnectorConfig;
 use llmspell_tools::communication::email_sender::EmailSenderConfig;
 use llmspell_tools::data::json_processor::JsonProcessorConfig;
@@ -542,9 +543,12 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
     match tool_name {
         // File system tools
         "file-operations" => {
-            FileOperationsTool::new(FileOperationsConfig::default())
-                .execute(input, context)
-                .await
+            FileOperationsTool::new(
+                FileOperationsConfig::default(),
+                create_default_test_sandbox(),
+            )
+            .execute(input, context)
+            .await
         }
         "file-search" => {
             let sandbox_context = SandboxContext {
@@ -581,9 +585,12 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
 
         // System tools
         "process-executor" => {
-            ProcessExecutorTool::new(ProcessExecutorConfig::default())
-                .execute(input, context)
-                .await
+            ProcessExecutorTool::new(
+                ProcessExecutorConfig::default(),
+                create_default_test_sandbox(),
+            )
+            .execute(input, context)
+            .await
         }
 
         // Data processing tools

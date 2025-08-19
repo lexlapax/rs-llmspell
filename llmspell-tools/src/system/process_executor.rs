@@ -11,7 +11,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     // NEW: Error handling with information disclosure prevention
     error_handling::{ErrorContext, SafeErrorHandler},
@@ -170,15 +170,14 @@ impl Default for ProcessExecutorConfig {
 pub struct ProcessExecutorTool {
     metadata: ComponentMetadata,
     config: ProcessExecutorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
     error_handler: SafeErrorHandler,
 }
 
 impl ProcessExecutorTool {
     /// Create a new process executor tool
     #[must_use]
-    pub fn new(config: ProcessExecutorConfig) -> Self {
+    pub fn new(config: ProcessExecutorConfig, sandbox: Arc<FileSandbox>) -> Self {
         // Determine if in production mode based on config
         let is_production = !cfg!(debug_assertions);
 
@@ -188,26 +187,7 @@ impl ProcessExecutorTool {
                 "Safe process execution with security controls and resource limits".to_string(),
             ),
             config,
-            sandbox_context: None,
-            error_handler: SafeErrorHandler::new(is_production),
-        }
-    }
-
-    /// Create a new process executor tool with sandbox context
-    #[must_use]
-    pub fn with_sandbox(
-        config: ProcessExecutorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        let is_production = !cfg!(debug_assertions);
-
-        Self {
-            metadata: ComponentMetadata::new(
-                "process_executor".to_string(),
-                "Safe process execution with security controls and resource limits".to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
             error_handler: SafeErrorHandler::new(is_production),
         }
     }
@@ -301,6 +281,13 @@ impl ProcessExecutorTool {
 
         // Set working directory
         if let Some(dir) = working_dir.or(self.config.default_working_directory.as_deref()) {
+            // Validate working directory using sandbox
+            if let Err(e) = self.sandbox.validate_path(dir) {
+                return Err(LLMSpellError::Security {
+                    message: format!("Working directory access denied: {e}"),
+                    violation_type: Some("path_validation".to_string()),
+                });
+            }
             cmd.current_dir(dir);
         }
 
@@ -460,6 +447,15 @@ impl ProcessExecutorTool {
         // Validate working directory if provided
         if let Some(work_dir) = params.get("working_directory").and_then(|v| v.as_str()) {
             let dir_path = Path::new(work_dir);
+
+            // Validate path using sandbox
+            if let Err(e) = self.sandbox.validate_path(dir_path) {
+                return Err(LLMSpellError::Security {
+                    message: format!("Working directory access denied: {e}"),
+                    violation_type: Some("path_validation".to_string()),
+                });
+            }
+
             if !dir_path.exists() {
                 return Err(LLMSpellError::Validation {
                     message: format!("Working directory does not exist: {work_dir}"),
@@ -751,17 +747,51 @@ mod tests {
     use tempfile::TempDir;
 
     fn create_test_process_executor() -> ProcessExecutorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_process_executor".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig::default();
-        ProcessExecutorTool::new(config)
+        ProcessExecutorTool::new(config, sandbox)
     }
 
     fn create_test_tool_with_custom_config() -> ProcessExecutorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_process_executor_custom".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig {
             max_execution_time_seconds: 5,
             max_output_size: 1024,
             ..Default::default()
         };
-        ProcessExecutorTool::new(config)
+        ProcessExecutorTool::new(config, sandbox)
     }
     #[tokio::test]
     async fn test_execute_simple_command() {
@@ -804,12 +834,19 @@ mod tests {
     }
     #[tokio::test]
     async fn test_execute_with_working_directory() {
-        let tool = create_test_process_executor();
+        use llmspell_testing::tool_helpers::create_test_sandbox_with_temp_dir;
+
         let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_str().unwrap();
+
+        // Create a sandbox that allows access to the temp directory
+        let sandbox = create_test_sandbox_with_temp_dir("process_executor_workdir", temp_path);
+        let config = ProcessExecutorConfig::default();
+        let tool = ProcessExecutorTool::new(config, sandbox);
 
         let input = create_test_tool_input(vec![
             ("executable", "pwd"),
-            ("working_directory", &temp_dir.path().to_string_lossy()),
+            ("working_directory", temp_path),
         ]);
 
         let result = tool
@@ -895,9 +932,22 @@ mod tests {
     }
     #[tokio::test]
     async fn test_working_directory_validation() {
-        let tool = create_test_process_executor();
+        use llmspell_testing::tool_helpers::create_test_sandbox;
 
-        // Nonexistent directory
+        // Create a sandbox that allows access to the nonexistent path for testing
+        let sandbox = create_test_sandbox(
+            "process_executor_validation",
+            vec![
+                "/tmp",
+                "/usr/bin",
+                "/bin",
+                "/nonexistent", // Allow the parent path so we can test the existence check
+            ],
+        );
+        let config = ProcessExecutorConfig::default();
+        let tool = ProcessExecutorTool::new(config, sandbox);
+
+        // Nonexistent directory - now we should get "does not exist" since it passes sandbox check
         let input = create_test_tool_input(vec![
             ("executable", "echo"),
             ("working_directory", "/nonexistent/directory/12345"),
@@ -962,6 +1012,23 @@ mod tests {
     }
     #[tokio::test]
     async fn test_arbitrary_commands_disabled() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_arbitrary_disabled".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig {
             permissions: ExecutionPermissions {
                 allow_arbitrary_commands: false,
@@ -969,13 +1036,30 @@ mod tests {
             },
             ..Default::default()
         };
-        let tool = ProcessExecutorTool::new(config);
+        let tool = ProcessExecutorTool::new(config, sandbox);
 
         // Should not allow arbitrary commands
         assert!(!tool.is_executable_allowed("arbitrary_command"));
     }
     #[tokio::test]
     async fn test_arbitrary_commands_enabled() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_arbitrary_enabled".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig {
             permissions: ExecutionPermissions {
                 allow_arbitrary_commands: true,
@@ -983,7 +1067,7 @@ mod tests {
             },
             ..Default::default()
         };
-        let tool = ProcessExecutorTool::new(config);
+        let tool = ProcessExecutorTool::new(config, sandbox);
 
         // Should allow arbitrary commands (unless blocked)
         assert!(tool.is_executable_allowed("arbitrary_command"));

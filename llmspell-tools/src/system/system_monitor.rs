@@ -10,7 +10,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_string, extract_parameters,
     response::ResponseBuilder,
@@ -133,34 +133,20 @@ impl Default for SystemMonitorConfig {
 pub struct SystemMonitorTool {
     metadata: ComponentMetadata,
     config: SystemMonitorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl SystemMonitorTool {
     /// Create a new system monitor tool
     #[must_use]
-    pub fn new(config: SystemMonitorConfig) -> Self {
+    pub fn new(config: SystemMonitorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "system_monitor".to_string(),
                 "System resource monitoring for CPU, memory, and disk usage tracking".to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new system monitor tool with sandbox context
-    #[must_use]
-    pub fn with_sandbox(config: SystemMonitorConfig, sandbox_context: Arc<SandboxContext>) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "system_monitor".to_string(),
-                "System resource monitoring for CPU, memory, and disk usage tracking".to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
@@ -224,7 +210,7 @@ impl SystemMonitorTool {
         // Simple CPU load approximation based on system load
         #[cfg(unix)]
         {
-            if let Ok(load_avg) = self.get_load_average() {
+            if let Ok(load_avg) = self.get_load_average(&self.sandbox) {
                 #[allow(clippy::cast_precision_loss)]
                 let cpu_count = get_cpu_count() as f64;
                 // Convert load average to approximate CPU percentage
@@ -241,10 +227,13 @@ impl SystemMonitorTool {
     /// Get system load average (Unix only)
     #[cfg(unix)]
     #[allow(clippy::unused_self)]
-    fn get_load_average(&self) -> Result<[f64; 3], std::io::Error> {
+    fn get_load_average(&self, sandbox: &FileSandbox) -> Result<[f64; 3], std::io::Error> {
         use std::fs;
 
-        let loadavg_content = fs::read_to_string("/proc/loadavg")?;
+        let loadavg_path = sandbox
+            .validate_path("/proc/loadavg".as_ref())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::PermissionDenied, e))?;
+        let loadavg_content = fs::read_to_string(&loadavg_path)?;
         let parts: Vec<&str> = loadavg_content.split_whitespace().collect();
 
         if parts.len() >= 3 {
@@ -272,7 +261,7 @@ impl SystemMonitorTool {
         // Cross-platform disk usage implementation
         #[cfg(unix)]
         {
-            if let Ok(mounts) = self.get_unix_mounts() {
+            if let Ok(mounts) = self.get_unix_mounts(&self.sandbox) {
                 let mut count = 0;
                 for (mount_point, fs_type) in mounts {
                     if count >= self.config.max_disk_mounts {
@@ -325,10 +314,16 @@ impl SystemMonitorTool {
     /// Get Unix mount points
     #[cfg(unix)]
     #[allow(clippy::unused_self)]
-    fn get_unix_mounts(&self) -> Result<Vec<(String, String)>, std::io::Error> {
+    fn get_unix_mounts(
+        &self,
+        sandbox: &FileSandbox,
+    ) -> Result<Vec<(String, String)>, std::io::Error> {
         use std::fs;
 
-        let mounts_content = fs::read_to_string("/proc/mounts")?;
+        let mounts_path = sandbox
+            .validate_path("/proc/mounts".as_ref())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::PermissionDenied, e))?;
+        let mounts_content = fs::read_to_string(&mounts_path)?;
         let mut mounts = Vec::new();
 
         for line in mounts_content.lines() {
@@ -456,14 +451,15 @@ impl SystemMonitorTool {
 
     /// Get process count (simplified implementation)
     #[allow(clippy::unused_async)]
-    async fn get_process_count(&self) -> Option<u32> {
+    async fn get_process_count(&self, sandbox: &FileSandbox) -> Option<u32> {
         if !self.config.collect.is_enabled(StatType::Process) {
             return None;
         }
 
         #[cfg(unix)]
         {
-            if let Ok(entries) = std::fs::read_dir("/proc") {
+            let proc_path = sandbox.validate_path("/proc".as_ref()).ok()?;
+            if let Ok(entries) = std::fs::read_dir(&proc_path) {
                 let count = entries
                     .filter_map(std::result::Result::ok)
                     .filter(|entry| {
@@ -492,10 +488,11 @@ impl SystemMonitorTool {
 
     /// Get system uptime (simplified implementation)
     #[allow(clippy::unused_async)]
-    async fn get_uptime(&self) -> Option<u64> {
+    async fn get_uptime(&self, sandbox: &FileSandbox) -> Option<u64> {
         #[cfg(unix)]
         {
-            if let Ok(uptime_content) = std::fs::read_to_string("/proc/uptime") {
+            let uptime_path = sandbox.validate_path("/proc/uptime".as_ref()).ok()?;
+            if let Ok(uptime_content) = std::fs::read_to_string(&uptime_path) {
                 if let Some(uptime_str) = uptime_content.split_whitespace().next() {
                     if let Ok(uptime_seconds) = uptime_str.parse::<f64>() {
                         #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
@@ -533,16 +530,16 @@ impl SystemMonitorTool {
 
         // Collect process count
         if self.config.collect.is_enabled(StatType::Process) {
-            stats.process_count = self.get_process_count().await;
+            stats.process_count = self.get_process_count(&self.sandbox).await;
         }
 
         // Get uptime
-        stats.uptime_seconds = self.get_uptime().await;
+        stats.uptime_seconds = self.get_uptime(&self.sandbox).await;
 
         // Get load average (Unix only)
         #[cfg(unix)]
         {
-            if let Ok(load_avg) = self.get_load_average() {
+            if let Ok(load_avg) = self.get_load_average(&self.sandbox) {
                 stats.load_average = Some(load_avg);
             }
         }
@@ -743,18 +740,50 @@ mod tests {
     use llmspell_testing::tool_helpers::create_test_tool_input;
 
     fn create_test_system_monitor() -> SystemMonitorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/proc")
+            .with_file_access("/tmp");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_system_monitor".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = SystemMonitorConfig::default();
-        SystemMonitorTool::new(config)
+        SystemMonitorTool::new(config, sandbox)
     }
 
     fn create_test_tool_with_custom_config() -> SystemMonitorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/proc")
+            .with_file_access("/tmp");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_system_monitor_custom".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = SystemMonitorConfig {
             max_disk_mounts: 5,
             cpu_sample_duration_ms: 500,
             include_disk_details: false,
             ..Default::default()
         };
-        SystemMonitorTool::new(config)
+        SystemMonitorTool::new(config, sandbox)
     }
     #[tokio::test]
     async fn test_collect_all_stats() {
@@ -870,7 +899,7 @@ mod tests {
     async fn test_process_count() {
         let tool = create_test_system_monitor();
 
-        let process_count = tool.get_process_count().await;
+        let process_count = tool.get_process_count(&tool.sandbox).await;
         // Process count might be None on some platforms
         if let Some(count) = process_count {
             assert!(count > 0);
@@ -907,13 +936,29 @@ mod tests {
     }
     #[tokio::test]
     async fn test_selective_collection() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/proc")
+            .with_file_access("/tmp");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_system_monitor_selective".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = SystemMonitorConfig {
             collect: StatsCollection {
                 enabled_stats: vec![StatType::Memory],
             },
             ..Default::default()
         };
-        let tool = SystemMonitorTool::new(config);
+        let tool = SystemMonitorTool::new(config, sandbox);
 
         let stats = tool.collect_system_stats().await.unwrap();
 
@@ -936,7 +981,7 @@ mod tests {
         let tool = create_test_system_monitor();
 
         // Load average might not be available in all test environments
-        if let Ok(load_avg) = tool.get_load_average() {
+        if let Ok(load_avg) = tool.get_load_average(&tool.sandbox) {
             assert!(load_avg[0] >= 0.0);
             assert!(load_avg[1] >= 0.0);
             assert!(load_avg[2] >= 0.0);
@@ -946,7 +991,7 @@ mod tests {
     async fn test_uptime() {
         let tool = create_test_system_monitor();
 
-        let uptime = tool.get_uptime().await;
+        let uptime = tool.get_uptime(&tool.sandbox).await;
         // Uptime might not be available in all test environments
         if let Some(uptime_secs) = uptime {
             assert!(uptime_secs > 0);

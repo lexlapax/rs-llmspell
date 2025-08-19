@@ -19,7 +19,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_f64, extract_optional_string, extract_parameters, extract_required_string,
     response::ResponseBuilder,
@@ -173,14 +173,13 @@ impl Default for VideoProcessorConfig {
 pub struct VideoProcessorTool {
     metadata: ComponentMetadata,
     config: VideoProcessorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl VideoProcessorTool {
     /// Create a new video processor tool
     #[must_use]
-    pub fn new(config: VideoProcessorConfig) -> Self {
+    pub fn new(config: VideoProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "video_processor".to_string(),
@@ -188,24 +187,7 @@ impl VideoProcessorTool {
                     .to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new video processor tool with sandbox context
-    #[must_use]
-    pub fn with_sandbox(
-        config: VideoProcessorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "video_processor".to_string(),
-                "Video file processing for format detection, metadata extraction, and thumbnails"
-                    .to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
@@ -227,9 +209,16 @@ impl VideoProcessorTool {
     }
 
     /// Extract metadata from video file
-    async fn extract_metadata(&self, file_path: &Path) -> LLMResult<VideoMetadata> {
+    async fn extract_metadata(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<VideoMetadata> {
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
         // Get file size
-        let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
+        let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("video_processor".to_string()),
             source: None,
@@ -406,7 +395,7 @@ impl BaseAgent for VideoProcessorTool {
                 let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
-                let metadata = self.extract_metadata(path).await?;
+                let metadata = self.extract_metadata(path, &self.sandbox).await?;
 
                 let mut message = format!("Video file: {:?} format", metadata.format);
 
@@ -562,9 +551,29 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
+    fn create_test_video_processor_with_temp_dir() -> (VideoProcessorTool, TempDir) {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_video".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        let tool = VideoProcessorTool::new(VideoProcessorConfig::default(), sandbox);
+        (tool, temp_dir)
+    }
+
     fn create_test_video_processor() -> VideoProcessorTool {
-        let config = VideoProcessorConfig::default();
-        VideoProcessorTool::new(config)
+        create_test_video_processor_with_temp_dir().0
     }
     #[tokio::test]
     async fn test_format_detection_by_extension() {
@@ -622,8 +631,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_video_processor();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_video_processor_with_temp_dir();
         let file_path = temp_dir.path().join("video.mp4");
 
         fs::write(&file_path, b"dummy mp4 content").unwrap();
@@ -664,13 +672,28 @@ mod tests {
     }
     #[tokio::test]
     async fn test_file_size_limit() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_video_size_limit".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = VideoProcessorConfig {
             max_file_size: 10, // Very small limit
             ..Default::default()
         };
-        let tool = VideoProcessorTool::new(config);
+        let tool = VideoProcessorTool::new(config, sandbox);
 
-        let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("large.mp4");
 
         // Create a file larger than the limit
@@ -788,8 +811,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_video_processor();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_video_processor_with_temp_dir();
         let file_path = temp_dir.path().join("test.mp4");
 
         fs::write(&file_path, b"dummy").unwrap();

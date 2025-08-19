@@ -169,8 +169,9 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
     });
 
     group.bench_function("file_operations", |b| {
+        let sandbox = create_test_sandbox();
         b.iter(|| {
-            let tool = FileOperationsTool::new(FileOperationsConfig::default());
+            let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox.clone());
             black_box(tool)
         });
     });
@@ -205,8 +206,9 @@ fn bench_system_tools_init(c: &mut Criterion) {
     });
 
     group.bench_function("process_executor", |b| {
+        let sandbox = create_test_sandbox();
         b.iter(|| {
-            let tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
+            let tool = ProcessExecutorTool::new(ProcessExecutorConfig::default(), sandbox.clone());
             black_box(tool)
         });
     });
@@ -219,8 +221,9 @@ fn bench_system_tools_init(c: &mut Criterion) {
     });
 
     group.bench_function("system_monitor", |b| {
+        let sandbox = create_test_sandbox();
         b.iter(|| {
-            let tool = SystemMonitorTool::new(SystemMonitorConfig::default());
+            let tool = SystemMonitorTool::new(SystemMonitorConfig::default(), sandbox.clone());
             black_box(tool)
         });
     });
@@ -271,15 +274,16 @@ fn bench_all_tools_sequential(c: &mut Criterion) {
             let _archive = ArchiveHandlerTool::new();
             let _file_conv =
                 FileConverterTool::new(FileConverterConfig::default(), sandbox.clone());
-            let _file_ops = FileOperationsTool::new(FileOperationsConfig::default());
+            let _file_ops =
+                FileOperationsTool::new(FileOperationsConfig::default(), sandbox.clone());
             let _file_search = FileSearchTool::new(FileSearchConfig::default(), sandbox.clone());
             let _file_watch = FileWatcherTool::new(FileWatcherConfig::default(), sandbox.clone());
 
             // System tools
             let _env = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
-            let _proc = ProcessExecutorTool::new(ProcessExecutorConfig::default());
+            let _proc = ProcessExecutorTool::new(ProcessExecutorConfig::default(), sandbox.clone());
             let _service = ServiceCheckerTool::new(ServiceCheckerConfig::default());
-            let _system = SystemMonitorTool::new(SystemMonitorConfig::default());
+            let _system = SystemMonitorTool::new(SystemMonitorConfig::default(), sandbox.clone());
 
             // Search tools
             let _web_search = WebSearchTool::new(WebSearchConfig::default());
