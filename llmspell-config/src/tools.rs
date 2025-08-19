@@ -8,6 +8,23 @@ fn default_true() -> bool {
     true
 }
 
+fn default_50mb() -> usize {
+    50_000_000
+}
+
+fn default_max_depth() -> Option<usize> {
+    Some(10)
+}
+
+fn default_blocked_extensions() -> Vec<String> {
+    vec![
+        "exe".to_string(),
+        "dll".to_string(),
+        "so".to_string(),
+        "dylib".to_string(),
+    ]
+}
+
 /// Tools configuration - Single source of truth for ALL tool settings
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ToolsConfig {
@@ -21,10 +38,13 @@ pub struct ToolsConfig {
 
     // Core tool categories
     /// File operations tool configuration
+    #[serde(default)]
     pub file_operations: FileOperationsConfig,
     /// Web search tool configuration  
+    #[serde(default)]
     pub web_search: WebSearchConfig,
     /// HTTP request tool configuration
+    #[serde(default)]
     pub http_request: HttpRequestConfig,
     /// Network settings for tools
     #[serde(skip_serializing_if = "Option::is_none", default)]
@@ -152,23 +172,31 @@ pub struct NetworkConfig {
 
 /// File operations tool configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct FileOperationsConfig {
     /// Whether file operations are enabled
     #[serde(default = "default_true")]
     pub enabled: bool,
     /// Allowed file paths for security
+    #[serde(default = "default_file_paths")]
     pub allowed_paths: Vec<String>,
     /// Maximum file size in bytes
+    #[serde(default = "default_50mb")]
     pub max_file_size: usize,
     /// Enable atomic write operations
+    #[serde(default = "default_true")]
     pub atomic_writes: bool,
     /// Maximum directory depth for traversal
+    #[serde(default = "default_max_depth")]
     pub max_depth: Option<usize>,
     /// Allowed file extensions (empty = all allowed)
+    #[serde(default)]
     pub allowed_extensions: Vec<String>,
     /// Blocked file extensions
+    #[serde(default = "default_blocked_extensions")]
     pub blocked_extensions: Vec<String>,
     /// Enable file type validation
+    #[serde(default = "default_true")]
     pub validate_file_types: bool,
 }
 
@@ -176,20 +204,61 @@ impl Default for FileOperationsConfig {
     fn default() -> Self {
         Self {
             enabled: true,
-            allowed_paths: vec!["/tmp".to_string()],
-            max_file_size: 50_000_000, // 50MB
+            allowed_paths: default_file_paths(),
+            max_file_size: default_50mb(),
             atomic_writes: true,
-            max_depth: Some(10),
+            max_depth: default_max_depth(),
             allowed_extensions: Vec::new(), // Empty = all allowed
-            blocked_extensions: vec![
-                "exe".to_string(),
-                "dll".to_string(),
-                "so".to_string(),
-                "dylib".to_string(),
-            ],
+            blocked_extensions: default_blocked_extensions(),
             validate_file_types: true,
         }
     }
+}
+
+fn default_file_paths() -> Vec<String> {
+    vec!["/tmp".to_string()]
+}
+
+fn default_rate_limit() -> u32 {
+    30
+}
+
+fn default_allowed_domains() -> Vec<String> {
+    vec!["*".to_string()]
+}
+
+fn default_allowed_hosts() -> Vec<String> {
+    vec!["*".to_string()]
+}
+
+fn default_max_results() -> usize {
+    10
+}
+
+fn default_timeout_seconds() -> u64 {
+    30
+}
+
+fn default_blocked_hosts() -> Vec<String> {
+    vec![
+        "localhost".to_string(),
+        "127.0.0.1".to_string(),
+        "0.0.0.0".to_string(),
+    ]
+}
+
+fn default_max_request_size() -> usize {
+    10_000_000 // 10MB
+}
+
+fn default_max_redirects() -> u32 {
+    5
+}
+
+fn default_http_headers() -> HashMap<String, String> {
+    let mut headers = HashMap::new();
+    headers.insert("User-Agent".to_string(), "llmspell-http/1.0".to_string());
+    headers
 }
 
 impl FileOperationsConfig {
@@ -319,18 +388,25 @@ impl Default for FileOperationsConfigBuilder {
 
 /// Web search tool configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct WebSearchConfig {
     /// Rate limit requests per minute
+    #[serde(default = "default_rate_limit")]
     pub rate_limit_per_minute: u32,
     /// Allowed domains (empty = all allowed)
+    #[serde(default = "default_allowed_domains")]
     pub allowed_domains: Vec<String>,
     /// Blocked domains
+    #[serde(default)]
     pub blocked_domains: Vec<String>,
     /// Maximum results per search
+    #[serde(default = "default_max_results")]
     pub max_results: usize,
     /// Request timeout in seconds
+    #[serde(default = "default_timeout_seconds")]
     pub timeout_seconds: u64,
     /// User agent string
+    #[serde(default)]
     pub user_agent: Option<String>,
 }
 
@@ -450,18 +526,25 @@ impl Default for WebSearchConfigBuilder {
 
 /// HTTP request tool configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct HttpRequestConfig {
     /// Allowed hosts (empty = all allowed)
+    #[serde(default = "default_allowed_hosts")]
     pub allowed_hosts: Vec<String>,
     /// Blocked hosts
+    #[serde(default = "default_blocked_hosts")]
     pub blocked_hosts: Vec<String>,
     /// Maximum request size in bytes
+    #[serde(default = "default_max_request_size")]
     pub max_request_size: usize,
     /// Request timeout in seconds
+    #[serde(default = "default_timeout_seconds")]
     pub timeout_seconds: u64,
     /// Maximum redirects to follow
+    #[serde(default = "default_max_redirects")]
     pub max_redirects: u32,
     /// Default headers to include
+    #[serde(default = "default_http_headers")]
     pub default_headers: HashMap<String, String>,
 }
 

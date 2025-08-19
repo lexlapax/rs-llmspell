@@ -205,7 +205,6 @@ fn validate_provider_config(config: &LLMSpellConfig) -> Result<(), ConfigError> 
 fn validate_tools_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
     // Validate file operations configuration
     let file_ops = &config.tools.file_operations;
-
     if file_ops.allowed_paths.is_empty() {
         return Err(ConfigError::Validation {
             field: Some("tools.file_operations.allowed_paths".to_string()),
@@ -250,7 +249,6 @@ fn validate_tools_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
 
     // Validate web search configuration
     let web_search = &config.tools.web_search;
-
     if web_search.rate_limit_per_minute == 0 {
         return Err(ConfigError::Validation {
             field: Some("tools.web_search.rate_limit_per_minute".to_string()),
@@ -281,7 +279,6 @@ fn validate_tools_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
 
     // Validate HTTP request configuration
     let http_req = &config.tools.http_request;
-
     if http_req.max_request_size == 0 {
         return Err(ConfigError::Validation {
             field: Some("tools.http_request.max_request_size".to_string()),

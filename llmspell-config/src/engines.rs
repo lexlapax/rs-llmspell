@@ -6,10 +6,13 @@ use std::collections::HashMap;
 
 /// Engine configurations
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct EngineConfigs {
+    #[serde(default)]
     pub lua: LuaConfig,
+    #[serde(default)]
     pub javascript: JSConfig,
-    #[serde(flatten)]
+    #[serde(flatten, default)]
     pub custom: HashMap<String, serde_json::Value>,
 }
 

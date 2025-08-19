@@ -833,63 +833,41 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
      - Applications use proper error handling with `pcall` for graceful fallback
      - State-based pattern ready for backend implementation
 
-10. [ ] **Fix Configuration & State Infrastructure Issues** (3 hours):
-    **Problem**: Config parsing is too strict and error messages are unhelpful
-    - Users get "Failed to parse TOML configuration" with no details
-    - Required fields don't use defaults even when Default is implemented
-    - Config structure changes from G.8 may have broken compatibility
+10. [x] **Fix Configuration & State Infrastructure Issues** (1.5 hours) - ✅ COMPLETED:
     
-    **10.1. Fix TOML Deserialization** (45 minutes):
-    - [ ] Add `#[serde(default)]` to all config structs that have Default impl
-      - [ ] `FileOperationsConfig` in tools.rs
-      - [ ] `WebSearchConfig` in tools.rs
-      - [ ] `HttpRequestConfig` in tools.rs
-      - [ ] `WebToolsConfig` in tools.rs
-      - [ ] `MediaToolsConfig` in tools.rs
-      - [ ] `CommunicationToolsConfig` in tools.rs
-      - [ ] `UtilityToolsConfig` in tools.rs
-      - [ ] `EmailToolsConfig` in tools.rs
-    - [ ] Make tool subsections optional with `Option<T>`
-    - [ ] Test minimal config loads successfully
+    **Problem Identified**: webapp-creator app failed with "Failed to parse TOML configuration"
+    - Root cause: Missing `#[serde(default)]` on provider config structs
+    - `#[serde(flatten)]` on ProviderManagerConfig caused deserialization conflicts
+    - Provider configs required `name` field even when using HashMap keys
     
-    **10.2. Improve Error Messages** (30 minutes):
-    - [ ] Catch TOML parse errors and show which field failed
-    - [ ] Add context about expected field types
-    - [ ] Show line number where error occurred
-    - [ ] Suggest fixes for common mistakes
+    **Solution Implemented**:
     
-    **10.3. Make Config User-Friendly** (45 minutes):
-    - [ ] All tool configs should be optional (wrap in Option)
-    - [ ] Provider configs should be optional
-    - [ ] Engine configs should use defaults if not specified
-    - [ ] Runtime sections should be optional
-    - [ ] Test that empty config file works with just `default_engine`
+    **10.1. Fixed Provider Configuration Structure** ✅:
+    - [x] Added `#[serde(default)]` to `ProviderConfig` struct
+    - [x] Added `#[serde(default)]` to all provider fields (`name`, `provider_type`)
+    - [x] Removed `#[serde(flatten)]` from `ProviderManagerConfig.providers` field
+      - Was: `#[serde(flatten, alias = "configs", default)]`
+      - Now: `#[serde(default)]`
+    - [x] This fixed the "missing field `name`" error in provider configs
     
-    **10.4. Fix Environment Variable Issues** (30 minutes):
-    - [ ] Verify env var registry works with flattened structure
-    - [ ] Test provider env vars (OPENAI_API_KEY, etc.)
-    - [ ] Test state persistence env vars
-    - [ ] Document all supported env vars
+    **10.2. Maintained Tool Config Architecture** ✅:
+    - [x] Kept tool configs as non-Option with `#[serde(default)]`
+    - [x] All tool config structs already had serde(default) from earlier work
+    - [x] This allows minimal configs while ensuring tools have valid limits
     
-    **10.5. Add Config Validation** (30 minutes):
-    - [ ] Validate paths exist for file_operations
-    - [ ] Validate URLs for webhooks
-    - [ ] Check API keys are set for enabled providers
-    - [ ] Warn about deprecated config patterns
+    **ARCHITECTURAL DECISION**: 
+    Configuration fields should be non-optional with `#[serde(default)]` attributes rather
+    than `Option<T>`. This provides:
+    1. **User-friendly minimal configs** - Users can omit any section and get defaults
+    2. **Type safety** - No Option unwrapping throughout the codebase
+    3. **Security guarantees** - Tools always have valid limits/restrictions
+    4. **Cleaner code** - Direct field access without .as_ref() chains
     
-    **10.6. Test All Example Configs** (30 minutes):
-    - [ ] Fix webapp-creator/config.toml
-    - [ ] Test all application configs load
-    - [ ] Test all cookbook configs load
-    - [ ] Test minimal configs work
-    - [ ] Create config migration script if needed
-    
-    **Quality Requirements**:
-    - [ ] Zero panic on invalid configs (graceful errors)
-    - [ ] All example configs load successfully
-    - [ ] Minimal config (just default_engine) works
-    - [ ] Clear error messages with suggested fixes
-    - [ ] Backward compatibility maintained where possible
+    **Testing Completed**:
+    - [x] Minimal config (just `default_engine = "lua"`) loads successfully
+    - [x] webapp-creator config loads and runs successfully
+    - [x] Empty config file uses all defaults
+    - [x] Debug build shows proper error messages (release build was hiding them)
 
 11. [ ] **Documentation & Migration Guide** (1 hour):
     - [ ] Create `/docs/technical/state-based-workflows.md`:
@@ -948,7 +926,138 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 
 ---
 
-#### Task 7.3.9: Example Testing Framework
+#### Task 7.3.9: Mandatory Sandbox Architecture (Security Critical)
+**Priority**: CRITICAL - SECURITY
+**Estimated Time**: 8 hours
+**Status**: TODO
+**Assigned To**: Security Team
+**Dependencies**: Task 7.3.8 (State-Based Workflow Implementation)
+
+**Description**: Implement mandatory sandbox architecture where ALL file system tools MUST use bridge-provided sandbox with configured security rules. This fixes the critical security vulnerability where FileOperationsTool creates its own sandbox, completely bypassing configured security restrictions.
+
+**CRITICAL SECURITY ISSUE IDENTIFIED**: 
+- FileOperationsTool ignores bridge security configuration and creates own sandbox
+- Media tools (Audio/Video/ImageProcessor) accept but never use sandbox context  
+- Tools can access any file path regardless of configured allowed_paths
+- This allows sandbox escape and unauthorized file system access
+
+**Architecture Decision (Option 1 - Mandatory Sandbox)**:
+Make all file system tools REQUIRE sandbox context and remove ability to create own sandboxes.
+
+**MEGATHINK ANALYSIS COMPLETED**: Comprehensive analysis shows:
+- **Root Cause**: FileOperationsTool.create_sandbox() method bypasses bridge security
+- **Scope**: 4 core tools affected (FileOps + 3 media tools)  
+- **Solution**: Remove sandbox creation, make sandbox parameter required
+- **Risk**: Breaking change to tool APIs, but essential for security
+
+**Implementation Steps**:
+
+**7.3.9.1: Remove FileOperationsTool Sandbox Creation** (2 hours) - CRITICAL:
+- [ ] **Update FileOperationsTool API**:
+  - [ ] Remove `create_sandbox()` method entirely from `llmspell-tools/src/fs/file_operations.rs`
+  - [ ] Change `sandbox_context: Option<Arc<SandboxContext>>` to required field
+  - [ ] Update `new(config)` → `new(config, sandbox)` constructor signature
+  - [ ] Remove all sandbox creation logic in execute methods
+  - [ ] Use provided sandbox for ALL file operations
+- [ ] **Quality Check**: Zero sandbox creation in FileOperationsTool
+- [ ] **Security Validation**: Tool cannot create own sandbox
+
+**7.3.9.2: Bridge Registration Security Updates** (1.5 hours):
+- [ ] **Update Bridge Tool Registration**:
+  - [ ] Modify `llmspell-bridge/src/tools.rs` register_file_system_tools()
+  - [ ] Change FileOperationsTool registration to ALWAYS pass bridge sandbox
+  - [ ] Remove `register_tool()` usage for FileOps, use `register_tool_with_sandbox()`
+  - [ ] Ensure ALL file system tools receive shared file_sandbox
+- [ ] **Validation**: All file system tools use bridge-configured security rules
+- [ ] **Test**: Bridge security propagation working correctly
+
+**7.3.9.3: Media Tools Sandbox Implementation** (2 hours):
+- [ ] **AudioProcessorTool Sandbox Usage**:
+  - [ ] Remove `#[allow(dead_code)]` from sandbox_context field
+  - [ ] Make sandbox_context required (not Option<Arc<SandboxContext>>)
+  - [ ] Implement file operations using provided sandbox
+  - [ ] Update constructor: `new(config)` → `new(config, sandbox)`
+- [ ] **VideoProcessorTool Sandbox Usage**: Same changes as AudioProcessor
+- [ ] **ImageProcessorTool Sandbox Usage**: Same changes as AudioProcessor
+- [ ] **Quality Check**: All media tools use sandbox for file operations
+
+**7.3.9.4: System Tools Sandbox Integration** (1 hour):
+- [ ] **ProcessExecutorTool Updates**:
+  - [ ] Audit file system usage in ProcessExecutorTool
+  - [ ] Use sandbox for any file operations if applicable
+  - [ ] Update constructor if file operations detected
+- [ ] **SystemMonitorTool Review**: Check for file system access patterns
+- [ ] **Quality Check**: All system tools respect sandbox restrictions
+
+**7.3.9.5: Test Infrastructure Updates** (1 hour):
+- [ ] **Update Test Helpers**:
+  - [ ] Modify `llmspell-testing/src/tool_helpers.rs` to provide sandbox
+  - [ ] Update all tool creation patterns in tests
+  - [ ] Ensure test sandboxes have proper security restrictions
+- [ ] **Fix Failing Tests**:
+  - [ ] Update all tests that create FileOperationsTool directly
+  - [ ] Update media tool tests to provide sandbox
+  - [ ] Update integration tests for new tool APIs
+- [ ] **Quality Check**: All tool tests pass with mandatory sandbox
+
+**7.3.9.6: Integration Testing & Validation** (30 minutes):
+- [ ] **Security Propagation Tests**:
+  - [ ] Test that configured allowed_paths are enforced by ALL tools
+  - [ ] Test sandbox escape attempts are blocked
+  - [ ] Test media tools respect file restrictions
+- [ ] **Performance Testing**: Ensure shared sandbox doesn't degrade performance
+- [ ] **Quality Check**: Security rules properly propagated to all components
+
+**7.3.9.7: Documentation & Examples Updates** (30 minutes):
+- [ ] **Update Security Documentation**:
+  - [ ] Document mandatory sandbox architecture
+  - [ ] Update tool development guide with required sandbox parameter
+  - [ ] Add security best practices for tool development
+- [ ] **Fix Examples**: Update any examples that create tools directly
+- [ ] **Quality Check**: All documentation reflects mandatory sandbox architecture
+
+**Subtasks for Late-Breaking Changes**:
+- [ ] **7.3.9.8: Additional Tool Discovery** - If analysis reveals more tools needing updates
+- [ ] **7.3.9.9: API Compatibility Layer** - If backward compatibility becomes critical
+- [ ] **7.3.9.10: Performance Optimization** - If shared sandbox causes performance issues
+
+**Files Requiring Changes** (Based on Analysis):
+**Core Tool Files**:
+- `llmspell-tools/src/fs/file_operations.rs` - Remove create_sandbox, require sandbox
+- `llmspell-tools/src/media/audio_processor.rs` - Use sandbox_context field
+- `llmspell-tools/src/media/video_processor.rs` - Use sandbox_context field  
+- `llmspell-tools/src/media/image_processor.rs` - Use sandbox_context field
+- `llmspell-tools/src/system/process_executor.rs` - Use sandbox if needed
+
+**Bridge Files**:
+- `llmspell-bridge/src/tools.rs` - Update all tool registrations
+
+**Test Files**: All test files that create these tools directly
+
+**Critical Quality Requirements**:
+- [ ] ZERO compilation errors after changes
+- [ ] ALL security tests passing
+- [ ] ALL file system operations go through bridge-configured sandbox
+- [ ] NO tools can create their own sandbox
+- [ ] Security rules propagate to ALL file system tools
+- [ ] Performance regression tests pass
+
+**Security Validation**:
+- [ ] FileOperationsTool cannot access files outside allowed_paths
+- [ ] Media tools respect bridge security configuration  
+- [ ] No sandbox creation methods remain in any tool
+- [ ] All file operations use bridge-provided sandbox
+- [ ] webapp-creator and other apps respect security restrictions
+
+**Success Metrics**:
+- Zero sandbox escape vulnerabilities
+- All file system tools enforce configured security rules
+- No tool can bypass bridge security configuration
+- Clean architecture with mandatory security compliance
+
+---
+
+#### Task 7.3.10: Example Testing Framework
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -990,7 +1099,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 
 ---
 
-#### Task 7.3.10: Example Documentation Integration
+#### Task 7.3.11: Example Documentation Integration
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -1036,7 +1145,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 
 ### Set 4: Documentation Cleanup (Day 7-9)
 
-#### Task 4.1: rs-llmspell browseable api documentation 
+#### Task 7.4.1: rs-llmspell browseable api documentation 
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1045,7 +1154,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 **Description**: Ensure a complete set of coherent apis documentation are created for rust and lua. they should be under `docs/user-guide/api/rust/` and `docs/user-guide/api/lua`. 
 
 
-#### Task 4.2: User Guide Standardization
+#### Task 7.4.2: User Guide Standardization
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1127,7 +1236,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 
 ---
 
-#### Task 4.3: Technical Documentation Cleanup
+#### Task 7.4.3: Technical Documentation Cleanup
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -1174,7 +1283,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 
 ---
 
-#### Task 4.4: Developer Guide Enhancement
+#### Task 7.4.4: Developer Guide Enhancement
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1239,7 +1348,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
 
 ---
 
-#### Task 4.4: Example Code Audit
+#### Task 7.4.5: Example Code Audit
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO

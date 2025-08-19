@@ -10,11 +10,13 @@ fn default_true() -> bool {
 
 /// Provider manager configuration
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
+#[serde(default)]
 pub struct ProviderManagerConfig {
     /// Default provider to use
+    #[serde(default)]
     pub default_provider: Option<String>,
-    /// Provider-specific configurations (flattened for intuitive config structure)
-    #[serde(flatten, alias = "configs")]
+    /// Provider-specific configurations
+    #[serde(default)]
     pub providers: HashMap<String, ProviderConfig>,
 }
 
@@ -101,10 +103,13 @@ impl Default for ProviderManagerConfigBuilder {
 
 /// Individual provider configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct ProviderConfig {
     /// Provider name identifier
+    #[serde(default)]
     pub name: String,
     /// Provider type (e.g., "openai", "anthropic", "ollama")
+    #[serde(default)]
     pub provider_type: String,
     /// Whether this provider is enabled
     #[serde(default = "default_true")]

@@ -38,6 +38,7 @@ const ENV_PREFIX: &str = "LLMSPELL_";
 
 /// Central LLMSpell configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
 pub struct LLMSpellConfig {
     /// Default script engine to use
     pub default_engine: String,
@@ -50,7 +51,7 @@ pub struct LLMSpellConfig {
     /// Tool-specific configurations
     pub tools: ToolsConfig,
     /// Hook system configuration
-    #[serde(skip_serializing_if = "Option::is_none", default)]
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub hooks: Option<HookConfig>,
 }
 
@@ -85,8 +86,7 @@ impl LLMSpellConfig {
 
     /// Parse TOML content with environment variable overrides and validation
     pub fn from_toml(content: &str) -> Result<Self, ConfigError> {
-        let mut config: LLMSpellConfig =
-            toml::from_str(content).with_context(|| "Failed to parse TOML configuration")?;
+        let mut config: LLMSpellConfig = toml::from_str(content)?;
 
         // Use registry for environment overrides
         config.apply_env_registry()?;
@@ -870,5 +870,33 @@ mod tests {
             .build();
 
         assert_eq!(config.default_engine, "javascript");
+    }
+
+    #[test]
+    fn test_minimal_toml_config() {
+        let toml_str = r#"default_engine = "lua""#;
+        let result = LLMSpellConfig::from_toml(toml_str);
+
+        // Should parse successfully
+        assert!(
+            result.is_ok(),
+            "Failed to parse minimal config: {:?}",
+            result
+        );
+
+        let config = result.unwrap();
+        assert_eq!(config.default_engine, "lua");
+    }
+
+    #[test]
+    fn test_empty_toml_config() {
+        let toml_str = "";
+        let result = LLMSpellConfig::from_toml(toml_str);
+
+        // Should use defaults
+        assert!(result.is_ok(), "Failed to parse empty config: {:?}", result);
+
+        let config = result.unwrap();
+        assert_eq!(config.default_engine, "lua");
     }
 }
