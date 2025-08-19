@@ -540,51 +540,236 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
    LLMSPELL_PROVIDER_OPENAI_MODEL   → providers.openai.model     # ← Intuitive
    ```
    
-   **G.8.1. Update ProviderManagerConfig structure** (1 hour):
-   - [ ] Modify `llmspell-config/src/providers.rs`:
+   **G.8.1. Update ProviderManagerConfig structure** ✅ COMPLETED (1 hour):
+   - [x] Modified `llmspell-config/src/providers.rs`:
      ```rust
      pub struct ProviderManagerConfig {
          pub default_provider: Option<String>,
-         // Remove the "configs" wrapper, flatten the HashMap
-         #[serde(flatten)]
+         // Flattened HashMap with alias for backward compatibility
+         #[serde(flatten, alias = "configs")]
          pub providers: HashMap<String, ProviderConfig>,
      }
      ```
-   - [ ] Update all field access: `self.configs.get(name)` → `self.providers.get(name)`
-   - [ ] Update builder methods: `.add_provider()` uses providers field
-   - [ ] Add serde alias for backward compatibility: `#[serde(alias = "configs")]`
-   - [ ] Run compile check: `cargo check -p llmspell-config`
+   - [x] Updated all field access: `self.configs.get(name)` → `self.providers.get(name)`
+   - [x] Updated builder methods: `.add_provider()` uses providers field
+   - [x] Added serde alias for backward compatibility: `#[serde(alias = "configs")]`
+   - [x] Compilation check passed: `cargo check -p llmspell-config`
    
-   **G.8.2. Update environment variable registry mappings** (45 minutes):
-   - [ ] Update `llmspell-config/src/env_registry.rs`:
-     - Change all `providers.configs.openai.*` → `providers.openai.*`
-     - Change all `providers.configs.anthropic.*` → `providers.anthropic.*`
-     - Update config paths to match flattened structure
-   - [ ] Test environment variable building: cargo test test_build_config_from_registry
-   - [ ] Verify JSON config structure matches expectation
+   **G.8.2. Update environment variable registry mappings** ✅ COMPLETED (45 minutes):
+   - [x] Updated `llmspell-config/src/env_registry.rs`:
+     - Changed all `providers.configs.openai.*` → `providers.openai.*`
+     - Changed all `providers.configs.anthropic.*` → `providers.anthropic.*`
+     - Updated config paths to match flattened structure
+   - [x] Fixed test expectation: `config["providers"]["openai"]["api_key"]`
+   - [x] Test passed: `cargo test test_build_config_from_registry`
+   - [x] Verified JSON config structure matches expectation
    
-   **G.8.3. Update all provider field references** (45 minutes):
-   - [ ] Update `llmspell-bridge/src/providers.rs`:
-     - Change `self.config.configs` → `self.config.providers`
-   - [ ] Update all test files:
-     - Change `config.configs.insert()` → `config.providers.insert()` 
-     - Update test assertions to expect new structure
-   - [ ] Update `llmspell-config/src/lib.rs` merge logic:
-     - Change JSON path from `providers.configs` → `providers`
-   - [ ] Run full test suite: `cargo test -p llmspell-config`
+   **G.8.3. Update all provider field references** ✅ COMPLETED (45 minutes):
+   - [x] Updated `llmspell-bridge/src/config_bridge.rs`:
+     - Changed `config.providers.configs` → `config.providers.providers` (4 references)
+   - [x] Updated `llmspell-bridge/src/providers.rs`:
+     - Changed `self.config.configs` → `self.config.providers` (7 references)
+   - [x] Updated `llmspell-cli/src/commands/validate.rs`:
+     - Changed `config.providers.configs` → `config.providers.providers`
+   - [x] Updated all test files:
+     - `bridge_provider_test.rs`: Changed `config.configs` → `config.providers`
+     - `integration_test.rs`: Changed `provider_config.configs` → `provider_config.providers`
+     - `provider_integration_test.rs`: Fixed struct field name
+     - `provider_enhancement_test.rs`: Fixed struct field name
+   - [x] Updated `llmspell-config/src/validation.rs`:
+     - Changed `config.providers.configs` → `config.providers.providers`
+   - [x] All tests passing: `cargo test -p llmspell-config` and `cargo check -p llmspell-bridge`
    
-   **G.8.4. Update example configuration files** (30 minutes):
+   **G.8.4. Configuration UX Improvements** (4.5 hours):
+   
+   **MAJOR UX ANALYSIS RESULTS**: Beyond the provider configs fix, discovered significant configuration UX issues:
+   
+   **Issues Identified**:
+   1. **CRITICAL**: Redundant top-level vs nested settings (confusing duplicate paths)
+   2. **HIGH**: Over-nested state persistence (5 levels deep: `runtime.state_persistence.flags.core.enabled`)
+   3. **MEDIUM**: Inconsistent naming patterns across configuration fields
+   
+   **G.8.4.1. HIGH PRIORITY: Remove Redundant Top-Level Configuration Fields** ✅ COMPLETED (2 hours):
+   
+   **Problem**: Multiple confusing ways to configure the same settings:
+   ```rust
+   pub struct LLMSpellConfig {
+       // REDUNDANT - Same as runtime.state_persistence.flags.core.enabled
+       pub state_enabled: Option<bool>,
+       // REDUNDANT - Same as runtime.state_persistence.backend_type  
+       pub state_backend: Option<String>,
+       // REDUNDANT - Same as runtime.state_persistence.schema_directory
+       pub state_path: Option<String>,
+       // REDUNDANT - Same as runtime.sessions.enabled
+       pub sessions_enabled: Option<bool>,
+       // REDUNDANT - Same as hooks.enabled
+       pub hooks_enabled: Option<bool>,
+   }
+   ```
+   
+   - [x] **Phase 1**: Remove redundant fields from `llmspell-config/src/lib.rs`:
+     - [x] Remove `state_enabled`, `state_backend`, `state_path` fields
+     - [x] Remove `sessions_enabled`, `hooks_enabled` fields  
+     - [x] Remove `config_path`, `home_dir`, `data_dir`, `log_dir` (should be runtime-only)
+     - [x] Update `Default` implementation
+     - [x] Update `merge_from_json()` to remove redundant field handling
+   
+   - [x] **Phase 2**: Update environment variable registry (`llmspell-config/src/env_registry.rs`):
+     - [x] Remove environment variable mappings for redundant fields
+     - [x] Keep only canonical paths (e.g., `runtime.sessions.enabled`)
+     - [x] Update tests to expect single configuration path
+   
+   - [x] **Phase 3**: Update bridge layer (`llmspell-bridge/src/config_bridge.rs`):
+     - [x] Remove any access to redundant top-level fields
+     - [x] Ensure all access goes through proper nested paths
+     - [x] Update configuration export methods
+   
+   - [x] **Phase 4**: Update CLI and other components:
+     - [x] Search for usage of redundant fields in `llmspell-cli/`
+     - [x] Update any field access to use canonical nested paths
+     - [x] Update validation logic in `llmspell-config/src/validation.rs`
+   
+   - [x] **Phase 5**: Update tests and examples:
+     - [x] Remove references to redundant fields in all test files
+     - [x] Update example configuration files
+     - [x] Test that canonical paths work correctly
+   
+   **G.8.4.2. MEDIUM PRIORITY: Flatten State Persistence Configuration** ✅ COMPLETED (1.5 hours):
+   
+   **Problem**: Excessive nesting (5 levels deep):
+   ```
+   runtime.state_persistence.flags.core.enabled              # TOO DEEP!
+   runtime.state_persistence.flags.backup.backup_enabled     # TOO DEEP!
+   ```
+   
+   **Solution**: Flatten to 3 levels maximum:
+   ```
+   runtime.state_persistence.enabled                         # Clean!
+   runtime.state_persistence.backup_enabled                  # Clean!
+   ```
+   
+   - [x] **Phase 1**: Restructure `llmspell-config/src/lib.rs`:
+     ```rust
+     #[derive(Debug, Clone, Deserialize, Serialize)]
+     pub struct StatePersistenceConfig {
+         // Flatten flags directly into config
+         pub enabled: bool,
+         pub migration_enabled: bool,
+         pub backup_enabled: bool,
+         pub backup_on_migration: bool,
+         
+         // Keep other fields as-is
+         pub backend_type: String,
+         pub schema_directory: Option<String>,
+         pub max_state_size_bytes: Option<usize>,
+         pub backup: Option<BackupConfig>,
+     }
+     ```
+   - [x] Remove `StatePersistenceFlags`, `CoreStateFlags`, `BackupFlags` structs  
+   - [x] Update `Default` implementation for flattened structure
+   - [x] Update `merge_from_json()` with backward compatibility
+   
+   - [x] **Phase 2**: Update environment variable registry:
+     - [x] Change paths: `flags.core.enabled` → `enabled`
+     - [x] Change paths: `flags.core.migration_enabled` → `migration_enabled`  
+     - [x] Change paths: `flags.backup.backup_enabled` → `backup_enabled`
+     - [x] Update all state persistence environment variable mappings
+     - [x] Add `backup_on_migration` environment variable mapping
+   
+   - [x] **Phase 3**: Update state persistence crate:
+     - [x] Update `llmspell-state-persistence/` to use flattened paths  
+     - [x] Search for any `.flags.core.` or `.flags.backup.` access patterns
+     - [x] Update configuration loading in state persistence initialization
+   
+   - [x] **Phase 4**: Update bridge and other components:
+     - [x] Update state access in `llmspell-bridge/`
+     - [x] Update any configuration access in workflows, agents, etc.
+     - [x] Test that state persistence still works correctly
+   
+   **G.8.4.3. LOW PRIORITY: Standardize Naming Patterns** (1 hour):
+   
+   **Problem**: Inconsistent naming across configuration:
+   - `script_timeout_seconds` vs `timeout_ms` (mixed time units)
+   - `rate_limit_per_minute` vs `rate_limit_per_hour` (mixed time scales)  
+   - `max_memory` vs `max_memory_bytes` (mixed specificity)
+   - `max_file_size` vs `max_request_size` (mixed patterns)
+   
+   **Solution**: Standardize to consistent patterns
+   
+   - [x] **Phase 1**: Standardize time units - prefer seconds for config, ms for internal:
+     - [x] `llmspell-config/src/engines.rs`: Keep `timeout_ms` (internal timing)
+     - [x] `llmspell-config/src/tools.rs`: Standardize to `timeout_seconds`
+     - [x] `llmspell-config/src/providers.rs`: Keep `timeout_seconds`
+     - [x] Update environment variable mappings accordingly
+   
+   - [x] **Phase 2**: Standardize rate limiting - prefer per_minute:
+     - [x] `llmspell-config/src/tools.rs`: Keep `rate_limit_per_minute`
+     - [x] Change any `rate_limit_per_hour` → `rate_limit_per_minute` with conversion
+     - [x] Update EmailToolsConfig to use per_minute instead of per_hour
+   
+   - [x] **Phase 3**: Standardize size fields - prefer explicit units:
+     - [x] `max_memory` → `max_memory_bytes` (engines)
+     - [x] `max_heap_size` → `max_heap_size_bytes` (engines)
+     - [x] Keep `max_file_size` as-is (already clear in context)
+     - [x] Updated validation.rs to use new field names
+     - [x] Fixed all tests to use new standardized field names
+   
+   - [x] **Phase 4**: Update references across codebase:
+     - [x] Search for old field names in bridge, tools, engines
+     - [x] Update validation messages to use new field names
+     - [x] Update environment variable names for consistency
+     - [x] Update all tests and examples
+     - [x] Fixed bridge factory LuaConfig and JSConfig structures
+     - [x] Updated bridge integration and performance tests
+     - [x] Fixed environment registry test for flattened state config
+   
+   **Quality Requirements**:
+   - [x] Zero compilation errors after all changes
+   - [x] All configuration tests passing  
+   - [x] Environment variable registry tests passing
+   - [x] No clippy warnings related to configuration
+   - [x] Validate backward compatibility where appropriate (serde aliases in place)
+   
+   **G.8.5. Update example configuration files** (30 minutes):
    - [ ] Update or recreate with commented out options (all config options) `examples/script-users/configs/applications.toml`:
-     ```toml
+   - [ ] Update example application configs to be the right configs
+    - examples/script-users/applications/research-assistant/config.toml
+    - examples/script-users/applications/code-review-assistant/config.toml
+    - examples/script-users/applications/webapp-creator/config-new.toml
+    - examples/script-users/applications/webapp-creator/config.toml
+    - examples/script-users/applications/content-generation-platform/config.toml
+    - examples/script-users/applications/data-pipeline/config.toml
+    - examples/script-users/applications/workflow-hub/config.toml
+    - examples/script-users/applications/document-intelligence/config.toml
+    - examples/script-users/applications/customer-support-bot/config.toml
+  - all other toml files in examples
+    - examples/script-users/configs/session-enabled.toml
+    - examples/script-users/configs/migration-enabled.toml
+    - examples/script-users/configs/cookbook.toml
+    - examples/script-users/configs/basic.toml
+    - examples/script-users/configs/minimal.toml
+    - examples/script-users/configs/example-providers.toml
+    - examples/script-users/configs/state-enabled.toml
+    - examples/script-users/configs/llmspell.toml
+    - examples/script-users/configs/backup-enabled.toml
+  
+       ```toml
      [providers]
      default = "openai"
-       [providers.openai]      # ← Remove "configs" level
+       [providers.openai]      # ← Clean hierarchy (was providers.configs.openai)
        enabled = true
        model = "gpt-4o-mini"
+       
+     [runtime.state_persistence]
+     enabled = true            # ← Clean path (was flags.core.enabled)
+     
+     [runtime.sessions]
+     enabled = false           # ← Single source of truth (not sessions_enabled)
      ```
    - [ ] Update all application config files to use clean structure
-   - [ ] Test example applications still work with new config format
+   - [ ] Remove any redundant top-level settings that duplicate nested ones
    - [ ] Update any inline documentation showing config examples
+   - [ ] Validate every config with llmspell binary (using validate - no need to run)
    
    **Rationale for G.8**:
    1. **Perfect Timing**: Step 9 requires updating examples anyway - no extra disruption

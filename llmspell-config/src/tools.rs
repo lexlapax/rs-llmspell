@@ -614,7 +614,7 @@ pub struct MediaToolsConfig {
     /// Maximum file size for media processing
     pub max_file_size: Option<usize>,
     /// Processing timeout in seconds
-    pub processing_timeout: Option<u64>,
+    pub processing_timeout_seconds: Option<u64>,
     /// Maximum image dimensions (e.g., "4096x4096")
     pub image_max_dimensions: Option<String>,
     /// Video processing quality (0-100)
@@ -627,13 +627,13 @@ pub struct MediaToolsConfig {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct DatabaseToolsConfig {
     /// Connection timeout in seconds
-    pub connection_timeout: Option<u64>,
+    pub connection_timeout_seconds: Option<u64>,
     /// Maximum concurrent connections
     pub max_connections: Option<u32>,
     /// Allowed database hosts (comma-separated)
     pub allowed_hosts: Option<String>,
     /// Query timeout in seconds
-    pub query_timeout: Option<u64>,
+    pub query_timeout_seconds: Option<u64>,
     /// Enable query logging
     pub enable_query_logging: Option<bool>,
 }
@@ -652,8 +652,8 @@ pub struct EmailToolsConfig {
     pub smtp_password: Option<String>,
     /// Default from address
     pub from_address: Option<String>,
-    /// Rate limit (emails per hour)
-    pub rate_limit_per_hour: Option<u32>,
+    /// Rate limit (emails per minute)
+    pub rate_limit_per_minute: Option<u32>,
     /// Enable TLS/SSL
     pub enable_tls: Option<bool>,
 }
@@ -668,7 +668,7 @@ pub struct SystemToolsConfig {
     /// Maximum output size in bytes
     pub max_output_size: Option<usize>,
     /// Command timeout in seconds
-    pub command_timeout: Option<u64>,
+    pub command_timeout_seconds: Option<u64>,
     /// Environment variables to pass through
     pub allowed_env_vars: Option<String>,
 }
@@ -685,7 +685,7 @@ pub struct DataToolsConfig {
     /// Enable data validation
     pub enable_validation: Option<bool>,
     /// Processing timeout in seconds
-    pub processing_timeout: Option<u64>,
+    pub processing_timeout_seconds: Option<u64>,
 }
 
 /// Academic tools configuration
@@ -730,7 +730,7 @@ pub struct SearchToolsConfig {
     /// Safe search mode
     pub safe_search: Option<bool>,
     /// Search timeout in seconds
-    pub timeout: Option<u64>,
+    pub timeout_seconds: Option<u64>,
 }
 
 #[cfg(test)]

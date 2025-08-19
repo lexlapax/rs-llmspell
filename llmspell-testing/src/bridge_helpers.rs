@@ -69,14 +69,14 @@ mod tests {
     #[test]
     fn test_create_lua_config() {
         let config = crate::bridge_helpers::lua::create_test_lua_config();
-        assert!(config.max_memory.unwrap_or(0) > 0);
+        assert!(config.max_memory_bytes.unwrap_or(0) > 0);
     }
 
     #[cfg(feature = "javascript")]
     #[test]
     fn test_create_js_config() {
         let config = crate::bridge_helpers::javascript::create_test_js_config();
-        assert!(config.max_heap_size.unwrap_or(0) > 0);
+        assert!(config.max_heap_size_bytes.unwrap_or(0) > 0);
     }
 
     #[test]

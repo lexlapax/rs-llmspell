@@ -256,7 +256,7 @@ async fn test_security_enforcement() {
 #[tokio::test]
 async fn test_memory_limits() {
     let lua_config = LuaConfig {
-        max_memory: Some(1024 * 1024), // 1MB limit
+        max_memory_bytes: Some(1024 * 1024), // 1MB limit
         ..Default::default()
     };
 
@@ -325,7 +325,7 @@ async fn test_cross_engine_compatibility_framework() {
     let lua_config = LuaConfig::default();
     let serialized = serde_json::to_string(&lua_config).unwrap();
     let deserialized: LuaConfig = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(lua_config.max_memory, deserialized.max_memory);
+    assert_eq!(lua_config.max_memory_bytes, deserialized.max_memory_bytes);
 
     // Test that errors are engine-agnostic
     let error = LLMSpellError::Script {

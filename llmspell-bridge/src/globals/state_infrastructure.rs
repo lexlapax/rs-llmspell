@@ -55,7 +55,7 @@ pub async fn get_or_create_state_infrastructure(
 
     // Create StateManager with default persistence config
     let persistence_config = PersistenceConfig {
-        enabled: config.flags.core.enabled,
+        enabled: config.enabled,
         backend_type: backend_type.clone(),
         ..Default::default()
     };
@@ -73,7 +73,7 @@ pub async fn get_or_create_state_infrastructure(
     context.set_bridge("state_manager", state_manager.clone());
 
     // Initialize migration infrastructure if enabled
-    let (migration_engine, schema_registry) = if config.flags.core.migration_enabled {
+    let (migration_engine, schema_registry) = if config.migration_enabled {
         debug!("Initializing migration infrastructure");
 
         // Create schema registry that will be shared
@@ -124,7 +124,7 @@ pub async fn get_or_create_state_infrastructure(
     };
 
     // Initialize backup infrastructure if enabled
-    let backup_manager = if config.flags.backup.backup_enabled {
+    let backup_manager = if config.backup_enabled {
         debug!("Initializing backup infrastructure");
 
         // Get backup config or use defaults
@@ -268,7 +268,6 @@ mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
     use llmspell_config::providers::ProviderManagerConfig;
-    use llmspell_config::{CoreStateFlags, StatePersistenceFlags};
     #[tokio::test]
     async fn test_state_infrastructure_creation() {
         let context = GlobalContext::new(
@@ -281,13 +280,7 @@ mod tests {
         );
 
         let config = StatePersistenceConfig {
-            flags: StatePersistenceFlags {
-                core: CoreStateFlags {
-                    enabled: true,
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
+            enabled: true,
             ..Default::default()
         };
 
@@ -319,13 +312,8 @@ mod tests {
         );
 
         let config = StatePersistenceConfig {
-            flags: StatePersistenceFlags {
-                core: CoreStateFlags {
-                    enabled: true,
-                    migration_enabled: true,
-                },
-                ..Default::default()
-            },
+            enabled: true,
+            migration_enabled: true,
             ..Default::default()
         };
 

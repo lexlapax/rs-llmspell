@@ -80,7 +80,7 @@ impl StateManagerAdapter {
 
         // Create persistence config
         let persistence_config = PersistenceConfig {
-            enabled: config.flags.core.enabled,
+            enabled: config.enabled,
             backend_type,
             flush_interval: std::time::Duration::from_secs(5),
             compression: config.backup.as_ref().is_none_or(|b| b.compression_enabled),

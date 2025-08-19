@@ -52,35 +52,6 @@ pub struct LLMSpellConfig {
     /// Hook system configuration
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub hooks: Option<HookConfig>,
-
-    // New fields for environment variable support (optional)
-    /// State persistence enabled
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub state_enabled: Option<bool>,
-    /// State backend type
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub state_backend: Option<String>,
-    /// State storage path
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub state_path: Option<String>,
-    /// Sessions enabled
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub sessions_enabled: Option<bool>,
-    /// Hooks enabled
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub hooks_enabled: Option<bool>,
-    /// Config file path (set when loaded)
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub config_path: Option<String>,
-    /// Home directory
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub home_dir: Option<String>,
-    /// Data directory for application data
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub data_dir: Option<String>,
-    /// Log directory for application logs
-    #[serde(skip_serializing_if = "Option::is_none", default)]
-    pub log_dir: Option<String>,
 }
 
 impl Default for LLMSpellConfig {
@@ -92,15 +63,6 @@ impl Default for LLMSpellConfig {
             runtime: GlobalRuntimeConfig::default(),
             tools: ToolsConfig::default(),
             hooks: None,
-            state_enabled: None,
-            state_backend: None,
-            state_path: None,
-            sessions_enabled: None,
-            hooks_enabled: None,
-            config_path: None,
-            home_dir: None,
-            data_dir: None,
-            log_dir: None,
         }
     }
 }
@@ -230,15 +192,46 @@ impl LLMSpellConfig {
                     self.runtime.state_persistence.backend_type = backend.to_string();
                 }
 
+                // Flattened structure - direct access
+                if let Some(enabled) = state.get("enabled").and_then(|v| v.as_bool()) {
+                    self.runtime.state_persistence.enabled = enabled;
+                }
+                if let Some(migration) = state.get("migration_enabled").and_then(|v| v.as_bool()) {
+                    self.runtime.state_persistence.migration_enabled = migration;
+                }
+                if let Some(backup_on_migration) =
+                    state.get("backup_on_migration").and_then(|v| v.as_bool())
+                {
+                    self.runtime.state_persistence.backup_on_migration = backup_on_migration;
+                }
+                if let Some(backup_enabled) = state.get("backup_enabled").and_then(|v| v.as_bool())
+                {
+                    self.runtime.state_persistence.backup_enabled = backup_enabled;
+                }
+
+                // Backward compatibility - support old nested structure
                 if let Some(flags) = state.get("flags").and_then(|v| v.as_object()) {
                     if let Some(core) = flags.get("core").and_then(|v| v.as_object()) {
                         if let Some(enabled) = core.get("enabled").and_then(|v| v.as_bool()) {
-                            self.runtime.state_persistence.flags.core.enabled = enabled;
+                            self.runtime.state_persistence.enabled = enabled;
                         }
                         if let Some(migration) =
                             core.get("migration_enabled").and_then(|v| v.as_bool())
                         {
-                            self.runtime.state_persistence.flags.core.migration_enabled = migration;
+                            self.runtime.state_persistence.migration_enabled = migration;
+                        }
+                    }
+                    if let Some(backup) = flags.get("backup").and_then(|v| v.as_object()) {
+                        if let Some(backup_on_migration) =
+                            backup.get("backup_on_migration").and_then(|v| v.as_bool())
+                        {
+                            self.runtime.state_persistence.backup_on_migration =
+                                backup_on_migration;
+                        }
+                        if let Some(backup_enabled) =
+                            backup.get("backup_enabled").and_then(|v| v.as_bool())
+                        {
+                            self.runtime.state_persistence.backup_enabled = backup_enabled;
                         }
                     }
                 }
@@ -369,20 +362,6 @@ impl LLMSpellConfig {
             if let Some(rate_limit) = hooks.get("rate_limit_per_minute").and_then(|v| v.as_u64()) {
                 hook_config.rate_limit_per_minute = Some(rate_limit as u32);
             }
-        }
-
-        // Merge path configurations
-        if let Some(config_path) = json.get("config_path").and_then(|v| v.as_str()) {
-            self.config_path = Some(config_path.to_string());
-        }
-        if let Some(home_dir) = json.get("home_dir").and_then(|v| v.as_str()) {
-            self.home_dir = Some(home_dir.to_string());
-        }
-        if let Some(data_dir) = json.get("data_dir").and_then(|v| v.as_str()) {
-            self.data_dir = Some(data_dir.to_string());
-        }
-        if let Some(log_dir) = json.get("log_dir").and_then(|v| v.as_str()) {
-            self.log_dir = Some(log_dir.to_string());
         }
 
         Ok(())
@@ -689,63 +668,18 @@ impl Default for SecurityConfig {
     }
 }
 
-/// Core state persistence flags
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(default)]
-pub struct CoreStateFlags {
-    /// Enable state persistence
-    pub enabled: bool,
-    /// Enable migration functionality
-    pub migration_enabled: bool,
-}
-
-impl Default for CoreStateFlags {
-    fn default() -> Self {
-        Self {
-            enabled: true, // Changed from false - in-memory state by default
-            migration_enabled: false,
-        }
-    }
-}
-
-/// Backup-related flags
-#[derive(Debug, Clone, Deserialize, Serialize)]
-#[serde(default)]
-pub struct BackupFlags {
-    /// Automatic backup on migration
-    pub backup_on_migration: bool,
-    /// Enable backup functionality
-    pub backup_enabled: bool,
-}
-
-impl Default for BackupFlags {
-    fn default() -> Self {
-        Self {
-            backup_on_migration: true,
-            backup_enabled: false,
-        }
-    }
-}
-
-/// State persistence feature flags
-#[derive(Debug, Clone, Default, Deserialize, Serialize)]
-#[serde(default)]
-pub struct StatePersistenceFlags {
-    /// Core state persistence features
-    #[serde(flatten)]
-    pub core: CoreStateFlags,
-    /// Backup-related features
-    #[serde(flatten)]
-    pub backup: BackupFlags,
-}
-
 /// State persistence configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
 pub struct StatePersistenceConfig {
-    /// Feature flags for state persistence
-    #[serde(flatten)]
-    pub flags: StatePersistenceFlags,
+    /// Enable state persistence (flattened from flags.core.enabled)
+    pub enabled: bool,
+    /// Enable migration functionality (flattened from flags.core.migration_enabled)
+    pub migration_enabled: bool,
+    /// Automatic backup on migration (flattened from flags.backup.backup_on_migration)
+    pub backup_on_migration: bool,
+    /// Enable backup functionality (flattened from flags.backup.backup_enabled)
+    pub backup_enabled: bool,
     /// Backend type for storage (memory, file, redis, etc.)
     pub backend_type: String,
     /// Directory for schema definitions
@@ -778,7 +712,10 @@ pub struct BackupConfig {
 impl Default for StatePersistenceConfig {
     fn default() -> Self {
         Self {
-            flags: StatePersistenceFlags::default(),
+            enabled: true, // In-memory state by default
+            migration_enabled: false,
+            backup_on_migration: true,
+            backup_enabled: false,
             backend_type: "memory".to_string(),
             schema_directory: None,
             max_state_size_bytes: Some(10_000_000), // 10MB per key

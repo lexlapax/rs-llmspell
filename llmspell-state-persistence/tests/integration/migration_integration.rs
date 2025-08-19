@@ -2,7 +2,7 @@
 // ABOUTME: Tests end-to-end migration scenarios with hook system integration
 
 use llmspell_state_persistence::{
-    config::FieldSchema, manager::SerializableState, migration::*, schema::*, StateManager,
+    config::{FieldSchema, SledConfig, StorageBackendType, PersistenceConfig}, manager::SerializableState, migration::*, schema::*, StateManager,
     StateResult, StateScope,
 };
 use llmspell_storage::{MemoryBackend, SledBackend};
@@ -14,7 +14,6 @@ use tempfile::TempDir;
 async fn create_test_state_manager_with_backend(
     backend_type: &str,
 ) -> StateResult<(StateManager, Option<TempDir>)> {
-    use llmspell_state_persistence::config::{StorageBackendType, PersistenceConfig};
     
     match backend_type {
         "memory" => {
@@ -28,10 +27,13 @@ async fn create_test_state_manager_with_backend(
             let temp_dir = TempDir::new().unwrap();
             let mut config = PersistenceConfig::default();
             config.enabled = true;
-            config.data_dir = Some(temp_dir.path().to_path_buf());
             
             let manager = StateManager::with_backend(
-                StorageBackendType::Sled,
+                StorageBackendType::Sled(SledConfig {
+                    path: temp_dir.path().to_path_buf(),
+                    cache_capacity: 64 * 1024 * 1024, // 64MB
+                    use_compression: true,
+                }),
                 config,
             ).await?;
             Ok((manager, Some(temp_dir)))

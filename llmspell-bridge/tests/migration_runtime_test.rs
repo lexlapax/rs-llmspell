@@ -8,14 +8,9 @@ use llmspell_config::LLMSpellConfig;
 async fn test_migration_api_available_when_configured() -> Result<(), Box<dyn std::error::Error>> {
     // Create config with state persistence and migration enabled
     let mut config = LLMSpellConfig::default();
-    config.runtime.state_persistence.flags.core.enabled = true;
+    config.runtime.state_persistence.enabled = true;
     config.runtime.state_persistence.backend_type = "memory".to_string();
-    config
-        .runtime
-        .state_persistence
-        .flags
-        .core
-        .migration_enabled = true;
+    config.runtime.state_persistence.migration_enabled = true;
 
     // Create runtime
     let runtime = ScriptRuntime::new_with_lua(config).await?;
@@ -57,7 +52,7 @@ async fn test_migration_api_not_available_when_disabled() -> Result<(), Box<dyn 
 {
     // Create config with state persistence disabled
     let mut config = LLMSpellConfig::default();
-    config.runtime.state_persistence.flags.core.enabled = false;
+    config.runtime.state_persistence.enabled = false;
 
     // Create runtime
     let runtime = ScriptRuntime::new_with_lua(config).await?;
@@ -92,14 +87,9 @@ async fn test_migration_api_not_available_when_disabled() -> Result<(), Box<dyn 
 async fn test_state_persistence_without_migration() -> Result<(), Box<dyn std::error::Error>> {
     // Create config with state persistence enabled but migration disabled
     let mut config = LLMSpellConfig::default();
-    config.runtime.state_persistence.flags.core.enabled = true;
+    config.runtime.state_persistence.enabled = true;
     config.runtime.state_persistence.backend_type = "memory".to_string();
-    config
-        .runtime
-        .state_persistence
-        .flags
-        .core
-        .migration_enabled = false;
+    config.runtime.state_persistence.migration_enabled = false;
 
     // Create runtime
     let runtime = ScriptRuntime::new_with_lua(config).await?;

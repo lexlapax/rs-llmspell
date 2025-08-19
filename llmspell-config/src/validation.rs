@@ -55,10 +55,10 @@ fn validate_basic_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
 /// Validate engine configuration
 fn validate_engine_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
     // Validate Lua configuration
-    if let Some(max_memory) = config.engines.lua.max_memory {
+    if let Some(max_memory) = config.engines.lua.max_memory_bytes {
         if max_memory == 0 {
             return Err(ConfigError::Validation {
-                field: Some("engines.lua.max_memory".to_string()),
+                field: Some("engines.lua.max_memory_bytes".to_string()),
                 message: "Lua max memory cannot be zero".to_string(),
             });
         }
@@ -84,10 +84,10 @@ fn validate_engine_config(config: &LLMSpellConfig) -> Result<(), ConfigError> {
     }
 
     // Validate JavaScript configuration
-    if let Some(max_heap) = config.engines.javascript.max_heap_size {
+    if let Some(max_heap) = config.engines.javascript.max_heap_size_bytes {
         if max_heap == 0 {
             return Err(ConfigError::Validation {
-                field: Some("engines.javascript.max_heap_size".to_string()),
+                field: Some("engines.javascript.max_heap_size_bytes".to_string()),
                 message: "JavaScript max heap size cannot be zero".to_string(),
             });
         }
@@ -534,13 +534,13 @@ mod tests {
     #[test]
     fn test_validate_engine_config_zero_memory() {
         let mut config = LLMSpellConfig::default();
-        config.engines.lua.max_memory = Some(0);
+        config.engines.lua.max_memory_bytes = Some(0);
 
         let result = validate_engine_config(&config);
         assert!(result.is_err());
 
         if let Err(ConfigError::Validation { field, .. }) = result {
-            assert_eq!(field, Some("engines.lua.max_memory".to_string()));
+            assert_eq!(field, Some("engines.lua.max_memory_bytes".to_string()));
         }
     }
 

@@ -49,7 +49,7 @@ pub struct LuaConfig {
     /// Standard library access level
     pub stdlib: StdlibLevel,
     /// Maximum memory usage in bytes
-    pub max_memory: Option<usize>,
+    pub max_memory_bytes: Option<usize>,
     /// Enable debug features
     pub enable_debug: bool,
     /// Execution timeout in milliseconds
@@ -62,7 +62,7 @@ impl Default for LuaConfig {
     fn default() -> Self {
         Self {
             stdlib: StdlibLevel::Standard,
-            max_memory: Some(50_000_000), // 50MB
+            max_memory_bytes: Some(50_000_000), // 50MB
             enable_debug: false,
             timeout_ms: Some(30_000), // 30 seconds
             security_level: SecurityLevel::Safe,
@@ -102,8 +102,8 @@ impl LuaConfigBuilder {
 
     /// Set the maximum memory limit
     #[must_use]
-    pub const fn max_memory(mut self, bytes: Option<usize>) -> Self {
-        self.config.max_memory = bytes;
+    pub const fn max_memory_bytes(mut self, bytes: Option<usize>) -> Self {
+        self.config.max_memory_bytes = bytes;
         self
     }
 
@@ -148,7 +148,7 @@ pub struct JSConfig {
     /// Enable strict mode
     pub strict_mode: bool,
     /// Maximum heap size in bytes
-    pub max_heap_size: Option<usize>,
+    pub max_heap_size_bytes: Option<usize>,
     /// Enable console API
     pub enable_console: bool,
     /// Execution timeout in milliseconds
@@ -161,7 +161,7 @@ impl Default for JSConfig {
     fn default() -> Self {
         Self {
             strict_mode: true,
-            max_heap_size: Some(50_000_000), // 50MB
+            max_heap_size_bytes: Some(50_000_000), // 50MB
             enable_console: true,
             timeout_ms: Some(30_000), // 30 seconds
             security_level: SecurityLevel::Safe,
@@ -201,8 +201,8 @@ impl JSConfigBuilder {
 
     /// Set the maximum heap size
     #[must_use]
-    pub const fn max_heap_size(mut self, bytes: Option<usize>) -> Self {
-        self.config.max_heap_size = bytes;
+    pub const fn max_heap_size_bytes(mut self, bytes: Option<usize>) -> Self {
+        self.config.max_heap_size_bytes = bytes;
         self
     }
 
@@ -247,7 +247,7 @@ mod tests {
     #[test]
     fn test_lua_config_default() {
         let config = LuaConfig::default();
-        assert_eq!(config.max_memory, Some(50_000_000));
+        assert_eq!(config.max_memory_bytes, Some(50_000_000));
         assert!(!config.enable_debug);
         assert_eq!(config.timeout_ms, Some(30_000));
     }
@@ -255,12 +255,12 @@ mod tests {
     #[test]
     fn test_lua_config_builder() {
         let config = LuaConfig::builder()
-            .max_memory(Some(100_000_000))
+            .max_memory_bytes(Some(100_000_000))
             .enable_debug(true)
             .security_level(SecurityLevel::Privileged)
             .build();
 
-        assert_eq!(config.max_memory, Some(100_000_000));
+        assert_eq!(config.max_memory_bytes, Some(100_000_000));
         assert!(config.enable_debug);
         assert!(matches!(config.security_level, SecurityLevel::Privileged));
     }
@@ -269,7 +269,7 @@ mod tests {
     fn test_js_config_default() {
         let config = JSConfig::default();
         assert!(config.strict_mode);
-        assert_eq!(config.max_heap_size, Some(50_000_000));
+        assert_eq!(config.max_heap_size_bytes, Some(50_000_000));
         assert!(config.enable_console);
     }
 
@@ -277,12 +277,12 @@ mod tests {
     fn test_js_config_builder() {
         let config = JSConfig::builder()
             .strict_mode(false)
-            .max_heap_size(Some(25_000_000))
+            .max_heap_size_bytes(Some(25_000_000))
             .security_level(SecurityLevel::Unrestricted)
             .build();
 
         assert!(!config.strict_mode);
-        assert_eq!(config.max_heap_size, Some(25_000_000));
+        assert_eq!(config.max_heap_size_bytes, Some(25_000_000));
         assert!(matches!(config.security_level, SecurityLevel::Unrestricted));
     }
 

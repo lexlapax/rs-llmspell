@@ -145,7 +145,7 @@ fn register_state_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_STATE_ENABLED")
             .description("Enable state persistence")
             .category(EnvCategory::State)
-            .config_path("runtime.state_persistence.flags.core.enabled")
+            .config_path("runtime.state_persistence.enabled")
             .default("true")
             .validator(|v| match v {
                 "true" | "false" => Ok(()),
@@ -179,7 +179,7 @@ fn register_state_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_STATE_MIGRATION_ENABLED")
             .description("Enable state migration functionality")
             .category(EnvCategory::State)
-            .config_path("runtime.state_persistence.flags.core.migration_enabled")
+            .config_path("runtime.state_persistence.migration_enabled")
             .default("false")
             .validator(|v| match v {
                 "true" | "false" => Ok(()),
@@ -192,8 +192,21 @@ fn register_state_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_STATE_BACKUP_ENABLED")
             .description("Enable state backup functionality")
             .category(EnvCategory::State)
-            .config_path("runtime.state_persistence.flags.backup.backup_enabled")
+            .config_path("runtime.state_persistence.backup_enabled")
             .default("false")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_STATE_BACKUP_ON_MIGRATION")
+            .description("Automatic backup on migration")
+            .category(EnvCategory::State)
+            .config_path("runtime.state_persistence.backup_on_migration")
+            .default("true")
             .validator(|v| match v {
                 "true" | "false" => Ok(()),
                 _ => Err("Value must be 'true' or 'false'".to_string()),
@@ -550,7 +563,7 @@ fn register_tool_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_TOOLS_MEDIA_PROCESSING_TIMEOUT")
             .description("Media processing timeout (seconds)")
             .category(EnvCategory::Tool)
-            .config_path("tools.media.processing_timeout")
+            .config_path("tools.media.processing_timeout_seconds")
             .default("300") // 5 minutes
             .validator(|v| {
                 v.parse::<u64>()
@@ -574,7 +587,7 @@ fn register_tool_vars(registry: &EnvRegistry) -> Result<(), String> {
         EnvVarDefBuilder::new("LLMSPELL_TOOLS_DB_CONNECTION_TIMEOUT")
             .description("Database connection timeout (seconds)")
             .category(EnvCategory::Tool)
-            .config_path("tools.database.connection_timeout")
+            .config_path("tools.database.connection_timeout_seconds")
             .default("10")
             .validator(|v| {
                 v.parse::<u64>()
@@ -640,10 +653,10 @@ fn register_tool_vars(registry: &EnvRegistry) -> Result<(), String> {
 
     registry.register_var(
         EnvVarDefBuilder::new("LLMSPELL_TOOLS_EMAIL_RATE_LIMIT")
-            .description("Email rate limit (emails per hour)")
+            .description("Email rate limit (emails per minute)")
             .category(EnvCategory::Tool)
-            .config_path("tools.email.rate_limit_per_hour")
-            .default("100")
+            .config_path("tools.email.rate_limit_per_minute")
+            .default("2") // 2 emails per minute = 120 per hour (reasonable for email)
             .validator(|v| {
                 v.parse::<u32>()
                     .map(|_| ())
@@ -912,40 +925,6 @@ fn register_session_hook_vars(registry: &EnvRegistry) -> Result<(), String> {
 
 /// Register path discovery environment variables
 fn register_path_vars(registry: &EnvRegistry) -> Result<(), String> {
-    registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_CONFIG")
-            .description("Path to LLMSpell configuration file")
-            .category(EnvCategory::Path)
-            .config_path("config_path")
-            .build(),
-    )?;
-
-    registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_HOME")
-            .description("LLMSpell home directory")
-            .category(EnvCategory::Path)
-            .config_path("home_dir")
-            .build(),
-    )?;
-
-    registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_DATA_DIR")
-            .description("LLMSpell data directory")
-            .category(EnvCategory::Path)
-            .config_path("data_dir")
-            .default("./data")
-            .build(),
-    )?;
-
-    registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_LOG_DIR")
-            .description("LLMSpell log directory")
-            .category(EnvCategory::Path)
-            .config_path("log_dir")
-            .default("./logs")
-            .build(),
-    )?;
-
     // Standard environment variables for path discovery
     // Note: These are read-only system variables used for config discovery
     // They don't map to config fields but are used by discover_config_file()
@@ -996,6 +975,8 @@ mod tests {
         assert!(registry.is_registered("LLMSPELL_STATE_ENABLED"));
         assert!(registry.is_registered("LLMSPELL_STATE_BACKEND"));
         assert!(registry.is_registered("LLMSPELL_STATE_MIGRATION_ENABLED"));
+        assert!(registry.is_registered("LLMSPELL_STATE_BACKUP_ENABLED"));
+        assert!(registry.is_registered("LLMSPELL_STATE_BACKUP_ON_MIGRATION"));
 
         // Check provider variables (standard and LLMSpell format)
         assert!(registry.is_registered("OPENAI_API_KEY"));
@@ -1020,8 +1001,6 @@ mod tests {
         assert!(registry.is_registered("LLMSPELL_HOOKS_RATE_LIMIT"));
 
         // Check path variables
-        assert!(registry.is_registered("LLMSPELL_CONFIG"));
-        assert!(registry.is_registered("LLMSPELL_HOME"));
         assert!(registry.is_registered("HOME"));
         assert!(registry.is_registered("XDG_CONFIG_HOME"));
 
@@ -1080,10 +1059,7 @@ mod tests {
 
         // Check that values were applied correctly
         assert_eq!(config["default_engine"], "javascript");
-        assert_eq!(
-            config["runtime"]["state_persistence"]["flags"]["core"]["enabled"],
-            true
-        );
+        assert_eq!(config["runtime"]["state_persistence"]["enabled"], true);
         assert_eq!(config["providers"]["openai"]["api_key"], "test-key");
     }
 }

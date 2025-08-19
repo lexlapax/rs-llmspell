@@ -38,7 +38,7 @@ async fn test_memory_usage_simple_scripts() {
 
     // Verify the configured memory limit is reasonable
     assert_eq!(
-        lua_config.max_memory,
+        lua_config.max_memory_bytes,
         Some(50_000_000),
         "Default memory limit should be 50MB"
     );

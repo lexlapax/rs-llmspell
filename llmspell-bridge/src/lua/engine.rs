@@ -254,7 +254,7 @@ impl ScriptEngineBridge for LuaEngine {
 
             // Check if state persistence is enabled and create state access
             if let Some(runtime_config) = &self.runtime_config {
-                if runtime_config.runtime.state_persistence.flags.core.enabled {
+                if runtime_config.runtime.state_persistence.enabled {
                     // Try to create StateManagerAdapter for state access
                     match futures::executor::block_on(
                         crate::state_adapter::StateManagerAdapter::from_config(

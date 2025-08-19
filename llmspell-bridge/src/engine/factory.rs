@@ -188,7 +188,7 @@ pub struct LuaConfig {
     /// Standard library access level
     pub stdlib: StdlibLevel,
     /// Maximum memory usage in bytes
-    pub max_memory: Option<usize>,
+    pub max_memory_bytes: Option<usize>,
     /// Enable debug features
     pub debug: bool,
     /// Custom package paths
@@ -199,7 +199,7 @@ impl Default for LuaConfig {
     fn default() -> Self {
         Self {
             stdlib: StdlibLevel::Safe,
-            max_memory: Some(50_000_000), // 50MB default
+            max_memory_bytes: Some(50_000_000), // 50MB default
             debug: false,
             package_paths: vec![],
         }
@@ -238,8 +238,8 @@ impl LuaConfigBuilder {
 
     /// Set the maximum memory usage in bytes
     #[must_use]
-    pub const fn max_memory(mut self, memory: Option<usize>) -> Self {
-        self.config.max_memory = memory;
+    pub const fn max_memory_bytes(mut self, memory: Option<usize>) -> Self {
+        self.config.max_memory_bytes = memory;
         self
     }
 
@@ -296,7 +296,7 @@ pub struct JSConfig {
     /// Enable strict mode
     pub strict_mode: bool,
     /// Maximum heap size in bytes
-    pub max_heap_size: Option<usize>,
+    pub max_heap_size_bytes: Option<usize>,
     /// Enable console API
     pub enable_console: bool,
     /// Module resolution strategy
@@ -307,7 +307,7 @@ impl Default for JSConfig {
     fn default() -> Self {
         Self {
             strict_mode: true,
-            max_heap_size: Some(100_000_000), // 100MB default
+            max_heap_size_bytes: Some(100_000_000), // 100MB default
             enable_console: true,
             module_resolution: ModuleResolution::Node,
         }
@@ -346,8 +346,8 @@ impl JSConfigBuilder {
 
     /// Set the maximum heap size in bytes
     #[must_use]
-    pub const fn max_heap_size(mut self, size: Option<usize>) -> Self {
-        self.config.max_heap_size = size;
+    pub const fn max_heap_size_bytes(mut self, size: Option<usize>) -> Self {
+        self.config.max_heap_size_bytes = size;
         self
     }
 
@@ -450,7 +450,7 @@ mod tests {
     #[test]
     fn test_lua_config_default() {
         let config = LuaConfig::default();
-        assert_eq!(config.max_memory, Some(50_000_000));
+        assert_eq!(config.max_memory_bytes, Some(50_000_000));
         assert!(!config.debug);
         assert!(config.package_paths.is_empty());
     }
@@ -458,7 +458,7 @@ mod tests {
     fn test_js_config_default() {
         let config = JSConfig::default();
         assert!(config.strict_mode);
-        assert_eq!(config.max_heap_size, Some(100_000_000));
+        assert_eq!(config.max_heap_size_bytes, Some(100_000_000));
         assert!(config.enable_console);
     }
     #[test]

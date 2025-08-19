@@ -66,7 +66,7 @@ async fn test_engine_switching_integration() {
     // Test that we can create engines by name
     let config = serde_json::json!({
         "stdlib": "safe",
-        "max_memory": 50_000_000,
+        "max_memory_bytes": 50_000_000,
         "debug": false,
         "package_paths": []
     });
