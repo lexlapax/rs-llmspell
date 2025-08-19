@@ -560,8 +560,45 @@ local review_context = {
     config = config
 }
 
--- Execute main review workflow
+-- Execute main review workflow (with state-based outputs)
 local result = main_review_workflow:execute(review_context)
+
+-- Check workflow success and extract outputs from state
+local review_outputs = {}
+if result and result.success then
+    print("  ✅ Review workflow completed successfully")
+    
+    -- Access outputs from state using helper methods
+    review_outputs.analysis = main_review_workflow:get_output("code_analysis")
+    review_outputs.reviews = main_review_workflow:get_output("review_process")
+    review_outputs.issues = main_review_workflow:get_output("issue_aggregation")
+    review_outputs.report = main_review_workflow:get_output("report_generation")
+    
+    -- Alternative: Direct State access for specific review types
+    if result.execution_id then
+        local security_review = State.get("workflow:" .. result.execution_id .. ":security_review")
+        if security_review then
+            review_outputs.security_findings = security_review
+        end
+        
+        local performance_review = State.get("workflow:" .. result.execution_id .. ":performance_review")
+        if performance_review then
+            review_outputs.performance_findings = performance_review
+        end
+    end
+    
+    print("  📦 Review outputs retrieved from state:")
+    for phase, output in pairs(review_outputs) do
+        if output then
+            print("    - " .. phase .. ": Retrieved")
+        end
+    end
+else
+    print("  ⚠️ Review workflow failed")
+    if result and result.error then
+        print("  Error: " .. tostring(result.error))
+    end
+end
 
 -- Extract execution time from workflow
 local execution_time_ms = 0
@@ -578,15 +615,15 @@ end
 
 print("\n5. Code Review Results:")
 print("=============================================================")
-print("  ✅ Review Status: COMPLETED")
+print("  ✅ Review Status: " .. (result and result.success and "COMPLETED" or "FAILED"))
 print("  ⏱️  Total Review Time: " .. execution_time_ms .. "ms")
 print("  🏗️  Architecture: Blueprint v2.0 Compliant")
 print("")
 print("  📊 Review Phases Completed:")
-print("    1. Code Analysis (Parallel): ✅ 3 files loaded and parsed")
-print("    2. Review Process (Loop): ✅ " .. config.review_settings.max_files_to_review .. " files reviewed")
-print("    3. Issue Aggregation: ✅ Issues deduplicated and prioritized")
-print("    4. Report Generation: ✅ Comprehensive report created")
+print("    1. Code Analysis (Parallel): " .. (review_outputs.analysis and "✅" or "⚠️") .. " 3 files loaded and parsed")
+print("    2. Review Process (Loop): " .. (review_outputs.reviews and "✅" or "⚠️") .. " " .. config.review_settings.max_files_to_review .. " files reviewed")
+print("    3. Issue Aggregation: " .. (review_outputs.issues and "✅" or "⚠️") .. " Issues deduplicated and prioritized")
+print("    4. Report Generation: " .. (review_outputs.report and "✅" or "⚠️") .. " Comprehensive report created")
 print("")
 
 -- Create detailed summary

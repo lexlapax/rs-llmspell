@@ -180,6 +180,13 @@ Synthesize all findings into a cohesive market analysis report.
 ]], market_data_json)
 })
 
+-- Note: This is a single agent invocation, not a workflow
+-- In a workflow context, you would access state-based outputs like:
+-- if result and result.success then
+--     local output = workflow:get_output("step_name")
+--     local data = State.get("workflow:" .. result.execution_id .. ":step_name")
+-- end
+
 print("Market Analysis Result:")
 if market_result and market_result.text then
     print(market_result.text)
@@ -313,6 +320,27 @@ if synthesis_result and synthesis_result.text then
 else
     print("No content available - synthesis_result:", tostring(synthesis_result))
 end
+
+-- Note: State-based workflow output access example
+-- If this were a workflow instead of individual agent calls, you would access outputs like:
+-- 
+-- local workflow = Workflow.builder():name("feedback_analysis"):sequential()
+--     :add_step({name = "research", type = "agent", agent = "researcher"})
+--     :add_step({name = "analyze", type = "agent", agent = "analyst"})
+--     :add_step({name = "decide", type = "agent", agent = "decision_maker"})
+--     :build()
+-- 
+-- local result = workflow:execute(context)
+-- if result and result.success then
+--     local research_output = workflow:get_output("research")
+--     local analysis_output = workflow:get_output("analyze") 
+--     local decision_output = workflow:get_output("decide")
+--     
+--     -- Alternative state access
+--     local state_research = State.get("workflow:" .. result.execution_id .. ":research")
+--     local state_analysis = State.get("workflow:" .. result.execution_id .. ":analyze")
+--     local state_decision = State.get("workflow:" .. result.execution_id .. ":decide")
+-- end
 
 -- Example 4: Parallel Agent Coordination
 print("\n\nExample 4: Parallel Agent Coordination")

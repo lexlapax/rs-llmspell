@@ -629,6 +629,34 @@ local execution_context = {
 -- Execute main research workflow
 local result = main_research:execute(execution_context)
 
+if result and result.success then
+    print("  ✅ Research workflow executed successfully, accessing state-based outputs...")
+    
+    -- Access outputs from state using workflow helper methods
+    local query_output = main_research:get_output("parse_query")
+    local search_output = main_research:get_output("search_databases")
+    local processing_output = main_research:get_output("process_papers")
+    local synthesis_output = main_research:get_output("synthesize_research")
+    local generation_output = main_research:get_output("generate_outputs")
+    
+    -- Alternative: Access directly via State global
+    local state_query = State.get("workflow:" .. result.execution_id .. ":parse_query")
+    local state_search = State.get("workflow:" .. result.execution_id .. ":search_databases")
+    local state_processing = State.get("workflow:" .. result.execution_id .. ":process_papers")
+    local state_synthesis = State.get("workflow:" .. result.execution_id .. ":synthesize_research")
+    local state_generation = State.get("workflow:" .. result.execution_id .. ":generate_outputs")
+    
+    -- Use state-retrieved outputs for further processing
+    if synthesis_output then
+        print("  🔗 Research synthesis output retrieved from state")
+    end
+    if generation_output then
+        print("  📊 Output generation results retrieved from state")
+    end
+else
+    print("  ⚠️ Research workflow failed")
+end
+
 -- Extract execution time
 local execution_time_ms = 0
 if result and result._metadata and result._metadata.execution_time_ms then

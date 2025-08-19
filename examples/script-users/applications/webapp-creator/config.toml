@@ -4,13 +4,13 @@
 # Default script engine
 default_engine = "lua"
 
-# Engine configurations - updated field names from engines.rs
+# Engine configurations - correct field names and values
 [engines.lua]
-stdlib = "Standard"
+stdlib = "Standard"  # Options: None, Basic, Standard, All
 max_memory_bytes = 100000000
 enable_debug = false
 timeout_ms = 30000
-security_level = "Safe"
+security_level = "Safe"  # Options: Safe, Privileged, Unrestricted
 
 [engines.javascript]
 strict_mode = true

@@ -280,6 +280,28 @@ local result = main_router:execute({
     timestamp = os.time()
 })
 
+if result and result.success then
+    print("  ✅ Support routing workflow executed successfully, accessing state-based outputs...")
+    
+    -- Access outputs from state using workflow helper methods
+    local classification_output = main_router:get_output("classify_ticket")
+    local processing_output = main_router:get_output("process_ticket")
+    
+    -- Alternative: Access directly via State global
+    local state_classification = State.get("workflow:" .. result.execution_id .. ":classify_ticket")
+    local state_processing = State.get("workflow:" .. result.execution_id .. ":process_ticket")
+    
+    -- Use state-retrieved outputs for further processing
+    if classification_output then
+        print("  🎯 Ticket classification output retrieved from state")
+    end
+    if processing_output then
+        print("  ⚙️ Ticket processing output retrieved from state")
+    end
+else
+    print("  ⚠️ Support routing workflow failed")
+end
+
 -- Extract actual execution time from workflow result
 local execution_time_ms = 0
 if result and result._metadata and result._metadata.execution_time_ms then

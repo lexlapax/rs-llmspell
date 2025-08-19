@@ -645,6 +645,32 @@ local intelligence_context = {
 -- Execute main workflow
 local result = main_intelligence_workflow:execute(intelligence_context)
 
+if result and result.success then
+    print("  ✅ Workflow executed successfully, accessing state-based outputs...")
+    
+    -- Access outputs from state using workflow helper methods
+    local ingestion_output = main_intelligence_workflow:get_output("ingest_documents")
+    local processing_output = main_intelligence_workflow:get_output("process_documents")
+    local knowledge_output = main_intelligence_workflow:get_output("build_knowledge")
+    local qa_output = main_intelligence_workflow:get_output("handle_queries")
+    
+    -- Alternative: Access directly via State global
+    local state_ingestion = State.get("workflow:" .. result.execution_id .. ":ingest_documents")
+    local state_processing = State.get("workflow:" .. result.execution_id .. ":process_documents")
+    local state_knowledge = State.get("workflow:" .. result.execution_id .. ":build_knowledge")
+    local state_qa = State.get("workflow:" .. result.execution_id .. ":handle_queries")
+    
+    -- Use state-retrieved outputs for further processing
+    if knowledge_output then
+        print("  📊 Knowledge building output retrieved from state")
+    end
+    if processing_output then
+        print("  🔄 Document processing output retrieved from state")
+    end
+else
+    print("  ⚠️ Workflow failed")
+end
+
 -- Extract execution time
 local execution_time_ms = 0
 if result and result._metadata and result._metadata.execution_time_ms then

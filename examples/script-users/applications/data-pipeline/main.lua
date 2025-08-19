@@ -446,12 +446,65 @@ print("  ✅ Main Pipeline: 4-phase ETL workflow created")
 print("\n4. Executing blueprint-compliant 4-phase ETL pipeline...")
 print("=" .. string.rep("=", 60))
 
--- Execute the 4-phase pipeline with timing
+-- Execute the 4-phase pipeline with timing (using state-based outputs)
 local result = main_pipeline:execute({
     pipeline_config = config,
     batch_size = config.batch_size,
     timestamp = os.time()
 })
+
+-- Check workflow success and extract outputs from state
+local pipeline_outputs = {}
+if result and result.success then
+    print("  ✅ Pipeline workflow completed successfully")
+    
+    -- Access outputs from state using helper methods (only if workflow supports it)
+    -- Note: get_output may not be available in all workflow implementations
+    local ok, extract_output = pcall(function() return main_pipeline:get_output("extract_phase") end)
+    if ok then
+        pipeline_outputs.extract = extract_output
+    end
+    
+    local ok, transform_output = pcall(function() return main_pipeline:get_output("transform_phase") end)
+    if ok then
+        pipeline_outputs.transform = transform_output
+    end
+    
+    local ok, analysis_output = pcall(function() return main_pipeline:get_output("analysis_phase") end)
+    if ok then
+        pipeline_outputs.analysis = analysis_output
+    end
+    
+    local ok, load_output = pcall(function() return main_pipeline:get_output("load_phase") end)
+    if ok then
+        pipeline_outputs.load = load_output
+    end
+    
+    -- Alternative: Direct State access for specific data sources (if State is available)
+    if result.execution_id and State then
+        local ok, db_data = pcall(function() return State.get("workflow:" .. result.execution_id .. ":extract_from_db") end)
+        if ok and db_data then
+            pipeline_outputs.database_records = db_data
+        end
+        
+        local ok, api_data = pcall(function() return State.get("workflow:" .. result.execution_id .. ":extract_from_api") end)
+        if ok and api_data then
+            pipeline_outputs.api_records = api_data
+        end
+    end
+    
+    print("  📦 Pipeline outputs retrieved from state:")
+    for phase, output in pairs(pipeline_outputs) do
+        if output then
+            print("    - " .. phase .. ": Retrieved")
+        end
+    end
+else
+    print("  ⚠️ Pipeline workflow failed")
+    if result and result.error then
+        print("  Error: " .. tostring(result.error))
+    end
+end
 
 -- Extract actual execution time from workflow result metadata
 local execution_time_ms = 0
@@ -469,27 +522,27 @@ end
 print("\n5. ETL Pipeline Results:")
 print("=" .. string.rep("=", 60))
 
-if result then
+if result and result.success then
     print("  ✅ Pipeline Status: COMPLETED")
     print("  ⏱️  Total Execution Time: " .. execution_time_ms .. "ms")
     print("  🏗️  Architecture: Blueprint v2.0 Compliant")
     
-    -- Phase-by-phase results
-    if result.extract_phase then
+    -- Phase-by-phase results using state outputs
+    if pipeline_outputs.extract then
         print("\n  📥 Phase 1 - Extract (Parallel): ✅ Completed")
         print("    • Database source: ✅ Connected")
         print("    • API source: ✅ Connected") 
         print("    • File source: ✅ Loaded")
     end
     
-    if result.transform_phase then
+    if pipeline_outputs.transform then
         print("  🔄 Phase 2 - Transform (Loop): ✅ Completed")
         print("    • Data validation: ✅ Performed")
         print("    • Data cleaning: ✅ Performed")
         print("    • Data enrichment: " .. (data_enricher and "✅ LLM Enhanced" or "⚠️ Basic Processing"))
     end
     
-    if result.analysis_phase then
+    if pipeline_outputs.analysis then
         print("  🔍 Phase 3 - Analysis (Parallel): ✅ Completed")
         local agent_count = 0
         if quality_analyzer then agent_count = agent_count + 1 end

@@ -351,26 +351,72 @@ local social_email_router = Workflow.builder()
 print("\n5. Executing content generation pipeline...")
 print("=============================================================")
 
--- Test with blog content
+-- Test with blog content (using state-based outputs)
 print("\n📝 Testing BLOG content generation...")
 local blog_result = content_router:execute({
     input = content_topics.blog
 })
-print("  ✅ Blog content generated and saved to: " .. config.files.blog_output)
 
--- Test with social content  
+if blog_result and blog_result.success then
+    -- Access outputs from state using helper
+    local blog_output = content_router:get_output("blog_workflow")
+    if blog_output then
+        print("  ✅ Blog content generated (retrieved from state)")
+        print("    Output location: " .. config.files.blog_output)
+    else
+        -- Alternative: Direct State access
+        if blog_result.execution_id then
+            local content = State.get("workflow:" .. blog_result.execution_id .. ":blog_workflow")
+            if content then
+                print("  ✅ Blog content generated (via State.get)")
+            end
+        end
+    end
+else
+    print("  ⚠️ Blog content generation failed")
+end
+
+-- Test with social content (using state-based outputs)
 print("\n📱 Testing SOCIAL content generation...")
 local social_result = social_email_router:execute({
     input = content_topics.social
 })
-print("  ✅ Social content generated with hashtags")
 
--- Test with email content
+if social_result and social_result.success then
+    -- Access social media outputs from state
+    local social_output = social_email_router:get_output("social_media_workflow")
+    if social_output then
+        print("  ✅ Social content generated with hashtags (from state)")
+        -- Could also access specific platforms
+        local twitter_output = social_email_router:get_output("create_twitter")
+        if twitter_output then
+            print("    Twitter posts retrieved from state")
+        end
+    end
+else
+    print("  ⚠️ Social content generation failed")
+end
+
+-- Test with email content (using state-based outputs)
 print("\n📧 Testing EMAIL content generation...")
 local email_result = social_email_router:execute({
     input = content_topics.email
 })
-print("  ✅ Email newsletter generated and personalized")
+
+if email_result and email_result.success then
+    -- Access email outputs from state
+    local email_output = social_email_router:get_output("email_newsletter_workflow")
+    if email_output then
+        print("  ✅ Email newsletter generated and personalized (from state)")
+        -- Can also get specific steps
+        local personalized = social_email_router:get_output("personalize_content")
+        if personalized then
+            print("    Personalization applied from state")
+        end
+    end
+else
+    print("  ⚠️ Email content generation failed")
+end
 
 -- ============================================================
 -- Step 6: Publishing and Analytics

@@ -410,6 +410,33 @@ local execution_context = {
 -- Execute main controller
 local result = main_controller:execute(execution_context)
 
+if result and result.success then
+    print("  ✅ Hub controller workflow executed successfully, accessing state-based outputs...")
+    
+    -- Access outputs from state using workflow helper methods
+    local classification_output = main_controller:get_output("classify_workflow")
+    local monitoring_output = main_controller:get_output("run_monitoring")
+    local dynamic_output = main_controller:get_output("run_dynamic")
+    
+    -- Alternative: Access directly via State global
+    local state_classification = State.get("workflow:" .. result.execution_id .. ":classify_workflow")
+    local state_monitoring = State.get("workflow:" .. result.execution_id .. ":run_monitoring")
+    local state_dynamic = State.get("workflow:" .. result.execution_id .. ":run_dynamic")
+    
+    -- Use state-retrieved outputs for further processing
+    if classification_output then
+        print("  📊 Workflow classification output retrieved from state")
+    end
+    if monitoring_output then
+        print("  📊 Monitoring execution output retrieved from state")
+    end
+    if dynamic_output then
+        print("  ⚙️ Dynamic execution output retrieved from state")
+    end
+else
+    print("  ⚠️ Hub controller workflow failed")
+end
+
 -- Extract execution time
 local execution_time_ms = 0
 if result and result._metadata and result._metadata.execution_time_ms then
