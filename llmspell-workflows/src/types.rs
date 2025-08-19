@@ -2,10 +2,59 @@
 //! ABOUTME: Provides types for memory-based workflow execution
 
 use crate::shared_state::WorkflowStateAccessor;
-use llmspell_core::ComponentId;
+use llmspell_core::{ComponentId, ExecutionContext, ContextScope, InheritancePolicy};
 use serde::{Deserialize, Serialize};
+use serde_json::json;
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+
+/// State key naming conventions for workflow outputs
+pub mod state_keys {
+    /// Generate state key for a workflow step output
+    pub fn step_output(workflow_id: &str, step_name: &str) -> String {
+        format!("workflow:{}:step:{}:output", workflow_id, step_name)
+    }
+    
+    /// Generate state key for a workflow step metadata
+    pub fn step_metadata(workflow_id: &str, step_name: &str) -> String {
+        format!("workflow:{}:step:{}:metadata", workflow_id, step_name)
+    }
+    
+    /// Generate state key for an agent execution output within a workflow
+    pub fn agent_output(workflow_id: &str, agent_name: &str) -> String {
+        format!("workflow:{}:agent:{}:output", workflow_id, agent_name)
+    }
+    
+    /// Generate state key for an agent execution metadata within a workflow
+    pub fn agent_metadata(workflow_id: &str, agent_name: &str) -> String {
+        format!("workflow:{}:agent:{}:metadata", workflow_id, agent_name)
+    }
+    
+    /// Generate state key for a nested workflow output
+    pub fn nested_workflow_output(parent_workflow_id: &str, child_workflow_name: &str) -> String {
+        format!("workflow:{}:nested:{}:output", parent_workflow_id, child_workflow_name)
+    }
+    
+    /// Generate state key for a nested workflow metadata
+    pub fn nested_workflow_metadata(parent_workflow_id: &str, child_workflow_name: &str) -> String {
+        format!("workflow:{}:nested:{}:metadata", parent_workflow_id, child_workflow_name)
+    }
+    
+    /// Generate state key for the final workflow output
+    pub fn final_output(workflow_id: &str) -> String {
+        format!("workflow:{}:final_output", workflow_id)
+    }
+    
+    /// Generate state key for workflow execution state
+    pub fn workflow_state(workflow_id: &str) -> String {
+        format!("workflow:{}:state", workflow_id)
+    }
+    
+    /// Generate state key for workflow execution errors
+    pub fn workflow_error(workflow_id: &str) -> String {
+        format!("workflow:{}:error", workflow_id)
+    }
+}
 
 /// Workflow input containing initial data and configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -366,5 +415,101 @@ impl StepExecutionContext {
         self.retry_attempt = attempt;
         self.is_final_retry = attempt >= max_attempts;
         self
+    }
+    
+    /// Convert StepExecutionContext to ExecutionContext for BaseAgent execution
+    pub fn to_execution_context(&self) -> ExecutionContext {
+        let mut ctx = ExecutionContext::new();
+        
+        // Set workflow scope using the execution ID
+        ctx.scope = ContextScope::Workflow(self.workflow_state.execution_id.to_string());
+        
+        // Copy workflow shared data to context data
+        for (key, value) in &self.workflow_state.shared_data {
+            ctx.data.insert(key.clone(), value.clone());
+        }
+        
+        // Add workflow metadata
+        ctx.data.insert("workflow_id".to_string(), json!(self.workflow_state.execution_id.to_string()));
+        ctx.data.insert("current_step".to_string(), json!(self.workflow_state.current_step));
+        ctx.data.insert("retry_attempt".to_string(), json!(self.retry_attempt));
+        ctx.data.insert("is_final_retry".to_string(), json!(self.is_final_retry));
+        
+        // Add step outputs as context data
+        for (step_id, output) in &self.workflow_state.step_outputs {
+            let key = format!("step_output:{}", step_id);
+            ctx.data.insert(key, output.clone());
+        }
+        
+        // Add timing information if available
+        if let Some(duration) = self.workflow_state.execution_duration() {
+            ctx.data.insert("execution_duration_ms".to_string(), json!(duration.as_millis()));
+        }
+        
+        ctx
+    }
+    
+    /// Create a child context for nested workflow execution
+    pub fn create_child_context(
+        &self, 
+        child_workflow_id: &str,
+        inheritance_policy: InheritancePolicy
+    ) -> ExecutionContext {
+        let parent_context = self.to_execution_context();
+        
+        // Create child context with proper scope and inheritance
+        let mut child_context = ExecutionContext::new();
+        child_context.parent_id = Some(parent_context.id.clone());
+        child_context.scope = ContextScope::Workflow(child_workflow_id.to_string());
+        child_context.inheritance = inheritance_policy;
+        
+        // Handle inheritance based on policy
+        match inheritance_policy {
+            InheritancePolicy::Inherit => {
+                // Copy parent's session IDs
+                child_context.session_id = parent_context.session_id.clone();
+                child_context.conversation_id = parent_context.conversation_id.clone();
+                child_context.user_id = parent_context.user_id.clone();
+                
+                // Copy parent's data with prefix to avoid conflicts
+                for (key, value) in &parent_context.data {
+                    child_context.data.insert(format!("parent:{}", key), value.clone());
+                }
+            },
+            InheritancePolicy::Isolate => {
+                // Only copy essential tracking IDs
+                child_context.session_id = parent_context.session_id.clone();
+                // Data is isolated - no copying
+            },
+            InheritancePolicy::Copy => {
+                // Copy parent's session IDs and selected data
+                child_context.session_id = parent_context.session_id.clone();
+                child_context.conversation_id = parent_context.conversation_id.clone();
+                child_context.user_id = parent_context.user_id.clone();
+                
+                // Copy only essential workflow data (not all parent data)
+                if let Some(workflow_id) = parent_context.data.get("workflow_id") {
+                    child_context.data.insert("parent_workflow_id".to_string(), workflow_id.clone());
+                }
+            },
+            InheritancePolicy::Share => {
+                // Share read-only access - copy session IDs and create reference
+                child_context.session_id = parent_context.session_id.clone();
+                child_context.conversation_id = parent_context.conversation_id.clone();
+                child_context.user_id = parent_context.user_id.clone();
+                
+                // Note: SharedMemory would handle actual sharing if needed
+                // For now, copy data with read-only intent
+                for (key, value) in &parent_context.data {
+                    child_context.data.insert(format!("shared:{}", key), value.clone());
+                }
+            },
+        }
+        
+        // Add nested workflow metadata
+        child_context.data.insert("parent_workflow_id".to_string(), json!(self.workflow_state.execution_id.to_string()));
+        child_context.data.insert("parent_step".to_string(), json!(self.workflow_state.current_step));
+        
+        child_context
     }
 }

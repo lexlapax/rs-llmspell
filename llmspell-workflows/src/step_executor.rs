@@ -338,35 +338,24 @@ impl StepExecutor {
             }
         }
 
-        // Create ExecutionContext from StepExecutionContext
-        let mut exec_context = llmspell_core::ExecutionContext::new();
-        
-        // Add workflow state data to context
-        for (key, value) in &context.workflow_state.shared_data {
-            exec_context.data.insert(key.clone(), value.clone());
-        }
-
-        // Set workflow execution ID in context
-        exec_context.scope = llmspell_core::execution_context::ContextScope::Workflow(
-            context.workflow_state.execution_id.to_string()
-        );
+        // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
+        let exec_context = context.to_execution_context();
 
         // Execute through BaseAgent trait
         let output = tool.execute(agent_input, exec_context).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
-            let step_key = format!(
-                "workflow:{}:step:{}",
-                context.workflow_state.execution_id,
-                tool_name
-            );
+            let workflow_id = context.workflow_state.execution_id.to_string();
+            
+            // Use standardized state key functions
+            let output_key = crate::types::state_keys::step_output(&workflow_id, tool_name);
+            let metadata_key = crate::types::state_keys::step_metadata(&workflow_id, tool_name);
             
             // Store the output in state
-            state_accessor.set(&step_key, serde_json::to_value(&output.text)?);
+            state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
             
-            // Also store metadata
-            let metadata_key = format!("{}_metadata", step_key);
+            // Store metadata
             state_accessor.set(&metadata_key, serde_json::to_value(&output.metadata)?);
         }
 
@@ -451,43 +440,37 @@ impl StepExecutor {
         // Create AgentInput from the provided input string
         let agent_input = llmspell_core::types::AgentInput::text(input);
 
-        // Create ExecutionContext from StepExecutionContext
-        let mut exec_context = llmspell_core::ExecutionContext::new();
+        // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
+        let mut exec_context = context.to_execution_context();
         
-        // Add workflow state data to context
-        for (key, value) in &context.workflow_state.shared_data {
-            exec_context.data.insert(key.clone(), value.clone());
-        }
-
-        // Set agent scope in context
+        // Override scope to Agent for this execution
         exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
 
-        // Set workflow execution ID in session
-        exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
+        // Set workflow execution ID in session if not already set
+        if exec_context.session_id.is_none() {
+            exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
+        }
 
         // Execute through BaseAgent trait
         let output = agent.execute(agent_input, exec_context).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
-            let step_key = format!(
-                "workflow:{}:agent:{}",
-                context.workflow_state.execution_id,
-                agent_name
-            );
+            let workflow_id = context.workflow_state.execution_id.to_string();
+            
+            // Use standardized state key functions
+            let output_key = crate::types::state_keys::agent_output(&workflow_id, &agent_name);
+            let metadata_key = crate::types::state_keys::agent_metadata(&workflow_id, &agent_name);
             
             // Store the output in state
-            state_accessor.set(&step_key, serde_json::to_value(&output.text)?);
+            state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
             
-            // Also store metadata
-            let metadata_key = format!("{}_metadata", step_key);
-            state_accessor.set(&metadata_key, serde_json::to_value(&output.metadata)?);
-            
-            // Store tool calls if any were made
+            // Store metadata including tool calls
+            let mut metadata = output.metadata;
             if !output.tool_calls.is_empty() {
-                let tool_calls_key = format!("{}_tool_calls", step_key);
-                state_accessor.set(&tool_calls_key, serde_json::to_value(&output.tool_calls)?);
+                metadata.extra.insert("tool_calls".to_string(), serde_json::to_value(&output.tool_calls)?);
             }
+            state_accessor.set(&metadata_key, serde_json::to_value(&metadata)?);
         }
 
         Ok(output.text)
@@ -627,46 +610,32 @@ impl StepExecutor {
             agent_input
         };
 
-        // Create ExecutionContext from StepExecutionContext
-        let mut exec_context = llmspell_core::ExecutionContext::new();
-        
-        // Add workflow state data to context
-        for (key, value) in &context.workflow_state.shared_data {
-            exec_context.data.insert(key.clone(), value.clone());
-        }
-
-        // Set nested workflow scope in context
-        exec_context.scope = llmspell_core::execution_context::ContextScope::Workflow(workflow_name.clone());
-
-        // Set parent workflow ID
-        exec_context.parent_id = Some(context.workflow_state.execution_id.to_string());
+        // Create child context for nested workflow execution with inheritance
+        let exec_context = context.create_child_context(
+            &workflow_name,
+            llmspell_core::execution_context::InheritancePolicy::Inherit
+        );
 
         // Execute through BaseAgent trait
         let output = workflow.execute(agent_input, exec_context).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
-            let step_key = format!(
-                "workflow:{}:nested:{}",
-                context.workflow_state.execution_id,
-                workflow_name
-            );
+            let workflow_id = context.workflow_state.execution_id.to_string();
+            
+            // Use standardized state key functions
+            let output_key = crate::types::state_keys::nested_workflow_output(&workflow_id, &workflow_name);
+            let metadata_key = crate::types::state_keys::nested_workflow_metadata(&workflow_id, &workflow_name);
             
             // Store the output in state
-            state_accessor.set(&step_key, serde_json::to_value(&output.text)?);
+            state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
             
-            // Store output metadata
-            let output_metadata_key = format!("{}_output_metadata", step_key);
-            state_accessor.set(&output_metadata_key, serde_json::to_value(&output.metadata)?);
-
-            // Store execution metadata about the nested workflow
-            let exec_metadata_key = format!("{}_execution", step_key);
-            let exec_metadata = serde_json::json!({
-                "workflow_id": workflow_name,
-                "input": input,
-                "completed_at": chrono::Utc::now().to_rfc3339(),
-            });
-            state_accessor.set(&exec_metadata_key, exec_metadata);
+            // Store combined metadata including execution details
+            let mut metadata = output.metadata;
+            metadata.extra.insert("workflow_id".to_string(), serde_json::json!(workflow_name));
+            metadata.extra.insert("input".to_string(), input.clone());
+            metadata.extra.insert("completed_at".to_string(), serde_json::json!(chrono::Utc::now().to_rfc3339()));
+            state_accessor.set(&metadata_key, serde_json::to_value(&metadata)?);
         }
 
         Ok(output.text)

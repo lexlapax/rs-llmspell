@@ -1370,36 +1370,75 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
   - [x] Apply same pattern to `execute_agent_step()` (COMPLETED - using real registry lookup and BaseAgent execution)
   - [x] Apply same pattern to `execute_workflow_step()` (COMPLETED - using real registry lookup and BaseAgent execution)
   
-- c. [ ] **Leverage Existing ExecutionContext Infrastructure**:
-  - [ ] In `llmspell-workflows/src/types.rs`, add conversion method (~line 100):
+- c. [x] **Leverage Existing ExecutionContext Infrastructure** (COMPLETED):
+  
+  **PLANNED vs ACTUAL IMPLEMENTATION**:
+  - **Planned**: Direct field mapping from StepExecutionContext
+  - **Actual**: StepExecutionContext doesn't have session_id/conversation_id directly
+  - **Solution**: Used workflow_state fields and added comprehensive conversion
+  
+  - [x] Added `to_execution_context()` conversion method in `types.rs:373-402`:
     ```rust
     impl StepExecutionContext {
         pub fn to_execution_context(&self) -> ExecutionContext {
             let mut ctx = ExecutionContext::new();
-            ctx.session_id = self.session_id.clone();
-            ctx.conversation_id = self.conversation_id.clone();
-            ctx.state = self.state.clone(); // State is already Option<Arc<dyn StateAccess>>
-            ctx.data.insert("workflow_id", json!(self.workflow_id));
-            ctx.data.insert("step_index", json!(self.step_index));
-            ctx.data.insert("current_data", self.current_data.clone());
+            // Set workflow scope using execution ID
+            ctx.scope = ContextScope::Workflow(self.workflow_state.execution_id.to_string());
+            
+            // Copy workflow shared data to context
+            for (key, value) in &self.workflow_state.shared_data {
+                ctx.data.insert(key.clone(), value.clone());
+            }
+            
+            // Add workflow metadata
+            ctx.data.insert("workflow_id", json!(self.workflow_state.execution_id));
+            ctx.data.insert("current_step", json!(self.workflow_state.current_step));
+            ctx.data.insert("retry_attempt", json!(self.retry_attempt));
+            
+            // Add step outputs and timing if available
+            for (step_id, output) in &self.workflow_state.step_outputs {
+                ctx.data.insert(format!("step_output:{}", step_id), output.clone());
+            }
             ctx
         }
     }
     ```
-  - [ ] State key naming convention for outputs:
-    ```
-    workflow:{workflow_id}:step:{step_name}:output     // Step output
-    workflow:{workflow_id}:step:{step_name}:metadata   // Step metadata
-    workflow:{workflow_id}:final_output                // Final workflow output
-    workflow:{workflow_id}:state                       // Workflow state
-    ```
-  - [ ] For nested workflows, use parent context:
+  
+  - [x] State key naming convention - **Created full module** `types.rs:11-57`:
     ```rust
-    let child_context = parent_context.create_child(
-        ContextScope::Workflow(workflow_id),
-        InheritancePolicy::Inherit
-    );
+    pub mod state_keys {
+        pub fn step_output(workflow_id: &str, step_name: &str) -> String
+        pub fn step_metadata(workflow_id: &str, step_name: &str) -> String  
+        pub fn agent_output(workflow_id: &str, agent_name: &str) -> String
+        pub fn agent_metadata(workflow_id: &str, agent_name: &str) -> String
+        pub fn nested_workflow_output(parent_id: &str, child_name: &str) -> String
+        pub fn nested_workflow_metadata(parent_id: &str, child_name: &str) -> String
+        pub fn final_output(workflow_id: &str) -> String
+        pub fn workflow_state(workflow_id: &str) -> String
+        pub fn workflow_error(workflow_id: &str) -> String
+    }
     ```
+    **Impact**: All StepExecutor methods now use these standardized functions instead of hardcoded formats
+  
+  - [x] Child context creation - **Full inheritance policy support** `types.rs:404-452`:
+    ```rust
+    pub fn create_child_context(&self, child_workflow_id: &str, 
+                                inheritance_policy: InheritancePolicy) -> ExecutionContext {
+        // Handles all 4 policies: Inherit, Isolate, Copy, Share
+        // Parent data prefixed with "parent:" or "shared:" based on policy
+        // Properly sets parent_id and scope relationships
+    }
+    ```
+    **Note**: InheritancePolicy doesn't have Custom variant - adapted to use all 4 existing variants
+  
+  **ARCHITECTURE INSIGHTS FROM IMPLEMENTATION**:
+  - **StepExecutor Simplification**: Replaced 3 separate manual ExecutionContext creations with unified approach:
+    - `execute_tool_step()`: Now uses `context.to_execution_context()` 
+    - `execute_agent_step()`: Uses `to_execution_context()` then overrides scope to Agent
+    - `execute_workflow_step()`: Uses `create_child_context()` with Inherit policy
+  - **Metadata Storage Pattern**: OutputMetadata.extra HashMap used for dynamic fields (tool_calls, workflow_id, etc.)
+  - **State Key Consistency**: Centralized naming prevents drift between writers and readers
+  - **Context Inheritance**: Nested workflows properly inherit parent context with conflict prevention (prefixing)
   
 - d. [ ] **Hook Integration Enhancements**:
   - [ ] StepExecutor already has `workflow_executor: Option<Arc<WorkflowExecutor>>` ✅
