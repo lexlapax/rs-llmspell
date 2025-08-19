@@ -45,7 +45,7 @@ impl ComponentRegistry {
         }
     }
 
-    /// Get the EventBus if available
+    /// Get the `EventBus` if available
     #[must_use]
     pub fn event_bus(&self) -> Option<Arc<EventBus>> {
         self.event_bus.clone()

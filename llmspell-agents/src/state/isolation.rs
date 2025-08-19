@@ -232,7 +232,7 @@ impl StateIsolationManager {
                 matches!(operation, StateOperation::Read) && self.is_shared_scope(target_scope)
             }
             IsolationBoundary::SharedAccess => {
-                // Allow full access to shared scopes
+                // Allow access to shared scopes (explicit permissions checked separately)
                 self.is_shared_scope(target_scope)
             }
             IsolationBoundary::Custom(policy) => {
@@ -252,7 +252,11 @@ impl StateIsolationManager {
         let access_control = self.access_control.read();
         let has_permission = access_control.has_permission(agent_id, target_scope, &permission);
 
-        let final_allowed = allowed || has_permission;
+        // For SharedAccess boundary, require both boundary access AND explicit permission
+        let final_allowed = match boundary {
+            IsolationBoundary::SharedAccess => allowed && has_permission,
+            _ => allowed || has_permission,
+        };
 
         // Audit the access attempt
         self.audit_access(

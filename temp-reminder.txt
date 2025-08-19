@@ -2,3 +2,11 @@
 - all tool functions should be consistent for two word functions either like-this or like_this, but not both.
 - security sandbox - add network access, add process execution access 
 
+now another thing to think about is how to debug when working with scripts in lua or javascript.. megathink and analyze .. are 
+there debug flags we can pass to the runtime from the configs - debug, warn etc , is the llmspell cli set up to do that? are there 
+debug , warn statements in the codebase that get activated when the flag is present? can we use debug hooks for llm debugging.. 
+mega think about this, look at the entire codebase and think about how we SHOULD do this holistically and present me with options.
+What is already in place? what do we need to add? how big are the changes across how many files?
+we can't always resort to adding temporary debug statements in code, compiling it, running it , fixing code and finally taking them out.
+There has to be a better way, even thinking of things like debugging as a feature for scripts that we can turn on for debug builds and 
+turn off for release builds or portions of them off.

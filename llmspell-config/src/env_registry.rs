@@ -988,7 +988,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_TIMING")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_TIMING_EVENTS")
             .description("Enable timing/performance events")
             .category(EnvCategory::Runtime)
             .config_path("events.emit_timing_events")
@@ -1001,7 +1001,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_STATE")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_STATE_EVENTS")
             .description("Enable state change events")
             .category(EnvCategory::Runtime)
             .config_path("events.emit_state_events")
@@ -1014,7 +1014,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_DEBUG")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EMIT_DEBUG_EVENTS")
             .description("Enable debug-level events")
             .category(EnvCategory::Runtime)
             .config_path("events.emit_debug_events")
@@ -1027,7 +1027,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_MAX_PER_SECOND")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_MAX_EVENTS_PER_SECOND")
             .description("Maximum events per second (rate limiting)")
             .category(EnvCategory::Runtime)
             .config_path("events.max_events_per_second")
@@ -1041,7 +1041,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
 
     // Filtering configuration
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_INCLUDE_TYPES")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_FILTERING_INCLUDE_TYPES")
             .description("Event types to include (comma-separated glob patterns)")
             .category(EnvCategory::Runtime)
             .config_path("events.filtering.include_types")
@@ -1050,7 +1050,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXCLUDE_TYPES")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_FILTERING_EXCLUDE_TYPES")
             .description("Event types to exclude (comma-separated glob patterns)")
             .category(EnvCategory::Runtime)
             .config_path("events.filtering.exclude_types")
@@ -1058,7 +1058,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_INCLUDE_COMPONENTS")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_FILTERING_INCLUDE_COMPONENTS")
             .description("Component IDs to include (comma-separated glob patterns)")
             .category(EnvCategory::Runtime)
             .config_path("events.filtering.include_components")
@@ -1067,7 +1067,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXCLUDE_COMPONENTS")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_FILTERING_EXCLUDE_COMPONENTS")
             .description("Component IDs to exclude (comma-separated glob patterns)")
             .category(EnvCategory::Runtime)
             .config_path("events.filtering.exclude_components")
@@ -1112,7 +1112,7 @@ fn register_event_vars(registry: &EnvRegistry) -> Result<(), String> {
     )?;
 
     registry.register_var(
-        EnvVarDefBuilder::new("LLMSPELL_EVENTS_PRETTY_JSON")
+        EnvVarDefBuilder::new("LLMSPELL_EVENTS_EXPORT_PRETTY_JSON")
             .description("Pretty-print JSON output")
             .category(EnvCategory::Runtime)
             .config_path("events.export.pretty_json")

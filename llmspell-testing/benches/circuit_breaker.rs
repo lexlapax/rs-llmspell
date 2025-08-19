@@ -97,6 +97,12 @@ fn bench_circuit_breaker_recovery(c: &mut Criterion) {
                 // Wait for half-open state
                 sleep(Duration::from_millis(15)).await;
 
+                // Trigger transition to half-open by checking if we can execute
+                assert!(
+                    circuit_breaker.can_execute(),
+                    "Should transition to half-open"
+                );
+
                 // Record successes to recover
                 for _ in 0..2 {
                     circuit_breaker.record_success(Duration::from_micros(100));

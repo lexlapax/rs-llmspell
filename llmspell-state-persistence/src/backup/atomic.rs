@@ -150,18 +150,14 @@ impl AtomicBackup {
         let mut entries = HashMap::new();
         let mut total_size = 0u64;
 
-        // Get all scopes that might contain data
-        // For now, we'll try the known scopes from the test data
-        // TODO: Implement proper scope discovery by querying the StateManager
-        let scopes = vec![
-            StateScope::Global,
-            // Check common custom scope patterns used in tests
-            StateScope::Custom("agent_1".to_string()),
-            StateScope::Custom("agent_2".to_string()),
-            StateScope::Custom("service_a".to_string()),
-            StateScope::Custom("service_b".to_string()),
-            StateScope::Custom("service_c".to_string()),
-        ];
+        // Discover all scopes by listing keys with empty prefix to get all data
+        let scopes = self.discover_scopes().await?;
+
+        debug!(
+            "Discovered {} scopes for backup: {:?}",
+            scopes.len(),
+            scopes
+        );
 
         // Capture state for each scope
         for scope in scopes {
@@ -239,6 +235,30 @@ impl AtomicBackup {
         }
 
         Ok(entries)
+    }
+
+    /// Discover all scopes that contain data by examining storage keys
+    async fn discover_scopes(&self) -> Result<Vec<StateScope>, StateError> {
+        use std::collections::HashSet;
+
+        let mut unique_scopes = HashSet::new();
+
+        // Get all storage keys using StateManager's method
+        let all_keys = self.state_manager.get_all_storage_keys().await?;
+
+        debug!("Found {} total keys for scope discovery", all_keys.len());
+
+        // Use StateScope's built-in parsing to extract scope information
+        for key in all_keys {
+            if let Some((scope, _key_part)) = StateScope::parse_storage_key(&key) {
+                unique_scopes.insert(scope);
+            }
+        }
+
+        let scopes: Vec<StateScope> = unique_scopes.into_iter().collect();
+        debug!("Discovered {} unique scopes: {:?}", scopes.len(), scopes);
+
+        Ok(scopes)
     }
 
     /// Serialize snapshot to bytes

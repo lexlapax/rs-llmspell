@@ -1658,6 +1658,15 @@ impl StateManager {
             .get_lineage(artifact_id)
             .await
     }
+
+    /// Get all storage keys for backup/discovery purposes
+    /// This is used by the backup system to discover all scopes and data
+    pub async fn get_all_storage_keys(&self) -> StateResult<Vec<String>> {
+        self.storage_adapter
+            .list_keys("")
+            .await
+            .map_err(|e| StateError::storage(e.to_string()))
+    }
 }
 
 // ==============================================================================

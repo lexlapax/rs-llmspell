@@ -115,13 +115,18 @@ impl LLMSpellConfig {
             .map_err(|e| ConfigError::Environment { message: e })?;
 
         // Merge environment config into self
-        self.merge_from_json(&env_config)?;
+        self.merge_from_json_impl(&env_config)?;
 
         Ok(())
     }
 
-    /// Merge values from JSON config (from registry)
-    fn merge_from_json(&mut self, json: &serde_json::Value) -> Result<(), ConfigError> {
+    /// Merge values from JSON config (from registry) - exposed for testing
+    pub fn merge_from_json(&mut self, json: &serde_json::Value) -> Result<(), ConfigError> {
+        self.merge_from_json_impl(json)
+    }
+
+    /// Internal implementation of merge_from_json
+    fn merge_from_json_impl(&mut self, json: &serde_json::Value) -> Result<(), ConfigError> {
         // Merge top-level values
         if let Some(engine) = json.get("default_engine").and_then(|v| v.as_str()) {
             debug!("Overriding default engine from env: {}", engine);

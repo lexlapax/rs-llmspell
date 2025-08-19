@@ -127,10 +127,9 @@ impl EnvRegistry {
                     cached.insert(name.clone(), value);
                 }
                 Err(_) => {
-                    // Use default if available
-                    if let Some(default) = &def.default {
-                        cached.insert(name.clone(), default.clone());
-                    }
+                    // Do NOT insert defaults into cached values
+                    // Defaults should only be used when no TOML value exists
+                    // and no environment variable is set
                 }
             }
         }

@@ -27,6 +27,9 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 - **Documentation**: >95% API documentation coverage required
 - **Formatting**: Run `cargo fmt --all` before every commit
 - **Performance**: Maintain established benchmarks (e.g., <10ms tool initialization, <1% hook overhead)
+- **Task Pacing**: DO NOT Jump ahead to new tasks in TODO.md unless explictly told to do so. Ask for confirmation.
+- **Eager Implementation**: NO SHORTCUTS. Completion in a holistic way is key. Don't skip and leave TODOs for later based on your assumptions.
+
 
 ### Quality Check Commands
 

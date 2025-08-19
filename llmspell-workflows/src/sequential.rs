@@ -342,6 +342,25 @@ impl SequentialWorkflow {
                         warn!("Stopping workflow '{}' due to step failure", self.name);
                         self.state_manager.complete_execution(false).await?;
 
+                        // Emit workflow failed event
+                        if let Some(ref events) = context.events {
+                            let _ = events
+                                .emit(
+                                    "workflow.failed",
+                                    serde_json::json!({
+                                        "workflow_id": execution_id,
+                                        "workflow_name": self.name,
+                                        "workflow_type": "sequential",
+                                        "error": "step_failed",
+                                        "failed_step": step.name,
+                                        "duration_ms": start_time.elapsed().as_millis(),
+                                        "steps_executed": steps_executed,
+                                        "steps_failed": steps_failed,
+                                    }),
+                                )
+                                .await;
+                        }
+
                         return Ok(WorkflowResult::failure(
                             execution_id,
                             WorkflowType::Sequential,

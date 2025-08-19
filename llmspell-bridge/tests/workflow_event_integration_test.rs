@@ -194,9 +194,7 @@ async fn test_workflow_event_emission() {
         "workflow.started should come before workflow.completed"
     );
 
-    println!(
-        "✅ Workflow event emission test passed! Events collected: {event_types:?}"
-    );
+    println!("✅ Workflow event emission test passed! Events collected: {event_types:?}");
 }
 
 #[tokio::test]
@@ -262,9 +260,7 @@ async fn test_workflow_failure_event() {
         "Should have workflow.failed event"
     );
 
-    println!(
-        "✅ Workflow failure event test passed! Events collected: {event_types:?}"
-    );
+    println!("✅ Workflow failure event test passed! Events collected: {event_types:?}");
 }
 
 #[tokio::test]

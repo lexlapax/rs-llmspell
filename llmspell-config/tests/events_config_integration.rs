@@ -3,7 +3,8 @@
 use llmspell_config::LLMSpellConfig;
 use std::env;
 
-// Helper function to clean up all event environment variables
+// Helper function to clean up all event environment variables (no longer needed with registry approach)
+#[allow(dead_code)]
 fn cleanup_event_env_vars() {
     let env_vars = [
         "LLMSPELL_EVENTS_ENABLED",
@@ -136,17 +137,30 @@ fn test_events_config_empty_toml() {
 
 #[test]
 fn test_events_config_env_overrides() {
-    // Clean up first to avoid conflicts with other tests
-    cleanup_event_env_vars();
+    use llmspell_config::{env_registry::register_standard_vars, EnvRegistry};
+    use std::collections::HashMap;
 
-    // Test basic environment variable override (we know this one works)
-    env::set_var("LLMSPELL_EVENTS_ENABLED", "false");
+    // Create isolated registry with test-specific overrides (no real env vars)
+    let registry = EnvRegistry::new();
+    register_standard_vars(&registry).expect("Failed to register standard vars");
 
-    // Create config and apply environment overrides
+    // Set up test overrides without touching global environment
+    let mut overrides = HashMap::new();
+    overrides.insert("LLMSPELL_EVENTS_ENABLED".to_string(), "false".to_string());
+    registry
+        .with_overrides(overrides)
+        .expect("Failed to set overrides");
+
+    // Build config directly from registry (bypasses load_from_env entirely)
+    let env_config = registry
+        .build_config()
+        .expect("Failed to build config from registry");
+
+    // Apply to default config
     let mut config = LLMSpellConfig::default();
     config
-        .apply_env_registry()
-        .expect("Failed to apply env registry");
+        .merge_from_json(&env_config)
+        .expect("Failed to merge env config");
 
     // Verify basic override works
     let events = &config.events;
@@ -154,15 +168,12 @@ fn test_events_config_env_overrides() {
         !events.enabled,
         "LLMSPELL_EVENTS_ENABLED should override to false"
     );
-
-    // Clean up environment variables
-    cleanup_event_env_vars();
 }
 
 #[test]
 fn test_events_config_toml_with_env_override() {
-    // Clean up any existing env vars first
-    cleanup_event_env_vars();
+    use llmspell_config::{env_registry::register_standard_vars, EnvRegistry};
+    use std::collections::HashMap;
 
     let toml_content = r#"
 [events]
@@ -191,20 +202,30 @@ stdout = false
         config.events.buffer_size
     );
 
-    // Now apply environment override for enabled field only
-    env::set_var("LLMSPELL_EVENTS_ENABLED", "false");
+    // Create isolated registry with test-specific overrides (no real env vars)
+    let registry = EnvRegistry::new();
+    register_standard_vars(&registry).expect("Failed to register standard vars");
+
+    // Set up test overrides for enabled field only
+    let mut overrides = HashMap::new();
+    overrides.insert("LLMSPELL_EVENTS_ENABLED".to_string(), "false".to_string());
+    registry
+        .with_overrides(overrides)
+        .expect("Failed to set overrides");
+
+    // Build config from registry and merge
+    let env_config = registry
+        .build_config()
+        .expect("Failed to build config from registry");
     config
-        .apply_env_registry()
-        .expect("Failed to apply env registry");
+        .merge_from_json(&env_config)
+        .expect("Failed to merge env config");
 
     // Environment should override TOML for enabled field, others unchanged
     assert!(!config.events.enabled); // Overridden by env
     assert_eq!(config.events.buffer_size, 5000); // From TOML (unchanged)
     assert!(config.events.emit_timing_events); // From TOML (unchanged)
     assert!(!config.events.export.stdout); // From TOML (unchanged)
-
-    // Clean up
-    cleanup_event_env_vars();
 }
 
 #[test]
