@@ -34,7 +34,8 @@ local json = JSON  -- Global JSON table provided by llmspell
 -- 3. Environment variable (backward compatible): WEBAPP_INPUT_FILE=user-input-ecommerce.lua
 -- 4. Default: user-input.lua
 local input_file = ARGS and ARGS.input or ARGS and ARGS[1] or os.getenv("WEBAPP_INPUT_FILE") or "user-input.lua"
-local input_path = "examples/script-users/applications/webapp-creator/" .. input_file
+-- Use just the filename, not the full path when running from this directory
+local input_path = input_file
 
 print("Loading user requirements from " .. input_file .. "...")
 local user_input = dofile(input_path)
@@ -523,8 +524,8 @@ print("\n  🎯 Total agents created: 20 (most complex Blueprint system)")
 
 print("\n2. Initializing project request from user input...")
 
--- Get project request from user input
-local project_request = user_input.requirements
+-- Get project request from user input (with fallback)
+local project_request = user_input.requirements or "Build a modern web application with user authentication, data management, and responsive design."
 
 -- Build enhanced request with user preferences
 if user_input.ux.must_have_features then
@@ -955,11 +956,12 @@ local main_controller = Workflow.builder()
     :conditional()
     
     -- Initial classification
+    -- The input will come from the execute() call, not hardcoded here
     :add_step({
         name = "classify_project",
         type = "agent",
-        agent = requirements_analyst and agent_names.requirements_analyst or nil,
-        input = project_request
+        agent = requirements_analyst and agent_names.requirements_analyst or nil
+        -- input is provided by execute()
     })
     
     -- Condition: Check project complexity
@@ -1033,14 +1035,9 @@ emit_event("webapp:start", {
     timestamp = os.date("%Y-%m-%d %H:%M:%S")
 })
 
--- Execute main controller
-local execution_context = {
-    project_request = project_request,
-    session_id = session_id,
-    timestamp = os.date("%Y-%m-%d %H:%M:%S")
-}
-
-local result = main_controller:execute(execution_context)
+-- Execute main controller with project request as the input text
+-- The workflow expects a string input, not a table
+local result = main_controller:execute(project_request)
 
 -- Check if workflow executed successfully
 print("\n📊 Workflow Result Analysis:")

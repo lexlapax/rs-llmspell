@@ -26,13 +26,13 @@ default_provider = "openai"
 [providers.openai]
 provider_type = "openai"
 api_key_env = "OPENAI_API_KEY"
-model = "gpt-4o-mini"
+default_model = "gpt-4o-mini"
 timeout_seconds = 60
 
 [providers.anthropic]
 provider_type = "anthropic"
 api_key_env = "ANTHROPIC_API_KEY"
-model = "claude-3-haiku-20240307"
+default_model = "claude-3-haiku-20240307"
 timeout_seconds = 60
 
 # Global runtime configuration - exact field names from lib.rs
@@ -69,7 +69,8 @@ storage_backend = "memory"
 # Tool configurations - These sections can be completely omitted if defaults are acceptable
 [tools.file_operations]
 allowed_paths = [
-    "*"
+    "/Users/spuri/projects/lexlapax/rs-llmspell/examples/script-users/applications/webapp-creator/generated",
+    "/tmp"
 ]
 atomic_writes = true
 max_file_size = 10485760

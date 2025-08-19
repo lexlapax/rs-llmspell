@@ -160,24 +160,48 @@ impl EnvRegistry {
         Ok(values)
     }
 
-    /// Build configuration from environment values
+    /// Build configuration from environment values (only actually-set values, not defaults)
     pub fn build_config(&self) -> Result<Value, String> {
-        let values = self.get_all_values()?;
+        // IMPORTANT: Only get values that were actually set, not defaults
+        let cached = self.cached_values.read().map_err(|e| e.to_string())?;
+        let overrides = self.overrides.read().map_err(|e| e.to_string())?;
         let defs = self.definitions.read().map_err(|e| e.to_string())?;
 
         let mut config = serde_json::json!({});
 
-        for (name, value) in values {
-            if let Some(def) = defs.get(&name) {
+        // Process overrides first (highest priority)
+        for (name, value) in overrides.iter() {
+            if let Some(def) = defs.get(name) {
                 // Validate the value
-                (def.validator)(&value)?;
+                (def.validator)(value)?;
 
                 // Apply to config JSON structure if path is defined
                 if let Some(path) = &def.config_path {
-                    apply_to_json_path(&mut config, path, &value)?;
+                    apply_to_json_path(&mut config, path, value)?;
                 }
             }
         }
+
+        // Then process cached values (actual env vars that were set)
+        for (name, value) in cached.iter() {
+            // Skip if already set by override
+            if overrides.contains_key(name) {
+                continue;
+            }
+            
+            if let Some(def) = defs.get(name) {
+                // Validate the value
+                (def.validator)(value)?;
+
+                // Apply to config JSON structure if path is defined
+                if let Some(path) = &def.config_path {
+                    apply_to_json_path(&mut config, path, value)?;
+                }
+            }
+        }
+
+        // NOTE: We intentionally DO NOT use defaults here
+        // Defaults should come from the config structs, not env vars
 
         Ok(config)
     }

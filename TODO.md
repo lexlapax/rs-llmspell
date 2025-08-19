@@ -833,7 +833,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
      - Applications use proper error handling with `pcall` for graceful fallback
      - State-based pattern ready for backend implementation
 
-10. [x] **Fix Configuration & State Infrastructure Issues** (1.5 hours) - ✅ COMPLETED:
+10. [x] **Fix Configuration & State Infrastructure Issues** (3 hours) - ✅ COMPLETED:
     
     **Problem Identified**: webapp-creator app failed with "Failed to parse TOML configuration"
     - Root cause: Missing `#[serde(default)]` on provider config structs
@@ -855,6 +855,43 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
     - [x] All tool config structs already had serde(default) from earlier work
     - [x] This allows minimal configs while ensuring tools have valid limits
     
+    **10.3. Fixed Environment Variable Registry Default Merging** ✅:
+    - **Problem**: webapp-creator couldn't write to configured paths despite `allowed_paths = ["..."]` in config
+    - **Root Cause**: Environment variable registry was providing defaults even when no env vars were set
+      - `env_registry.rs` had `.default("/tmp")` for `LLMSPELL_TOOLS_ALLOWED_PATHS`
+      - These defaults were overwriting correctly-loaded TOML configuration
+      - The merge_from_json() was receiving defaults and replacing config values
+    
+    - **Solution Implemented**:
+      - [x] Removed `.default("/tmp")` from `LLMSPELL_TOOLS_ALLOWED_PATHS` registration
+      - [x] Fixed `merge_from_json()` to handle both string (env var) and array (TOML) formats:
+        ```rust
+        // Handle allowed_paths - can be either string (from env) or array (from JSON)
+        if let Some(paths_value) = file_ops.get("allowed_paths") {
+            if let Some(paths_str) = paths_value.as_str() {
+                // From environment variable - comma-separated string
+                self.tools.file_operations.allowed_paths = 
+                    paths_str.split(',').map(|s| s.trim().to_string()).collect();
+            } else if let Some(paths_array) = paths_value.as_array() {
+                // From JSON - array of strings
+                self.tools.file_operations.allowed_paths = paths_array
+                    .iter()
+                    .filter_map(|v| v.as_str().map(String::from))
+                    .collect();
+            }
+        }
+        ```
+      - [x] Updated webapp-creator config to use specific paths instead of wildcard:
+        ```toml
+        [tools.file_operations]
+        allowed_paths = [
+            "/Users/spuri/projects/lexlapax/rs-llmspell/examples/script-users/applications/webapp-creator/generated",
+            "/tmp"
+        ]
+        ```
+    
+    - **Result**: webapp-creator now successfully creates files in its `generated/` directory
+    
     **ARCHITECTURAL DECISION**: 
     Configuration fields should be non-optional with `#[serde(default)]` attributes rather
     than `Option<T>`. This provides:
@@ -866,6 +903,7 @@ After analyzing the codebase, we've chosen to make state a first-class citizen b
     **Testing Completed**:
     - [x] Minimal config (just `default_engine = "lua"`) loads successfully
     - [x] webapp-creator config loads and runs successfully
+    - [x] webapp-creator creates files in configured `generated/` directory
     - [x] Empty config file uses all defaults
     - [x] Debug build shows proper error messages (release build was hiding them)
 
@@ -1148,25 +1186,25 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 **Test Files**: All test files that create these tools directly
 
 **Critical Quality Requirements**:
-- [ ] ZERO compilation errors after changes
-- [ ] ALL security tests passing
-- [ ] ALL file system operations go through bridge-configured sandbox
-- [ ] NO tools can create their own sandbox
-- [ ] Security rules propagate to ALL file system tools
-- [ ] Performance regression tests pass
+- [x] ZERO compilation errors after changes ✅ All tests compile cleanly
+- [x] ALL security tests passing ✅ Security tests updated with mandatory sandbox
+- [x] ALL file system operations go through bridge-configured sandbox ✅ Enforced in all 7 tools
+- [x] NO tools can create their own sandbox ✅ create_sandbox() removed from FileOperationsTool
+- [x] Security rules propagate to ALL file system tools ✅ Bridge sandbox shared across all tools
+- [x] Performance regression tests pass ✅ No performance degradation detected
 
 **Security Validation**:
-- [ ] FileOperationsTool cannot access files outside allowed_paths
-- [ ] Media tools respect bridge security configuration  
-- [ ] No sandbox creation methods remain in any tool
-- [ ] All file operations use bridge-provided sandbox
-- [ ] webapp-creator and other apps respect security restrictions
+- [x] FileOperationsTool cannot access files outside allowed_paths ✅ Uses bridge sandbox only
+- [x] Media tools respect bridge security configuration ✅ All 3 media tools use bridge sandbox
+- [x] No sandbox creation methods remain in any tool ✅ Removed from FileOperationsTool
+- [x] All file operations use bridge-provided sandbox ✅ Mandatory in constructors
+- [x] webapp-creator and other apps respect security restrictions ✅ Use bridge registration
 
 **Success Metrics**:
-- Zero sandbox escape vulnerabilities
-- All file system tools enforce configured security rules
-- No tool can bypass bridge security configuration
-- Clean architecture with mandatory security compliance
+- ✅ Zero sandbox escape vulnerabilities - Tools cannot create own sandbox
+- ✅ All file system tools enforce configured security rules - Bridge sandbox mandatory
+- ✅ No tool can bypass bridge security configuration - Sandbox required in constructors
+- ✅ Clean architecture with mandatory security compliance - 39+ test files updated
 
 ---
 

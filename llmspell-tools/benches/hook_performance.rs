@@ -5,9 +5,10 @@
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_core::{traits::tool::Tool, types::AgentInput, ExecutionContext};
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
 use llmspell_tools::{
     data::json_processor::JsonProcessorTool,
-    fs::file_operations::FileOperationsTool,
+    fs::file_operations::{FileOperationsTool, FileOperationsConfig},
     lifecycle::hook_integration::{HookFeatures, ToolExecutor, ToolLifecycleConfig},
     util::calculator::CalculatorTool,
 };
@@ -240,10 +241,14 @@ fn benchmark_circuit_breaker(c: &mut Criterion) {
 }
 
 fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
+    let sandbox = create_default_test_sandbox();
     let tools: Vec<(&str, Box<dyn Tool>)> = vec![
         ("calculator", Box::new(CalculatorTool::new())),
         ("json_processor", Box::new(JsonProcessorTool::default())),
-        ("file_operations", Box::new(FileOperationsTool::default())),
+        ("file_operations", Box::new(FileOperationsTool::new(
+            FileOperationsConfig::default(),
+            sandbox,
+        ))),
     ];
 
     let mut group = c.benchmark_group("hook_overhead_percentage");

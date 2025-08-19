@@ -442,7 +442,7 @@ fn register_tool_vars(registry: &EnvRegistry) -> Result<(), String> {
             .description("Comma-separated list of allowed paths for file operations")
             .category(EnvCategory::Tool)
             .config_path("tools.file_operations.allowed_paths")
-            .default("/tmp")
+            // No default - use config file value
             .build(),
     )?;
 

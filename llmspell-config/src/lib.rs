@@ -209,32 +209,6 @@ impl LLMSpellConfig {
                     self.runtime.state_persistence.backup_enabled = backup_enabled;
                 }
 
-                // Backward compatibility - support old nested structure
-                if let Some(flags) = state.get("flags").and_then(|v| v.as_object()) {
-                    if let Some(core) = flags.get("core").and_then(|v| v.as_object()) {
-                        if let Some(enabled) = core.get("enabled").and_then(|v| v.as_bool()) {
-                            self.runtime.state_persistence.enabled = enabled;
-                        }
-                        if let Some(migration) =
-                            core.get("migration_enabled").and_then(|v| v.as_bool())
-                        {
-                            self.runtime.state_persistence.migration_enabled = migration;
-                        }
-                    }
-                    if let Some(backup) = flags.get("backup").and_then(|v| v.as_object()) {
-                        if let Some(backup_on_migration) =
-                            backup.get("backup_on_migration").and_then(|v| v.as_bool())
-                        {
-                            self.runtime.state_persistence.backup_on_migration =
-                                backup_on_migration;
-                        }
-                        if let Some(backup_enabled) =
-                            backup.get("backup_enabled").and_then(|v| v.as_bool())
-                        {
-                            self.runtime.state_persistence.backup_enabled = backup_enabled;
-                        }
-                    }
-                }
             }
 
             // Merge session settings
@@ -258,74 +232,63 @@ impl LLMSpellConfig {
                 }
 
                 if let Some(provider_obj) = config.as_object() {
-                    // Update or create provider config
-                    let mut provider_config = self
-                        .providers
-                        .providers
-                        .get(name)
-                        .cloned()
-                        .unwrap_or_else(|| ProviderConfig {
-                            name: name.clone(),
-                            provider_type: name.clone(),
-                            enabled: true,
-                            ..Default::default()
-                        });
-
-                    if let Some(api_key) = provider_obj.get("api_key").and_then(|v| v.as_str()) {
-                        provider_config.api_key = Some(api_key.to_string());
-                    }
-                    if let Some(base_url) = provider_obj.get("base_url").and_then(|v| v.as_str()) {
-                        provider_config.base_url = Some(base_url.to_string());
-                    }
-                    if let Some(model) = provider_obj.get("default_model").and_then(|v| v.as_str())
-                    {
-                        provider_config.default_model = Some(model.to_string());
-                    }
-
-                    self.providers
-                        .providers
-                        .insert(name.clone(), provider_config);
-                }
-            }
-
-            // Also handle backward compatibility for configs structure
-            if let Some(configs) = providers.get("configs").and_then(|v| v.as_object()) {
-                for (name, config) in configs {
-                    if let Some(provider_obj) = config.as_object() {
-                        // Update or create provider config
-                        let mut provider_config = self
-                            .providers
-                            .providers
-                            .get(name)
-                            .cloned()
-                            .unwrap_or_else(|| ProviderConfig {
+                    // Check if provider already exists in config
+                    if let Some(existing_provider) = self.providers.providers.get_mut(name) {
+                        // Provider exists - only update fields that are present in env config
+                        if let Some(api_key) = provider_obj.get("api_key").and_then(|v| v.as_str()) {
+                            existing_provider.api_key = Some(api_key.to_string());
+                        }
+                        if let Some(base_url) = provider_obj.get("base_url").and_then(|v| v.as_str()) {
+                            existing_provider.base_url = Some(base_url.to_string());
+                        }
+                        if let Some(model) = provider_obj.get("default_model").and_then(|v| v.as_str()) {
+                            existing_provider.default_model = Some(model.to_string());
+                        }
+                        if let Some(timeout) = provider_obj.get("timeout_seconds").and_then(|v| v.as_u64()) {
+                            existing_provider.timeout_seconds = Some(timeout);
+                        }
+                        if let Some(max_retries) = provider_obj.get("max_retries").and_then(|v| v.as_u64()) {
+                            existing_provider.max_retries = Some(max_retries as u32);
+                        }
+                        // Only update other fields if they're present
+                        if let Some(provider_type) = provider_obj.get("provider_type").and_then(|v| v.as_str()) {
+                            existing_provider.provider_type = provider_type.to_string();
+                        }
+                        if let Some(enabled) = provider_obj.get("enabled").and_then(|v| v.as_bool()) {
+                            existing_provider.enabled = enabled;
+                        }
+                        // Do NOT insert/replace - we already modified in place
+                    } else {
+                        // Provider doesn't exist in config - only create if it has minimum required fields
+                        // Don't create incomplete providers from just API keys
+                        if provider_obj.contains_key("default_model") || provider_obj.contains_key("provider_type") {
+                            let mut provider_config = ProviderConfig {
                                 name: name.clone(),
-                                provider_type: name.clone(),
+                                provider_type: provider_obj.get("provider_type")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or(name)
+                                    .to_string(),
                                 enabled: true,
                                 ..Default::default()
-                            });
+                            };
 
-                        if let Some(api_key) = provider_obj.get("api_key").and_then(|v| v.as_str())
-                        {
-                            provider_config.api_key = Some(api_key.to_string());
+                            if let Some(api_key) = provider_obj.get("api_key").and_then(|v| v.as_str()) {
+                                provider_config.api_key = Some(api_key.to_string());
+                            }
+                            if let Some(base_url) = provider_obj.get("base_url").and_then(|v| v.as_str()) {
+                                provider_config.base_url = Some(base_url.to_string());
+                            }
+                            if let Some(model) = provider_obj.get("default_model").and_then(|v| v.as_str()) {
+                                provider_config.default_model = Some(model.to_string());
+                            }
+                            
+                            self.providers.providers.insert(name.clone(), provider_config);
                         }
-                        if let Some(base_url) =
-                            provider_obj.get("base_url").and_then(|v| v.as_str())
-                        {
-                            provider_config.base_url = Some(base_url.to_string());
-                        }
-                        if let Some(model) =
-                            provider_obj.get("default_model").and_then(|v| v.as_str())
-                        {
-                            provider_config.default_model = Some(model.to_string());
-                        }
-
-                        self.providers
-                            .providers
-                            .insert(name.clone(), provider_config);
+                        // Otherwise skip - don't create incomplete provider from just api_key
                     }
                 }
             }
+
         }
 
         // Merge tool configurations
@@ -337,9 +300,19 @@ impl LLMSpellConfig {
                 if let Some(max_size) = file_ops.get("max_file_size").and_then(|v| v.as_u64()) {
                     self.tools.file_operations.max_file_size = max_size as usize;
                 }
-                if let Some(paths) = file_ops.get("allowed_paths").and_then(|v| v.as_str()) {
-                    self.tools.file_operations.allowed_paths =
-                        paths.split(',').map(|s| s.trim().to_string()).collect();
+                // Handle allowed_paths - can be either string (from env) or array (from JSON)
+                if let Some(paths_value) = file_ops.get("allowed_paths") {
+                    if let Some(paths_str) = paths_value.as_str() {
+                        // From environment variable - comma-separated string
+                        self.tools.file_operations.allowed_paths =
+                            paths_str.split(',').map(|s| s.trim().to_string()).collect();
+                    } else if let Some(paths_array) = paths_value.as_array() {
+                        // From JSON - array of strings
+                        self.tools.file_operations.allowed_paths = paths_array
+                            .iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect();
+                    }
                 }
             }
             if let Some(network) = tools.get("network").and_then(|v| v.as_object()) {
