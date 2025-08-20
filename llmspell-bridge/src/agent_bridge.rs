@@ -167,10 +167,16 @@ impl AgentBridge {
         }
 
         // Also register in component registry for script access
-        tracing::debug!("DEBUG: Registering agent '{}' in ComponentRegistry", instance_name);
+        tracing::debug!(
+            "DEBUG: Registering agent '{}' in ComponentRegistry",
+            instance_name
+        );
         self.registry
             .register_agent(instance_name.to_string(), agent)?;
-        tracing::info!("DEBUG: Successfully registered agent '{}' in ComponentRegistry", instance_name);
+        tracing::info!(
+            "DEBUG: Successfully registered agent '{}' in ComponentRegistry",
+            instance_name
+        );
 
         Ok(())
     }

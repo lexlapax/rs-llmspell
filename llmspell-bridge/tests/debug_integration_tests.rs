@@ -632,14 +632,24 @@ fn test_global_debug_manager_integration() {
     // Test that our bridge correctly uses the global debug manager
     let manager = global_debug_manager();
 
-    // Set level through manager
-    manager.set_level(DebugLevel::Warn);
+    // Test multiple level changes to ensure they sync properly
+    for test_level in [DebugLevel::Error, DebugLevel::Warn, DebugLevel::Info, DebugLevel::Debug] {
+        // Set level through manager
+        manager.set_level(test_level);
 
-    // Create bridge and verify it sees the same level
-    let bridge = DebugBridge::new();
-    assert_eq!(bridge.get_level(), "WARN");
+        // Verify manager reports the set level
+        assert_eq!(manager.get_level(), test_level);
+
+        // Create bridge and verify it sees the same level
+        let bridge = DebugBridge::new();
+        
+        // The bridge should see the same level as the manager
+        assert_eq!(bridge.get_level(), test_level.to_string());
+    }
 
     // Test logging through bridge affects global manager
+    let bridge = DebugBridge::new();
+    manager.clear_captured(); // Clear any previous entries
     bridge.log("error", "Test error message", Some("test.module"));
 
     let entries = manager.get_captured_entries();

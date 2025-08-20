@@ -5,9 +5,12 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_bridge::{workflows::WorkflowBridge, ComponentRegistry};
+use llmspell_core::ComponentId;
+use llmspell_workflows::{StepType, WorkflowConfig, WorkflowStep};
 use mlua::Lua;
 use serde_json::json;
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::runtime::Runtime;
 
 fn benchmark_workflow_creation(c: &mut Criterion) {
@@ -18,14 +21,26 @@ fn benchmark_workflow_creation(c: &mut Criterion) {
     c.bench_function("workflow_creation_sequential", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let params = json!({
-                    "name": "test_workflow",
-                    "steps": [
-                        {"name": "step1", "tool": "mock_tool"}
-                    ]
-                });
+                let name = "test_workflow".to_string();
+                let steps = vec![WorkflowStep {
+                    id: ComponentId::from_name("step1"),
+                    name: "step1".to_string(),
+                    step_type: StepType::Tool {
+                        tool_name: "mock_tool".to_string(),
+                        parameters: serde_json::Value::default(),
+                    },
+                    timeout: None,
+                    retry_attempts: 0,
+                }];
+                let config = WorkflowConfig::default();
                 let id = bridge
-                    .create_workflow("sequential", black_box(params))
+                    .create_workflow(
+                        "sequential",
+                        black_box(name),
+                        black_box(steps),
+                        black_box(config),
+                        None,
+                    )
                     .await
                     .unwrap();
                 black_box(id);
@@ -36,15 +51,29 @@ fn benchmark_workflow_creation(c: &mut Criterion) {
     c.bench_function("workflow_creation_parallel", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let params = json!({
-                    "name": "test_workflow",
-                    "branches": [
-                        {"name": "branch1", "steps": []}
-                    ],
-                    "max_concurrency": 2
-                });
+                let name = "test_workflow".to_string();
+                let steps = vec![WorkflowStep {
+                    id: ComponentId::from_name("branch1_step1"),
+                    name: "branch1_step1".to_string(),
+                    step_type: StepType::Tool {
+                        tool_name: "mock_tool".to_string(),
+                        parameters: serde_json::Value::default(),
+                    },
+                    timeout: None,
+                    retry_attempts: 0,
+                }];
+                let config = WorkflowConfig {
+                    max_execution_time: Some(Duration::from_secs(60)),
+                    ..Default::default()
+                };
                 let id = bridge
-                    .create_workflow("parallel", black_box(params))
+                    .create_workflow(
+                        "parallel",
+                        black_box(name),
+                        black_box(steps),
+                        black_box(config),
+                        None,
+                    )
                     .await
                     .unwrap();
                 black_box(id);
@@ -109,13 +138,22 @@ fn benchmark_workflow_execution(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 // Create a simple workflow
-                let params = json!({
-                    "name": "bench_workflow",
-                    "steps": [
-                        {"name": "step1", "function": "mock_func", "parameters": {}}
-                    ]
-                });
-                let id = bridge.create_workflow("sequential", params).await.unwrap();
+                let name = "bench_workflow".to_string();
+                let steps = vec![WorkflowStep {
+                    id: ComponentId::from_name("step1"),
+                    name: "step1".to_string(),
+                    step_type: StepType::Custom {
+                        function_name: "mock_func".to_string(),
+                        parameters: serde_json::Value::default(),
+                    },
+                    timeout: None,
+                    retry_attempts: 0,
+                }];
+                let config = WorkflowConfig::default();
+                let id = bridge
+                    .create_workflow("sequential", name, steps, config, None)
+                    .await
+                    .unwrap();
 
                 // Get workflow info
                 let info = bridge.get_workflow(&id).await.unwrap();
@@ -139,15 +177,26 @@ fn benchmark_bridge_overhead(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 // Metadata operations cycle
-                let params = json!({
-                    "name": "overhead_test",
-                    "steps": [{"name": "step1", "function": "test_func", "parameters": {}}]
-                });
+                let name = "overhead_test".to_string();
+                let steps = vec![WorkflowStep {
+                    id: ComponentId::from_name("step1"),
+                    name: "step1".to_string(),
+                    step_type: StepType::Custom {
+                        function_name: "test_func".to_string(),
+                        parameters: serde_json::Value::default(),
+                    },
+                    timeout: None,
+                    retry_attempts: 0,
+                }];
+                let config = WorkflowConfig::default();
 
                 let start = std::time::Instant::now();
 
                 // Create workflow
-                let id = bridge.create_workflow("sequential", params).await.unwrap();
+                let id = bridge
+                    .create_workflow("sequential", name, steps, config, None)
+                    .await
+                    .unwrap();
 
                 // Get workflow info
                 let info = bridge.get_workflow(&id).await.unwrap();

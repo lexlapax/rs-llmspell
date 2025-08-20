@@ -337,29 +337,41 @@ impl StepExecutor {
         // DEBUG: Log the step type and details
         match &step.step_type {
             StepType::Agent { agent_id, input } => {
-                debug!("DEBUG: Step '{}' is Agent type with agent_id: '{}', input: '{}'", 
-                    step.name, agent_id, input);
+                debug!(
+                    "DEBUG: Step '{}' is Agent type with agent_id: '{}', input: '{}'",
+                    step.name, agent_id, input
+                );
             }
             StepType::Tool { tool_name, .. } => {
-                debug!("DEBUG: Step '{}' is Tool type with tool: '{}'", step.name, tool_name);
+                debug!(
+                    "DEBUG: Step '{}' is Tool type with tool: '{}'",
+                    step.name, tool_name
+                );
             }
             StepType::Workflow { workflow_id, .. } => {
-                debug!("DEBUG: Step '{}' is Workflow type with workflow_id: {:?}", 
-                    step.name, workflow_id);
+                debug!(
+                    "DEBUG: Step '{}' is Workflow type with workflow_id: {:?}",
+                    step.name, workflow_id
+                );
             }
             StepType::Custom { function_name, .. } => {
-                debug!("DEBUG: Step '{}' is Custom type with function: '{}'", 
-                    step.name, function_name);
+                debug!(
+                    "DEBUG: Step '{}' is Custom type with function: '{}'",
+                    step.name, function_name
+                );
             }
         }
-        
+
         let result = match &step.step_type {
             StepType::Tool {
                 tool_name,
                 parameters,
             } => self.execute_tool_step(tool_name, parameters, context).await,
             StepType::Agent { agent_id, input } => {
-                debug!("DEBUG: About to execute agent step for agent_id: '{}'", agent_id);
+                debug!(
+                    "DEBUG: About to execute agent step for agent_id: '{}'",
+                    agent_id
+                );
                 self.execute_agent_step(agent_id, input, context).await
             }
             StepType::Custom {
@@ -594,7 +606,7 @@ impl StepExecutor {
     /// Execute an agent step
     async fn execute_agent_step(
         &self,
-        agent_name: &str,  // Changed from ComponentId to String to use original agent name
+        agent_name: &str, // Changed from ComponentId to String to use original agent name
         input: &str,
         context: &StepExecutionContext,
     ) -> Result<String> {
@@ -620,22 +632,18 @@ impl StepExecutor {
             let mock_id = ComponentId::from_name(agent_name);
             return self.execute_agent_step_mock(mock_id, input).await;
         };
-        
+
         // DEBUG: Log what we're looking for
         debug!("DEBUG: Looking for agent with name: '{}'", agent_name);
-        
+
         // Look up agent by its original name
-        let agent =
-            registry
-                .get_agent(agent_name)
-                .await
-                .ok_or_else(|| {
-                    error!("DEBUG: Agent '{}' not found in registry", agent_name);
-                    LLMSpellError::Component {
-                        message: format!("Agent '{}' not found in registry", agent_name),
-                        source: None,
-                    }
-                })?;
+        let agent = registry.get_agent(agent_name).await.ok_or_else(|| {
+            error!("DEBUG: Agent '{}' not found in registry", agent_name);
+            LLMSpellError::Component {
+                message: format!("Agent '{}' not found in registry", agent_name),
+                source: None,
+            }
+        })?;
 
         // Create AgentInput from the provided input string
         let agent_input = llmspell_core::types::AgentInput::text(input);
@@ -661,8 +669,8 @@ impl StepExecutor {
             let workflow_id = context.workflow_state.execution_id.to_string();
 
             // Use standardized state key functions
-            let output_key = crate::types::state_keys::agent_output(&workflow_id, &agent_name);
-            let metadata_key = crate::types::state_keys::agent_metadata(&workflow_id, &agent_name);
+            let output_key = crate::types::state_keys::agent_output(&workflow_id, agent_name);
+            let metadata_key = crate::types::state_keys::agent_metadata(&workflow_id, agent_name);
 
             // Store the output in state
             state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
@@ -987,7 +995,7 @@ mod tests {
         let config = WorkflowConfig::default();
         let executor = StepExecutor::new(config);
 
-        let agent_id = ComponentId::new();
+        let agent_id = "test_agent".to_string();
         let step = WorkflowStep::new(
             "agent_test".to_string(),
             StepType::Agent {

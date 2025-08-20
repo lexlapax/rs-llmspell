@@ -1,0 +1,21 @@
+Build a comprehensive e-commerce platform with product catalog, shopping cart,
+secure checkout process, order tracking, and AI-powered product recommendations.
+Include an admin dashboard for inventory management, order processing, and analytics.
+Support multiple payment methods and international shipping.
+    
+
+Must-have features:
+- Product catalog with search and filters
+- Shopping cart and wishlist
+- Secure checkout with multiple payment options
+- User accounts and order history
+- Inventory management
+- Order tracking and notifications
+- Admin dashboard
+- Product reviews and ratings
+
+
+Technical preferences:
+- Frontend: Next.js
+- Backend: Node.js
+- Database: PostgreSQL

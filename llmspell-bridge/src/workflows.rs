@@ -8,7 +8,6 @@ use crate::standardized_workflows::StandardizedWorkflowFactory;
 use crate::workflow_performance::{ExecutionCache, OptimizedConverter, PerformanceMetrics};
 use crate::ComponentRegistry;
 use llmspell_core::{traits::base_agent::BaseAgent, LLMSpellError, Result};
-use llmspell_workflows::conditional::ConditionalConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -217,43 +216,8 @@ impl BridgeDiscovery<WorkflowInfo> for WorkflowDiscovery {
     }
 }
 
-/// Factory for creating workflow instances
-pub struct WorkflowFactory;
-
-impl WorkflowFactory {
-    /// Create a workflow instance based on type and parameters
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if workflow type is unknown or creation fails
-    pub fn create_workflow(
-        workflow_type: &str,
-        params: &serde_json::Value,
-    ) -> Result<Box<dyn WorkflowExecutor>> {
-        match workflow_type {
-            "sequential" => {
-                let workflow = create_sequential_workflow(params, None)?;
-                Ok(Box::new(workflow))
-            }
-            "conditional" => {
-                let workflow = create_conditional_workflow(params, None)?;
-                Ok(Box::new(workflow))
-            }
-            "loop" => {
-                let workflow = create_loop_workflow(params, None)?;
-                Ok(Box::new(workflow))
-            }
-            "parallel" => {
-                let workflow = create_parallel_workflow(params, None)?;
-                Ok(Box::new(workflow))
-            }
-            _ => Err(llmspell_core::LLMSpellError::Configuration {
-                message: format!("Unknown workflow type: {workflow_type}"),
-                source: None,
-            }),
-        }
-    }
-}
+// JSON-based WorkflowFactory removed - use StandardizedWorkflowFactory instead
+// which creates workflows from Rust structures directly without JSON translation
 
 /// Trait for workflow execution through the bridge
 #[async_trait::async_trait]
@@ -269,7 +233,8 @@ pub trait WorkflowExecutor: Send + Sync {
 }
 
 // Helper functions to create specific workflow types
-
+// REMOVED: All JSON-based workflow creation functions
+/*
 pub fn create_sequential_workflow(
     params: &serde_json::Value,
     registry: Option<Arc<ComponentRegistry>>,
@@ -647,7 +612,7 @@ fn apply_parallel_config(
 }
 
 /// Convert JSON input to `AgentInput` with fallback logic
-fn json_to_agent_input(input: &serde_json::Value) -> llmspell_core::types::AgentInput {
+pub(crate) fn json_to_agent_input(input: &serde_json::Value) -> llmspell_core::types::AgentInput {
     // Try to deserialize directly first
     if let Ok(agent_input) =
         serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
@@ -844,9 +809,35 @@ fn parse_loop_iterator(config: &serde_json::Value) -> Result<llmspell_workflows:
         })
     }
 }
+*/ // End of removed JSON-based workflow creation functions
+
+// Helper function for converting JSON to AgentInput - still needed for WorkflowExecutor trait
+/// Convert JSON input to `AgentInput` with fallback logic
+pub(crate) fn json_to_agent_input(input: &serde_json::Value) -> llmspell_core::types::AgentInput {
+    // Try to deserialize directly first
+    if let Ok(agent_input) =
+        serde_json::from_value::<llmspell_core::types::AgentInput>(input.clone())
+    {
+        return agent_input;
+    }
+
+    // Fallback: try to extract text field from JSON object
+    if let Some(text) = input.get("text").and_then(|v| v.as_str()) {
+        return llmspell_core::types::AgentInput::text(text.to_string());
+    }
+
+    // Fallback: treat entire value as string if it is one
+    if let Some(text_str) = input.as_str() {
+        return llmspell_core::types::AgentInput::text(text_str.to_string());
+    }
+
+    // Last resort: empty input
+    llmspell_core::types::AgentInput::text("")
+}
 
 // Executor implementations for each workflow type
 
+#[allow(dead_code)]
 struct SequentialWorkflowExecutor {
     workflow: llmspell_workflows::SequentialWorkflow,
     name: String,
@@ -877,9 +868,9 @@ impl WorkflowExecutor for SequentialWorkflowExecutor {
     }
 }
 
-struct ConditionalWorkflowExecutor {
-    workflow: llmspell_workflows::ConditionalWorkflow,
-    name: String,
+pub(crate) struct ConditionalWorkflowExecutor {
+    pub(crate) workflow: llmspell_workflows::ConditionalWorkflow,
+    pub(crate) name: String,
 }
 
 #[async_trait::async_trait]
@@ -907,9 +898,9 @@ impl WorkflowExecutor for ConditionalWorkflowExecutor {
     }
 }
 
-struct LoopWorkflowExecutor {
-    workflow: llmspell_workflows::LoopWorkflow,
-    name: String,
+pub(crate) struct LoopWorkflowExecutor {
+    pub(crate) workflow: llmspell_workflows::LoopWorkflow,
+    pub(crate) name: String,
 }
 
 #[async_trait::async_trait]
@@ -937,9 +928,9 @@ impl WorkflowExecutor for LoopWorkflowExecutor {
     }
 }
 
-struct ParallelWorkflowExecutor {
-    workflow: llmspell_workflows::ParallelWorkflow,
-    name: String,
+pub(crate) struct ParallelWorkflowExecutor {
+    pub(crate) workflow: llmspell_workflows::ParallelWorkflow,
+    pub(crate) name: String,
 }
 
 #[async_trait::async_trait]
@@ -972,7 +963,7 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
 /// This function creates an `ExecutionContext` with state persistence enabled
 /// based on the current configuration. It uses in-memory state by default
 /// but can be configured for persistent backends.
-async fn create_execution_context_with_state(
+pub(crate) async fn create_execution_context_with_state(
 ) -> Result<llmspell_core::execution_context::ExecutionContext> {
     // For now, create in-memory state adapter
     // TODO: Read from global config once available
@@ -1115,7 +1106,7 @@ impl WorkflowBridge {
         self.discovery.get_workflow_types()
     }
 
-    /// Create a workflow instance
+    /// Create a workflow instance from Rust structures
     ///
     /// # Errors
     ///
@@ -1123,11 +1114,14 @@ impl WorkflowBridge {
     pub async fn create_workflow(
         &self,
         workflow_type: &str,
-        params: serde_json::Value,
+        name: String,
+        steps: Vec<llmspell_workflows::WorkflowStep>,
+        config: llmspell_workflows::WorkflowConfig,
+        error_strategy: Option<llmspell_workflows::ErrorStrategy>,
     ) -> Result<String> {
         let workflow = self
             .standardized_factory
-            .create_from_type_json(workflow_type, params)
+            .create_from_steps(workflow_type, name, steps, config, error_strategy)
             .await?;
 
         let workflow_id = format!("workflow_{}", uuid::Uuid::new_v4());
@@ -1245,31 +1239,8 @@ impl WorkflowBridge {
         }
     }
 
-    /// Execute a workflow and immediately return (one-shot execution)
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - Workflow creation fails
-    /// - Workflow execution fails
-    /// - Cleanup operations fail
-    pub async fn execute_workflow_oneshot(
-        &self,
-        workflow_type: &str,
-        params: serde_json::Value,
-        input: serde_json::Value,
-    ) -> Result<serde_json::Value> {
-        // Create workflow
-        let workflow_id = self.create_workflow(workflow_type, params).await?;
-
-        // Execute workflow
-        let result = self.execute_workflow(&workflow_id, input).await;
-
-        // Clean up workflow
-        self.remove_workflow(&workflow_id).await?;
-
-        result
-    }
+    // JSON-based oneshot execution removed - use create_workflow with Rust structures instead
+    // pub async fn execute_workflow_oneshot(...) removed
 
     /// Get a workflow instance by ID
     ///
@@ -1717,35 +1688,17 @@ impl WorkflowRegistry {
         templates.values().cloned().collect()
     }
 
-    /// Create workflow from template
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if:
-    /// - Template is not found
-    /// - Parameter merging fails
-    /// - Workflow creation fails
+    // JSON-based template creation removed - use create_workflow with Rust structures instead
+    /*
     pub async fn create_from_template(
         &self,
         template_id: &str,
         params: serde_json::Value,
         bridge: &WorkflowBridge,
     ) -> Result<String> {
-        let template = self.get_template(template_id).await?;
-
-        // Merge template defaults with provided params
-        let mut config = template.default_config.clone();
-        if let (Some(config_obj), Some(params_obj)) = (config.as_object_mut(), params.as_object()) {
-            for (key, value) in params_obj {
-                config_obj.insert(key.clone(), value.clone());
-            }
-        }
-
-        // Create workflow through bridge
-        bridge
-            .create_workflow(&template.workflow_type, config)
-            .await
+        // Removed - requires JSON
     }
+    */
 
     /// Register default workflow templates
     fn register_default_templates(&mut self) {

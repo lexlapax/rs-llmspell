@@ -189,8 +189,8 @@ mod tests {
                 name = "test_seq",
                 description = "Test sequential workflow",
                 steps = {
-                    {name = "step1", tool = "uuid_generator", input = {}},
-                    {name = "step2", tool = "hash_calculator", input = {algorithm = "sha256", input = "test"}}
+                    {name = "step1", type = "tool", tool = "uuid_generator", input = {}},
+                    {name = "step2", type = "tool", tool = "hash_calculator", input = {algorithm = "sha256", input = "test"}}
                 }
             })
             
@@ -199,8 +199,8 @@ mod tests {
                 name = "test_par", 
                 description = "Test parallel workflow",
                 steps = {
-                    {name = "task1", tool = "uuid_generator", input = {}},
-                    {name = "task2", tool = "date_time_handler", input = {operation = "now"}}
+                    {name = "task1", type = "tool", tool = "uuid_generator", input = {}},
+                    {name = "task2", type = "tool", tool = "date_time_handler", input = {operation = "now"}}
                 }
             })
             

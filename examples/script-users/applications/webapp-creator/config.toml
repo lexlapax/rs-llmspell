@@ -84,6 +84,7 @@ module_filters = [
 [tools.file_operations]
 allowed_paths = [
     "/Users/spuri/projects/lexlapax/rs-llmspell/examples/script-users/applications/webapp-creator/generated",
+    "/Users/spuri/projects/lexlapax/rs-llmspell/generated",
     "/tmp"
 ]
 atomic_writes = true

@@ -36,11 +36,10 @@ pub fn create_test_tool_step(name: &str, tool_name: &str, params: Value) -> Work
 
 /// Create a test agent workflow step
 pub fn create_test_agent_step(name: &str, agent_id: &str, input: String) -> WorkflowStep {
-    use llmspell_core::types::ComponentId;
     WorkflowStep::new(
         name.to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(agent_id),
+            agent_id: agent_id.to_string(),
             input,
         },
     )
@@ -168,7 +167,6 @@ mod tests {
 
     #[test]
     fn test_create_agent_step() {
-        use llmspell_core::types::ComponentId;
         let input = "Process this message";
         let step = create_test_agent_step("chat", "agent-1", input.to_string());
         assert_eq!(step.name, "chat");
@@ -177,7 +175,7 @@ mod tests {
                 agent_id,
                 input: agent_input,
             } => {
-                assert_eq!(agent_id, ComponentId::from_name("agent-1"));
+                assert_eq!(agent_id, "agent-1");
                 assert_eq!(agent_input, input);
             }
             _ => panic!("Expected agent step"),

@@ -3,6 +3,8 @@
 
 use llmspell_bridge::workflows::WorkflowBridge;
 use llmspell_bridge::ComponentRegistry;
+use llmspell_core::ComponentId;
+use llmspell_workflows::{StepType, WorkflowConfig, WorkflowStep};
 use std::sync::Arc;
 #[tokio::test]
 async fn test_workflow_bridge_creation() {
@@ -37,12 +39,14 @@ async fn test_sequential_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
     let bridge = WorkflowBridge::new(registry);
 
-    let params = serde_json::json!({
-        "name": "test_sequential",
-        "steps": []  // Empty steps for now
-    });
+    let name = "test_sequential".to_string();
+    let steps = vec![]; // Empty steps for now
+    let config = WorkflowConfig::default();
 
-    let workflow_id = bridge.create_workflow("sequential", params).await.unwrap();
+    let workflow_id = bridge
+        .create_workflow("sequential", name, steps, config, None)
+        .await
+        .unwrap();
     assert!(workflow_id.starts_with("workflow_"));
 
     // Test listing active workflows
@@ -61,11 +65,13 @@ async fn test_workflow_metrics() {
     assert_eq!(metrics["workflow_executions"], 0);
 
     // Create a workflow
-    let params = serde_json::json!({
-        "name": "metrics_test",
-        "steps": []
-    });
-    let _ = bridge.create_workflow("sequential", params).await.unwrap();
+    let name = "metrics_test".to_string();
+    let steps = vec![];
+    let config = WorkflowConfig::default();
+    let _ = bridge
+        .create_workflow("sequential", name, steps, config, None)
+        .await
+        .unwrap();
 
     // Check updated metrics
     let metrics = bridge.get_bridge_metrics().await;
@@ -77,12 +83,14 @@ async fn test_workflow_removal() {
     let registry = Arc::new(ComponentRegistry::new());
     let bridge = WorkflowBridge::new(registry);
 
-    let params = serde_json::json!({
-        "name": "removal_test",
-        "steps": []
-    });
+    let name = "removal_test".to_string();
+    let steps = vec![];
+    let config = WorkflowConfig::default();
 
-    let workflow_id = bridge.create_workflow("sequential", params).await.unwrap();
+    let workflow_id = bridge
+        .create_workflow("sequential", name, steps, config, None)
+        .await
+        .unwrap();
 
     // Verify workflow exists
     let active = bridge.list_active_workflows().await;
@@ -118,16 +126,17 @@ async fn test_parallel_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
     let bridge = WorkflowBridge::new(registry);
 
-    let params = serde_json::json!({
-        "name": "parallel_test",
-        "branches": [{
-            "name": "branch1",
-            "steps": []
-        }],
-        "max_concurrency": 2
-    });
+    let name = "parallel_test".to_string();
+    let steps = vec![]; // For parallel workflows, steps would be distributed across branches
+    let config = WorkflowConfig {
+        max_execution_time: Some(std::time::Duration::from_secs(60)),
+        ..Default::default()
+    };
 
-    let workflow_id = bridge.create_workflow("parallel", params).await.unwrap();
+    let workflow_id = bridge
+        .create_workflow("parallel", name, steps, config, None)
+        .await
+        .unwrap();
     assert!(workflow_id.starts_with("workflow_"));
 }
 #[tokio::test]
@@ -135,14 +144,14 @@ async fn test_conditional_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
     let bridge = WorkflowBridge::new(registry);
 
-    let params = serde_json::json!({
-        "name": "conditional_test",
-        "condition": "true",
-        "then_branch": {},
-        "else_branch": {}
-    });
+    let name = "conditional_test".to_string();
+    let steps = vec![]; // For conditional workflows, steps would be in branches
+    let config = WorkflowConfig::default();
 
-    let workflow_id = bridge.create_workflow("conditional", params).await.unwrap();
+    let workflow_id = bridge
+        .create_workflow("conditional", name, steps, config, None)
+        .await
+        .unwrap();
     assert!(workflow_id.starts_with("workflow_"));
 }
 #[tokio::test]
@@ -150,20 +159,22 @@ async fn test_loop_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
     let bridge = WorkflowBridge::new(registry);
 
-    let params = serde_json::json!({
-        "name": "loop_test",
-        "iterator": {
-            "type": "range",
-            "start": 0,
-            "end": 3,
-            "step": 1
+    let name = "loop_test".to_string();
+    let steps = vec![WorkflowStep {
+        id: ComponentId::from_name("loop_step"),
+        name: "loop_step".to_string(),
+        step_type: StepType::Tool {
+            tool_name: "mock_tool".to_string(),
+            parameters: serde_json::Value::default(),
         },
-        "body": [{
-            "name": "loop_step",
-            "tool": "mock_tool"
-        }]
-    });
+        timeout: None,
+        retry_attempts: 0,
+    }];
+    let config = WorkflowConfig::default();
 
-    let workflow_id = bridge.create_workflow("loop", params).await.unwrap();
+    let workflow_id = bridge
+        .create_workflow("loop", name, steps, config, None)
+        .await
+        .unwrap();
     assert!(workflow_id.starts_with("workflow_"));
 }

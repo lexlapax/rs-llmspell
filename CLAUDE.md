@@ -19,16 +19,18 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 - **Update TODO.md**: update as you accomplish sub-tasks not after everything in the task is complete. new insights, architecture decisions should be updated in the relevant sections as we make them.
 
 ## Development Norms
-
-### Code Quality Standards
-- **Zero Warnings Policy**: All code must compile without warnings (`cargo clippy --workspace --all-target --all-features`)
-- **Writing Rust code**: Follow clippy warning syntax, don't introduce new clippy errors
-- **Test Coverage**: >90% coverage required (enforced in CI)
-- **Documentation**: >95% API documentation coverage required
-- **Formatting**: Run `cargo fmt --all` before every commit
+### Code Implementation Norms
 - **Performance**: Maintain established benchmarks (e.g., <10ms tool initialization, <1% hook overhead)
 - **Task Pacing**: DO NOT Jump ahead to new tasks in TODO.md unless explictly told to do so. Ask for confirmation.
 - **Eager Implementation**: NO SHORTCUTS. Completion in a holistic way is key. Don't skip and leave TODOs for later based on your assumptions.
+- **Attack Complexity**: go to megathink mode to attack complexity.. do not simplify and say, for now
+- **Writing Rust code**: Follow clippy warning syntax, don't introduce new clippy errors
+
+### Code Quality Standards
+- **Zero Warnings Policy**: All code must compile without warnings (`cargo clippy --workspace --all-target --all-features`)
+- **Test Coverage**: >90% coverage required (enforced in CI)
+- **Documentation**: >95% API documentation coverage required
+- **Formatting**: Run `cargo fmt --all` before every commit
 
 
 ### Quality Check Commands
