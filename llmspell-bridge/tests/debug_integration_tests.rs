@@ -11,19 +11,30 @@ use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_utils::debug::{global_debug_manager, DebugLevel};
 use mlua::{Lua, Result as LuaResult};
 use std::sync::Arc;
+use tokio::sync::{Mutex, MutexGuard};
+
+// Global mutex to ensure test isolation
+static TEST_MUTEX: Mutex<()> = Mutex::const_new(());
 
 /// Helper to create a test Lua environment with debug globals
-async fn create_test_lua() -> LuaResult<(Lua, Arc<DebugBridge>)> {
+async fn create_test_lua() -> LuaResult<(Lua, Arc<DebugBridge>, MutexGuard<'static, ()>)> {
+    // Acquire test mutex to ensure serial execution and state isolation
+    let guard = TEST_MUTEX.lock().await;
+
     let lua = Lua::new();
     let bridge = Arc::new(DebugBridge::new());
 
-    // Initialize with clean state - reset global debug manager
+    // AGGRESSIVE state reset - the global debug manager is shared across tests
     let global_manager = global_debug_manager();
-    global_manager.set_enabled(true);
-    global_manager.set_level(DebugLevel::Trace);
-    global_manager.clear_captured();
-    global_manager.clear_module_filters();
-    global_manager.set_default_filter_enabled(true);
+
+    // Reset multiple times to ensure state changes stick
+    for _ in 0..3 {
+        global_manager.set_enabled(true);
+        global_manager.set_level(DebugLevel::Trace);
+        global_manager.clear_captured();
+        global_manager.clear_module_filters();
+        global_manager.set_default_filter_enabled(true);
+    }
 
     // Also set through bridge for consistency
     bridge.set_enabled(true);
@@ -40,12 +51,12 @@ async fn create_test_lua() -> LuaResult<(Lua, Arc<DebugBridge>)> {
 
     inject_debug_global(&lua, &context, &bridge)?;
 
-    Ok((lua, bridge))
+    Ok((lua, bridge, guard))
 }
 
 #[tokio::test]
 async fn test_basic_debug_logging() -> LuaResult<()> {
-    let (lua, bridge) = create_test_lua().await?;
+    let (lua, bridge, _guard) = create_test_lua().await?;
 
     // Test basic logging from Lua
     lua.load(
@@ -80,7 +91,7 @@ async fn test_basic_debug_logging() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_performance_timing() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     // Test timer functionality
     let duration: f64 = lua
@@ -110,7 +121,7 @@ async fn test_performance_timing() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_timer_laps() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     // Test lap functionality
     let success: bool = lua
@@ -136,7 +147,7 @@ async fn test_timer_laps() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_module_filtering() -> LuaResult<()> {
-    let (lua, bridge) = create_test_lua().await?;
+    let (lua, bridge, _guard) = create_test_lua().await?;
 
     // Add filter to only allow workflow modules
     lua.load(
@@ -184,7 +195,7 @@ async fn test_module_filtering() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_metadata_logging() -> LuaResult<()> {
-    let (lua, bridge) = create_test_lua().await?;
+    let (lua, bridge, _guard) = create_test_lua().await?;
 
     // Test logging with metadata
     lua.load(
@@ -212,7 +223,7 @@ async fn test_metadata_logging() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_object_dumping() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     // Test different dump modes
     let dump_result: String = lua
@@ -256,7 +267,7 @@ async fn test_object_dumping() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_compact_dump() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     let compact_dump: String = lua
         .load(
@@ -287,7 +298,7 @@ async fn test_compact_dump() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_stack_trace_collection() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     let trace_result: String = lua
         .load(
@@ -329,7 +340,7 @@ async fn test_stack_trace_collection() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_stack_trace_with_options() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     let trace_json: String = lua
         .load(
@@ -358,7 +369,7 @@ async fn test_stack_trace_with_options() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_debug_level_control() -> LuaResult<()> {
-    let (lua, bridge) = create_test_lua().await?;
+    let (lua, bridge, _guard) = create_test_lua().await?;
 
     // Test level setting
     lua.load(
@@ -387,7 +398,7 @@ async fn test_debug_level_control() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_performance_reports() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     // Create some timing data and generate reports
     let reports: (String, String) = lua
@@ -424,7 +435,7 @@ async fn test_performance_reports() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_memory_stats() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     let stats_valid: bool = lua
         .load(
@@ -447,7 +458,7 @@ async fn test_memory_stats() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_event_recording() -> LuaResult<()> {
-    let (lua, _bridge) = create_test_lua().await?;
+    let (lua, _bridge, _guard) = create_test_lua().await?;
 
     let success: bool = lua
         .load(
@@ -473,7 +484,7 @@ async fn test_event_recording() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_captured_entries_management() -> LuaResult<()> {
-    let (lua, bridge) = create_test_lua().await?;
+    let (lua, bridge, _guard) = create_test_lua().await?;
 
     bridge.clear_captured();
 
@@ -515,7 +526,7 @@ async fn test_captured_entries_management() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_filter_summary() -> LuaResult<()> {
-    let (lua, bridge) = create_test_lua().await?;
+    let (lua, bridge, _guard) = create_test_lua().await?;
 
     // Ensure clean state - clear multiple times to be sure
     bridge.clear_module_filters();
@@ -549,7 +560,7 @@ async fn test_filter_summary() -> LuaResult<()> {
 
 #[tokio::test]
 async fn test_advanced_filter_patterns() -> LuaResult<()> {
-    let (lua, bridge) = create_test_lua().await?;
+    let (lua, bridge, _guard) = create_test_lua().await?;
 
     bridge.clear_captured();
 

@@ -76,7 +76,6 @@ async fn test_agent_create_with_provider_model_syntax() {
     }
 }
 
-#[ignore = "Obsolete test - error messages have changed in new implementation"]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_base_url_override() {
     let config = create_test_runtime_config();
@@ -84,28 +83,40 @@ async fn test_base_url_override() {
         .await
         .expect("Failed to create runtime");
 
-    // Test base URL override functionality
+    // Test base URL override functionality with modern builder API
     let script = r#"
-        -- Test base URL override parsing works
-        local success, err = pcall(function()
-            return Agent.create({
-                model = "openai/gpt-3.5-turbo",
-                base_url = "http://localhost:8080/v1",
-                prompt = "You are a test assistant"
-            })
+        -- Test base URL override parsing works with builder API
+        local success, agent = pcall(function()
+            return Agent.builder()
+                :model("openai/gpt-3.5-turbo")
+                :base_url("http://localhost:8080/v1")
+                :system_prompt("You are a test assistant")
+                :build()
         end)
         
         -- Debug output
         print("Base URL override test - Success:", success)
         if not success then
-            print("Error:", tostring(err))
+            print("Error:", tostring(agent))
         else
-            print("Result type:", type(err))
+            print("Agent created:", type(agent))
         end
         
-        -- Should fail with provider error (openai not configured)
-        assert(not success, "Should fail with unconfigured provider")
-        assert(err, "Should have error message")
+        -- Agent creation should succeed even without providers configured
+        -- The actual provider validation happens during execution
+        assert(success, "Agent creation should succeed: " .. tostring(agent))
+        assert(agent, "Should have agent instance")
+        
+        -- Test that we can't actually execute without proper provider
+        if success then
+            local exec_success, exec_result = pcall(function()
+                return agent:run("Hello")
+            end)
+            
+            -- Execution should fail without configured provider
+            assert(not exec_success, "Execution should fail without configured provider")
+            print("Execution failed as expected:", tostring(exec_result))
+        end
         
         return true
     "#;
@@ -253,7 +264,6 @@ async fn test_provider_fallback() {
     }
 }
 
-#[ignore = "Obsolete test - error handling has changed in new implementation"]
 #[tokio::test(flavor = "multi_thread")]
 async fn test_provider_model_parsing() {
     let config = create_test_runtime_config();
@@ -261,40 +271,84 @@ async fn test_provider_model_parsing() {
         .await
         .expect("Failed to create runtime");
 
-    // Test various provider/model syntax variations
+    // Test various provider/model syntax variations with modern builder API
     let script = r#"
         -- Test different syntax variations
+        -- Some providers are supported, others are not
         local test_cases = {
-            "openai/gpt-4",
-            "anthropic/claude-3-opus-20240229",
-            "groq/llama2-70b-4096",
-            "perplexity/mixtral-8x7b-instruct",
-            "together/mixtral-8x7b-32768",
-            "gpt-3.5-turbo",  -- No provider, should use default
-            "gemini-pro",     -- No provider, should use default
+            {model = "openai/gpt-4", supported = true},
+            {model = "anthropic/claude-3-opus-20240229", supported = true},
+            {model = "groq/llama2-70b-4096", supported = false},  -- Unsupported provider
+            {model = "perplexity/mixtral-8x7b-instruct", supported = false},  -- Unsupported provider
+            {model = "together/mixtral-8x7b-32768", supported = false},  -- Unsupported provider
+            {model = "gpt-3.5-turbo", supported = true},  -- No provider, uses default
+            {model = "gemini-pro", supported = true},     -- No provider, uses default (but invalid model)
         }
         
         local results = {}
-        for i, model in ipairs(test_cases) do
+        for i, test_case in ipairs(test_cases) do
             local success, result = pcall(function()
-                return Agent.create({
-                    model = model,
-                    prompt = "Test"
-                })
+                return Agent.builder()
+                    :model(test_case.model)
+                    :system_prompt("Test")
+                    :build()
             end)
             
-            -- All should fail because no providers are configured
             results[i] = {
-                model = model,
-                parsed_correctly = not success  -- Should fail with no providers
+                model = test_case.model,
+                supported = test_case.supported,
+                created = success,
+                agent = success and result or nil,
+                error = not success and tostring(result) or nil
             }
         end
         
-        -- All should fail with provider errors, not parsing errors
+        -- Check results based on expected behavior
+        local all_correct = true
         for _, r in ipairs(results) do
-            assert(r.parsed_correctly, "Model should parse but fail with provider error: " .. r.model)
+            if r.supported then
+                -- Supported providers should create agents successfully
+                if not r.created then
+                    -- Some models might fail due to API validation even with supported providers
+                    if r.error:find("does not exist") or r.error:find("validation failed") then
+                        print("Model validation failed as expected for: " .. r.model)
+                    else
+                        print("ERROR: Unexpected failure for supported model: " .. r.model)
+                        print("  Error: " .. r.error)
+                        all_correct = false
+                    end
+                else
+                    print("Successfully created agent for: " .. r.model)
+                    
+                    -- Test that execution fails without configured providers
+                    local exec_success = pcall(function()
+                        return r.agent:run("Test message")
+                    end)
+                    if exec_success then
+                        print("  WARNING: Execution succeeded unexpectedly")
+                    else
+                        print("  Execution would fail without provider (as expected)")
+                    end
+                end
+            else
+                -- Unsupported providers should fail with specific error
+                if r.created then
+                    print("ERROR: Unsupported provider created agent: " .. r.model)
+                    all_correct = false
+                else
+                    if r.error:find("Unsupported provider") or r.error:find("unsupported provider") then
+                        print("Unsupported provider rejected as expected: " .. r.model)
+                    else
+                        print("ERROR: Wrong error for unsupported provider: " .. r.model)
+                        print("  Error: " .. r.error)
+                        all_correct = false
+                    end
+                end
+            end
         end
         
+        assert(all_correct, "Provider/model parsing test failed")
+        print("Provider/model syntax validation works correctly")
         return true
     "#;
 

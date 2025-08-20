@@ -69,8 +69,9 @@ impl EnhancedModuleFilter {
 
     /// Add a filter rule
     pub fn add_rule(&mut self, rule: FilterRule) {
-        // When adding an enabled rule, change default to false (allow-list behavior)
-        if rule.enabled && self.has_no_rules() {
+        // When adding an enabled rule to an empty filter, switch to allow-list behavior
+        // This provides intuitive behavior: adding enabled rules creates an allow-list
+        if rule.enabled && self.is_empty() {
             self.default_enabled = false;
         }
 
@@ -98,7 +99,7 @@ impl EnhancedModuleFilter {
     }
 
     /// Check if the filter has no rules
-    fn has_no_rules(&self) -> bool {
+    fn is_empty(&self) -> bool {
         self.exact_matches.is_empty()
             && self.pattern_cache.is_empty()
             && self.hierarchical_rules.is_empty()
@@ -409,8 +410,14 @@ mod tests {
     #[test]
     fn test_exact_matching() {
         let mut filter = EnhancedModuleFilter::new();
-        filter.add_filter("workflow.step1", true);
-        filter.add_filter("agent.internal", false);
+
+        // For fine-grained control with both enabled and disabled rules,
+        // explicitly set default behavior before adding rules
+        filter.add_filter("agent.internal", false); // Add disable rule first
+        filter.add_filter("workflow.step1", true); // Then add enable rule
+
+        // Re-enable default for unmatched modules (fine-grained control mode)
+        filter.set_default_enabled(true);
 
         assert!(filter.should_log("workflow.step1"));
         assert!(!filter.should_log("agent.internal"));
