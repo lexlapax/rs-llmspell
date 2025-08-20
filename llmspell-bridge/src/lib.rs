@@ -236,6 +236,7 @@
 // Core modules
 pub mod config_bridge;
 pub mod conversion;
+pub mod debug_bridge;
 pub mod discovery;
 pub mod engine;
 pub mod providers;

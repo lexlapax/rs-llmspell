@@ -3,7 +3,9 @@
 
 pub mod agent_global;
 pub mod artifact_global;
+pub mod config_global;
 pub mod core;
+pub mod debug_global;
 pub mod event_global;
 pub mod hook_global;
 pub mod injection;
@@ -43,6 +45,9 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     builder.register(Arc::new(json_global::JsonGlobal::new()));
     builder.register(Arc::new(core::LoggerGlobal::new()));
     builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
+
+    // Register Debug global for unified debugging infrastructure
+    builder.register(Arc::new(debug_global::DebugGlobal::new()));
 
     // Create StateGlobal with migration support if configured
     let state_global = if let Some(runtime_config) =

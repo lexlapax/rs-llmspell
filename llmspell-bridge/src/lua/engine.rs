@@ -9,6 +9,7 @@ use crate::engine::{
     ScriptOutput, ScriptStream,
 };
 use crate::lua::globals::args::inject_args_global;
+use crate::lua::output_capture::{install_output_capture, ConsoleCapture};
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
@@ -32,6 +33,8 @@ pub struct LuaEngine {
     execution_context: ExecutionContext,
     runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
     script_args: Option<std::collections::HashMap<String, String>>,
+    #[cfg(feature = "lua")]
+    console_capture: Option<Arc<ConsoleCapture>>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -57,12 +60,16 @@ impl LuaEngine {
             // TODO: restrict stdlib for Safe level
             let lua = Lua::new();
 
+            // Install output capture (without debug bridge for now)
+            let console_capture = install_output_capture(&lua, None).ok();
+
             Ok(Self {
                 lua: Arc::new(parking_lot::Mutex::new(lua)),
                 _config: config.clone(),
                 execution_context: ExecutionContext::default(),
                 runtime_config: None,
                 script_args: None,
+                console_capture,
             })
         }
 
@@ -104,6 +111,11 @@ impl ScriptEngineBridge for LuaEngine {
 
             // For now, keep synchronous execution but prepare for async tool calls
             // The async execution will happen within tool calls, not at the script level
+            // Clear any previous console output
+            if let Some(capture) = &self.console_capture {
+                capture.clear();
+            }
+
             let result = {
                 let lua = self.lua.lock();
 
@@ -138,9 +150,15 @@ impl ScriptEngineBridge for LuaEngine {
 
             match result {
                 Ok(output) => {
+                    // Get captured console output
+                    let console_output = self
+                        .console_capture
+                        .as_ref()
+                        .map_or_else(Vec::new, |capture| capture.get_lines());
+
                     Ok(ScriptOutput {
                         output,
-                        console_output: vec![], // TODO: Capture console output
+                        console_output,
                         metadata: ScriptMetadata {
                             engine: "lua".to_string(),
                             #[allow(clippy::cast_possible_truncation)]

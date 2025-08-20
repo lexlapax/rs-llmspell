@@ -23,7 +23,11 @@ impl ConfigBridgeGlobal {
 
     /// Create a Config global for a specific script
     #[must_use]
-    pub fn for_script(config: LLMSpellConfig, script_id: String, permissions: ConfigPermissions) -> Self {
+    pub fn for_script(
+        config: LLMSpellConfig,
+        script_id: String,
+        permissions: ConfigPermissions,
+    ) -> Self {
         Self {
             bridge: Arc::new(ConfigBridge::for_script(config, script_id, permissions)),
         }
@@ -49,12 +53,12 @@ impl GlobalObject for ConfigBridgeGlobal {
 
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, _context: &GlobalContext) -> Result<()> {
-        crate::lua::globals::config::inject_config_global(lua, &self.bridge).map_err(
-            |e| llmspell_core::LLMSpellError::Configuration {
+        crate::lua::globals::config::inject_config_global(lua, &self.bridge).map_err(|e| {
+            llmspell_core::LLMSpellError::Configuration {
                 message: format!("Failed to inject Config global: {e}"),
                 source: None,
-            },
-        )
+            }
+        })
     }
 
     #[cfg(feature = "javascript")]
@@ -63,12 +67,12 @@ impl GlobalObject for ConfigBridgeGlobal {
         ctx: &mut boa_engine::Context,
         _context: &GlobalContext,
     ) -> Result<()> {
-        crate::javascript::globals::config::inject_config_global(ctx, self.bridge.clone()).map_err(|e| {
-            llmspell_core::LLMSpellError::Configuration {
+        crate::javascript::globals::config::inject_config_global(ctx, self.bridge.clone()).map_err(
+            |e| llmspell_core::LLMSpellError::Configuration {
                 message: format!("Failed to inject Config global for JavaScript: {e}"),
                 source: None,
-            }
-        })
+            },
+        )
     }
 }
 
@@ -81,7 +85,7 @@ mod tests {
         let config = LLMSpellConfig::default();
         let permissions = ConfigPermissions::read_only();
         let global = ConfigBridgeGlobal::new(config, permissions);
-        
+
         let metadata = global.metadata();
         assert_eq!(metadata.name, "Config");
         assert!(!metadata.required);
@@ -92,7 +96,7 @@ mod tests {
         let config = LLMSpellConfig::default();
         let permissions = ConfigPermissions::standard();
         let global = ConfigBridgeGlobal::for_script(config, "test-script".to_string(), permissions);
-        
+
         assert_eq!(global.bridge().permissions().read, true);
         assert_eq!(global.bridge().permissions().modify_providers, true);
         assert_eq!(global.bridge().permissions().modify_security, false);

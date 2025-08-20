@@ -5,12 +5,14 @@
 
 pub mod entry;
 pub mod levels;
+pub mod module_filter;
 pub mod output;
 pub mod performance;
 
 // Re-export commonly used types
 pub use self::entry::DebugEntry;
 pub use self::levels::DebugLevel;
+pub use self::module_filter::{EnhancedModuleFilter, FilterPattern, FilterRule, FilterSummary};
 pub use self::output::{BufferOutput, DebugOutput, FileOutput, MultiOutput, StdoutOutput};
 pub use self::performance::{PerformanceTracker, Profiler};
 
@@ -44,7 +46,7 @@ pub struct DebugManager {
     /// Active performance trackers by ID
     performance_trackers: DashMap<String, Arc<PerformanceTracker>>,
     /// Module filters for targeted debugging
-    module_filters: Arc<RwLock<ModuleFilter>>,
+    module_filters: Arc<RwLock<EnhancedModuleFilter>>,
     /// Capture buffer for later analysis
     capture_buffer: Arc<BufferOutput>,
 }
@@ -73,7 +75,7 @@ impl DebugManager {
             output_handler: Arc::new(RwLock::new(Box::new(multi_output))),
             profiler: Arc::new(Profiler::new()),
             performance_trackers: DashMap::new(),
-            module_filters: Arc::new(RwLock::new(ModuleFilter::new())),
+            module_filters: Arc::new(RwLock::new(EnhancedModuleFilter::new())),
             capture_buffer,
         }
     }
@@ -194,6 +196,26 @@ impl DebugManager {
         self.module_filters.write().clear();
     }
 
+    /// Get module filter summary
+    pub fn get_filter_summary(&self) -> FilterSummary {
+        self.module_filters.read().get_filter_summary()
+    }
+
+    /// Remove a specific filter pattern
+    pub fn remove_module_filter(&self, pattern: &str) -> bool {
+        self.module_filters.write().remove_filter(pattern)
+    }
+
+    /// Set default filter behavior
+    pub fn set_default_filter_enabled(&self, enabled: bool) {
+        self.module_filters.write().set_default_enabled(enabled);
+    }
+
+    /// Add a filter rule with full configuration
+    pub fn add_filter_rule(&self, rule: FilterRule) {
+        self.module_filters.write().add_rule(rule);
+    }
+
     /// Check if a message should be logged based on level and module
     fn should_log(&self, level: DebugLevel, module: Option<&str>) -> bool {
         // Check level first
@@ -218,59 +240,6 @@ impl DebugManager {
 impl Default for DebugManager {
     fn default() -> Self {
         Self::new()
-    }
-}
-
-/// Module filtering for targeted debugging
-struct ModuleFilter {
-    /// Patterns that enable logging
-    enabled_patterns: Vec<String>,
-    /// Patterns that disable logging
-    disabled_patterns: Vec<String>,
-}
-
-impl ModuleFilter {
-    fn new() -> Self {
-        Self {
-            enabled_patterns: Vec::new(),
-            disabled_patterns: Vec::new(),
-        }
-    }
-
-    fn add_filter(&mut self, pattern: &str, enabled: bool) {
-        if enabled {
-            self.enabled_patterns.push(pattern.to_string());
-        } else {
-            self.disabled_patterns.push(pattern.to_string());
-        }
-    }
-
-    fn should_log(&self, module: &str) -> bool {
-        // If any disabled pattern matches, don't log
-        for pattern in &self.disabled_patterns {
-            if module.contains(pattern) || pattern == "*" {
-                return false;
-            }
-        }
-
-        // If no enabled patterns, log everything not disabled
-        if self.enabled_patterns.is_empty() {
-            return true;
-        }
-
-        // Otherwise, must match an enabled pattern
-        for pattern in &self.enabled_patterns {
-            if module.contains(pattern) || pattern == "*" {
-                return true;
-            }
-        }
-
-        false
-    }
-
-    fn clear(&mut self) {
-        self.enabled_patterns.clear();
-        self.disabled_patterns.clear();
     }
 }
 
@@ -343,8 +312,8 @@ mod tests {
         let manager = DebugManager::new();
         manager.set_level(DebugLevel::Debug);
 
-        // Enable only "workflow" modules
-        manager.add_module_filter("workflow", true);
+        // Enable workflow modules using hierarchical pattern
+        manager.add_module_filter("workflow.*", true);
 
         manager.log(
             DebugLevel::Info,
