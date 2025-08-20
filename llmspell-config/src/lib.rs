@@ -10,11 +10,13 @@ use tokio::fs;
 use tracing::debug;
 
 // Re-export engine configurations from bridge
+pub use crate::debug::DebugConfig;
 pub use crate::engines::{EngineConfigs, JSConfig, LuaConfig};
 pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, IsolationMode};
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
 pub use crate::tools::{FileOperationsConfig, ToolsConfig};
 
+pub mod debug;
 pub mod engines;
 pub mod env;
 pub mod env_registry;
@@ -55,6 +57,8 @@ pub struct LLMSpellConfig {
     pub hooks: Option<HookConfig>,
     /// Event system configuration
     pub events: EventsConfig,
+    /// Debug system configuration
+    pub debug: DebugConfig,
 }
 
 impl Default for LLMSpellConfig {
@@ -67,6 +71,7 @@ impl Default for LLMSpellConfig {
             tools: ToolsConfig::default(),
             hooks: None,
             events: EventsConfig::default(),
+            debug: DebugConfig::default(),
         }
     }
 }
@@ -666,6 +671,13 @@ impl LLMSpellConfigBuilder {
     #[must_use]
     pub fn events(mut self, events: EventsConfig) -> Self {
         self.config.events = events;
+        self
+    }
+
+    /// Set the debug configuration
+    #[must_use]
+    pub fn debug(mut self, debug: DebugConfig) -> Self {
+        self.config.debug = debug;
         self
     }
 

@@ -2108,43 +2108,64 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 - **Thread-Safe Design**: All debug operations safe for concurrent script execution
 - **Output Flexibility**: stdout, file, buffer, JSON, with module filtering
 
-**Sub-Task 1: Core Rust Debug Infrastructure** (4 hours) - `llmspell-utils/src/debug/`
-- [ ] Create `DebugManager` with level management (Off/Error/Warn/Info/Debug/Trace)
-- [ ] Implement `DebugOutput` trait with stdout/file/buffer handlers
-- [ ] Add `PerformanceTracker` for timing operations with lap support
-- [ ] Create `DebugEntry` struct with timestamp, level, module, message, metadata
-- [ ] Implement thread-safe capture buffer for later analysis
+**Sub-Task 1: Core Rust Debug Infrastructure** (4 hours) - `llmspell-utils/src/debug/` ✅ COMPLETED
+- [x] Create `DebugManager` with level management (Off/Error/Warn/Info/Debug/Trace)
+- [x] Implement `DebugOutput` trait with stdout/file/buffer handlers  
+- [x] Add `PerformanceTracker` for timing operations with lap support
+- [x] Create `DebugEntry` struct with timestamp, level, module, message, metadata
+- [x] Implement thread-safe capture buffer for later analysis
+- [x] Implement `DebugOutput` for `Arc<T>` to allow shared ownership patterns
 - **Architecture Decision**: Centralized manager ensures consistent behavior across all script engines
 - **Why**: Scripts need same debug capabilities as Rust code, but routed through single point
+- **Technical Insights**:
+  - Used `DashMap` for lock-free concurrent tracker storage (performance critical)
+  - `parking_lot::RwLock` for better performance than std::sync::RwLock
+  - Removed `Serialize/Deserialize` from `Instant` fields (not serializable by design)
+  - Global static `GLOBAL_DEBUG_MANAGER` using `once_cell::Lazy` for zero-cost initialization
+  - Module filtering supports wildcard patterns and enable/disable lists
+  - Multi-output system allows routing to stdout + file + buffer simultaneously
 
-**Sub-Task 2: Configuration Layer** (2 hours) - `llmspell-config/src/debug.rs`
-- [ ] Create `DebugConfig` struct with all debug settings
-- [ ] Add `DebugOutputConfig` for output routing (stdout/file/buffer)
-- [ ] Integrate into main `LLMSpellConfig` structure
-- [ ] Support for module filters and performance tracking flags
-- [ ] Add pretty-print and stack trace configuration options
+**Sub-Task 2: Configuration Layer** (2 hours) - `llmspell-config/src/debug.rs` ✅ COMPLETED
+- [x] Create `DebugConfig` struct with all debug settings
+- [x] Add `DebugOutputConfig` for output routing (stdout/file/buffer)
+- [x] Integrate into main `LLMSpellConfig` structure
+- [x] Support for module filters and performance tracking flags
+- [x] Add pretty-print and stack trace configuration options
 - **Architecture Decision**: Configuration separate from implementation for flexibility
 - **Why**: Debug settings must be controllable at multiple levels (CLI, env, config file)
+- **Technical Insights**:
+  - Fixed defaults: `level="info"`, `stdout=true`, `colored=true`, `format="text"`
+  - Hierarchical config merge strategy implemented for precedence handling
+  - Per-module level overrides supported via HashMap<String, String>
 
-**Sub-Task 3: Environment Variable Support** (1 hour) - `llmspell-config/src/env_registry.rs`
-- [ ] Register `LLMSPELL_DEBUG=true/false` master switch
-- [ ] Add `LLMSPELL_DEBUG_LEVEL=trace/debug/info/warn/error/off`
-- [ ] Support `LLMSPELL_DEBUG_OUTPUT=stdout/file:/path/to/file`
-- [ ] Add `LLMSPELL_DEBUG_MODULES=module1,module2` for filtering
-- [ ] Register `LLMSPELL_DEBUG_PERFORMANCE=true/false` for profiling
-- [ ] Add `LLMSPELL_DEBUG_FORMAT=text/json/pretty` for output format
+**Sub-Task 3: Environment Variable Support** (1 hour) - `llmspell-config/src/debug.rs` ✅ COMPLETED
+- [x] Register `LLMSPELL_DEBUG=true/false` master switch, default config false
+- [x] Add `LLMSPELL_DEBUG_LEVEL=trace/debug/info/warn/error/off`, default config info
+- [x] Support `LLMSPELL_DEBUG_OUTPUT=stdout,colored,file:/path/to/file`
+- [x] Add `LLMSPELL_DEBUG_MODULES=+enabled.*,-disabled.*` for filtering
+- [x] Register `LLMSPELL_DEBUG_PERFORMANCE=true/false` for profiling, default config false
+- [x] Format parsing integrated in output config, default text
 - **Architecture Decision**: Environment variables override config file but not CLI
 - **Why**: Allows runtime debug control without modifying configs or command lines
+- **Technical Insights**:
+  - Implemented in `DebugConfig::from_env()` method
+  - Module filters use `+` prefix for enable, `-` prefix for disable
+  - Output supports comma-separated values for multiple outputs
 
-**Sub-Task 4: CLI Integration** (1 hour) - `llmspell-cli/src/cli.rs`
-- [ ] Add `--debug` flag for quick debug enable
-- [ ] Add `--debug-level <level>` for granular control
-- [ ] Support `--debug-format <format>` for output formatting
-- [ ] Add `--debug-modules <list>` for module filtering
-- [ ] Implement `--debug-perf` for performance profiling
-- [ ] Wire CLI args to DebugManager initialization in main.rs
+**Sub-Task 4: CLI Integration** (1 hour) - `llmspell-cli/src/cli.rs` ✅ COMPLETED
+- [x] Add `--debug` flag for quick debug enable
+- [x] Add `--debug-level <level>` for granular control
+- [x] Support `--debug-format <format>` for output formatting
+- [x] Add `--debug-modules <list>` for module filtering
+- [x] Implement `--debug-perf` for performance profiling
+- [x] Wire CLI args to DebugManager initialization in main.rs
 - **Architecture Decision**: CLI flags have highest priority in configuration hierarchy
 - **Why**: Command-line control is most immediate and visible to developers
+- **Technical Insights**:
+  - All debug flags marked as `global = true` for availability in all subcommands
+  - Module filter parsing supports +/- prefixes for enable/disable
+  - Helper functions added to apply CLI settings to both DebugManager and config
+  - Re-exported DebugLevel and other types from debug module for external use
 
 **Sub-Task 5: Script Bridge Layer** (2 hours) - `llmspell-bridge/src/debug_bridge.rs`
 - [ ] Create `DebugBridge` that wraps Rust DebugManager
@@ -2153,6 +2174,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 - [ ] Create `get_stacktrace()` using script engine's debug APIs
 - [ ] Implement `dump_value()` for pretty-printing any script value
 - [ ] Add memory profiling methods connecting to Rust allocator stats
+- [ ] Ensure `llmspell-bridge/src/globals/debug_globals.rs` is created 
 - **Architecture Decision**: Bridge pattern decouples script API from Rust implementation
 - **Why**: Allows different script engines to share same debug infrastructure
 

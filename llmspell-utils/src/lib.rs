@@ -107,6 +107,9 @@ pub mod rate_limiting;
 /// Circuit breaker pattern for fault tolerance
 pub mod circuit_breaker;
 
+/// Debug infrastructure for script engines
+pub mod debug;
+
 /// Resource limit enforcement framework
 pub mod resource_limits;
 

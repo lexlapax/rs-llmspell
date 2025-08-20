@@ -110,6 +110,7 @@ walkdir = "2.5"
 crossbeam = "0.8"
 parking_lot = "0.12"
 lazy_static = "1.4"
+dashmap = "6.1"
 
 # Random number generation
 rand = "0.8"
