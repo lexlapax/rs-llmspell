@@ -1,7 +1,7 @@
 //! ABOUTME: Multi-agent coordination patterns via workflows
 //! ABOUTME: Demonstrates how to coordinate multiple agents using workflow patterns
 
-use llmspell_core::{ComponentId, Result};
+use llmspell_core::Result;
 use llmspell_workflows::{
     LoopWorkflowBuilder, ParallelBranch, ParallelWorkflowBuilder, SequentialWorkflowBuilder,
     StepType, WorkflowStep,
@@ -66,7 +66,7 @@ pub fn create_pipeline_workflow(
         let step = WorkflowStep::new(
             step_name,
             StepType::Agent {
-                agent_id: ComponentId::from_name(agent_id),
+                agent_id: agent_id.to_string(),  // Now uses String directly
                 input: step_input.to_string(),
             },
         );
@@ -97,7 +97,7 @@ pub fn create_fork_join_workflow(
             .add_step(WorkflowStep::new(
                 format!("{task_name}_execution"),
                 StepType::Agent {
-                    agent_id: ComponentId::from_name(agent_id),
+                    agent_id: agent_id.to_string(),  // Now uses String directly
                     input: input.to_string(),
                 },
             ));
@@ -132,7 +132,7 @@ pub fn create_consensus_workflow(
             .add_step(WorkflowStep::new(
                 format!("{agent_id}_vote"),
                 StepType::Agent {
-                    agent_id: ComponentId::from_name(agent_id),
+                    agent_id: agent_id.to_string(),  // Now uses String directly
                     input: serde_json::json!({
                         "task": "evaluate_options",
                         "options": options,
@@ -167,7 +167,7 @@ pub fn create_delegation_workflow(
     builder = builder.add_step(WorkflowStep::new(
         "task_analysis".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(coordinator_agent),
+            agent_id: coordinator_agent.to_string(),  // Now uses String directly
             input: serde_json::json!({
                 "task": task,
                 "available_workers": worker_agents.iter().map(|(id, spec)| {
@@ -199,7 +199,7 @@ pub fn create_delegation_workflow(
     builder = builder.add_step(WorkflowStep::new(
         "aggregate_results".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(coordinator_agent),
+            agent_id: coordinator_agent.to_string(),  // Now uses String directly
             input: serde_json::json!({
                 "task": "aggregate_delegated_results",
                 "delegation_results": "$execute_delegations_output"
@@ -234,7 +234,7 @@ pub fn create_collaboration_workflow(
         builder = builder.add_step(WorkflowStep::new(
             format!("collaborate_agent_{i}"),
             StepType::Agent {
-                agent_id: ComponentId::from_name(agent_id),
+                agent_id: agent_id.to_string(),  // Now uses String directly
                 input: serde_json::json!({
                     "action": "collaborate",
                     "context": if i == 0 {
@@ -277,7 +277,7 @@ pub fn create_hierarchical_workflow(
     builder = builder.add_step(WorkflowStep::new(
         "manager_planning".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(manager_agent),
+            agent_id: manager_agent.to_string(),  // Now uses String directly
             input: serde_json::json!({
                 "task": task,
                 "team_structure": {
@@ -320,7 +320,7 @@ pub fn create_hierarchical_workflow(
     builder = builder.add_step(WorkflowStep::new(
         "final_report".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(manager_agent),
+            agent_id: manager_agent.to_string(),  // Now uses String directly
             input: serde_json::json!({
                 "action": "create_final_report",
                 "team_reports": "$consolidate_reports_output",

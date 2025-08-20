@@ -1602,6 +1602,7 @@ pub struct LoopWorkflowBuilder {
     iteration_delay: Option<Duration>,
     workflow_config: WorkflowConfig,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    registry: Option<Arc<dyn ComponentLookup>>,
 }
 
 impl LoopWorkflowBuilder {
@@ -1618,6 +1619,7 @@ impl LoopWorkflowBuilder {
             iteration_delay: None,
             workflow_config: WorkflowConfig::default(),
             workflow_executor: None,
+            registry: None,
         }
     }
 
@@ -1703,6 +1705,12 @@ impl LoopWorkflowBuilder {
         self
     }
 
+    /// Set the component registry for component lookup
+    pub fn with_registry(mut self, registry: Arc<dyn ComponentLookup>) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
     pub fn build(self) -> Result<LoopWorkflow> {
         let iterator =
             self.iterator
@@ -1743,15 +1751,27 @@ impl LoopWorkflowBuilder {
             iteration_delay: self.iteration_delay,
         };
 
-        if let Some(workflow_executor) = self.workflow_executor {
-            Ok(LoopWorkflow::new_with_hooks(
+        match (self.workflow_executor, self.registry) {
+            (Some(executor), Some(registry)) => Ok(LoopWorkflow::new_with_hooks_and_registry(
                 self.name,
                 config,
                 self.workflow_config,
-                workflow_executor,
-            ))
-        } else {
-            Ok(LoopWorkflow::new(self.name, config, self.workflow_config))
+                executor,
+                Some(registry),
+            )),
+            (Some(executor), None) => Ok(LoopWorkflow::new_with_hooks(
+                self.name,
+                config,
+                self.workflow_config,
+                executor,
+            )),
+            (None, Some(registry)) => Ok(LoopWorkflow::new_with_registry(
+                self.name,
+                config,
+                self.workflow_config,
+                Some(registry),
+            )),
+            (None, None) => Ok(LoopWorkflow::new(self.name, config, self.workflow_config)),
         }
     }
 }

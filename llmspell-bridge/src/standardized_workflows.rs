@@ -181,7 +181,20 @@ impl StandardizedWorkflowFactory {
             return Ok(Box::new(parallel_workflow));
         }
 
-        // For other workflow types, use the standardized factory
+        // For sequential and loop workflows, bypass factory and use working implementation with registry
+        if workflow_type == "sequential" {
+            let sequential_workflow =
+                super::workflows::create_sequential_workflow(&params, self.registry.clone())?;
+            return Ok(Box::new(sequential_workflow));
+        }
+
+        if workflow_type == "loop" {
+            let loop_workflow =
+                super::workflows::create_loop_workflow(&params, self.registry.clone())?;
+            return Ok(Box::new(loop_workflow));
+        }
+
+        // For other workflow types, use the standardized factory (should not reach here)
         let workflow = self
             .factory
             .create_from_type(workflow_type, name.clone(), config, type_config)

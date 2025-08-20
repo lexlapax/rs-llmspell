@@ -46,7 +46,7 @@ fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowS
             WorkflowStep::new(
                 name,
                 StepType::Agent {
-                    agent_id: ComponentId::from_name(&agent_id),
+                    agent_id,  // Now uses String directly
                     input,
                 },
             )

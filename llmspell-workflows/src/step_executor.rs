@@ -334,13 +334,33 @@ impl StepExecutor {
 
         // Execute the actual step based on its type
         let start_time = std::time::Instant::now();
+        // DEBUG: Log the step type and details
+        match &step.step_type {
+            StepType::Agent { agent_id, input } => {
+                debug!("DEBUG: Step '{}' is Agent type with agent_id: '{}', input: '{}'", 
+                    step.name, agent_id, input);
+            }
+            StepType::Tool { tool_name, .. } => {
+                debug!("DEBUG: Step '{}' is Tool type with tool: '{}'", step.name, tool_name);
+            }
+            StepType::Workflow { workflow_id, .. } => {
+                debug!("DEBUG: Step '{}' is Workflow type with workflow_id: {:?}", 
+                    step.name, workflow_id);
+            }
+            StepType::Custom { function_name, .. } => {
+                debug!("DEBUG: Step '{}' is Custom type with function: '{}'", 
+                    step.name, function_name);
+            }
+        }
+        
         let result = match &step.step_type {
             StepType::Tool {
                 tool_name,
                 parameters,
             } => self.execute_tool_step(tool_name, parameters, context).await,
             StepType::Agent { agent_id, input } => {
-                self.execute_agent_step(*agent_id, input, context).await
+                debug!("DEBUG: About to execute agent step for agent_id: '{}'", agent_id);
+                self.execute_agent_step(agent_id, input, context).await
             }
             StepType::Custom {
                 function_name,
@@ -574,11 +594,11 @@ impl StepExecutor {
     /// Execute an agent step
     async fn execute_agent_step(
         &self,
-        agent_id: ComponentId,
+        agent_name: &str,  // Changed from ComponentId to String to use original agent name
         input: &str,
         context: &StepExecutionContext,
     ) -> Result<String> {
-        debug!("Executing agent step: {:?}", agent_id);
+        debug!("Executing agent step: '{}'", agent_name);
 
         // Validate input
         if input.is_empty() {
@@ -593,21 +613,28 @@ impl StepExecutor {
         let Some(ref registry) = self.registry else {
             // Fall back to mock execution for backward compatibility in tests
             warn!(
-                "No registry available, using mock execution for agent: {:?}",
-                agent_id
+                "No registry available, using mock execution for agent: '{}'",
+                agent_name
             );
-            return self.execute_agent_step_mock(agent_id, input).await;
+            // Create a ComponentId for the mock function (temporary)
+            let mock_id = ComponentId::from_name(agent_name);
+            return self.execute_agent_step_mock(mock_id, input).await;
         };
-
-        // Try to lookup agent by ID string representation
-        let agent_name = agent_id.to_string();
+        
+        // DEBUG: Log what we're looking for
+        debug!("DEBUG: Looking for agent with name: '{}'", agent_name);
+        
+        // Look up agent by its original name
         let agent =
             registry
-                .get_agent(&agent_name)
+                .get_agent(agent_name)
                 .await
-                .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent '{}' not found in registry", agent_name),
-                    source: None,
+                .ok_or_else(|| {
+                    error!("DEBUG: Agent '{}' not found in registry", agent_name);
+                    LLMSpellError::Component {
+                        message: format!("Agent '{}' not found in registry", agent_name),
+                        source: None,
+                    }
                 })?;
 
         // Create AgentInput from the provided input string
@@ -617,6 +644,8 @@ impl StepExecutor {
         let mut exec_context = context.to_execution_context();
 
         // Override scope to Agent for this execution
+        // Create a ComponentId from the agent name for the scope
+        let agent_id = ComponentId::from_name(agent_name);
         exec_context.scope = llmspell_core::execution_context::ContextScope::Agent(agent_id);
 
         // Set workflow execution ID in session if not already set

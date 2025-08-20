@@ -913,6 +913,7 @@ pub struct SequentialWorkflowBuilder {
     steps: Vec<WorkflowStep>,
     error_strategy: Option<ErrorStrategy>,
     workflow_executor: Option<Arc<WorkflowExecutor>>,
+    registry: Option<Arc<dyn ComponentLookup>>,
 }
 
 impl SequentialWorkflowBuilder {
@@ -924,6 +925,7 @@ impl SequentialWorkflowBuilder {
             steps: Vec::new(),
             error_strategy: None,
             workflow_executor: None,
+            registry: None,
         }
     }
 
@@ -957,6 +959,12 @@ impl SequentialWorkflowBuilder {
         self
     }
 
+    /// Set the component registry for component lookup
+    pub fn with_registry(mut self, registry: Arc<dyn ComponentLookup>) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
     /// Build the sequential workflow
     pub fn build(mut self) -> SequentialWorkflow {
         // Apply error strategy if provided
@@ -964,10 +972,20 @@ impl SequentialWorkflowBuilder {
             self.config.default_error_strategy = strategy;
         }
 
-        let mut workflow = if let Some(workflow_executor) = self.workflow_executor {
-            SequentialWorkflow::new_with_hooks(self.name, self.config, workflow_executor)
-        } else {
-            SequentialWorkflow::new(self.name, self.config)
+        let mut workflow = match (self.workflow_executor, self.registry) {
+            (Some(executor), Some(registry)) => SequentialWorkflow::new_with_hooks_and_registry(
+                self.name,
+                self.config,
+                executor,
+                Some(registry),
+            ),
+            (Some(executor), None) => {
+                SequentialWorkflow::new_with_hooks(self.name, self.config, executor)
+            }
+            (None, Some(registry)) => {
+                SequentialWorkflow::new_with_registry(self.name, self.config, Some(registry))
+            }
+            (None, None) => SequentialWorkflow::new(self.name, self.config),
         };
         workflow.add_steps(self.steps);
         workflow

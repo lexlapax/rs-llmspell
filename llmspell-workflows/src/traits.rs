@@ -50,7 +50,8 @@ pub enum StepType {
     },
     /// Execute an agent with given input
     Agent {
-        agent_id: ComponentId,
+        // Changed from ComponentId to String to preserve original agent name for registry lookup
+        agent_id: String,
         input: String,
     },
     /// Custom function execution

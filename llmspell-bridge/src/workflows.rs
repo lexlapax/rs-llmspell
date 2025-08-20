@@ -232,7 +232,7 @@ impl WorkflowFactory {
     ) -> Result<Box<dyn WorkflowExecutor>> {
         match workflow_type {
             "sequential" => {
-                let workflow = create_sequential_workflow(params)?;
+                let workflow = create_sequential_workflow(params, None)?;
                 Ok(Box::new(workflow))
             }
             "conditional" => {
@@ -240,7 +240,7 @@ impl WorkflowFactory {
                 Ok(Box::new(workflow))
             }
             "loop" => {
-                let workflow = create_loop_workflow(params)?;
+                let workflow = create_loop_workflow(params, None)?;
                 Ok(Box::new(workflow))
             }
             "parallel" => {
@@ -270,7 +270,10 @@ pub trait WorkflowExecutor: Send + Sync {
 
 // Helper functions to create specific workflow types
 
-fn create_sequential_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
+pub fn create_sequential_workflow(
+    params: &serde_json::Value,
+    registry: Option<Arc<ComponentRegistry>>,
+) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::SequentialWorkflowBuilder;
 
     let name = params
@@ -293,6 +296,12 @@ fn create_sequential_workflow(params: &serde_json::Value) -> Result<impl Workflo
     for step_json in steps {
         let step = parse_workflow_step(step_json)?;
         builder = builder.add_step(step);
+    }
+
+    // Add registry if provided
+    if let Some(reg) = registry {
+        use llmspell_core::ComponentLookup;
+        builder = builder.with_registry(reg as Arc<dyn ComponentLookup>);
     }
 
     let workflow = builder.build();
@@ -432,7 +441,10 @@ pub fn create_conditional_workflow(
     Ok(ConditionalWorkflowExecutor { workflow, name })
 }
 
-fn create_loop_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
+pub fn create_loop_workflow(
+    params: &serde_json::Value,
+    registry: Option<Arc<ComponentRegistry>>,
+) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{LoopIterator, LoopWorkflowBuilder};
 
     let name = params
@@ -463,6 +475,12 @@ fn create_loop_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecu
             let step = parse_workflow_step(step_json)?;
             builder = builder.add_step(step);
         }
+    }
+
+    // Add registry if provided
+    if let Some(reg) = registry {
+        use llmspell_core::ComponentLookup;
+        builder = builder.with_registry(reg as Arc<dyn ComponentLookup>);
     }
 
     let workflow = builder.build()?;
@@ -715,7 +733,7 @@ fn parse_workflow_step(step_json: &serde_json::Value) -> Result<llmspell_workflo
             .cloned()
             .unwrap_or_else(|| serde_json::json!({}));
         StepType::Agent {
-            agent_id: ComponentId::from_name(agent_id),
+            agent_id: agent_id.to_string(),  // Keep original agent name for registry lookup
             input: input.to_string(),
         }
     } else if let Some(func_name) = step_json.get("function").and_then(|v| v.as_str()) {
