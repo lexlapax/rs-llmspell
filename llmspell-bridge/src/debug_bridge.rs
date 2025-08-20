@@ -57,6 +57,7 @@ impl DebugBridge {
     }
 
     /// Start a performance timer
+    #[must_use]
     pub fn start_timer(&self, name: &str) -> String {
         let tracker = self.manager.start_timer(name);
         let id = format!("timer_{}", uuid::Uuid::new_v4());
@@ -65,6 +66,7 @@ impl DebugBridge {
     }
 
     /// Stop a timer and get the duration in milliseconds
+    #[must_use]
     pub fn stop_timer(&self, id: &str) -> Option<f64> {
         self.trackers
             .lock()
@@ -73,16 +75,16 @@ impl DebugBridge {
     }
 
     /// Record a lap for a timer
+    #[must_use]
     pub fn lap_timer(&self, id: &str, lap_name: &str) -> bool {
-        if let Some(tracker) = self.trackers.lock().get(id) {
+        self.trackers.lock().get(id).is_some_and(|tracker| {
             tracker.lap(lap_name);
             true
-        } else {
-            false
-        }
+        })
     }
 
     /// Get the elapsed time for a timer without stopping it
+    #[must_use]
     pub fn elapsed_timer(&self, id: &str) -> Option<f64> {
         self.trackers
             .lock()
@@ -91,16 +93,16 @@ impl DebugBridge {
     }
 
     /// Set the debug level
+    #[must_use]
     pub fn set_level(&self, level: &str) -> bool {
-        if let Ok(debug_level) = level.parse::<DebugLevel>() {
+        level.parse::<DebugLevel>().is_ok_and(|debug_level| {
             self.manager.set_level(debug_level);
             true
-        } else {
-            false
-        }
+        })
     }
 
     /// Get the current debug level
+    #[must_use]
     pub fn get_level(&self) -> String {
         self.manager.get_level().to_string()
     }
@@ -111,6 +113,7 @@ impl DebugBridge {
     }
 
     /// Check if debugging is enabled
+    #[must_use]
     pub fn is_enabled(&self) -> bool {
         self.manager.is_enabled()
     }
@@ -126,11 +129,13 @@ impl DebugBridge {
     }
 
     /// Get module filter summary
+    #[must_use]
     pub fn get_filter_summary(&self) -> llmspell_utils::debug::FilterSummary {
         self.manager.get_filter_summary()
     }
 
     /// Remove a specific filter pattern
+    #[must_use]
     pub fn remove_module_filter(&self, pattern: &str) -> bool {
         self.manager.remove_module_filter(pattern)
     }
@@ -141,6 +146,7 @@ impl DebugBridge {
     }
 
     /// Add advanced filter rule
+    #[must_use]
     pub fn add_filter_rule(&self, pattern: &str, pattern_type: &str, enabled: bool) -> bool {
         use llmspell_utils::debug::{FilterPattern, FilterRule};
 
@@ -164,11 +170,10 @@ impl DebugBridge {
 
     /// Get captured debug entries
     pub fn get_captured_entries(&self, limit: Option<usize>) -> Vec<DebugEntryInfo> {
-        let entries = if let Some(n) = limit {
-            self.manager.get_last_entries(n)
-        } else {
-            self.manager.get_captured_entries()
-        };
+        let entries = limit.map_or_else(
+            || self.manager.get_captured_entries(),
+            |n| self.manager.get_last_entries(n),
+        );
 
         entries.into_iter().map(Into::into).collect()
     }
@@ -179,23 +184,26 @@ impl DebugBridge {
     }
 
     /// Generate a performance report
+    #[must_use]
     pub fn generate_performance_report(&self) -> String {
         self.manager.generate_performance_report()
     }
 
     /// Dump a value for debugging (pretty-print) - JSON fallback
+    #[must_use]
     pub fn dump_value(&self, value: &Value, label: Option<&str>) -> String {
         let pretty = serde_json::to_string_pretty(value)
             .unwrap_or_else(|_| "Failed to serialize".to_string());
 
         if let Some(label) = label {
-            format!("{}: {}", label, pretty)
+            format!("{label}: {pretty}")
         } else {
             pretty
         }
     }
 
     /// Dump a value with enhanced formatting options (for script engines with advanced dumping)
+    #[must_use]
     pub fn dump_value_enhanced(
         &self,
         value: &Value,
@@ -207,7 +215,8 @@ impl DebugBridge {
     }
 
     /// Get memory statistics (placeholder for future implementation)
-    pub fn get_memory_stats(&self) -> MemoryStats {
+    #[must_use]
+    pub const fn get_memory_stats(&self) -> MemoryStats {
         MemoryStats {
             used_bytes: 0,
             allocated_bytes: 0,
@@ -217,13 +226,16 @@ impl DebugBridge {
     }
 
     /// Generate JSON performance report
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JSON serialization fails.
     pub fn generate_json_report(&self) -> Result<String, String> {
         // Use the global debug manager's profiler
         let profiler = llmspell_utils::debug::performance::Profiler::new();
         profiler
             .generate_json_report()
-            .map_err(|e| format!("JSON serialization failed: {}", e))
+            .map_err(|e| format!("JSON serialization failed: {e}"))
     }
 
     /// Generate flame graph compatible output
@@ -241,18 +253,17 @@ impl DebugBridge {
     }
 
     /// Record a custom event on a timer
+    #[must_use]
     pub fn record_event(
         &self,
         timer_id: &str,
         event_name: &str,
         metadata: Option<serde_json::Value>,
     ) -> bool {
-        if let Some(tracker) = self.trackers.lock().get(timer_id) {
+        self.trackers.lock().get(timer_id).is_some_and(|tracker| {
             tracker.event(event_name, metadata);
             true
-        } else {
-            false
-        }
+        })
     }
 
     /// Get stack trace options for different debug levels
@@ -281,7 +292,7 @@ impl fmt::Debug for DebugBridge {
             .field("enabled", &self.is_enabled())
             .field("level", &self.get_level())
             .field("tracker_count", &self.trackers.lock().len())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -326,7 +337,7 @@ pub struct TimerHandle {
 impl TimerHandle {
     /// Create a new timer handle
     #[must_use]
-    pub fn new(id: String, name: String) -> Self {
+    pub const fn new(id: String, name: String) -> Self {
         Self { id, name }
     }
 }

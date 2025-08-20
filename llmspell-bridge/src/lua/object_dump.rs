@@ -47,7 +47,7 @@ impl Default for DumpOptions {
 impl DumpOptions {
     /// Create compact dumping options for one-liners
     #[must_use]
-    pub fn compact() -> Self {
+    pub const fn compact() -> Self {
         Self {
             max_depth: 3,
             indent_size: 0,
@@ -62,7 +62,7 @@ impl DumpOptions {
 
     /// Create verbose dumping options for detailed inspection
     #[must_use]
-    pub fn verbose() -> Self {
+    pub const fn verbose() -> Self {
         Self {
             max_depth: 20,
             indent_size: 4,
@@ -112,7 +112,7 @@ impl DumpContext {
         }
     }
 
-    fn newline(&self) -> &'static str {
+    const fn newline(&self) -> &'static str {
         if self.options.compact_mode {
             " "
         } else {
@@ -128,6 +128,7 @@ impl DumpContext {
 }
 
 /// Dump a Lua value with advanced formatting options
+#[must_use]
 pub fn dump_value(value: &Value, options: &DumpOptions) -> String {
     let mut context = DumpContext::new(options.clone());
     dump_value_impl(value, &mut context);
@@ -135,12 +136,13 @@ pub fn dump_value(value: &Value, options: &DumpOptions) -> String {
 }
 
 /// Dump a Lua value with a label
+#[must_use]
 pub fn dump_labeled_value(value: &Value, label: &str, options: &DumpOptions) -> String {
     let dumped = dump_value(value, options);
     if options.compact_mode {
-        format!("{}: {}", label, dumped)
+        format!("{label}: {dumped}")
     } else {
-        format!("{}:\n{}", label, dumped)
+        format!("{label}:\n{dumped}")
     }
 }
 
@@ -157,7 +159,7 @@ fn dump_value_impl(value: &Value, context: &mut DumpContext) {
         Value::Number(n) => dump_number(*n, context),
         Value::String(s) => dump_string(s, context),
         Value::Table(t) => {
-            if let Err(_) = dump_table(t, context) {
+            if dump_table(t, context).is_err() {
                 context.output.push_str("<table dump error>");
             }
         }
@@ -179,25 +181,25 @@ fn dump_nil(context: &mut DumpContext) {
 
 fn dump_boolean(value: bool, context: &mut DumpContext) {
     if context.options.show_types {
-        let _ = write!(context.output, "{} (boolean)", value);
+        let _ = write!(context.output, "{value} (boolean)");
     } else {
-        let _ = write!(context.output, "{}", value);
+        let _ = write!(context.output, "{value}");
     }
 }
 
 fn dump_integer(value: i64, context: &mut DumpContext) {
     if context.options.show_types {
-        let _ = write!(context.output, "{} (integer)", value);
+        let _ = write!(context.output, "{value} (integer)");
     } else {
-        let _ = write!(context.output, "{}", value);
+        let _ = write!(context.output, "{value}");
     }
 }
 
 fn dump_number(value: f64, context: &mut DumpContext) {
     if context.options.show_types {
-        let _ = write!(context.output, "{} (number)", value);
+        let _ = write!(context.output, "{value} (number)");
     } else {
-        let _ = write!(context.output, "{}", value);
+        let _ = write!(context.output, "{value}");
     }
 }
 
@@ -220,7 +222,7 @@ fn dump_string(value: &mlua::String, context: &mut DumpContext) {
                     s.len()
                 );
             } else {
-                let _ = write!(context.output, "\"{}\"", escaped);
+                let _ = write!(context.output, "\"{escaped}\"");
             }
         }
         Err(_) => {
@@ -231,12 +233,11 @@ fn dump_string(value: &mlua::String, context: &mut DumpContext) {
 
 fn dump_table(table: &Table, context: &mut DumpContext) -> LuaResult<()> {
     // Check for circular references
-    let table_ptr = table.to_pointer() as *const u8;
+    let table_ptr = table.to_pointer().cast::<u8>();
     if let Some(first_depth) = context.visited_tables.get(&table_ptr) {
         let _ = write!(
             context.output,
-            "<circular reference to depth {}>",
-            first_depth
+            "<circular reference to depth {first_depth}>"
         );
         return Ok(());
     }
@@ -269,7 +270,10 @@ fn check_array_like(table: &Table) -> LuaResult<(bool, usize)> {
         let (key, _) = pair?;
         match key {
             Value::Integer(i) if i > 0 => {
-                max_index = max_index.max(i as usize);
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                {
+                    max_index = max_index.max(i as usize);
+                }
             }
             _ => {
                 is_array = false;
@@ -283,7 +287,7 @@ fn check_array_like(table: &Table) -> LuaResult<(bool, usize)> {
 
 fn dump_array_table(table: &Table, length: usize, context: &mut DumpContext) -> LuaResult<()> {
     let type_info = if context.options.show_types {
-        format!(" (array, {} elements)", length)
+        format!(" (array, {length} elements)")
     } else {
         String::new()
     };
@@ -312,10 +316,11 @@ fn dump_array_table(table: &Table, length: usize, context: &mut DumpContext) -> 
 
         for i in 1..=display_length {
             context.write_indent();
-            let _ = write!(context.output, "[{}] = ", i);
+            let _ = write!(context.output, "[{i}] = ");
             let value: Value = table.get(i)?;
             dump_value_impl(&value, context);
-            context.output.push_str(&format!(",{}", context.newline()));
+            context.output.push(',');
+            context.output.push_str(context.newline());
         }
 
         if length > display_length {
@@ -351,7 +356,7 @@ fn dump_hash_table(table: &Table, context: &mut DumpContext) -> LuaResult<()> {
     }
 
     let type_info = if context.options.show_types {
-        format!(" (table, {} pairs)", pairs_count)
+        format!(" (table, {pairs_count} pairs)")
     } else {
         String::new()
     };
@@ -384,7 +389,8 @@ fn dump_hash_table(table: &Table, context: &mut DumpContext) -> LuaResult<()> {
             dump_table_key(key, context);
             context.output.push_str(" = ");
             dump_value_impl(value, context);
-            context.output.push_str(&format!(",{}", context.newline()));
+            context.output.push(',');
+            context.output.push_str(context.newline());
         }
 
         if pairs_count > display_count {
@@ -410,29 +416,26 @@ fn dump_hash_table(table: &Table, context: &mut DumpContext) -> LuaResult<()> {
 }
 
 fn dump_table_key(key: &Value, context: &mut DumpContext) {
-    match key {
-        Value::String(s) => {
-            if let Ok(str_val) = s.to_str() {
-                // Check if it's a valid identifier
-                if str_val.chars().all(|c| c.is_alphanumeric() || c == '_')
-                    && str_val
-                        .chars()
-                        .next()
-                        .map_or(false, |c| c.is_alphabetic() || c == '_')
-                {
-                    context.output.push_str(str_val);
-                } else {
-                    let _ = write!(context.output, "[{}]", str_val);
-                }
+    if let Value::String(s) = key {
+        if let Ok(str_val) = s.to_str() {
+            // Check if it's a valid identifier
+            if str_val.chars().all(|c| c.is_alphanumeric() || c == '_')
+                && str_val
+                    .chars()
+                    .next()
+                    .is_some_and(|c| c.is_alphabetic() || c == '_')
+            {
+                context.output.push_str(str_val);
             } else {
-                context.output.push_str("[<invalid string>]");
+                let _ = write!(context.output, "[{str_val}]");
             }
+        } else {
+            context.output.push_str("[<invalid string>]");
         }
-        _ => {
-            context.output.push('[');
-            dump_value_impl(key, context);
-            context.output.push(']');
-        }
+    } else {
+        context.output.push('[');
+        dump_value_impl(key, context);
+        context.output.push(']');
     }
 }
 
@@ -470,32 +473,32 @@ fn dump_light_userdata(context: &mut DumpContext) {
 
 fn dump_error(error: &mlua::Error, context: &mut DumpContext) {
     if context.options.show_types {
-        let _ = write!(context.output, "<error: {}> (error)", error);
+        let _ = write!(context.output, "<error: {error}> (error)");
     } else {
-        let _ = write!(context.output, "<error: {}>", error);
+        let _ = write!(context.output, "<error: {error}>");
     }
 }
 
 /// Create Lua functions for object dumping
+///
+/// # Errors
+///
+/// Returns an error if Lua table creation or function binding fails
 pub fn create_dump_functions(lua: &Lua) -> LuaResult<Table> {
     let dump_table = lua.create_table()?;
 
     // dump(value, [options])
     let dump_fn = lua.create_function(|_lua, (value, options): (Value, Option<Table>)| {
-        let dump_options = if let Some(opts) = options {
-            DumpOptions {
-                max_depth: opts.get("max_depth").unwrap_or(10),
-                indent_size: opts.get("indent_size").unwrap_or(2),
-                max_string_length: opts.get("max_string_length").unwrap_or(200),
-                max_array_elements: opts.get("max_array_elements").unwrap_or(50),
-                max_table_pairs: opts.get("max_table_pairs").unwrap_or(50),
-                show_types: opts.get("show_types").unwrap_or(true),
-                show_addresses: opts.get("show_addresses").unwrap_or(false),
-                compact_mode: opts.get("compact_mode").unwrap_or(false),
-            }
-        } else {
-            DumpOptions::default()
-        };
+        let dump_options = options.map_or_else(DumpOptions::default, |opts| DumpOptions {
+            max_depth: opts.get("max_depth").unwrap_or(10),
+            indent_size: opts.get("indent_size").unwrap_or(2),
+            max_string_length: opts.get("max_string_length").unwrap_or(200),
+            max_array_elements: opts.get("max_array_elements").unwrap_or(50),
+            max_table_pairs: opts.get("max_table_pairs").unwrap_or(50),
+            show_types: opts.get("show_types").unwrap_or(true),
+            show_addresses: opts.get("show_addresses").unwrap_or(false),
+            compact_mode: opts.get("compact_mode").unwrap_or(false),
+        });
 
         Ok(dump_value(&value, &dump_options))
     })?;
@@ -514,20 +517,16 @@ pub fn create_dump_functions(lua: &Lua) -> LuaResult<Table> {
     // dumpWithLabel(value, label, [options])
     let dump_labeled_fn = lua.create_function(
         |_lua, (value, label, options): (Value, String, Option<Table>)| {
-            let dump_options = if let Some(opts) = options {
-                DumpOptions {
-                    max_depth: opts.get("max_depth").unwrap_or(10),
-                    indent_size: opts.get("indent_size").unwrap_or(2),
-                    max_string_length: opts.get("max_string_length").unwrap_or(200),
-                    max_array_elements: opts.get("max_array_elements").unwrap_or(50),
-                    max_table_pairs: opts.get("max_table_pairs").unwrap_or(50),
-                    show_types: opts.get("show_types").unwrap_or(true),
-                    show_addresses: opts.get("show_addresses").unwrap_or(false),
-                    compact_mode: opts.get("compact_mode").unwrap_or(false),
-                }
-            } else {
-                DumpOptions::default()
-            };
+            let dump_options = options.map_or_else(DumpOptions::default, |opts| DumpOptions {
+                max_depth: opts.get("max_depth").unwrap_or(10),
+                indent_size: opts.get("indent_size").unwrap_or(2),
+                max_string_length: opts.get("max_string_length").unwrap_or(200),
+                max_array_elements: opts.get("max_array_elements").unwrap_or(50),
+                max_table_pairs: opts.get("max_table_pairs").unwrap_or(50),
+                show_types: opts.get("show_types").unwrap_or(true),
+                show_addresses: opts.get("show_addresses").unwrap_or(false),
+                compact_mode: opts.get("compact_mode").unwrap_or(false),
+            });
 
             Ok(dump_labeled_value(&value, &label, &dump_options))
         },

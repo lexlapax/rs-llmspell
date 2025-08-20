@@ -6,6 +6,7 @@
 use mlua::{Function, Lua, Result as LuaResult, Table, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt::Write;
 
 /// Stack frame information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,7 +71,7 @@ impl Default for StackTraceOptions {
 impl StackTraceOptions {
     /// Create options for error-level capture (minimal)
     #[must_use]
-    pub fn for_error() -> Self {
+    pub const fn for_error() -> Self {
         Self {
             max_depth: 20,
             capture_locals: false,
@@ -81,7 +82,7 @@ impl StackTraceOptions {
 
     /// Create options for trace-level capture (comprehensive)
     #[must_use]
-    pub fn for_trace() -> Self {
+    pub const fn for_trace() -> Self {
         Self {
             max_depth: 50,
             capture_locals: true,
@@ -92,6 +93,7 @@ impl StackTraceOptions {
 }
 
 /// Capture a stack trace from the current Lua execution point
+#[must_use]
 pub fn capture_stack_trace(lua: &Lua, options: &StackTraceOptions) -> StackTrace {
     match capture_stack_trace_impl(lua, options) {
         Ok(trace) => trace,
@@ -99,7 +101,7 @@ pub fn capture_stack_trace(lua: &Lua, options: &StackTraceOptions) -> StackTrace
             frames: vec![],
             max_depth: options.max_depth,
             truncated: false,
-            error: Some(format!("Stack trace capture failed: {}", e)),
+            error: Some(format!("Stack trace capture failed: {e}")),
         },
     }
 }
@@ -116,10 +118,7 @@ fn capture_stack_trace_impl(lua: &Lua, options: &StackTraceOptions) -> LuaResult
         // Get basic frame info
         let info_result: LuaResult<Table> = getinfo_fn.call((level, "nSluf"));
 
-        let info_table = match info_result {
-            Ok(table) => table,
-            Err(_) => break, // No more frames
-        };
+        let Ok(info_table) = info_result else { break }; // No more frames
 
         // Extract frame information
         let frame = extract_frame_info(lua, &info_table, level, options)?;
@@ -258,21 +257,21 @@ fn value_to_debug_string(value: &Value) -> String {
         Value::Boolean(b) => b.to_string(),
         Value::Integer(i) => i.to_string(),
         Value::Number(n) => n.to_string(),
-        Value::String(s) => match s.to_str() {
-            Ok(str_val) => {
+        Value::String(s) => s.to_str().map_or_else(
+            |_| "\"<invalid string>\"".to_string(),
+            |str_val| {
                 if str_val.len() > 100 {
                     format!("\"{}...\" ({})", &str_val[..97], str_val.len())
                 } else {
-                    format!("\"{}\"", str_val)
+                    format!("\"{str_val}\"")
                 }
-            }
-            Err(_) => "\"<invalid string>\"".to_string(),
-        },
+            },
+        ),
         Value::Table(_) => "table".to_string(),
         Value::Function(_) => "function".to_string(),
         Value::Thread(_) => "thread".to_string(),
         Value::UserData(_) | Value::LightUserData(_) => "userdata".to_string(),
-        Value::Error(e) => format!("error: {}", e),
+        Value::Error(e) => format!("error: {e}"),
     }
 }
 
@@ -281,7 +280,7 @@ impl StackTrace {
     #[must_use]
     pub fn format(&self) -> String {
         if let Some(error) = &self.error {
-            return format!("Stack trace error: {}", error);
+            return format!("Stack trace error: {error}");
         }
 
         if self.frames.is_empty() {
@@ -291,20 +290,19 @@ impl StackTrace {
         let mut output = String::from("Stack trace:\n");
 
         for (i, frame) in self.frames.iter().enumerate() {
-            let frame_header = if let Some(name) = &frame.name {
-                format!("  #{}: in function '{}'", i, name)
-            } else {
-                format!("  #{}: in <unknown>", i)
-            };
+            let frame_header = frame.name.as_ref().map_or_else(
+                || format!("  #{i}: in <unknown>"),
+                |name| format!("  #{i}: in function '{name}'"),
+            );
 
             output.push_str(&frame_header);
 
             // Add source information
             if let Some(source) = &frame.source {
                 if let Some(line) = frame.line {
-                    output.push_str(&format!(" ({}:{})", source, line));
+                    let _ = write!(output, " ({source}:{line})");
                 } else {
-                    output.push_str(&format!(" ({})", source));
+                    let _ = write!(output, " ({source})");
                 }
             }
 
@@ -314,7 +312,7 @@ impl StackTrace {
             if !frame.locals.is_empty() {
                 output.push_str("    Locals:\n");
                 for (name, value) in &frame.locals {
-                    output.push_str(&format!("      {} = {}\n", name, value));
+                    let _ = writeln!(output, "      {name} = {value}");
                 }
             }
 
@@ -322,19 +320,23 @@ impl StackTrace {
             if !frame.upvalues.is_empty() {
                 output.push_str("    Upvalues:\n");
                 for (name, value) in &frame.upvalues {
-                    output.push_str(&format!("      {} = {}\n", name, value));
+                    let _ = writeln!(output, "      {name} = {value}");
                 }
             }
         }
 
         if self.truncated {
-            output.push_str(&format!("  ... (truncated at {} frames)\n", self.max_depth));
+            let _ = writeln!(output, "  ... (truncated at {} frames)", self.max_depth);
         }
 
         output
     }
 
     /// Format as JSON string
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JSON serialization fails
     pub fn to_json(&self) -> Result<String, serde_json::Error> {
         serde_json::to_string_pretty(self)
     }
@@ -347,24 +349,26 @@ impl StackTrace {
 
     /// Get the topmost frame (most recent call)
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)]
     pub fn top_frame(&self) -> Option<&StackFrame> {
         self.frames.first()
     }
 }
 
 /// Create a stack trace function for Lua scripts
+///
+/// # Errors
+///
+/// Returns an error if function creation fails
 pub fn create_stacktrace_function(lua: &Lua) -> LuaResult<Function> {
     lua.create_function(|lua, options: Option<Table>| {
-        let trace_options = if let Some(opts) = options {
-            StackTraceOptions {
+        let trace_options =
+            options.map_or_else(StackTraceOptions::default, |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
                 capture_locals: opts.get("capture_locals").unwrap_or(false),
                 capture_upvalues: opts.get("capture_upvalues").unwrap_or(false),
                 include_source: opts.get("include_source").unwrap_or(true),
-            }
-        } else {
-            StackTraceOptions::default()
-        };
+            });
 
         let trace = capture_stack_trace(lua, &trace_options);
         Ok(trace.format())

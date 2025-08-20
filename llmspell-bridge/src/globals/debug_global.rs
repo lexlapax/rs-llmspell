@@ -23,7 +23,7 @@ impl DebugGlobal {
 
     /// Get the debug bridge
     #[must_use]
-    pub fn bridge(&self) -> &Arc<DebugBridge> {
+    pub const fn bridge(&self) -> &Arc<DebugBridge> {
         &self.bridge
     }
 }
@@ -48,12 +48,12 @@ impl GlobalObject for DebugGlobal {
 
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
-        crate::lua::globals::debug::inject_debug_global(lua, context, self.bridge.clone()).map_err(
-            |e| llmspell_core::LLMSpellError::Component {
+        crate::lua::globals::debug::inject_debug_global(lua, context, &self.bridge).map_err(|e| {
+            llmspell_core::LLMSpellError::Component {
                 message: format!("Failed to inject Debug global: {e}"),
                 source: None,
-            },
-        )
+            }
+        })
     }
 
     #[cfg(feature = "javascript")]

@@ -7,7 +7,8 @@ use crate::debug_bridge::DebugBridge;
 use crate::globals::GlobalContext;
 use crate::lua::object_dump::{dump_labeled_value, dump_value, DumpOptions};
 use crate::lua::stacktrace::{capture_stack_trace, StackTraceOptions};
-use mlua::{Lua, UserData, UserDataMethods, Value};
+use llmspell_utils::debug::FilterPattern;
+use mlua::{Lua, UserData, UserDataFields, UserDataMethods, Value};
 use std::sync::Arc;
 
 /// Timer handle for Lua
@@ -31,6 +32,11 @@ impl UserData for LuaTimer {
             Ok(this.bridge.elapsed_timer(&this.id))
         });
     }
+
+    fn add_fields<'lua, F: UserDataFields<'lua, Self>>(fields: &mut F) {
+        // Expose timer ID for event recording
+        fields.add_field_method_get("id", |_, this| Ok(this.id.clone()));
+    }
 }
 
 /// Inject Debug global into Lua environment
@@ -44,7 +50,7 @@ impl UserData for LuaTimer {
 pub fn inject_debug_global(
     lua: &Lua,
     _context: &GlobalContext,
-    bridge: Arc<DebugBridge>,
+    bridge: &Arc<DebugBridge>,
 ) -> mlua::Result<()> {
     let debug_table = lua.create_table()?;
 
@@ -199,26 +205,24 @@ pub fn inject_debug_global(
 
         let rules_table = lua.create_table()?;
         for (i, rule) in summary.rules.iter().enumerate() {
-            let rule_table = lua.create_table()?;
+            let rule_entry = lua.create_table()?;
 
             let (pattern_str, pattern_type) = match &rule.pattern {
-                llmspell_utils::debug::FilterPattern::Exact(p) => (p.clone(), "exact"),
-                llmspell_utils::debug::FilterPattern::Wildcard(p) => (p.clone(), "wildcard"),
-                llmspell_utils::debug::FilterPattern::Regex(p) => (p.clone(), "regex"),
-                llmspell_utils::debug::FilterPattern::Hierarchical(p) => {
-                    (p.clone(), "hierarchical")
-                }
+                FilterPattern::Exact(p) => (p.clone(), "exact"),
+                FilterPattern::Wildcard(p) => (p.clone(), "wildcard"),
+                FilterPattern::Regex(p) => (p.clone(), "regex"),
+                FilterPattern::Hierarchical(p) => (p.clone(), "hierarchical"),
             };
 
-            rule_table.set("pattern", pattern_str)?;
-            rule_table.set("pattern_type", pattern_type)?;
-            rule_table.set("enabled", rule.enabled)?;
+            rule_entry.set("pattern", pattern_str)?;
+            rule_entry.set("pattern_type", pattern_type)?;
+            rule_entry.set("enabled", rule.enabled)?;
 
             if let Some(desc) = &rule.description {
-                rule_table.set("description", desc.clone())?;
+                rule_entry.set("description", desc.clone())?;
             }
 
-            rules_table.set(i + 1, rule_table)?;
+            rules_table.set(i + 1, rule_entry)?;
         }
         table.set("rules", rules_table)?;
 
@@ -267,11 +271,10 @@ pub fn inject_debug_global(
     // Debug.dump(value, [label]) - Enhanced Lua-specific dumping
     let dump_fn = lua.create_function(move |_lua, (value, label): (Value, Option<String>)| {
         let options = DumpOptions::default();
-        if let Some(label_str) = label {
-            Ok(dump_labeled_value(&value, &label_str, &options))
-        } else {
-            Ok(dump_value(&value, &options))
-        }
+        label.map_or_else(
+            || Ok(dump_value(&value, &options)),
+            |label_str| Ok(dump_labeled_value(&value, &label_str, &options)),
+        )
     })?;
     debug_table.set("dump", dump_fn)?;
 
@@ -279,11 +282,10 @@ pub fn inject_debug_global(
     let dump_compact_fn =
         lua.create_function(move |_lua, (value, label): (Value, Option<String>)| {
             let options = DumpOptions::compact();
-            if let Some(label_str) = label {
-                Ok(dump_labeled_value(&value, &label_str, &options))
-            } else {
-                Ok(dump_value(&value, &options))
-            }
+            label.map_or_else(
+                || Ok(dump_value(&value, &options)),
+                |label_str| Ok(dump_labeled_value(&value, &label_str, &options)),
+            )
         })?;
     debug_table.set("dumpCompact", dump_compact_fn)?;
 
@@ -291,11 +293,10 @@ pub fn inject_debug_global(
     let dump_verbose_fn =
         lua.create_function(move |_lua, (value, label): (Value, Option<String>)| {
             let options = DumpOptions::verbose();
-            if let Some(label_str) = label {
-                Ok(dump_labeled_value(&value, &label_str, &options))
-            } else {
-                Ok(dump_value(&value, &options))
-            }
+            label.map_or_else(
+                || Ok(dump_value(&value, &options)),
+                |label_str| Ok(dump_labeled_value(&value, &label_str, &options)),
+            )
         })?;
     debug_table.set("dumpVerbose", dump_verbose_fn)?;
 
@@ -313,11 +314,10 @@ pub fn inject_debug_global(
                 compact_mode: options_table.get("compact_mode").unwrap_or(false),
             };
 
-            if let Some(label_str) = label {
-                Ok(dump_labeled_value(&value, &label_str, &options))
-            } else {
-                Ok(dump_value(&value, &options))
-            }
+            label.map_or_else(
+                || Ok(dump_value(&value, &options)),
+                |label_str| Ok(dump_labeled_value(&value, &label_str, &options)),
+            )
         },
     )?;
     debug_table.set("dumpWithOptions", dump_with_options_fn)?;
@@ -402,17 +402,15 @@ pub fn inject_debug_global(
     // Debug.stackTrace([options])
     let bridge_clone = bridge.clone();
     let stack_trace_fn = lua.create_function(move |lua, options: Option<mlua::Table>| {
-        let trace_options = if let Some(opts) = options {
-            StackTraceOptions {
+        let trace_options = options.map_or_else(
+            || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()),
+            |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
                 capture_locals: opts.get("capture_locals").unwrap_or(false),
                 capture_upvalues: opts.get("capture_upvalues").unwrap_or(false),
                 include_source: opts.get("include_source").unwrap_or(true),
-            }
-        } else {
-            // Use options based on current debug level
-            bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level())
-        };
+            },
+        );
 
         let trace = capture_stack_trace(lua, &trace_options);
         Ok(trace.format())
@@ -422,23 +420,21 @@ pub fn inject_debug_global(
     // Debug.stackTraceJson([options])
     let bridge_clone = bridge.clone();
     let stack_trace_json_fn = lua.create_function(move |lua, options: Option<mlua::Table>| {
-        let trace_options = if let Some(opts) = options {
-            StackTraceOptions {
+        let trace_options = options.map_or_else(
+            || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()),
+            |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
                 capture_locals: opts.get("capture_locals").unwrap_or(false),
                 capture_upvalues: opts.get("capture_upvalues").unwrap_or(false),
                 include_source: opts.get("include_source").unwrap_or(true),
-            }
-        } else {
-            bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level())
-        };
+            },
+        );
 
         let trace = capture_stack_trace(lua, &trace_options);
         match trace.to_json() {
             Ok(json) => Ok(json),
             Err(e) => Err(mlua::Error::RuntimeError(format!(
-                "JSON serialization failed: {}",
-                e
+                "JSON serialization failed: {e}"
             ))),
         }
     })?;
@@ -453,16 +449,12 @@ pub fn inject_debug_global(
 /// Convert Lua value to JSON
 fn lua_value_to_json(value: &Value) -> mlua::Result<serde_json::Value> {
     match value {
-        Value::Nil => Ok(serde_json::Value::Null),
         Value::Boolean(b) => Ok(serde_json::Value::Bool(*b)),
         Value::Integer(i) => Ok(serde_json::Value::Number((*i).into())),
-        Value::Number(n) => {
-            if let Some(num) = serde_json::Number::from_f64(*n) {
+        Value::Number(n) => serde_json::Number::from_f64(*n)
+            .map_or(Ok(serde_json::Value::Null), |num| {
                 Ok(serde_json::Value::Number(num))
-            } else {
-                Ok(serde_json::Value::Null)
-            }
-        }
+            }),
         Value::String(s) => Ok(serde_json::Value::String(s.to_str()?.to_string())),
         Value::Table(t) => {
             // Check if it's an array-like table
@@ -473,7 +465,10 @@ fn lua_value_to_json(value: &Value) -> mlua::Result<serde_json::Value> {
                 let (k, _) = pair?;
                 match k {
                     Value::Integer(i) if i > 0 => {
-                        max_index = max_index.max(i as usize);
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        {
+                            max_index = max_index.max(i as usize);
+                        }
                     }
                     _ => {
                         is_array = false;
@@ -507,15 +502,10 @@ fn json_to_lua_value<'lua>(lua: &'lua Lua, value: &serde_json::Value) -> mlua::R
     match value {
         serde_json::Value::Null => Ok(Value::Nil),
         serde_json::Value::Bool(b) => Ok(Value::Boolean(*b)),
-        serde_json::Value::Number(n) => {
-            if let Some(i) = n.as_i64() {
-                Ok(Value::Integer(i))
-            } else if let Some(f) = n.as_f64() {
-                Ok(Value::Number(f))
-            } else {
-                Ok(Value::Nil)
-            }
-        }
+        serde_json::Value::Number(n) => n.as_i64().map_or_else(
+            || n.as_f64().map_or(Ok(Value::Nil), |f| Ok(Value::Number(f))),
+            |i| Ok(Value::Integer(i)),
+        ),
         serde_json::Value::String(s) => Ok(Value::String(lua.create_string(s)?)),
         serde_json::Value::Array(arr) => {
             let table = lua.create_table()?;

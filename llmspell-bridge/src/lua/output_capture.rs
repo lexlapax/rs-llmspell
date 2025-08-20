@@ -1,4 +1,4 @@
-//! Output capture for Lua print() and other console functions
+//! Output capture for Lua `print()` and other console functions
 //!
 //! Routes Lua output through the debug infrastructure for capture and analysis.
 
@@ -64,7 +64,11 @@ impl Default for ConsoleCapture {
     }
 }
 
-/// Override Lua's print() function to capture output
+/// Override Lua's `print()` function to capture output
+///
+/// # Errors
+///
+/// Returns an error if function creation or global setting fails
 pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> {
     // Create a custom print function
     let print_fn = lua.create_function(move |_lua, args: MultiValue| {
@@ -78,8 +82,9 @@ pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> 
                 Value::Integer(i) => i.to_string(),
                 Value::Number(n) => {
                     // Format number similarly to Lua
+                    #[allow(clippy::float_cmp)]
                     if n.floor() == n && n.is_finite() {
-                        format!("{:.0}", n)
+                        format!("{n:.0}")
                     } else {
                         n.to_string()
                     }
@@ -89,7 +94,7 @@ pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> 
                 Value::Function(_) => "function".to_string(),
                 Value::Thread(_) => "thread".to_string(),
                 Value::UserData(_) | Value::LightUserData(_) => "userdata".to_string(),
-                Value::Error(e) => format!("error: {}", e),
+                Value::Error(e) => format!("error: {e}"),
             };
             output.push(str_val);
         }
@@ -101,7 +106,7 @@ pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> 
         capture.add_line(line.clone());
 
         // Also print to stdout for immediate feedback
-        println!("{}", line);
+        println!("{line}");
 
         Ok(())
     })?;
@@ -113,6 +118,10 @@ pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> 
 }
 
 /// Override other console functions (io.write, etc.)
+///
+/// # Errors
+///
+/// Returns an error if I/O function override fails
 pub fn override_io_functions(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> {
     // Get the io table
     let io_table: mlua::Table = lua.globals().get("io")?;
@@ -134,7 +143,7 @@ pub fn override_io_functions(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResu
         // io.write doesn't add newline
         if !output.is_empty() {
             capture.add_line(output.clone());
-            print!("{}", output);
+            print!("{output}");
         }
 
         // Return io.stdout as Lua does
@@ -149,15 +158,18 @@ pub fn override_io_functions(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResu
 }
 
 /// Install all output capture overrides
+///
+/// # Errors
+///
+/// Returns an error if output capture installation fails
 pub fn install_output_capture(
     lua: &Lua,
     debug_bridge: Option<Arc<DebugBridge>>,
 ) -> LuaResult<Arc<ConsoleCapture>> {
-    let capture = if let Some(bridge) = debug_bridge {
-        Arc::new(ConsoleCapture::with_debug_bridge(bridge))
-    } else {
-        Arc::new(ConsoleCapture::new())
-    };
+    let capture = debug_bridge.map_or_else(
+        || Arc::new(ConsoleCapture::new()),
+        |bridge| Arc::new(ConsoleCapture::with_debug_bridge(bridge)),
+    );
 
     override_print(lua, capture.clone())?;
     override_io_functions(lua, capture.clone())?;

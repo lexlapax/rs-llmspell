@@ -131,6 +131,7 @@ impl EnhancedModuleFilter {
     }
 
     /// Check if a module should be logged
+    #[must_use]
     pub fn should_log(&self, module: &str) -> bool {
         // First check exact matches (fastest)
         if let Some(&enabled) = self.exact_matches.get(module) {
@@ -163,6 +164,7 @@ impl EnhancedModuleFilter {
     }
 
     /// Get all current filter rules as a summary
+    #[must_use]
     pub fn get_filter_summary(&self) -> FilterSummary {
         let mut rules = Vec::new();
 
@@ -218,43 +220,44 @@ impl EnhancedModuleFilter {
         regex_pattern.push('^');
 
         while i < chars.len() {
-            match chars[i] {
-                '*' => regex_pattern.push_str(".*"),
-                '?' => regex_pattern.push('.'),
-                '[' => {
+            match chars.get(i).copied() {
+                Some('*') => regex_pattern.push_str(".*"),
+                Some('?') => regex_pattern.push('.'),
+                Some('[') => {
                     // Handle character classes
                     regex_pattern.push('[');
                     i += 1;
-                    while i < chars.len() && chars[i] != ']' {
-                        if chars[i] == '\\' {
+                    while i < chars.len() && chars.get(i) != Some(&']') {
+                        if chars.get(i) == Some(&'\\') {
                             regex_pattern.push('\\');
                             i += 1;
-                            if i < chars.len() {
-                                regex_pattern.push(chars[i]);
+                            if let Some(&escaped_char) = chars.get(i) {
+                                regex_pattern.push(escaped_char);
                             }
-                        } else {
-                            regex_pattern.push(chars[i]);
+                        } else if let Some(&ch) = chars.get(i) {
+                            regex_pattern.push(ch);
                         }
                         i += 1;
                     }
-                    if i < chars.len() {
+                    if chars.get(i) == Some(&']') {
                         regex_pattern.push(']');
                     }
                 }
-                '\\' => {
+                Some('\\') => {
                     regex_pattern.push('\\');
                     i += 1;
-                    if i < chars.len() {
-                        regex_pattern.push(chars[i]);
+                    if let Some(&escaped_char) = chars.get(i) {
+                        regex_pattern.push(escaped_char);
                     }
                 }
-                c if c.is_ascii_alphanumeric() || c == '_' || c == '-' => {
+                Some(c) if c.is_ascii_alphanumeric() || c == '_' || c == '-' => {
                     regex_pattern.push(c);
                 }
-                c => {
+                Some(c) => {
                     regex_pattern.push('\\');
                     regex_pattern.push(c);
                 }
+                None => break,
             }
             i += 1;
         }
@@ -270,8 +273,7 @@ impl EnhancedModuleFilter {
         }
 
         // Check if module starts with pattern followed by a dot
-        if module.starts_with(pattern) {
-            let remaining = &module[pattern.len()..];
+        if let Some(remaining) = module.strip_prefix(pattern) {
             remaining.starts_with('.')
         } else {
             false
@@ -317,6 +319,7 @@ impl EnhancedModuleFilter {
     }
 
     /// Get performance statistics
+    #[must_use]
     pub fn get_stats(&self) -> FilterStats {
         FilterStats {
             exact_matches: self.exact_matches.len(),
@@ -394,7 +397,7 @@ impl EnhancedModuleFilter {
     pub fn component(component: &str) -> Self {
         let mut filter = Self::new();
         filter.set_default_enabled(false);
-        filter.add_filter(&format!("{}.*", component), true);
+        filter.add_filter(&format!("{component}.*"), true);
         filter
     }
 }

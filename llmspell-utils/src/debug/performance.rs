@@ -150,7 +150,17 @@ impl PerformanceTracker {
         } else {
             let len = sorted_times.len();
             let median = sorted_times[len / 2];
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
             let p95_idx = ((len as f64) * 0.95).floor() as usize;
+            #[allow(
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss,
+                clippy::cast_precision_loss
+            )]
             let p99_idx = ((len as f64) * 0.99).floor() as usize;
             (
                 Some(median),
@@ -164,19 +174,23 @@ impl PerformanceTracker {
             (None, None)
         } else {
             let sum_nanos: u128 = lap_times.iter().map(Duration::as_nanos).sum();
+            #[allow(clippy::cast_precision_loss)]
             let mean_nanos = sum_nanos / lap_times.len() as u128;
             let mean_duration = Duration::from_nanos(u64::try_from(mean_nanos).unwrap_or(u64::MAX));
 
             // Calculate variance
+            #[allow(clippy::cast_precision_loss)]
             let variance: f64 = lap_times
                 .iter()
                 .map(|d| {
+                    #[allow(clippy::cast_precision_loss)]
                     let diff = d.as_nanos() as f64 - mean_nanos as f64;
                     diff * diff
                 })
                 .sum::<f64>()
                 / lap_times.len() as f64;
 
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
             let std_dev_duration = Duration::from_nanos(variance.sqrt() as u64);
 
             (Some(mean_duration), Some(std_dev_duration))
@@ -327,24 +341,19 @@ impl Profiler {
         let trackers = self.get_all_trackers();
 
         for tracker in trackers {
-            self.flame_graph_recursive(&tracker, &mut output, String::new());
+            Self::flame_graph_recursive(&tracker, &mut output, "");
         }
 
         output
     }
 
     /// Recursively generate flame graph entries
-    fn flame_graph_recursive(
-        &self,
-        tracker: &PerformanceTracker,
-        output: &mut String,
-        stack: String,
-    ) {
+    fn flame_graph_recursive(tracker: &PerformanceTracker, output: &mut String, stack: &str) {
         let stats = tracker.get_stats();
         let stack_name = if stack.is_empty() {
             stats.name.clone()
         } else {
-            format!("{};{}", stack, stats.name)
+            format!("{stack};{}", stats.name)
         };
 
         // Add main entry for this tracker
@@ -352,18 +361,21 @@ impl Profiler {
 
         // Add entries for each lap
         for (lap_name, duration) in &stats.laps {
-            let lap_stack = format!("{};{}", stack_name, lap_name);
+            let lap_stack = format!("{stack_name};{lap_name}");
             let _ = writeln!(output, "{} {}", lap_stack, duration.as_micros());
         }
 
         // Process children recursively
         for child in tracker.children.read().iter() {
-            self.flame_graph_recursive(child, output, stack_name.clone());
+            Self::flame_graph_recursive(child, output, &stack_name);
         }
     }
 
     /// Generate JSON performance report
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JSON serialization fails
     pub fn generate_json_report(&self) -> Result<String, serde_json::Error> {
         let report = self.generate_report();
         let now = std::time::SystemTime::now()
@@ -373,7 +385,7 @@ impl Profiler {
 
         serde_json::to_string_pretty(&JsonReport {
             version: "1.0".to_string(),
-            generated_at: format!("timestamp_{}", now),
+            generated_at: format!("timestamp_{now}"),
             summary: JsonSummary::from_report(&report),
             timings: report.timings,
         })
@@ -391,6 +403,7 @@ impl Profiler {
             .filter_map(|t| {
                 let stats = t.get_stats();
                 match (stats.memory_start, stats.memory_end) {
+                    #[allow(clippy::cast_possible_wrap)]
                     (Some(start), Some(end)) => Some(end as i64 - start as i64),
                     _ => None,
                 }
@@ -420,6 +433,7 @@ impl Profiler {
                             start_bytes: stats.memory_start,
                             end_bytes: stats.memory_end,
                             delta_bytes: match (stats.memory_start, stats.memory_end) {
+                                #[allow(clippy::cast_possible_wrap)]
                                 (Some(start), Some(end)) => Some(end as i64 - start as i64),
                                 _ => None,
                             },
@@ -502,7 +516,9 @@ impl JsonSummary {
         let total_time: Duration = report.timings.values().map(|stats| stats.total).sum();
 
         let avg_time = if total_operations > 0 {
-            total_time.as_secs_f64() * 1000.0 / total_operations as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_ops_f64 = total_operations as f64;
+            total_time.as_secs_f64() * 1000.0 / total_ops_f64
         } else {
             0.0
         };
