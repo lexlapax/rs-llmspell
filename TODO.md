@@ -1265,7 +1265,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
 
 **Implementation Steps**:
 
-**10.1: Core Rust Infrastructure Updates** (16 hours) - ARCHITECTURAL OVERHAUL:
+##### 10.1: Core Rust Infrastructure Updates** (16 hours) - ARCHITECTURAL OVERHAUL:
 
 **CRITICAL ARCHITECTURAL ISSUE**: The StepExecutor cannot execute ANY components (agents, tools, workflows) because it lacks access to the ComponentRegistry. All execution methods are mocked. WorkflowBridge HAS the registry but doesn't pass it through.
 
@@ -2096,7 +2096,162 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
  - **Cross-Storage Design**: State abstractions must work across different storage backends
  - **Backup Architecture**: Complete state capture requires dynamic scope discovery, not hardcoded lists
 
-**10.2: WebApp Creator Lua Rebuild** (8 hours):
+##### 10.2: Debug Infrastructure and hooks for script engines** (19 hours)
+
+**Problem Statement**: Script debugging is painful - no way to conditionally output debug info, no performance profiling, no stack traces, requires constant recompilation with print statements. Scripts need production-ready debugging that integrates with Rust's tracing infrastructure.
+
+**Architecture Overview**: 
+- **Centralized DebugManager**: Single Rust-native debug system that all script engines call into
+- **Configuration Hierarchy**: CLI flags → Environment variables → Config file → Runtime control
+- **Zero-cost Abstraction**: When disabled, debug calls compile to no-ops (feature flags)
+- **Script-Agnostic API**: Same Debug global works for Lua, JavaScript (Phase 5), Python (Phase 9)
+- **Thread-Safe Design**: All debug operations safe for concurrent script execution
+- **Output Flexibility**: stdout, file, buffer, JSON, with module filtering
+
+**Sub-Task 1: Core Rust Debug Infrastructure** (4 hours) - `llmspell-utils/src/debug/`
+- [ ] Create `DebugManager` with level management (Off/Error/Warn/Info/Debug/Trace)
+- [ ] Implement `DebugOutput` trait with stdout/file/buffer handlers
+- [ ] Add `PerformanceTracker` for timing operations with lap support
+- [ ] Create `DebugEntry` struct with timestamp, level, module, message, metadata
+- [ ] Implement thread-safe capture buffer for later analysis
+- **Architecture Decision**: Centralized manager ensures consistent behavior across all script engines
+- **Why**: Scripts need same debug capabilities as Rust code, but routed through single point
+
+**Sub-Task 2: Configuration Layer** (2 hours) - `llmspell-config/src/debug.rs`
+- [ ] Create `DebugConfig` struct with all debug settings
+- [ ] Add `DebugOutputConfig` for output routing (stdout/file/buffer)
+- [ ] Integrate into main `LLMSpellConfig` structure
+- [ ] Support for module filters and performance tracking flags
+- [ ] Add pretty-print and stack trace configuration options
+- **Architecture Decision**: Configuration separate from implementation for flexibility
+- **Why**: Debug settings must be controllable at multiple levels (CLI, env, config file)
+
+**Sub-Task 3: Environment Variable Support** (1 hour) - `llmspell-config/src/env_registry.rs`
+- [ ] Register `LLMSPELL_DEBUG=true/false` master switch
+- [ ] Add `LLMSPELL_DEBUG_LEVEL=trace/debug/info/warn/error/off`
+- [ ] Support `LLMSPELL_DEBUG_OUTPUT=stdout/file:/path/to/file`
+- [ ] Add `LLMSPELL_DEBUG_MODULES=module1,module2` for filtering
+- [ ] Register `LLMSPELL_DEBUG_PERFORMANCE=true/false` for profiling
+- [ ] Add `LLMSPELL_DEBUG_FORMAT=text/json/pretty` for output format
+- **Architecture Decision**: Environment variables override config file but not CLI
+- **Why**: Allows runtime debug control without modifying configs or command lines
+
+**Sub-Task 4: CLI Integration** (1 hour) - `llmspell-cli/src/cli.rs`
+- [ ] Add `--debug` flag for quick debug enable
+- [ ] Add `--debug-level <level>` for granular control
+- [ ] Support `--debug-format <format>` for output formatting
+- [ ] Add `--debug-modules <list>` for module filtering
+- [ ] Implement `--debug-perf` for performance profiling
+- [ ] Wire CLI args to DebugManager initialization in main.rs
+- **Architecture Decision**: CLI flags have highest priority in configuration hierarchy
+- **Why**: Command-line control is most immediate and visible to developers
+
+**Sub-Task 5: Script Bridge Layer** (2 hours) - `llmspell-bridge/src/debug_bridge.rs`
+- [ ] Create `DebugBridge` that wraps Rust DebugManager
+- [ ] Implement `log()` method routing to appropriate Rust level
+- [ ] Add `start_timer()` returning TimerHandle for performance tracking
+- [ ] Create `get_stacktrace()` using script engine's debug APIs
+- [ ] Implement `dump_value()` for pretty-printing any script value
+- [ ] Add memory profiling methods connecting to Rust allocator stats
+- **Architecture Decision**: Bridge pattern decouples script API from Rust implementation
+- **Why**: Allows different script engines to share same debug infrastructure
+
+**Sub-Task 6: Lua Global Implementation** (3 hours) - `llmspell-bridge/src/lua/globals/debug.rs`
+- [ ] Create Debug global with methods: trace/debug/info/warn/error
+- [ ] Implement `Debug.setLevel()` for runtime level control
+- [ ] Add `Debug.timer()` returning timer userdata object
+- [ ] Create `Debug.stacktrace()` using Lua debug library
+- [ ] Implement `Debug.dump()` for table/value inspection
+- [ ] Add `Debug.memory()` for Lua memory statistics
+- [ ] Support `Debug.setModule()` for module-scoped debugging
+- **Architecture Decision**: Debug global follows same pattern as other globals (Tool, Agent, etc.)
+- **Why**: Consistent API makes debugging feel native to the script environment
+
+**Sub-Task 7: Output Capture System** (2 hours) - `llmspell-bridge/src/lua/output_capture.rs`
+- [ ] Override Lua `print()` to route through debug system
+- [ ] Capture stdout/stderr into buffers
+- [ ] Implement line buffering with overflow protection
+- [ ] Add timestamp and module tagging to captured output
+- [ ] Fix TODO in engine.rs for console_output collection
+- [ ] Support output replay for debugging test failures
+- **Architecture Decision**: Transparent capture preserves existing print() behavior
+- **Why**: Scripts shouldn't need modification to benefit from debug infrastructure
+
+**Sub-Task 8: Performance Profiling** (2 hours) - `llmspell-utils/src/debug/profiler.rs`
+- [ ] Create `Profiler` with hierarchical timer tracking
+- [ ] Implement statistical analysis (min/max/avg/p95/p99)
+- [ ] Add memory snapshot capability
+- [ ] Create flame graph compatible output format
+- [ ] Support for marking custom events and regions
+- [ ] Generate performance reports in JSON/text formats
+- **Architecture Decision**: Profiling data stored separately from debug logs
+- **Why**: Performance data needs different retention and analysis than debug messages
+
+**Sub-Task 9: Stack Trace Collection** (1.5 hours) - `llmspell-bridge/src/lua/stacktrace.rs`
+- [ ] Use Lua debug.getinfo() for stack frames
+- [ ] Collect local variables at each frame (if trace level)
+- [ ] Include upvalues and function names
+- [ ] Format stack traces consistently with Rust backtraces
+- [ ] Add source location mapping for script files
+- [ ] Support depth limiting to avoid huge traces
+- **Architecture Decision**: Lazy collection only when errors occur or explicitly requested
+- **Why**: Stack collection is expensive, should be opt-in for performance
+
+**Sub-Task 10: Object Dumping Utilities** (1 hour) - `llmspell-utils/src/debug/dump.rs`
+- [ ] Create `Dumpable` trait for pretty-printing
+- [ ] Implement recursive table/object traversal with cycle detection
+- [ ] Add max depth and width limits
+- [ ] Support colorized output for terminals
+- [ ] Handle metatables and userdata appropriately
+- [ ] Create compact and expanded format options
+- **Architecture Decision**: Dumping logic in Rust, formatting in scripts
+- **Why**: Rust can handle cycles and limits safely, scripts control presentation
+
+**Sub-Task 11: Module-Based Filtering** (1 hour) - `llmspell-utils/src/debug/filter.rs`
+- [ ] Implement include/exclude module lists
+- [ ] Support wildcard patterns (e.g., "workflow.*")
+- [ ] Add regex pattern matching for complex filters
+- [ ] Create per-module level overrides
+- [ ] Cache filter decisions for performance
+- **Architecture Decision**: Filtering at Rust level before output
+- **Why**: Reduces noise in debug output, improves performance
+
+**Sub-Task 12: Testing & Examples** (2 hours)
+- [ ] Create `examples/debug/basic-debugging.lua` showing all debug levels
+- [ ] Add `examples/debug/performance-profiling.lua` with timer usage
+- [ ] Write `examples/debug/advanced-debugging.lua` with stack traces
+- [ ] Create unit tests for DebugManager in `llmspell-utils/tests/`
+- [ ] Add integration tests in `llmspell-bridge/tests/debug_integration_test.rs`
+- [ ] Write benchmark for debug overhead when disabled
+- **Architecture Decision**: Examples are executable documentation
+- **Why**: Developers learn by example, tests ensure reliability
+
+**Sub-Task 13: Documentation** (0.5 hours)
+- [ ] Write `docs/user-guide/debugging.md` with common scenarios
+- [ ] Create `docs/developer-guide/debug-infrastructure.md` for contributors
+- [ ] Add debug section to script examples README
+- [ ] Update CHANGELOG.md with debug features
+- **Architecture Decision**: User-facing docs separate from developer docs
+- **Why**: Different audiences need different levels of detail
+
+**Key Design Principles**:
+1. **Progressive Enhancement**: Basic print() still works, debug adds capabilities
+2. **Performance First**: Zero cost when disabled, minimal when enabled
+3. **Script Parity**: All script engines get same debug capabilities
+4. **Production Safe**: Debug calls can stay in production code
+5. **Fail Silent**: Debug system failures don't crash scripts
+
+**Dependencies**: 
+- Requires Task 7.3.10 Sub-tasks 1-4 (BaseAgent, StepExecutor) for clean integration
+- Benefits from Event system (Task 10.1 e) for debug event emission
+
+**Success Metrics**:
+- [ ] Debug overhead <1% when disabled
+- [ ] <5ms per debug call when enabled
+- [ ] Stack trace collection <10ms
+- [ ] Memory overhead <1MB for typical debug session
+
+##### 10.3: WebApp Creator Lua Rebuild** (8 hours):
 - a. [ ] **State-Based Output Collection Implementation**:
   - [ ] After workflow execution, read from state instead of result:
     ```lua
@@ -2272,7 +2427,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     end
     ```
 
-**10.3: Integration and Testing** (4 hours):
+##### 10.4: Integration and Testing** (4 hours):
 - a. [ ] **Pre-Implementation Validation** (verify existing infrastructure):
   - [ ] Check `llmspell-core/src/execution_context.rs:158` - Confirm state field exists:
     ```rust
@@ -2328,7 +2483,7 @@ Make all file system tools REQUIRE sandbox context and remove ability to create 
     test -f /tmp/test-ecommerce/README.md || echo "FAIL: No README"
     ```
 
-**10.5: Documentation and Examples** (4 hours):
+##### 10.5: Documentation and Examples** (4 hours):
 - a. [ ] **Update Configuration Documentation**:
   - [ ] Create `examples/script-users/applications/webapp-creator/CONFIG.md`:
     ```markdown
