@@ -7,6 +7,7 @@ use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::workflows::WorkflowBridge;
 use crate::ComponentRegistry;
 use llmspell_core::Result;
+use llmspell_state_persistence::StateManager;
 use std::sync::Arc;
 
 /// Workflow global object for script engines
@@ -16,10 +17,20 @@ pub struct WorkflowGlobal {
 }
 
 impl WorkflowGlobal {
-    /// Create a new Workflow global
+    /// Create a new Workflow global without state manager
     #[must_use]
     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
-        let bridge = Arc::new(WorkflowBridge::new(registry.clone()));
+        let bridge = Arc::new(WorkflowBridge::new(&registry, None));
+        Self { registry, bridge }
+    }
+
+    /// Create a new Workflow global with state manager
+    #[must_use]
+    pub fn with_state_manager(
+        registry: Arc<ComponentRegistry>,
+        state_manager: Arc<StateManager>,
+    ) -> Self {
+        let bridge = Arc::new(WorkflowBridge::new(&registry, Some(state_manager)));
         Self { registry, bridge }
     }
 

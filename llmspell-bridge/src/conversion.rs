@@ -312,58 +312,8 @@ pub struct WorkflowMetadata {
     pub extra: Option<Value>,
 }
 
-/// Transform sequential workflow result
-#[must_use]
-pub fn transform_sequential_result(
-    result: &llmspell_workflows::SequentialWorkflowResult,
-) -> ScriptWorkflowResult {
-    let metadata = WorkflowMetadata {
-        start_time: chrono::Utc::now().to_rfc3339(), // Would be better from actual result
-        end_time: chrono::Utc::now().to_rfc3339(),
-        steps_executed: Some(result.successful_steps.len() + result.failed_steps.len()),
-        steps_succeeded: Some(result.successful_steps.len()),
-        steps_failed: Some(result.failed_steps.len()),
-        extra: Some(serde_json::json!({
-            "step_results": result.successful_steps.iter().chain(result.failed_steps.iter()).map(|sr| {
-                serde_json::json!({
-                    "step_name": sr.step_name,
-                    "success": sr.success,
-                    "duration_ms": sr.duration.as_millis(),
-                    "output": sr.output,
-                    "error": sr.error,
-                })
-            }).collect::<Vec<_>>(),
-        })),
-    };
-
-    let error = if result.success {
-        None
-    } else {
-        result.error_message.as_ref().map(|e| WorkflowError {
-            error_type: "SequentialExecutionError".to_string(),
-            message: e.clone(),
-            location: result.failed_steps.first().map(|sr| sr.step_name.clone()),
-            details: None,
-        })
-    };
-
-    ScriptWorkflowResult {
-        success: result.success,
-        workflow_type: "sequential".to_string(),
-        workflow_name: result.workflow_name.clone(),
-        duration_ms: u64::try_from(result.duration.as_millis()).unwrap_or(0),
-        data: serde_json::json!({
-            "steps_executed": result.successful_steps.len() + result.failed_steps.len(),
-            "successful_steps": result.successful_steps.len(),
-            "failed_steps": result.failed_steps.len(),
-            "final_output": result.successful_steps.last()
-                .map(|sr| sr.output.clone())
-                .unwrap_or_default(),
-        }),
-        error,
-        metadata,
-    }
-}
+// REMOVED: transform_sequential_result - SequentialWorkflowResult no longer exists
+// Workflows now return AgentOutput directly through BaseAgent::execute
 
 /// Transform conditional workflow result
 #[must_use]

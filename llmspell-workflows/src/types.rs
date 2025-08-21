@@ -401,6 +401,8 @@ pub struct StepExecutionContext {
     pub is_final_retry: bool,
     /// Event emitter from parent context
     pub events: Option<Arc<dyn llmspell_core::traits::event::EventEmitter>>,
+    /// State access for persistent storage (from ExecutionContext)
+    pub state: Option<Arc<dyn llmspell_core::traits::state::StateAccess>>,
 }
 
 impl StepExecutionContext {
@@ -412,6 +414,7 @@ impl StepExecutionContext {
             retry_attempt: 0,
             is_final_retry: false,
             events: None,
+            state: None,
         }
     }
 
@@ -427,6 +430,12 @@ impl StepExecutionContext {
         events: Arc<dyn llmspell_core::traits::event::EventEmitter>,
     ) -> Self {
         self.events = Some(events);
+        self
+    }
+
+    /// Add state access to the context
+    pub fn with_state(mut self, state: Arc<dyn llmspell_core::traits::state::StateAccess>) -> Self {
+        self.state = Some(state);
         self
     }
 
@@ -487,6 +496,9 @@ impl StepExecutionContext {
 
         // Add events if provided
         ctx.events = events;
+
+        // Add state if available
+        ctx.state = self.state.clone();
 
         ctx
     }

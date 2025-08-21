@@ -270,9 +270,8 @@ pub mod monitoring;
 // Workflow modules (consolidated)
 pub mod multi_agent;
 pub mod orchestration;
-pub mod standardized_workflows;
 pub mod workflow_performance;
-pub mod workflows; // Includes WorkflowBridge and WorkflowRegistry (merged from workflow_bridge.rs and workflow_registry_bridge.rs)
+pub mod workflows; // Includes WorkflowBridge, WorkflowRegistry, and StandardizedWorkflowFactory (consolidated)
 
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]

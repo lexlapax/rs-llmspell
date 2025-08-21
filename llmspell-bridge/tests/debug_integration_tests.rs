@@ -633,7 +633,12 @@ fn test_global_debug_manager_integration() {
     let manager = global_debug_manager();
 
     // Test multiple level changes to ensure they sync properly
-    for test_level in [DebugLevel::Error, DebugLevel::Warn, DebugLevel::Info, DebugLevel::Debug] {
+    for test_level in [
+        DebugLevel::Error,
+        DebugLevel::Warn,
+        DebugLevel::Info,
+        DebugLevel::Debug,
+    ] {
         // Set level through manager
         manager.set_level(test_level);
 
@@ -642,7 +647,7 @@ fn test_global_debug_manager_integration() {
 
         // Create bridge and verify it sees the same level
         let bridge = DebugBridge::new();
-        
+
         // The bridge should see the same level as the manager
         assert_eq!(bridge.get_level(), test_level.to_string());
     }

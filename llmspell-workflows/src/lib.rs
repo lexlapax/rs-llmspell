@@ -31,7 +31,7 @@ pub use types::{
 
 pub use traits::{ErrorStrategy, StepResult, StepType, WorkflowStatus, WorkflowStep};
 
-pub use sequential::{SequentialWorkflow, SequentialWorkflowBuilder, SequentialWorkflowResult};
+pub use sequential::{SequentialWorkflow, SequentialWorkflowBuilder};
 
 pub use conditional::{
     BranchExecutionResult, ConditionalBranch, ConditionalWorkflow, ConditionalWorkflowBuilder,

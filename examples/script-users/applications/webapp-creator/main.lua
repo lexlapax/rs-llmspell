@@ -11,8 +11,8 @@
 --    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main-v2.lua
 --
 -- 2. With configuration file:
---    LLMSPELL_CONFIG=examples/script-users/applications/webapp-creator/config.toml \
---    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main-v2.lua
+--    ./target/debug/llmspell -c examples/script-users/applications/webapp-creator/config.toml \
+--     run examples/script-users/applications/webapp-creator/main-v2.lua
 --
 -- 3. Full execution with API keys:
 --    export OPENAI_API_KEY="sk-..."
@@ -105,7 +105,7 @@ print()
 -- ============================================================
 
 -- Collect workflow outputs from state (Task 10.3.a)
-function collect_workflow_outputs(workflow_id, step_names)
+function collect_workflow_outputs(workflow_id, step_names, agent_id_map)
     local outputs = {}
     
     if Debug then
@@ -113,14 +113,16 @@ function collect_workflow_outputs(workflow_id, step_names)
     end
     
     for _, step_name in ipairs(step_names) do
-        local key = string.format("workflow:%s:step:%s:output", workflow_id, step_name)
+        -- Use the actual agent ID with timestamp if available
+        local actual_agent_id = agent_id_map and agent_id_map[step_name] or step_name
+        local key = string.format("workflow:%s:agent:%s:output", workflow_id, actual_agent_id)
         local output = State.get(key)
         
         if Debug then
             if output then
-                Debug.debug("Retrieved " .. step_name .. " output", "webapp.state")
+                Debug.debug("Retrieved " .. step_name .. " output from key: " .. key, "webapp.state")
             else
-                Debug.warn("No output for " .. step_name, "webapp.state")
+                Debug.warn("No output for " .. step_name .. " at key: " .. key, "webapp.state")
             end
         end
         
@@ -158,7 +160,7 @@ print("📊 Research & Analysis Agents:")
 agents.requirements_analyst = Agent.builder()
     :name("requirements_analyst_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are a requirements analyst. Extract and structure software requirements from user input.
     Output a JSON object with: functional_requirements, non_functional_requirements, constraints, and priorities.]])
@@ -168,7 +170,7 @@ print("  1. Requirements Analyst: " .. (agents.requirements_analyst and "✓" or
 agents.ux_researcher = Agent.builder()
     :name("ux_researcher_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.4)
     :system_prompt([[You are a UX researcher. Generate user personas, user journeys, and pain points.
     Output a JSON object with: personas (array), user_journeys (array), pain_points (array).]])
@@ -178,7 +180,8 @@ print("  2. UX Researcher: " .. (agents.ux_researcher and "✓" or "✗"))
 agents.market_researcher = Agent.builder()
     :name("market_researcher_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.5)
     :system_prompt([[You are a market researcher. Analyze similar products and competitive landscape.
     Output a JSON object with: competitors (array), market_gaps, unique_value_proposition.]])
@@ -188,7 +191,7 @@ print("  3. Market Researcher: " .. (agents.market_researcher and "✓" or "✗"
 agents.tech_stack_advisor = Agent.builder()
     :name("tech_stack_advisor_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are a tech stack advisor. Recommend optimal technologies based on requirements.
     Output a JSON object with: frontend (framework, libraries), backend (language, framework), database (type, specific), devops (tools).]])
@@ -198,7 +201,8 @@ print("  4. Tech Stack Advisor: " .. (agents.tech_stack_advisor and "✓" or "�
 agents.feasibility_analyst = Agent.builder()
     :name("feasibility_analyst_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.3)
     :system_prompt([[You are a feasibility analyst. Evaluate technical feasibility and risks.
     Output a JSON object with: feasibility_score (0-100), risks (array), mitigation_strategies (array).]])
@@ -211,7 +215,7 @@ print("\n🏗️ Architecture & Design Agents:")
 agents.system_architect = Agent.builder()
     :name("system_architect_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are a system architect. Create high-level system architecture.
     Output a JSON object with: components (array), interactions (array), deployment_diagram.]])
@@ -221,7 +225,8 @@ print("  6. System Architect: " .. (agents.system_architect and "✓" or "✗"))
 agents.database_architect = Agent.builder()
     :name("database_architect_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.3)
     :system_prompt([[You are a database architect. Design database schema and relationships.
     Output SQL CREATE statements for all tables with proper relationships and indexes.]])
@@ -231,7 +236,7 @@ print("  7. Database Architect: " .. (agents.database_architect and "✓" or "�
 agents.api_designer = Agent.builder()
     :name("api_designer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are an API designer. Create RESTful or GraphQL API specifications.
     Output an OpenAPI 3.0 specification in YAML format.]])
@@ -241,7 +246,8 @@ print("  8. API Designer: " .. (agents.api_designer and "✓" or "✗"))
 agents.security_architect = Agent.builder()
     :name("security_architect_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.2)
     :system_prompt([[You are a security architect. Define security requirements and measures.
     Output a JSON object with: authentication, authorization, encryption, security_headers, owasp_compliance.]])
@@ -251,7 +257,7 @@ print("  9. Security Architect: " .. (agents.security_architect and "✓" or "�
 agents.frontend_designer = Agent.builder()
     :name("frontend_designer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.5)
     :system_prompt([[You are a frontend designer. Create UI component structure and layouts.
     Output a JSON object with: pages (array), components (array), design_system (colors, typography, spacing).]])
@@ -264,7 +270,7 @@ print("\n💻 Implementation Agents:")
 agents.backend_developer = Agent.builder()
     :name("backend_developer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are a backend developer. Generate backend server code.
     Output complete Node.js/Express server code with all routes, middleware, and database connections.]])
@@ -274,7 +280,7 @@ print("  11. Backend Developer: " .. (agents.backend_developer and "✓" or "✗
 agents.frontend_developer = Agent.builder()
     :name("frontend_developer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.4)
     :system_prompt([[You are a frontend developer. Generate React component code.
     Output complete React components with TypeScript, including App.tsx and all child components.]])
@@ -284,7 +290,8 @@ print("  12. Frontend Developer: " .. (agents.frontend_developer and "✓" or "�
 agents.database_developer = Agent.builder()
     :name("database_developer_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.2)
     :system_prompt([[You are a database developer. Create migration scripts and seed data.
     Output SQL migration files for database setup and initial data.]])
@@ -294,7 +301,7 @@ print("  13. Database Developer: " .. (agents.database_developer and "✓" or "�
 agents.api_developer = Agent.builder()
     :name("api_developer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are an API developer. Implement API endpoints based on specifications.
     Output complete API route implementations with validation and error handling.]])
@@ -304,7 +311,8 @@ print("  14. API Developer: " .. (agents.api_developer and "✓" or "✗"))
 agents.integration_developer = Agent.builder()
     :name("integration_developer_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.3)
     :system_prompt([[You are an integration developer. Connect frontend, backend, and database.
     Output integration code including API clients, data fetching hooks, and state management.]])
@@ -317,7 +325,7 @@ print("\n🚀 Quality & Deployment Agents:")
 agents.test_engineer = Agent.builder()
     :name("test_engineer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are a test engineer. Generate comprehensive test suites.
     Output Jest/Mocha test files for unit tests and Cypress tests for E2E.]])
@@ -327,7 +335,8 @@ print("  16. Test Engineer: " .. (agents.test_engineer and "✓" or "✗"))
 agents.devops_engineer = Agent.builder()
     :name("devops_engineer_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.3)
     :system_prompt([[You are a DevOps engineer. Create deployment configurations.
     Output Dockerfile, docker-compose.yml, and GitHub Actions CI/CD workflow.]])
@@ -337,7 +346,7 @@ print("  17. DevOps Engineer: " .. (agents.devops_engineer and "✓" or "✗"))
 agents.documentation_writer = Agent.builder()
     :name("documentation_writer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-3.5-turbo")
+    :model("gpt-3.5-turbo")
     :temperature(0.4)
     :system_prompt([[You are a documentation writer. Generate comprehensive README and docs.
     Output markdown documentation including setup, usage, API reference, and contributing guidelines.]])
@@ -347,7 +356,7 @@ print("  18. Documentation Writer: " .. (agents.documentation_writer and "✓" o
 agents.performance_optimizer = Agent.builder()
     :name("performance_optimizer_" .. timestamp)
     :type("llm")
-    :model("openai/gpt-4")
+    :model("gpt-4o-mini")
     :temperature(0.3)
     :system_prompt([[You are a performance optimizer. Analyze and optimize code.
     Output performance recommendations and optimized code snippets.]])
@@ -357,7 +366,8 @@ print("  19. Performance Optimizer: " .. (agents.performance_optimizer and "✓"
 agents.code_reviewer = Agent.builder()
     :name("code_reviewer_" .. timestamp)
     :type("llm")
-    :model("anthropic/claude-3-haiku-20240307")
+    :provider("anthropic")
+    :model("claude-3-haiku-20240307")
     :temperature(0.2)
     :system_prompt([[You are a code reviewer. Review generated code for quality and best practices.
     Output code review comments and improved code versions.]])
@@ -385,19 +395,18 @@ local agent_order = {
 }
 
 local agent_names = {}
+local agent_ids = {}  -- Store actual agent IDs with timestamps
 for _, name in ipairs(agent_order) do
     local agent = agents[name]
     agent_names[#agent_names + 1] = name
     
     -- The agent was created with name "name_timestamp", use that
     local agent_id = name .. "_" .. timestamp
+    agent_ids[name] = agent_id  -- Map base name to actual ID
     
     -- Add step - let Rust handle any errors
-    -- NOTE: Do not include 'type' field - parser determines type from presence of 'agent' field
-    local step_input = JSON.stringify(user_input)
-    if not step_input then
-        error("Failed to stringify user_input for step: " .. name)
-    end
+    -- Use simple text input instead of complex JSON to avoid "Agent input cannot be empty" errors
+    local step_input = user_input.requirements  -- Simple text input
     
     -- Debug: Check all values before add_step
     print(string.format("  Adding step: name='%s', agent='%s', input=%s chars", 
@@ -407,7 +416,7 @@ for _, name in ipairs(agent_order) do
         name = name,
         type = "agent",  -- Required by Lua workflow parser
         agent = agent_id,  -- Use the agent's registered name
-        input = step_input  -- Pass the full input to each agent
+        input = step_input  -- Pass simple text input to each agent
     })
 end
 
@@ -442,16 +451,40 @@ if Debug then
 end
 
 if result then
-    -- Try different possible field names for workflow ID
-    local workflow_id = result.workflow_id or result.execution_id or result.id or 
-                       (result.metadata and result.metadata.workflow_id) or
-                       "workflow_60353df9-ab06-437d-95af-9ad892834b2a"  -- Use the logged ID as fallback
+    -- Extract workflow ID from metadata
+    local workflow_id = nil
+    
+    -- Check if metadata exists and has the execution_id in extra
+    if result.metadata and type(result.metadata) == "table" then
+        if result.metadata.extra and type(result.metadata.extra) == "table" then
+            workflow_id = result.metadata.extra.execution_id or result.metadata.extra.workflow_id
+            
+            -- Also check if there are agent_outputs already collected
+            if result.metadata.extra.agent_outputs then
+                print("Agent outputs already collected in metadata")
+                -- Use the pre-collected outputs if available
+            end
+        end
+    end
+    
+    -- Fallback to other possible locations
+    if not workflow_id then
+        workflow_id = result.workflow_id or result.execution_id or result.id
+    end
     
     if workflow_id then
         print("Workflow ID: " .. workflow_id)
         
-        -- Collect all outputs
-        local outputs = collect_workflow_outputs(workflow_id, agent_names)
+        -- Collect all outputs (or use pre-collected ones from metadata)
+        local outputs = nil
+        if result.metadata and result.metadata.extra and result.metadata.extra.agent_outputs then
+            -- Use pre-collected outputs from metadata
+            outputs = result.metadata.extra.agent_outputs
+            print("Using pre-collected agent outputs from workflow metadata")
+        else
+            -- Fallback to manual collection from state
+            outputs = collect_workflow_outputs(workflow_id, agent_names, agent_ids)
+        end
         
         -- ============================================================
         -- File Generation Pipeline (Task 10.3.c)
@@ -459,10 +492,11 @@ if result then
         
         print("\n📁 Generating Project Files...\n")
         
-        -- Create project directory
+        -- Create project directory (recursive to create parent dirs)
         Tool.invoke("file_operations", {
             operation = "mkdir",
-            path = project_dir
+            path = project_dir,
+            recursive = true
         })
         
         -- Requirements and Analysis

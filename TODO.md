@@ -83,7 +83,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 #### Task 7.3.10: WebApp Creator Complete Rebuild (Production-Ready)
 **Priority**: CRITICAL - CORE ARCHITECTURE BROKEN
 **Estimated Time**: 36 hours (16h core + 8h webapp + 4h integration + 8h testing/docs)
-**Status**: IN PROGRESS (10.1 a, b, c, d, e [Sub-tasks 1-7] COMPLETED, 10.2 Debug Infrastructure COMPLETED, 10.3 JSON Removal COMPLETED)
+**Status**: IN PROGRESS (10.1 a, b, c, d, e [Sub-tasks 1-7] COMPLETED, 10.2 Debug Infrastructure COMPLETED, 10.3 JSON Removal COMPLETED, 10.4 State Sharing COMPLETED)
 **Assigned To**: Core Team (infrastructure) + Solutions Team (webapp)
 **Dependencies**: Task 7.1.7 (BaseAgent implementation), Task 7.3.8 (State-Based Workflows), Task 7.3.9 (Mandatory Sandbox)
 
@@ -102,6 +102,18 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
   - ✅ Sub-task 5: Configuration Schema - Complete EventsConfig with environment variables
   - ✅ Sub-task 6: Testing Infrastructure - TestEventCollector with comprehensive helpers
   - ✅ Sub-task 7: Migration Strategy - Full backward-compatible migration documentation
+
+- ✅ 10.4: State Sharing Between Lua and Workflows (COMPLETED):
+  - **Problem**: Workflows created separate StateManagerAdapter instances instead of using global StateManager
+  - **Root Cause**: create_execution_context_with_state() was creating new in-memory state instead of using shared state
+  - **Solution**: Pass StateManager through WorkflowBridge to ensure state sharing
+  - **Implementation**:
+    - Modified WorkflowGlobal to extract StateManager from GlobalContext
+    - Updated WorkflowBridge constructor to accept Option<Arc<StateManager>>
+    - Threaded StateManager through all workflow executors (Sequential, Parallel, Loop, Conditional)
+    - Updated create_execution_context_with_state() to accept and use shared StateManager
+    - Consolidated duplicate workflow executors from standardized_workflows.rs into workflows.rs
+  - **Result**: Lua State.set/get operations now share same state store as workflow execution
 
 
 **REGISTRY ARCHITECTURE DECISION**:

@@ -275,9 +275,16 @@ impl UserData for WorkflowInstance {
                 None,
             )?;
 
-            // Extract and store execution_id if present
-            if let Some(execution_id) = result.get("execution_id").and_then(|v| v.as_str()) {
-                *last_execution_id.write() = Some(execution_id.to_string());
+            // Extract and store execution_id if present - check metadata.extra first
+            let execution_id = result
+                .get("metadata")
+                .and_then(|m| m.get("extra"))
+                .and_then(|e| e.get("execution_id"))
+                .and_then(|v| v.as_str())
+                .or_else(|| result.get("execution_id").and_then(|v| v.as_str()));
+
+            if let Some(exec_id) = execution_id {
+                *last_execution_id.write() = Some(exec_id.to_string());
             }
 
             // Convert result to Lua table
@@ -805,9 +812,7 @@ impl UserData for WorkflowBuilder {
 
             // Create WorkflowConfig from builder settings
             let workflow_config = llmspell_workflows::WorkflowConfig {
-                max_execution_time: this
-                    .timeout_ms
-                    .map(std::time::Duration::from_millis),
+                max_execution_time: this.timeout_ms.map(std::time::Duration::from_millis),
                 default_step_timeout: std::time::Duration::from_secs(30),
                 max_retry_attempts: 3,
                 retry_delay_ms: 1000,

@@ -11,6 +11,7 @@ use super::state::{ExecutionStats, StateManager};
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, StepResult, WorkflowStatus, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
+use super::StepType;
 use async_trait::async_trait;
 use llmspell_core::{
     execution_context::ExecutionContext,
@@ -554,6 +555,8 @@ impl ConditionalWorkflow {
 
                 // Create execution context for step
                 let mut workflow_state = crate::types::WorkflowState::new();
+                // CRITICAL: Use the workflow's execution_id, not a new one!
+                workflow_state.execution_id = ComponentId::from_name(&execution_id);
                 workflow_state.shared_data = self.state_manager.get_all_shared_data().await?;
                 workflow_state.current_step = index;
                 let step_context = StepExecutionContext::new(workflow_state, None);
@@ -755,7 +758,11 @@ impl ConditionalWorkflow {
     /// Execute the workflow (legacy method for backward compatibility)
     pub async fn execute_workflow(&self) -> Result<ConditionalWorkflowResult> {
         let start_time = Instant::now();
-        info!("Starting conditional workflow: {}", self.name);
+        let execution_id = uuid::Uuid::new_v4().to_string();
+        info!(
+            "Starting conditional workflow: {} (execution: {})",
+            self.name, execution_id
+        );
 
         // Execute workflow start hooks
         if let Some(workflow_executor) = &self.workflow_executor {
@@ -888,7 +895,7 @@ impl ConditionalWorkflow {
                 }
 
                 // Execute the branch
-                let branch_result = self.execute_branch(branch, &context).await?;
+                let branch_result = self.execute_branch(branch, &context, &execution_id).await?;
                 executed_branches.push(branch_result);
 
                 // If short-circuit evaluation is enabled and we don't execute all matching branches
@@ -914,7 +921,9 @@ impl ConditionalWorkflow {
                     "No conditions matched, executing default branch: {}",
                     default_branch.name
                 );
-                let branch_result = self.execute_branch(default_branch, &context).await?;
+                let branch_result = self
+                    .execute_branch(default_branch, &context, &execution_id)
+                    .await?;
                 executed_branches.push(branch_result);
             } else {
                 warn!("No conditions matched and no default branch available");
@@ -976,6 +985,7 @@ impl ConditionalWorkflow {
         &self,
         branch: &ConditionalBranch,
         _context: &ConditionEvaluationContext,
+        execution_id: &str,
     ) -> Result<BranchExecutionResult> {
         let start_time = Instant::now();
         info!("Executing branch: {}", branch.name);
@@ -988,6 +998,8 @@ impl ConditionalWorkflow {
             // Create execution context
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = crate::types::WorkflowState::new();
+            // CRITICAL: Use the workflow's execution_id, not a new one!
+            workflow_state.execution_id = ComponentId::from_name(execution_id);
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = step_results.len();
             let execution_context = StepExecutionContext::new(workflow_state, None);
@@ -1114,9 +1126,12 @@ impl BaseAgent for ConditionalWorkflow {
         self.validate_input(&input).await?;
 
         // Check if we should use state-based execution
-        let (workflow_result, output_text) = if context.state.is_some() {
+        let (workflow_result, output_text, execution_id_for_outputs) = if context.state.is_some() {
             // Use state-based execution
             let result = self.execute_with_state(&context).await?;
+
+            // Store execution_id for output collection
+            let exec_id = result.execution_id.clone();
 
             let text = if result.success {
                 format!(
@@ -1149,7 +1164,7 @@ impl BaseAgent for ConditionalWorkflow {
                 error_message: result.error.as_ref().map(|e| e.to_string()),
             };
 
-            (legacy_result, text)
+            (legacy_result, text, Some(exec_id))
         } else {
             // Use legacy execution
             let workflow_result = self.execute_workflow().await?;
@@ -1181,7 +1196,7 @@ impl BaseAgent for ConditionalWorkflow {
                 )
             };
 
-            (workflow_result, text)
+            (workflow_result, text, None)
         };
 
         // Build AgentOutput with execution metadata
@@ -1235,6 +1250,39 @@ impl BaseAgent for ConditionalWorkflow {
             "short_circuit_evaluation".to_string(),
             serde_json::json!(self.config.short_circuit_evaluation),
         );
+
+        // Add execution_id to metadata
+        if let Some(execution_id) = &execution_id_for_outputs {
+            metadata
+                .extra
+                .insert("execution_id".to_string(), serde_json::json!(execution_id));
+            metadata
+                .extra
+                .insert("workflow_id".to_string(), serde_json::json!(execution_id));
+
+            // Collect agent outputs from state if available
+            let mut agent_outputs = serde_json::Map::new();
+            if let Some(ref state) = context.state {
+                for branch in &self.branches {
+                    for step in &branch.steps {
+                        if let StepType::Agent { agent_id, .. } = &step.step_type {
+                            let key =
+                                format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+                            if let Ok(Some(output)) = state.read(&key).await {
+                                agent_outputs.insert(agent_id.clone(), output);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !agent_outputs.is_empty() {
+                metadata.extra.insert(
+                    "agent_outputs".to_string(),
+                    serde_json::Value::Object(agent_outputs),
+                );
+            }
+        }
 
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }

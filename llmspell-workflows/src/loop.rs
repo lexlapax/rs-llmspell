@@ -9,6 +9,7 @@ use crate::{
     step_executor::StepExecutor,
     traits::{ErrorStrategy, StepResult, WorkflowStep as TraitWorkflowStep},
     types::{StepExecutionContext, WorkflowConfig, WorkflowState},
+    StepType,
 };
 use async_trait::async_trait;
 use llmspell_core::{
@@ -580,7 +581,12 @@ impl LoopWorkflow {
     }
 
     /// Execute loop body for one iteration
-    async fn execute_iteration(&self, iteration: usize, value: Value) -> Result<Vec<StepResult>> {
+    async fn execute_iteration(
+        &self,
+        iteration: usize,
+        value: Value,
+        execution_id: &str,
+    ) -> Result<Vec<StepResult>> {
         // Set loop variables
         self.state_manager
             .set_shared_data("loop_index".to_string(), Value::Number(iteration.into()))
@@ -606,6 +612,8 @@ impl LoopWorkflow {
             // Create execution context
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = WorkflowState::new();
+            // CRITICAL: Use the workflow's execution_id, not a new one!
+            workflow_state.execution_id = ComponentId::from_name(execution_id);
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = step_index;
             let context = StepExecutionContext::new(workflow_state, None);
@@ -1023,7 +1031,11 @@ impl LoopWorkflow {
     /// Execute the loop workflow
     pub async fn execute_workflow(&self) -> Result<LoopWorkflowResult> {
         let start_time = Instant::now();
-        info!("Starting loop workflow: {}", self.name);
+        let execution_id = uuid::Uuid::new_v4().to_string();
+        info!(
+            "Starting loop workflow: {} (execution: {})",
+            self.name, execution_id
+        );
 
         // Execute workflow start hooks
         if let Some(workflow_executor) = &self.workflow_executor {
@@ -1101,6 +1113,8 @@ impl LoopWorkflow {
             // Get current state
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = WorkflowState::new();
+            // CRITICAL: Use the workflow's execution_id, not a new one!
+            workflow_state.execution_id = ComponentId::from_name(&execution_id);
             workflow_state.shared_data = shared_data;
 
             // For while conditions, check if we should continue
@@ -1122,7 +1136,10 @@ impl LoopWorkflow {
             }
 
             // Execute iteration
-            match self.execute_iteration(iteration, value.clone()).await {
+            match self
+                .execute_iteration(iteration, value.clone(), &execution_id)
+                .await
+            {
                 Ok(results) => {
                     all_results.push(results);
                     completed_iterations += 1;
@@ -1271,9 +1288,12 @@ impl BaseAgent for LoopWorkflow {
         self.validate_input(&input).await?;
 
         // Check if we should use state-based execution
-        let (workflow_result, output_text) = if context.state.is_some() {
+        let (workflow_result, output_text, execution_id_for_outputs) = if context.state.is_some() {
             // Use state-based execution
             let result = self.execute_with_state(&context).await?;
+
+            // Store execution_id for output collection
+            let exec_id = result.execution_id.clone();
 
             let text = if result.success {
                 let break_info = if result.steps_skipped > 0 {
@@ -1318,7 +1338,7 @@ impl BaseAgent for LoopWorkflow {
                 error: result.error.as_ref().map(|e| e.to_string()),
             };
 
-            (legacy_result, text)
+            (legacy_result, text, Some(exec_id))
         } else {
             // Use legacy execution
             let workflow_result = self.execute_workflow().await?;
@@ -1349,7 +1369,7 @@ impl BaseAgent for LoopWorkflow {
                 )
             };
 
-            (workflow_result, text)
+            (workflow_result, text, None)
         };
 
         // Build AgentOutput with execution metadata
@@ -1436,6 +1456,36 @@ impl BaseAgent for LoopWorkflow {
             "continue_on_error".to_string(),
             serde_json::json!(self.config.continue_on_error),
         );
+
+        // Add execution_id to metadata
+        if let Some(execution_id) = &execution_id_for_outputs {
+            metadata
+                .extra
+                .insert("execution_id".to_string(), serde_json::json!(execution_id));
+            metadata
+                .extra
+                .insert("workflow_id".to_string(), serde_json::json!(execution_id));
+
+            // Collect agent outputs from state if available
+            let mut agent_outputs = serde_json::Map::new();
+            if let Some(ref state) = context.state {
+                for step in &self.config.body {
+                    if let StepType::Agent { agent_id, .. } = &step.step_type {
+                        let key = format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+                        if let Ok(Some(output)) = state.read(&key).await {
+                            agent_outputs.insert(agent_id.clone(), output);
+                        }
+                    }
+                }
+            }
+
+            if !agent_outputs.is_empty() {
+                metadata.extra.insert(
+                    "agent_outputs".to_string(),
+                    serde_json::Value::Object(agent_outputs),
+                );
+            }
+        }
 
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }

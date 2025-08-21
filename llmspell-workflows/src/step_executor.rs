@@ -649,6 +649,7 @@ impl StepExecutor {
         let agent_input = llmspell_core::types::AgentInput::text(input);
 
         // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
+        // This will preserve the state field if it was set in StepExecutionContext
         let mut exec_context = context.to_execution_context();
 
         // Override scope to Agent for this execution
@@ -664,16 +665,25 @@ impl StepExecutor {
         // Execute through BaseAgent trait
         let output = agent.execute(agent_input, exec_context.clone()).await?;
 
-        // Write output to state if state accessor is available
-        if let Some(ref state_accessor) = context.state_accessor {
+        // Write output to state if state is available in ExecutionContext
+        debug!(
+            "Checking for state in ExecutionContext: state = {:?}",
+            exec_context.state.is_some()
+        );
+        if let Some(ref state) = exec_context.state {
             let workflow_id = context.workflow_state.execution_id.to_string();
 
             // Use standardized state key functions
             let output_key = crate::types::state_keys::agent_output(&workflow_id, agent_name);
             let metadata_key = crate::types::state_keys::agent_metadata(&workflow_id, agent_name);
 
+            debug!("Writing agent output to state with key: {}", output_key);
+            debug!("Agent output text: {:?}", output.text);
+
             // Store the output in state
-            state_accessor.set(&output_key, serde_json::to_value(&output.text)?);
+            state
+                .write(&output_key, serde_json::to_value(&output.text)?)
+                .await?;
 
             // Store metadata including tool calls
             let mut metadata = output.metadata;
@@ -683,7 +693,11 @@ impl StepExecutor {
                     serde_json::to_value(&output.tool_calls)?,
                 );
             }
-            state_accessor.set(&metadata_key, serde_json::to_value(&metadata)?);
+            state
+                .write(&metadata_key, serde_json::to_value(&metadata)?)
+                .await?;
+
+            debug!("Successfully wrote agent output to state");
 
             // Emit state change event if events are available
             if let Some(ref events) = exec_context.events {
@@ -701,6 +715,8 @@ impl StepExecutor {
                         .await;
                 }
             }
+        } else {
+            debug!("No state available in ExecutionContext to write agent output");
         }
 
         Ok(output.text)

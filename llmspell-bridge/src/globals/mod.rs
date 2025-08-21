@@ -136,9 +136,19 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     };
     builder.register(Arc::new(agent_global));
 
-    builder.register(Arc::new(workflow_global::WorkflowGlobal::new(
-        context.registry.clone(),
-    )));
+    // Create workflow global with state manager if available
+    let workflow_global = context
+        .get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
+        .map_or_else(
+            || workflow_global::WorkflowGlobal::new(context.registry.clone()),
+            |state_manager| {
+                workflow_global::WorkflowGlobal::with_state_manager(
+                    context.registry.clone(),
+                    state_manager,
+                )
+            },
+        );
+    builder.register(Arc::new(workflow_global));
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 

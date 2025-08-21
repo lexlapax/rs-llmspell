@@ -9,6 +9,7 @@ use crate::{
     step_executor::StepExecutor,
     traits::{StepResult, WorkflowStep as TraitWorkflowStep},
     types::{StepExecutionContext, WorkflowConfig, WorkflowState},
+    StepType,
 };
 use async_trait::async_trait;
 use llmspell_core::{
@@ -519,6 +520,7 @@ impl ParallelWorkflow {
     }
 
     /// Execute a single branch
+    #[allow(clippy::too_many_arguments)]
     async fn execute_branch(
         branch: ParallelBranch,
         step_executor: Arc<StepExecutor>,
@@ -527,6 +529,7 @@ impl ParallelWorkflow {
         workflow_config: WorkflowConfig,
         workflow_metadata: Option<ComponentMetadata>,
         has_hooks: bool,
+        execution_id: String,
     ) -> BranchResult {
         let start_time = Instant::now();
         let branch_name = branch.name.clone();
@@ -555,6 +558,8 @@ impl ParallelWorkflow {
                 .await
                 .unwrap_or_default();
             let mut workflow_state = WorkflowState::new();
+            // CRITICAL: Use the workflow's execution_id, not a new one!
+            workflow_state.execution_id = ComponentId::from_name(&execution_id);
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = index;
             let context = StepExecutionContext::new(workflow_state, branch.timeout);
@@ -750,7 +755,9 @@ impl ParallelWorkflow {
                     }
 
                     // Execute step
-                    let workflow_state = WorkflowState::new();
+                    let mut workflow_state = WorkflowState::new();
+                    // CRITICAL: Use the workflow's execution_id, not a new one!
+                    workflow_state.execution_id = ComponentId::from_name(&exec_id);
                     let step_context = StepExecutionContext::new(workflow_state, None);
 
                     let step_result = if workflow_executor.is_some() {
@@ -968,9 +975,11 @@ impl ParallelWorkflow {
     /// Execute the parallel workflow (legacy method for backward compatibility)
     pub async fn execute_workflow(&self) -> Result<ParallelWorkflowResult> {
         let start_time = Instant::now();
+        let execution_id = uuid::Uuid::new_v4().to_string();
         info!(
-            "Starting parallel workflow: {} with {} branches",
+            "Starting parallel workflow: {} (execution: {}) with {} branches",
             self.name,
+            execution_id,
             self.branches.len()
         );
 
@@ -1044,6 +1053,7 @@ impl ParallelWorkflow {
             let fail_signal = fail_signal.clone();
             let fail_fast = self.config.fail_fast;
             let workflow_metadata = workflow_metadata.clone();
+            let execution_id = execution_id.clone();
 
             let handle = tokio::spawn(async move {
                 // Check if we should stop due to fail-fast
@@ -1068,6 +1078,7 @@ impl ParallelWorkflow {
                     workflow_config,
                     Some(workflow_metadata),
                     has_hooks,
+                    execution_id.clone(),
                 )
                 .await;
 
@@ -1227,15 +1238,18 @@ impl BaseAgent for ParallelWorkflow {
         self.validate_input(&input).await?;
 
         // Execute the workflow using state-based implementation if state is available
-        let workflow_result = if context.state.is_some() {
+        let (workflow_result, execution_id_for_outputs) = if context.state.is_some() {
             // Use new state-based execution
             let result = self.execute_with_state(&context).await?;
+
+            // Store execution_id for output collection
+            let exec_id = result.execution_id.clone();
 
             // Convert to legacy result for backward compatibility
             // This will be removed once all callers are updated
             let branch_results = vec![]; // Branch details are in state now
 
-            ParallelWorkflowResult {
+            let legacy_result = ParallelWorkflowResult {
                 workflow_name: result.workflow_name,
                 success: result.success,
                 branch_results,
@@ -1248,10 +1262,12 @@ impl BaseAgent for ParallelWorkflow {
                 failed_branches: result.steps_failed,
                 stopped_early: false,
                 error: result.error.map(|e| e.to_string()),
-            }
+            };
+
+            (legacy_result, Some(exec_id))
         } else {
             // Fall back to legacy implementation when no state is available
-            self.execute_workflow().await?
+            (self.execute_workflow().await?, None)
         };
 
         // Convert ParallelWorkflowResult to AgentOutput
@@ -1314,6 +1330,39 @@ impl BaseAgent for ParallelWorkflow {
             "fail_fast".to_string(),
             serde_json::json!(self.config.fail_fast),
         );
+
+        // Add execution_id to metadata
+        if let Some(execution_id) = &execution_id_for_outputs {
+            metadata
+                .extra
+                .insert("execution_id".to_string(), serde_json::json!(execution_id));
+            metadata
+                .extra
+                .insert("workflow_id".to_string(), serde_json::json!(execution_id));
+
+            // Collect agent outputs from state if available
+            let mut agent_outputs = serde_json::Map::new();
+            if let Some(ref state) = context.state {
+                for branch in &self.branches {
+                    for step in &branch.steps {
+                        if let StepType::Agent { agent_id, .. } = &step.step_type {
+                            let key =
+                                format!("workflow:{}:agent:{}:output", execution_id, agent_id);
+                            if let Ok(Some(output)) = state.read(&key).await {
+                                agent_outputs.insert(agent_id.clone(), output);
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !agent_outputs.is_empty() {
+                metadata.extra.insert(
+                    "agent_outputs".to_string(),
+                    serde_json::Value::Object(agent_outputs),
+                );
+            }
+        }
 
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
