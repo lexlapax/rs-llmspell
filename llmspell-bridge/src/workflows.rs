@@ -1171,19 +1171,25 @@ pub(crate) async fn create_execution_context_with_state(
     info!("Creating execution context with state support");
 
     // Use provided state manager or create in-memory one
-    let state_adapter: Arc<dyn llmspell_core::traits::state::StateAccess> = if let Some(sm) = state_manager {
-        info!("WorkflowBridge: Using StateManager at {:p} for workflow state", Arc::as_ptr(&sm));
-        // Use NoScopeStateAdapter to avoid adding "global:" prefix to workflow keys
-        Arc::new(crate::state_adapter::NoScopeStateAdapter::new(sm))
-    } else {
-        info!("No shared StateManager provided, creating in-memory adapter");
-        Arc::new(crate::state_adapter::StateManagerAdapter::in_memory()
-            .await
-            .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create state adapter: {e}"),
-                source: None,
-            })?)
-    };
+    let state_adapter: Arc<dyn llmspell_core::traits::state::StateAccess> =
+        if let Some(sm) = state_manager {
+            info!(
+                "WorkflowBridge: Using StateManager at {:p} for workflow state",
+                Arc::as_ptr(&sm)
+            );
+            // Use NoScopeStateAdapter to avoid adding "global:" prefix to workflow keys
+            Arc::new(crate::state_adapter::NoScopeStateAdapter::new(sm))
+        } else {
+            info!("No shared StateManager provided, creating in-memory adapter");
+            Arc::new(
+                crate::state_adapter::StateManagerAdapter::in_memory()
+                    .await
+                    .map_err(|e| LLMSpellError::Component {
+                        message: format!("Failed to create state adapter: {e}"),
+                        source: None,
+                    })?,
+            )
+        };
 
     let context = llmspell_core::execution_context::ExecutionContextBuilder::new()
         .state(state_adapter)
@@ -2100,7 +2106,7 @@ mod workflow_bridge_tests {
     #[tokio::test]
     async fn test_workflow_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry, None);
+        let bridge = WorkflowBridge::new(&registry, None);
 
         // Test listing workflow types
         let types = bridge.list_workflow_types();
@@ -2110,7 +2116,7 @@ mod workflow_bridge_tests {
     #[tokio::test]
     async fn test_workflow_info() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry, None);
+        let bridge = WorkflowBridge::new(&registry, None);
 
         // Test getting workflow info
         let info = bridge.get_workflow_info("sequential").unwrap();
@@ -2124,7 +2130,7 @@ mod workflow_bridge_tests {
     #[tokio::test]
     async fn test_bridge_metrics() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = WorkflowBridge::new(registry, None);
+        let bridge = WorkflowBridge::new(&registry, None);
 
         // Get initial metrics
         let metrics = bridge.get_bridge_metrics().await;

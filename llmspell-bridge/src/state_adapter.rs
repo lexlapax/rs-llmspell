@@ -309,9 +309,15 @@ impl fmt::Debug for NoScopeStateAdapter {
 impl StateAccess for NoScopeStateAdapter {
     async fn read(&self, key: &str) -> Result<Option<Value>> {
         use tracing::info;
-        info!("NoScopeStateAdapter: Reading key '{}' with Custom(\"\") scope", key);
-        info!("NoScopeStateAdapter: Full storage key will be: custom::{}", key);
-        
+        info!(
+            "NoScopeStateAdapter: Reading key '{}' with Custom(\"\") scope",
+            key
+        );
+        info!(
+            "NoScopeStateAdapter: Full storage key will be: custom::{}",
+            key
+        );
+
         // Use Custom scope with empty string - this will add "custom::" prefix
         self.state_manager
             .get(StateScope::Custom(String::new()), key)
@@ -325,9 +331,15 @@ impl StateAccess for NoScopeStateAdapter {
 
     async fn write(&self, key: &str, value: Value) -> Result<()> {
         use tracing::info;
-        info!("NoScopeStateAdapter: Writing key '{}' with Custom(\"\") scope", key);
-        info!("NoScopeStateAdapter: Full storage key will be: custom::{}", key);
-        
+        info!(
+            "NoScopeStateAdapter: Writing key '{}' with Custom(\"\") scope",
+            key
+        );
+        info!(
+            "NoScopeStateAdapter: Full storage key will be: custom::{}",
+            key
+        );
+
         // Use Custom scope with empty string to minimize prefix
         self.state_manager
             .set(StateScope::Custom(String::new()), key, value)
@@ -340,8 +352,11 @@ impl StateAccess for NoScopeStateAdapter {
     }
 
     async fn delete(&self, key: &str) -> Result<bool> {
-        debug!("NoScopeStateAdapter: Deleting key '{}' without any scope prefix", key);
-        
+        debug!(
+            "NoScopeStateAdapter: Deleting key '{}' without any scope prefix",
+            key
+        );
+
         self.state_manager
             .delete(StateScope::Custom(String::new()), key)
             .await
@@ -354,7 +369,7 @@ impl StateAccess for NoScopeStateAdapter {
 
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         debug!("NoScopeStateAdapter: Listing keys with prefix '{}'", prefix);
-        
+
         // For listing, we need to handle the scope properly
         // This is complex because we need to reconstruct the full keys
         // For now, return empty list as this is mainly used for debugging

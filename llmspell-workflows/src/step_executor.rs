@@ -651,7 +651,7 @@ impl StepExecutor {
         // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
         // This will preserve the state field if it was set in StepExecutionContext
         let mut exec_context = context.to_execution_context();
-        
+
         info!(
             "execute_agent_step: context.state before conversion: {}, exec_context.state after conversion: {}",
             context.state.is_some(),

@@ -176,14 +176,14 @@ impl SequentialWorkflow {
         // Generate ComponentId once and use it consistently
         let execution_component_id = ComponentId::new();
         let execution_id = execution_component_id.to_string();
-        
+
         // Debug: Double-check state availability
         debug!(
             "execute_with_state - State in context: {}, type: {:?}",
             context.state.is_some(),
             context.state.as_ref().map(|_| "StateAccess")
         );
-        
+
         info!(
             "Starting sequential workflow: {} (execution: {}) - State available: {}",
             self.name,
@@ -588,7 +588,7 @@ impl BaseAgent for SequentialWorkflow {
 
         // Execute workflow
         let result = self.execute_with_state(&context).await?;
-        
+
         // Build output text
         let output_text = if result.success {
             format!(
@@ -601,7 +601,11 @@ impl BaseAgent for SequentialWorkflow {
             format!(
                 "Sequential workflow '{}' failed: {}. {} steps executed, {} failed. Duration: {:?}",
                 result.workflow_name,
-                result.error.as_ref().map(|e| e.to_string()).unwrap_or_else(|| "Unknown error".to_string()),
+                result
+                    .error
+                    .as_ref()
+                    .map(|e| e.to_string())
+                    .unwrap_or_else(|| "Unknown error".to_string()),
                 result.steps_executed,
                 result.steps_failed,
                 result.duration
@@ -614,22 +618,45 @@ impl BaseAgent for SequentialWorkflow {
             execution_time_ms: Some(result.duration.as_millis() as u64),
             ..Default::default()
         };
-        
-        metadata.extra.insert("workflow_type".to_string(), serde_json::json!("sequential"));
-        metadata.extra.insert("workflow_name".to_string(), serde_json::json!(result.workflow_name));
-        metadata.extra.insert("execution_id".to_string(), serde_json::json!(result.execution_id));
-        metadata.extra.insert("workflow_id".to_string(), serde_json::json!(result.execution_id));
-        metadata.extra.insert("total_steps".to_string(), serde_json::json!(self.steps.len()));
-        metadata.extra.insert("successful_steps".to_string(), serde_json::json!(result.steps_executed - result.steps_failed));
-        metadata.extra.insert("failed_steps".to_string(), serde_json::json!(result.steps_failed));
-        
+
+        metadata
+            .extra
+            .insert("workflow_type".to_string(), serde_json::json!("sequential"));
+        metadata.extra.insert(
+            "workflow_name".to_string(),
+            serde_json::json!(result.workflow_name),
+        );
+        metadata.extra.insert(
+            "execution_id".to_string(),
+            serde_json::json!(result.execution_id),
+        );
+        metadata.extra.insert(
+            "workflow_id".to_string(),
+            serde_json::json!(result.execution_id),
+        );
+        metadata.extra.insert(
+            "total_steps".to_string(),
+            serde_json::json!(self.steps.len()),
+        );
+        metadata.extra.insert(
+            "successful_steps".to_string(),
+            serde_json::json!(result.steps_executed - result.steps_failed),
+        );
+        metadata.extra.insert(
+            "failed_steps".to_string(),
+            serde_json::json!(result.steps_failed),
+        );
+
         #[allow(clippy::cast_precision_loss)]
         let success_rate = if result.steps_executed > 0 {
-            ((result.steps_executed - result.steps_failed) as f64 / result.steps_executed as f64) * 100.0
-        } else { 
-            0.0 
+            ((result.steps_executed - result.steps_failed) as f64 / result.steps_executed as f64)
+                * 100.0
+        } else {
+            0.0
         };
-        metadata.extra.insert("success_rate".to_string(), serde_json::json!(success_rate));
+        metadata
+            .extra
+            .insert("success_rate".to_string(), serde_json::json!(success_rate));
 
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
@@ -844,7 +871,7 @@ mod tests {
             },
         );
 
-        let workflow = SequentialWorkflow::builder("test_workflow".to_string())
+        let _workflow = SequentialWorkflow::builder("test_workflow".to_string())
             .add_step(step)
             .with_error_strategy(ErrorStrategy::Continue)
             .build();
@@ -870,7 +897,7 @@ mod tests {
             },
         );
 
-        let workflow = SequentialWorkflow::builder("test_workflow".to_string())
+        let _workflow = SequentialWorkflow::builder("test_workflow".to_string())
             .add_step(step1)
             .add_step(step2)
             .build();
@@ -897,7 +924,7 @@ mod tests {
             },
         );
 
-        let workflow = SequentialWorkflow::builder("test_workflow".to_string())
+        let _workflow = SequentialWorkflow::builder("test_workflow".to_string())
             .add_step(step1)
             .add_step(step2)
             .with_error_strategy(ErrorStrategy::FailFast)
@@ -933,7 +960,7 @@ mod tests {
             },
         );
 
-        let workflow = SequentialWorkflow::builder("test_workflow".to_string())
+        let _workflow = SequentialWorkflow::builder("test_workflow".to_string())
             .add_step(step1)
             .add_step(step2)
             .add_step(step3)

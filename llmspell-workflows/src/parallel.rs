@@ -1057,7 +1057,7 @@ impl ParallelWorkflow {
             let fail_signal = fail_signal.clone();
             let fail_fast = self.config.fail_fast;
             let workflow_metadata = workflow_metadata.clone();
-            let execution_id = execution_id.clone();
+            let _execution_id = execution_id.clone();
 
             let handle = tokio::spawn(async move {
                 // Check if we should stop due to fail-fast

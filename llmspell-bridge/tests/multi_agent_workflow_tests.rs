@@ -86,7 +86,7 @@ async fn test_multi_agent_integration() {
     use std::sync::Arc;
 
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(registry);
+    let bridge = WorkflowBridge::new(&registry, None);
 
     // Create a simple pipeline workflow through the bridge
     let _params = json!({

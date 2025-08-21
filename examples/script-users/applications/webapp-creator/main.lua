@@ -116,7 +116,8 @@ function collect_workflow_outputs(workflow_id, step_names, agent_id_map)
         -- Use the actual agent ID with timestamp if available
         local actual_agent_id = agent_id_map and agent_id_map[step_name] or step_name
         local key = string.format("workflow:%s:agent:%s:output", workflow_id, actual_agent_id)
-        local output = State.get(key)
+        -- Use State.load with "custom" scope and colon prefix
+        local output = State.load("custom", ":" .. key)
         
         if Debug then
             if output then
@@ -217,8 +218,10 @@ agents.system_architect = Agent.builder()
     :type("llm")
     :model("gpt-4o-mini")
     :temperature(0.3)
-    :system_prompt([[You are a system architect. Create high-level system architecture.
-    Output a JSON object with: components (array), interactions (array), deployment_diagram.]])
+    :max_tokens(1200)
+    :system_prompt([[You are a system architect. Create SIMPLE system architecture.
+    Output a JSON object with: components (5 max), interactions (5 max).
+    Keep descriptions under 10 words each. Be concise.]])
     :build()
 print("  6. System Architect: " .. (agents.system_architect and "✓" or "✗"))
 
@@ -227,9 +230,12 @@ agents.database_architect = Agent.builder()
     :type("llm")
     :provider("anthropic")
     :model("claude-3-haiku-20240307")
-    :temperature(0.3)
-    :system_prompt([[You are a database architect. Design database schema and relationships.
-    Output SQL CREATE statements for all tables with proper relationships and indexes.]])
+    :temperature(0.2)
+    :max_tokens(1500)
+    :system_prompt([[You are a database architect. Generate SIMPLE SQL schema.
+    Output ONLY CREATE TABLE statements for 4 core tables.
+    Include: users, products, orders, order_items.
+    Keep it concise. No explanations.]])
     :build()
 print("  7. Database Architect: " .. (agents.database_architect and "✓" or "✗"))
 
@@ -238,8 +244,10 @@ agents.api_designer = Agent.builder()
     :type("llm")
     :model("gpt-4o-mini")
     :temperature(0.3)
-    :system_prompt([[You are an API designer. Create RESTful or GraphQL API specifications.
-    Output an OpenAPI 3.0 specification in YAML format.]])
+    :max_tokens(1200)
+    :system_prompt([[You are an API designer. Create SIMPLE API endpoints.
+    Output a JSON object with 5 REST endpoints: path, method, description.
+    Keep it under 20 lines. No OpenAPI, just simple JSON.]])
     :build()
 print("  8. API Designer: " .. (agents.api_designer and "✓" or "✗"))
 
@@ -249,8 +257,10 @@ agents.security_architect = Agent.builder()
     :provider("anthropic")
     :model("claude-3-haiku-20240307")
     :temperature(0.2)
-    :system_prompt([[You are a security architect. Define security requirements and measures.
-    Output a JSON object with: authentication, authorization, encryption, security_headers, owasp_compliance.]])
+    :max_tokens(800)
+    :system_prompt([[You are a security architect. List 5 security measures.
+    Output a JSON object with: measures (array of {type, description}).
+    Keep each description under 15 words. Be specific.]])
     :build()
 print("  9. Security Architect: " .. (agents.security_architect and "✓" or "✗"))
 
@@ -258,9 +268,11 @@ agents.frontend_designer = Agent.builder()
     :name("frontend_designer_" .. timestamp)
     :type("llm")
     :model("gpt-4o-mini")
-    :temperature(0.5)
-    :system_prompt([[You are a frontend designer. Create UI component structure and layouts.
-    Output a JSON object with: pages (array), components (array), design_system (colors, typography, spacing).]])
+    :temperature(0.4)
+    :max_tokens(1000)
+    :system_prompt([[You are a frontend designer. List UI components.
+    Output a JSON object with: pages (5 max), components (10 max).
+    Keep names simple, no descriptions. Be concise.]])
     :build()
 print("  10. Frontend Designer: " .. (agents.frontend_designer and "✓" or "✗"))
 
@@ -272,8 +284,10 @@ agents.backend_developer = Agent.builder()
     :type("llm")
     :model("gpt-4o-mini")
     :temperature(0.3)
-    :system_prompt([[You are a backend developer. Generate backend server code.
-    Output complete Node.js/Express server code with all routes, middleware, and database connections.]])
+    :max_tokens(1800)
+    :system_prompt([[You are a backend developer. Generate SIMPLE Express server.
+    Output ONLY basic server.js with 5 routes and MongoDB connection.
+    Keep it under 60 lines. No explanations, just code.]])
     :build()
 print("  11. Backend Developer: " .. (agents.backend_developer and "✓" or "✗"))
 
@@ -303,19 +317,24 @@ agents.api_developer = Agent.builder()
     :type("llm")
     :model("gpt-4o-mini")
     :temperature(0.3)
-    :system_prompt([[You are an API developer. Implement API endpoints based on specifications.
-    Output complete API route implementations with validation and error handling.]])
+    :max_tokens(1000)
+    :system_prompt([[You are an API developer. Generate SIMPLE Express.js route definitions.
+    Output ONLY JavaScript code for 5 basic REST endpoints.
+    Include: GET /products, POST /cart, POST /checkout, GET /orders.
+    Keep it under 50 lines. No explanations.]])
     :build()
 print("  14. API Developer: " .. (agents.api_developer and "✓" or "✗"))
 
 agents.integration_developer = Agent.builder()
     :name("integration_developer_" .. timestamp)
     :type("llm")
-    :provider("anthropic")
-    :model("claude-3-haiku-20240307")
+    :model("gpt-4o-mini")
     :temperature(0.3)
-    :system_prompt([[You are an integration developer. Connect frontend, backend, and database.
-    Output integration code including API clients, data fetching hooks, and state management.]])
+    :max_tokens(800)
+    :system_prompt([[You are an integration developer. Write SIMPLE connection code.
+    Output ONLY code to connect frontend to backend API.
+    Include: axios setup, 3 API call functions.
+    Keep it under 30 lines. No explanations.]])
     :build()
 print("  15. Integration Developer: " .. (agents.integration_developer and "✓" or "✗"))
 

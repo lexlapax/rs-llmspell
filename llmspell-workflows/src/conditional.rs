@@ -899,7 +899,9 @@ impl ConditionalWorkflow {
                 }
 
                 // Execute the branch
-                let branch_result = self.execute_branch(branch, &context, execution_component_id).await?;
+                let branch_result = self
+                    .execute_branch(branch, &context, execution_component_id)
+                    .await?;
                 executed_branches.push(branch_result);
 
                 // If short-circuit evaluation is enabled and we don't execute all matching branches

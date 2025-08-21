@@ -6,9 +6,7 @@
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use llmspell_core::{error::LLMSpellError, traits::state::StateAccess};
 use llmspell_state_persistence::{
-    migration::MigrationEngine,
-    schema::{SchemaRegistry, SemanticVersion},
-    StateManager, StateScope,
+    migration::MigrationEngine, schema::SchemaRegistry, StateManager, StateScope,
 };
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -110,7 +108,10 @@ impl StateGlobal {
     ) -> Self {
         // Use StateManagerAdapter with Custom scope for StateGlobal
         // This allows reading keys that were written by NoScopeStateAdapter
-        tracing::info!("StateGlobal: Creating StateManagerAdapter with StateManager at {:p}", Arc::as_ptr(&state_manager));
+        tracing::info!(
+            "StateGlobal: Creating StateManagerAdapter with StateManager at {:p}",
+            Arc::as_ptr(&state_manager)
+        );
         let state_access: Arc<dyn StateAccess> =
             Arc::new(crate::state_adapter::StateManagerAdapter::new(
                 state_manager.clone(),
@@ -186,11 +187,12 @@ impl GlobalObject for StateGlobal {
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
         // Delegate to the inject_state_global function in lua/globals/state.rs
-        crate::lua::globals::state::inject_state_global(lua, context, self)
-            .map_err(|e| LLMSpellError::Component {
+        crate::lua::globals::state::inject_state_global(lua, context, self).map_err(|e| {
+            LLMSpellError::Component {
                 message: format!("Failed to inject State global: {e}"),
                 source: None,
-            })
+            }
+        })
     }
     #[cfg(feature = "javascript")]
     fn inject_javascript(
