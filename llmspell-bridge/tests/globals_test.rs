@@ -550,46 +550,48 @@ mod lua_globals {
         injector.inject_lua(&lua, &context)?;
 
         // Test State global functions (in-memory implementation)
+        // Note: State API uses save/load with scope parameter, not set/get
         lua.load(
             r#"
-            -- Test State.set() and State.get()
-            State.set("test_key", "test_value")
-            local value = State.get("test_key")
-            assert(value == "test_value", "State.get() should return stored value")
+            -- Test State.save() and State.load() with scope
+            State.save("global", "test_key", "test_value")
+            local value = State.load("global", "test_key")
+            assert(value == "test_value", "State.load() should return stored value")
             
             -- Test complex data
-            State.set("complex", {
+            State.save("global", "complex", {
                 name = "test",
                 count = 42,
                 nested = {
                     flag = true
                 }
             })
-            local complex = State.get("complex")
+            local complex = State.load("global", "complex")
             assert(complex.name == "test", "Complex state name incorrect")
             assert(complex.count == 42, "Complex state count incorrect")
             assert(complex.nested.flag == true, "Complex state nested flag incorrect")
             
-            -- Test State.list()
-            local keys = State.list()
-            assert(type(keys) == "table", "State.list() should return a table")
+            -- Test State.list_keys()
+            local keys = State.list_keys("global")
+            assert(type(keys) == "table", "State.list_keys() should return a table")
             local found_test_key = false
             local found_complex = false
             for _, key in ipairs(keys) do
-                if key == "test_key" then found_test_key = true end
-                if key == "complex" then found_complex = true end
+                -- Keys may include scope prefix
+                if key:find("test_key") then found_test_key = true end
+                if key:find("complex") then found_complex = true end
             end
-            assert(found_test_key, "State.list() should include test_key")
-            assert(found_complex, "State.list() should include complex")
+            assert(found_test_key, "State.list_keys() should include test_key")
+            assert(found_complex, "State.list_keys() should include complex")
             
             -- Test State.delete()
-            State.delete("test_key")
-            value = State.get("test_key")
-            assert(value == nil, "State.get() should return nil after delete")
+            State.delete("global", "test_key")
+            value = State.load("global", "test_key")
+            assert(value == nil, "State.load() should return nil after delete")
             
             -- Test non-existent key
-            value = State.get("non_existent")
-            assert(value == nil, "State.get() should return nil for non-existent key")
+            value = State.load("global", "non_existent")
+            assert(value == nil, "State.load() should return nil for non-existent key")
         "#,
         )
         .exec()

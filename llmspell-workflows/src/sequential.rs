@@ -640,7 +640,7 @@ impl BaseAgent for SequentialWorkflow {
         );
         metadata.extra.insert(
             "successful_steps".to_string(),
-            serde_json::json!(result.steps_executed - result.steps_failed),
+            serde_json::json!(result.steps_executed.saturating_sub(result.steps_failed)),
         );
         metadata.extra.insert(
             "failed_steps".to_string(),
@@ -871,7 +871,7 @@ mod tests {
             },
         );
 
-        let _workflow = SequentialWorkflow::builder("test_workflow".to_string())
+        let workflow = SequentialWorkflow::builder("test_workflow".to_string())
             .add_step(step)
             .with_error_strategy(ErrorStrategy::Continue)
             .build();

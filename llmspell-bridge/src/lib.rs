@@ -268,7 +268,6 @@ pub mod agents;
 pub mod monitoring;
 
 // Workflow modules (consolidated)
-pub mod multi_agent;
 pub mod orchestration;
 pub mod workflow_performance;
 pub mod workflows; // Includes WorkflowBridge, WorkflowRegistry, and StandardizedWorkflowFactory (consolidated)

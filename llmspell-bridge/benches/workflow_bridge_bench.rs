@@ -16,7 +16,7 @@ use tokio::runtime::Runtime;
 fn benchmark_workflow_creation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(registry);
+    let bridge = WorkflowBridge::new(&registry, None);
 
     c.bench_function("workflow_creation_sequential", |b| {
         b.iter(|| {
@@ -85,7 +85,7 @@ fn benchmark_workflow_creation(c: &mut Criterion) {
 fn benchmark_workflow_discovery(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(registry);
+    let bridge = WorkflowBridge::new(&registry, None);
 
     c.bench_function("list_workflow_types", |b| {
         b.iter(|| {
@@ -130,7 +130,7 @@ fn benchmark_parameter_conversion(c: &mut Criterion) {
 fn benchmark_workflow_execution(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(registry);
+    let bridge = WorkflowBridge::new(&registry, None);
 
     // For now, benchmark workflow creation and metadata operations
     // Actual execution requires registry threading (TODO 7.3.10)
@@ -170,7 +170,7 @@ fn benchmark_workflow_execution(c: &mut Criterion) {
 fn benchmark_bridge_overhead(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let registry = Arc::new(ComponentRegistry::new());
-    let bridge = WorkflowBridge::new(registry);
+    let bridge = WorkflowBridge::new(&registry, None);
 
     // Measure overhead of bridge operations
     c.bench_function("bridge_overhead_metadata_ops", |b| {
@@ -389,7 +389,7 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                     local workflow = Workflow.sequential({
                         name = "bench_complete",
                         steps = {
-                            {name = "step1", type = "function", tool = "test_func", input = {data = "test"}}
+                            {name = "step1", type = "tool", tool = "test_func", input = {data = "test"}}
                         }
                     });
                     local info = workflow:get_info();
