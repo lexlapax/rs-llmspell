@@ -191,20 +191,7 @@ impl SequentialWorkflow {
             context.state.is_some()
         );
 
-        // Emit workflow started event
-        if let Some(ref events) = context.events {
-            let _ = events
-                .emit(
-                    "workflow.started",
-                    serde_json::json!({
-                        "workflow_id": execution_id,
-                        "workflow_name": self.name,
-                        "workflow_type": "sequential",
-                        "total_steps": self.steps.len(),
-                    }),
-                )
-                .await;
-        }
+        // Note: workflow.started event is now emitted by execute_with_events() wrapper
 
         // Execute workflow start hooks
         if let Some(workflow_executor) = &self.workflow_executor {
@@ -237,23 +224,7 @@ impl SequentialWorkflow {
                 error!("Workflow '{}' exceeded maximum execution time", self.name);
                 self.state_manager.complete_execution(false).await?;
 
-                // Emit workflow failed event
-                if let Some(ref events) = context.events {
-                    let _ = events
-                        .emit(
-                            "workflow.failed",
-                            serde_json::json!({
-                                "workflow_id": execution_id,
-                                "workflow_name": self.name,
-                                "workflow_type": "sequential",
-                                "error": "timeout",
-                                "duration_ms": start_time.elapsed().as_millis(),
-                                "steps_executed": steps_executed,
-                                "steps_failed": steps_failed,
-                            }),
-                        )
-                        .await;
-                }
+                // Note: workflow.failed event is now emitted by execute_with_events() wrapper
 
                 return Ok(WorkflowResult::failure(
                     execution_id,
@@ -374,24 +345,7 @@ impl SequentialWorkflow {
                         warn!("Stopping workflow '{}' due to step failure", self.name);
                         self.state_manager.complete_execution(false).await?;
 
-                        // Emit workflow failed event
-                        if let Some(ref events) = context.events {
-                            let _ = events
-                                .emit(
-                                    "workflow.failed",
-                                    serde_json::json!({
-                                        "workflow_id": execution_id,
-                                        "workflow_name": self.name,
-                                        "workflow_type": "sequential",
-                                        "error": "step_failed",
-                                        "failed_step": step.name,
-                                        "duration_ms": start_time.elapsed().as_millis(),
-                                        "steps_executed": steps_executed,
-                                        "steps_failed": steps_failed,
-                                    }),
-                                )
-                                .await;
-                        }
+                        // Note: workflow.failed event is now emitted by execute_with_events() wrapper
 
                         return Ok(WorkflowResult::failure(
                             execution_id,
@@ -432,24 +386,7 @@ impl SequentialWorkflow {
                             );
                             self.state_manager.complete_execution(false).await?;
 
-                            // Emit workflow failed event
-                            if let Some(ref events) = context.events {
-                                let _ = events
-                                    .emit(
-                                        "workflow.failed",
-                                        serde_json::json!({
-                                            "workflow_id": execution_id,
-                                            "workflow_name": self.name,
-                                            "workflow_type": "sequential",
-                                            "error": "step_failed",
-                                            "failed_step": step.name,
-                                            "duration_ms": start_time.elapsed().as_millis(),
-                                            "steps_executed": steps_executed,
-                                            "steps_failed": steps_failed,
-                                        }),
-                                    )
-                                    .await;
-                            }
+                            // Note: workflow.failed event is now emitted by execute_with_events() wrapper
 
                             return Ok(WorkflowResult::failure(
                                 execution_id,
@@ -474,24 +411,7 @@ impl SequentialWorkflow {
         let duration = start_time.elapsed();
         self.state_manager.complete_execution(true).await?;
 
-        // Emit workflow completed event
-        if let Some(ref events) = context.events {
-            let _ = events
-                .emit(
-                    "workflow.completed",
-                    serde_json::json!({
-                        "workflow_id": execution_id,
-                        "workflow_name": self.name,
-                        "workflow_type": "sequential",
-                        "duration_ms": duration.as_millis(),
-                        "steps_executed": steps_executed,
-                        "steps_failed": steps_failed,
-                        "steps_skipped": steps_skipped,
-                        "state_keys": state_keys.len(),
-                    }),
-                )
-                .await;
-        }
+        // Note: workflow.completed event is now emitted by execute_with_events() wrapper
 
         // Execute workflow completion hooks
         if let Some(workflow_executor) = &self.workflow_executor {

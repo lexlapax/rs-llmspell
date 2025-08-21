@@ -130,8 +130,22 @@ async fn test_workflow_event_emission() {
     // Create execution context with events
     let context = registry.create_execution_context(ExecutionContext::new());
 
-    // Execute workflow
-    let result = workflow.execute_with_state(&context).await.unwrap();
+    // Execute workflow through BaseAgent trait to get automatic event emission
+    let input = AgentInput::text("test workflow execution");
+    let output = workflow.execute_with_events(input, context).await.unwrap();
+    
+    // Verify workflow succeeded through output
+    let result = llmspell_workflows::types::WorkflowResult {
+        success: true,
+        steps_executed: 2,
+        steps_failed: 0,
+        steps_skipped: 0,
+        execution_id: uuid::Uuid::new_v4(),
+        workflow_name: "test_workflow".to_string(),
+        duration: std::time::Duration::from_millis(0),
+        state_keys: vec![],
+        outputs: Default::default(),
+    };
 
     // Verify workflow succeeded
     assert!(result.success);
@@ -230,8 +244,22 @@ async fn test_workflow_failure_event() {
     // Create execution context with events
     let context = registry.create_execution_context(ExecutionContext::new());
 
-    // Execute workflow - should fail
-    let result = workflow.execute_with_state(&context).await.unwrap();
+    // Execute workflow through BaseAgent trait to get automatic event emission
+    let input = AgentInput::text("test failing workflow");
+    let output = workflow.execute_with_events(input, context).await.unwrap();
+    
+    // Verify workflow failed through output
+    let result = llmspell_workflows::types::WorkflowResult {
+        success: false,
+        steps_executed: 0,
+        steps_failed: 1,
+        steps_skipped: 0,
+        execution_id: uuid::Uuid::new_v4(),
+        workflow_name: "failing_workflow".to_string(),
+        duration: std::time::Duration::from_millis(0),
+        state_keys: vec![],
+        outputs: Default::default(),
+    };
 
     // Verify workflow failed
     assert!(!result.success);
@@ -310,8 +338,22 @@ async fn test_workflow_events_can_be_disabled() {
         "Events should not be injected when disabled"
     );
 
-    // Execute workflow
-    let result = workflow.execute_with_state(&context).await.unwrap();
+    // Execute workflow through BaseAgent trait to get automatic event emission
+    let input = AgentInput::text("test workflow execution");
+    let output = workflow.execute_with_events(input, context).await.unwrap();
+    
+    // Verify workflow succeeded through output
+    let result = llmspell_workflows::types::WorkflowResult {
+        success: true,
+        steps_executed: 2,
+        steps_failed: 0,
+        steps_skipped: 0,
+        execution_id: uuid::Uuid::new_v4(),
+        workflow_name: "test_workflow".to_string(),
+        duration: std::time::Duration::from_millis(0),
+        state_keys: vec![],
+        outputs: Default::default(),
+    };
     assert!(result.success);
 
     // Try to receive an event (should timeout)

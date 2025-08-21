@@ -523,8 +523,8 @@ impl StepExecutor {
         // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
         let exec_context = context.to_execution_context();
 
-        // Execute through BaseAgent trait
-        let output = tool.execute(agent_input, exec_context).await?;
+        // Execute through BaseAgent trait with automatic event emission
+        let output = tool.execute_with_events(agent_input, exec_context).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
@@ -668,8 +668,8 @@ impl StepExecutor {
             exec_context.session_id = Some(context.workflow_state.execution_id.to_string());
         }
 
-        // Execute through BaseAgent trait
-        let output = agent.execute(agent_input, exec_context.clone()).await?;
+        // Execute through BaseAgent trait with automatic event emission
+        let output = agent.execute_with_events(agent_input, exec_context.clone()).await?;
 
         // Write output to state if state is available in ExecutionContext
         info!(
@@ -867,8 +867,8 @@ impl StepExecutor {
             llmspell_core::execution_context::InheritancePolicy::Inherit,
         );
 
-        // Execute through BaseAgent trait
-        let output = workflow.execute(agent_input, exec_context).await?;
+        // Execute through BaseAgent trait with automatic event emission
+        let output = workflow.execute_with_events(agent_input, exec_context).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {

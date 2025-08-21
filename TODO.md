@@ -1738,77 +1738,187 @@ All architectural changes in 10.1-10.4 broke numerous tests:
 **Conclusion**: TODO was outdated - feature already working correctly
 
 ##### 10.6: Event Emission Consolidation and Streamlining** (3 hours):
-**Priority**: HIGH - Architectural Debt & Code Duplication
-**Status**: TODO
-**Problem**: Duplicate event emission code across components; inconsistent patterns
-**Discovery**: BaseAgent has execute_with_events() but nothing uses it; workflows manually emit duplicates
+**Priority**: HIGH - Architectural Debt & Multiple Execution Paths
+**Status**: IN PROGRESS
+**Problem**: Three execution paths when there should be ONE
+**Discovery**: Workflows have execute(), execute_with_events(), AND execute_with_state() - architectural mess!
+
+**CRITICAL INSIGHT** (discovered during implementation):
+- We created the exact problem we were trying to solve - multiple execution paths!
+- ExecutionContext ALREADY has both state AND events as Option fields
+- Current chain: execute_with_events() → execute() → execute_with_state()
+- Tests bypass the chain by calling execute_with_state() directly
+- **Result**: Can't get both state AND events reliably
 
 **Current State Analysis**:
-- **BaseAgent trait** has execute_with_events() that wraps execute() and emits start/complete/failed
-- **Tools/Agents**: Don't emit events (good!), but not getting them because StepExecutor calls execute()
-- **Workflows**: Manually emit duplicate events that execute_with_events would handle
-- **StepExecutor**: Calls execute() directly, missing BaseAgent's event wrapper
-- **Result**: Duplicate code, inconsistent events, 0% usage of execute_with_events
+- **execute()**: BaseAgent method that just delegates to execute_with_state()
+- **execute_with_events()**: Wrapper that adds events, calls execute()
+- **execute_with_state()**: Workflow-specific public method that does actual work
+- **Problem**: Three public methods, unclear which to call, bypasses possible
 
-**Consolidation Plan (REMOVAL & STREAMLINING)**:
+**FINAL Consolidation Plan (TRUE SINGLE EXECUTION PATH)**:
 
-- [ ] **Phase 1: Switch to execute_with_events** (30 min):
-  - [ ] Change StepExecutor to call execute_with_events() instead of execute():
-    - `step_executor.rs:527` - tool.execute() → tool.execute_with_events()
-    - `step_executor.rs:672` - agent.execute() → agent.execute_with_events()
-    - `step_executor.rs:871` - workflow.execute() → workflow.execute_with_events()
-  - [ ] Update WorkflowExecutor implementations in bridge:
-    - `workflows.rs:1051,1084,1115,1146` - workflow.execute() → workflow.execute_with_events()
-  - **Impact**: All components get consistent start/complete/failed events automatically
+**Scope Analysis**:
+- 110 BaseAgent implementations across 85 files
+- 4 workflows, 80+ tools, multiple agents, test mocks
+- Thousands of test calls to various execute methods
 
-- [ ] **Phase 2: Remove Duplicate Events from Workflows** (45 min):
-  - [ ] **Sequential** (sequential.rs): Remove 5 manual emissions of workflow.started/completed/failed
-    - Lines ~198, ~244, ~381, ~439, ~475 - DELETE these event blocks
-    - Keep only workflow-specific events (step progress, state changes)
-  - [ ] **Parallel** (parallel.rs): Ensure no duplicate start/complete/failed
-    - Add ONLY branch-specific events: branch.started, branch.completed, branch.failed
-  - [ ] **Loop** (loop.rs): Ensure no duplicate start/complete/failed
-    - Add ONLY iteration-specific events: iteration.started, iteration.completed, break.condition
-  - [ ] **Conditional** (conditional.rs): Ensure no duplicate start/complete/failed
-    - Add ONLY condition-specific events: condition.evaluated, branch.selected
+- [x] **Phase 1: Discovery** ✅ COMPLETED:
+  - [x] Attempted execute_with_events() approach
+  - **Discovery**: Three execution paths (execute, execute_with_events, execute_with_state)
+  - **Root Problem**: ExecutionContext has both state AND events, but multiple paths prevent using both
 
-- [ ] **Phase 3: Standardize Event Patterns** (45 min):
-  - [ ] Create workflow-specific event helper functions to avoid duplication:
+- [ ] **Phase 2: BaseAgent Trait Refactoring** (1 hour):
+  - [ ] **Step 1**: Modify BaseAgent trait in llmspell-core:
     ```rust
-    // In each workflow file, single helper for workflow-specific events only
-    fn emit_branch_event(&self, branch_name: &str, status: &str, context: &ExecutionContext)
-    fn emit_iteration_event(&self, iteration: usize, status: &str, context: &ExecutionContext)
-    fn emit_condition_event(&self, result: bool, branch: &str, context: &ExecutionContext)
+    trait BaseAgent {
+        // ONE public method that handles everything
+        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+            // 1. Emit start event if context.events.is_some()
+            // 2. Call self.execute_impl(input, context)
+            // 3. Emit complete/failed event if context.events.is_some()
+        }
+        
+        // Components implement this protected method
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+    }
     ```
-  - [ ] Ensure consistent metadata in all events (component_id, correlation_id, timing)
+  - [ ] **Step 2**: Delete execute_with_events() from trait entirely
+  - [ ] **Step 3**: Update default implementations for validate_input, handle_error
 
-- [ ] **Phase 4: Testing & Verification** (1 hour):
-  - [ ] Update existing tests to expect execute_with_events patterns
-  - [ ] Verify no duplicate events in test output
-  - [ ] Add test that ALL components emit events when execute_with_events is called
-  - [ ] Test event filtering still works with consolidated approach
+- [ ] **Phase 3: Update All Components** (2 hours):
+  - [ ] **Workflows** (4 files):
+    - [ ] sequential.rs: Rename execute() to execute_impl(), merge execute_with_state() logic, delete execute_with_state()
+    - [ ] parallel.rs: Same refactoring, add branch-specific events only
+    - [ ] loop.rs: Same refactoring, add iteration-specific events only
+    - [ ] conditional.rs: Same refactoring, add condition-specific events only
+  - [ ] **Tools** (~80 files in llmspell-tools):
+    - [ ] Bulk rename: execute() → execute_impl() (sed script)
+    - [ ] Verify no manual event emission (grep check)
+    - [ ] No execute_with_state to remove (tools don't have it)
+  - [ ] **Agents** (~10 files in llmspell-agents):
+    - [ ] Rename execute() → execute_impl()
+    - [ ] Remove any manual event emission
+    - [ ] Update any delegation patterns
 
-**Benefits of This Approach**:
-1. **REMOVES ~200 lines** of duplicate event emission code
-2. **CONSOLIDATES** event logic in one place (BaseAgent trait)
-3. **ENSURES** 100% consistent events across all components
-4. **SIMPLIFIES** maintenance - one place to update event format
-5. **ENABLES** event emission for all tools/agents automatically
+- [ ] **Phase 4: Update All Callers** (1 hour):
+  - [ ] **StepExecutor**: Change all calls back to just execute() (revert Phase 1)
+  - [ ] **WorkflowBridge**: Change all calls back to just execute() (revert Phase 1)
+  - [ ] **Tests** (massive scope):
+    - [ ] Find all execute_with_state() calls → change to execute()
+    - [ ] Find all execute_with_events() calls → change to execute()
+    - [ ] Update expectations for automatic event emission
+  - [ ] **Examples**: Update any example code
 
-**Event Hierarchy After Consolidation**:
+- [ ] **Phase 5: Verification** (30 min):
+  - [ ] Run full test suite
+  - [ ] Verify events are emitted for all components
+  - [ ] Verify state operations still work
+  - [ ] Check clippy for any new warnings
+  - [ ] Document the new single-path architecture
+
+**Phase 6: Code Removal Metrics**:
+- [ ] **Expected Removals**:
+  - [ ] ~200 lines from execute_with_events() method in BaseAgent trait
+  - [ ] ~300 lines from execute_with_state() in each workflow (4 × 300 = 1200 lines)
+  - [ ] ~100 lines of duplicate event emission across workflows
+  - [ ] ~50 lines of test helper functions for execute_with_state
+  - [ ] **Total Expected Removal: ~1,550 lines**
+
+**Implementation Commands & Scripts**:
+```bash
+# Phase 3 Tools Bulk Update:
+find llmspell-tools/src -name "*.rs" -type f | while read file; do
+    sed -i 's/async fn execute(/async fn execute_impl(/g' "$file"
+done
+
+# Phase 3 Agents Bulk Update:
+find llmspell-agents/src -name "*.rs" -type f | while read file; do
+    sed -i 's/async fn execute(/async fn execute_impl(/g' "$file"
+done
+
+# Phase 4 Test Updates:
+# Find all execute_with_state calls:
+rg "execute_with_state\(" --type rust | wc -l  # Count them first
+rg "execute_with_state\(" --type rust -l | while read file; do
+    sed -i 's/\.execute_with_state(/\.execute(/g' "$file"
+done
+
+# Find all execute_with_events calls:
+rg "execute_with_events\(" --type rust | wc -l  # Count them first
+rg "execute_with_events\(" --type rust -l | while read file; do
+    sed -i 's/\.execute_with_events(/\.execute(/g' "$file"
+done
 ```
-BaseAgent.execute_with_events():
-  → {component_type}.started (automatic via trait)
-  → workflow.step.started (StepExecutor)
-    → {specific workflow events} (branch/iteration/condition)
-  → workflow.step.completed (StepExecutor)
-  → {component_type}.completed (automatic via trait)
-```
 
-**Code Removal Targets**:
-- Sequential: ~50 lines of manual event emission
-- StepExecutor: Possibly consolidate step events with BaseAgent events
-- Total estimated removal: 150-200 lines
+**Specific File Checklist**:
+- [ ] **Core Trait** (llmspell-core/src/traits/base_agent.rs):
+  - [ ] Line 90-120: Change execute() to provided method with event logic
+  - [ ] Line 121: Add execute_impl() as required method
+  - [ ] Line 221-299: DELETE execute_with_events() entirely
+  - [ ] Update trait docs to explain single execution path
+
+- [ ] **Workflows to Update**:
+  - [ ] llmspell-workflows/src/sequential.rs:
+    - [ ] Line 174-474: Move execute_with_state() body to execute_impl()
+    - [ ] Line 499: Rename execute() to execute_impl()
+    - [ ] Line 510: Remove call to execute_with_state()
+    - [ ] Delete execute_with_state() method entirely
+  - [ ] llmspell-workflows/src/parallel.rs: Same pattern
+  - [ ] llmspell-workflows/src/loop.rs: Same pattern
+  - [ ] llmspell-workflows/src/conditional.rs: Same pattern
+
+- [ ] **Bridge Updates**:
+  - [ ] llmspell-bridge/src/workflows.rs:
+    - [ ] Lines 1051, 1084, 1115, 1146: Revert to execute()
+  - [ ] llmspell-workflows/src/step_executor.rs:
+    - [ ] Lines 527, 672, 871: Revert to execute()
+
+- [ ] **Test File Updates** (high impact):
+  - [ ] llmspell-bridge/tests/workflow_event_integration_test.rs
+  - [ ] llmspell-bridge/tests/lua_workflow_api_tests.rs
+  - [ ] llmspell-workflows/tests/*.rs
+  - [ ] llmspell-agents/tests/*.rs
+  - [ ] llmspell-tools/tests/*.rs
+
+**Validation Checklist**:
+- [ ] No more execute_with_state in codebase: `rg "execute_with_state" --type rust` returns 0
+- [ ] No more execute_with_events in codebase: `rg "execute_with_events" --type rust` returns 0
+- [ ] All tests pass: `cargo test --workspace`
+- [ ] No clippy warnings: `cargo clippy --workspace --all-features`
+- [ ] Event emission verified: Run workflow_event_integration_test specifically
+- [ ] State operations verified: Run state persistence tests
+**Architectural Benefits After Consolidation**:
+1. **Single Source of Truth**: ONE execute() method, context determines behavior
+2. **No Bypassing**: Can't skip events or state by calling wrong method
+3. **Consistent Behavior**: All 110 components work identically
+4. **Less Code**: ~1,550 lines removed, easier to maintain
+5. **Clear Contract**: Components implement execute_impl(), framework handles orchestration
+6. **Future Proof**: New cross-cutting concerns (metrics, tracing) add to ONE place
+
+**Problems This Solves**:
+- **Current Bug**: Tests get state OR events, not both
+- **Confusion**: Which method to call? execute()? execute_with_events()? execute_with_state()?
+- **Inconsistency**: Some components emit events, some don't
+- **Duplication**: Event emission code repeated in workflows
+- **Fragility**: Easy to break by calling wrong method
+
+**Implementation Order (Critical Path)**:
+1. FIRST: Update BaseAgent trait (breaks everything, that's OK)
+2. THEN: Update all implementations (mechanical change)
+3. THEN: Update all callers (revert Phase 1 changes)
+4. FINALLY: Update tests (largest scope)
+5. VERIFY: Run full test suite, fix any issues
+
+**Success Criteria**:
+- [ ] `rg "execute_with_state" --type rust` returns 0 results
+- [ ] `rg "execute_with_events" --type rust` returns 0 results  
+- [ ] `cargo test --workspace` passes
+- [ ] `cargo clippy --workspace --all-features` has no warnings
+- [ ] Line count reduction >= 1,500 lines
+- [ ] All 110 BaseAgent implementations use execute_impl()
+- [ ] Events and state work together in same execution
+
 
 ##### 10.7: Integration and Testing** (4 hours):
 - a. [ ] **Pre-Implementation Validation** (verify existing infrastructure):
