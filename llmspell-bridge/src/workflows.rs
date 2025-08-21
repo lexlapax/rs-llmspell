@@ -1171,24 +1171,22 @@ pub(crate) async fn create_execution_context_with_state(
     info!("Creating execution context with state support");
 
     // Use provided state manager or create in-memory one
-    let state_adapter = if let Some(sm) = state_manager {
-        info!("Using provided shared StateManager for workflow state");
-        crate::state_adapter::StateManagerAdapter::new(
-            sm,
-            llmspell_state_persistence::StateScope::Global,
-        )
+    let state_adapter: Arc<dyn llmspell_core::traits::state::StateAccess> = if let Some(sm) = state_manager {
+        info!("WorkflowBridge: Using StateManager at {:p} for workflow state", Arc::as_ptr(&sm));
+        // Use NoScopeStateAdapter to avoid adding "global:" prefix to workflow keys
+        Arc::new(crate::state_adapter::NoScopeStateAdapter::new(sm))
     } else {
         info!("No shared StateManager provided, creating in-memory adapter");
-        crate::state_adapter::StateManagerAdapter::in_memory()
+        Arc::new(crate::state_adapter::StateManagerAdapter::in_memory()
             .await
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to create state adapter: {e}"),
                 source: None,
-            })?
+            })?)
     };
 
     let context = llmspell_core::execution_context::ExecutionContextBuilder::new()
-        .state(Arc::new(state_adapter))
+        .state(state_adapter)
         .build();
 
     info!(

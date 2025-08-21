@@ -529,7 +529,7 @@ impl ParallelWorkflow {
         workflow_config: WorkflowConfig,
         workflow_metadata: Option<ComponentMetadata>,
         has_hooks: bool,
-        execution_id: String,
+        execution_component_id: ComponentId,
     ) -> BranchResult {
         let start_time = Instant::now();
         let branch_name = branch.name.clone();
@@ -558,8 +558,8 @@ impl ParallelWorkflow {
                 .await
                 .unwrap_or_default();
             let mut workflow_state = WorkflowState::new();
-            // CRITICAL: Use the workflow's execution_id, not a new one!
-            workflow_state.execution_id = ComponentId::from_name(&execution_id);
+            // CRITICAL: Use the workflow's execution_component_id, not a new one!
+            workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = index;
             let context = StepExecutionContext::new(workflow_state, branch.timeout);
@@ -669,7 +669,9 @@ impl ParallelWorkflow {
     /// Returns only metadata in the WorkflowResult.
     pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
         let start_time = Instant::now();
-        let execution_id = uuid::Uuid::new_v4().to_string();
+        // Generate ComponentId once and use it consistently
+        let execution_component_id = ComponentId::new();
+        let execution_id = execution_component_id.to_string();
         info!(
             "Starting parallel workflow: {} (execution: {}) with {} branches",
             self.name,
@@ -756,8 +758,8 @@ impl ParallelWorkflow {
 
                     // Execute step
                     let mut workflow_state = WorkflowState::new();
-                    // CRITICAL: Use the workflow's execution_id, not a new one!
-                    workflow_state.execution_id = ComponentId::from_name(&exec_id);
+                    // CRITICAL: Use the workflow's execution_component_id, not a new one!
+                    workflow_state.execution_id = execution_component_id;
                     let step_context = StepExecutionContext::new(workflow_state, None);
 
                     let step_result = if workflow_executor.is_some() {
@@ -975,7 +977,9 @@ impl ParallelWorkflow {
     /// Execute the parallel workflow (legacy method for backward compatibility)
     pub async fn execute_workflow(&self) -> Result<ParallelWorkflowResult> {
         let start_time = Instant::now();
-        let execution_id = uuid::Uuid::new_v4().to_string();
+        // Generate ComponentId once and use it consistently
+        let execution_component_id = ComponentId::new();
+        let execution_id = execution_component_id.to_string();
         info!(
             "Starting parallel workflow: {} (execution: {}) with {} branches",
             self.name,
@@ -1078,7 +1082,7 @@ impl ParallelWorkflow {
                     workflow_config,
                     Some(workflow_metadata),
                     has_hooks,
-                    execution_id.clone(),
+                    execution_component_id,
                 )
                 .await;
 

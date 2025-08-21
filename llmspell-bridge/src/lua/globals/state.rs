@@ -21,15 +21,18 @@ fn create_save_handler(
         let full_key = format!("{scope_str}:{key}");
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.write(&full_key, json_value).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let key_clone = full_key.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "state_save",
+                async move { state_clone.write(&key_clone, json_value).await },
+                None,
+            );
 
             match result {
                 Ok(()) => Ok(()),
-                Err(e) => Err(LuaError::RuntimeError(format!("State save error: {e}"))),
+                Err(e) => Err(e),
             }
         } else {
             let mut state = fallback_state.write();
@@ -45,19 +48,33 @@ fn create_load_handler(
     fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 ) -> impl Fn(&Lua, (String, String)) -> mlua::Result<Value> {
     move |lua, (scope_str, key): (String, String)| {
+        // For custom scope with workflow keys, construct the key properly
+        // The StateAccess will add its own prefix, so we just pass the key part
+        let actual_key = if scope_str == "custom" && key.starts_with(":") {
+            // Remove leading colon for custom::workflow keys
+            key[1..].to_string()
+        } else {
+            key.clone()
+        };
+        
         let full_key = format!("{scope_str}:{key}");
+        tracing::info!("Lua State.load: scope='{}', key='{}', actual_key='{}', full_key='{}'", scope_str, key, actual_key, full_key);
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.read(&full_key).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            // Pass the actual_key which will get the Custom("") prefix from StateManagerAdapter
+            let state_clone = state.clone();
+            let key_clone = actual_key.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "state_load",
+                async move { state_clone.read(&key_clone).await },
+                None,
+            );
 
             match result {
                 Ok(Some(value)) => json_to_lua_value(lua, &value),
                 Ok(None) => Ok(Value::Nil),
-                Err(e) => Err(LuaError::RuntimeError(format!("State load error: {e}"))),
+                Err(e) => Err(e),
             }
         } else {
             let state = fallback_state.read();
@@ -77,11 +94,14 @@ fn create_delete_handler(
         let full_key = format!("{scope_str}:{key}");
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.delete(&full_key).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let key_clone = full_key.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "state_delete",
+                async move { state_clone.delete(&key_clone).await },
+                None,
+            );
 
             match result {
                 Ok(_) => Ok(()),
@@ -103,11 +123,14 @@ fn create_list_keys_handler(
     move |lua, scope_str: String| {
         if let Some(state) = &state_access {
             let prefix = format!("{scope_str}:");
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.list_keys(&prefix).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let prefix_clone = prefix.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "state_list_keys",
+                async move { state_clone.list_keys(&prefix_clone).await },
+                None,
+            );
 
             match result {
                 Ok(keys) => {
@@ -147,11 +170,14 @@ fn create_workflow_get_handler(
         let key = format!("workflow:{workflow_id}:{step_name}");
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.read(&key).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let key_clone = key.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "workflow_get",
+                async move { state_clone.read(&key_clone).await },
+                None,
+            );
 
             match result {
                 Ok(Some(value)) => json_to_lua_value(lua, &value),
@@ -176,11 +202,14 @@ fn create_workflow_list_handler(
         let prefix = format!("workflow:{workflow_id}:");
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.list_keys(&prefix).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let prefix_clone = prefix.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "workflow_list",
+                async move { state_clone.list_keys(&prefix_clone).await },
+                None,
+            );
 
             match result {
                 Ok(keys) => {
@@ -220,11 +249,14 @@ fn create_agent_get_handler(
         let full_key = format!("agent:{agent_id}:{key}");
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.read(&full_key).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let key_clone = full_key.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "agent_get",
+                async move { state_clone.read(&key_clone).await },
+                None,
+            );
 
             match result {
                 Ok(Some(value)) => json_to_lua_value(lua, &value),
@@ -250,11 +282,15 @@ fn create_agent_set_handler(
         let json_value = lua_value_to_json(value)?;
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.write(&full_key, json_value).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let key_clone = full_key.clone();
+            let value_clone = json_value.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "agent_set",
+                async move { state_clone.write(&key_clone, value_clone).await },
+                None,
+            );
 
             match result {
                 Ok(()) => Ok(()),
@@ -277,11 +313,14 @@ fn create_tool_get_handler(
         let full_key = format!("tool:{tool_id}:{key}");
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.read(&full_key).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let key_clone = full_key.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "agent_get",
+                async move { state_clone.read(&key_clone).await },
+                None,
+            );
 
             match result {
                 Ok(Some(value)) => json_to_lua_value(lua, &value),
@@ -307,11 +346,15 @@ fn create_tool_set_handler(
         let json_value = lua_value_to_json(value)?;
 
         if let Some(state) = &state_access {
-            let runtime = tokio::runtime::Handle::try_current()
-                .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
-
-            let result = runtime.block_on(async { state.write(&full_key, json_value).await });
+            // Use block_on_async utility for proper async-to-sync conversion
+            let state_clone = state.clone();
+            let key_clone = full_key.clone();
+            let value_clone = json_value.clone();
+            let result = crate::lua::sync_utils::block_on_async(
+                "agent_set",
+                async move { state_clone.write(&key_clone, value_clone).await },
+                None,
+            );
 
             match result {
                 Ok(()) => Ok(()),
@@ -337,9 +380,6 @@ fn setup_migration_methods(
     let migrate_engine = migration_engine.clone();
     let migrate_registry = schema_registry.clone();
     let migrate_fn = lua.create_function(move |lua, target_version: String| {
-        let runtime = tokio::runtime::Handle::try_current()
-            .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-            .map_err(|e| mlua::Error::RuntimeError(format!("No tokio runtime: {e}")))?;
 
         // Parse semantic version
         let target_ver: llmspell_state_persistence::schema::SemanticVersion =
@@ -373,11 +413,18 @@ fn setup_migration_methods(
             rollback_on_error: true,
         };
 
-        let result = runtime.block_on(async {
-            migrate_engine
-                .migrate(&current_ver, &target_ver, migration_config)
-                .await
-        });
+        let engine_clone = migrate_engine.clone();
+        let current_ver_clone = current_ver.clone();
+        let target_ver_clone = target_ver.clone();
+        let result = crate::lua::sync_utils::block_on_async(
+            "state_migrate",
+            async move {
+                engine_clone
+                    .migrate(&current_ver_clone, &target_ver_clone, migration_config)
+                    .await
+            },
+            Some(std::time::Duration::from_secs(300)),
+        );
 
         match result {
             Ok(migration_result) => {
@@ -577,12 +624,15 @@ pub fn inject_state_global(
     _context: &GlobalContext,
     state_global: &StateGlobal,
 ) -> mlua::Result<()> {
+    tracing::info!("inject_state_global called");
     let state_table = lua.create_table()?;
 
     // Clone references for the closures
     let state_access = state_global.state_access.clone();
     let _state_manager = state_global.state_manager.clone(); // Keep for migration/backup features
     let fallback_state = state_global.fallback_state.clone();
+    
+    tracing::info!("inject_state_global: state_access is_some: {}", state_access.is_some());
 
     // Basic operations
     state_table.set(

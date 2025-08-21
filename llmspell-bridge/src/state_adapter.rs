@@ -283,6 +283,85 @@ impl Default for StateManagerAdapterBuilder {
     }
 }
 
+/// A no-prefix adapter that passes keys through without any scope prefix
+/// Used for workflow state where keys already contain the full path
+#[derive(Clone)]
+pub struct NoScopeStateAdapter {
+    state_manager: Arc<StateManager>,
+}
+
+impl NoScopeStateAdapter {
+    /// Create a new no-scope adapter
+    pub const fn new(state_manager: Arc<StateManager>) -> Self {
+        Self { state_manager }
+    }
+}
+
+impl fmt::Debug for NoScopeStateAdapter {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("NoScopeStateAdapter")
+            .field("state_manager", &"Arc<StateManager>")
+            .finish()
+    }
+}
+
+#[async_trait]
+impl StateAccess for NoScopeStateAdapter {
+    async fn read(&self, key: &str) -> Result<Option<Value>> {
+        use tracing::info;
+        info!("NoScopeStateAdapter: Reading key '{}' with Custom(\"\") scope", key);
+        info!("NoScopeStateAdapter: Full storage key will be: custom::{}", key);
+        
+        // Use Custom scope with empty string - this will add "custom::" prefix
+        self.state_manager
+            .get(StateScope::Custom(String::new()), key)
+            .await
+            .map_err(|e| LLMSpellError::Storage {
+                message: format!("Failed to read state: {e}"),
+                operation: Some("read".to_string()),
+                source: None,
+            })
+    }
+
+    async fn write(&self, key: &str, value: Value) -> Result<()> {
+        use tracing::info;
+        info!("NoScopeStateAdapter: Writing key '{}' with Custom(\"\") scope", key);
+        info!("NoScopeStateAdapter: Full storage key will be: custom::{}", key);
+        
+        // Use Custom scope with empty string to minimize prefix
+        self.state_manager
+            .set(StateScope::Custom(String::new()), key, value)
+            .await
+            .map_err(|e| LLMSpellError::Storage {
+                message: format!("Failed to write state: {e}"),
+                operation: Some("write".to_string()),
+                source: None,
+            })
+    }
+
+    async fn delete(&self, key: &str) -> Result<bool> {
+        debug!("NoScopeStateAdapter: Deleting key '{}' without any scope prefix", key);
+        
+        self.state_manager
+            .delete(StateScope::Custom(String::new()), key)
+            .await
+            .map_err(|e| LLMSpellError::Storage {
+                message: format!("Failed to delete state: {e}"),
+                operation: Some("delete".to_string()),
+                source: None,
+            })
+    }
+
+    async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
+        debug!("NoScopeStateAdapter: Listing keys with prefix '{}'", prefix);
+        
+        // For listing, we need to handle the scope properly
+        // This is complex because we need to reconstruct the full keys
+        // For now, return empty list as this is mainly used for debugging
+        Ok(Vec::new())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

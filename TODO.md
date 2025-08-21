@@ -1226,7 +1226,37 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 
 **🚀 Ready for Production Use**: Scripts can now leverage professional debugging tools including hierarchical logging, performance profiling, module filtering, object inspection, and comprehensive diagnostics.
 
-##### 10.3: WebApp Creator Lua Rebuild** (8 hours): ✅ COMPLETED (2025-08-20)
+##### 10.3: WebApp Creator Lua Rebuild** (8 hours): ✅ COMPLETED (2025-08-21)
+
+**CRITICAL STATE SHARING FIX** ✅ COMPLETED (2025-08-21):
+- **Problem**: Agent outputs weren't being captured in state for file generation
+- **Root Cause Analysis**:
+  1. Workflows created separate StateManagerAdapter instances instead of using global StateManager
+  2. StateGlobal and WorkflowGlobal weren't sharing the same StateManager instance
+  3. State keys were being double-prefixed (custom::custom::)
+  4. Runtime panics from improper async-to-sync conversion
+  5. Massive code duplication in StateGlobal (600+ lines)
+- **Solution Implementation**:
+  1. **Created NoScopeStateAdapter** (`llmspell-bridge/src/state_adapter.rs`):
+     - Uses StateScope::Custom("") to avoid double-prefixing
+     - Ensures keys are prefixed only once as "custom::{key}"
+  2. **Fixed State Sharing** (`llmspell-bridge/src/workflows.rs`):
+     - Modified WorkflowGlobal to extract StateManager from GlobalContext
+     - Updated WorkflowBridge constructor to accept Option<Arc<StateManager>>
+     - Threaded StateManager through all workflow executors (Sequential, Parallel, Loop, Conditional)
+     - Fixed create_execution_context_with_state() to use shared StateManager
+  3. **Code Simplification** (following "no backward compatibility" directive):
+     - Removed 600+ lines of duplicate code from StateGlobal
+     - Delegated to inject_state_global function
+     - Removed SequentialWorkflowResult abstraction
+     - Removed unused execute_workflow() function
+     - Fixed ComponentId generation consistency
+     - Removed unused execution_id parameters throughout codebase
+  4. **Fixed Runtime Panics** (`llmspell-bridge/src/lua/globals/state.rs`):
+     - Used block_on_async utility instead of Handle::current().block_on()
+     - Properly handles async-to-sync conversion in Lua context
+- **Result**: Agent outputs now properly captured in state and accessible from Lua
+- **Verification**: test-file-gen.lua successfully generates HTML files from agent output
 
 **JSON REMOVAL ARCHITECTURE REFACTORING** ✅ COMPLETED (2025-08-20):
 - **Problem Identified**: Unnecessary JSON serialization for internal Rust-to-script communication
@@ -1234,7 +1264,6 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 - **Architecture Decision**: Remove ALL JSON usage for internal translation between Rust and script engines
 - **Clippy Warnings Fixed**: Fixed all 14 categories of clippy warnings systematically for cleaner code
 - **Test Failures Resolved**: Fixed loop workflow, debug manager, and streaming tests
-- **WebApp Creator Validation**: Successfully validated webapp-creator works with real LLM calls
 - **Implementation**:
   1. **Workflows**: ✅ Removed JSON-based workflow creation functions
      - Removed `WorkflowFactory` struct with JSON-based `create_workflow` method
@@ -1249,14 +1278,19 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 - **Result**: Less code, better type safety, improved performance
 - **Key Insight**: JSON is for external boundaries (scripts↔Rust), not internal Rust communication
 
-**WEBAPP-CREATOR VALIDATION RESULTS** ✅ COMPLETED (2025-08-20):
-- **Successfully executes all 20 agents** with real LLM API calls (OpenAI GPT-4, Anthropic Claude)
+**WEBAPP-CREATOR VALIDATION RESULTS** ✅ COMPLETED (2025-08-21):
+- **Successfully executes all 20 agents** with real LLM API calls (OpenAI GPT-4o-mini, Anthropic Claude)
 - **Workflow execution time**: ~4 minutes for complete pipeline (vs mock 262ms before)
 - **Fixed issues**:
+  - Model name errors - Changed from "openai/gpt-4" to "gpt-4o-mini"
+  - State sharing - Workflows now use global StateManager instance
   - "Workflow input text cannot be empty" - Added proper input format with "text" field
   - File access violations - Configured absolute paths in allowed_paths
   - Simplified from 1459 lines (main.lua) to 467 lines (main-v2.lua)
-- **Remaining issue**: Agent outputs not captured in State (needs investigation)
+- **Working Features**:
+  - Agent outputs properly captured in state
+  - File generation from state working
+  - State accessible via Lua State.load("custom", ":workflow:...") pattern
 
 - a. [x] **State-Based Output Collection Implementation** ✅ COMPLETED:
   - [x] After workflow execution, read from state instead of result ✅

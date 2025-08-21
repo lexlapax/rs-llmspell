@@ -585,7 +585,7 @@ impl LoopWorkflow {
         &self,
         iteration: usize,
         value: Value,
-        execution_id: &str,
+        execution_component_id: ComponentId,
     ) -> Result<Vec<StepResult>> {
         // Set loop variables
         self.state_manager
@@ -612,8 +612,8 @@ impl LoopWorkflow {
             // Create execution context
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = WorkflowState::new();
-            // CRITICAL: Use the workflow's execution_id, not a new one!
-            workflow_state.execution_id = ComponentId::from_name(execution_id);
+            // CRITICAL: Use the workflow's execution_component_id, not a new one!
+            workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = step_index;
             let context = StepExecutionContext::new(workflow_state, None);
@@ -759,7 +759,9 @@ impl LoopWorkflow {
     /// indicating where the actual outputs have been written.
     pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
         let start_time = Instant::now();
-        let execution_id = format!("loop_{}", uuid::Uuid::new_v4());
+        // Generate ComponentId once and use it consistently
+        let execution_component_id = ComponentId::new();
+        let execution_id = format!("loop_{}", execution_component_id);
 
         // Get state access or return error
         let state = context
@@ -1031,7 +1033,9 @@ impl LoopWorkflow {
     /// Execute the loop workflow
     pub async fn execute_workflow(&self) -> Result<LoopWorkflowResult> {
         let start_time = Instant::now();
-        let execution_id = uuid::Uuid::new_v4().to_string();
+        // Generate ComponentId once and use it consistently
+        let execution_component_id = ComponentId::new();
+        let execution_id = execution_component_id.to_string();
         info!(
             "Starting loop workflow: {} (execution: {})",
             self.name, execution_id
@@ -1113,8 +1117,8 @@ impl LoopWorkflow {
             // Get current state
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = WorkflowState::new();
-            // CRITICAL: Use the workflow's execution_id, not a new one!
-            workflow_state.execution_id = ComponentId::from_name(&execution_id);
+            // CRITICAL: Use the workflow's execution_component_id, not a new one!
+            workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
 
             // For while conditions, check if we should continue
@@ -1137,7 +1141,7 @@ impl LoopWorkflow {
 
             // Execute iteration
             match self
-                .execute_iteration(iteration, value.clone(), &execution_id)
+                .execute_iteration(iteration, value.clone(), execution_component_id)
                 .await
             {
                 Ok(results) => {

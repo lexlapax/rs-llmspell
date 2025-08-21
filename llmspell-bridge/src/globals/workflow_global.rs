@@ -30,6 +30,7 @@ impl WorkflowGlobal {
         registry: Arc<ComponentRegistry>,
         state_manager: Arc<StateManager>,
     ) -> Self {
+        tracing::info!("WorkflowGlobal: Creating WorkflowBridge with StateManager at {:p}", Arc::as_ptr(&state_manager));
         let bridge = Arc::new(WorkflowBridge::new(&registry, Some(state_manager)));
         Self { registry, bridge }
     }

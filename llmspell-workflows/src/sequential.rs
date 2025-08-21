@@ -173,7 +173,17 @@ impl SequentialWorkflow {
     /// and returns only metadata in the WorkflowResult.
     pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
         let start_time = Instant::now();
-        let execution_id = uuid::Uuid::new_v4().to_string();
+        // Generate ComponentId once and use it consistently
+        let execution_component_id = ComponentId::new();
+        let execution_id = execution_component_id.to_string();
+        
+        // Debug: Double-check state availability
+        debug!(
+            "execute_with_state - State in context: {}, type: {:?}",
+            context.state.is_some(),
+            context.state.as_ref().map(|_| "StateAccess")
+        );
+        
         info!(
             "Starting sequential workflow: {} (execution: {}) - State available: {}",
             self.name,
@@ -273,9 +283,8 @@ impl SequentialWorkflow {
             // Create execution context for step
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = crate::types::WorkflowState::new();
-            // CRITICAL: Use the workflow's execution_id, not a new one!
-            // Use from_name with the execution_id string to get consistent ComponentId
-            workflow_state.execution_id = ComponentId::from_name(&execution_id);
+            // CRITICAL: Use the workflow's execution_component_id, not a new one!
+            workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = index;
             let mut step_context = StepExecutionContext::new(workflow_state.clone(), None);
@@ -287,14 +296,18 @@ impl SequentialWorkflow {
 
             // Pass state to step context if available
             if let Some(ref state) = context.state {
-                debug!(
-                    "Passing state to StepExecutionContext for step {}",
+                info!(
+                    "Passing state to StepExecutionContext for step {} - state exists: true",
                     step.name
                 );
                 step_context = step_context.with_state(state.clone());
+                info!(
+                    "After with_state: step_context.state is_some: {}",
+                    step_context.state.is_some()
+                );
             } else {
-                debug!(
-                    "No state available in ExecutionContext for step {}",
+                warn!(
+                    "No state available in ExecutionContext for step {} - state is None!",
                     step.name
                 );
             }
@@ -566,6 +579,12 @@ impl BaseAgent for SequentialWorkflow {
     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
         // Validate input
         self.validate_input(&input).await?;
+
+        // Debug: Check state availability
+        debug!(
+            "SequentialWorkflow::execute - State available in context: {}",
+            context.state.is_some()
+        );
 
         // Execute workflow
         let result = self.execute_with_state(&context).await?;

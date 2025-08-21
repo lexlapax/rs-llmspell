@@ -453,7 +453,9 @@ impl ConditionalWorkflow {
     /// writing outputs to state and returning only metadata.
     pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
         let start_time = Instant::now();
-        let execution_id = uuid::Uuid::new_v4().to_string();
+        // Generate ComponentId once and use it consistently
+        let execution_component_id = ComponentId::new();
+        let execution_id = execution_component_id.to_string();
         info!(
             "Starting conditional workflow: {} (execution: {})",
             self.name, execution_id
@@ -555,8 +557,8 @@ impl ConditionalWorkflow {
 
                 // Create execution context for step
                 let mut workflow_state = crate::types::WorkflowState::new();
-                // CRITICAL: Use the workflow's execution_id, not a new one!
-                workflow_state.execution_id = ComponentId::from_name(&execution_id);
+                // CRITICAL: Use the workflow's execution_component_id, not a new one!
+                workflow_state.execution_id = execution_component_id;
                 workflow_state.shared_data = self.state_manager.get_all_shared_data().await?;
                 workflow_state.current_step = index;
                 let step_context = StepExecutionContext::new(workflow_state, None);
@@ -758,7 +760,9 @@ impl ConditionalWorkflow {
     /// Execute the workflow (legacy method for backward compatibility)
     pub async fn execute_workflow(&self) -> Result<ConditionalWorkflowResult> {
         let start_time = Instant::now();
-        let execution_id = uuid::Uuid::new_v4().to_string();
+        // Generate ComponentId once and use it consistently
+        let execution_component_id = ComponentId::new();
+        let execution_id = execution_component_id.to_string();
         info!(
             "Starting conditional workflow: {} (execution: {})",
             self.name, execution_id
@@ -895,7 +899,7 @@ impl ConditionalWorkflow {
                 }
 
                 // Execute the branch
-                let branch_result = self.execute_branch(branch, &context, &execution_id).await?;
+                let branch_result = self.execute_branch(branch, &context, execution_component_id).await?;
                 executed_branches.push(branch_result);
 
                 // If short-circuit evaluation is enabled and we don't execute all matching branches
@@ -922,7 +926,7 @@ impl ConditionalWorkflow {
                     default_branch.name
                 );
                 let branch_result = self
-                    .execute_branch(default_branch, &context, &execution_id)
+                    .execute_branch(default_branch, &context, execution_component_id)
                     .await?;
                 executed_branches.push(branch_result);
             } else {
@@ -985,7 +989,7 @@ impl ConditionalWorkflow {
         &self,
         branch: &ConditionalBranch,
         _context: &ConditionEvaluationContext,
-        execution_id: &str,
+        execution_component_id: ComponentId,
     ) -> Result<BranchExecutionResult> {
         let start_time = Instant::now();
         info!("Executing branch: {}", branch.name);
@@ -998,8 +1002,8 @@ impl ConditionalWorkflow {
             // Create execution context
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = crate::types::WorkflowState::new();
-            // CRITICAL: Use the workflow's execution_id, not a new one!
-            workflow_state.execution_id = ComponentId::from_name(execution_id);
+            // CRITICAL: Use the workflow's execution_component_id, not a new one!
+            workflow_state.execution_id = execution_component_id;
             workflow_state.shared_data = shared_data;
             workflow_state.current_step = step_results.len();
             let execution_context = StepExecutionContext::new(workflow_state, None);
