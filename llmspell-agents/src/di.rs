@@ -234,7 +234,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl BaseAgent for MockTool {
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,

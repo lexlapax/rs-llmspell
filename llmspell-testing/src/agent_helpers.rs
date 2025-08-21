@@ -88,7 +88,7 @@ impl llmspell_core::traits::base_agent::BaseAgent for TestProviderAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         _input: AgentInput,
         _context: ExecutionContext,

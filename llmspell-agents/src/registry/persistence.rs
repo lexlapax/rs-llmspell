@@ -350,7 +350,7 @@ mod tests {
                 Ok(())
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 _input: llmspell_core::types::AgentInput,
                 _context: llmspell_core::ExecutionContext,
@@ -464,7 +464,7 @@ mod tests {
                     Ok(())
                 }
 
-                async fn execute(
+                async fn execute_impl(
                     &self,
                     _input: llmspell_core::types::AgentInput,
                     _context: llmspell_core::ExecutionContext,

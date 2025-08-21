@@ -49,7 +49,11 @@ impl BaseAgent for ConcurrentAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Increment execution count atomically
         let count = self.execution_count.fetch_add(1, Ordering::SeqCst) + 1;
 

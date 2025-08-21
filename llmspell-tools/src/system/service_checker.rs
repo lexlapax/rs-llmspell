@@ -475,7 +475,7 @@ impl BaseAgent for ServiceCheckerTool {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,

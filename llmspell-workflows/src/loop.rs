@@ -1284,7 +1284,11 @@ impl BaseAgent for LoopWorkflow {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Convert AgentInput to workflow execution
         // The workflow will use the input text as an execution trigger
 
@@ -1489,6 +1493,18 @@ impl BaseAgent for LoopWorkflow {
                     serde_json::Value::Object(agent_outputs),
                 );
             }
+        }
+
+        // If workflow failed, return an error so BaseAgent emits workflow.failed event
+        if !workflow_result.success {
+            return Err(LLMSpellError::Workflow {
+                message: output_text.clone(),
+                step: workflow_result
+                    .error
+                    .as_ref()
+                    .map(|_| "loop_execution".to_string()),
+                source: None,
+            });
         }
 
         Ok(AgentOutput::text(output_text).with_metadata(metadata))

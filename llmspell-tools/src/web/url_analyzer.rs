@@ -150,7 +150,11 @@ impl BaseAgent for UrlAnalyzerTool {
         Ok(AgentOutput::text(format!("UrlAnalyzer error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url_str = extract_required_string(params, "input")?;
         let fetch_metadata = extract_optional_bool(params, "fetch_metadata").unwrap_or(false);

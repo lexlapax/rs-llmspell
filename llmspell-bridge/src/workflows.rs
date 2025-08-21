@@ -1048,7 +1048,7 @@ impl WorkflowExecutor for SequentialWorkflowExecutor {
 
         // Execute through BaseAgent interface with state
         info!("SequentialWorkflowExecutor: Executing workflow with input");
-        let agent_output = self.workflow.execute_with_events(agent_input, context).await?;
+        let agent_output = self.workflow.execute(agent_input, context).await?;
 
         info!("SequentialWorkflowExecutor: Workflow execution completed");
 
@@ -1081,7 +1081,7 @@ impl WorkflowExecutor for ConditionalWorkflowExecutor {
         let agent_input = json_to_agent_input(&input);
 
         // Execute through BaseAgent interface with state
-        let agent_output = self.workflow.execute_with_events(agent_input, context).await?;
+        let agent_output = self.workflow.execute(agent_input, context).await?;
 
         // Convert AgentOutput to JSON
         Ok(serde_json::to_value(&agent_output)?)
@@ -1112,7 +1112,7 @@ impl WorkflowExecutor for LoopWorkflowExecutor {
         let agent_input = json_to_agent_input(&input);
 
         // Execute through BaseAgent interface with state
-        let agent_output = self.workflow.execute_with_events(agent_input, context).await?;
+        let agent_output = self.workflow.execute(agent_input, context).await?;
 
         // Convert AgentOutput to JSON
         Ok(serde_json::to_value(&agent_output)?)
@@ -1143,7 +1143,7 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
         let agent_input = json_to_agent_input(&input);
 
         // Execute through BaseAgent interface with state
-        let agent_output = self.workflow.execute_with_events(agent_input, context).await?;
+        let agent_output = self.workflow.execute(agent_input, context).await?;
 
         // Convert AgentOutput to JSON
         Ok(serde_json::to_value(&agent_output)?)

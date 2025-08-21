@@ -391,7 +391,11 @@ impl BaseAgent for GraphBuilderTool {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Create resource tracker for this execution
         let limits = ResourceLimits {
             max_memory_bytes: Some(100 * 1024 * 1024), // 100MB for graph processing

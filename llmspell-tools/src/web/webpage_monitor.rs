@@ -105,7 +105,11 @@ impl BaseAgent for WebpageMonitorTool {
         Ok(AgentOutput::text(format!("WebpageMonitor error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let previous_content = extract_optional_string(params, "previous_content");

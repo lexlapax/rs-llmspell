@@ -1,11 +1,13 @@
-//! ABOUTME: External API tests for conditional workflows with real LLM agents
-//! ABOUTME: Tests using real OpenAI/Anthropic APIs for content classification
+//! ABOUTME: External API integration tests requiring real LLM providers
+//! ABOUTME: Tests LLM-based workflows using actual OpenAI/Anthropic APIs
+//! ABOUTME: All tests marked with #[ignore = "external"] to skip in CI without API keys
 
 use llmspell_bridge::engine::factory::LuaConfig;
 use llmspell_bridge::engine::ScriptEngineBridge;
 use llmspell_bridge::lua::LuaEngine;
 use llmspell_bridge::{ComponentRegistry, ProviderManager};
 use llmspell_config::providers::ProviderManagerConfig;
+use llmspell_tools::CalculatorTool;
 use std::sync::Arc;
 
 // Helper function to create a test script engine
@@ -31,6 +33,12 @@ async fn create_real_providers() -> Arc<ProviderManager> {
 #[ignore = "external"]
 async fn test_real_llm_content_classification() {
     let registry = Arc::new(ComponentRegistry::new());
+
+    // Register calculator tool for workflow steps
+    registry
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .unwrap();
+
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
@@ -77,7 +85,7 @@ async fn test_real_llm_content_classification() {
             :build()
         
         -- Execute with real LLM
-        local result = router:execute({ input = "test" })
+        local result = router:execute({ text = "test content" })
         
         return {
             success = result ~= nil,
@@ -89,9 +97,17 @@ async fn test_real_llm_content_classification() {
 
     // This test requires real API keys to pass
     if std::env::var("OPENAI_API_KEY").is_ok() {
-        assert!(result.is_ok());
-        let value = result.unwrap().output;
-        assert_eq!(value["success"], true);
+        match result {
+            Ok(output) => {
+                let value = output.output;
+                assert_eq!(value["success"], true);
+            }
+            Err(e) => {
+                // Workflow might fail if steps fail - print error for debugging
+                eprintln!("Test failed with error: {}", e);
+                panic!("Workflow execution failed: {}", e);
+            }
+        }
     }
 }
 
@@ -99,6 +115,12 @@ async fn test_real_llm_content_classification() {
 #[ignore = "external"]
 async fn test_multi_model_classification_routing() {
     let registry = Arc::new(ComponentRegistry::new());
+
+    // Register calculator tool for workflow steps
+    registry
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .unwrap();
+
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();
@@ -177,6 +199,12 @@ async fn test_multi_model_classification_routing() {
 #[ignore = "external"]
 async fn test_production_content_pipeline() {
     let registry = Arc::new(ComponentRegistry::new());
+
+    // Register calculator tool for workflow steps
+    registry
+        .register_tool("calculator".to_string(), Arc::new(CalculatorTool::new()))
+        .unwrap();
+
     let providers = create_real_providers().await;
 
     let mut engine = create_test_engine();

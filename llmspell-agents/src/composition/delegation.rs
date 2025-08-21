@@ -418,7 +418,11 @@ impl BaseAgent for DelegatingAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Parse the input as a delegation request
         let request: DelegationRequest = serde_json::from_str(&input.text)?;
 
@@ -576,7 +580,7 @@ mod tests {
                 &self.metadata
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 _input: AgentInput,
                 _context: ExecutionContext,

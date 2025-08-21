@@ -50,7 +50,11 @@ impl BaseAgent for PerformanceTestAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Simulate work by sleeping for the specified duration
         tokio::time::sleep(self.execution_time).await;
         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
@@ -84,7 +88,11 @@ impl BaseAgent for FastMockTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Very fast execution - just echo input
         Ok(AgentOutput::text(format!("Fast: {}", input.text)))
     }

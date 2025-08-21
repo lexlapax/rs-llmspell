@@ -39,7 +39,11 @@ impl BaseAgent for TestAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Validate input first
         self.validate_input(&input).await?;
 
@@ -117,7 +121,11 @@ impl BaseAgent for TestTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         *self.invocation_count.lock().unwrap() += 1;
 
         // Parse parameters from input parameters

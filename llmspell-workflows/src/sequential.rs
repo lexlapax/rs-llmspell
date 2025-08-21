@@ -496,7 +496,11 @@ impl BaseAgent for SequentialWorkflow {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Validate input
         self.validate_input(&input).await?;
 
@@ -577,6 +581,21 @@ impl BaseAgent for SequentialWorkflow {
         metadata
             .extra
             .insert("success_rate".to_string(), serde_json::json!(success_rate));
+
+        // If workflow failed, return an error so BaseAgent emits workflow.failed event
+        if !result.success {
+            return Err(LLMSpellError::Workflow {
+                message: output_text.clone(),
+                step: result.error.as_ref().and_then(|e| {
+                    if let WorkflowError::StepExecutionFailed { step_name, .. } = e {
+                        Some(step_name.clone())
+                    } else {
+                        None
+                    }
+                }),
+                source: None,
+            });
+        }
 
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }

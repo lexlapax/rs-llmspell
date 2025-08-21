@@ -129,7 +129,7 @@ mod lua_globals {
                 })
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 _input: llmspell_core::types::AgentInput,
                 _context: ExecutionContext,

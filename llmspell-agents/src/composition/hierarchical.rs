@@ -198,7 +198,11 @@ impl BaseAgent for HierarchicalCompositeAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let pattern = self.execution_pattern.read().unwrap().clone();
         let value = serde_json::to_value(&input)?;
         let result = self.execute_pattern(pattern, value, &context).await?;
@@ -621,7 +625,7 @@ mod tests {
                 &self.metadata
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 input: AgentInput,
                 _context: ExecutionContext,

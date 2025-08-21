@@ -44,7 +44,7 @@
 //!
 //! // Use mock agent in tests
 //! let mut mock = MockBaseAgent::new();
-//! mock.expect_execute()
+//! mock.expect_execute_impl()
 //!     .returning(|_, _| Ok(AgentOutput::text("test")));
 //!
 //! // Generate test data with proptest

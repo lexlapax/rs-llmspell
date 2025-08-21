@@ -465,7 +465,11 @@ impl BaseAgent for AgentWrappedTool {
         self.agent.metadata()
     }
 
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Check if this is a tool invocation (has "parameters" field) or direct agent execution
         if input.parameters.contains_key("parameters") {
             // This is a tool invocation - transform parameters
@@ -580,7 +584,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,

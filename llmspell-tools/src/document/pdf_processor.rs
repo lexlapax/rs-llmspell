@@ -214,7 +214,11 @@ impl BaseAgent for PdfProcessorTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Create resource tracker for this execution
         let limits = ResourceLimits {
             max_memory_bytes: Some(50 * 1024 * 1024), // 50MB for PDF processing

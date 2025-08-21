@@ -205,14 +205,15 @@ async fn test_workflow_error_handling() {
     // Execute as agent
     let input = AgentInput::text("Test error handling");
     let context = ExecutionContext::default();
-    let result = workflow.execute(input, context).await.unwrap();
+    let result = workflow.execute(input, context).await;
 
-    // Should handle error gracefully
-    assert!(result.text.contains("failed"));
-    assert_eq!(
-        result.metadata.extra.get("workflow_type").unwrap(),
-        &json!("sequential")
-    );
+    // Should return an error when workflow fails
+    assert!(result.is_err());
+    if let Err(e) = result {
+        let error_string = e.to_string();
+        assert!(error_string.contains("failed"));
+        assert!(error_string.contains("error_test"));
+    }
 }
 
 #[tokio::test]

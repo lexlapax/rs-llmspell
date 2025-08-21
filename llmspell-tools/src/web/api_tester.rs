@@ -115,7 +115,11 @@ impl BaseAgent for ApiTesterTool {
         Ok(AgentOutput::text(format!("ApiTester error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let method_str = extract_optional_string(params, "method").unwrap_or("GET");

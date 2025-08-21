@@ -293,7 +293,7 @@ impl BaseAgent for LLMAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,

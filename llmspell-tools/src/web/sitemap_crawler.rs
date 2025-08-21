@@ -107,7 +107,11 @@ impl BaseAgent for SitemapCrawlerTool {
         Ok(AgentOutput::text(format!("SitemapCrawler error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let follow_sitemaps = extract_optional_bool(params, "follow_sitemaps").unwrap_or(true);

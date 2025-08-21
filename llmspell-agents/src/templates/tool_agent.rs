@@ -553,7 +553,7 @@ impl BaseAgent for MockToolAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         _input: AgentInput,
         _context: ExecutionContext,

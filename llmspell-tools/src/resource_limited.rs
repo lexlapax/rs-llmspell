@@ -62,7 +62,7 @@ impl<T: Tool + Send + Sync> BaseAgent for ResourceLimitedTool<T> {
         self.inner.metadata()
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         context: ExecutionContext,
@@ -238,7 +238,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,

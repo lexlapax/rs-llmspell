@@ -276,7 +276,7 @@ impl BaseAgent for MockAgent {
     /// # Panics
     ///
     /// Panics if any Mutex is poisoned
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         context: ExecutionContext,
@@ -663,7 +663,7 @@ impl BaseAgent for MockTool {
     /// # Panics
     ///
     /// Panics if any Mutex is poisoned
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,

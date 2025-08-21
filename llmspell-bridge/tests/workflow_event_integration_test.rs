@@ -14,6 +14,7 @@ use llmspell_workflows::{
     sequential::SequentialWorkflow,
     traits::{StepType, WorkflowStep},
     types::WorkflowConfig,
+    ResultWorkflowType as WorkflowType, WorkflowError, WorkflowResult, WorkflowStatus,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,7 +39,11 @@ impl BaseAgent for TestTool {
         &self.metadata
     }
 
-    async fn execute(&self, _input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        _input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Simulate some work
         tokio::time::sleep(Duration::from_millis(10)).await;
         Ok(AgentOutput::text(format!(
@@ -75,6 +80,7 @@ impl Tool for TestTool {
 }
 
 #[tokio::test]
+#[allow(clippy::too_many_lines)]
 async fn test_workflow_event_emission() {
     // Create EventBus and subscribe to workflow events
     let event_bus = Arc::new(EventBus::new());
@@ -132,19 +138,23 @@ async fn test_workflow_event_emission() {
 
     // Execute workflow through BaseAgent trait to get automatic event emission
     let input = AgentInput::text("test workflow execution");
-    let output = workflow.execute_with_events(input, context).await.unwrap();
-    
+    let _output = workflow.execute(input, context).await.unwrap();
+
     // Verify workflow succeeded through output
-    let result = llmspell_workflows::types::WorkflowResult {
+    let result = WorkflowResult {
+        execution_id: uuid::Uuid::new_v4().to_string(),
+        workflow_type: WorkflowType::Sequential,
+        workflow_name: "test_workflow".to_string(),
         success: true,
+        status: WorkflowStatus::Completed,
+        summary: "Test workflow completed".to_string(),
+        state_keys: vec![],
         steps_executed: 2,
         steps_failed: 0,
         steps_skipped: 0,
-        execution_id: uuid::Uuid::new_v4(),
-        workflow_name: "test_workflow".to_string(),
         duration: std::time::Duration::from_millis(0),
-        state_keys: vec![],
-        outputs: Default::default(),
+        error: None,
+        metadata: serde_json::Map::new(),
     };
 
     // Verify workflow succeeded
@@ -246,19 +256,27 @@ async fn test_workflow_failure_event() {
 
     // Execute workflow through BaseAgent trait to get automatic event emission
     let input = AgentInput::text("test failing workflow");
-    let output = workflow.execute_with_events(input, context).await.unwrap();
-    
+    // Expect the workflow to fail and return an error
+    let _ = workflow.execute(input, context).await.unwrap_err();
+
     // Verify workflow failed through output
-    let result = llmspell_workflows::types::WorkflowResult {
+    let result = WorkflowResult {
+        execution_id: uuid::Uuid::new_v4().to_string(),
+        workflow_type: WorkflowType::Sequential,
+        workflow_name: "failing_workflow".to_string(),
         success: false,
+        status: WorkflowStatus::Failed,
+        summary: "Test workflow failed".to_string(),
+        state_keys: vec![],
         steps_executed: 0,
         steps_failed: 1,
         steps_skipped: 0,
-        execution_id: uuid::Uuid::new_v4(),
-        workflow_name: "failing_workflow".to_string(),
         duration: std::time::Duration::from_millis(0),
-        state_keys: vec![],
-        outputs: Default::default(),
+        error: Some(WorkflowError::StepExecutionFailed {
+            step_name: "test_step".to_string(),
+            reason: "Test failure".to_string(),
+        }),
+        metadata: serde_json::Map::new(),
     };
 
     // Verify workflow failed
@@ -273,19 +291,24 @@ async fn test_workflow_failure_event() {
     // Verify we got workflow.started and workflow.step.failed events
     let event_types: Vec<String> = events.iter().map(|e| e.event_type.clone()).collect();
 
+    println!("DEBUG: Events received: {:?}", event_types);
+
     assert!(
         event_types.contains(&"workflow.started".to_string()),
-        "Should have workflow.started event"
+        "Should have workflow.started event. Got: {:?}",
+        event_types
     );
 
     assert!(
         event_types.contains(&"workflow.step.failed".to_string()),
-        "Should have workflow.step.failed event"
+        "Should have workflow.step.failed event. Got: {:?}",
+        event_types
     );
 
     assert!(
         event_types.contains(&"workflow.failed".to_string()),
-        "Should have workflow.failed event"
+        "Should have workflow.failed event. Got: {:?}",
+        event_types
     );
 
     println!("✅ Workflow failure event test passed! Events collected: {event_types:?}");
@@ -340,19 +363,23 @@ async fn test_workflow_events_can_be_disabled() {
 
     // Execute workflow through BaseAgent trait to get automatic event emission
     let input = AgentInput::text("test workflow execution");
-    let output = workflow.execute_with_events(input, context).await.unwrap();
-    
+    let _output = workflow.execute(input, context).await.unwrap();
+
     // Verify workflow succeeded through output
-    let result = llmspell_workflows::types::WorkflowResult {
+    let result = WorkflowResult {
+        execution_id: uuid::Uuid::new_v4().to_string(),
+        workflow_type: WorkflowType::Sequential,
+        workflow_name: "test_workflow".to_string(),
         success: true,
+        status: WorkflowStatus::Completed,
+        summary: "Test workflow completed".to_string(),
+        state_keys: vec![],
         steps_executed: 2,
         steps_failed: 0,
         steps_skipped: 0,
-        execution_id: uuid::Uuid::new_v4(),
-        workflow_name: "test_workflow".to_string(),
         duration: std::time::Duration::from_millis(0),
-        state_keys: vec![],
-        outputs: Default::default(),
+        error: None,
+        metadata: serde_json::Map::new(),
     };
     assert!(result.success);
 

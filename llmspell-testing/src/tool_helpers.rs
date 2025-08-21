@@ -127,7 +127,7 @@ impl llmspell_core::traits::base_agent::BaseAgent for TestTool {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,

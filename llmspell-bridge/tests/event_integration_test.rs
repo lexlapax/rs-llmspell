@@ -31,7 +31,11 @@ impl BaseAgent for TestComponent {
         &self.metadata
     }
 
-    async fn execute(&self, _input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        _input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         Ok(AgentOutput::text("Test output"))
     }
 
@@ -71,7 +75,7 @@ async fn test_event_bus_wiring_through_registry() {
     let input = AgentInput::text("test input");
 
     // Execute with events (this should emit lifecycle events)
-    let _output = component.execute_with_events(input, context).await.unwrap();
+    let _output = component.execute(input, context).await.unwrap();
 
     // Check if we received the started event
     let started_event = timeout(Duration::from_millis(100), receiver.recv())
@@ -145,7 +149,7 @@ async fn test_event_filtering_through_config() {
     let input = AgentInput::text("test input");
 
     // Execute with events
-    let _output = component.execute_with_events(input, context).await.unwrap();
+    let _output = component.execute(input, context).await.unwrap();
 
     // Should only receive completed event (started is filtered out)
     let event = timeout(Duration::from_millis(100), receiver.recv())
@@ -182,6 +186,6 @@ async fn test_registry_without_event_bus() {
     let input = AgentInput::text("test input");
 
     // This should work fine, just no events emitted
-    let output = component.execute_with_events(input, context).await.unwrap();
+    let output = component.execute(input, context).await.unwrap();
     assert_eq!(output.text, "Test output");
 }

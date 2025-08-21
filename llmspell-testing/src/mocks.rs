@@ -19,7 +19,7 @@
 //!
 //! # async fn test_example() {
 //! let mut mock = MockBaseAgent::new();
-//! mock.expect_execute()
+//! mock.expect_execute_impl()
 //!     .times(1)
 //!     .returning(|input, _| {
 //!         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
@@ -55,7 +55,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for BaseAgent {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -72,7 +72,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for Agent {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -99,7 +99,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for Tool {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -124,7 +124,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for Workflow {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -165,7 +165,15 @@ mod tests {
     async fn test_mock_base_agent() {
         let mut mock = MockBaseAgent::new();
 
-        mock.expect_execute()
+        // Set up metadata expectation (required by execute() for event emission)
+        let metadata = ComponentMetadata::new(
+            "test-mock".to_string(),
+            "Test Mock".to_string(),
+        );
+        mock.expect_metadata()
+            .return_const(metadata);
+
+        mock.expect_execute_impl()
             .times(1)
             .returning(|input, _| Ok(AgentOutput::text(format!("Echo: {}", input.text))));
 

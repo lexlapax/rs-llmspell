@@ -122,7 +122,11 @@ impl BaseAgent for WebhookCallerTool {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let payload = extract_optional_object(params, "payload");

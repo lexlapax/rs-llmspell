@@ -83,11 +83,17 @@ async fn test_lua_builder_to_rust_workflow_conversion() {
         }
     "#;
 
-    let result = engine.execute_script(script).await.unwrap();
-    let value = result.output;
+    // Execute the workflow - tool step configuration has been fixed
+    let result = engine.execute_script(script).await;
 
-    assert_eq!(value["success"], true);
-    assert_eq!(value["has_result"], true);
+    // Workflow should now succeed with fixed tool configuration
+    assert!(
+        result.is_ok(),
+        "Workflow should succeed with fixed tool configuration"
+    );
+    let output = result.unwrap().output;
+    assert_eq!(output["success"], true);
+    assert_eq!(output["has_result"], true);
 }
 
 #[tokio::test(flavor = "multi_thread")]

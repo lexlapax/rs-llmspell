@@ -513,18 +513,15 @@ impl StepExecutor {
             llmspell_core::types::AgentInput::text(parameters.to_string())
         };
 
-        // Add all parameters to the agent input
-        if let Some(obj) = parameters.as_object() {
-            for (key, value) in obj {
-                agent_input = agent_input.with_parameter(key.clone(), value.clone());
-            }
-        }
+        // Tools expect parameters to be wrapped in a "parameters" object
+        // This is required by the extract_parameters utility function
+        agent_input = agent_input.with_parameter("parameters".to_string(), parameters.clone());
 
         // Convert StepExecutionContext to ExecutionContext for BaseAgent execution
         let exec_context = context.to_execution_context();
 
         // Execute through BaseAgent trait with automatic event emission
-        let output = tool.execute_with_events(agent_input, exec_context).await?;
+        let output = tool.execute(agent_input, exec_context).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {
@@ -669,7 +666,7 @@ impl StepExecutor {
         }
 
         // Execute through BaseAgent trait with automatic event emission
-        let output = agent.execute_with_events(agent_input, exec_context.clone()).await?;
+        let output = agent.execute(agent_input, exec_context.clone()).await?;
 
         // Write output to state if state is available in ExecutionContext
         info!(
@@ -868,7 +865,7 @@ impl StepExecutor {
         );
 
         // Execute through BaseAgent trait with automatic event emission
-        let output = workflow.execute_with_events(agent_input, exec_context).await?;
+        let output = workflow.execute(agent_input, exec_context).await?;
 
         // Write output to state if state accessor is available
         if let Some(ref state_accessor) = context.state_accessor {

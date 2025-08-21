@@ -207,7 +207,11 @@ impl BaseAgent for UuidGeneratorTool {
     }
 
     #[allow(clippy::too_many_lines)]
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters from input using shared utility
         let params = extract_parameters(&input)?;
 
