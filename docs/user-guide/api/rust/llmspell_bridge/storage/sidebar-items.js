@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["StorageConfig","StorageConfigBuilder","StorageDiscovery","StorageInfo","StoragePerformance"]};

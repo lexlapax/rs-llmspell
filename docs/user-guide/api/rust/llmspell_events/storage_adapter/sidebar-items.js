@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["EventPersistenceManager","EventStorageAdapter","PersistenceConfig","StorageStats"],"trait":["EventStorage"]};

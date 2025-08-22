@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["WorkflowType"],"struct":["DefaultWorkflowFactory","TemplateWorkflowFactory","WorkflowParams","WorkflowTemplate"],"trait":["WorkflowFactory"]};

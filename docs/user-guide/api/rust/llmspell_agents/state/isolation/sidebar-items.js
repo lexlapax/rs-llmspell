@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["IsolationBoundary","StateOperation","StatePermission","StateScope"],"struct":["IsolatedStateAccessor","SharedScopeConfig","StateAccessAudit","StateAccessControl","StateIsolationManager"],"trait":["IsolatedStateAgent"]};

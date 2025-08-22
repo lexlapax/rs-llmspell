@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["search_in_directory","search_in_file","should_search_file"],"struct":["SearchMatch","SearchOptions","SearchResult"]};

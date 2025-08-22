@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BackupType","MigrationEvent","ValidationPhase","ValidationResult"],"struct":["MigrationEventBuilder"]};

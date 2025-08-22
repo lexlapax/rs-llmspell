@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["csv_analyzer","graph_builder","json_processor"]};

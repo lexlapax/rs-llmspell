@@ -1,0 +1,192 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="ABOUTME: llmspell-bridge - Language-agnostic script runtime with bridge pattern ABOUTME: Supports multiple script engines (Lua, JavaScript, Python) through `ScriptEngineBridge`"><title>llmspell_bridge - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="llmspell_bridge" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31) (Homebrew)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../static.files/storage-3a5871a4.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../llmspell_bridge/index.html">llmspell_<wbr>bridge</a><span class="version">0.6.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#llmspell-bridge" title="`LLMSpell` Bridge"><code>LLMSpell</code> Bridge</a><ul><li><a href="#key-features" title="Key Features">Key Features</a></li><li><a href="#architecture" title="Architecture">Architecture</a></li><li><a href="#quick-start" title="Quick Start">Quick Start</a></li><li><a href="#lua-integration" title="Lua Integration">Lua Integration</a></li><li><a href="#javascript-support-planned---phase-5" title="JavaScript Support (Planned - Phase 5)">JavaScript Support (Planned - Phase 5)</a></li><li><a href="#python-support-planned---phase-9" title="Python Support (Planned - Phase 9)">Python Support (Planned - Phase 9)</a></li><li><a href="#cross-language-compatibility" title="Cross-Language Compatibility">Cross-Language Compatibility</a></li><li><a href="#configuration" title="Configuration">Configuration</a></li><li><a href="#provider-access" title="Provider Access">Provider Access</a></li></ul></li></ul><h3><a href="#reexports">Crate Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#structs" title="Structs">Structs</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>llmspell_bridge</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/llmspell_bridge/lib.rs.html#1-292">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>ABOUTME: llmspell-bridge - Language-agnostic script runtime with bridge pattern
+ABOUTME: Supports multiple script engines (Lua, JavaScript, Python) through <code>ScriptEngineBridge</code></p>
+<h2 id="llmspell-bridge"><a class="doc-anchor" href="#llmspell-bridge">§</a><code>LLMSpell</code> Bridge</h2>
+<p>The bridge crate provides a language-agnostic runtime for executing scripts that
+interact with LLM agents, tools, and workflows. It implements the Bridge pattern
+to support multiple scripting languages through a common interface.</p>
+<h3 id="key-features"><a class="doc-anchor" href="#key-features">§</a>Key Features</h3>
+<ul>
+<li><strong>Multi-Language Support</strong>: Execute scripts in Lua (Phase 1), JavaScript (Phase 5),
+and Python (Phase 9)</li>
+<li><strong>Streaming Execution</strong>: Support for streaming responses from LLM providers</li>
+<li><strong>Provider Integration</strong>: Access multiple LLM providers through a unified API</li>
+<li><strong>Security Controls</strong>: Fine-grained security settings for script execution</li>
+<li><strong>Component Registry</strong>: Dynamic registration of agents, tools, and workflows</li>
+</ul>
+<h3 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h3>
+<p>The bridge uses a three-layer architecture:</p>
+<ol>
+<li><strong><code>ScriptEngineBridge</code> Trait</strong>: Defines the common interface for all script engines</li>
+<li><strong>Language Implementations</strong>: Concrete implementations for each scripting language</li>
+<li><strong><code>ScriptRuntime</code></strong>: High-level runtime that manages engines and provides the user API</li>
+</ol>
+<h3 id="quick-start"><a class="doc-anchor" href="#quick-start">§</a>Quick Start</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>llmspell_bridge::ScriptRuntime;
+<span class="kw">use </span>llmspell_config::LLMSpellConfig;
+
+<span class="comment">// Create a runtime with Lua engine
+</span><span class="kw">let </span>runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="comment">// Execute a simple script
+</span><span class="kw">let </span>output = runtime.execute_script(<span class="string">r#"
+    print("Hello from Lua!")
+    return { message = "Script completed" }
+"#</span>).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="macro">println!</span>(<span class="string">"Output: {:?}"</span>, output.output);</code></pre></div>
+<h3 id="lua-integration"><a class="doc-anchor" href="#lua-integration">§</a>Lua Integration</h3><h4 id="creating-agents"><a class="doc-anchor" href="#creating-agents">§</a>Creating Agents</h4><div class="example-wrap"><pre class="language-lua"><code>-- Create an agent with OpenAI provider
+local agent = Agent.create({
+    name = &quot;assistant&quot;,
+    provider = &quot;openai&quot;,
+    model = &quot;gpt-4&quot;,
+    temperature = 0.7
+})
+
+-- Execute the agent
+local response = agent:execute(&quot;What is the capital of France?&quot;)
+print(response.text)
+
+-- Using streaming
+local stream = agent:execute_stream(&quot;Tell me a story&quot;)
+for chunk in stream do
+    io.write(chunk.content)
+end</code></pre></div><h4 id="using-tools"><a class="doc-anchor" href="#using-tools">§</a>Using Tools</h4><div class="example-wrap"><pre class="language-lua"><code>-- List available tools
+local tools = Tool.list()
+for _, tool in ipairs(tools) do
+    print(tool.name, tool.description)
+end
+
+-- Execute a tool
+local result = Tool.execute(&quot;file_reader&quot;, {
+    path = &quot;/tmp/data.txt&quot;
+})
+
+-- Create custom tool wrapper
+local calculator = Tool.wrap(&quot;calculator&quot;)
+local sum = calculator({operation = &quot;add&quot;, a = 5, b = 3})</code></pre></div><h4 id="building-workflows"><a class="doc-anchor" href="#building-workflows">§</a>Building Workflows</h4><div class="example-wrap"><pre class="language-lua"><code>-- Create a sequential workflow
+local workflow = Workflow.sequential({
+    name = &quot;data_pipeline&quot;,
+    steps = {
+        {tool = &quot;file_reader&quot;, params = {path = &quot;input.txt&quot;}},
+        {tool = &quot;text_processor&quot;, params = {operation = &quot;uppercase&quot;}},
+        {tool = &quot;file_writer&quot;, params = {path = &quot;output.txt&quot;}}
+    }
+})
+
+-- Execute workflow
+local result = workflow:execute()
+
+-- Parallel workflow
+local parallel = Workflow.parallel({
+    name = &quot;multi_search&quot;,
+    steps = {
+        {tool = &quot;web_search&quot;, params = {query = &quot;rust programming&quot;}},
+        {tool = &quot;arxiv_search&quot;, params = {query = &quot;machine learning&quot;}},
+        {tool = &quot;news_search&quot;, params = {query = &quot;technology&quot;}}
+    }
+})</code></pre></div><h4 id="session-management"><a class="doc-anchor" href="#session-management">§</a>Session Management</h4><div class="example-wrap"><pre class="language-lua"><code>-- Create or load session
+local session = Session.load(&quot;user-123&quot;) or Session.create({
+    id = &quot;user-123&quot;,
+    metadata = {user = &quot;alice&quot;, created = os.time()}
+})
+
+-- Store artifacts
+session:store_artifact(&quot;conversation&quot;, conversation_history)
+session:store_artifact(&quot;settings&quot;, user_preferences)
+
+-- Save session
+session:save()
+
+-- List all sessions
+local sessions = Session.list()</code></pre></div><h3 id="javascript-support-planned---phase-5"><a class="doc-anchor" href="#javascript-support-planned---phase-5">§</a>JavaScript Support (Planned - Phase 5)</h3><div class="example-wrap"><pre class="language-javascript"><code>// Create agent
+const agent = await Agent.create({
+    name: &quot;assistant&quot;,
+    provider: &quot;anthropic&quot;,
+    model: &quot;claude-3-opus&quot;
+});
+
+// Execute with async/await
+const response = await agent.execute(&quot;Explain quantum computing&quot;);
+console.log(response.text);
+
+// Tool execution
+const result = await Tool.execute(&quot;web_search&quot;, {
+    query: &quot;latest AI news&quot;
+});</code></pre></div><h3 id="python-support-planned---phase-9"><a class="doc-anchor" href="#python-support-planned---phase-9">§</a>Python Support (Planned - Phase 9)</h3><div class="example-wrap"><pre class="language-python"><code># Create agent
+agent = Agent.create(
+    name=&quot;assistant&quot;,
+    provider=&quot;openai&quot;,
+    model=&quot;gpt-4&quot;
+)
+
+# Execute
+response = agent.execute(&quot;What is machine learning?&quot;)
+print(response.text)
+
+# Use with async
+async def process():
+    async for chunk in agent.execute_stream(&quot;Tell me about Python&quot;):
+        print(chunk.content, end=&quot;&quot;)</code></pre></div><h3 id="cross-language-compatibility"><a class="doc-anchor" href="#cross-language-compatibility">§</a>Cross-Language Compatibility</h3>
+<p>All scripting languages share the same underlying Rust implementations, ensuring:</p>
+<ul>
+<li><strong>Consistent Behavior</strong>: Same results across languages</li>
+<li><strong>Shared State</strong>: Sessions and artifacts accessible from any language</li>
+<li><strong>Unified Security</strong>: Same security policies apply to all scripts</li>
+<li><strong>Performance</strong>: Native Rust performance for all operations</li>
+</ul>
+<h3 id="configuration"><a class="doc-anchor" href="#configuration">§</a>Configuration</h3>
+<p>The runtime can be configured through <code>LLMSpellConfig</code>:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>llmspell_bridge::ScriptRuntime;
+<span class="kw">use </span>llmspell_config::LLMSpellConfig;
+
+<span class="kw">let </span><span class="kw-2">mut </span>config = LLMSpellConfig::default();
+
+<span class="comment">// Configure security settings
+</span>config.runtime.security.allow_file_access = <span class="bool-val">false</span>;
+config.runtime.security.allow_network_access = <span class="bool-val">true</span>;
+config.runtime.security.max_memory_bytes = <span class="prelude-val">Some</span>(<span class="number">50_000_000</span>); <span class="comment">// 50MB
+
+// Set default engine
+</span>config.default_engine = <span class="string">"lua"</span>.to_string();
+
+<span class="kw">let </span>runtime = ScriptRuntime::new_with_engine_name(<span class="string">"lua"</span>, config).<span class="kw">await</span><span class="question-mark">?</span>;</code></pre></div>
+<h3 id="provider-access"><a class="doc-anchor" href="#provider-access">§</a>Provider Access</h3>
+<p>Scripts can access LLM providers configured in the runtime:</p>
+
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">let </span>runtime = ScriptRuntime::new_with_lua(LLMSpellConfig::default()).<span class="kw">await</span><span class="question-mark">?</span>;
+
+<span class="kw">let </span>script = <span class="string">r#"
+    -- List available providers
+    local providers = Provider.list()
+    for _, p in ipairs(providers) do
+        print("Provider: " .. p.name)
+    end
+     
+    return providers
+"#</span>;
+
+<span class="kw">let </span>output = runtime.execute_script(script).<span class="kw">await</span><span class="question-mark">?</span>;</code></pre></div>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.register_engine_plugin"><code>pub use engine::<a class="fn" href="engine/factory/fn.register_engine_plugin.html" title="fn llmspell_bridge::engine::factory::register_engine_plugin">register_engine_plugin</a>;</code></dt><dt id="reexport.unregister_engine_plugin"><code>pub use engine::<a class="fn" href="engine/factory/fn.unregister_engine_plugin.html" title="fn llmspell_bridge::engine::factory::unregister_engine_plugin">unregister_engine_plugin</a>;</code></dt><dt id="reexport.EngineFactory"><code>pub use engine::<a class="struct" href="engine/factory/struct.EngineFactory.html" title="struct llmspell_bridge::engine::factory::EngineFactory">EngineFactory</a>;</code></dt><dt id="reexport.EngineFeatures"><code>pub use engine::<a class="struct" href="engine/bridge/struct.EngineFeatures.html" title="struct llmspell_bridge::engine::bridge::EngineFeatures">EngineFeatures</a>;</code></dt><dt id="reexport.EngineInfo"><code>pub use engine::<a class="struct" href="engine/factory/struct.EngineInfo.html" title="struct llmspell_bridge::engine::factory::EngineInfo">EngineInfo</a>;</code></dt><dt id="reexport.ExecutionContext"><code>pub use engine::<a class="struct" href="engine/bridge/struct.ExecutionContext.html" title="struct llmspell_bridge::engine::bridge::ExecutionContext">ExecutionContext</a>;</code></dt><dt id="reexport.ScriptEngineBridge"><code>pub use engine::<a class="trait" href="engine/bridge/trait.ScriptEngineBridge.html" title="trait llmspell_bridge::engine::bridge::ScriptEngineBridge">ScriptEngineBridge</a>;</code></dt><dt id="reexport.ScriptEnginePlugin"><code>pub use engine::<a class="trait" href="engine/factory/trait.ScriptEnginePlugin.html" title="trait llmspell_bridge::engine::factory::ScriptEnginePlugin">ScriptEnginePlugin</a>;</code></dt><dt id="reexport.ScriptMetadata"><code>pub use engine::<a class="struct" href="engine/bridge/struct.ScriptMetadata.html" title="struct llmspell_bridge::engine::bridge::ScriptMetadata">ScriptMetadata</a>;</code></dt><dt id="reexport.ScriptOutput"><code>pub use engine::<a class="struct" href="engine/bridge/struct.ScriptOutput.html" title="struct llmspell_bridge::engine::bridge::ScriptOutput">ScriptOutput</a>;</code></dt><dt id="reexport.ScriptStream"><code>pub use engine::<a class="struct" href="engine/bridge/struct.ScriptStream.html" title="struct llmspell_bridge::engine::bridge::ScriptStream">ScriptStream</a>;</code></dt><dt id="reexport.SecurityContext"><code>pub use engine::<a class="struct" href="engine/bridge/struct.SecurityContext.html" title="struct llmspell_bridge::engine::bridge::SecurityContext">SecurityContext</a>;</code></dt><dt id="reexport.ProviderManager"><code>pub use providers::<a class="struct" href="providers/struct.ProviderManager.html" title="struct llmspell_bridge::providers::ProviderManager">ProviderManager</a>;</code></dt><dt id="reexport.ComponentRegistry"><code>pub use registry::<a class="struct" href="registry/struct.ComponentRegistry.html" title="struct llmspell_bridge::registry::ComponentRegistry">ComponentRegistry</a>;</code></dt><dt id="reexport.ScriptRuntime"><code>pub use runtime::<a class="struct" href="runtime/struct.ScriptRuntime.html" title="struct llmspell_bridge::runtime::ScriptRuntime">ScriptRuntime</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="agent_bridge/index.html" title="mod llmspell_bridge::agent_bridge">agent_<wbr>bridge</a></dt><dd>ABOUTME: Agent bridge for script-to-agent communication
+ABOUTME: Provides unified interface for scripts to interact with agents</dd><dt><a class="mod" href="agents/index.html" title="mod llmspell_bridge::agents">agents</a></dt><dd>ABOUTME: Agent discovery and management for script bridge
+ABOUTME: Provides registry integration for agents from llmspell-agents crate</dd><dt><a class="mod" href="artifact_bridge/index.html" title="mod llmspell_bridge::artifact_bridge">artifact_<wbr>bridge</a></dt><dd>ABOUTME: Core artifact bridge providing language-agnostic artifact operations
+ABOUTME: Wraps <code>ArtifactStorage</code> for script access with async operations</dd><dt><a class="mod" href="config_bridge/index.html" title="mod llmspell_bridge::config_bridge">config_<wbr>bridge</a></dt><dd>ABOUTME: Configuration bridge for runtime config access from scripts
+ABOUTME: Provides secure, audited configuration access with granular permissions</dd><dt><a class="mod" href="conversion/index.html" title="mod llmspell_bridge::conversion">conversion</a></dt><dd>ABOUTME: Common type conversion traits for script-to-native translations
+ABOUTME: Defines core traits used by all language-specific conversions</dd><dt><a class="mod" href="debug_bridge/index.html" title="mod llmspell_bridge::debug_bridge">debug_<wbr>bridge</a></dt><dd>Debug bridge for script engines</dd><dt><a class="mod" href="discovery/index.html" title="mod llmspell_bridge::discovery">discovery</a></dt><dd>ABOUTME: Unified discovery pattern for bridge components
+ABOUTME: Provides consistent discovery interface across all component types</dd><dt><a class="mod" href="engine/index.html" title="mod llmspell_bridge::engine">engine</a></dt><dd>ABOUTME: Language abstraction layer for script engines
+ABOUTME: Provides <code>ScriptEngineBridge</code> trait and factory pattern for multi-language support</dd><dt><a class="mod" href="event_bridge/index.html" title="mod llmspell_bridge::event_bridge">event_<wbr>bridge</a></dt><dt><a class="mod" href="event_bus_adapter/index.html" title="mod llmspell_bridge::event_bus_adapter">event_<wbr>bus_<wbr>adapter</a></dt><dt><a class="mod" href="event_serialization/index.html" title="mod llmspell_bridge::event_serialization">event_<wbr>serialization</a></dt><dt><a class="mod" href="globals/index.html" title="mod llmspell_bridge::globals">globals</a></dt><dd>ABOUTME: Global object injection infrastructure for script engines
+ABOUTME: Provides centralized management of all script-accessible globals</dd><dt><a class="mod" href="hook_bridge/index.html" title="mod llmspell_bridge::hook_bridge">hook_<wbr>bridge</a></dt><dd>ABOUTME: Hook bridge for cross-language hook execution system
+ABOUTME: Provides unified interface for scripts to register and execute hooks</dd><dt><a class="mod" href="javascript/index.html" title="mod llmspell_bridge::javascript">javascript</a></dt><dd>ABOUTME: JavaScript script engine implementation of <code>ScriptEngineBridge</code>
+ABOUTME: Provides ES2020 JavaScript with async/await and generator-based streaming</dd><dt><a class="mod" href="lua/index.html" title="mod llmspell_bridge::lua">lua</a></dt><dd>ABOUTME: Lua script engine implementation of <code>ScriptEngineBridge</code>
+ABOUTME: Provides Lua 5.4 scripting with coroutine-based streaming</dd><dt><a class="mod" href="monitoring/index.html" title="mod llmspell_bridge::monitoring">monitoring</a></dt><dd>ABOUTME: Bridge monitoring implementations
+ABOUTME: Provides concrete implementations of monitoring traits for the bridge</dd><dt><a class="mod" href="orchestration/index.html" title="mod llmspell_bridge::orchestration">orchestration</a></dt><dd>ABOUTME: Workflow-based orchestration patterns for complex agent systems
+ABOUTME: Provides high-level orchestration capabilities using workflow primitives</dd><dt><a class="mod" href="providers/index.html" title="mod llmspell_bridge::providers">providers</a></dt><dd>ABOUTME: Provider management for LLM providers accessible from scripts
+ABOUTME: Manages provider configuration, capability detection, and access control</dd><dt><a class="mod" href="providers_discovery/index.html" title="mod llmspell_bridge::providers_discovery">providers_<wbr>discovery</a></dt><dd>ABOUTME: Provider discovery for LLM providers
+ABOUTME: Provides discovery of available LLM providers and their capabilities</dd><dt><a class="mod" href="registry/index.html" title="mod llmspell_bridge::registry">registry</a></dt><dd>ABOUTME: Component registry for managing agents, tools, and workflows
+ABOUTME: Central registry for all scriptable components accessible from engines</dd><dt><a class="mod" href="runtime/index.html" title="mod llmspell_bridge::runtime">runtime</a></dt><dd>ABOUTME: Language-agnostic script runtime using <code>ScriptEngineBridge</code> abstraction
+ABOUTME: Central execution orchestrator supporting multiple script engines</dd><dt><a class="mod" href="session_bridge/index.html" title="mod llmspell_bridge::session_bridge">session_<wbr>bridge</a></dt><dd>ABOUTME: Core session bridge providing language-agnostic session operations
+ABOUTME: Wraps <code>SessionManager</code> for script access with async operations</dd><dt><a class="mod" href="state_adapter/index.html" title="mod llmspell_bridge::state_adapter">state_<wbr>adapter</a></dt><dt><a class="mod" href="storage/index.html" title="mod llmspell_bridge::storage">storage</a></dt><dd>ABOUTME: Storage backend discovery for state persistence
+ABOUTME: Provides discovery of available storage backends (<code>Memory</code>, <code>Sled</code>, <code>RocksDB</code>)</dd><dt><a class="mod" href="tools/index.html" title="mod llmspell_bridge::tools">tools</a></dt><dd>ABOUTME: Tool registration and management for the bridge
+ABOUTME: Initializes and provides access to all Phase 2 tools from llmspell-tools</dd><dt><a class="mod" href="workflow_performance/index.html" title="mod llmspell_bridge::workflow_performance">workflow_<wbr>performance</a></dt><dd>ABOUTME: Performance optimizations for workflow bridge operations
+ABOUTME: Ensures workflow bridge overhead stays under 10ms requirement</dd><dt><a class="mod" href="workflows/index.html" title="mod llmspell_bridge::workflows">workflows</a></dt><dd>ABOUTME: Workflow discovery and management for script integration
+ABOUTME: Provides workflow type information and factory methods</dd></dl><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.LLMSpellConfig.html" title="struct llmspell_bridge::LLMSpellConfig">LLMSpell<wbr>Config</a></dt><dd>Central LLMSpell configuration</dd></dl></section></div></main></body></html>

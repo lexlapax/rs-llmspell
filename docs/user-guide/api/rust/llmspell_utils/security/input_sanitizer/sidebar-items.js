@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["IssueType","SanitizationError","Severity"],"struct":["InputSanitizer","SanitizationConfig","ValidationIssue","ValidationReport"]};

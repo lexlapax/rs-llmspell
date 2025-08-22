@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ResourceEventType"],"struct":["MonitoringConfig","ResourceEvent","ResourceMonitor","ResourceStatistics"]};

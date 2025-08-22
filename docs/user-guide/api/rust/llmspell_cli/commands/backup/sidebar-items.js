@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BackupSubcommand"],"fn":["execute_backup"],"struct":["BackupCommand"]};

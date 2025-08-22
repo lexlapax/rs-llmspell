@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["WorkflowStatus"],"struct":["BridgeMetrics","SearchCriteria","StandardizedWorkflowFactory","WorkflowBridge","WorkflowDiscovery","WorkflowExecutionRecord","WorkflowInfo","WorkflowMetadata","WorkflowRegistry","WorkflowTemplate","WorkflowUsageStats"],"trait":["WorkflowExecutor"]};

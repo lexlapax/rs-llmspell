@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["BackupType"],"struct":["BackupManager","BackupMetadata","BackupSchedule","BackupStats","BackupStatus","CompressionInfo","EncryptionInfo","IncrementalBackup"]};

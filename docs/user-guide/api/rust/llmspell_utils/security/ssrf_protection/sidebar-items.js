@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SsrfError"],"struct":["SsrfProtectionConfig","SsrfProtector","ValidatedUrl"]};

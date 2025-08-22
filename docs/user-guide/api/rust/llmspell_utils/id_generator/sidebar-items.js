@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["NAMESPACE_AGENT","NAMESPACE_TOOL","NAMESPACE_WORKFLOW"],"fn":["extract_prefix","extract_uuid","generate_component_id","generate_deterministic_id","generate_sequential_id","generate_short_id","validate_component_id"],"struct":["ComponentIdBuilder"],"type":["ComponentId"]};

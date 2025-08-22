@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["ExecutionPermissions","IoCapture","ProcessExecutorConfig","ProcessExecutorTool","ProcessResult"]};

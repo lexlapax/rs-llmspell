@@ -1,0 +1,9 @@
+(function() {
+    var implementors = Object.fromEntries([["llmspell_testing",[["impl <a class=\"trait\" href=\"llmspell_core/traits/workflow/trait.Workflow.html\" title=\"trait llmspell_core::traits::workflow::Workflow\">Workflow</a> for <a class=\"struct\" href=\"llmspell_testing/mocks/struct.MockWorkflow.html\" title=\"struct llmspell_testing::mocks::MockWorkflow\">MockWorkflow</a>"]]],["llmspell_workflows",[["impl <a class=\"trait\" href=\"llmspell_core/traits/workflow/trait.Workflow.html\" title=\"trait llmspell_core::traits::workflow::Workflow\">Workflow</a> for <a class=\"struct\" href=\"llmspell_workflows/conditional/struct.ConditionalWorkflow.html\" title=\"struct llmspell_workflows::conditional::ConditionalWorkflow\">ConditionalWorkflow</a>"],["impl <a class=\"trait\" href=\"llmspell_core/traits/workflow/trait.Workflow.html\" title=\"trait llmspell_core::traits::workflow::Workflow\">Workflow</a> for <a class=\"struct\" href=\"llmspell_workflows/loop/struct.LoopWorkflow.html\" title=\"struct llmspell_workflows::loop::LoopWorkflow\">LoopWorkflow</a>"],["impl <a class=\"trait\" href=\"llmspell_core/traits/workflow/trait.Workflow.html\" title=\"trait llmspell_core::traits::workflow::Workflow\">Workflow</a> for <a class=\"struct\" href=\"llmspell_workflows/parallel/struct.ParallelWorkflow.html\" title=\"struct llmspell_workflows::parallel::ParallelWorkflow\">ParallelWorkflow</a>"],["impl <a class=\"trait\" href=\"llmspell_core/traits/workflow/trait.Workflow.html\" title=\"trait llmspell_core::traits::workflow::Workflow\">Workflow</a> for <a class=\"struct\" href=\"llmspell_workflows/sequential/struct.SequentialWorkflow.html\" title=\"struct llmspell_workflows::sequential::SequentialWorkflow\">SequentialWorkflow</a>"]]]]);
+    if (window.register_implementors) {
+        window.register_implementors(implementors);
+    } else {
+        window.pending_implementors = implementors;
+    }
+})()
+//{"start":57,"fragment_lengths":[333,1362]}

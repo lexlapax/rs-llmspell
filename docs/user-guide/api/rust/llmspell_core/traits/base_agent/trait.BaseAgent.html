@@ -1,0 +1,214 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Base trait for all components in the LLMSpell system."><title>BaseAgent in llmspell_core::traits::base_agent - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="llmspell_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31) (Homebrew)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../../../static.files/storage-3a5871a4.js"></script><script defer src="sidebar-items.js"></script><script defer src="../../../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc trait"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../llmspell_core/index.html">llmspell_<wbr>core</a><span class="version">0.6.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Base<wbr>Agent</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#implementation-requirements" title="Implementation Requirements">Implementation Requirements</a></li><li><a href="#examples" title="Examples">Examples</a></li></ul><h3><a href="#required-methods">Required Methods</a></h3><ul class="block"><li><a href="#tymethod.execute_impl" title="execute_impl">execute_impl</a></li><li><a href="#tymethod.handle_error" title="handle_error">handle_error</a></li><li><a href="#tymethod.metadata" title="metadata">metadata</a></li><li><a href="#tymethod.validate_input" title="validate_input">validate_input</a></li></ul><h3><a href="#provided-methods">Provided Methods</a></h3><ul class="block"><li><a href="#method.execute" title="execute">execute</a></li><li><a href="#method.stream_execute" title="stream_execute">stream_execute</a></li><li><a href="#method.supported_media_types" title="supported_media_types">supported_media_types</a></li><li><a href="#method.supports_multimodal" title="supports_multimodal">supports_multimodal</a></li><li><a href="#method.supports_streaming" title="supports_streaming">supports_streaming</a></li></ul><h3><a href="#implementors">Implementors</a></h3></section><div id="rustdoc-modnav"><h2><a href="index.html">In llmspell_<wbr>core::<wbr>traits::<wbr>base_<wbr>agent</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">llmspell_core</a>::<wbr><a href="../index.html">traits</a>::<wbr><a href="index.html">base_agent</a></div><h1>Trait <span class="trait">BaseAgent</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/llmspell_core/traits/base_agent.rs.html#74-298">Source</a> </span></div><pre class="rust item-decl"><code>pub trait BaseAgent: <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Sync.html" title="trait core::marker::Sync">Sync</a> {
+    // Required methods
+    fn <a href="#tymethod.metadata" class="fn">metadata</a>(&amp;self) -&gt; &amp;<a class="struct" href="../../types/struct.ComponentMetadata.html" title="struct llmspell_core::types::ComponentMetadata">ComponentMetadata</a>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.execute_impl" class="fn">execute_impl</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+        input: <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+        context: <a class="struct" href="../../execution_context/struct.ExecutionContext.html" title="struct llmspell_core::execution_context::ExecutionContext">ExecutionContext</a>,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="struct" href="../../types/agent_io/struct.AgentOutput.html" title="struct llmspell_core::types::agent_io::AgentOutput">AgentOutput</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.validate_input" class="fn">validate_input</a>&lt;'life0, 'life1, 'async_trait&gt;(
+        &amp;'life0 self,
+        input: &amp;'life1 <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.86.0/std/primitive.unit.html">()</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait,
+             'life1: 'async_trait</span>;
+<span class="item-spacer"></span>    fn <a href="#tymethod.handle_error" class="fn">handle_error</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+        error: <a class="enum" href="../../error/enum.LLMSpellError.html" title="enum llmspell_core::error::LLMSpellError">LLMSpellError</a>,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="struct" href="../../types/agent_io/struct.AgentOutput.html" title="struct llmspell_core::types::agent_io::AgentOutput">AgentOutput</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span>;
+
+    // Provided methods
+    fn <a href="#method.execute" class="fn">execute</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+        input: <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+        context: <a class="struct" href="../../execution_context/struct.ExecutionContext.html" title="struct llmspell_core::execution_context::ExecutionContext">ExecutionContext</a>,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="struct" href="../../types/agent_io/struct.AgentOutput.html" title="struct llmspell_core::types::agent_io::AgentOutput">AgentOutput</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.stream_execute" class="fn">stream_execute</a>&lt;'life0, 'async_trait&gt;(
+        &amp;'life0 self,
+        _input: <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+        _context: <a class="struct" href="../../execution_context/struct.ExecutionContext.html" title="struct llmspell_core::execution_context::ExecutionContext">ExecutionContext</a>,
+    ) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="type" href="../../types/type.AgentStream.html" title="type llmspell_core::types::AgentStream">AgentStream</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;
+       <span class="where">where Self: 'async_trait,
+             'life0: 'async_trait</span> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.supports_streaming" class="fn">supports_streaming</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.86.0/std/primitive.bool.html">bool</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.supports_multimodal" class="fn">supports_multimodal</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.86.0/std/primitive.bool.html">bool</a> { ... }
+<span class="item-spacer"></span>    fn <a href="#method.supported_media_types" class="fn">supported_media_types</a>(&amp;self) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="enum" href="../../types/enum.MediaType.html" title="enum llmspell_core::types::MediaType">MediaType</a>&gt; { ... }
+}</code></pre><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>Base trait for all components in the LLMSpell system.</p>
+<p>This is the foundational trait that all agents, tools, and workflows must implement.
+It provides the core interface for component execution, validation, and error handling.</p>
+<h2 id="implementation-requirements"><a class="doc-anchor" href="#implementation-requirements">§</a>Implementation Requirements</h2>
+<ul>
+<li>Components must be <code>Send + Sync</code> for async execution</li>
+<li>All methods should handle errors gracefully</li>
+<li>Input validation should be thorough but not overly restrictive</li>
+<li>Error handling should provide meaningful recovery options</li>
+</ul>
+<h2 id="examples"><a class="doc-anchor" href="#examples">§</a>Examples</h2>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>llmspell_core::{
+    ComponentMetadata, <span class="prelude-ty">Result</span>, LLMSpellError, ExecutionContext,
+    types::{AgentInput, AgentOutput},
+    traits::base_agent::BaseAgent
+};
+<span class="kw">use </span>async_trait::async_trait;
+
+<span class="kw">struct </span>MyAgent {
+    metadata: ComponentMetadata,
+}
+
+<span class="attr">#[async_trait]
+</span><span class="kw">impl </span>BaseAgent <span class="kw">for </span>MyAgent {
+    <span class="kw">fn </span>metadata(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ComponentMetadata {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.metadata
+    }
+     
+    <span class="kw">async fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;AgentOutput&gt; {
+        <span class="comment">// Validate input first
+        </span><span class="self">self</span>.validate_input(<span class="kw-2">&amp;</span>input).<span class="kw">await</span><span class="question-mark">?</span>;
+         
+        <span class="comment">// Process the input
+        </span><span class="kw">let </span>result = <span class="macro">format!</span>(<span class="string">"Processed: {}"</span>, input.text);
+         
+        <span class="prelude-val">Ok</span>(AgentOutput::text(result))
+    }
+     
+    <span class="kw">async fn </span>validate_input(<span class="kw-2">&amp;</span><span class="self">self</span>, input: <span class="kw-2">&amp;</span>AgentInput) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="kw">if </span>input.text.is_empty() {
+            <span class="kw">return </span><span class="prelude-val">Err</span>(LLMSpellError::Validation {
+                message: <span class="string">"Text cannot be empty"</span>.to_string(),
+                field: <span class="prelude-val">Some</span>(<span class="string">"text"</span>.to_string()),
+            });
+        }
+        <span class="prelude-val">Ok</span>(())
+    }
+     
+    <span class="kw">async fn </span>handle_error(<span class="kw-2">&amp;</span><span class="self">self</span>, error: LLMSpellError) -&gt; <span class="prelude-ty">Result</span>&lt;AgentOutput&gt; {
+        <span class="prelude-val">Ok</span>(AgentOutput::text(<span class="macro">format!</span>(<span class="string">"Error handled: {}"</span>, error)))
+    }
+}</code></pre></div>
+</div></details><h2 id="required-methods" class="section-header">Required Methods<a href="#required-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="tymethod.metadata" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#80">Source</a><h4 class="code-header">fn <a href="#tymethod.metadata" class="fn">metadata</a>(&amp;self) -&gt; &amp;<a class="struct" href="../../types/struct.ComponentMetadata.html" title="struct llmspell_core::types::ComponentMetadata">ComponentMetadata</a></h4></section></summary><div class="docblock"><p>Get component metadata.</p>
+<p>Returns a reference to the component’s metadata including its ID,
+name, version, and description. This metadata is immutable and
+identifies the component throughout its lifecycle.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.execute_impl" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#192-196">Source</a><h4 class="code-header">fn <a href="#tymethod.execute_impl" class="fn">execute_impl</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+    input: <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+    context: <a class="struct" href="../../execution_context/struct.ExecutionContext.html" title="struct llmspell_core::execution_context::ExecutionContext">ExecutionContext</a>,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="struct" href="../../types/agent_io/struct.AgentOutput.html" title="struct llmspell_core::types::agent_io::AgentOutput">AgentOutput</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Implementation-specific execution logic.</p>
+<p>This is the method that components must implement to provide their
+specific functionality. It’s called by the public <code>execute()</code> method
+after handling cross-cutting concerns like event emission.</p>
+<h5 id="arguments"><a class="doc-anchor" href="#arguments">§</a>Arguments</h5>
+<ul>
+<li><code>input</code> - The input containing prompt and optional context data</li>
+<li><code>context</code> - Execution context with session info and environment</li>
+</ul>
+<h5 id="returns"><a class="doc-anchor" href="#returns">§</a>Returns</h5>
+<p>Returns <code>Ok(AgentOutput)</code> on success, or an error if execution fails.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.validate_input" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#212">Source</a><h4 class="code-header">fn <a href="#tymethod.validate_input" class="fn">validate_input</a>&lt;'life0, 'life1, 'async_trait&gt;(
+    &amp;'life0 self,
+    input: &amp;'life1 <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="primitive" href="https://doc.rust-lang.org/1.86.0/std/primitive.unit.html">()</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,
+    'life1: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Validate input before execution.</p>
+<p>Called before <code>execute()</code> to validate the input parameters.
+Implementations should check for required fields, validate formats,
+and ensure the input meets the component’s requirements.</p>
+<h5 id="arguments-1"><a class="doc-anchor" href="#arguments-1">§</a>Arguments</h5>
+<ul>
+<li><code>input</code> - The input to validate</li>
+</ul>
+<h5 id="returns-1"><a class="doc-anchor" href="#returns-1">§</a>Returns</h5>
+<p>Returns <code>Ok(())</code> if validation passes, or a <code>Validation</code> error
+with details about what failed.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="tymethod.handle_error" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#228">Source</a><h4 class="code-header">fn <a href="#tymethod.handle_error" class="fn">handle_error</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+    error: <a class="enum" href="../../error/enum.LLMSpellError.html" title="enum llmspell_core::error::LLMSpellError">LLMSpellError</a>,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="struct" href="../../types/agent_io/struct.AgentOutput.html" title="struct llmspell_core::types::agent_io::AgentOutput">AgentOutput</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Handle execution errors.</p>
+<p>Provides a way for components to handle errors gracefully and
+potentially recover or provide fallback responses. This method
+is called when an error occurs during execution.</p>
+<h5 id="arguments-2"><a class="doc-anchor" href="#arguments-2">§</a>Arguments</h5>
+<ul>
+<li><code>error</code> - The error that occurred</li>
+</ul>
+<h5 id="returns-2"><a class="doc-anchor" href="#returns-2">§</a>Returns</h5>
+<p>Returns an <code>AgentOutput</code> with error information or a fallback response,
+or propagates the error if it cannot be handled.</p>
+</div></details></div><h2 id="provided-methods" class="section-header">Provided Methods<a href="#provided-methods" class="anchor">§</a></h2><div class="methods"><details class="toggle method-toggle" open><summary><section id="method.execute" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#102-176">Source</a><h4 class="code-header">fn <a href="#method.execute" class="fn">execute</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+    input: <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+    context: <a class="struct" href="../../execution_context/struct.ExecutionContext.html" title="struct llmspell_core::execution_context::ExecutionContext">ExecutionContext</a>,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="struct" href="../../types/agent_io/struct.AgentOutput.html" title="struct llmspell_core::types::agent_io::AgentOutput">AgentOutput</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Execute the component with given input.</p>
+<p>This is the main execution method that handles both event emission and state management
+based on what’s available in the ExecutionContext. Components should NOT override this
+method - instead, they should implement <code>execute_impl()</code>.</p>
+<h5 id="behavior"><a class="doc-anchor" href="#behavior">§</a>Behavior</h5>
+<ul>
+<li>If <code>context.events</code> is Some, emits start/complete/failed events</li>
+<li>If <code>context.state</code> is Some, state operations are available</li>
+<li>Always calls <code>execute_impl()</code> for the actual component logic</li>
+</ul>
+<h5 id="arguments-3"><a class="doc-anchor" href="#arguments-3">§</a>Arguments</h5>
+<ul>
+<li><code>input</code> - The input containing prompt and optional context data</li>
+<li><code>context</code> - Execution context with optional state and events</li>
+</ul>
+<h5 id="returns-3"><a class="doc-anchor" href="#returns-3">§</a>Returns</h5>
+<p>Returns <code>Ok(AgentOutput)</code> on success, or an error if execution fails.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.stream_execute" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#250-259">Source</a><h4 class="code-header">fn <a href="#method.stream_execute" class="fn">stream_execute</a>&lt;'life0, 'async_trait&gt;(
+    &amp;'life0 self,
+    _input: <a class="struct" href="../../types/agent_io/struct.AgentInput.html" title="struct llmspell_core::types::agent_io::AgentInput">AgentInput</a>,
+    _context: <a class="struct" href="../../execution_context/struct.ExecutionContext.html" title="struct llmspell_core::execution_context::ExecutionContext">ExecutionContext</a>,
+) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/core/pin/struct.Pin.html" title="struct core::pin::Pin">Pin</a>&lt;<a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/boxed/struct.Box.html" title="struct alloc::boxed::Box">Box</a>&lt;dyn <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/future/future/trait.Future.html" title="trait core::future::future::Future">Future</a>&lt;Output = <a class="type" href="../../error/type.Result.html" title="type llmspell_core::error::Result">Result</a>&lt;<a class="type" href="../../types/type.AgentStream.html" title="type llmspell_core::types::AgentStream">AgentStream</a>&gt;&gt; + <a class="trait" href="https://doc.rust-lang.org/1.86.0/core/marker/trait.Send.html" title="trait core::marker::Send">Send</a> + 'async_trait&gt;&gt;<div class="where">where
+    Self: 'async_trait,
+    'life0: 'async_trait,</div></h4></section></summary><div class="docblock"><p>Execute the component with streaming output.</p>
+<p>This method provides streaming execution capabilities, allowing components
+to emit partial results as they become available. This is especially useful
+for LLM interactions where text can be generated incrementally.</p>
+<h5 id="arguments-4"><a class="doc-anchor" href="#arguments-4">§</a>Arguments</h5>
+<ul>
+<li><code>input</code> - The input containing prompt and optional context data</li>
+<li><code>context</code> - Execution context with session info and environment</li>
+</ul>
+<h5 id="returns-4"><a class="doc-anchor" href="#returns-4">§</a>Returns</h5>
+<p>Returns a stream of <code>AgentChunk</code> items containing partial results,
+or an error if streaming is not supported by this component.</p>
+<h5 id="default-implementation"><a class="doc-anchor" href="#default-implementation">§</a>Default Implementation</h5>
+<p>The default implementation returns a NotImplemented error, indicating
+that the component does not support streaming execution.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.supports_streaming" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#270-272">Source</a><h4 class="code-header">fn <a href="#method.supports_streaming" class="fn">supports_streaming</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.86.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Check if this component supports streaming execution.</p>
+<p>Returns <code>true</code> if the component implements streaming via <code>stream_execute()</code>,
+<code>false</code> otherwise. Components that support streaming should override this
+method to return <code>true</code>.</p>
+<h5 id="default-implementation-1"><a class="doc-anchor" href="#default-implementation-1">§</a>Default Implementation</h5>
+<p>Returns <code>false</code> by default, indicating no streaming support.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.supports_multimodal" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#282-284">Source</a><h4 class="code-header">fn <a href="#method.supports_multimodal" class="fn">supports_multimodal</a>(&amp;self) -&gt; <a class="primitive" href="https://doc.rust-lang.org/1.86.0/std/primitive.bool.html">bool</a></h4></section></summary><div class="docblock"><p>Check if this component supports multimodal content.</p>
+<p>Returns <code>true</code> if the component can process and generate content
+beyond plain text (images, audio, video, binary), <code>false</code> otherwise.</p>
+<h5 id="default-implementation-2"><a class="doc-anchor" href="#default-implementation-2">§</a>Default Implementation</h5>
+<p>Returns <code>false</code> by default, indicating text-only support.</p>
+</div></details><details class="toggle method-toggle" open><summary><section id="method.supported_media_types" class="method"><a class="src rightside" href="../../../src/llmspell_core/traits/base_agent.rs.html#295-297">Source</a><h4 class="code-header">fn <a href="#method.supported_media_types" class="fn">supported_media_types</a>(&amp;self) -&gt; <a class="struct" href="https://doc.rust-lang.org/1.86.0/alloc/vec/struct.Vec.html" title="struct alloc::vec::Vec">Vec</a>&lt;<a class="enum" href="../../types/enum.MediaType.html" title="enum llmspell_core::types::MediaType">MediaType</a>&gt;</h4></section></summary><div class="docblock"><p>Get the media types supported by this component.</p>
+<p>Returns a vector of <code>MediaType</code> values indicating which types of
+content this component can process in its input and/or generate
+in its output.</p>
+<h5 id="default-implementation-3"><a class="doc-anchor" href="#default-implementation-3">§</a>Default Implementation</h5>
+<p>Returns only <code>MediaType::Text</code> by default.</p>
+</div></details></div><h2 id="implementors" class="section-header">Implementors<a href="#implementors" class="anchor">§</a></h2><div id="implementors-list"></div><script src="../../../trait.impl/llmspell_core/traits/base_agent/trait.BaseAgent.js" async></script></section></div></main></body></html>

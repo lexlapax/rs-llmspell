@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["RateLimitAlgorithm","RateLimitError"],"struct":["RateLimiter","RateLimiterBuilder","RateLimiterConfig"]};

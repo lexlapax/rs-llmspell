@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ViolationSeverity"],"struct":["PerformanceMonitor","PerformanceReport","PerformanceSnapshot","PerformanceThresholds","PerformanceViolation","ResourceUsage"]};

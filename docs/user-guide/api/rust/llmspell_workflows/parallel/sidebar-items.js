@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["BranchResult","ParallelBranch","ParallelConfig","ParallelConfigBuilder","ParallelWorkflow","ParallelWorkflowBuilder","ParallelWorkflowResult"]};

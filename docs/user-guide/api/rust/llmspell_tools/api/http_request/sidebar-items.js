@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AuthType","HttpMethod","ResponseBody"],"struct":["HttpRequestConfig","HttpRequestTool","HttpResponse","RetryConfig"]};

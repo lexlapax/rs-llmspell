@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["FieldTransform","TransformationError","ValidationType"],"struct":["DataTransformer","StateTransformation","TransformationResult","ValidationRule"]};

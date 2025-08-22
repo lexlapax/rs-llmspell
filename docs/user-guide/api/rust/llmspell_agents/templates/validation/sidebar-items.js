@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ValidationError","ValidationWarning"],"fn":["analyze_template"],"struct":["TemplateValidator","ValidationResult"],"trait":["ValidationRule"]};
