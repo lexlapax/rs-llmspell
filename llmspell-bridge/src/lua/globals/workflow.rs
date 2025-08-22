@@ -98,16 +98,20 @@ fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowS
         }
     };
 
-    // Parse optional step configuration
+    // Parse optional step configuration and apply to step
+    let mut final_step = step;
+
     if let Ok(timeout_ms) = step_table.get::<_, u64>("timeout_ms") {
         debug!("Step timeout requested: {}ms", timeout_ms);
+        final_step = final_step.with_timeout(std::time::Duration::from_millis(timeout_ms));
     }
 
     if let Ok(retry_count) = step_table.get::<_, u32>("retry_count") {
         debug!("Step retry count: {}", retry_count);
+        final_step = final_step.with_retry(retry_count);
     }
 
-    Ok(step)
+    Ok(final_step)
 }
 
 /// Parse error strategy from string
@@ -802,11 +806,11 @@ impl UserData for WorkflowBuilder {
                 .steps
                 .iter()
                 .map(|step| llmspell_workflows::WorkflowStep {
-                    id: llmspell_core::ComponentId::from_name(&step.name),
+                    id: step.id,
                     name: step.name.clone(),
                     step_type: step.step_type.clone(),
-                    timeout: None,
-                    retry_attempts: 0,
+                    timeout: step.timeout, // Preserve the timeout from the parsed step
+                    retry_attempts: step.retry_attempts, // Preserve retry attempts too
                 })
                 .collect();
 
@@ -842,11 +846,11 @@ impl UserData for WorkflowBuilder {
                         this.then_steps
                             .iter()
                             .map(|step| llmspell_workflows::WorkflowStep {
-                                id: llmspell_core::ComponentId::from_name(&step.name),
+                                id: step.id,
                                 name: step.name.clone(),
                                 step_type: step.step_type.clone(),
-                                timeout: None,
-                                retry_attempts: 0,
+                                timeout: step.timeout, // Preserve the timeout from the parsed step
+                                retry_attempts: step.retry_attempts, // Preserve retry attempts too
                             })
                             .collect()
                     }

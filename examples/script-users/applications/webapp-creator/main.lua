@@ -282,7 +282,8 @@ print("\n💻 Implementation Agents:")
 agents.backend_developer = Agent.builder()
     :name("backend_developer_" .. timestamp)
     :type("llm")
-    :model("gpt-4o-mini")
+    :provider("anthropic")
+    :model("claude-3-5-sonnet-20241022")
     :temperature(0.3)
     :max_tokens(1800)
     :system_prompt([[You are a backend developer. Generate SIMPLE Express server.
@@ -294,7 +295,8 @@ print("  11. Backend Developer: " .. (agents.backend_developer and "✓" or "✗
 agents.frontend_developer = Agent.builder()
     :name("frontend_developer_" .. timestamp)
     :type("llm")
-    :model("gpt-4o-mini")
+    :provider("anthropic")
+    :model("claude-3-5-sonnet-20241022")
     :temperature(0.4)
     :system_prompt([[You are a frontend developer. Generate React component code.
     Output complete React components with TypeScript, including App.tsx and all child components.]])
@@ -305,7 +307,7 @@ agents.database_developer = Agent.builder()
     :name("database_developer_" .. timestamp)
     :type("llm")
     :provider("anthropic")
-    :model("claude-3-haiku-20240307")
+    :model("claude-3-5-sonnet-20241022")
     :temperature(0.2)
     :system_prompt([[You are a database developer. Create migration scripts and seed data.
     Output SQL migration files for database setup and initial data.]])
@@ -315,7 +317,8 @@ print("  13. Database Developer: " .. (agents.database_developer and "✓" or "�
 agents.api_developer = Agent.builder()
     :name("api_developer_" .. timestamp)
     :type("llm")
-    :model("gpt-4o-mini")
+    :provider("anthropic")
+    :model("claude-3-5-sonnet-20241022")
     :temperature(0.3)
     :max_tokens(1000)
     :system_prompt([[You are an API developer. Generate SIMPLE Express.js route definitions.
@@ -328,7 +331,8 @@ print("  14. API Developer: " .. (agents.api_developer and "✓" or "✗"))
 agents.integration_developer = Agent.builder()
     :name("integration_developer_" .. timestamp)
     :type("llm")
-    :model("gpt-4o-mini")
+    :provider("anthropic")
+    :model("claude-3-5-sonnet-20241022")
     :temperature(0.3)
     :max_tokens(800)
     :system_prompt([[You are an integration developer. Write SIMPLE connection code.
@@ -403,6 +407,7 @@ print("\n📊 Starting Workflow Execution...\n")
 local webapp_workflow = Workflow.builder()
     :name("webapp_creator_workflow")
     :description("Generate complete web application")
+    :timeout_ms(1800000)  -- 30 minutes total workflow timeout (but steps still limited to 30s each)
     :sequential()
 
 -- Add each agent as a workflow step in logical order
@@ -431,12 +436,22 @@ for _, name in ipairs(agent_order) do
     print(string.format("  Adding step: name='%s', agent='%s', input=%s chars", 
         tostring(name), tostring(agent_id), string.len(step_input)))
     
-    webapp_workflow:add_step({
+    -- Add longer timeout for developer agents that generate code
+    local step_config = {
         name = name,
         type = "agent",  -- Required by Lua workflow parser
         agent = agent_id,  -- Use the agent's registered name
         input = step_input  -- Pass simple text input to each agent
-    })
+    }
+    
+    -- Set 2-minute timeout for developer agents, 1 minute for others
+    if name:match("developer") or name:match("engineer") or name:match("writer") then
+        step_config.timeout_ms = 120000  -- 2 minutes for code generation
+    else
+        step_config.timeout_ms = 60000   -- 1 minute for analysis agents
+    end
+    
+    webapp_workflow:add_step(step_config)
 end
 
 -- Build and execute workflow
