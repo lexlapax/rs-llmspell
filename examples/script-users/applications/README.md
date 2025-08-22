@@ -376,12 +376,12 @@ Phase 22: AI/ML + Multimodal
 #### **Application Evolution Rationale**
 | Layer | Application | Universal Problem | Source Transformation | Agent Change | Technical Showcase |
 |-------|-------------|-------------------|----------------------|--------------|-------------------|
-| 1-2 | file-organizer | "My files are a complete mess" | document-intelligence → RENAME + REDUCE | 8→3 agents | llmspell-core, basic workflows |
-| 1-2 | research-collector | "Research is scattered and overwhelming" | research-assistant → RENAME + REDUCE | 11→2 agents | llmspell-tools (web_search), parallel workflows |
+| 1-2 | file-organizer | "My files are a complete mess" | document-intelligence → RENAME + REDUCE | 8→3 agents | llmspell-core, basic workflows (remove State) |
+| 1-2 | research-collector | "Research is scattered and overwhelming" | research-assistant → RENAME + REDUCE | 11→2 agents | llmspell-tools (web_search), parallel workflows (no State) |
 | 3 | content-creator | "Content creation takes forever" | content-generation-platform → RENAME + REDUCE | 7→4 agents | llmspell-workflows (conditional), state mgmt |
 | 4 | communication-manager | "Communication management is overwhelming" | customer-support-bot → RENAME + EXPAND | 3→5 agents | llmspell-sessions, nested workflows |
 | 5 | process-orchestrator | "Complex processes need automation" | data-pipeline + workflow-hub → MERGE | 9→7 agents | llmspell-hooks, llmspell-events, loop workflows |
-| 5 | code-review-assistant | "Code quality at scale" | STANDARDIZE (already positioned) | 3 agents ✅ | Professional development workflows |
+| 5 | code-review-assistant | "Code quality at scale" | STANDARDIZE (consolidate agents) | 7→3 agents | Professional development workflows |
 | 6 | webapp-creator | "Build applications with AI" | STANDARDIZE (already positioned) | 20 agents ✅ | Complete llmspell ecosystem |
 
 #### **Versioned Inheritance Benefits Validation**
