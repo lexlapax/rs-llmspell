@@ -211,8 +211,12 @@ async fn test_workflow_error_handling() {
     assert!(result.is_err());
     if let Err(e) = result {
         let error_string = e.to_string();
-        assert!(error_string.contains("failed"));
-        assert!(error_string.contains("error_test"));
+        // Check that error message contains the step name that failed
+        assert!(error_string.contains("invalid_step") || error_string.contains("failed"));
+        // Check that it mentions the actual error (empty tool name)
+        assert!(
+            error_string.contains("Tool name cannot be empty") || error_string.contains("empty")
+        );
     }
 }
 

@@ -177,7 +177,7 @@ fn bench_text_operations(c: &mut Criterion) {
                 "parameters",
                 json!({
                     "operation": "uppercase",
-                    "text": test_text
+                    "input": test_text
                 }),
             );
             rt.block_on(async {
@@ -193,7 +193,7 @@ fn bench_text_operations(c: &mut Criterion) {
                 "parameters",
                 json!({
                     "operation": "replace",
-                    "text": test_text,
+                    "input": test_text,
                     "pattern": "Lorem",
                     "replacement": "LOREM"
                 }),
@@ -344,7 +344,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
                     "parameters",
                     json!({
                         "operation": "uppercase",
-                        "text": "test value"
+                        "input": "test value"
                     }),
                 );
                 let text_result = text_tool

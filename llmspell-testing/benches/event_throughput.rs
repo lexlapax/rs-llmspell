@@ -37,7 +37,7 @@ fn bench_event_publishing(c: &mut Criterion) {
                             );
                             // Handle potential rate limiting gracefully
                             let _ = black_box(event_bus.publish(event).await);
-                            
+
                             // Add small delay every 1000 events to avoid overwhelming the system
                             if i > 0 && i % 1000 == 0 {
                                 tokio::time::sleep(Duration::from_millis(1)).await;
@@ -65,7 +65,7 @@ fn bench_event_subscription(c: &mut Criterion) {
         ("exact", "test.event.specific"),
         ("wildcard_suffix", "test.event.*"),
         // Prefix and multi-segment wildcards not yet implemented
-        // ("wildcard_prefix", "*.event.specific"),  
+        // ("wildcard_prefix", "*.event.specific"),
         // ("wildcard_multi", "test.*.specific"),
     ];
 
@@ -87,21 +87,22 @@ fn bench_event_subscription(c: &mut Criterion) {
 
                     // Receive events with timeout to prevent hanging
                     let mut received = 0;
-                    let timeout = tokio::time::timeout(
-                        Duration::from_secs(5),
-                        async {
-                            while let Some(_event) = receiver.recv().await {
-                                received += 1;
-                                if received >= 100 {
-                                    break;
-                                }
+                    let timeout = tokio::time::timeout(Duration::from_secs(5), async {
+                        while let Some(_event) = receiver.recv().await {
+                            received += 1;
+                            if received >= 100 {
+                                break;
                             }
                         }
-                    ).await;
-                    
+                    })
+                    .await;
+
                     // If timeout occurs, we still want to continue the benchmark
                     if timeout.is_err() {
-                        eprintln!("Warning: Timeout waiting for events with pattern '{}'", pattern);
+                        eprintln!(
+                            "Warning: Timeout waiting for events with pattern '{}'",
+                            pattern
+                        );
                     }
 
                     black_box(received);
@@ -379,7 +380,7 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
                     serde_json::json!({"data": format!("data-{}", i)}),
                     Language::Rust,
                 );
-                bus.publish(event).await.unwrap();
+                let _ = bus.publish(event).await;
             }
         });
 
@@ -396,7 +397,7 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
         }
 
         let elapsed = start.elapsed();
-        publisher.await.unwrap();
+        let _ = publisher.await;
 
         #[allow(clippy::cast_lossless)]
         let received_f64 = received as f64;

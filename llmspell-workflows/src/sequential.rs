@@ -4,7 +4,7 @@
 use super::error_handling::{ErrorAction, ErrorHandler};
 use super::hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
 use super::result::{WorkflowError, WorkflowResult, WorkflowType};
-use super::state::{ExecutionStats, StateManager};
+use super::state::StateManager;
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, WorkflowStatus, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
@@ -171,7 +171,51 @@ impl SequentialWorkflow {
     ///
     /// This is the new state-based execution method that writes outputs to state
     /// and returns only metadata in the WorkflowResult.
-    pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
+    // execute_with_state removed - functionality moved to execute_impl
+    /// Cancel the workflow execution
+    pub async fn cancel(&self) -> Result<()> {
+        warn!("Cancelling sequential workflow: {}", self.name);
+        self.state_manager.cancel_execution().await
+    }
+
+    /// Reset the workflow to initial state
+    pub async fn reset(&self) -> Result<()> {
+        debug!("Resetting sequential workflow: {}", self.name);
+        self.state_manager.reset().await
+    }
+
+    /// Get shared data value
+    pub async fn get_shared_data(&self, key: &str) -> Result<Option<serde_json::Value>> {
+        self.state_manager.get_shared_data(key).await
+    }
+
+    /// Set shared data value
+    pub async fn set_shared_data(&self, key: String, value: serde_json::Value) -> Result<()> {
+        self.state_manager.set_shared_data(key, value).await
+    }
+}
+
+#[async_trait]
+impl BaseAgent for SequentialWorkflow {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
+    }
+
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        // Validate input
+        self.validate_input(&input).await?;
+
+        // Debug: Check state availability
+        debug!(
+            "SequentialWorkflow::execute - State available in context: {}",
+            context.state.is_some()
+        );
+
+        // Execute workflow with state (inlined from execute_with_state)
         let start_time = Instant::now();
         // Generate ComponentId once and use it consistently
         let execution_component_id = ComponentId::new();
@@ -179,7 +223,7 @@ impl SequentialWorkflow {
 
         // Debug: Double-check state availability
         debug!(
-            "execute_with_state - State in context: {}, type: {:?}",
+            "execute_impl - State in context: {}, type: {:?}",
             context.state.is_some(),
             context.state.as_ref().map(|_| "StateAccess")
         );
@@ -191,7 +235,7 @@ impl SequentialWorkflow {
             context.state.is_some()
         );
 
-        // Note: workflow.started event is now emitted by execute_with_events() wrapper
+        // Note: workflow.started event is now emitted by execute() wrapper in BaseAgent
 
         // Execute workflow start hooks
         if let Some(workflow_executor) = &self.workflow_executor {
@@ -224,24 +268,13 @@ impl SequentialWorkflow {
                 error!("Workflow '{}' exceeded maximum execution time", self.name);
                 self.state_manager.complete_execution(false).await?;
 
-                // Note: workflow.failed event is now emitted by execute_with_events() wrapper
+                // Note: workflow.failed event is now emitted by execute() wrapper in BaseAgent
 
-                return Ok(WorkflowResult::failure(
-                    execution_id,
-                    WorkflowType::Sequential,
-                    self.name.clone(),
-                    WorkflowError::Timeout {
-                        duration: start_time.elapsed(),
-                        message: format!(
-                            "Workflow '{}' exceeded maximum execution time",
-                            self.name
-                        ),
-                    },
-                    state_keys,
-                    steps_executed,
-                    steps_failed,
-                    start_time.elapsed(),
-                ));
+                return Err(LLMSpellError::Workflow {
+                    message: format!("Workflow '{}' exceeded maximum execution time", self.name),
+                    step: None,
+                    source: None,
+                });
             }
 
             debug!(
@@ -345,23 +378,19 @@ impl SequentialWorkflow {
                         warn!("Stopping workflow '{}' due to step failure", self.name);
                         self.state_manager.complete_execution(false).await?;
 
-                        // Note: workflow.failed event is now emitted by execute_with_events() wrapper
+                        // Note: workflow.failed event is now emitted by execute() wrapper in BaseAgent
 
-                        return Ok(WorkflowResult::failure(
-                            execution_id,
-                            WorkflowType::Sequential,
-                            self.name.clone(),
-                            WorkflowError::StepExecutionFailed {
-                                step_name: step.name.clone(),
-                                reason: step_result
+                        return Err(LLMSpellError::Workflow {
+                            message: format!(
+                                "Step '{}' failed: {}",
+                                step.name,
+                                step_result
                                     .error
-                                    .unwrap_or_else(|| "Unknown error".to_string()),
-                            },
-                            state_keys,
-                            steps_executed,
-                            steps_failed,
-                            start_time.elapsed(),
-                        ));
+                                    .unwrap_or_else(|| "Unknown error".to_string())
+                            ),
+                            step: Some(step.name.clone()),
+                            source: None,
+                        });
                     }
                     ErrorAction::ContinueToNext => {
                         warn!(
@@ -386,21 +415,13 @@ impl SequentialWorkflow {
                             );
                             self.state_manager.complete_execution(false).await?;
 
-                            // Note: workflow.failed event is now emitted by execute_with_events() wrapper
+                            // Note: workflow.failed event is now emitted by execute() wrapper in BaseAgent
 
-                            return Ok(WorkflowResult::failure(
-                                execution_id,
-                                WorkflowType::Sequential,
-                                self.name.clone(),
-                                WorkflowError::StepExecutionFailed {
-                                    step_name: step.name.clone(),
-                                    reason: format!("All retries exhausted for step {}", step.name),
-                                },
-                                state_keys,
-                                steps_executed,
-                                steps_failed,
-                                start_time.elapsed(),
-                            ));
+                            return Err(LLMSpellError::Workflow {
+                                message: format!("All retries exhausted for step {}", step.name),
+                                step: Some(step.name.clone()),
+                                source: None,
+                            });
                         }
                     }
                 }
@@ -411,7 +432,7 @@ impl SequentialWorkflow {
         let duration = start_time.elapsed();
         self.state_manager.complete_execution(true).await?;
 
-        // Note: workflow.completed event is now emitted by execute_with_events() wrapper
+        // Note: workflow.completed event is now emitted by execute() wrapper in BaseAgent
 
         // Execute workflow completion hooks
         if let Some(workflow_executor) = &self.workflow_executor {
@@ -431,8 +452,8 @@ impl SequentialWorkflow {
         }
 
         // Return metadata-only result
-        if steps_failed > 0 {
-            Ok(WorkflowResult::partial(
+        let result = if steps_failed > 0 {
+            WorkflowResult::partial(
                 execution_id,
                 WorkflowType::Sequential,
                 self.name.clone(),
@@ -442,76 +463,17 @@ impl SequentialWorkflow {
                 steps_skipped,
                 duration,
                 None,
-            ))
+            )
         } else {
-            Ok(WorkflowResult::success(
+            WorkflowResult::success(
                 execution_id,
                 WorkflowType::Sequential,
                 self.name.clone(),
                 state_keys,
                 steps_executed,
                 duration,
-            ))
-        }
-    }
-
-    // Legacy execute_workflow method removed - use execute_with_state() instead
-
-    /// Get current execution status
-    pub async fn get_status(&self) -> Result<WorkflowStatus> {
-        self.state_manager.get_status().await
-    }
-
-    /// Get execution statistics
-    pub async fn get_execution_stats(&self) -> Result<ExecutionStats> {
-        self.state_manager.get_execution_stats().await
-    }
-
-    /// Cancel the workflow execution
-    pub async fn cancel(&self) -> Result<()> {
-        warn!("Cancelling sequential workflow: {}", self.name);
-        self.state_manager.cancel_execution().await
-    }
-
-    /// Reset the workflow to initial state
-    pub async fn reset(&self) -> Result<()> {
-        debug!("Resetting sequential workflow: {}", self.name);
-        self.state_manager.reset().await
-    }
-
-    /// Get shared data value
-    pub async fn get_shared_data(&self, key: &str) -> Result<Option<serde_json::Value>> {
-        self.state_manager.get_shared_data(key).await
-    }
-
-    /// Set shared data value
-    pub async fn set_shared_data(&self, key: String, value: serde_json::Value) -> Result<()> {
-        self.state_manager.set_shared_data(key, value).await
-    }
-}
-
-#[async_trait]
-impl BaseAgent for SequentialWorkflow {
-    fn metadata(&self) -> &ComponentMetadata {
-        &self.metadata
-    }
-
-    async fn execute_impl(
-        &self,
-        input: AgentInput,
-        context: ExecutionContext,
-    ) -> Result<AgentOutput> {
-        // Validate input
-        self.validate_input(&input).await?;
-
-        // Debug: Check state availability
-        debug!(
-            "SequentialWorkflow::execute - State available in context: {}",
-            context.state.is_some()
-        );
-
-        // Execute workflow
-        let result = self.execute_with_state(&context).await?;
+            )
+        };
 
         // Build output text
         let output_text = if result.success {
@@ -680,7 +642,7 @@ impl Workflow for SequentialWorkflow {
     }
 
     async fn status(&self) -> Result<CoreWorkflowStatus> {
-        let status = self.get_status().await?;
+        let status = self.state_manager.get_status().await?;
 
         // Convert our WorkflowStatus to CoreWorkflowStatus
         let core_status = match status {
@@ -935,12 +897,12 @@ mod tests {
             SequentialWorkflow::new("test_workflow".to_string(), WorkflowConfig::default());
 
         // Initial status should be pending
-        let status = workflow.get_status().await.unwrap();
+        let status = workflow.state_manager.get_status().await.unwrap();
         assert_eq!(status, WorkflowStatus::Pending);
 
         // Reset should work
         workflow.reset().await.unwrap();
-        let status = workflow.get_status().await.unwrap();
+        let status = workflow.state_manager.get_status().await.unwrap();
         assert_eq!(status, WorkflowStatus::Pending);
     }
 }

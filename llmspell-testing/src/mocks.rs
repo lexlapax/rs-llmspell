@@ -166,12 +166,8 @@ mod tests {
         let mut mock = MockBaseAgent::new();
 
         // Set up metadata expectation (required by execute() for event emission)
-        let metadata = ComponentMetadata::new(
-            "test-mock".to_string(),
-            "Test Mock".to_string(),
-        );
-        mock.expect_metadata()
-            .return_const(metadata);
+        let metadata = ComponentMetadata::new("test-mock".to_string(), "Test Mock".to_string());
+        mock.expect_metadata().return_const(metadata);
 
         mock.expect_execute_impl()
             .times(1)

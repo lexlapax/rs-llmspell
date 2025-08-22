@@ -104,8 +104,8 @@ async fn test_real_llm_content_classification() {
             }
             Err(e) => {
                 // Workflow might fail if steps fail - print error for debugging
-                eprintln!("Test failed with error: {}", e);
-                panic!("Workflow execution failed: {}", e);
+                eprintln!("Test failed with error: {e}");
+                panic!("Workflow execution failed: {e}");
             }
         }
     }
