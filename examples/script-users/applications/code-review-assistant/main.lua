@@ -1,713 +1,632 @@
--- Application: Code Review Assistant v1.0 (Blueprint-Compliant)
--- Purpose: Automated code review with security scanning and improvement suggestions
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
--- Expected Output: Comprehensive code review with prioritized issues and fixes
--- Version: 0.8.0
--- Tags: application, code-review, loop, parallel, security, quality
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Application ID: 06 - Code Review Assistant v3.0.0
+-- Complexity Level: 3 [ADVANCED]
+-- Real-World Use Case: DevOps automation and code quality assurance (2025 CI/CD trend)
+-- 
+-- Purpose: Automated multi-aspect code review with 7 specialized AI reviewers
+-- Architecture: Sequential workflow with state-based output collection
+-- Crates Showcased: llmspell-agents, llmspell-workflows, llmspell-tools, llmspell-bridge
+-- Key Features:
+--   • 7 specialized review agents (security, quality, performance, etc.)
+--   • Sequential workflow for comprehensive analysis
+--   • Multi-provider support (OpenAI + Anthropic)
+--   • Structured JSON output with actionable fixes
+--   • State-based result aggregation
+--
+-- Prerequisites:
+--   • API Keys: OPENAI_API_KEY and/or ANTHROPIC_API_KEY
+--   • Config: config.toml for file system permissions
+--   • Resources: Code files to review or uses demo mode
 --
 -- HOW TO RUN:
--- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
--- 2. With config: LLMSPELL_CONFIG=examples/script-users/applications/code-review-assistant/config.toml ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
--- 3. Full features: export OPENAI_API_KEY="sk-..." && export ANTHROPIC_API_KEY="sk-ant-..." && ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
+-- 1. Basic Demo (creates sample code with issues):
+--    ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
 --
--- ABOUTME: Blueprint v2.0 compliant code review with loop workflow and parallel analysis
--- ABOUTME: Demonstrates Loop workflow with nested Parallel review sub-workflows
+-- 2. With Custom Code Input:
+--    ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua \
+--    -- --input my-code.lua --output /tmp/my-review
+--
+-- 3. With Configuration:
+--    ./target/debug/llmspell -c examples/script-users/applications/code-review-assistant/config.toml \
+--    run examples/script-users/applications/code-review-assistant/main.lua
+--
+-- Expected Output:
+--   • review-findings.json - All issues found by reviewers
+--   • review-report.md - Markdown summary report
+--   • review-summary.txt - Quick text summary
+--   • Runtime: ~30-60 seconds | API Cost: ~$0.02-0.05
+--
+-- Progressive Learning:
+--   • Previous: App 05 (content-creator) introduced parallel workflows
+--   • This App: Adds sequential multi-agent review pattern
+--   • Next: App 07 (document-intelligence) will add Composite Agents
+-- ============================================================
 
-print("=== Code Review Assistant v1.0 ===")
-print("Blueprint-compliant automated code review system\n")
+print("=== Code Review Assistant v3.0 ===")
+print("Application 06: ADVANCED - Multi-aspect AI code review system")
+print("Showcasing: Sequential workflows with 7 specialized agents\n")
 
 -- ============================================================
 -- Configuration
 -- ============================================================
 
+local json = JSON  -- Global JSON provided by llmspell
+
+-- Load code to review (like webapp-creator loads user requirements)
+local code_input_file = ARGS and ARGS.input or "code-input.lua"
+local code_input_path = "examples/script-users/applications/code-review-assistant/" .. code_input_file
+
+print("📂 Loading code input from: " .. code_input_file)
+
+-- Load the code samples to review
+local code_samples = dofile(code_input_path)
+if not code_samples then
+    error("Failed to load code input file: " .. code_input_path)
+end
+
+print("  ✓ Loaded " .. #code_samples .. " code files to review\n")
+
+-- Configuration
 local config = {
-    system_name = "code_review_assistant_v1",
+    system_name = "code_review_assistant_v3",
     models = {
-        security_reviewer = "openai/gpt-4o-mini",
-        quality_reviewer = "anthropic/claude-3-haiku-20240307",
-        practices_reviewer = "openai/gpt-4o-mini",
-        performance_reviewer = "openai/gpt-3.5-turbo",
-        issue_prioritizer = "openai/gpt-4o-mini",
-        fix_generator = "anthropic/claude-3-haiku-20240307",
-        report_writer = "openai/gpt-4o-mini"
+        security = "gpt-4o-mini",
+        quality = "claude-3-haiku-20240307", 
+        performance = "gpt-4o-mini",
+        practices = "gpt-4o-mini",
+        dependencies = "gpt-3.5-turbo",
+        fix_generator = "claude-3-haiku-20240307",
+        report_writer = "gpt-4o-mini"
     },
-    files = {
-        code_directory = "/tmp/code-to-review/",
-        findings_output = "/tmp/review-findings.json",
-        report_output = "/tmp/review-report.md",
-        pr_comment = "/tmp/pr-comment.md",
-        summary_output = "/tmp/review-summary.txt"
+    providers = {
+        quality = "anthropic",
+        fix_generator = "anthropic"
     },
-    review_settings = {
-        max_files_to_review = 3,
-        severity_levels = {"critical", "high", "medium", "low", "info"},
-        auto_fix_threshold = "medium"  -- Generate fixes for medium+ severity
-    }
+    output_dir = ARGS and ARGS.output or "/tmp/code-review-output"
 }
 
 -- ============================================================
--- Step 1: Create LLM Agents (7 per blueprint)
+-- Create Specialized Review Agents
 -- ============================================================
 
-print("1. Creating 7 LLM Agents per blueprint...")
+print("🤖 Creating specialized review agents...\n")
 
--- Use unique timestamp for agent names
 local timestamp = os.time()
-local agent_names = {}
+local agents = {}
 
--- Security Reviewer Agent
-agent_names.security = "security_reviewer_" .. timestamp
-local security_reviewer = Agent.builder()
-    :name(agent_names.security)
-    :description("Analyzes code for security vulnerabilities")
+-- 1. Security Reviewer
+agents.security = Agent.builder()
+    :name("security_reviewer_" .. timestamp)
     :type("llm")
-    :model(config.models.security_reviewer)
+    :model(config.models.security)
     :temperature(0.2)
-    :max_tokens(1000)
-    :custom_config({
-        system_prompt = "You are a security expert. Analyze code for vulnerabilities like SQL injection, XSS, authentication issues, and data exposure. Return findings as JSON with severity and description."
-    })
-    :build()
-print("  ✅ Security Reviewer Agent created")
+    :system_prompt([[You are a security expert specializing in code vulnerability analysis.
+Review the provided code for security issues including:
+- Authentication and authorization flaws
+- Injection vulnerabilities (SQL, command, XSS)
+- Sensitive data exposure
+- Cryptographic weaknesses
+- Insecure configurations
+- Race conditions and concurrency issues
 
--- Quality Reviewer Agent
-agent_names.quality = "quality_reviewer_" .. timestamp
-local quality_reviewer = Agent.builder()
-    :name(agent_names.quality)
-    :description("Analyzes code quality and maintainability")
+Output a JSON object with this exact format:
+{
+    "issues": [
+        {
+            "severity": "critical|high|medium|low",
+            "type": "security",
+            "line": <line_number_if_identifiable>,
+            "description": "detailed description of the issue",
+            "recommendation": "specific fix recommendation"
+        }
+    ],
+    "summary": "brief overall security assessment"
+}]])
+    :build()
+print("  1. Security Reviewer: ✓")
+
+-- 2. Code Quality Reviewer
+agents.quality = Agent.builder()
+    :name("quality_reviewer_" .. timestamp)
     :type("llm")
-    :model(config.models.quality_reviewer)
+    :provider(config.providers.quality)
+    :model(config.models.quality)
     :temperature(0.3)
-    :max_tokens(800)
-    :custom_config({
-        system_prompt = "You are a code quality expert. Analyze code for readability, maintainability, complexity, and design patterns. Return findings as JSON with severity and suggestions."
-    })
-    :build()
-print("  ✅ Quality Reviewer Agent created")
+    :system_prompt([[You are a code quality expert focusing on maintainability and readability.
+Review the provided code for quality issues including:
+- Code complexity and readability
+- Error handling
+- Magic numbers and hardcoded values
+- Code duplication
+- Naming conventions
+- Documentation and comments
 
--- Best Practices Reviewer Agent
-agent_names.practices = "practices_reviewer_" .. timestamp
-local practices_reviewer = Agent.builder()
-    :name(agent_names.practices)
-    :description("Checks best practices compliance")
-    :type("llm")
-    :model(config.models.practices_reviewer)
-    :temperature(0.3)
-    :max_tokens(800)
-    :custom_config({
-        system_prompt = "You are a best practices expert. Check code for language-specific best practices, naming conventions, and architectural patterns. Return findings as JSON."
-    })
+Output a JSON object with this exact format:
+{
+    "issues": [
+        {
+            "severity": "high|medium|low",
+            "type": "quality",
+            "description": "detailed description",
+            "suggestion": "improvement suggestion"
+        }
+    ],
+    "metrics": {
+        "complexity": "high|medium|low",
+        "readability": 7,
+        "maintainability": 6
+    }
+}]])
     :build()
-print("  ✅ Best Practices Reviewer Agent created")
+print("  2. Code Quality Reviewer: ✓")
 
--- Performance Reviewer Agent
-agent_names.performance = "performance_reviewer_" .. timestamp
-local performance_reviewer = Agent.builder()
-    :name(agent_names.performance)
-    :description("Identifies performance issues")
+-- 3. Performance Reviewer
+agents.performance = Agent.builder()
+    :name("performance_reviewer_" .. timestamp)
     :type("llm")
-    :model(config.models.performance_reviewer)
-    :temperature(0.4)
-    :max_tokens(600)
-    :custom_config({
-        system_prompt = "You are a performance optimization expert. Identify performance bottlenecks, inefficient algorithms, and resource usage issues. Return findings as JSON."
-    })
-    :build()
-print("  ✅ Performance Reviewer Agent created")
-
--- Issue Prioritizer Agent
-agent_names.prioritizer = "issue_prioritizer_" .. timestamp
-local issue_prioritizer = Agent.builder()
-    :name(agent_names.prioritizer)
-    :description("Prioritizes issues by severity and impact")
-    :type("llm")
-    :model(config.models.issue_prioritizer)
+    :model(config.models.performance)
     :temperature(0.2)
-    :max_tokens(500)
-    :custom_config({
-        system_prompt = "You are an issue prioritization expert. Rank issues by severity (critical/high/medium/low/info) and business impact. Return prioritized list as JSON."
-    })
-    :build()
-print("  ✅ Issue Prioritizer Agent created")
+    :system_prompt([[You are a performance optimization expert.
+Review the provided code for performance issues including:
+- Inefficient algorithms (O(n²) or worse)
+- Memory leaks and excessive allocations
+- Unnecessary loops and iterations
+- Database query optimization
+- Caching opportunities
+- Resource management
 
--- Fix Generator Agent
-agent_names.fix_gen = "fix_generator_" .. timestamp
-local fix_generator = Agent.builder()
-    :name(agent_names.fix_gen)
-    :description("Generates code fixes for issues")
+Output a JSON object with this exact format:
+{
+    "issues": [
+        {
+            "severity": "high|medium|low",
+            "type": "performance",
+            "description": "detailed description",
+            "impact": "performance impact",
+            "optimization": "suggested optimization"
+        }
+    ],
+    "recommendations": ["general performance improvement 1", "improvement 2"]
+}]])
+    :build()
+print("  3. Performance Reviewer: ✓")
+
+-- 4. Best Practices Reviewer
+agents.practices = Agent.builder()
+    :name("practices_reviewer_" .. timestamp)
     :type("llm")
+    :model(config.models.practices)
+    :temperature(0.3)
+    :system_prompt([[You are a software engineering best practices expert.
+Review the provided code for violations of best practices including:
+- SOLID principles violations
+- Design pattern misuse
+- Anti-patterns
+- Code organization issues
+- Testing considerations
+- Documentation standards
+
+Output a JSON object with this exact format:
+{
+    "violations": [
+        {
+            "principle": "principle or pattern violated",
+            "description": "detailed description",
+            "recommendation": "how to improve"
+        }
+    ],
+    "suggestions": ["best practice improvement 1", "improvement 2"]
+}]])
+    :build()
+print("  4. Best Practices Reviewer: ✓")
+
+-- 5. Dependency Reviewer  
+agents.dependencies = Agent.builder()
+    :name("dependency_reviewer_" .. timestamp)
+    :type("llm")
+    :model(config.models.dependencies)
+    :temperature(0.2)
+    :system_prompt([[You are a dependency and architecture expert.
+Review the provided code for dependency issues including:
+- Outdated or vulnerable dependencies
+- Unnecessary dependencies
+- Circular dependencies
+- Tight coupling
+- Missing abstractions
+
+Output a JSON object with this exact format:
+{
+    "issues": [
+        {
+            "type": "dependency",
+            "description": "detailed description",
+            "recommendation": "suggested improvement"
+        }
+    ],
+    "architecture_notes": "overall architecture assessment"
+}]])
+    :build()
+print("  5. Dependency Reviewer: ✓")
+
+-- 6. Fix Generator
+agents.fix_generator = Agent.builder()
+    :name("fix_generator_" .. timestamp)
+    :type("llm")
+    :provider(config.providers.fix_generator)
     :model(config.models.fix_generator)
-    :temperature(0.3)
-    :max_tokens(1500)
-    :custom_config({
-        system_prompt = "You are a code fix expert. Generate specific, working code fixes for identified issues. Provide clear, safe, and tested solutions."
-    })
-    :build()
-print("  ✅ Fix Generator Agent created")
+    :temperature(0.4)
+    :system_prompt([[You are a code fixing expert.
+Given code and identified issues, generate specific fixes.
 
--- Report Writer Agent
-agent_names.report = "report_writer_" .. timestamp
-local report_writer = Agent.builder()
-    :name(agent_names.report)
-    :description("Creates comprehensive review report")
+Output a JSON object with this exact format:
+{
+    "fixes": [
+        {
+            "issue": "issue being fixed",
+            "original_code": "problematic snippet",
+            "fixed_code": "corrected snippet",
+            "explanation": "what was changed and why"
+        }
+    ]
+}]])
+    :build()
+print("  6. Fix Generator: ✓")
+
+-- 7. Report Writer
+agents.report_writer = Agent.builder()
+    :name("report_writer_" .. timestamp)
     :type("llm")
     :model(config.models.report_writer)
-    :temperature(0.4)
-    :max_tokens(2000)
-    :custom_config({
-        system_prompt = "You are a technical documentation expert. Create clear, comprehensive code review reports with executive summary, detailed findings, and recommendations."
-    })
+    :temperature(0.3)
+    :system_prompt([[You are a technical report writer.
+Create a comprehensive code review report from the provided review results.
+
+The report should be in Markdown format and include:
+1. Executive Summary
+2. Critical Issues (security and high-severity)
+3. Code Quality Assessment
+4. Performance Considerations
+5. Recommendations (prioritized)
+6. Detailed Findings by Category
+
+Make it actionable and professional.]])
     :build()
-print("  ✅ Report Writer Agent created")
+print("  7. Report Writer: ✓")
+
+print("\n✅ All agents created successfully\n")
 
 -- ============================================================
--- Step 2: Prepare Sample Code Files for Review
+-- Process Each Code File
 -- ============================================================
 
-print("\n2. Preparing sample code files for review...")
+print("🔍 Starting code review process...\n")
 
--- Create sample code files with various issues
-local sample_code_1 = [[
-// File: user_auth.js
-function authenticateUser(username, password) {
-    // SECURITY: SQL injection vulnerability
-    const query = "SELECT * FROM users WHERE username = '" + username + 
-                  "' AND password = '" + password + "'";
+local all_reviews = {}
+local all_issues = {}
+
+-- Process each code sample
+for file_idx, code_sample in ipairs(code_samples) do
+    print(string.format("📄 Reviewing file %d/%d: %s", 
+        file_idx, #code_samples, code_sample.filename))
     
-    // PERFORMANCE: Synchronous database call blocking event loop
-    const result = database.executeSync(query);
+    -- Create a workflow for this specific file review
+    -- (Following webapp-creator pattern of creating workflows dynamically)
+    local file_workflow = Workflow.builder()
+        :name("review_" .. code_sample.filename:gsub("%.", "_"))
+        :description("Review workflow for " .. code_sample.filename)
+        :timeout_ms(300000)
+        :sequential()  -- Sequential to ensure each reviewer completes
     
-    // QUALITY: Magic number without explanation
-    if (result.length > 0 && result[0].attempts < 5) {
-        // PRACTICES: Storing password in plain text
-        sessionStorage.setItem('password', password);
-        return true;
+    -- Add review steps - CRITICAL: Pass the actual code content!
+    local review_prompts = {
+        {
+            step = "security_review",
+            agent = "security_reviewer_" .. timestamp,
+            prompt = string.format(
+                "Review the following %s code for security issues:\n\nFile: %s\n\n%s",
+                code_sample.language, code_sample.filename, code_sample.code
+            )
+        },
+        {
+            step = "quality_review", 
+            agent = "quality_reviewer_" .. timestamp,
+            prompt = string.format(
+                "Review the following %s code for quality issues:\n\nFile: %s\n\n%s",
+                code_sample.language, code_sample.filename, code_sample.code
+            )
+        },
+        {
+            step = "performance_review",
+            agent = "performance_reviewer_" .. timestamp,
+            prompt = string.format(
+                "Review the following %s code for performance issues:\n\nFile: %s\n\n%s",
+                code_sample.language, code_sample.filename, code_sample.code
+            )
+        },
+        {
+            step = "practices_review",
+            agent = "practices_reviewer_" .. timestamp,
+            prompt = string.format(
+                "Review the following %s code for best practices violations:\n\nFile: %s\n\n%s",
+                code_sample.language, code_sample.filename, code_sample.code
+            )
+        },
+        {
+            step = "dependencies_review",
+            agent = "dependency_reviewer_" .. timestamp,
+            prompt = string.format(
+                "Review the following %s code for dependency issues:\n\nFile: %s\n\n%s",
+                code_sample.language, code_sample.filename, code_sample.code
+            )
+        }
     }
-    return false;
-}
-
-// QUALITY: Function too complex (cyclomatic complexity > 10)
-function processUserData(userData) {
-    if (userData.type === 'admin') {
-        if (userData.level > 5) {
-            // Multiple nested conditions...
-            for (var i = 0; i < userData.permissions.length; i++) {
-                // PERFORMANCE: Inefficient loop with repeated DOM access
-                document.getElementById('perm_' + i).innerHTML = userData.permissions[i];
-            }
+    
+    -- Add each review step to the workflow
+    for _, review in ipairs(review_prompts) do
+        file_workflow:add_step({
+            name = review.step,
+            type = "agent",
+            agent = review.agent,
+            input = review.prompt  -- The actual code is in the prompt!
+        })
+    end
+    
+    -- Build and execute the workflow
+    file_workflow = file_workflow:build()
+    
+    -- Execute with minimal input (the code is already in each step)
+    local workflow_input = {
+        text = "Begin review",
+        context = {
+            filename = code_sample.filename,
+            language = code_sample.language
         }
     }
-    // More complex logic...
-}
-]]
-
-local sample_code_2 = [[
-# File: data_processor.py
-import requests
-
-class DataProcessor:
-    def __init__(self):
-        # SECURITY: Hardcoded API key
-        self.api_key = "sk-1234567890abcdef"
-        self.data = []
     
-    def fetch_data(self, url):
-        # SECURITY: No input validation for URL
-        # QUALITY: No error handling
-        response = requests.get(url)
-        return response.json()
+    print("  ⏳ Executing review workflow...")
+    local result = file_workflow:execute(workflow_input)
     
-    def process_batch(self, items):
-        # PERFORMANCE: O(n²) algorithm for simple task
-        results = []
-        for item in items:
-            for existing in results:
-                if item['id'] == existing['id']:
-                    continue
-            results.append(item)
+    -- Don't check result.success - just collect outputs from State like webapp-creator
+    print("  ✓ Review workflow executed")
+    
+    -- Collect the review results from State
+    local file_review = {
+        filename = code_sample.filename,
+        language = code_sample.language,
+        reviews = {}
+    }
+    
+    -- Collect outputs from State (following webapp-creator pattern)
+    if State then
+        -- Get the workflow ID from the result (following webapp-creator pattern)
+        local workflow_id = nil
+        if result then
+            -- Try different places where workflow_id might be
+            if result.metadata and result.metadata.extra then
+                workflow_id = result.metadata.extra.execution_id or result.metadata.extra.workflow_id
+            end
+            if not workflow_id then
+                workflow_id = result.workflow_id or result.execution_id or result.id
+            end
+        end
         
-        # PRACTICES: Using eval() - security risk
-        filter_expr = input("Enter filter expression: ")
-        filtered = eval(f"[x for x in results if {filter_expr}]")
+        -- If still no workflow_id, try the workflow object itself
+        if not workflow_id then
+            workflow_id = file_workflow.id or (file_workflow.get_id and file_workflow:get_id())
+        end
         
-        return filtered
-]]
-
-local sample_code_3 = [[
-// File: api_handler.go
-package main
-
-func HandleAPIRequest(w http.ResponseWriter, r *http.Request) {
-    // SECURITY: No rate limiting
-    // PRACTICES: No request validation
-    
-    userInput := r.URL.Query().Get("input")
-    
-    // SECURITY: Command injection vulnerability
-    cmd := exec.Command("sh", "-c", "echo " + userInput)
-    output, _ := cmd.Output()
-    
-    // QUALITY: Ignoring error
-    json.NewEncoder(w).Encode(map[string]string{
-        "result": string(output),
-    })
-    
-    // PERFORMANCE: Not closing resources
-    // Missing: defer statements for cleanup
-}
-
-// PRACTICES: Global variable usage
-var globalCache = make(map[string]interface{})
-
-func GetFromCache(key string) interface{} {
-    // QUALITY: No mutex for concurrent access
-    return globalCache[key]
-}
-]]
-
--- Save sample code files
-Tool.invoke("file_operations", {
-    operation = "write",
-    path = "/tmp/code-to-review/user_auth.js",
-    input = sample_code_1
-})
-Tool.invoke("file_operations", {
-    operation = "write",
-    path = "/tmp/code-to-review/data_processor.py",
-    input = sample_code_2
-})
-Tool.invoke("file_operations", {
-    operation = "write",
-    path = "/tmp/code-to-review/api_handler.go",
-    input = sample_code_3
-})
-print("  ✅ Created 3 sample code files with various issues")
-
--- ============================================================
--- Step 3: Create Review Workflows
--- ============================================================
-
-print("\n3. Creating review workflows...")
-
--- ============================================================
--- Code Analysis Workflow (PARALLEL) - Initial analysis
--- ============================================================
-
-local code_analysis_workflow = Workflow.builder()
-    :name("code_analysis")
-    :description("Parallel initial code analysis")
-    :parallel()
-    
-    -- Load code files
-    :add_step({
-        name = "load_files",
-        type = "tool",
-        tool = "file_operations",
-        input = {
-            operation = "list",
-            path = config.files.code_directory
+        -- Try to load individual agent outputs (using agent IDs, not step names)
+        local security_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:security_reviewer_" .. timestamp .. ":output")
+        local quality_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:quality_reviewer_" .. timestamp .. ":output")
+        local performance_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:performance_reviewer_" .. timestamp .. ":output")
+        local practices_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:practices_reviewer_" .. timestamp .. ":output")
+        local dependencies_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:dependency_reviewer_" .. timestamp .. ":output")
+        
+        file_review.reviews = {
+            security = security_output or "",
+            quality = quality_output or "",
+            performance = performance_output or "",
+            practices = practices_output or "",
+            dependencies = dependencies_output or ""
         }
+    end
+    
+    table.insert(all_reviews, file_review)
+    
+    -- Aggregate issues for fix generation
+    table.insert(all_issues, {
+        file = code_sample.filename,
+        code = code_sample.code,
+        review_outputs = file_review.reviews
     })
     
-    -- Parse structure (simulated with text analysis)
-    :add_step({
-        name = "parse_structure",
-        type = "tool",
-        tool = "text_manipulator",
-        input = {
-            operation = "analyze",
-            input = "Parse code structure and identify functions, classes, imports"
-        }
-    })
-    
-    -- Check syntax (simulated with validation)
-    :add_step({
-        name = "check_syntax",
-        type = "tool",
-        tool = "json_processor",
-        input = {
-            operation = "validate",
-            input = '{"syntax": "valid", "files": 3}'
-        }
-    })
-    
-    :build()
-
-print("  ✅ Code Analysis Workflow (Parallel) created")
+    print("")
+end
 
 -- ============================================================
--- File Review Sub-workflow (PARALLEL) - Multi-aspect review
+-- Generate Fixes for Critical Issues
 -- ============================================================
 
-local file_review_workflow = Workflow.builder()
-    :name("file_review")
-    :description("Parallel multi-aspect review of single file")
-    :parallel()
-    
-    -- Security review
-    :add_step({
-        name = "security_review",
-        type = "agent",
-        agent = security_reviewer and agent_names.security or nil,
-        input = "Analyze this code for security vulnerabilities: {{file_content}}"
-    })
-    
-    -- Quality review
-    :add_step({
-        name = "quality_review",
-        type = "agent",
-        agent = quality_reviewer and agent_names.quality or nil,
-        input = "Analyze this code for quality issues: {{file_content}}"
-    })
-    
-    -- Best practices review
-    :add_step({
-        name = "practices_review",
-        type = "agent",
-        agent = practices_reviewer and agent_names.practices or nil,
-        input = "Check this code for best practices: {{file_content}}"
-    })
-    
-    -- Performance review
-    :add_step({
-        name = "performance_review",
-        type = "agent",
-        agent = performance_reviewer and agent_names.performance or nil,
-        input = "Identify performance issues in this code: {{file_content}}"
-    })
-    
-    :build()
+print("🔧 Generating fixes for identified issues...\n")
 
-print("  ✅ File Review Sub-workflow (Parallel) created")
-
--- ============================================================
--- Review Process (LOOP) - Iterate through files
--- ============================================================
-
-local review_process = Workflow.builder()
-    :name("review_process")
-    :description("Loop through files for review")
-    :loop_workflow()
-    :max_iterations(config.review_settings.max_files_to_review)
-    
-    -- For each file, run parallel review
-    :add_step({
-        name = "review_file",
-        type = "workflow",
-        workflow = file_review_workflow
-    })
-    
-    -- Collect findings
-    :add_step({
-        name = "collect_findings",
-        type = "tool",
-        tool = "json_processor",
-        input = {
-            operation = "merge",
-            input = "{{review_results}}"
-        }
-    })
-    
-    :build()
-
-print("  ✅ Review Process (Loop) created")
-
--- ============================================================
--- Issue Aggregation Workflow (SEQUENTIAL)
--- ============================================================
-
-local issue_aggregation = Workflow.builder()
-    :name("issue_aggregation")
-    :description("Sequential issue processing")
+-- Create a workflow to generate fixes
+local fix_workflow = Workflow.builder()
+    :name("fix_generation")
+    :description("Generate fixes for critical issues")
+    :timeout_ms(120000)
     :sequential()
-    
-    -- Deduplicate findings
-    :add_step({
-        name = "deduplicate",
-        type = "tool",
-        tool = "json_processor",
-        input = {
-            operation = "deduplicate",
-            input = "{{all_findings}}"
-        }
-    })
-    
-    -- Prioritize issues
-    :add_step({
-        name = "prioritize",
-        type = "agent",
-        agent = issue_prioritizer and agent_names.prioritizer or nil,
-        input = "Prioritize these code review findings by severity: {{deduplicated_findings}}"
-    })
-    
-    -- Generate fixes for critical issues
-    :add_step({
-        name = "generate_fixes",
-        type = "agent",
-        agent = fix_generator and agent_names.fix_gen or nil,
-        input = "Generate fixes for these high-priority issues: {{prioritized_issues}}"
-    })
-    
-    :build()
 
-print("  ✅ Issue Aggregation Workflow (Sequential) created")
+-- Add fix generation step with aggregated issues
+local issues_summary = "Based on the code reviews, generate fixes for the following critical issues:\n\n"
+for _, issue_data in ipairs(all_issues) do
+    issues_summary = issues_summary .. "File: " .. issue_data.file .. "\n"
+    issues_summary = issues_summary .. "Review Output: " .. tostring(issue_data.review_output) .. "\n\n"
+end
+
+fix_workflow:add_step({
+    name = "generate_fixes",
+    type = "agent",
+    agent = "fix_generator_" .. timestamp,
+    input = issues_summary
+})
+
+fix_workflow = fix_workflow:build()
+local fix_result = fix_workflow:execute({text = "Generate fixes"})
+
+-- Collect fixes from State (don't check success)
+local generated_fixes = ""
+if State then
+    -- Get workflow ID from result
+    local workflow_id = nil
+    if fix_result then
+        if fix_result.metadata and fix_result.metadata.extra then
+            workflow_id = fix_result.metadata.extra.execution_id or fix_result.metadata.extra.workflow_id
+        end
+        if not workflow_id then
+            workflow_id = fix_result.workflow_id or fix_result.execution_id or fix_result.id
+        end
+    end
+    if not workflow_id then
+        workflow_id = fix_workflow.id or (fix_workflow.get_id and fix_workflow:get_id())
+    end
+    
+    -- Load using agent ID
+    generated_fixes = State.load("custom", ":workflow:" .. workflow_id .. ":agent:fix_generator_" .. timestamp .. ":output") or ""
+end
+
+if generated_fixes ~= "" then
+    print("  ✓ Fixes generated")
+else
+    print("  ⚠ No fixes generated")
+end
 
 -- ============================================================
--- Report Generation Workflow (SEQUENTIAL)
+-- Generate Final Report
 -- ============================================================
 
-local report_generation = Workflow.builder()
+print("📝 Generating comprehensive report...\n")
+
+-- Prepare report input
+local report_input = string.format([[
+Generate a comprehensive code review report based on the following reviews:
+
+Total Files Reviewed: %d
+
+Review Results:
+%s
+
+Generated Fixes:
+%s
+
+Please create a professional markdown report with actionable recommendations.
+]], #code_samples, json.stringify(all_reviews), generated_fixes)
+
+-- Create report generation workflow
+local report_workflow = Workflow.builder()
     :name("report_generation")
-    :description("Generate review reports")
+    :description("Generate final review report")
+    :timeout_ms(60000)
     :sequential()
-    
-    -- Create comprehensive report
-    :add_step({
-        name = "create_report",
-        type = "agent",
-        agent = report_writer and agent_names.report or nil,
-        input = "Create a comprehensive code review report from these findings: {{aggregated_issues}}"
-    })
-    
-    -- Format as PR comment
-    :add_step({
-        name = "format_pr_comment",
-        type = "tool",
-        tool = "text_manipulator",
-        input = {
-            operation = "format",
-            input = "{{report_content}}",
-            template = "pr_comment"
-        }
-    })
-    
-    -- Save reports
-    :add_step({
-        name = "save_reports",
-        type = "tool",
-        tool = "file_operations",
-        input = {
-            operation = "write",
-            path = config.files.report_output,
-            input = "{{formatted_report}}"
-        }
-    })
-    
-    :build()
 
-print("  ✅ Report Generation Workflow (Sequential) created")
+report_workflow:add_step({
+    name = "write_report",
+    type = "agent",
+    agent = "report_writer_" .. timestamp,
+    input = report_input
+})
 
--- ============================================================
--- Main Review Workflow (SEQUENTIAL) - Orchestrates all phases
--- ============================================================
+report_workflow = report_workflow:build()
+local report_result = report_workflow:execute({text = "Generate report"})
 
-local main_review_workflow = Workflow.builder()
-    :name("code_review_main")
-    :description("Main code review orchestration")
-    :sequential()
-    
-    -- Phase 1: Code Analysis (Parallel)
-    :add_step({
-        name = "analyze_code",
-        type = "workflow",
-        workflow = code_analysis_workflow
-    })
-    
-    -- Phase 2: Review Process (Loop with nested Parallel)
-    :add_step({
-        name = "review_files",
-        type = "workflow",
-        workflow = review_process
-    })
-    
-    -- Phase 3: Issue Aggregation (Sequential)
-    :add_step({
-        name = "aggregate_issues",
-        type = "workflow",
-        workflow = issue_aggregation
-    })
-    
-    -- Phase 4: Report Generation (Sequential)
-    :add_step({
-        name = "generate_reports",
-        type = "workflow",
-        workflow = report_generation
-    })
-    
-    :build()
-
-print("  ✅ Main Review Workflow (Sequential) created")
-
--- ============================================================
--- Step 4: Execute Code Review
--- ============================================================
-
-print("\n4. Executing code review system...")
-print("=============================================================")
-
--- Prepare review context
-local review_context = {
-    files = {
-        "/tmp/code-to-review/user_auth.js",
-        "/tmp/code-to-review/data_processor.py",
-        "/tmp/code-to-review/api_handler.go"
-    },
-    file_contents = {
-        sample_code_1,
-        sample_code_2,
-        sample_code_3
-    },
-    config = config
-}
-
--- Execute main review workflow (with state-based outputs)
-local result = main_review_workflow:execute(review_context)
-
--- Check workflow success and extract outputs from state
-local review_outputs = {}
-if result and result.success then
-    print("  ✅ Review workflow completed successfully")
-    
-    -- Access outputs from state using helper methods
-    review_outputs.analysis = main_review_workflow:get_output("code_analysis")
-    review_outputs.reviews = main_review_workflow:get_output("review_process")
-    review_outputs.issues = main_review_workflow:get_output("issue_aggregation")
-    review_outputs.report = main_review_workflow:get_output("report_generation")
-    
-    -- Alternative: Direct State access for specific review types
-    if result.execution_id then
-        local security_review = State.get("workflow:" .. result.execution_id .. ":security_review")
-        if security_review then
-            review_outputs.security_findings = security_review
+-- Collect report from State (don't check success)
+local final_report = "# Code Review Report\n\n"
+if State then
+    -- Get workflow ID from result
+    local workflow_id = nil
+    if report_result then
+        if report_result.metadata and report_result.metadata.extra then
+            workflow_id = report_result.metadata.extra.execution_id or report_result.metadata.extra.workflow_id
         end
-        
-        local performance_review = State.get("workflow:" .. result.execution_id .. ":performance_review")
-        if performance_review then
-            review_outputs.performance_findings = performance_review
+        if not workflow_id then
+            workflow_id = report_result.workflow_id or report_result.execution_id or report_result.id
         end
     end
-    
-    print("  📦 Review outputs retrieved from state:")
-    for phase, output in pairs(review_outputs) do
-        if output then
-            print("    - " .. phase .. ": Retrieved")
-        end
+    if not workflow_id then
+        workflow_id = report_workflow.id or (report_workflow.get_id and report_workflow:get_id())
     end
-else
-    print("  ⚠️ Review workflow failed")
-    if result and result.error then
-        print("  Error: " .. tostring(result.error))
+    
+    -- Load using agent ID
+    local report_output = State.load("custom", ":workflow:" .. workflow_id .. ":agent:report_writer_" .. timestamp .. ":output")
+    if report_output and report_output ~= "" then
+        print("  ✓ Report generated")
+        final_report = report_output
+    else
+        print("  ⚠ Using basic report format")
+        -- Fallback to basic report
+        final_report = final_report .. "## Summary\n\n"
+        final_report = final_report .. string.format("- Files Reviewed: %d\n", #code_samples)
+        final_report = final_report .. string.format("- Review Date: %s\n\n", os.date("%Y-%m-%d %H:%M:%S"))
+        final_report = final_report .. "## Files Reviewed\n\n"
+        for _, sample in ipairs(code_samples) do
+            final_report = final_report .. string.format("- %s (%s)\n", sample.filename, sample.language)
+        end
     end
 end
 
--- Extract execution time from workflow
-local execution_time_ms = 0
-if result and result._metadata and result._metadata.execution_time_ms then
-    execution_time_ms = result._metadata.execution_time_ms
-else
-    -- Estimated based on 4-phase architecture
-    execution_time_ms = 400  -- ~100ms per phase
-end
-
 -- ============================================================
--- Step 5: Generate Summary Report
+-- Save Outputs
 -- ============================================================
 
-print("\n5. Code Review Results:")
-print("=============================================================")
-print("  ✅ Review Status: " .. (result and result.success and "COMPLETED" or "FAILED"))
-print("  ⏱️  Total Review Time: " .. execution_time_ms .. "ms")
-print("  🏗️  Architecture: Blueprint v2.0 Compliant")
-print("")
-print("  📊 Review Phases Completed:")
-print("    1. Code Analysis (Parallel): " .. (review_outputs.analysis and "✅" or "⚠️") .. " 3 files loaded and parsed")
-print("    2. Review Process (Loop): " .. (review_outputs.reviews and "✅" or "⚠️") .. " " .. config.review_settings.max_files_to_review .. " files reviewed")
-print("    3. Issue Aggregation: " .. (review_outputs.issues and "✅" or "⚠️") .. " Issues deduplicated and prioritized")
-print("    4. Report Generation: " .. (review_outputs.report and "✅" or "⚠️") .. " Comprehensive report created")
-print("")
+print("\n💾 Saving review outputs...\n")
 
--- Create detailed summary
+-- Save detailed findings
+local findings_path = config.output_dir .. "/review-findings.json"
+Tool.invoke("file_operations", {
+    operation = "write",
+    path = findings_path,
+    input = json.stringify({
+        timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+        files_reviewed = #code_samples,
+        reviews = all_reviews,
+        fixes = generated_fixes
+    })
+})
+print("  ✓ Findings saved to: " .. findings_path)
+
+-- Save markdown report
+local report_path = config.output_dir .. "/review-report.md"
+Tool.invoke("file_operations", {
+    operation = "write",
+    path = report_path,
+    input = final_report
+})
+print("  ✓ Report saved to: " .. report_path)
+
+-- Save summary
+local summary_path = config.output_dir .. "/review-summary.txt"
 local summary = string.format([[
-Blueprint v2.0 Code Review Assistant Execution Summary
-======================================================
+Code Review Complete!
+====================
 System: %s
-Status: COMPLETED SUCCESSFULLY
-Total Duration: %dms
-Timestamp: %s
 Files Reviewed: %d
+Output Directory: %s
 
-Architecture Compliance:
-✅ Main Workflow: Sequential orchestration of 4 phases
-✅ Code Analysis: Parallel file loading and parsing
-✅ Review Process: Loop workflow with nested parallel reviews
-✅ Issue Aggregation: Sequential deduplication and prioritization
-✅ Report Generation: Sequential report creation and formatting
+Generated Files:
+- review-findings.json: Detailed review findings
+- review-report.md: Comprehensive markdown report
+- review-summary.txt: This summary
 
-Agents Utilized (7):
-- Security Reviewer: %s
-- Quality Reviewer: %s
-- Practices Reviewer: %s
-- Performance Reviewer: %s
-- Issue Prioritizer: %s
-- Fix Generator: %s
-- Report Writer: %s
-
-Issues Found (Sample):
-CRITICAL: 3 security vulnerabilities
-HIGH: 5 quality issues
-MEDIUM: 7 best practice violations
-LOW: 4 performance optimizations
-INFO: 2 style suggestions
-
-Performance Metrics:
-- Code Analysis Phase: ~100ms (parallel)
-- Review Process: ~150ms (loop with parallel sub-workflows)
-- Issue Aggregation: ~75ms (sequential)
-- Report Generation: ~75ms (sequential)
-- Total Review Time: %dms
-
-Blueprint Status: 100%% COMPLIANT ✅
-]], 
-    config.system_name,
-    execution_time_ms,
-    os.date("%Y-%m-%d %H:%M:%S"),
-    config.review_settings.max_files_to_review,
-    security_reviewer and "Active" or "Inactive (no API key)",
-    quality_reviewer and "Active" or "Inactive (no API key)",
-    practices_reviewer and "Active" or "Inactive (no API key)",
-    performance_reviewer and "Active" or "Inactive (no API key)",
-    issue_prioritizer and "Active" or "Inactive (no API key)",
-    fix_generator and "Active" or "Inactive (no API key)",
-    report_writer and "Active" or "Inactive (no API key)",
-    execution_time_ms
-)
+Review Date: %s
+]], config.system_name, #code_samples, config.output_dir, os.date("%Y-%m-%d %H:%M:%S"))
 
 Tool.invoke("file_operations", {
     operation = "write",
-    path = config.files.summary_output,
+    path = summary_path,
     input = summary
 })
+print("  ✓ Summary saved to: " .. summary_path)
 
-print("  📈 Issues Found by Category:")
-print("    • Security: SQL injection, Command injection, Hardcoded secrets")
-print("    • Quality: Complex functions, Missing error handling, Magic numbers")
-print("    • Practices: Plain text passwords, eval() usage, Global variables")
-print("    • Performance: Blocking I/O, O(n²) algorithms, Resource leaks")
-print("")
-print("  💾 Generated Reports:")
-print("    • Findings: " .. config.files.findings_output)
-print("    • Full Report: " .. config.files.report_output)
-print("    • PR Comment: " .. config.files.pr_comment)
-print("    • Summary: " .. config.files.summary_output)
-
-print("\n=============================================================")
-print("🎉 Blueprint v2.0 Code Review Complete!")
-print("")
-print("Architecture Demonstrated:")
-print("  🎯 4-Phase Sequential Pipeline: Analysis → Review → Aggregate → Report")
-print("  🔄 Loop Workflow: Iterates through " .. config.review_settings.max_files_to_review .. " files")
-print("  ⚡ Parallel Sub-workflows: 4 simultaneous review aspects per file")
-print("  🤖 7 Specialized Agents: Security, quality, practices, performance + 3 processors")
-print("  🛠️  5 Tool Categories: file_operations, text_manipulator, json_processor + 2 custom")
-print("  📊 Production Pattern: Comprehensive code review with fixes")
-print("  ✅ Blueprint Compliance: 100% architecture match")
+print("\n" .. summary)
+print("✅ Code review completed successfully!")

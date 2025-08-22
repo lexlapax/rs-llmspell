@@ -1,53 +1,67 @@
--- Application: WebApp Creator v2.0 (Task 10.3 Clean Implementation)
--- Purpose: Generate complete web applications using 20 specialized AI agents
--- Architecture: State-based workflow with proper output collection and error recovery
--- Prerequisites: OPENAI_API_KEY and ANTHROPIC_API_KEY environment variables
--- Expected Output: Complete web application with frontend, backend, database, tests, and deployment
--- Version: 2.0.0 (Complete rewrite for Task 10.3 of Phase 7.3.10)
--- Tags: application, webapp-creator, workflows, agents, state, error-handling
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Application ID: 10 - WebApp Creator v2.0.0
+-- Complexity Level: 4 [EXPERT]
+-- Real-World Use Case: Full-stack application generation (Google Jarvis-like, 2025 AI development trend)
+-- 
+-- Purpose: Generate complete production-ready web applications using 20 specialized AI agents
+-- Architecture: Sequential workflow with state-based output collection and error recovery
+-- Crates Showcased: llmspell-agents, llmspell-workflows, llmspell-tools, llmspell-bridge, 
+--                   llmspell-state-persistence, llmspell-utils, llmspell-testing
+-- Key Features:
+--   • 20 specialized agents for full-stack development
+--   • Complete app generation: frontend, backend, database, tests, deployment
+--   • State-based output collection with workflow IDs
+--   • Error recovery with exponential backoff
+--   • Production-ready code generation with best practices
+--
+-- Prerequisites:
+--   • API Keys: OPENAI_API_KEY and ANTHROPIC_API_KEY (both required)
+--   • Config: config.toml for file system and security settings
+--   • Resources: ~120 seconds runtime, ~$0.50-1.00 API costs
 --
 -- HOW TO RUN:
--- 1. Basic test (no API keys - will create agent structure):
---    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main-v2.lua
+-- 1. Basic Demo (generates e-commerce platform):
+--    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua
 --
--- 2. With configuration file:
+-- 2. With Custom Requirements:
+--    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main.lua \
+--    -- --input user-input-social.lua --output ~/projects/my-app
+--
+-- 3. With Full Configuration:
 --    ./target/debug/llmspell -c examples/script-users/applications/webapp-creator/config.toml \
---     run examples/script-users/applications/webapp-creator/main-v2.lua
+--    run examples/script-users/applications/webapp-creator/main.lua \
+--    -- --input user-input-ecommerce.lua --output ./generated
 --
--- 3. Full execution with API keys:
---    export OPENAI_API_KEY="sk-..."
---    export ANTHROPIC_API_KEY="sk-ant-..."
---    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main-v2.lua
+-- 4. Production Mode (with optimizations):
+--    ./target/release/llmspell -c config.toml run main.lua \
+--    -- --input requirements.lua --output /var/www/apps --production
 --
--- 4. With custom input file:
---    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main-v2.lua \
---    -- --input user-input-ecommerce.lua
+-- Expected Output:
+--   • Complete web application structure (20+ files)
+--   • Frontend: React/Vue components, routing, state management
+--   • Backend: API endpoints, database models, authentication
+--   • Infrastructure: Docker, CI/CD, deployment configs
+--   • Documentation: README, API docs, setup guides
+--   • Runtime: ~120-180 seconds | API Cost: ~$0.50-1.00
 --
--- 5. With custom output directory:
---    ./target/debug/llmspell run examples/script-users/applications/webapp-creator/main-v2.lua \
---    -- --input user-input-ecommerce.lua --output ~/projects
---
--- ABOUTME: Clean implementation of webapp creator demonstrating state-based output collection
--- ABOUTME: Replaces 1459-line main.lua with focused 467-line implementation
--- ABOUTME: Uses proper error handling with retry logic and partial state recovery
--- ABOUTME: Implements all 20 agents as specified in Task 10.3.b of TODO.md
---
--- KEY IMPROVEMENTS OVER v1.0:
--- • 68% code reduction (467 vs 1459 lines) for better maintainability
--- • Proper state-based output collection using workflow_id
--- • Clean error handling with exponential backoff and recovery
--- • Modular helper functions for reusability
--- • Direct workflow execution instead of complex nested controllers
--- • Focused on core functionality without demonstration bloat
+-- Progressive Learning:
+--   • Previous: App 09 (sales-automation) introduced meta-workflows
+--   • This App: Demonstrates production patterns with 20 agents
+--   • Completion: You've mastered all llmspell capabilities!
 --
 -- ARCHITECTURE HIGHLIGHTS:
--- • collect_workflow_outputs(): Centralized state retrieval (Task 10.3.a)
--- • safe_agent_execute(): Retry logic with partial state saving (Task 10.3.d)
--- • generate_file(): Unified file generation with error handling (Task 10.3.c)
--- • 20 specialized agents with specific models and prompts (Task 10.3.b)
--- • Recovery mechanism for resuming from failures (Task 10.3.d)
+-- • collect_workflow_outputs(): Centralized state retrieval
+-- • safe_agent_execute(): Retry logic with partial state saving
+-- • generate_file(): Unified file generation with error handling
+-- • 20 specialized agents with specific models and prompts
+-- • Recovery mechanism for resuming from failures
+-- ============================================================
 
-print("=== WebApp Creator v2.0 - Clean Implementation ===\n")
+print("=== WebApp Creator v2.0 ===")
+print("Application 10: EXPERT - Complete web application generation")
+print("Showcasing: Production patterns with 20 specialized agents\n")
 
 -- ============================================================
 -- Configuration and Setup

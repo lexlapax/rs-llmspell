@@ -1,333 +1,280 @@
-# Code Review Assistant
+# Code Review Assistant - Level 6: ADVANCED
 
-An automated code review system with security scanning, quality analysis, and improvement suggestions using llmspell's loop workflows and parallel multi-aspect review.
+**Real-World Application**: DevOps automation and CI/CD code quality assurance (2025 trend)  
+**Complexity**: ⭐⭐⭐⭐☆  
+**Est. Runtime**: 30-60 seconds | **API Cost**: ~$0.02-0.05
 
 ## Overview
 
-The Code Review Assistant demonstrates:
-- **4-Phase Architecture**: Analysis → Review → Aggregation → Report
-- **Loop Workflow**: Iterates through multiple files for review
-- **Parallel Sub-workflows**: 4 simultaneous review aspects per file
-- **7 Specialized Agents**: Security, quality, practices, performance reviewers + processors
-- **Blueprint v2.0 Compliant**: Production-grade code review patterns
+The Code Review Assistant automates comprehensive code reviews using 7 specialized AI agents, addressing the growing need for automated quality assurance in modern CI/CD pipelines. This application demonstrates how multiple agents can work sequentially to analyze code from different perspectives, providing actionable feedback similar to enterprise tools like GitHub Copilot for PRs and AWS CodeGuru.
 
-## Prerequisites
+## Features Demonstrated
 
-### Required
-- llmspell built and available (`cargo build --release`)
-- At least one of:
-  - OpenAI API key: `export OPENAI_API_KEY="sk-..."`
-  - Anthropic API key: `export ANTHROPIC_API_KEY="sk-ant-..."`
+### llmspell Crates Showcased
+- `llmspell-agents`: 7 specialized review agents with distinct prompts
+- `llmspell-workflows`: Sequential workflow with state management
+- `llmspell-tools`: File operations for reading/writing code and reports
+- `llmspell-bridge`: Lua script integration with async agent execution
+- `llmspell-state-persistence`: Output collection via workflow state
 
-### Optional
-- Both API keys for multi-provider functionality
-- GitHub integration for PR comments (future enhancement)
+### Progressive Complexity
+| Aspect | Implementation | New in This Level |
+|--------|---------------|-------------------|
+| Agents | 7 specialized reviewers | Multi-agent orchestration |
+| Workflow | Sequential with state | State-based output collection |
+| Providers | OpenAI + Anthropic | Multi-provider coordination |
+| Output | JSON + Markdown + Text | Structured multi-format output |
+| Tools | File operations | Integrated tool usage |
+
+### Agent Specializations
+- **Security Reviewer** (GPT-4o-mini): Authentication, injection, crypto vulnerabilities
+- **Quality Reviewer** (Claude-3-Haiku): Maintainability, readability, error handling
+- **Performance Reviewer** (GPT-4o-mini): Algorithms, resource management
+- **Best Practices Reviewer** (GPT-4o-mini): SOLID principles, design patterns
+- **Dependency Reviewer** (GPT-3.5-Turbo): Architecture, coupling issues
+- **Fix Generator** (Claude-3-Haiku): Actionable code fixes
+- **Report Writer** (GPT-4o-mini): Comprehensive markdown reports
 
 ## Quick Start
 
-### 1. Basic Execution (No API Keys)
+### Prerequisites
+- llmspell built and available (`cargo build --release`)
+- API Keys: `OPENAI_API_KEY` and/or `ANTHROPIC_API_KEY`
+- Config: `config.toml` for file system permissions
+
+### 1. Basic Demo Mode
 ```bash
-# Runs with simulated agents and sample code analysis
+# Creates sample code with issues and runs review
 ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
 ```
 
-### 2. With Configuration File
+### 2. With Custom Code Input
 ```bash
-# Uses the provided config.toml for provider settings
-LLMSPELL_CONFIG=examples/script-users/applications/code-review-assistant/config.toml \
-  ./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
+# Review your own code
+./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua \
+  -- --input my-code.lua --output /tmp/my-review
 ```
 
-### 3. Full Production Mode
+### 3. With Configuration
 ```bash
-# Set API keys for real code analysis
-export OPENAI_API_KEY="sk-..."
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# Run with full capabilities
-./target/debug/llmspell run examples/script-users/applications/code-review-assistant/main.lua
+# Use configuration file for permissions
+./target/debug/llmspell -c examples/script-users/applications/code-review-assistant/config.toml \
+  run examples/script-users/applications/code-review-assistant/main.lua
 ```
 
-## Architecture
+## Configuration Structure
 
-### Workflow Structure
-
-```
-Main Review Workflow (Sequential)
-├── Phase 1: Code Analysis (Parallel)
-│   ├── Load Code Files (Tool)
-│   ├── Parse Structure (Tool)
-│   └── Check Syntax (Tool)
-│
-├── Phase 2: Review Process (Loop - iterates 3 files)
-│   └── For each file:
-│       └── File Review (Parallel Sub-workflow)
-│           ├── Security Review (Agent)
-│           ├── Quality Review (Agent)
-│           ├── Practices Review (Agent)
-│           └── Performance Review (Agent)
-│
-├── Phase 3: Issue Aggregation (Sequential)
-│   ├── Deduplicate Findings (Tool)
-│   ├── Prioritize Issues (Agent)
-│   └── Generate Fixes (Agent)
-│
-└── Phase 4: Report Generation (Sequential)
-    ├── Create Report (Agent)
-    ├── Format PR Comment (Tool)
-    └── Save Reports (Tool)
-```
-
-### Agents
-
-| Agent | Model | Purpose | Temperature |
-|-------|-------|---------|-------------|
-| **Security Reviewer** | GPT-4o-mini | Vulnerability detection (SQL injection, XSS, etc.) | 0.2 |
-| **Quality Reviewer** | Claude-3-haiku | Code quality and maintainability analysis | 0.3 |
-| **Practices Reviewer** | GPT-4o-mini | Best practices and conventions compliance | 0.3 |
-| **Performance Reviewer** | GPT-3.5-turbo | Performance bottleneck identification | 0.4 |
-| **Issue Prioritizer** | GPT-4o-mini | Severity ranking and impact assessment | 0.2 |
-| **Fix Generator** | Claude-3-haiku | Code fix suggestions for issues | 0.3 |
-| **Report Writer** | GPT-4o-mini | Comprehensive review report creation | 0.4 |
-
-### Tools
-
-- **file_operations**: Code file loading and report saving
-- **text_manipulator**: Report formatting and text processing
-- **json_processor**: Issue deduplication and data merging
-- **code_analyzer**: Code structure parsing (simulated)
-- **syntax_validator**: Syntax checking (simulated)
-
-## Sample Code Issues
-
-The assistant creates sample files with various issues to demonstrate detection capabilities:
-
-### Security Issues
-- SQL injection vulnerabilities
-- Command injection risks
-- Hardcoded API keys and secrets
-- Missing input validation
-- Plain text password storage
-
-### Quality Issues
-- High cyclomatic complexity
-- Missing error handling
-- Magic numbers without explanation
-- Code duplication
-- Ignored errors
-
-### Best Practice Violations
-- Use of `eval()` function
-- Global variable usage
-- Missing resource cleanup
-- No request validation
-- Improper naming conventions
-
-### Performance Problems
-- Synchronous blocking I/O
-- O(n²) algorithms
-- Repeated DOM access in loops
-- Resource leaks
-- Missing concurrent access control
-
-## Configuration
-
-### config.toml Structure
-
-```toml
-default_engine = "lua"
-
-[providers.providers.openai]
-provider_type = "openai"
-api_key_env = "OPENAI_API_KEY"
-model = "gpt-4o-mini"
-
-[providers.providers.anthropic]
-provider_type = "anthropic"
-api_key_env = "ANTHROPIC_API_KEY"
-model = "claude-3-haiku-20240307"
-```
-
-### Customization Options
-
-Edit `main.lua` to customize:
+The application uses a comprehensive configuration system:
 
 ```lua
 local config = {
+    system_name = "code_review_assistant_v2",
+    
+    -- Model assignments for each reviewer
     models = {
-        security_reviewer = "openai/gpt-4",  -- Use GPT-4 for better security analysis
-        quality_reviewer = "anthropic/claude-3-opus",  -- Premium quality review
+        security_reviewer = "gpt-4o-mini",
+        quality_reviewer = "claude-3-haiku-20240307",
+        practices_reviewer = "gpt-4o-mini",
+        performance_reviewer = "gpt-4o-mini",
+        dependencies_reviewer = "gpt-3.5-turbo",
+        fix_generator = "claude-3-haiku-20240307",
+        report_writer = "gpt-4o-mini"
     },
+    
+    -- Provider configuration
+    providers = {
+        quality_reviewer = "anthropic",
+        fix_generator = "anthropic"
+    },
+    
+    -- File paths
+    files = {
+        code_directory = "/tmp/code-to-review",
+        findings_output = "/tmp/review-findings.json",
+        report_output = "/tmp/review-report.md",
+        fixes_output = "/tmp/suggested-fixes.json",
+        summary_output = "/tmp/review-summary.txt"
+    },
+    
+    -- Review settings
     review_settings = {
-        max_files_to_review = 10,  -- Review more files
-        auto_fix_threshold = "high"  -- Only fix critical issues
+        max_files_to_review = 10,
+        severity_levels = {"critical", "high", "medium", "low", "info"},
+        auto_fix_threshold = "medium"
     }
 }
 ```
 
-## Output Files
+## Architecture
 
-| File | Description |
-|------|-------------|
-| `/tmp/code-to-review/*.js/py/go` | Sample code files with issues |
-| `/tmp/review-findings.json` | Raw findings from all reviewers |
-| `/tmp/review-report.md` | Comprehensive markdown report |
-| `/tmp/pr-comment.md` | Formatted GitHub PR comment |
-| `/tmp/review-summary.txt` | Execution summary and metrics |
-
-## Performance Metrics
-
-Typical execution times:
-
-- **Code Analysis** (Parallel): ~100ms
-- **Review Process** (Loop × 3 files): ~150ms
-  - Each file review (Parallel): ~50ms
-- **Issue Aggregation** (Sequential): ~75ms
-- **Report Generation** (Sequential): ~75ms
-- **Total Review Time**: ~400ms
-
-## Loop Workflow Implementation
-
-The review process demonstrates loop workflows:
-
-```lua
-local review_process = Workflow.builder()
-    :name("review_process")
-    :loop_workflow()
-    :max_iterations(3)  -- Review 3 files
-    :add_step({
-        name = "review_file",
-        type = "workflow",
-        workflow = file_review_workflow  -- Nested parallel workflow
-    })
-    :build()
+```
+Code Review Workflow (Sequential)
+├── Agent Creation Phase
+│   ├── Security Reviewer (GPT-4o-mini)
+│   ├── Quality Reviewer (Claude-3-Haiku)
+│   ├── Performance Reviewer (GPT-4o-mini)
+│   ├── Best Practices Reviewer (GPT-4o-mini)
+│   ├── Dependency Reviewer (GPT-3.5-Turbo)
+│   ├── Fix Generator (Claude-3-Haiku)
+│   └── Report Writer (GPT-4o-mini)
+│
+├── File Processing Phase
+│   ├── Load Code Input (code-input.lua)
+│   └── Prepare Code Content for Review
+│
+├── Sequential Review Execution
+│   ├── Step 1: Security Review → State[:workflow:ID:agent:security:output]
+│   ├── Step 2: Quality Review → State[:workflow:ID:agent:quality:output]
+│   ├── Step 3: Performance Review → State[:workflow:ID:agent:performance:output]
+│   ├── Step 4: Best Practices Review → State[:workflow:ID:agent:practices:output]
+│   └── Step 5: Dependencies Review → State[:workflow:ID:agent:dependencies:output]
+│
+└── Output Generation Phase
+    ├── Collect All State Outputs
+    ├── Generate Fixes and Report
+    ├── Save review-findings.json
+    ├── Save review-report.md
+    └── Save review-summary.txt
 ```
 
-Each iteration runs a parallel sub-workflow with 4 simultaneous reviewers.
+## Learning Path
 
-## Parallel Review Benefits
+### Prerequisites
+- **Complete Apps 01-05**: Basic agents, workflows, and tools
+- **Understand**: Sequential workflows, state management, multi-agent coordination
 
-### Per-File Analysis
-- 4 aspects reviewed simultaneously
-- Independent agent processing
-- Faster than sequential review
-- Comprehensive coverage
+### You'll Learn
+- Multi-agent orchestration with specialized roles
+- State-based output collection from workflows
+- Multi-provider coordination (OpenAI + Anthropic)
+- Structured output generation in multiple formats
+- Error handling in sequential workflows
 
-### Overall Performance
-- Loop enables scalable file processing
-- Parallel analysis reduces total time
-- Nested workflows provide modularity
+### Next Step
+- **App 07 (document-intelligence)**: Adds Composite Agents and all 4 workflow types
+- **Enhancement Path**: Convert to parallel workflow for 5x speed improvement
+
+## Sample Issues Detected
+
+The demo mode creates files with various issues to demonstrate capabilities:
+
+### JavaScript (auth.js)
+- **Security**: Hardcoded secret keys, weak MD5 hashing, no rate limiting
+- **Quality**: No input validation, console logging of sensitive data
+- **Practices**: Direct object mutation, missing error handling
+
+### Python (data_processor.py)
+- **Security**: No path validation, unsafe file operations
+- **Quality**: Ambiguous state, magic numbers, inconsistent return types
+- **Performance**: Inefficient nested loops, multiple data passes
+- **Practices**: God methods, modifying input parameters
+
+### Go (api_handler.go)
+- **Security**: SQL injection, no authentication, race conditions
+- **Quality**: Ignored errors, no request validation
+- **Performance**: String concatenation in loops, resource leaks
+- **Practices**: Global variables, missing mutex for concurrent access
+
+## Sample Output
+
+### Generated Files
+| File | Description | Size |
+|------|-------------|------|
+| `review-findings.json` | All issues found by reviewers | ~5-10KB |
+| `review-report.md` | Markdown summary report | ~3-5KB |
+| `review-summary.txt` | Quick text summary | ~500B |
+
+### Example Finding (review-findings.json)
+```json
+{
+  "auth.js": {
+    "security": [
+      {
+        "severity": "critical",
+        "issue": "Hardcoded secret key",
+        "line": 5,
+        "fix": "Use environment variables for secrets"
+      }
+    ],
+    "quality": [
+      {
+        "severity": "high",
+        "issue": "No input validation",
+        "line": 12,
+        "fix": "Add validation for user inputs"
+      }
+    ]
+  }
+}
+```
+
+## Execution Flow
+
+1. **Initialization**: Creates specialized AI agents with specific prompts
+2. **File Preparation**: Creates demo files or reads from specified directory
+3. **Workflow Creation**: Builds sequential workflow with review steps
+4. **Review Execution**: Processes each file through all reviewers
+5. **Result Collection**: Gathers outputs from workflow execution
+6. **Report Generation**: Creates summary and saves output files
 
 ## Cost Considerations
 
 **Warning**: Real API usage incurs costs:
 
-- **Security/Quality Review**: ~$0.002 per file
-- **Fix Generation**: ~$0.001 per issue
-- **Report Generation**: ~$0.002 per report
-- **Typical run cost**: $0.01 - $0.02 per repository
+- **Per-file review cost**: ~$0.005-$0.01
+- **Report generation**: ~$0.002
+- **Typical run (3 files)**: ~$0.02-$0.03
 
 To minimize costs:
-1. Limit `max_files_to_review`
-2. Use cheaper models for non-critical reviews
-3. Cache results for unchanged files
+- Limit `max_files_to_review` in configuration
+- Use GPT-3.5-Turbo for non-critical reviews
+- Test with demo mode before production use
 
-## Issue Prioritization
+## Current Status
 
-Issues are categorized by severity:
+### Working Features
+- ✅ All 7 reviewers generate meaningful feedback
+- ✅ Code content properly passed to agents
+- ✅ State-based output collection
+- ✅ Multi-format output generation
+- ✅ Error handling and recovery
 
-1. **CRITICAL**: Security vulnerabilities requiring immediate fix
-2. **HIGH**: Significant bugs or security risks
-3. **MEDIUM**: Quality issues affecting maintainability
-4. **LOW**: Best practice violations
-5. **INFO**: Style suggestions and improvements
+### Enhancement Opportunities
+- Convert to parallel workflow (5x speed improvement)
+- Add Hook system for critical issues
+- Integrate more tools (web_search for CVEs, webhooks for CI/CD)
+- Add session persistence for review history
 
 ## Troubleshooting
 
-### "Agent needs API key" Messages
-- Review continues with basic analysis
-- Set environment variables for AI-powered features
+### "Tool execution failed" Errors
+- Ensure output directories are writable
+- Check file permissions for code directory
 
-### Loop Workflow Issues
-- Check `max_iterations` configuration
-- Verify file count doesn't exceed limits
+### Empty Review Results
+- Verify API keys are set correctly
+- Check network connectivity to AI providers
 
-### Parallel Execution Problems
-- Ensure sufficient system resources
-- Check for timeout issues with large files
+### Workflow Execution Issues
+- Review log output for specific step failures
+- Ensure all required agents are created successfully
 
-## Blueprint Compliance
+## Related Applications
 
-✅ 4-Phase Sequential Architecture
-✅ Loop workflow for file iteration
-✅ Parallel sub-workflows for multi-aspect review
-✅ 7 specialized agents as required
-✅ Issue aggregation and prioritization
-✅ Comprehensive report generation
-✅ Production error handling
+### Progressive Learning Path
+1. **Apps 01-02**: Foundation - Basic agents and tools
+2. **Apps 03-05**: Business Ready - Sessions, hooks, events
+3. **App 06** (This): Advanced - Multi-agent orchestration
+4. **Apps 07-08**: Expert techniques - Composite agents, meta-workflows
+5. **Apps 09-10**: Production patterns - Dynamic workflows, 20+ agents
 
-## Example Use Cases
+### Similar Applications
+- **App 10 (webapp-creator)**: 20-agent orchestration for full-stack generation
+- **App 05 (content-creator)**: Parallel workflow for content generation
+- **App 07 (document-intelligence)**: Composite agents for document analysis
 
-1. **Pull Request Reviews**: Automated code review for PRs
-2. **Security Audits**: Vulnerability scanning across codebases
-3. **Code Quality Gates**: Enforce quality standards in CI/CD
-4. **Legacy Code Analysis**: Assess technical debt in old code
-5. **Compliance Checking**: Verify adherence to coding standards
+## Version History
 
-## Extending the System
-
-1. **Add More Reviewers**: Documentation, testing, accessibility
-2. **Language Support**: Add language-specific analyzers
-3. **IDE Integration**: Real-time review in development
-4. **Custom Rules**: Company-specific coding standards
-5. **Fix Application**: Automatic fix application with approval
-
-## Integration Points
-
-### GitHub Integration
-```bash
-# Future: Direct PR comment posting
-gh pr comment 123 --body-file /tmp/pr-comment.md
-```
-
-### CI/CD Pipeline
-```yaml
-# Example GitHub Actions integration
-- name: Code Review
-  run: |
-    llmspell run code-review-assistant/main.lua
-    cat /tmp/review-summary.txt
-```
-
-### Custom Analyzers
-The system uses simulated analyzers but can integrate real tools:
-- ESLint for JavaScript
-- Pylint for Python
-- golangci-lint for Go
-- SonarQube for comprehensive analysis
-
-## Review Report Structure
-
-Generated reports include:
-
-1. **Executive Summary**: High-level findings and metrics
-2. **Critical Issues**: Security vulnerabilities and bugs
-3. **Code Quality**: Maintainability and complexity analysis
-4. **Performance Analysis**: Bottlenecks and optimizations
-5. **Best Practices**: Convention compliance
-6. **Suggested Fixes**: Actionable code improvements
-7. **Metrics**: Coverage, complexity, and quality scores
-
-## Related Examples
-
-- **Customer Support System**: Conditional routing patterns
-- **Data Pipeline**: Loop workflow techniques
-- **Content Generation Platform**: Multi-agent collaboration
-- **Workflow Examples**: Basic patterns in `examples/lua/workflows/`
-
-## Support
-
-For issues or questions:
-- Review the main llmspell documentation
-- Check blueprint.md for architectural patterns
-- See examples/script-users/getting-started/ for basics
+- **v3.0.0**: Current - Standardized header, proper code passing, state collection
+- **v2.0.0**: Sequential workflow implementation
+- **v1.0.0**: Initial parallel workflow attempt
