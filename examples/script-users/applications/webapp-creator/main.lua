@@ -427,60 +427,103 @@ print("  20. Code Reviewer: " .. (agents.code_reviewer and "✓" or "✗"))
 
 print("\n📊 Starting Workflow Execution...\n")
 
--- Create workflow for sequential agent execution
+-- Create LOOP workflow for iterative code generation (Expert pattern)
+local code_generation_loop = Workflow.builder()
+    :name("code_generation_loop")
+    :description("Iterative code generation in batches")
+    :loop_workflow()  -- LOOP workflow pattern (correct method name)
+    :max_iterations(5)  -- Process 5 iterations for different components
+    
+    :add_step({
+        name = "generate_component",
+        type = "agent",
+        agent = agents.backend_developer and ("backend_developer_" .. timestamp) or nil,
+        input = "Generate code for component {{iteration}} of 5: {{component_type}}"
+    })
+    
+    :build()
+
+-- Create workflow with LOOP for iterative generation
 local webapp_workflow = Workflow.builder()
     :name("webapp_creator_workflow")
-    :description("Generate complete web application")
-    :timeout_ms(1800000)  -- 30 minutes total workflow timeout (but steps still limited to 30s each)
+    :description("Generate complete web application with iterative patterns")
+    :timeout_ms(1800000)  -- 30 minutes total workflow timeout
     :sequential()
 
--- Add each agent as a workflow step in logical order
-local agent_order = {
+-- Add research and architecture agents first
+local initial_agents = {
     "requirements_analyst", "ux_researcher", "market_researcher", "tech_stack_advisor", "feasibility_analyst",
-    "system_architect", "database_architect", "api_designer", "security_architect", "frontend_designer",
-    "backend_developer", "frontend_developer", "database_developer", "api_developer", "integration_developer",
+    "system_architect", "database_architect", "api_designer", "security_architect", "frontend_designer"
+}
+
+-- Then add development agents with loop pattern
+local development_agents = {
+    "backend_developer", "frontend_developer", "database_developer", "api_developer", "integration_developer"
+}
+
+-- Finally add testing and documentation agents
+local final_agents = {
     "test_engineer", "devops_engineer", "documentation_writer", "performance_optimizer", "code_reviewer"
 }
 
+-- Combine all agents
+local agent_order = {}
+for _, name in ipairs(initial_agents) do table.insert(agent_order, name) end
+for _, name in ipairs(development_agents) do table.insert(agent_order, name) end
+for _, name in ipairs(final_agents) do table.insert(agent_order, name) end
+
 local agent_names = {}
 local agent_ids = {}  -- Store actual agent IDs with timestamps
-for _, name in ipairs(agent_order) do
+
+-- Add initial agents (research and architecture)
+for _, name in ipairs(initial_agents) do
     local agent = agents[name]
     agent_names[#agent_names + 1] = name
-    
-    -- The agent was created with name "name_timestamp", use that
     local agent_id = name .. "_" .. timestamp
-    agent_ids[name] = agent_id  -- Map base name to actual ID
+    agent_ids[name] = agent_id
     
-    -- Add step - let Rust handle any errors
-    -- Use simple text input instead of complex JSON to avoid "Agent input cannot be empty" errors
-    local step_input = user_input.requirements  -- Simple text input
-    
-    -- Debug: Check all values before add_step
-    print(string.format("  Adding step: name='%s', agent='%s', input=%s chars", 
-        tostring(name), tostring(agent_id), string.len(step_input)))
-    
-    -- Add longer timeout for developer agents that generate code
-    local step_config = {
+    webapp_workflow:add_step({
         name = name,
-        type = "agent",  -- Required by Lua workflow parser
-        agent = agent_id,  -- Use the agent's registered name
-        input = step_input  -- Pass simple text input to each agent
-    }
+        type = "agent",
+        agent = agent_id,
+        input = user_input.requirements,
+        timeout_ms = 60000  -- 1 minute for analysis agents
+    })
+end
+
+-- Add LOOP workflow for development phase (nested workflow)
+webapp_workflow:add_step({
+    name = "iterative_code_generation",
+    type = "workflow",
+    workflow = code_generation_loop  -- Nested LOOP workflow
+})
+
+-- Add remaining agents (testing and documentation)
+for _, name in ipairs(final_agents) do
+    local agent = agents[name]
+    agent_names[#agent_names + 1] = name
+    local agent_id = name .. "_" .. timestamp
+    agent_ids[name] = agent_id
     
-    -- Set 2-minute timeout for developer agents, 1 minute for others
-    if name:match("developer") or name:match("engineer") or name:match("writer") then
-        step_config.timeout_ms = 120000  -- 2 minutes for code generation
-    else
-        step_config.timeout_ms = 60000   -- 1 minute for analysis agents
-    end
-    
-    webapp_workflow:add_step(step_config)
+    webapp_workflow:add_step({
+        name = name,
+        type = "agent",
+        agent = agent_id,
+        input = user_input.requirements,
+        timeout_ms = 120000  -- 2 minutes for final phase
+    })
+end
+
+-- Also add development agents to tracking (for compatibility)
+for _, name in ipairs(development_agents) do
+    agent_names[#agent_names + 1] = name
+    agent_ids[name] = name .. "_" .. timestamp
 end
 
 -- Build and execute workflow
 webapp_workflow = webapp_workflow:build()
 print("\nExecuting workflow with " .. #agent_names .. " agents...")
+print("⚡ Features: LOOP workflow for iterative code generation (5 iterations)")
 
 -- Note: Agents are already registered when created via Agent.builder():build()
 -- The workflow should be able to find them by name

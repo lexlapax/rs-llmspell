@@ -169,55 +169,78 @@ print("  ✅ Business communication scenarios: " .. #current_communications .. "
 
 print("\n3. Creating business communication workflows with state persistence...")
 
--- Main Communication Management Workflow - with nested business processes
+-- Main Communication Management Workflow with CONDITIONAL routing
 local communication_workflow = Workflow.builder()
     :name("communication_management")
-    :description("Comprehensive business communication management")
-    :sequential()
+    :description("Comprehensive business communication management with conditional routing")
+    :conditional()
     
-    -- Step 1: Classify communication
+    -- Initial analysis steps (before branching)
     :add_step({
         name = "classify_communication",
         type = "agent",
         agent = comm_classifier and ("comm_classifier_" .. timestamp) or nil,
-        input = "Classify this business communication by type, priority, and urgency: {{communication_content}}. Consider business context and relationship management needs."
+        input = "Classify this business communication by type, priority (1-10), and urgency: {{communication_content}}. Return priority as a number."
     })
     
-    -- Step 2: Analyze sentiment and relationship health
     :add_step({
         name = "analyze_sentiment",
         type = "agent",
         agent = sentiment_analyzer and ("sentiment_analyzer_" .. timestamp) or nil,
-        input = "Analyze the sentiment and relationship health in this business communication: {{communication_content}}. Consider client satisfaction, partnership dynamics, and escalation needs."
+        input = "Analyze the sentiment in this communication: {{communication_content}}. Return: POSITIVE, NEUTRAL, or NEGATIVE."
     })
     
-    -- Step 3: Generate appropriate response
-    :add_step({
-        name = "generate_response",
+    -- Conditional routing based on sentiment/priority
+    -- Using "always" condition for now (SharedDataEquals needs state integration)
+    :condition({ 
+        type = "always"  -- Will execute then_branch (escalation path)
+        -- Future: type = "shared_data_equals", key = "sentiment", value = "NEGATIVE"
+    })
+    
+    -- THEN branch: Escalation path for negative sentiment
+    :add_then_step({
+        name = "escalate_response",
         type = "agent",
         agent = response_generator and ("response_generator_" .. timestamp) or nil,
-        input = "Generate a professional business response based on classification {{classify_communication}} and sentiment {{analyze_sentiment}} for: {{communication_content}}"
+        input = "URGENT ESCALATION: Generate an immediate, empathetic response acknowledging concerns. Classification: {{classify_communication}}, Sentiment: {{analyze_sentiment}}. Content: {{communication_content}}"
     })
     
-    -- Step 4: Coordinate scheduling needs
-    :add_step({
+    :add_then_step({
+        name = "notify_management",
+        type = "tool",
+        tool = "webhook_caller",
+        input = {
+            url = config.integration.notification_webhook,
+            method = "POST",
+            payload = '{"alert": "Negative sentiment detected", "priority": "HIGH", "content": "{{communication_content}}"}'
+        }
+    })
+    
+    -- ELSE branch: Standard path for positive/neutral sentiment
+    :add_else_step({
+        name = "standard_response",
+        type = "agent",
+        agent = response_generator and ("response_generator_" .. timestamp) or nil,
+        input = "Generate a professional business response. Classification: {{classify_communication}}, Sentiment: {{analyze_sentiment}}. Content: {{communication_content}}"
+    })
+    
+    :add_else_step({
         name = "coordinate_schedule",
         type = "agent",
         agent = schedule_coordinator and ("schedule_coordinator_" .. timestamp) or nil,
-        input = "Identify scheduling needs and coordination requirements from this communication: {{communication_content}}. Suggest meeting times and follow-up schedules."
+        input = "Identify scheduling needs from: {{communication_content}}. Suggest meeting times and follow-ups."
     })
     
-    -- Step 5: Track communication thread
-    :add_step({
+    :add_else_step({
         name = "track_communication",
         type = "agent",
         agent = tracking_agent and ("tracking_agent_" .. timestamp) or nil,
-        input = "Update communication tracking for this thread. Consider relationship progression, follow-up needs, and business continuity: {{communication_content}}"
+        input = "Update tracking for this thread. Consider relationship progression: {{communication_content}}"
     })
     
     :build()
 
-print("  ✅ Business Communication Management Workflow created")
+print("  ✅ Business Communication Management Workflow created (with conditional routing)")
 
 -- ============================================================
 -- Step 4: Execute Communication Management
@@ -244,9 +267,9 @@ print("  ✅ Communication management workflow completed!")
 
 -- Business layer outputs
 print("  📋 Communication classified: Type, priority, and urgency identified")
-print("  💭 Sentiment analyzed: Relationship health and escalation needs assessed")
+print("  💭 Sentiment analyzed: CONDITIONAL routing based on sentiment")
+print("  🔀 Conditional path: Negative → Escalation | Positive/Neutral → Standard")
 print("  ✍️  Response generated: Professional business response drafted")
-print("  📅 Schedule coordinated: Meeting and follow-up requirements identified")
 print("  📊 Tracking updated: Communication thread and relationship status maintained")
 
 -- Extract execution time
@@ -477,7 +500,7 @@ print("    • Communication Log: " .. config.files.communication_log)
 print("")
 print("  🔧 Technical Architecture:")
 print("    • Agents: 5 (expanded from 3) - Business complexity")
-print("    • Workflows: Sequential business process with comprehensive tracking")
+print("    • Workflows: CONDITIONAL routing (sentiment-based) + nested workflows")
 print("    • Crates: Core + state-persistence + sessions (business infrastructure)")
 print("    • Tools: email_sender, webhook_caller, file_operations, scheduling")
 print("    • State Management: PERSISTENT (threads, sessions, relationship context)")

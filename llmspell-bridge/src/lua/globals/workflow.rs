@@ -348,6 +348,41 @@ impl UserData for WorkflowInstance {
             },
         );
 
+        // set_shared_data method - Set shared data for conditional workflows
+        methods.add_method(
+            "set_shared_data",
+            |lua, this, (key, value): (String, mlua::Value)| {
+                // Store in workflow-specific shared data namespace
+                // This integrates with the State global if available
+                if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                    if let Ok(set_fn) = globals.get::<_, mlua::Function>("set") {
+                        // Use a special namespace for workflow shared data
+                        let shared_key = format!("workflow:{}:shared:{}", this.workflow_id, key);
+                        set_fn.call::<_, ()>((shared_key, value.clone()))?;
+                    }
+                }
+
+                // Convert value to JSON for storage
+                let json_value = lua_value_to_json(value)?;
+
+                // Store using bridge's internal state mechanism
+                let bridge = this.bridge.clone();
+                let workflow_id = this.workflow_id.clone();
+
+                block_on_async(
+                    "set_shared_data",
+                    async move {
+                        bridge
+                            .set_workflow_shared_data(&workflow_id, &key, json_value)
+                            .await
+                    },
+                    None,
+                )?;
+
+                Ok(())
+            },
+        );
+
         // on_before_execute method (Hook integration)
         methods.add_method(
             "on_before_execute",
@@ -628,7 +663,8 @@ struct WorkflowBuilder {
     error_strategy: Option<String>,
     timeout_ms: Option<u64>,
     // Conditional workflow fields
-    condition: Option<WorkflowCondition>,
+    condition_type: Option<String>, // Store condition type
+    condition_params: Option<serde_json::Value>, // Store condition parameters
     then_steps: Vec<WorkflowStep>,
     else_steps: Vec<WorkflowStep>,
     // Loop workflow fields
@@ -648,7 +684,8 @@ impl WorkflowBuilder {
             steps: Vec::new(),
             error_strategy: None,
             timeout_ms: None,
-            condition: None,
+            condition_type: None,
+            condition_params: None,
             then_steps: Vec::new(),
             else_steps: Vec::new(),
             loop_condition: None,
@@ -711,14 +748,39 @@ impl UserData for WorkflowBuilder {
         });
 
         // Conditional workflow specific methods
-        methods.add_method_mut("condition", |_, this, _func: mlua::Function| {
-            // Store Lua function for condition evaluation
-            // Note: This is a simplified version - in production, you'd need to handle
-            // Lua function storage and evaluation properly
-            this.condition = Some(Box::new(move |_value| {
-                // In a real implementation, this would evaluate the Lua function
-                true
-            }));
+        methods.add_method_mut("condition", |_lua, this, condition_table: Table| {
+            // Parse condition from table instead of function
+            let condition_type: String = condition_table.get("type")?;
+
+            // Store condition type and parameters
+            this.condition_type = Some(condition_type.clone());
+
+            // Convert Lua table to JSON for parameters
+            let mut params = serde_json::Map::new();
+
+            match condition_type.as_str() {
+                "shared_data_equals" => {
+                    let key: String = condition_table.get("key")?;
+                    let value: mlua::Value = condition_table.get("value")?;
+
+                    params.insert("key".to_string(), serde_json::Value::String(key));
+                    params.insert("value".to_string(), lua_value_to_json(value)?);
+                }
+                "shared_data_exists" => {
+                    let key: String = condition_table.get("key")?;
+                    params.insert("key".to_string(), serde_json::Value::String(key));
+                }
+                "always" | "never" => {
+                    // No parameters needed
+                }
+                _ => {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Unknown condition type: {condition_type}"
+                    )));
+                }
+            }
+
+            this.condition_params = Some(serde_json::Value::Object(params));
             Ok(this.clone())
         });
 
@@ -835,25 +897,12 @@ impl UserData for WorkflowBuilder {
                 _ => llmspell_workflows::ErrorStrategy::FailFast,
             });
 
-            // For conditional workflows, merge then/else steps
-            // Note: Conditional workflow handling simplified - may need proper branch support later
+            // For conditional workflows, we need to pass condition info and both branches
             let final_steps = match workflow_type.as_str() {
                 "conditional" => {
-                    // For now, just use then_steps if available, else use regular steps
-                    if this.then_steps.is_empty() {
-                        workflow_steps
-                    } else {
-                        this.then_steps
-                            .iter()
-                            .map(|step| llmspell_workflows::WorkflowStep {
-                                id: step.id,
-                                name: step.name.clone(),
-                                step_type: step.step_type.clone(),
-                                timeout: step.timeout, // Preserve the timeout from the parsed step
-                                retry_attempts: step.retry_attempts, // Preserve retry attempts too
-                            })
-                            .collect()
-                    }
+                    // For conditional workflows, we'll pass both branches
+                    // For now, use regular steps as a fallback
+                    workflow_steps
                 }
                 _ => workflow_steps,
             };
@@ -862,27 +911,49 @@ impl UserData for WorkflowBuilder {
             let bridge = this.bridge.clone();
             let workflow_name = name;
 
+            // Clone data needed for conditional workflow creation
+            let condition_type = this.condition_type.clone();
+            let condition_params = this.condition_params.clone();
+            let then_steps = this.then_steps.clone();
+            let else_steps = this.else_steps.clone();
+
             let result = block_on_async(
                 "workflow_builder_create",
                 async move {
                     let workflow_name_clone = workflow_name.clone();
                     let workflow_type_clone = workflow_type.clone();
-                    bridge
-                        .create_workflow(
-                            workflow_type,
-                            workflow_name_clone.clone(),
-                            final_steps,
-                            workflow_config,
-                            error_strategy,
-                        )
-                        .await
-                        .map(|workflow_id| WorkflowInstance {
-                            workflow_id,
-                            bridge: bridge.clone(),
-                            name: workflow_name_clone,
-                            workflow_type: workflow_type_clone,
-                            last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
-                        })
+
+                    // For conditional workflows, use special creation method
+                    if workflow_type == "conditional" {
+                        bridge
+                            .create_conditional_workflow(
+                                workflow_name_clone.clone(),
+                                condition_type,
+                                condition_params,
+                                then_steps,
+                                else_steps,
+                                workflow_config,
+                                error_strategy,
+                            )
+                            .await
+                    } else {
+                        bridge
+                            .create_workflow(
+                                workflow_type,
+                                workflow_name_clone.clone(),
+                                final_steps,
+                                workflow_config,
+                                error_strategy,
+                            )
+                            .await
+                    }
+                    .map(|workflow_id| WorkflowInstance {
+                        workflow_id,
+                        bridge: bridge.clone(),
+                        name: workflow_name_clone,
+                        workflow_type: workflow_type_clone,
+                        last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
+                    })
                 },
                 None,
             )?;
@@ -903,7 +974,8 @@ impl Clone for WorkflowBuilder {
             steps: self.steps.clone(),
             error_strategy: self.error_strategy.clone(),
             timeout_ms: self.timeout_ms,
-            condition: None, // Can't clone closures, will be set fresh
+            condition_type: self.condition_type.clone(),
+            condition_params: self.condition_params.clone(),
             then_steps: self.then_steps.clone(),
             else_steps: self.else_steps.clone(),
             loop_condition: None, // Can't clone closures, will be set fresh

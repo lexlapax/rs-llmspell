@@ -370,10 +370,40 @@ impl StateAccess for NoScopeStateAdapter {
     async fn list_keys(&self, prefix: &str) -> Result<Vec<String>> {
         debug!("NoScopeStateAdapter: Listing keys with prefix '{}'", prefix);
 
-        // For listing, we need to handle the scope properly
-        // This is complex because we need to reconstruct the full keys
-        // For now, return empty list as this is mainly used for debugging
-        Ok(Vec::new())
+        // List all keys in the Custom("") scope
+        let all_keys = self
+            .state_manager
+            .list_keys(StateScope::Custom(String::new()))
+            .await
+            .map_err(|e| LLMSpellError::Storage {
+                message: format!("Failed to list keys: {e}"),
+                operation: Some("list_keys".to_string()),
+                source: None,
+            })?;
+
+        // Filter by prefix and remove the "custom::" prefix that StateManager adds
+        let filtered_keys: Vec<String> = all_keys
+            .into_iter()
+            .filter_map(|key| {
+                // Remove "custom::" prefix if present
+                let clean_key = key.strip_prefix("custom::").unwrap_or(&key);
+
+                // Check if it matches our prefix
+                if clean_key.starts_with(prefix) {
+                    Some(clean_key.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect();
+
+        debug!(
+            "NoScopeStateAdapter: Found {} keys matching prefix '{}'",
+            filtered_keys.len(),
+            prefix
+        );
+
+        Ok(filtered_keys)
     }
 }
 

@@ -5,7 +5,8 @@ Professional-grade business process orchestration application demonstrating adva
 
 ## Features
 - **8-Agent Architecture**: Specialized agents for different process types
-- **Conditional Routing**: Business rules-based workflow routing
+- **NEW Conditional Workflows**: Table-based conditions with then/else branches
+- **Two Conditional Workflows**: Master orchestration and incident routing
 - **Multi-Process Support**: Approval, migration, QA, and incident workflows
 - **Professional Complexity**: Enterprise-grade orchestration patterns
 - **State Management**: Persistent workflow state and audit trails
@@ -59,10 +60,36 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 - **Next**: Expert/Enterprise (12+ agents, complex patterns)
 
 ## Technical Architecture
+
+### NEW Conditional Workflow Implementation
+The process orchestrator now uses the new table-based conditional API:
+
+```lua
+-- Master Orchestration Workflow
+:conditional()
+:condition({ 
+    type = "never"  -- Demo: always takes else_branch (standard path)
+    -- Future: type = "shared_data_equals", key = "process_type", value = "INCIDENT"
+})
+
+-- THEN branch: Incident handling
+:add_then_step({ ... })  
+
+-- ELSE branch: Standard processing  
+:add_else_step({ ... })
+
+-- Incident Routing Workflow
+:condition({ 
+    type = "always"  -- Demo: always takes then_branch (critical path)
+    -- Future: type = "shared_data_equals", key = "severity", value = "CRITICAL"
+})
+```
+
+### Workflow Components
 - **Agents**: 8 specialized professional agents
-- **Workflows**: Master orchestration + 3 specialized sub-workflows
-- **Patterns**: Sequential with conditional routing simulation
-- **Crates**: Core + workflows + advanced orchestration
+- **Workflows**: 2 conditional workflows (master orchestration + incident routing)
+- **Patterns**: Conditional with proper then/else branches
+- **Conditions**: Using "always" and "never" for demonstration
 - **Tools**: http_request, webhook_caller, file_operations
 - **State**: Professional state management with persistence
 

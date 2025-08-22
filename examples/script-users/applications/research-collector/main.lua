@@ -100,36 +100,37 @@ Tool.invoke("file_operations", {
 print("  ✅ Sample research scenario: " .. current_research)
 
 -- ============================================================
--- Step 3: Simple Research Workflows (Universal Pattern)
+-- Step 3: Parallel Research Workflows (Improved Performance)
 -- ============================================================
 
-print("\n3. Creating simple research workflows...")
+print("\n3. Creating parallel research workflows...")
 
--- Simple Sequential Research Workflow (simplified for universal appeal)
+-- Parallel Research Workflow for faster execution
+-- Both agents search simultaneously, then results are merged
 local main_research_workflow = Workflow.builder()
     :name("main_research")
-    :description("Simple research collection workflow")
-    :sequential()
+    :description("Parallel research collection workflow")
+    :parallel()  -- CHANGED: Now parallel for better performance
     
-    -- Step 1: Search for information
+    -- Both agents execute simultaneously
     :add_step({
         name = "search_step",
         type = "agent",
         agent = search_agent and ("search_agent_" .. timestamp) or nil,
-        input = "Search for information about: " .. current_research
+        input = "Search for comprehensive information about: " .. current_research
     })
     
-    -- Step 2: Synthesize findings
     :add_step({
         name = "synthesis_step",
         type = "agent",
         agent = synthesis_agent and ("synthesis_agent_" .. timestamp) or nil,
-        input = "Create a practical summary and recommendations for vacation planning in Japan for first-time tourists in spring"
+        input = "Analyze and create practical recommendations for: " .. current_research
     })
     
     :build()
 
-print("  ✅ Main Research Workflow created")
+print("  ✅ Main Research Workflow created (Parallel execution enabled)")
+print("  ⚡ Both agents will search simultaneously for faster results")
 
 -- ============================================================
 -- Step 4: Execute Research Collection

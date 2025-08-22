@@ -124,36 +124,67 @@ end
 print("  ✅ Created " .. #sample_files .. " messy files for organization")
 
 -- ============================================================
--- Step 3: Simple Sequential Workflow (Universal Pattern)
+-- Step 3: File Organization Workflow with LOOP Pattern
 -- ============================================================
 
-print("\n3. Creating simple file organization workflow...")
+print("\n3. Creating file organization workflow with batch processing...")
 
--- Simple Sequential Workflow: classify → organize (simplified for universal appeal)
-local file_organization_workflow = Workflow.builder()
-    :name("file_organization")
-    :description("Simple sequential file organization")
-    :sequential()
+-- Batch Processing Workflow (processes files in groups)
+local batch_classification_workflow = Workflow.builder()
+    :name("batch_classification")
+    :description("Process files in batches of 3")
+    :loop_workflow()  -- LOOP workflow pattern (correct method name)
+    :max_iterations(4)  -- Process 4 batches (3 files each = 12 files total)
     
-    -- Step 1: Classify files using AI
     :add_step({
-        name = "classify_files",
+        name = "process_batch",
         type = "agent",
         agent = category_classifier and ("category_classifier_" .. timestamp) or nil,
-        input = "Classify these common file types into categories (Documents, Images, Videos, Audio, Code, Archive, Other): vacation_photo_2023.jpg, important_document.pdf, random_notes.txt, project_code.py, music_track.mp3, presentation_draft.pptx, backup_archive.zip, screenshot_20240822.png, meeting_notes_Q3.docx, video_tutorial.mp4"
+        input = "Classify batch {{iteration}} of files (3 files per batch). Files in this batch: {{batch_files}}. Return categories for each."
     })
     
-    -- Step 2: Generate organization suggestions
     :add_step({
-        name = "suggest_organization",
-        type = "agent", 
-        agent = organization_suggester and ("organization_suggester_" .. timestamp) or nil,
-        input = "Create a simple folder organization plan for these file types: photos, documents, code files, music, presentations, archives, screenshots, notes, and videos"
+        name = "scan_batch",
+        type = "agent",
+        agent = file_scanner and ("file_scanner_" .. timestamp) or nil,
+        input = "Scan and analyze batch {{iteration}} files for content type and metadata: {{batch_files}}"
     })
     
     :build()
 
-print("  ✅ File Organization Workflow (Sequential) created")
+-- Main File Organization Workflow with nested loop
+local file_organization_workflow = Workflow.builder()
+    :name("file_organization")
+    :description("File organization with batch processing loop")
+    :sequential()
+    
+    -- Step 1: Process files in batches using LOOP workflow
+    :add_step({
+        name = "batch_processing",
+        type = "workflow",
+        workflow = batch_classification_workflow  -- Nested LOOP workflow
+    })
+    
+    -- Step 2: Generate organization suggestions based on all batches
+    :add_step({
+        name = "suggest_organization",
+        type = "agent", 
+        agent = organization_suggester and ("organization_suggester_" .. timestamp) or nil,
+        input = "Create a folder organization plan based on the batch processing results: {{batch_processing}}. Consider all file types found."
+    })
+    
+    -- Step 3: Final review and optimization
+    :add_step({
+        name = "optimize_structure",
+        type = "agent",
+        agent = file_scanner and ("file_scanner_" .. timestamp) or nil,
+        input = "Review and optimize the organization structure for {{suggest_organization}}. Ensure no duplicate categories."
+    })
+    
+    :build()
+
+print("  ✅ File Organization Workflow created")
+print("  ⚡ Features: LOOP workflow for batch processing (4 iterations × 3 files/batch)")
 
 -- ============================================================
 -- Step 4: Execute File Organization
@@ -174,6 +205,7 @@ local result = file_organization_workflow:execute(execution_context)
 print("  ✅ File organization completed successfully!")
 
 -- Simple outputs for universal users
+print("  🔄 Batch processing: 4 iterations × 3 files/batch")
 print("  🏷️  Files classified into categories")  
 print("  📋 Organization plan created")
 
@@ -275,7 +307,7 @@ print("    • Organization Plan: " .. config.files.organization_plan)
 print("")
 print("  🔧 Technical Architecture:")
 print("    • Agents: 3 (down from 8) - Universal complexity")
-print("    • Workflow: Simple sequential (scan → classify → organize)")
+print("    • Workflow: LOOP pattern with batch processing (4 iterations)")
 print("    • Crates: Core only (llmspell-core, llmspell-agents, llmspell-bridge)")
 print("    • Tools: Basic only (file_operations, text_manipulator)")
 print("    • State Management: REMOVED (immediate results only)")

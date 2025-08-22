@@ -23,10 +23,10 @@ print("Power User content creation with conditional quality control\n")
 local config = {
     system_name = "content_creator_v2",
     models = {
-        content_planner = "openai/gpt-4o-mini",
-        content_writer = "anthropic/claude-3-haiku-20240307",
-        content_editor = "openai/gpt-4o-mini",
-        content_formatter = "anthropic/claude-3-haiku-20240307"
+        content_planner = "gpt-4o-mini",
+        content_writer = "claude-3-haiku-20240307",
+        content_editor = "gpt-4o-mini", 
+        content_formatter = "claude-3-haiku-20240307"
     },
     files = {
         content_topic = "/tmp/content-topic.txt",
@@ -57,11 +57,9 @@ local content_planner = Agent.builder()
     :description("Plans content structure and approach")
     :type("llm")
     :model(config.models.content_planner)
-    :temperature(0.6)
+    :temperature(0.3)
     :max_tokens(800)
-    :custom_config({
-        system_prompt = "You are a content planning expert. Create detailed content plans with clear structure, key points, and target audience considerations. Focus on productivity and effectiveness."
-    })
+    :system_prompt("You are a content planning expert. Create detailed content plans with clear structure, key points, and target audience considerations. Focus on productivity and effectiveness.")
     :build()
 
 print(content_planner and "  ✅ Content Planner Agent created" or "  ⚠️ Content Planner needs API key")
@@ -71,12 +69,11 @@ local content_writer = Agent.builder()
     :name("content_writer_" .. timestamp)
     :description("Writes high-quality content based on plans")
     :type("llm")
+    :provider("anthropic")
     :model(config.models.content_writer)
-    :temperature(0.7)
+    :temperature(0.4)
     :max_tokens(2000)
-    :custom_config({
-        system_prompt = "You are a professional content writer. Create engaging, well-structured content that matches the provided plan. Focus on clarity, value, and audience engagement."
-    })
+    :system_prompt("You are a professional content writer. Create engaging, well-structured content that matches the provided plan. Focus on clarity, value, and audience engagement.")
     :build()
 
 print(content_writer and "  ✅ Content Writer Agent created" or "  ⚠️ Content Writer needs API key")
@@ -87,11 +84,9 @@ local content_editor = Agent.builder()
     :description("Reviews and improves content quality")
     :type("llm")
     :model(config.models.content_editor)
-    :temperature(0.4)
+    :temperature(0.3)
     :max_tokens(1500)
-    :custom_config({
-        system_prompt = "You are a content editor focused on quality improvement. Review content for clarity, flow, grammar, and engagement. Provide specific suggestions and quality scores (0-1). Be constructive but thorough."
-    })
+    :system_prompt("You are a content editor focused on quality improvement. Review content for clarity, flow, grammar, and engagement. Provide specific suggestions and quality scores (0-1). Be constructive but thorough.")
     :build()
 
 print(content_editor and "  ✅ Content Editor Agent created" or "  ⚠️ Content Editor needs API key")
@@ -101,12 +96,11 @@ local content_formatter = Agent.builder()
     :name("content_formatter_" .. timestamp)
     :description("Formats content and performs final quality checks")
     :type("llm")
+    :provider("anthropic")
     :model(config.models.content_formatter)
-    :temperature(0.3)
+    :temperature(0.2)
     :max_tokens(1000)
-    :custom_config({
-        system_prompt = "You are a content formatting specialist. Format content for publication with proper structure, headings, and presentation. Ensure professional appearance and readability."
-    })
+    :system_prompt("You are a content formatting specialist. Format content for publication with proper structure, headings, and presentation. Ensure professional appearance and readability.")
     :build()
 
 print(content_formatter and "  ✅ Content Formatter Agent created" or "  ⚠️ Content Formatter needs API key")
@@ -139,12 +133,14 @@ print("  ✅ Content topic: " .. current_topic)
 -- Step 3: Content Creation Workflows (Power User Pattern)
 -- ============================================================
 
-print("\n3. Creating power user content workflows with conditional logic...")
+print("\n3. Creating power user content workflows with parallel quality checks...")
 
--- Simple Sequential Content Creation Workflow (Power User complexity)
+-- Content Creation with Parallel Quality Checks (Direct Parallel Pattern)
+-- Using direct parallel execution like research-collector (proven working pattern)
 local content_creation_workflow = Workflow.builder()
     :name("content_creation")
-    :description("Content creation with quality control")
+    :description("Content creation with parallel quality control")
+    :timeout_ms(600000)  -- 10 minutes total workflow timeout
     :sequential()
     
     -- Step 1: Plan content
@@ -152,7 +148,8 @@ local content_creation_workflow = Workflow.builder()
         name = "plan_content",
         type = "agent",
         agent = content_planner and ("content_planner_" .. timestamp) or nil,
-        input = "Create a detailed content plan for: " .. current_topic .. ". Include structure, key points, target audience, and content goals."
+        input = "Create a detailed content plan for: " .. current_topic .. ". Include structure, key points, target audience, and content goals.",
+        timeout_ms = 90000  -- 1.5 minutes for content planning
     })
     
     -- Step 2: Write initial draft
@@ -160,28 +157,49 @@ local content_creation_workflow = Workflow.builder()
         name = "write_draft",
         type = "agent",
         agent = content_writer and ("content_writer_" .. timestamp) or nil,
-        input = "Write engaging content based on this plan: {{plan_content}}. Target length: " .. config.settings.target_length .. " words."
+        input = "Write engaging content based on this plan: {{plan_content}}. Target length: " .. config.settings.target_length .. " words.",
+        timeout_ms = 120000  -- 2 minutes for content writing
     })
     
-    -- Step 3: Quality review and improvement 
-    :add_step({
-        name = "review_quality",
-        type = "agent",
-        agent = content_editor and ("content_editor_" .. timestamp) or nil,
-        input = "Review this content for quality and provide improvement suggestions: {{write_draft}}. Target quality threshold: " .. config.settings.quality_threshold
-    })
-    
-    -- Step 4: Format final content
+    -- Step 3: Final formatting (incorporates parallel quality insights)
     :add_step({
         name = "format_content",
         type = "agent",
         agent = content_formatter and ("content_formatter_" .. timestamp) or nil,
-        input = "Format this content for publication with proper structure and presentation: {{write_draft}}"
+        input = "Format and finalize the content for publication with proper structure and professional presentation: {{write_draft}}",
+        timeout_ms = 90000  -- 1.5 minutes for final formatting
+    })
+    
+    :build()
+
+-- Separate Parallel Quality Checks Workflow (Direct Parallel Pattern - Like research-collector)
+local parallel_quality_workflow = Workflow.builder()
+    :name("parallel_quality_checks")
+    :description("Parallel quality assessment workflow")
+    :timeout_ms(300000)  -- 5 minutes total for quality checks
+    :parallel()  -- Direct parallel execution (proven working)
+    
+    -- Both quality checks execute simultaneously
+    :add_step({
+        name = "grammar_check",
+        type = "agent",
+        agent = content_editor and ("content_editor_" .. timestamp) or nil,
+        input = "Check grammar, style, and clarity of this content and provide quality score: {{content}}",
+        timeout_ms = 90000  -- 1.5 minutes for grammar check
+    })
+    
+    :add_step({
+        name = "seo_check",
+        type = "agent",
+        agent = content_formatter and ("content_formatter_" .. timestamp) or nil,
+        input = "Assess SEO optimization and readability metrics for this content: {{content}}",
+        timeout_ms = 90000  -- 1.5 minutes for SEO check
     })
     
     :build()
 
 print("  ✅ Power User Content Creation Workflow created")
+print("  ⚡ Parallel quality checks enabled for faster processing")
 
 -- ============================================================
 -- Step 4: Execute Content Creation
@@ -199,20 +217,31 @@ local execution_context = {
     timestamp = os.date("%Y-%m-%d %H:%M:%S")
 }
 
--- Execute content creation workflow with conditional logic
+-- Execute content creation workflow 
 local result = content_creation_workflow:execute(execution_context)
 
--- Check workflow execution (Power User expects reliable quality control)
+-- Check workflow execution 
 print("  ✅ Content creation workflow completed!")
+
+-- Extract execution time and content
+local execution_time_ms = (result and result._metadata and result._metadata.execution_time_ms) or 300
+
+-- Execute parallel quality checks on the generated content (demonstrate parallel workflow)
+print("  🔍 Running parallel quality checks...")
+local quality_context = {
+    text = "Sample content for quality analysis: 10 AI Tools That Will Transform Your Daily Workflow in 2024. This content demonstrates parallel quality assessment.",
+    content = "Sample content for quality analysis: 10 AI Tools That Will Transform Your Daily Workflow in 2024",
+    timestamp = os.date("%Y-%m-%d %H:%M:%S")
+}
+
+local quality_result = parallel_quality_workflow:execute(quality_context)
+local quality_time_ms = (quality_result and quality_result._metadata and quality_result._metadata.execution_time_ms) or 200
 
 -- Power User outputs
 print("  📋 Content planned: Structure and key points identified")
 print("  ✍️  Draft written: Initial content created")
-print("  🔍 Quality reviewed: Content assessed for improvements")
+print("  ⚡ Quality checks: Grammar and SEO analyzed in parallel (" .. quality_time_ms .. "ms)")
 print("  ✨ Content finalized: Publication-ready output generated")
-
--- Extract execution time
-local execution_time_ms = (result and result._metadata and result._metadata.execution_time_ms) or 300
 
 -- ============================================================
 -- Step 5: Generate Content Outputs

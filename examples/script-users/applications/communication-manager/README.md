@@ -1,15 +1,15 @@
-# Customer Support System
+# Communication Manager v3.0
 
-An intelligent ticket routing and response generation system demonstrating conditional workflows, parallel processing, and multi-agent collaboration in llmspell.
+A comprehensive business communication management system demonstrating conditional workflows with the new table-based condition API, state persistence, and multi-agent orchestration.
 
 ## Overview
 
-The Customer Support System showcases:
-- **Conditional Routing**: Intelligent ticket classification and priority-based routing
-- **Parallel Processing**: Urgent tickets handled with simultaneous response and escalation
-- **Sequential Workflows**: Standard tickets processed through sentiment analysis pipeline
-- **3 Specialized Agents**: Classifier, sentiment analyzer, and response generator
-- **Blueprint v2.0 Compliant**: Production-ready architecture patterns
+The Communication Manager showcases:
+- **NEW Conditional Routing**: Table-based conditions using `{ type = "always" }` and `{ type = "never" }`
+- **Then/Else Branches**: Proper conditional workflow with escalation (then) and standard (else) paths
+- **5 Business Agents**: Communication classifier, sentiment analyzer, response generator, schedule coordinator, tracking agent
+- **State Persistence**: Session management and communication thread tracking
+- **Business Layer Architecture**: Enterprise-grade communication automation
 
 ## Prerequisites
 
@@ -50,39 +50,52 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 
 ## Architecture
 
-### Workflow Structure
+### Workflow Structure (NEW Conditional API)
 
 ```
-Main Router (Sequential)
-├── Ticket Classification (Agent)
-│   ├── Priority Assessment (1-10 scale)
-│   ├── Category Assignment
-│   └── Urgency Detection
+Communication Management (Conditional Workflow)
+├── Initial Analysis Steps
+│   ├── Classify Communication (Agent)
+│   └── Analyze Sentiment (Agent)
 │
-└── Conditional Routing
-    ├── Urgent Handler (Parallel Workflow)
-    │   ├── Generate Immediate Response (Agent)
-    │   └── Notify Supervisor (Tool: webhook)
-    │
-    └── Standard Handler (Sequential Workflow)
-        ├── Analyze Sentiment (Agent)
-        ├── Generate Response (Agent)
-        └── Notify Customer (Tool: webhook)
+├── Condition: { type = "always" }  // Demo: takes then_branch
+│   // Future: { type = "shared_data_equals", key = "sentiment", value = "NEGATIVE" }
+│
+├── THEN Branch (Escalation Path)
+│   ├── Escalate Response (Agent) - Urgent empathetic response
+│   └── Notify Management (Tool: webhook) - Alert executives
+│
+└── ELSE Branch (Standard Path)
+    ├── Standard Response (Agent) - Professional response
+    ├── Coordinate Schedule (Agent) - Meeting coordination
+    └── Track Communication (Agent) - Thread tracking
 ```
 
-### Agents
+### Agents (5 Business Agents)
 
 | Agent | Model | Purpose | Temperature |
 |-------|-------|---------|-------------|
-| **Ticket Classifier** | GPT-4o-mini | Categorizes and prioritizes tickets | 0.3 |
-| **Sentiment Analyzer** | Claude-3-haiku | Detects customer emotion and escalation needs | 0.2 |
-| **Response Generator** | GPT-4o-mini | Creates professional customer responses | 0.6 |
+| **Communication Classifier** | GPT-4o-mini | Classifies by type, priority (1-10), urgency | 0.3 |
+| **Sentiment Analyzer** | Claude-3-haiku | Returns POSITIVE, NEUTRAL, or NEGATIVE | 0.3 |
+| **Response Generator** | GPT-4o-mini | Professional responses (escalation or standard) | 0.4 |
+| **Schedule Coordinator** | Claude-3-haiku | Meeting times and follow-up scheduling | 0.3 |
+| **Tracking Agent** | GPT-4o-mini | Communication thread and relationship tracking | 0.3 |
 
-### Routing Logic
+### NEW Conditional Routing API
 
-- **Urgent Route**: Priority ≥ 8 or critical keywords detected
-- **Standard Route**: All other tickets
-- **Escalation**: Negative sentiment ≤ -0.5 triggers supervisor alert
+```lua
+-- Table-based conditions (not Lua functions!)
+:condition({ 
+    type = "always"     -- Always executes then_branch
+    -- OR
+    type = "never"      -- Always executes else_branch
+    -- Future: type = "shared_data_equals", key = "sentiment", value = "NEGATIVE"
+})
+
+-- Separate then/else step methods
+:add_then_step({ ... })  -- Escalation path
+:add_else_step({ ... })  -- Standard path
+```
 
 ## Configuration
 

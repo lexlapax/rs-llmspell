@@ -6,11 +6,15 @@
 use crate::discovery::BridgeDiscovery;
 use crate::workflow_performance::{ExecutionCache, OptimizedConverter, PerformanceMetrics};
 use crate::ComponentRegistry;
-use llmspell_core::{traits::base_agent::BaseAgent, LLMSpellError, Result};
+use llmspell_core::{
+    traits::{base_agent::BaseAgent, state::StateAccess},
+    LLMSpellError, Result,
+};
 use llmspell_workflows::{
+    conditional::{ConditionalBranch, ConditionalWorkflowBuilder},
     factory::{DefaultWorkflowFactory, WorkflowFactory},
     types::WorkflowConfig,
-    ErrorStrategy, WorkflowStep,
+    Condition, ErrorStrategy, WorkflowStep,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -1257,6 +1261,8 @@ pub struct WorkflowBridge {
     perf_metrics: Arc<PerformanceMetrics>,
     /// Standardized workflow factory
     standardized_factory: Arc<StandardizedWorkflowFactory>,
+    /// Shared data cache for conditional workflows
+    shared_data_cache: Arc<RwLock<HashMap<String, HashMap<String, serde_json::Value>>>>,
 }
 
 /// Record of workflow execution
@@ -1326,6 +1332,7 @@ impl WorkflowBridge {
             execution_cache: Arc::new(ExecutionCache::new(1000)),
             perf_metrics: Arc::new(PerformanceMetrics::new()),
             standardized_factory,
+            shared_data_cache: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -1384,6 +1391,169 @@ impl WorkflowBridge {
             workflow_id, workflow_type
         );
         Ok(workflow_id)
+    }
+
+    /// Create a conditional workflow with explicit branches
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow creation fails
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_conditional_workflow(
+        &self,
+        name: String,
+        condition_type: Option<String>,
+        condition_params: Option<serde_json::Value>,
+        then_steps: Vec<WorkflowStep>,
+        else_steps: Vec<WorkflowStep>,
+        config: llmspell_workflows::WorkflowConfig,
+        error_strategy: Option<llmspell_workflows::ErrorStrategy>,
+    ) -> Result<String> {
+        // Create the condition from type and params
+        let condition = match condition_type.as_deref() {
+            Some("shared_data_equals") => {
+                if let Some(serde_json::Value::Object(params)) = condition_params {
+                    if let (Some(serde_json::Value::String(key)), Some(value)) =
+                        (params.get("key"), params.get("value"))
+                    {
+                        Condition::SharedDataEquals {
+                            key: key.clone(),
+                            expected_value: value.clone(),
+                        }
+                    } else {
+                        Condition::Always
+                    }
+                } else {
+                    Condition::Always
+                }
+            }
+            Some("shared_data_exists") => {
+                if let Some(serde_json::Value::Object(params)) = condition_params {
+                    if let Some(serde_json::Value::String(key)) = params.get("key") {
+                        Condition::SharedDataExists { key: key.clone() }
+                    } else {
+                        Condition::Always
+                    }
+                } else {
+                    Condition::Always
+                }
+            }
+            Some("never") => Condition::Never,
+            _ => Condition::Always,
+        };
+
+        // Convert WorkflowStep to llmspell_workflows::WorkflowStep
+        let convert_steps = |steps: Vec<WorkflowStep>| -> Vec<llmspell_workflows::WorkflowStep> {
+            steps.into_iter().collect()
+        };
+
+        let then_workflow_steps = convert_steps(then_steps);
+        let else_workflow_steps = convert_steps(else_steps);
+
+        // Create conditional workflow with both branches
+        let mut builder =
+            ConditionalWorkflowBuilder::new(name.clone()).with_workflow_config(config);
+
+        // Add registry if available
+        if let Some(ref reg) = self.standardized_factory.registry {
+            builder = builder.with_registry(reg.clone());
+        }
+
+        // Create then branch with the actual condition
+        let then_branch = ConditionalBranch::new("then_branch".to_string(), condition)
+            .with_steps(then_workflow_steps);
+        builder = builder.add_branch(then_branch);
+
+        // Create else branch (default)
+        let else_branch =
+            ConditionalBranch::default("else_branch".to_string()).with_steps(else_workflow_steps);
+        builder = builder.add_branch(else_branch);
+
+        // Apply error strategy
+        if let Some(strategy) = error_strategy {
+            builder = builder.with_error_strategy(strategy);
+        }
+
+        let workflow = builder.build();
+        let workflow_executor = Box::new(ConditionalWorkflowExecutor {
+            workflow,
+            name,
+            state_manager: self.standardized_factory.state_manager.clone(),
+        });
+
+        let workflow_id = format!("workflow_{}", uuid::Uuid::new_v4());
+        let mut workflows = self.active_workflows.write().await;
+        workflows.insert(workflow_id.clone(), Arc::new(workflow_executor));
+
+        self.metrics
+            .workflows_created
+            .fetch_add(1, Ordering::Relaxed);
+
+        Ok(workflow_id)
+    }
+
+    /// Set shared data for a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow not found
+    pub async fn set_workflow_shared_data(
+        &self,
+        workflow_id: &str,
+        key: &str,
+        value: serde_json::Value,
+    ) -> Result<()> {
+        // Store in runtime cache for immediate access
+        let mut shared_data_cache = self.shared_data_cache.write().await;
+        let workflow_data = shared_data_cache
+            .entry(workflow_id.to_string())
+            .or_insert_with(HashMap::new);
+        workflow_data.insert(key.to_string(), value.clone());
+
+        // CRITICAL: Also write to the state manager that workflows will actually use
+        if let Some(ref state_manager) = self.standardized_factory.state_manager {
+            // Write to both workflow-specific and global shared namespace
+            // Workflow-specific takes precedence when reading
+            let workflow_key = format!("workflow:{workflow_id}:shared:{key}");
+            let global_key = format!("shared:{key}");
+
+            // Use the StateManagerAdapter to write to state
+            let state_adapter =
+                crate::state_adapter::NoScopeStateAdapter::new(state_manager.clone());
+
+            // Write to workflow-specific namespace
+            if let Err(e) = state_adapter.write(&workflow_key, value.clone()).await {
+                tracing::warn!("Failed to write workflow-specific shared data: {}", e);
+            }
+
+            // Also write to global shared namespace for broader access
+            if let Err(e) = state_adapter.write(&global_key, value).await {
+                tracing::warn!("Failed to write global shared data: {}", e);
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Get shared data for a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow not found
+    pub async fn get_workflow_shared_data(
+        &self,
+        workflow_id: &str,
+        key: &str,
+    ) -> Result<Option<serde_json::Value>> {
+        // Check runtime cache
+        let shared_data_cache = self.shared_data_cache.read().await;
+        if let Some(workflow_data) = shared_data_cache.get(workflow_id) {
+            if let Some(value) = workflow_data.get(key) {
+                return Ok(Some(value.clone()));
+            }
+        }
+
+        Ok(None)
     }
 
     /// Execute a workflow

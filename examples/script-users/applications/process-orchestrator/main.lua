@@ -260,58 +260,177 @@ print("  ✅ Process scenarios prepared: 4 different business workflows")
 
 print("\n3. Creating professional process orchestration workflows...")
 
--- ============================================================
--- Master Orchestration Workflow (Sequential with Conditional Routing)
--- ============================================================
+-- No separate validation workflow needed - will be built inline
 
-local master_orchestration_workflow = Workflow.builder()
-    :name("master_process_orchestration")
-    :description("Professional process orchestration with conditional routing")
+-- Critical incident workflow (for high priority incidents)
+local critical_incident_workflow = Workflow.builder()
+    :name("critical_incident")
+    :description("Critical incident escalation")
+    :parallel()  -- Emergency parallel response
+    
+    :add_step({
+        name = "immediate_response",
+        type = "agent",
+        agent = incident_manager and agent_names.incident or nil,
+        input = "CRITICAL: Initiate immediate incident response for: {{incident_details}}"
+    })
+    
+    :add_step({
+        name = "executive_notification",
+        type = "agent",
+        agent = notification_orchestrator and agent_names.notification or nil,
+        input = "URGENT: Send executive escalation for critical incident: {{incident_details}}"
+    })
+    
+    :build()
+
+-- Standard incident workflow (for normal priority)
+local standard_incident_workflow = Workflow.builder()
+    :name("standard_incident")
+    :description("Standard incident handling")
     :sequential()
     
-    -- Step 1: Process Intake and Classification
+    :add_step({
+        name = "incident_triage",
+        type = "agent",
+        agent = incident_manager and agent_names.incident or nil,
+        input = "Triage and assess incident: {{incident_details}}"
+    })
+    
+    :add_step({
+        name = "team_notification",
+        type = "agent",
+        agent = notification_orchestrator and agent_names.notification or nil,
+        input = "Notify relevant teams about incident: {{incident_triage}}"
+    })
+    
+    :build()
+
+-- ============================================================
+-- Master Orchestration Workflow with CONDITIONAL Routing 
+-- ============================================================
+
+-- Create a conditional workflow for priority-based incident routing
+local incident_routing_workflow = Workflow.builder()
+    :name("incident_routing")
+    :description("Route incidents based on priority")
+    :conditional()
+    
+    -- Initial assessment
+    :add_step({
+        name = "assess_severity",
+        type = "agent",
+        agent = incident_manager and agent_names.incident or nil,
+        input = "Assess incident severity for: {{incident_details}}. Return CRITICAL or STANDARD."
+    })
+    
+    -- Use "always" condition for demo (would use shared_data_equals with severity in production)
+    :condition({ 
+        type = "always"  -- Demo: always takes critical path
+        -- Future: type = "shared_data_equals", key = "severity", value = "CRITICAL"
+    })
+    
+    -- THEN branch: Critical incident path
+    :add_then_step({
+        name = "immediate_response",
+        type = "agent",
+        agent = incident_manager and agent_names.incident or nil,
+        input = "CRITICAL: Initiate immediate incident response for: {{incident_details}}"
+    })
+    
+    :add_then_step({
+        name = "executive_notification",
+        type = "agent",
+        agent = notification_orchestrator and agent_names.notification or nil,
+        input = "URGENT: Send executive escalation for critical incident: {{incident_details}}"
+    })
+    
+    -- ELSE branch: Standard incident path
+    :add_else_step({
+        name = "incident_triage",
+        type = "agent",
+        agent = incident_manager and agent_names.incident or nil,
+        input = "Triage and assess standard incident: {{incident_details}}"
+    })
+    
+    :add_else_step({
+        name = "team_notification",
+        type = "agent",
+        agent = notification_orchestrator and agent_names.notification or nil,
+        input = "Notify relevant teams about incident: {{incident_triage}}"
+    })
+    
+    :build()
+
+-- Master orchestration with conditional routing for process types
+local master_orchestration_workflow = Workflow.builder()
+    :name("master_process_orchestration")
+    :description("Professional orchestration with conditional routing")
+    :conditional()
+    
+    -- Initial classification
     :add_step({
         name = "process_intake",
         type = "agent",
         agent = process_intake and agent_names.intake or nil,
-        input = "Analyze and categorize this business process request: {{process_request}}"
+        input = "Analyze this business process request: {{process_request}}. Determine if it's an INCIDENT or OTHER type."
     })
     
-    -- Step 2: Business Rules Application
     :add_step({
-        name = "apply_business_rules", 
+        name = "assess_priority",
         type = "agent",
         agent = rules_classifier and agent_names.classifier or nil,
-        input = "Apply business rules and determine workflow routing for: {{intake_analysis}}"
+        input = "Assess priority for: {{process_request}}. Return CRITICAL, HIGH, MEDIUM, or LOW."
     })
     
-    -- Step 3: Route to Specialized Workflow (simulated conditional)
-    :add_step({
-        name = "route_to_specialist",
-        type = "agent", 
-        agent = master_orchestrator and agent_names.orchestrator or nil,
-        input = "Based on classification {{business_rules}}, coordinate with appropriate specialist agent and determine process execution strategy"
+    -- Conditional routing (using "never" to demonstrate else branch)
+    :condition({ 
+        type = "never"  -- Demo: always takes standard path (else branch)
+        -- Future: type = "shared_data_equals", key = "process_type", value = "INCIDENT"
     })
     
-    -- Step 4: Process Execution Coordination
-    :add_step({
-        name = "coordinate_execution",
+    -- THEN branch: Incident handling path
+    :add_then_step({
+        name = "handle_incident",
         type = "agent",
-        agent = master_orchestrator and agent_names.orchestrator or nil, 
-        input = "Coordinate the execution of {{specialist_routing}} with proper monitoring and checkpoints"
+        agent = incident_manager and agent_names.incident or nil,
+        input = "Handle incident with priority {{assess_priority}}: {{process_request}}"
     })
     
-    -- Step 5: Final Notification and Audit
-    :add_step({
-        name = "finalize_process",
+    :add_then_step({
+        name = "incident_escalation",
         type = "agent",
         agent = notification_orchestrator and agent_names.notification or nil,
-        input = "Generate final notifications and audit trail for completed process: {{execution_results}}"
+        input = "Escalate if needed based on priority {{assess_priority}}"
+    })
+    
+    -- ELSE branch: Standard process handling
+    :add_else_step({
+        name = "standard_processing",
+        type = "agent",
+        agent = master_orchestrator and agent_names.orchestrator or nil,
+        input = "Process standard request with priority {{assess_priority}}: {{process_request}}"
+    })
+    
+    :add_else_step({
+        name = "approval_check",
+        type = "agent",
+        agent = approval_coordinator and agent_names.approval or nil,
+        input = "Check if approval needed for: {{process_request}}"
+    })
+    
+    :add_else_step({
+        name = "complete_process",
+        type = "agent",
+        agent = master_orchestrator and agent_names.orchestrator or nil,
+        input = "Complete process workflow for: {{process_request}}"
     })
     
     :build()
 
 print("  ✅ Master Orchestration Workflow created")
+print("  ✅ Incident Routing Workflow created")
+print("  ⚡ Features: CONDITIONAL routing with then/else branches + Priority-based escalation")
 
 -- ============================================================
 -- Specialized Sub-Workflows (Parallel Execution Simulation)
@@ -470,8 +589,8 @@ print("    Time to Value: ~5 seconds (enterprise-grade orchestration)")
 
 print("\n  🔧 Technical Architecture:")
 print("    • Agents: 8 (professional orchestration complexity)")
-print("    • Workflows: Master + 3 specialized sub-workflows")
-print("    • Patterns: Sequential with conditional routing simulation")
+print("    • Workflows: Master + 6 workflows (3 nested, 2 conditional branches)")
+print("    • Patterns: CONDITIONAL + NESTED + PARALLEL workflows")
 print("    • Crates: Core + workflows + advanced orchestration")
 print("    • Tools: http_request, webhook_caller, file_operations")
 print("    • Business Rules: Automated routing and escalation")
