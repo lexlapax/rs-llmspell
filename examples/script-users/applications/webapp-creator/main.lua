@@ -540,7 +540,7 @@ local crud_workflow = Workflow.builder()
         type = "agent",
         agent = agents.backend_developer and ("backend_developer_" .. timestamp) or nil,
         input = "Generate complete CRUD operations (Create, Read, Update, Delete) for entity: {{loop_value}}. Include Express.js routes, database queries, and validation.",
-        timeout_ms = 30000
+        timeout_ms = 120000  -- 2 minutes for backend CRUD generation
     })
     
     :add_step({
@@ -548,7 +548,7 @@ local crud_workflow = Workflow.builder()
         type = "agent",
         agent = agents.frontend_developer and ("frontend_developer_" .. timestamp) or nil,
         input = "Generate React components for CRUD operations for entity: {{loop_value}}. Include list view, create form, edit form, and delete confirmation.",
-        timeout_ms = 30000
+        timeout_ms = 120000  -- 2 minutes for frontend CRUD generation
     })
     
     :add_step({
@@ -556,7 +556,7 @@ local crud_workflow = Workflow.builder()
         type = "agent",
         agent = agents.test_engineer and ("test_engineer_" .. timestamp) or nil,
         input = "Generate API tests for {{loop_value}} CRUD operations. Include tests for all endpoints.",
-        timeout_ms = 20000
+        timeout_ms = 60000  -- 1 minute for test generation
     })
     
     :build()
@@ -699,6 +699,11 @@ if result then
             Tool.invoke("file_operations", {
                 operation = "mkdir",
                 path = project_dir .. "/frontend/src/crud"
+            })
+            -- Create tests directory first
+            Tool.invoke("file_operations", {
+                operation = "mkdir",
+                path = project_dir .. "/tests"
             })
             Tool.invoke("file_operations", {
                 operation = "mkdir",

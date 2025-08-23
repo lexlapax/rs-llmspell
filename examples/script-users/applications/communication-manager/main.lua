@@ -208,11 +208,11 @@ local communication_workflow = Workflow.builder()
     :add_then_step({
         name = "notify_management",
         type = "tool",
-        tool = "webhook_caller",
+        tool = "webhook-caller",
         input = {
-            url = config.integration.notification_webhook,
+            input = config.integration.notification_webhook,
             method = "POST",
-            payload = '{"alert": "Negative sentiment detected", "priority": "HIGH", "content": "{{communication_content}}"}'
+            payload = {alert = "Negative sentiment detected", priority = "HIGH", content = "{{communication_content}}"}
         }
     })
     
