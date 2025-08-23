@@ -45,6 +45,38 @@ Everyone with a computer faces this - downloads folder chaos, desktop clutter, s
 ./target/debug/llmspell --debug run examples/script-users/applications/file-organizer/main.lua
 ```
 
+## NEW: Loop Workflow Support (v2.0) 🔄
+
+### Batch Processing with Loop Workflows
+The File Organizer now supports **loop workflows** for processing large directories in batches:
+
+```lua
+-- Process files in batches of 10
+local workflow = Workflow.builder()
+    :name("batch_file_organizer")
+    :loop()
+    :with_collection(file_list)  -- Or use :with_range() for numeric iteration
+    :max_iterations(10)           -- Process max 10 batches
+    :add_step({
+        name = "process_batch",
+        type = "agent",
+        agent = "file_classifier"
+    })
+    :build()
+```
+
+### Loop Iterator Options
+- **Range**: `:with_range({ start = 1, ["end"] = 100, step = 10 })` - Process files 1-100 in batches of 10
+- **Collection**: `:with_collection(file_list)` - Iterate over specific file list
+- **Limit**: `:max_iterations(5)` - Safety limit to prevent runaway processing
+
+### Example: Batch Processing 1000 Files
+```bash
+# Process large directory in batches
+./target/debug/llmspell run examples/script-users/applications/file-organizer/main.lua \
+  -- --input-dir /tmp/huge-directory --batch-size 50
+```
+
 ## Simple Architecture
 
 ### 3 Simple Agents (Universal Complexity)

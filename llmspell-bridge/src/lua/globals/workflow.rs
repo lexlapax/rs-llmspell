@@ -65,10 +65,18 @@ fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowS
                 serde_json::json!({})
             };
 
+            // Parse the existing workflow ID instead of creating a new one
+            let component_id = ComponentId::parse(&workflow_id).map_err(|e| {
+                mlua::Error::RuntimeError(format!(
+                    "Failed to parse workflow ID '{}': {}",
+                    workflow_id, e
+                ))
+            })?;
+
             WorkflowStep::new(
                 name,
                 StepType::Workflow {
-                    workflow_id: ComponentId::from_name(&workflow_id),
+                    workflow_id: component_id,
                     input: input_value,
                 },
             )

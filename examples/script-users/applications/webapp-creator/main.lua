@@ -427,26 +427,20 @@ print("  20. Code Reviewer: " .. (agents.code_reviewer and "✓" or "✗"))
 
 print("\n📊 Starting Workflow Execution...\n")
 
--- Create LOOP workflow for iterative code generation (Expert pattern)
-local code_generation_loop = Workflow.builder()
-    :name("code_generation_loop")
-    :description("Iterative code generation in batches")
-    :loop_workflow()  -- LOOP workflow pattern (correct method name)
-    :max_iterations(5)  -- Process 5 iterations for different components
-    
-    :add_step({
-        name = "generate_component",
-        type = "agent",
-        agent = agents.backend_developer and ("backend_developer_" .. timestamp) or nil,
-        input = "Generate code for component {{iteration}} of 5: {{component_type}}"
-    })
-    
-    :build()
+-- Expert Pattern: Use LOOP workflow for generating CRUD operations
+-- This demonstrates iterative generation of similar but distinct components
+local crud_entities = {
+    "users",      -- User management CRUD
+    "products",   -- Product catalog CRUD  
+    "orders",     -- Order management CRUD
+    "reviews",    -- Review system CRUD
+    "inventory"   -- Inventory tracking CRUD
+}
 
--- Create workflow with LOOP for iterative generation
+-- Create the main webapp workflow (sequential)
 local webapp_workflow = Workflow.builder()
     :name("webapp_creator_workflow")
-    :description("Generate complete web application with iterative patterns")
+    :description("Generate complete web application with expert patterns")
     :timeout_ms(1800000)  -- 30 minutes total workflow timeout
     :sequential()
 
@@ -491,12 +485,21 @@ for _, name in ipairs(initial_agents) do
     })
 end
 
--- Add LOOP workflow for development phase (nested workflow)
-webapp_workflow:add_step({
-    name = "iterative_code_generation",
-    type = "workflow",
-    workflow = code_generation_loop  -- Nested LOOP workflow
-})
+-- Add development agents as regular steps (not in loop for now)
+for _, name in ipairs(development_agents) do
+    local agent = agents[name]
+    agent_names[#agent_names + 1] = name
+    local agent_id = name .. "_" .. timestamp
+    agent_ids[name] = agent_id
+    
+    webapp_workflow:add_step({
+        name = name,
+        type = "agent",
+        agent = agent_id,
+        input = user_input.requirements,
+        timeout_ms = 90000  -- 1.5 minutes for development agents
+    })
+end
 
 -- Add remaining agents (testing and documentation)
 for _, name in ipairs(final_agents) do
@@ -520,20 +523,69 @@ for _, name in ipairs(development_agents) do
     agent_ids[name] = name .. "_" .. timestamp
 end
 
--- Build and execute workflow
+-- Build the main workflow
 webapp_workflow = webapp_workflow:build()
-print("\nExecuting workflow with " .. #agent_names .. " agents...")
-print("⚡ Features: LOOP workflow for iterative code generation (5 iterations)")
+
+-- Create LOOP workflow for CRUD generation (Expert Pattern)
+print("\n🔄 Creating LOOP workflow for CRUD generation...")
+local crud_workflow = Workflow.builder()
+    :name("crud_generator")
+    :description("Generate CRUD operations for multiple entities")
+    :loop()
+    :with_collection(crud_entities)  -- Process each entity
+    :max_iterations(5)  -- Generate CRUD for 5 entities
+    
+    :add_step({
+        name = "generate_backend_crud",
+        type = "agent",
+        agent = agents.backend_developer and ("backend_developer_" .. timestamp) or nil,
+        input = "Generate complete CRUD operations (Create, Read, Update, Delete) for entity: {{loop_value}}. Include Express.js routes, database queries, and validation.",
+        timeout_ms = 30000
+    })
+    
+    :add_step({
+        name = "generate_frontend_crud",
+        type = "agent",
+        agent = agents.frontend_developer and ("frontend_developer_" .. timestamp) or nil,
+        input = "Generate React components for CRUD operations for entity: {{loop_value}}. Include list view, create form, edit form, and delete confirmation.",
+        timeout_ms = 30000
+    })
+    
+    :add_step({
+        name = "generate_api_tests",
+        type = "agent",
+        agent = agents.test_engineer and ("test_engineer_" .. timestamp) or nil,
+        input = "Generate API tests for {{loop_value}} CRUD operations. Include tests for all endpoints.",
+        timeout_ms = 20000
+    })
+    
+    :build()
+
+print("  ✅ CRUD Loop Workflow created")
+print("  ⚡ Will generate CRUD for: " .. table.concat(crud_entities, ", "))
+
+print("\n📊 Executing Main Workflow...")
+print("  Phase 1: Analysis and Architecture (" .. #initial_agents .. " agents)")
+print("  Phase 2: Core Development (" .. #development_agents .. " agents)")  
+print("  Phase 3: Testing and Documentation (" .. #final_agents .. " agents)")
 
 -- Note: Agents are already registered when created via Agent.builder():build()
 -- The workflow should be able to find them by name
 
--- Workflow expects input with a "text" field for the sequential workflow
+-- Execute main workflow first
 local workflow_input = {
     text = user_input.requirements,  -- Pass the requirements as the main text
     context = user_input  -- Pass the full user_input as context
 }
+print("\n⏳ Executing main workflow...")
 local result = webapp_workflow:execute(workflow_input)  -- Pass formatted input
+
+-- Execute CRUD loop workflow separately
+print("\n🔄 Executing CRUD generation loop workflow...")
+local crud_result = crud_workflow:execute({
+    text = "Generate CRUD operations for e-commerce entities",
+    entities = crud_entities
+})
 
 -- ============================================================
 -- State-Based Output Collection (Task 10.3.a)
@@ -636,6 +688,37 @@ if result then
         })
         generate_file(project_dir .. "/backend/src/server.js", outputs.backend_developer)
         generate_file(project_dir .. "/backend/src/routes.js", outputs.api_developer)
+        
+        -- Generate CRUD files from loop workflow
+        if crud_result then
+            print("\n📂 Generating CRUD modules from loop workflow...")
+            Tool.invoke("file_operations", {
+                operation = "mkdir",
+                path = project_dir .. "/backend/src/crud"
+            })
+            Tool.invoke("file_operations", {
+                operation = "mkdir",
+                path = project_dir .. "/frontend/src/crud"
+            })
+            Tool.invoke("file_operations", {
+                operation = "mkdir",
+                path = project_dir .. "/tests/crud"
+            })
+            
+            -- Generate a file for each CRUD entity
+            for i, entity in ipairs(crud_entities) do
+                if i <= 5 then  -- Limited by max_iterations
+                    generate_file(project_dir .. "/backend/src/crud/" .. entity .. "_routes.js", 
+                        "// CRUD routes for " .. entity .. " (generated by loop workflow)")
+                    generate_file(project_dir .. "/frontend/src/crud/" .. entity .. "_components.jsx", 
+                        "// React components for " .. entity .. " CRUD (generated by loop workflow)")
+                    generate_file(project_dir .. "/tests/crud/" .. entity .. "_test.js",
+                        "// API tests for " .. entity .. " (generated by loop workflow)")
+                end
+            end
+            print("  ✅ Generated CRUD modules for " .. math.min(5, #crud_entities) .. " entities")
+        end
+        
         generate_file(project_dir .. "/backend/package.json", {
             name = safe_project_name .. "-backend",
             version = "1.0.0",

@@ -260,11 +260,136 @@ print("  ✅ Process scenarios prepared: 4 different business workflows")
 
 print("\n3. Creating professional process orchestration workflows...")
 
--- No separate validation workflow needed - will be built inline
+-- ============================================================
+-- Sub-Workflows for Nested Composition (Demonstrating Nesting)
+-- ============================================================
+
+-- Level 3: Document Validation Sub-Workflow (deepest level)
+local document_validation_workflow = Workflow.builder()
+    :name("document_validation_" .. timestamp)
+    :description("Document validation and compliance check")
+    :sequential()
+    
+    :add_step({
+        name = "validate_format",
+        type = "agent",
+        agent = qa_coordinator and agent_names.qa or nil,
+        input = "Validate document format and structure: {{document_details}}"
+    })
+    
+    :add_step({
+        name = "check_compliance",
+        type = "agent",
+        agent = rules_classifier and agent_names.classifier or nil,
+        input = "Check compliance requirements for: {{document_details}}"
+    })
+    
+    :build()
+
+print("  ✅ Document Validation Sub-Workflow created (Level 3)")
+
+-- Level 3: Signature Verification Sub-Workflow (deepest level)
+local signature_verification_workflow = Workflow.builder()
+    :name("signature_verification_" .. timestamp)
+    :description("Digital signature and authorization verification")
+    :sequential()
+    
+    :add_step({
+        name = "verify_signatures",
+        type = "agent",
+        agent = approval_coordinator and agent_names.approval or nil,
+        input = "Verify all required signatures for: {{approval_request}}"
+    })
+    
+    :add_step({
+        name = "check_authorization",
+        type = "agent",
+        agent = rules_classifier and agent_names.classifier or nil,
+        input = "Verify authorization levels for: {{approval_request}}"
+    })
+    
+    :build()
+
+print("  ✅ Signature Verification Sub-Workflow created (Level 3)")
+
+-- Level 2: Approval Validation Nested Workflow (contains Level 3 workflows)
+local approval_validation_workflow = Workflow.builder()
+    :name("approval_validation_" .. timestamp)
+    :description("Complete approval validation with nested checks")
+    :sequential()
+    
+    :add_step({
+        name = "initial_review",
+        type = "agent",
+        agent = approval_coordinator and agent_names.approval or nil,
+        input = "Initial approval review for: {{approval_request}}"
+    })
+    
+    -- NESTED WORKFLOW STEP: Document validation
+    :add_step({
+        name = "document_validation",
+        type = "workflow",
+        workflow = document_validation_workflow,  -- Reference to sub-workflow
+        input = {
+            document_details = "{{approval_request}}"
+        }
+    })
+    
+    -- NESTED WORKFLOW STEP: Signature verification
+    :add_step({
+        name = "signature_verification",
+        type = "workflow",
+        workflow = signature_verification_workflow,  -- Reference to sub-workflow
+        input = {
+            approval_request = "{{approval_request}}"
+        }
+    })
+    
+    :add_step({
+        name = "final_approval",
+        type = "agent",
+        agent = approval_coordinator and agent_names.approval or nil,
+        input = "Final approval decision based on validation results: {{document_validation}} {{signature_verification}}"
+    })
+    
+    :build()
+
+print("  ✅ Approval Validation Workflow created (Level 2, contains 2 nested workflows)")
+
+-- Level 2: Approval Routing Nested Workflow
+local approval_routing_workflow = Workflow.builder()
+    :name("approval_routing_" .. timestamp)
+    :description("Route approvals to appropriate stakeholders")
+    :sequential()
+    
+    :add_step({
+        name = "determine_approvers",
+        type = "agent",
+        agent = rules_classifier and agent_names.classifier or nil,
+        input = "Determine approval chain for: {{approval_request}}"
+    })
+    
+    :add_step({
+        name = "notify_approvers",
+        type = "agent",
+        agent = notification_orchestrator and agent_names.notification or nil,
+        input = "Send approval requests to stakeholders: {{determine_approvers}}"
+    })
+    
+    :add_step({
+        name = "track_responses",
+        type = "agent",
+        agent = approval_coordinator and agent_names.approval or nil,
+        input = "Track and consolidate approval responses"
+    })
+    
+    :build()
+
+print("  ✅ Approval Routing Workflow created (Level 2)")
 
 -- Critical incident workflow (for high priority incidents)
 local critical_incident_workflow = Workflow.builder()
-    :name("critical_incident")
+    :name("critical_incident_" .. timestamp)
     :description("Critical incident escalation")
     :parallel()  -- Emergency parallel response
     
@@ -286,7 +411,7 @@ local critical_incident_workflow = Workflow.builder()
 
 -- Standard incident workflow (for normal priority)
 local standard_incident_workflow = Workflow.builder()
-    :name("standard_incident")
+    :name("standard_incident_" .. timestamp)
     :description("Standard incident handling")
     :sequential()
     
@@ -433,36 +558,57 @@ print("  ✅ Incident Routing Workflow created")
 print("  ⚡ Features: CONDITIONAL routing with then/else branches + Priority-based escalation")
 
 -- ============================================================
--- Specialized Sub-Workflows (Parallel Execution Simulation)
+-- Level 1: Main Approval Process (contains Level 2 workflows)
 -- ============================================================
 
--- Approval Workflow
+-- Main Approval Workflow with Nested Sub-Workflows
 local approval_workflow = Workflow.builder()
-    :name("approval_process")
-    :description("Approval workflow with escalation logic")
+    :name("approval_process_" .. timestamp)
+    :description("Main approval workflow with nested validation and routing")
     :sequential()
     
     :add_step({
-        name = "evaluate_approval",
+        name = "intake_approval",
         type = "agent",
-        agent = approval_coordinator and agent_names.approval or nil,
-        input = "Evaluate approval requirements and routing for: {{approval_request}}"
+        agent = process_intake and agent_names.intake or nil,
+        input = "Process approval request intake: {{approval_request}}"
+    })
+    
+    -- NESTED WORKFLOW STEP: Complete validation process (Level 2)
+    :add_step({
+        name = "validation_process",
+        type = "workflow",
+        workflow = approval_validation_workflow,  -- This workflow contains Level 3 workflows
+        input = {
+            approval_request = "{{intake_approval}}"
+        }
+    })
+    
+    -- NESTED WORKFLOW STEP: Approval routing (Level 2)
+    :add_step({
+        name = "routing_process",
+        type = "workflow",
+        workflow = approval_routing_workflow,
+        input = {
+            approval_request = "{{validation_process}}"
+        }
     })
     
     :add_step({
-        name = "notify_stakeholders",
-        type = "agent", 
-        agent = notification_orchestrator and agent_names.notification or nil,
-        input = "Notify relevant stakeholders about approval status: {{approval_decision}}"
+        name = "finalize_approval",
+        type = "agent",
+        agent = master_orchestrator and agent_names.orchestrator or nil,
+        input = "Finalize approval process with results: {{validation_process}} {{routing_process}}"
     })
     
     :build()
 
-print("  ✅ Approval Workflow created")
+print("  ✅ Main Approval Workflow created (Level 1, contains 2 Level 2 workflows)")
+print("  📊 Nesting depth: 3 levels (Main → Validation/Routing → Document/Signature)")
 
 -- Migration Workflow
 local migration_workflow = Workflow.builder()
-    :name("migration_process")
+    :name("migration_process_" .. timestamp)
     :description("Data migration coordination workflow")
     :sequential()
     
@@ -486,7 +632,7 @@ print("  ✅ Migration Workflow created")
 
 -- Incident Response Workflow  
 local incident_workflow = Workflow.builder()
-    :name("incident_response")
+    :name("incident_response_" .. timestamp)
     :description("Incident response and escalation workflow")
     :sequential()
     
@@ -589,8 +735,12 @@ print("    Time to Value: ~5 seconds (enterprise-grade orchestration)")
 
 print("\n  🔧 Technical Architecture:")
 print("    • Agents: 8 (professional orchestration complexity)")
-print("    • Workflows: Master + 6 workflows (3 nested, 2 conditional branches)")
-print("    • Patterns: CONDITIONAL + NESTED + PARALLEL workflows")
+print("    • Workflows: 9 total (3-level nesting demonstrated)")
+print("      - Level 1: Main Approval Process (contains Level 2)")
+print("      - Level 2: Validation & Routing (contain Level 3)")
+print("      - Level 3: Document & Signature verification")
+print("    • Patterns: CONDITIONAL + NESTED (3 levels) + PARALLEL workflows")
+print("    • Nesting Depth: 3 levels demonstrated")
 print("    • Crates: Core + workflows + advanced orchestration")
 print("    • Tools: http_request, webhook_caller, file_operations")
 print("    • Business Rules: Automated routing and escalation")

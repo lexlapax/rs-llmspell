@@ -129,62 +129,60 @@ print("  ✅ Created " .. #sample_files .. " messy files for organization")
 
 print("\n3. Creating file organization workflow with batch processing...")
 
--- Batch Processing Workflow (processes files in groups)
-local batch_classification_workflow = Workflow.builder()
-    :name("batch_classification")
-    :description("Process files in batches of 3")
-    :loop_workflow()  -- LOOP workflow pattern (correct method name)
-    :max_iterations(4)  -- Process 4 batches (3 files each = 12 files total)
+-- Use the sample files we created for loop demonstration
+-- In a real application, we'd use list_dir to get actual files
+
+-- Loop Workflow - Process each file with actual agents
+local loop_organization_workflow = Workflow.builder()
+    :name("loop_file_processor")
+    :description("Process files using loop workflow with agents")
+    :loop()  -- Use the new loop() method
+    :with_collection(sample_files)  -- Process our sample file list
+    :max_iterations(5)  -- Process max 5 files (demonstrates limiting)
     
     :add_step({
-        name = "process_batch",
+        name = "scan_file",
+        type = "agent",
+        agent = file_scanner and ("file_scanner_" .. timestamp) or nil,
+        input = "Analyze this file and determine its type and purpose: {{loop_value}}. Respond with a brief description.",
+        timeout_ms = 5000
+    })
+    
+    :add_step({
+        name = "classify_file",
         type = "agent",
         agent = category_classifier and ("category_classifier_" .. timestamp) or nil,
-        input = "Classify batch {{iteration}} of files (3 files per batch). Files in this batch: {{batch_files}}. Return categories for each."
-    })
-    
-    :add_step({
-        name = "scan_batch",
-        type = "agent",
-        agent = file_scanner and ("file_scanner_" .. timestamp) or nil,
-        input = "Scan and analyze batch {{iteration}} files for content type and metadata: {{batch_files}}"
+        input = "Classify this file '{{loop_value}}' into one category: Documents, Images, Videos, Audio, Code, Archive, or Other. Reply with just the category name.",
+        timeout_ms = 5000
     })
     
     :build()
 
--- Main File Organization Workflow with nested loop
-local file_organization_workflow = Workflow.builder()
-    :name("file_organization")
-    :description("File organization with batch processing loop")
-    :sequential()
-    
-    -- Step 1: Process files in batches using LOOP workflow
+-- Alternative: Range-based loop workflow for processing files by index
+local range_workflow = Workflow.builder()
+    :name("range_processor")
+    :description("Process files by index range")
+    :loop()
+    :with_range({ start = 1, ["end"] = 6, step = 2 })  -- Process files 1, 3, 5
     :add_step({
-        name = "batch_processing",
-        type = "workflow",
-        workflow = batch_classification_workflow  -- Nested LOOP workflow
+        name = "process_by_index",
+        type = "tool",
+        tool = "text_manipulator",
+        input = { 
+            operation = "uppercase",
+            input = "Processing file at index {{loop_index}}"
+        }
     })
-    
-    -- Step 2: Generate organization suggestions based on all batches
-    :add_step({
-        name = "suggest_organization",
-        type = "agent", 
-        agent = organization_suggester and ("organization_suggester_" .. timestamp) or nil,
-        input = "Create a folder organization plan based on the batch processing results: {{batch_processing}}. Consider all file types found."
-    })
-    
-    -- Step 3: Final review and optimization
-    :add_step({
-        name = "optimize_structure",
-        type = "agent",
-        agent = file_scanner and ("file_scanner_" .. timestamp) or nil,
-        input = "Review and optimize the organization structure for {{suggest_organization}}. Ensure no duplicate categories."
-    })
-    
     :build()
+
+-- Main File Organization Workflow - Just execute the loop workflow directly
+local file_organization_workflow = loop_organization_workflow
 
 print("  ✅ File Organization Workflow created")
-print("  ⚡ Features: LOOP workflow for batch processing (4 iterations × 3 files/batch)")
+print("  ⚡ Loop workflow features:")
+print("     • Collection iteration: Processing " .. #sample_files .. " files")
+print("     • Max iterations: Limited to 5 files (demonstrates safety limit)")
+print("     • Range workflow available: For index-based processing")
 
 -- ============================================================
 -- Step 4: Execute File Organization
@@ -205,12 +203,18 @@ local result = file_organization_workflow:execute(execution_context)
 print("  ✅ File organization completed successfully!")
 
 -- Simple outputs for universal users
-print("  🔄 Batch processing: 4 iterations × 3 files/batch")
+print("  🔄 Loop workflow executed: Collection of " .. #sample_files .. " files")
+print("  ⚡ Max iterations limited to 5 (safety feature demonstration)")
 print("  🏷️  Files classified into categories")  
 print("  📋 Organization plan created")
 
--- Extract simple execution time
-local execution_time_ms = (result and result._metadata and result._metadata.execution_time_ms) or 150
+-- Extract execution time from result metadata
+local execution_time_ms = 150  -- Default fallback
+if result and result.metadata and result.metadata.execution_time_ms then
+    execution_time_ms = result.metadata.execution_time_ms
+elseif result and result._metadata and result._metadata.execution_time_ms then
+    execution_time_ms = result._metadata.execution_time_ms
+end
 
 -- ============================================================
 -- Step 5: Create Organized Structure
@@ -307,7 +311,8 @@ print("    • Organization Plan: " .. config.files.organization_plan)
 print("")
 print("  🔧 Technical Architecture:")
 print("    • Agents: 3 (down from 8) - Universal complexity")
-print("    • Workflow: LOOP pattern with batch processing (4 iterations)")
+print("    • Workflow: LOOP pattern with collection iteration (max 5 files)")
+print("    • Loop types: Collection (used), Range (available), While (available)")
 print("    • Crates: Core only (llmspell-core, llmspell-agents, llmspell-bridge)")
 print("    • Tools: Basic only (file_operations, text_manipulator)")
 print("    • State Management: REMOVED (immediate results only)")

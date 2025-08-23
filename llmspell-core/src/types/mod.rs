@@ -60,6 +60,23 @@ impl ComponentId {
         Self(Uuid::new_v5(&namespace, name.as_bytes()))
     }
 
+    /// Parse `ComponentId` from a UUID string
+    ///
+    /// This parses an existing UUID string (with or without "workflow_" prefix)
+    /// into a ComponentId. Used for referencing existing workflows.
+    pub fn parse(s: &str) -> Result<Self, uuid::Error> {
+        // Strip common prefixes if present
+        let uuid_str = s
+            .strip_prefix("workflow_")
+            .or_else(|| s.strip_prefix("agent_"))
+            .or_else(|| s.strip_prefix("tool_"))
+            .unwrap_or(s);
+
+        // Parse the UUID
+        let uuid = Uuid::parse_str(uuid_str)?;
+        Ok(Self(uuid))
+    }
+
     /// Get inner UUID
     #[must_use]
     pub fn uuid(&self) -> Uuid {
