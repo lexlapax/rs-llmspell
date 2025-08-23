@@ -255,12 +255,7 @@ mod tests {
 
         let result: Result<i32, mlua::Error> = block_on_async(
             "test_error",
-            async {
-                Err::<i32, std::io::Error>(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "test error",
-                ))
-            },
+            async { Err::<i32, std::io::Error>(std::io::Error::other("test error")) },
             None,
         );
 

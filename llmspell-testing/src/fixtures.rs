@@ -454,8 +454,7 @@ mod tests {
     fn test_load_fixture_json() {
         // Test with existing migration test data
         let result = load_fixture_json("data/migration_test_cases/v1_to_v2_user_schema.json");
-        if result.is_ok() {
-            let json = result.unwrap();
+        if let Ok(json) = result {
             assert!(json.is_object());
         }
     }

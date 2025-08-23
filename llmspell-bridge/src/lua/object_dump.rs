@@ -484,7 +484,7 @@ fn dump_error(error: &mlua::Error, context: &mut DumpContext) {
 /// # Errors
 ///
 /// Returns an error if Lua table creation or function binding fails
-pub fn create_dump_functions(lua: &Lua) -> LuaResult<Table> {
+pub fn create_dump_functions(lua: &Lua) -> LuaResult<Table<'_>> {
     let dump_table = lua.create_table()?;
 
     // dump(value, [options])

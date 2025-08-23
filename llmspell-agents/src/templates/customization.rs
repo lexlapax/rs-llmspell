@@ -485,7 +485,7 @@ pub fn create_range_parameter(
             ParameterConstraint::MinValue(min),
             ParameterConstraint::MaxValue(max),
         ],
-        examples: vec![min.into(), ((min + max) / 2.0).into(), max.into()],
+        examples: vec![min.into(), f64::midpoint(min, max).into(), max.into()],
     }
 }
 

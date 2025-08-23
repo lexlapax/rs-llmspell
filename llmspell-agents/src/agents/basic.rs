@@ -124,6 +124,7 @@ impl BasicAgent {
     /// # Errors
     ///
     /// Returns an error if the state machine cannot transition to the Paused state
+    #[allow(clippy::cognitive_complexity)]
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing BasicAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -171,6 +172,7 @@ impl BasicAgent {
     /// # Errors
     ///
     /// Returns an error if the state machine cannot transition to the Stopped state
+    #[allow(clippy::cognitive_complexity)]
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping BasicAgent '{}'", self.metadata.name);
 

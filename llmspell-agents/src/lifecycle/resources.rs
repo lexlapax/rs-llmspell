@@ -275,6 +275,7 @@ impl ResourceManager {
     /// - Resource allocation fails
     /// - Insufficient resources available
     /// - Quota exceeded
+    #[allow(clippy::cognitive_complexity)]
     pub async fn allocate(&self, request: ResourceRequest) -> Result<ResourceAllocation> {
         debug!(
             "Allocating {} {} for agent {}",
@@ -371,6 +372,7 @@ impl ResourceManager {
     /// Returns an error if:
     /// - Allocation not found
     /// - Deallocation hooks fail
+    #[allow(clippy::cognitive_complexity)]
     pub async fn deallocate(&self, allocation_id: &str) -> Result<()> {
         let allocation = self.find_allocation(allocation_id).await?;
 

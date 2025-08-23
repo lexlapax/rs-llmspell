@@ -155,7 +155,7 @@ async fn test_tool_initialization_performance() {
     }
 }
 
-/// Test calculator DoS protection (security hardening from Phase 3.0.12)
+/// Test calculator `DoS` protection (security hardening from Phase 3.0.12)
 #[tokio::test]
 async fn test_security_hardening_compliance() {
     let calculator = CalculatorTool::new();
@@ -198,7 +198,7 @@ async fn test_security_hardening_compliance() {
     println!("✅ Calculator DoS protection is working");
 }
 
-/// Test ResponseBuilder consistency across tool categories
+/// Test `ResponseBuilder` consistency across tool categories
 #[tokio::test]
 async fn test_response_builder_consistency() {
     // Test tools that should reliably return valid responses for simple operations

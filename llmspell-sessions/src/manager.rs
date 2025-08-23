@@ -97,10 +97,9 @@ impl SessionManager {
         // Create storage directories if needed
         if config.auto_persist {
             std::fs::create_dir_all(&config.storage_path).map_err(|e| {
-                SessionError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to create storage directory: {e}"),
-                ))
+                SessionError::Io(std::io::Error::other(format!(
+                    "Failed to create storage directory: {e}"
+                )))
             })?;
         }
 
@@ -1520,10 +1519,7 @@ impl SessionManager {
     ) -> Result<ArtifactId> {
         // Read file content
         let content = tokio::fs::read(file_path).await.map_err(|e| {
-            SessionError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to read file: {e}"),
-            ))
+            SessionError::Io(std::io::Error::other(format!("Failed to read file: {e}")))
         })?;
 
         // Use file name as artifact name

@@ -364,7 +364,7 @@ impl SystemMonitorTool {
 
             // SAFETY: path_c is a valid C string and statvfs is a valid mutable reference
             #[allow(unsafe_code)]
-            let result = unsafe { libc::statvfs(path_c.as_ptr(), &mut statvfs) };
+            let result = unsafe { libc::statvfs(path_c.as_ptr(), &raw mut statvfs) };
 
             if result == 0 {
                 let block_size = statvfs.f_bsize;

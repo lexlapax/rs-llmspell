@@ -392,7 +392,7 @@ impl Default for ProviderDiscovery {
     }
 }
 
-/// Implementation of unified BridgeDiscovery trait for ProviderDiscovery
+/// Implementation of unified `BridgeDiscovery` trait for `ProviderDiscovery`
 #[async_trait::async_trait]
 impl BridgeDiscovery<ProviderTypeInfo> for ProviderDiscovery {
     async fn discover_types(&self) -> Vec<(String, ProviderTypeInfo)> {

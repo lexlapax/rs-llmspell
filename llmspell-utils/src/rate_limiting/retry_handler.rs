@@ -138,10 +138,9 @@ impl RetryHandler {
                             error!("Rate limit exceeded for provider {}: {:?}", provider, e);
                             return Err(last_error.unwrap_or_else(|| {
                                 // Create a generic error if we don't have one
-                                Box::new(std::io::Error::new(
-                                    std::io::ErrorKind::Other,
-                                    format!("Rate limit exceeded for provider: {provider}"),
-                                ))
+                                Box::new(std::io::Error::other(format!(
+                                    "Rate limit exceeded for provider: {provider}"
+                                )))
                                     as Box<dyn std::error::Error + Send + Sync>
                             }));
                         }
@@ -284,10 +283,7 @@ mod tests {
                     Box::pin(async move {
                         let count = attempts.fetch_add(1, Ordering::SeqCst);
                         if count < 2 {
-                            Err(Box::new(std::io::Error::new(
-                                std::io::ErrorKind::Other,
-                                "Simulated failure",
-                            ))
+                            Err(Box::new(std::io::Error::other("Simulated failure"))
                                 as Box<dyn std::error::Error + Send + Sync>)
                         } else {
                             Ok("Success")
@@ -315,10 +311,7 @@ mod tests {
                     let attempts = Arc::clone(&attempts_clone);
                     Box::pin(async move {
                         attempts.fetch_add(1, Ordering::SeqCst);
-                        Err(Box::new(std::io::Error::new(
-                            std::io::ErrorKind::Other,
-                            "Always fails",
-                        ))
+                        Err(Box::new(std::io::Error::other("Always fails"))
                             as Box<dyn std::error::Error + Send + Sync>)
                     })
                 },

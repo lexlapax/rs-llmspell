@@ -199,6 +199,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine pause fails
+    #[allow(clippy::cognitive_complexity)]
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing LLMAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -246,6 +247,7 @@ impl LLMAgent {
     /// # Errors
     ///
     /// Returns an error if state machine stop fails
+    #[allow(clippy::cognitive_complexity)]
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping LLMAgent '{}'", self.metadata.name);
 

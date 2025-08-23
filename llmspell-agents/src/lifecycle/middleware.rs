@@ -273,6 +273,7 @@ impl LifecycleMiddlewareChain {
     /// Currently never returns an error as middleware failures are handled internally
     /// and stored in the context data. The Result type is provided for future
     /// extensibility (e.g., critical system-level middleware failures).
+    #[allow(clippy::cognitive_complexity)]
     pub async fn execute(&self, mut context: MiddlewareContext) -> Result<MiddlewareContext> {
         if !self.config.behavior_flags.enabled {
             return Ok(context);

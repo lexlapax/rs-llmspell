@@ -239,7 +239,6 @@ impl ShutdownCoordinator {
     /// - Agent is already shutting down
     /// - Shutdown process fails
     /// - Timeout occurs and force shutdown is disabled
-    #[allow(clippy::too_many_lines)]
     pub async fn shutdown_agent(
         &self,
         request: ShutdownRequest,
@@ -256,53 +255,17 @@ impl ShutdownCoordinator {
             );
         }
 
-        // Check if already shutting down
-        {
-            let active = self.active_shutdowns.read().await;
-            if active.contains_key(&agent_id) {
-                return Err(anyhow!("Agent {} is already shutting down", agent_id));
-            }
-        }
-
-        // Register active shutdown
-        {
-            let mut active = self.active_shutdowns.write().await;
-            active.insert(agent_id.clone(), request.clone());
-        }
+        // Check and register shutdown
+        self.check_and_register_shutdown(&agent_id, &request)
+            .await?;
 
         // Emit shutdown started event
-        let event = LifecycleEvent::new(
-            LifecycleEventType::TerminationStarted,
-            agent_id.clone(),
-            LifecycleEventData::Generic {
-                message: format!("Shutdown initiated with priority {:?}", request.priority),
-                details: request.metadata.clone(),
-            },
-            "shutdown_coordinator".to_string(),
-        );
-
-        if let Err(e) = self.event_system.emit(event).await {
-            warn!("Failed to emit shutdown started event: {}", e);
-        }
+        self.emit_shutdown_started_event(&agent_id, &request).await;
 
         // Perform shutdown with timeout
-        let shutdown_result = if let Ok(result) = timeout(
-            request.timeout,
-            self.perform_shutdown(&request, state_machine.clone()),
-        )
-        .await
-        {
-            result
-        } else {
-            warn!("Shutdown timeout for agent {}", agent_id);
-
-            if request.force_if_timeout {
-                warn!("Forcing shutdown for agent {}", agent_id);
-                self.force_shutdown(&request, state_machine.clone()).await
-            } else {
-                Err(anyhow!("Shutdown timeout and force disabled"))
-            }
-        };
+        let shutdown_result = self
+            .execute_shutdown_with_timeout(&request, &agent_id, state_machine.clone())
+            .await;
 
         // Clean up active shutdown
         {
@@ -311,102 +274,27 @@ impl ShutdownCoordinator {
         }
 
         // Create result
-        let final_state = state_machine.current_state().await;
-        let result = match shutdown_result {
-            Ok(resources_cleaned) => ShutdownResult {
-                request_id: request_id.clone(),
-                agent_id: agent_id.clone(),
-                success: true,
-                forced: false,
-                duration: start_time.elapsed(),
-                error: None,
-                final_state: Some(final_state),
-                resources_cleaned,
-            },
-            Err(e) => ShutdownResult {
-                request_id: request_id.clone(),
-                agent_id: agent_id.clone(),
-                success: false,
-                forced: false,
-                duration: start_time.elapsed(),
-                error: Some(e.to_string()),
-                final_state: Some(final_state),
-                resources_cleaned: 0,
-            },
-        };
+        let result = self
+            .create_shutdown_result(
+                &request_id,
+                &agent_id,
+                shutdown_result,
+                state_machine.clone(),
+                start_time,
+            )
+            .await;
 
         // Execute after shutdown hooks
-        let hooks = self.hooks.read().await;
-        for hook in hooks.iter() {
-            if let Err(e) = hook.after_shutdown(&result).await {
-                warn!("Shutdown hook failed in after_shutdown: {}", e);
-            }
-        }
+        self.execute_shutdown_hooks(&result).await;
 
         // Record result in history
-        {
-            let mut history = self.shutdown_history.lock().await;
-            history.push(result.clone());
-
-            // Trim history if needed
-            if history.len() > self.config.max_history_size {
-                history.remove(0);
-            }
-        }
+        self.record_shutdown_history(&result).await;
 
         // Emit shutdown completed event
-        let event_type = if result.success {
-            LifecycleEventType::TerminationCompleted
-        } else {
-            LifecycleEventType::ErrorOccurred
-        };
+        self.emit_shutdown_completed_event(&agent_id, &result).await;
 
-        let event = LifecycleEvent::new(
-            event_type,
-            agent_id.clone(),
-            LifecycleEventData::Generic {
-                message: if result.success {
-                    "Shutdown completed successfully".to_string()
-                } else {
-                    format!(
-                        "Shutdown failed: {}",
-                        result.error.as_deref().unwrap_or("Unknown error")
-                    )
-                },
-                details: HashMap::from([
-                    (
-                        "duration_ms".to_string(),
-                        result.duration.as_millis().to_string(),
-                    ),
-                    (
-                        "resources_cleaned".to_string(),
-                        result.resources_cleaned.to_string(),
-                    ),
-                    ("forced".to_string(), result.forced.to_string()),
-                ]),
-            },
-            "shutdown_coordinator".to_string(),
-        );
-
-        if let Err(e) = self.event_system.emit(event).await {
-            warn!("Failed to emit shutdown completed event: {}", e);
-        }
-
-        if self.config.enable_logging {
-            if result.success {
-                info!(
-                    "Successfully shut down agent {} in {:?}",
-                    agent_id, result.duration
-                );
-            } else {
-                error!(
-                    "Failed to shut down agent {} after {:?}: {}",
-                    agent_id,
-                    result.duration,
-                    result.error.as_deref().unwrap_or("Unknown error")
-                );
-            }
-        }
+        // Log result
+        self.log_shutdown_result(&agent_id, &result);
 
         Ok(result)
     }
@@ -623,6 +511,187 @@ impl ShutdownCoordinator {
     pub async fn get_active_shutdowns(&self) -> HashMap<String, ShutdownRequest> {
         let active = self.active_shutdowns.read().await;
         active.clone()
+    }
+
+    /// Helper: Check and register shutdown
+    async fn check_and_register_shutdown(
+        &self,
+        agent_id: &str,
+        request: &ShutdownRequest,
+    ) -> Result<()> {
+        // Check if already shutting down
+        {
+            let active = self.active_shutdowns.read().await;
+            if active.contains_key(agent_id) {
+                return Err(anyhow!("Agent {} is already shutting down", agent_id));
+            }
+        }
+
+        // Register active shutdown
+        {
+            let mut active = self.active_shutdowns.write().await;
+            active.insert(agent_id.to_string(), request.clone());
+        }
+
+        Ok(())
+    }
+
+    /// Helper: Emit shutdown started event
+    async fn emit_shutdown_started_event(&self, agent_id: &str, request: &ShutdownRequest) {
+        let event = LifecycleEvent::new(
+            LifecycleEventType::TerminationStarted,
+            agent_id.to_string(),
+            LifecycleEventData::Generic {
+                message: format!("Shutdown initiated with priority {:?}", request.priority),
+                details: request.metadata.clone(),
+            },
+            "shutdown_coordinator".to_string(),
+        );
+
+        if let Err(e) = self.event_system.emit(event).await {
+            warn!("Failed to emit shutdown started event: {}", e);
+        }
+    }
+
+    /// Helper: Execute shutdown with timeout
+    async fn execute_shutdown_with_timeout(
+        &self,
+        request: &ShutdownRequest,
+        agent_id: &str,
+        state_machine: Arc<AgentStateMachine>,
+    ) -> Result<u32> {
+        if let Ok(result) = timeout(
+            request.timeout,
+            self.perform_shutdown(request, state_machine.clone()),
+        )
+        .await
+        {
+            result
+        } else {
+            warn!("Shutdown timeout for agent {}", agent_id);
+
+            if request.force_if_timeout {
+                warn!("Forcing shutdown for agent {}", agent_id);
+                self.force_shutdown(request, state_machine).await
+            } else {
+                Err(anyhow!("Shutdown timeout and force disabled"))
+            }
+        }
+    }
+
+    /// Helper: Create shutdown result
+    async fn create_shutdown_result(
+        &self,
+        request_id: &str,
+        agent_id: &str,
+        shutdown_result: Result<u32>,
+        state_machine: Arc<AgentStateMachine>,
+        start_time: Instant,
+    ) -> ShutdownResult {
+        let final_state = state_machine.current_state().await;
+
+        match shutdown_result {
+            Ok(resources_cleaned) => ShutdownResult {
+                request_id: request_id.to_string(),
+                agent_id: agent_id.to_string(),
+                success: true,
+                forced: false,
+                duration: start_time.elapsed(),
+                error: None,
+                final_state: Some(final_state),
+                resources_cleaned,
+            },
+            Err(e) => ShutdownResult {
+                request_id: request_id.to_string(),
+                agent_id: agent_id.to_string(),
+                success: false,
+                forced: false,
+                duration: start_time.elapsed(),
+                error: Some(e.to_string()),
+                final_state: Some(final_state),
+                resources_cleaned: 0,
+            },
+        }
+    }
+
+    /// Helper: Execute shutdown hooks
+    async fn execute_shutdown_hooks(&self, result: &ShutdownResult) {
+        let hooks = self.hooks.read().await;
+        for hook in hooks.iter() {
+            if let Err(e) = hook.after_shutdown(result).await {
+                warn!("Shutdown hook failed in after_shutdown: {}", e);
+            }
+        }
+    }
+
+    /// Helper: Record shutdown history
+    async fn record_shutdown_history(&self, result: &ShutdownResult) {
+        let mut history = self.shutdown_history.lock().await;
+        history.push(result.clone());
+
+        // Trim history if needed
+        if history.len() > self.config.max_history_size {
+            history.remove(0);
+        }
+    }
+
+    /// Helper: Emit shutdown completed event
+    async fn emit_shutdown_completed_event(&self, agent_id: &str, result: &ShutdownResult) {
+        let event_type = if result.success {
+            LifecycleEventType::TerminationCompleted
+        } else {
+            LifecycleEventType::ErrorOccurred
+        };
+
+        let event = LifecycleEvent::new(
+            event_type,
+            agent_id.to_string(),
+            LifecycleEventData::Generic {
+                message: if result.success {
+                    "Shutdown completed successfully".to_string()
+                } else {
+                    format!(
+                        "Shutdown failed: {}",
+                        result.error.as_deref().unwrap_or("Unknown error")
+                    )
+                },
+                details: HashMap::from([
+                    (
+                        "duration_ms".to_string(),
+                        result.duration.as_millis().to_string(),
+                    ),
+                    (
+                        "resources_cleaned".to_string(),
+                        result.resources_cleaned.to_string(),
+                    ),
+                    ("forced".to_string(), result.forced.to_string()),
+                ]),
+            },
+            "shutdown_coordinator".to_string(),
+        );
+
+        if let Err(e) = self.event_system.emit(event).await {
+            warn!("Failed to emit shutdown completed event: {}", e);
+        }
+    }
+
+    /// Helper: Log shutdown result
+    fn log_shutdown_result(&self, agent_id: &str, result: &ShutdownResult) {
+        if self.config.enable_logging {
+            if result.success {
+                info!(
+                    "Successfully shut down agent {} in {:?}",
+                    agent_id, result.duration
+                );
+            } else {
+                error!(
+                    "Failed to shut down agent {} after {:?}: {}",
+                    agent_id,
+                    result.duration,
+                    result.error.as_deref().unwrap_or("Unknown error")
+                );
+            }
+        }
     }
 
     /// Check if agent is shutting down

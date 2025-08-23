@@ -430,7 +430,7 @@ impl Clone for BenchmarkConfig {
 mod tests {
     use super::*;
     #[tokio::test]
-    #[ignore] // Expensive test - run manually with --include-ignored
+    #[ignore = "Expensive test - run manually with --include-ignored"]
     async fn test_production_performance_benchmark() {
         let config = BenchmarkConfig {
             iterations: 5,

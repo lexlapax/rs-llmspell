@@ -200,7 +200,7 @@ pub fn inject_replay_global(lua: &Lua) -> Result<(), LLMSpellError> {
 /// Returns an error if:
 /// - Table creation fails
 /// - Method injection fails
-pub fn create_replay_api(lua: &Lua) -> LuaResult<Table> {
+pub fn create_replay_api(lua: &Lua) -> LuaResult<Table<'_>> {
     let replay = lua.create_table()?;
 
     // ReplayMode constructors

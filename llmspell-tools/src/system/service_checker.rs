@@ -207,6 +207,7 @@ impl ServiceCheckerTool {
 
     /// Check TCP port connectivity
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     async fn check_tcp_port(
         &self,
         host: &str,
@@ -330,6 +331,7 @@ impl ServiceCheckerTool {
 
     /// Check HTTP/HTTPS service health
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     async fn check_http_service(
         &self,
         url: &str,

@@ -25,6 +25,7 @@ use tracing::{debug, info, warn};
 /// - Migration handler initialization fails
 /// - State manager creation fails
 #[allow(clippy::too_many_lines)]
+#[allow(clippy::cognitive_complexity)]
 pub async fn get_or_create_state_infrastructure(
     context: &GlobalContext,
     config: &StatePersistenceConfig,

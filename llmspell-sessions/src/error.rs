@@ -336,7 +336,7 @@ mod tests {
         }
 
         let source_err: Box<dyn std::error::Error + Send + Sync> =
-            Box::new(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
+            Box::new(std::io::Error::other("io error"));
         let error = SessionError::replay_with_source("replay io error", source_err);
         match error {
             SessionError::ReplayError { message, source } => {
@@ -432,7 +432,7 @@ mod tests {
         use std::error::Error;
 
         // Test that errors with sources properly implement Error trait
-        let io_error = std::io::Error::new(std::io::ErrorKind::Other, "root cause");
+        let io_error = std::io::Error::other("root cause");
         let source_err = anyhow::Error::new(io_error);
         let error = SessionError::general_with_source("high level error", source_err);
 

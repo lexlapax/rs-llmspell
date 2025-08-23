@@ -192,7 +192,7 @@ impl Default for WorkflowDiscovery {
     }
 }
 
-/// Implementation of unified BridgeDiscovery trait for WorkflowDiscovery
+/// Implementation of unified `BridgeDiscovery` trait for `WorkflowDiscovery`
 #[async_trait::async_trait]
 impl BridgeDiscovery<WorkflowInfo> for WorkflowDiscovery {
     async fn discover_types(&self) -> Vec<(String, WorkflowInfo)> {
@@ -847,6 +847,7 @@ fn json_to_agent_input(input: &serde_json::Value) -> llmspell_core::types::Agent
 /// based on the current configuration. It uses in-memory state by default
 /// but can be configured for persistent backends.
 #[allow(dead_code)]
+#[allow(clippy::cognitive_complexity)]
 async fn create_execution_context_with_state(
     state_manager: Option<Arc<llmspell_state_persistence::StateManager>>,
 ) -> Result<llmspell_core::execution_context::ExecutionContext> {
@@ -1491,6 +1492,7 @@ impl WorkflowBridge {
     /// - JSON serialization fails
     /// - Workflow is not found
     /// - Workflow execution fails
+    #[allow(clippy::cognitive_complexity)]
     pub async fn execute_workflow(
         &self,
         workflow_id: &str,

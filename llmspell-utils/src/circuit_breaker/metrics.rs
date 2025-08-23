@@ -222,6 +222,7 @@ impl Default for MetricsCollector {
 
 /// Alert levels for circuit breaker monitoring
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum AlertLevel {
     /// Circuit is healthy
     Healthy,
@@ -231,6 +232,7 @@ pub enum AlertLevel {
     Critical,
 }
 
+#[allow(dead_code)]
 impl From<&CircuitMetrics> for AlertLevel {
     fn from(metrics: &CircuitMetrics) -> Self {
         if metrics.is_critical() {

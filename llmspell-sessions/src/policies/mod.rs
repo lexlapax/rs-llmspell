@@ -268,7 +268,7 @@ mod tests {
     }
 
     // TODO: Enable this test once we implement actual hook registration
-    #[ignore]
+    #[ignore = "Pending hook registration implementation"]
     #[tokio::test]
     async fn test_policy_registration() {
         let config = SessionPolicyConfig::default();

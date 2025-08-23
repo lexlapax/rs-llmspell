@@ -80,6 +80,7 @@ impl FileWatcherTool {
 
     /// Start watching files and return events
     #[allow(clippy::unused_async)]
+    #[allow(clippy::cognitive_complexity)]
     async fn watch_files(&self, watch_config: WatchConfig) -> AnyhowResult<Vec<FileEvent>> {
         // Validate configuration
         watch_config.validate()?;

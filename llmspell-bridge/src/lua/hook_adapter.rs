@@ -176,7 +176,7 @@ impl HookAdapter for LuaHookAdapter {
     }
 
     fn extract_error(&self, result: &Self::Result) -> Option<String> {
-        result.downcast_ref::<String>().cloned()
+        (**result).downcast_ref::<String>().cloned()
     }
 }
 

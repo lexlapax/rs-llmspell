@@ -486,7 +486,7 @@ mod tests {
     }
     #[test]
     fn test_general_error_with_source() {
-        let source_error = std::io::Error::new(std::io::ErrorKind::Other, "source error");
+        let source_error = std::io::Error::other("source error");
         let error = SessionError::General {
             message: "General failure".to_string(),
             source: Some(anyhow::Error::new(source_error)),
@@ -497,7 +497,7 @@ mod tests {
     }
     #[test]
     fn test_replay_error_with_source() {
-        let source_error = std::io::Error::new(std::io::ErrorKind::Other, "replay source");
+        let source_error = std::io::Error::other("replay source");
         let error = SessionError::ReplayError {
             message: "Replay failed".to_string(),
             source: Some(Box::new(source_error)),

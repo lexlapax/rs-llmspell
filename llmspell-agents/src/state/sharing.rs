@@ -554,17 +554,14 @@ impl StateSharingManager {
         agent_id: &str,
         channel: &SharedStateChannel,
     ) -> Result<()> {
-        match pattern {
-            SharingPattern::Broadcast => {
-                // Only creator can broadcast
-                if agent_id != channel.creator_agent_id {
-                    return Err(anyhow::anyhow!("Only channel creator can broadcast"));
-                }
+        if pattern == SharingPattern::Broadcast {
+            // Only creator can broadcast
+            if agent_id != channel.creator_agent_id {
+                return Err(anyhow::anyhow!("Only channel creator can broadcast"));
             }
-            // Pipeline: Agents can only publish when it's their turn (enforced by process_pipeline_stage)
-            // RequestResponse, Collaborative, Hierarchical: Allow any participant to publish
-            _ => {}
         }
+        // Pipeline: Agents can only publish when it's their turn (enforced by process_pipeline_stage)
+        // RequestResponse, Collaborative, Hierarchical: Allow any participant to publish
         Ok(())
     }
 }

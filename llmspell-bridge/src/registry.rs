@@ -214,7 +214,7 @@ impl Default for ComponentRegistry {
     }
 }
 
-/// Implementation of ComponentLookup trait for ComponentRegistry
+/// Implementation of `ComponentLookup` trait for `ComponentRegistry`
 /// This allows the registry to be used from llmspell-workflows without circular deps
 #[async_trait]
 impl ComponentLookup for ComponentRegistry {

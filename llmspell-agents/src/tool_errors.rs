@@ -532,7 +532,7 @@ impl ErrorContext {
 
     /// Get error count for this context
     #[must_use]
-    pub fn error_count(&self) -> usize {
+    pub const fn error_count(&self) -> usize {
         self.error_history.len()
     }
 
@@ -626,6 +626,7 @@ impl ToolErrorHandler {
     }
 
     /// Attempt recovery from an error
+    #[allow(clippy::cognitive_complexity)]
     async fn attempt_recovery(
         &self,
         error: ToolIntegrationError,

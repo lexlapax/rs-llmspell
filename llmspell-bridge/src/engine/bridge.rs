@@ -38,7 +38,7 @@ pub trait ScriptEngineBridge: Send + Sync {
 
     /// Set script arguments to be made available in the script environment
     ///
-    /// Arguments are passed as a HashMap and made available in a language-specific way:
+    /// Arguments are passed as a `HashMap` and made available in a language-specific way:
     /// - Lua: Global `ARGS` table
     /// - JavaScript: Global `args` object
     /// - Python: `sys.argv` equivalent

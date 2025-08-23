@@ -51,7 +51,7 @@ impl ValidationResult {
 
     /// Check if there are any issues (errors or warnings)
     #[must_use]
-    pub fn has_issues(&self) -> bool {
+    pub const fn has_issues(&self) -> bool {
         !self.errors.is_empty() || !self.warnings.is_empty()
     }
 }

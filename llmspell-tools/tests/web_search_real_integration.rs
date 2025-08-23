@@ -9,7 +9,7 @@ use llmspell_core::{
 use llmspell_tools::search::{web_search::WebSearchConfig, WebSearchTool};
 use serde_json::Value;
 
-/// Test basic DuckDuckGo search functionality with real API call
+/// Test basic `DuckDuckGo` search functionality with real API call
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_duckduckgo_real_search() {
@@ -177,7 +177,7 @@ async fn test_error_handling() {
     }
 }
 
-/// Test that validates the WebSearchTool meets Phase 3.0 standards
+/// Test that validates the `WebSearchTool` meets Phase 3.0 standards
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_phase_30_compliance() {
@@ -216,7 +216,7 @@ async fn test_phase_30_compliance() {
     }
 }
 
-/// Debug test to see raw DuckDuckGo API response
+/// Debug test to see raw `DuckDuckGo` API response
 #[tokio::test]
 #[ignore = "external,debug"] // Run with --ignored to see debug output
 async fn debug_duckduckgo_api() {

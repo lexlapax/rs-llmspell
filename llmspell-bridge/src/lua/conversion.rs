@@ -273,7 +273,7 @@ fn parse_media_content(_lua: &Lua, table: &Table) -> mlua::Result<MediaContent> 
 /// - Table creation fails
 /// - Setting table values fails
 /// - Media encoding fails
-pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table> {
+pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table<'_>> {
     let table = lua.create_table()?;
 
     // Check if text contains structured JSON response from tools
@@ -331,42 +331,41 @@ pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result
         let media_array = lua.create_table()?;
         for (i, media) in output.media.iter().enumerate() {
             let media_table = lua.create_table()?;
-            match media {
-                MediaContent::Image {
-                    data,
-                    format,
-                    metadata,
-                } => {
-                    media_table.set(
-                        "base64",
-                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data),
-                    )?;
-                    media_table.set("type", "image")?;
-                    media_table.set(
-                        "format",
-                        match format {
-                            ImageFormat::Png => "png",
-                            ImageFormat::Jpeg => "jpeg",
-                            ImageFormat::Webp => "webp",
-                            ImageFormat::Gif => "gif",
-                            ImageFormat::Svg => "svg",
-                            ImageFormat::Tiff => "tiff",
-                        },
-                    )?;
-                    media_table.set("width", metadata.width)?;
-                    media_table.set("height", metadata.height)?;
-                    media_table.set(
-                        "color_space",
-                        match metadata.color_space {
-                            ColorSpace::RGB => "rgb",
-                            ColorSpace::RGBA => "rgba",
-                            ColorSpace::Grayscale => "grayscale",
-                            ColorSpace::CMYK => "cmyk",
-                        },
-                    )?;
-                }
-                _ => {} // Other media types not yet supported
+            if let MediaContent::Image {
+                data,
+                format,
+                metadata,
+            } = media
+            {
+                media_table.set(
+                    "base64",
+                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data),
+                )?;
+                media_table.set("type", "image")?;
+                media_table.set(
+                    "format",
+                    match format {
+                        ImageFormat::Png => "png",
+                        ImageFormat::Jpeg => "jpeg",
+                        ImageFormat::Webp => "webp",
+                        ImageFormat::Gif => "gif",
+                        ImageFormat::Svg => "svg",
+                        ImageFormat::Tiff => "tiff",
+                    },
+                )?;
+                media_table.set("width", metadata.width)?;
+                media_table.set("height", metadata.height)?;
+                media_table.set(
+                    "color_space",
+                    match metadata.color_space {
+                        ColorSpace::RGB => "rgb",
+                        ColorSpace::RGBA => "rgba",
+                        ColorSpace::Grayscale => "grayscale",
+                        ColorSpace::CMYK => "cmyk",
+                    },
+                )?;
             }
+            // Other media types not yet supported
 
             media_array.set(i + 1, media_table)?;
         }
@@ -395,7 +394,7 @@ pub fn lua_table_to_tool_input(_lua: &Lua, table: Table) -> mlua::Result<JsonVal
 /// - Table creation fails
 /// - JSON to Lua conversion fails
 /// - Setting table values fails
-pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<Table> {
+pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<Table<'_>> {
     let table = lua.create_table()?;
 
     // Set success status
@@ -463,7 +462,7 @@ pub fn workflow_result_to_lua_table<'lua>(
 pub fn script_workflow_result_to_lua_table(
     lua: &Lua,
     result: crate::conversion::ScriptWorkflowResult,
-) -> mlua::Result<Table> {
+) -> mlua::Result<Table<'_>> {
     // Convert to JSON first, then to Lua
     let json_value = serde_json::to_value(result)
         .map_err(|e| LuaError::RuntimeError(format!("Failed to serialize workflow result: {e}")))?;

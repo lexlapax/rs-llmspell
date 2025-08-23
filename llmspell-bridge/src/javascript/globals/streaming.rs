@@ -1,4 +1,4 @@
-//! ABOUTME: JavaScript Streaming global implementation stub  
+//! ABOUTME: JavaScript Streaming global implementation stub\
 //! ABOUTME: Streaming API bindings for JavaScript engine (Phase 12+ implementation)
 
 use crate::globals::GlobalContext;

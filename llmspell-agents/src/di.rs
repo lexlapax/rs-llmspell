@@ -85,9 +85,12 @@ impl DIContainer {
     pub async fn get_service<T: Any + Send + Sync + Clone + 'static>(&self) -> Option<Arc<T>> {
         let type_id = TypeId::of::<T>();
         let services = self.services.read().await;
-        services
-            .get(&type_id)
-            .and_then(|service| service.downcast_ref::<T>().map(|s| Arc::new(s.clone())))
+        services.get(&type_id).and_then(|service| {
+            service
+                .as_ref()
+                .downcast_ref::<T>()
+                .map(|s| Arc::new(s.clone()))
+        })
     }
 
     /// Register a named instance
@@ -114,14 +117,17 @@ impl DIContainer {
         name: &str,
     ) -> Option<Arc<T>> {
         let instances = self.named_instances.read().await;
-        instances
-            .get(name)
-            .and_then(|instance| instance.downcast_ref::<T>().map(|i| Arc::new(i.clone())))
+        instances.get(name).and_then(|instance| {
+            instance
+                .as_ref()
+                .downcast_ref::<T>()
+                .map(|i| Arc::new(i.clone()))
+        })
     }
 
     /// Create a scoped container with additional dependencies
     #[must_use]
-    pub fn create_scope(&self) -> ScopedDIContainer {
+    pub fn create_scope(&self) -> ScopedDIContainer<'_> {
         ScopedDIContainer {
             parent: self,
             scoped_services: Arc::new(RwLock::new(HashMap::new())),
@@ -163,7 +169,10 @@ impl ScopedDIContainer<'_> {
         // Check scoped services first
         let scoped = self.scoped_services.read().await;
         if let Some(service) = scoped.get(&type_id) {
-            return service.downcast_ref::<T>().map(|s| Arc::new(s.clone()));
+            return service
+                .as_ref()
+                .downcast_ref::<T>()
+                .map(|s| Arc::new(s.clone()));
         }
 
         // Fall back to parent

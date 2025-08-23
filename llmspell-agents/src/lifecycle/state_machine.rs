@@ -436,6 +436,7 @@ impl AgentStateMachine {
     }
 
     /// Execute hooks for a state transition phase
+    #[allow(clippy::cognitive_complexity)]
     async fn execute_transition_hooks(
         &self,
         state: AgentState,

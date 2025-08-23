@@ -343,7 +343,7 @@ impl StackTrace {
 
     /// Get frame count
     #[must_use]
-    pub fn frame_count(&self) -> usize {
+    pub const fn frame_count(&self) -> usize {
         self.frames.len()
     }
 
@@ -360,7 +360,7 @@ impl StackTrace {
 /// # Errors
 ///
 /// Returns an error if function creation fails
-pub fn create_stacktrace_function(lua: &Lua) -> LuaResult<Function> {
+pub fn create_stacktrace_function(lua: &Lua) -> LuaResult<Function<'_>> {
     lua.create_function(|lua, options: Option<Table>| {
         let trace_options =
             options.map_or_else(StackTraceOptions::default, |opts| StackTraceOptions {

@@ -20,9 +20,10 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Health status levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum HealthStatus {
     /// Everything is operating normally
+    #[default]
     Healthy,
     /// Minor issues detected, but agent is still functional
     Warning,
@@ -292,6 +293,7 @@ impl AgentHealthMonitor {
     ///
     /// Returns an error if any health check fails to execute
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     pub async fn check_health(&self) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
 

@@ -79,7 +79,7 @@ async fn test_script_list_providers() {
     );
 }
 
-/// Test that scripts work but globals need inject_apis
+/// Test that scripts work but globals need `inject_apis`
 #[tokio::test]
 async fn test_script_without_api_injection() {
     let lua_config = LuaConfig::default();

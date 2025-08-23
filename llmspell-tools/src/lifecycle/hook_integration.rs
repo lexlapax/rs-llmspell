@@ -284,6 +284,7 @@ impl ToolExecutor {
     /// - Resource limits are exceeded
     /// - Circuit breaker trips due to repeated failures
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     pub async fn execute_tool_with_hooks(
         &self,
         tool: &dyn Tool,
@@ -464,6 +465,7 @@ impl ToolExecutor {
     }
 
     /// Execute hooks for a specific phase
+    #[allow(clippy::cognitive_complexity)]
     async fn execute_hook_phase<T: Clone>(
         &self,
         tool_context: &ToolHookContext,

@@ -249,6 +249,7 @@ impl ProcessExecutorTool {
 
     /// Execute a process with the given arguments
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     async fn execute_process(
         &self,
         executable: &str,

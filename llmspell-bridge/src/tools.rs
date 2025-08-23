@@ -454,7 +454,7 @@ impl ToolDiscovery {
     }
 }
 
-/// Implementation of unified BridgeDiscovery trait for ToolDiscovery
+/// Implementation of unified `BridgeDiscovery` trait for `ToolDiscovery`
 #[async_trait::async_trait]
 impl BridgeDiscovery<ToolInfo> for ToolDiscovery {
     async fn discover_types(&self) -> Vec<(String, ToolInfo)> {

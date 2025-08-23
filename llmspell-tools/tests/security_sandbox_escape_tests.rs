@@ -261,7 +261,7 @@ fn test_sandbox_escape_via_environment_variables() {
     // Test that process tool exists and can be created
     // The actual security validation happens in separate security tests
     assert!(
-        std::ptr::eq(&process_tool, &process_tool),
+        std::ptr::eq(&raw const process_tool, &raw const process_tool),
         "ProcessExecutor tool should be createable"
     );
 

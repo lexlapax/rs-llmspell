@@ -409,11 +409,7 @@ mod tests {
 
         // Failed operation
         let result = breaker
-            .execute(|| {
-                Box::pin(async {
-                    Err::<i32, _>(std::io::Error::new(std::io::ErrorKind::Other, "test error"))
-                })
-            })
+            .execute(|| Box::pin(async { Err::<i32, _>(std::io::Error::other("test error")) }))
             .await;
 
         assert!(result.is_err());

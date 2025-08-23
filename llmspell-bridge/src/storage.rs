@@ -204,7 +204,7 @@ impl Default for StorageDiscovery {
     }
 }
 
-/// Implementation of unified BridgeDiscovery trait for StorageDiscovery
+/// Implementation of unified `BridgeDiscovery` trait for `StorageDiscovery`
 #[async_trait::async_trait]
 impl BridgeDiscovery<StorageInfo> for StorageDiscovery {
     async fn discover_types(&self) -> Vec<(String, StorageInfo)> {

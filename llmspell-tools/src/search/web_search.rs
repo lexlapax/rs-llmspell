@@ -304,6 +304,7 @@ impl WebSearchTool {
     }
 
     /// Perform search with fallback support
+    #[allow(clippy::cognitive_complexity)]
     async fn search_with_fallback(
         &self,
         query: &str,

@@ -1,4 +1,4 @@
-//! ABOUTME: Lua-specific Streaming global implementation  
+//! ABOUTME: Lua-specific Streaming global implementation\
 //! ABOUTME: Provides Lua bindings for streaming utilities and coroutine functionality
 
 use crate::globals::GlobalContext;
@@ -180,7 +180,10 @@ impl UserData for StreamReceiver {
 /// Returns an error if:
 /// - Table creation fails
 /// - Method creation fails
-pub fn create_lua_stream_bridge(lua: &Lua, receiver: mpsc::Receiver<String>) -> LuaResult<Table> {
+pub fn create_lua_stream_bridge(
+    lua: &Lua,
+    receiver: mpsc::Receiver<String>,
+) -> LuaResult<Table<'_>> {
     let stream = lua.create_table()?;
 
     // Create the receiver wrapper

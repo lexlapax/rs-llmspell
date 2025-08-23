@@ -75,10 +75,7 @@ async fn test_retry_with_backoff() {
             Box::pin(async move {
                 let count = attempts.fetch_add(1, Ordering::SeqCst);
                 if count < 2 {
-                    Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "rate limit exceeded",
-                    ))
+                    Err(Box::new(std::io::Error::other("rate limit exceeded"))
                         as Box<dyn std::error::Error + Send + Sync>)
                 } else {
                     Ok("Success".to_string())

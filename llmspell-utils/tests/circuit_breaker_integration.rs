@@ -33,12 +33,7 @@ async fn test_circuit_breaker_basic_flow() {
     for _ in 0..3 {
         let result = breaker
             .execute(|| {
-                Box::pin(async {
-                    Err::<i32, _>(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "simulated failure",
-                    ))
-                })
+                Box::pin(async { Err::<i32, _>(std::io::Error::other("simulated failure")) })
             })
             .await;
         assert!(result.is_err());
@@ -155,11 +150,7 @@ async fn test_circuit_breaker_concurrent_access() {
                 }
             } else {
                 let result = breaker
-                    .execute(|| {
-                        Box::pin(async {
-                            Err::<i32, _>(std::io::Error::new(std::io::ErrorKind::Other, "failure"))
-                        })
-                    })
+                    .execute(|| Box::pin(async { Err::<i32, _>(std::io::Error::other("failure")) }))
                     .await;
                 if result.is_err() {
                     failure_count.fetch_add(1, Ordering::SeqCst);
