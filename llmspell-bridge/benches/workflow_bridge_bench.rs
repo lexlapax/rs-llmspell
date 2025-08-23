@@ -156,10 +156,11 @@ fn benchmark_workflow_execution(c: &mut Criterion) {
                     .unwrap();
 
                 // Get workflow info
-                let info = bridge.get_workflow(&id).await.unwrap();
+                let info = bridge.get_workflow(&id).unwrap();
 
-                // Remove workflow
-                bridge.remove_workflow(&id).await.unwrap();
+                // Note: Workflow removal is not supported in unified architecture
+                // Workflows remain in registry for reuse
+                // let _ = bridge.remove_workflow(&id); // This would return an error
 
                 black_box(info);
             });
@@ -199,7 +200,7 @@ fn benchmark_bridge_overhead(c: &mut Criterion) {
                     .unwrap();
 
                 // Get workflow info
-                let info = bridge.get_workflow(&id).await.unwrap();
+                let info = bridge.get_workflow(&id).unwrap();
 
                 // Get execution history
                 let history = bridge.get_execution_history().await;
@@ -207,8 +208,9 @@ fn benchmark_bridge_overhead(c: &mut Criterion) {
                 // List workflow types
                 let workflow_types = bridge.list_workflow_types();
 
-                // Remove workflow
-                bridge.remove_workflow(&id).await.unwrap();
+                // Note: Workflow removal is not supported in unified architecture
+                // Workflows remain in registry for reuse
+                // let _ = bridge.remove_workflow(&id); // This would return an error
 
                 let duration = start.elapsed();
 

@@ -60,7 +60,7 @@ async fn test_workflow_metrics() {
     let bridge = WorkflowBridge::new(&registry, None);
 
     // Get initial metrics
-    let metrics = bridge.get_bridge_metrics().await;
+    let metrics = bridge.get_bridge_metrics();
     assert_eq!(metrics["workflows_created"], 0);
     assert_eq!(metrics["workflow_executions"], 0);
 
@@ -74,9 +74,9 @@ async fn test_workflow_metrics() {
         .unwrap();
 
     // Check updated metrics
-    let metrics = bridge.get_bridge_metrics().await;
+    let metrics = bridge.get_bridge_metrics();
     assert_eq!(metrics["workflows_created"], 1);
-    assert_eq!(metrics["active_workflows"], 1);
+    assert_eq!(metrics["registered_workflows"], 1);
 }
 #[tokio::test]
 async fn test_workflow_removal() {
@@ -96,15 +96,21 @@ async fn test_workflow_removal() {
     let active = bridge.list_active_workflows().await;
     assert_eq!(active.len(), 1);
 
-    // Remove workflow
-    bridge.remove_workflow(&workflow_id).await.unwrap();
+    // Removal is not supported in unified registry architecture
+    // Workflows are persistent components that remain available for reuse
+    let removal_result = bridge.remove_workflow(&workflow_id);
+    assert!(removal_result.is_err());
+    assert!(removal_result
+        .unwrap_err()
+        .to_string()
+        .contains("not supported"));
 
-    // Verify workflow is gone
+    // Workflow should still exist after attempted removal
     let active = bridge.list_active_workflows().await;
-    assert_eq!(active.len(), 0);
+    assert_eq!(active.len(), 1);
 
-    // Try to remove non-existent workflow
-    assert!(bridge.remove_workflow("non_existent").await.is_err());
+    // Try to remove non-existent workflow (also returns error)
+    assert!(bridge.remove_workflow("non_existent").is_err());
 }
 #[tokio::test]
 async fn test_workflow_discovery() {

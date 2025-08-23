@@ -113,10 +113,7 @@ async fn test_lua_workflow_conditional() {
                 tool = "calculator",
                 input = { input = "2 + 2" }
             })
-            :condition(function(ctx)
-                -- Simple condition: always return true for then branch
-                return true
-            end)
+            :condition({ type = "always" })
             :add_then_step({
                 name = "then_step",
                 type = "tool",

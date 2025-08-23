@@ -53,6 +53,12 @@ impl ComponentId {
         Self(Uuid::new_v4())
     }
 
+    /// Create `ComponentId` from an existing UUID
+    #[must_use]
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
     /// Create `ComponentId` from name (deterministic)
     #[must_use]
     pub fn from_name(name: &str) -> Self {
@@ -60,21 +66,26 @@ impl ComponentId {
         Self(Uuid::new_v5(&namespace, name.as_bytes()))
     }
 
-    /// Parse `ComponentId` from a UUID string
+    /// Parse `ComponentId` from a UUID string or create from name
     ///
-    /// This parses an existing UUID string (with or without "workflow_" prefix)
-    /// into a ComponentId. Used for referencing existing workflows.
-    pub fn parse(s: &str) -> Result<Self, uuid::Error> {
-        // Strip common prefixes if present
+    /// This handles both cases:
+    /// 1. Existing UUID strings (with or without prefixes like "workflow_")
+    /// 2. Names that should be converted to UUIDs deterministically
+    pub fn parse_or_from_name(s: &str) -> Self {
+        // Try to extract UUID from common prefixed formats
         let uuid_str = s
             .strip_prefix("workflow_")
             .or_else(|| s.strip_prefix("agent_"))
             .or_else(|| s.strip_prefix("tool_"))
             .unwrap_or(s);
 
-        // Parse the UUID
-        let uuid = Uuid::parse_str(uuid_str)?;
-        Ok(Self(uuid))
+        // Try to parse as UUID first
+        if let Ok(uuid) = Uuid::parse_str(uuid_str) {
+            Self(uuid)
+        } else {
+            // Fall back to creating from name
+            Self::from_name(s)
+        }
     }
 
     /// Get inner UUID

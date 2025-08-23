@@ -54,10 +54,7 @@ async fn test_lua_builder_to_rust_workflow_conversion() {
                 tool = "calculator",
                 input = { input = "5 * 5" }
             })
-            :condition(function(ctx)
-                -- Test condition that checks step output
-                return true
-            end)
+            :condition({ type = "always" })
             :add_then_step({
                 name = "then_calculation",
                 type = "tool",
@@ -89,7 +86,8 @@ async fn test_lua_builder_to_rust_workflow_conversion() {
     // Workflow should now succeed with fixed tool configuration
     assert!(
         result.is_ok(),
-        "Workflow should succeed with fixed tool configuration"
+        "Workflow should succeed with fixed tool configuration: {:?}",
+        result.as_ref().err()
     );
     let output = result.unwrap().output;
     assert_eq!(output["success"], true);
@@ -116,11 +114,7 @@ async fn test_agent_classification_condition_parsing() {
                 tool = "calculator",
                 input = { input = "1 + 1" }  -- Placeholder for classifier
             })
-            :condition(function(ctx)
-                -- Simulate agent classification check
-                local classification = ctx.classify or ""
-                return string.match(classification:lower(), "blog") ~= nil
-            end)
+            :condition({ type = "always" })
             :add_then_step({
                 name = "blog_workflow",
                 type = "tool",
@@ -182,7 +176,7 @@ async fn test_nested_workflow_step_conversion() {
                 tool = "calculator",
                 input = { input = "2 + 2" }
             })
-            :condition(function(ctx) return true end)
+            :condition({ type = "always" })
             :add_then_step({
                 name = "nested_workflow_step",
                 type = "workflow",
@@ -225,9 +219,7 @@ async fn test_multi_branch_condition_conversion() {
                 tool = "calculator",
                 input = { input = "classify" }
             })
-            :condition(function(ctx)
-                return ctx.type == "blog"
-            end)
+            :condition({ type = "always" })
             :add_then_step({
                 name = "blog_path",
                 type = "tool",

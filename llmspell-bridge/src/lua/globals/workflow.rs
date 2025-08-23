@@ -16,6 +16,7 @@ use tracing::{debug, info};
 use uuid;
 
 /// Parse step configuration from Lua table
+#[allow(clippy::cognitive_complexity)]
 fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
     let name: String = step_table.get("name")?;
     let step_type: String = step_table.get("type")?;
@@ -65,13 +66,29 @@ fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowS
                 serde_json::json!({})
             };
 
-            // Parse the existing workflow ID instead of creating a new one
-            let component_id = ComponentId::parse(&workflow_id).map_err(|e| {
-                mlua::Error::RuntimeError(format!(
-                    "Failed to parse workflow ID '{}': {}",
-                    workflow_id, e
-                ))
-            })?;
+            // Parse the existing workflow ID - this extracts the UUID part
+            debug!("Parsing workflow ID for nested step: '{}'", workflow_id);
+
+            // Extract just the UUID part from "workflow_UUID" format
+            let uuid_str = workflow_id
+                .strip_prefix("workflow_")
+                .unwrap_or(&workflow_id);
+
+            debug!("Extracted UUID string: '{}'", uuid_str);
+
+            // Parse the UUID directly - don't create a new one!
+            let component_id = uuid::Uuid::parse_str(uuid_str).map_or_else(
+                |_| {
+                    debug!("Failed to parse UUID, falling back to parse_or_from_name");
+                    ComponentId::parse_or_from_name(&workflow_id)
+                },
+                |uuid| {
+                    debug!("Successfully parsed existing UUID: {}", uuid);
+                    ComponentId::from_uuid(uuid)
+                },
+            );
+
+            debug!("Final ComponentId: {}", component_id);
 
             WorkflowStep::new(
                 name,
@@ -1661,30 +1678,45 @@ pub fn inject_workflow_global(
 
     // Add registry methods
 
-    // Workflow.list() - list all registered workflows
+    // Workflow.list() - list all registered workflow instances
     let bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "list",
         lua.create_function(move |lua, ()| {
             let bridge = bridge_clone.clone();
 
-            // Use shared sync utility for async operation
-            let workflows = block_on_async::<_, Vec<(String, WorkflowInfo)>, LLMSpellError>(
-                "workflow_list",
-                async move {
-                    Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(bridge.get_all_workflow_info())
-                },
-                None,
-            )?;
+            // Get registered workflow instances from ComponentRegistry
+            let registered_workflows = bridge.get_registered_workflows();
 
             let list_table = lua.create_table()?;
-            for (i, (id, info)) in workflows.iter().enumerate() {
-                let workflow_table = lua.create_table()?;
-                workflow_table.set("id", id.clone())?;
-                workflow_table.set("type", info.workflow_type.clone())?;
-                workflow_table.set("description", info.description.clone())?;
-                workflow_table.set("features", info.features.clone())?;
-                list_table.set(i + 1, workflow_table)?;
+
+            // If we have registered instances, return those
+            if registered_workflows.is_empty() {
+                // Fallback: show workflow types if no instances registered
+                let workflow_types = block_on_async::<_, Vec<(String, WorkflowInfo)>, LLMSpellError>(
+                    "workflow_list_types",
+                    async move {
+                        Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(bridge.get_all_workflow_info())
+                    },
+                    None,
+                )?;
+
+                for (i, (id, info)) in workflow_types.iter().enumerate() {
+                    let workflow_table = lua.create_table()?;
+                    workflow_table.set("id", id.clone())?;
+                    workflow_table.set("type", info.workflow_type.clone())?;
+                    workflow_table.set("description", info.description.clone())?;
+                    workflow_table.set("features", info.features.clone())?;
+                    list_table.set(i + 1, workflow_table)?;
+                }
+            } else {
+                for (i, (id, name)) in registered_workflows.iter().enumerate() {
+                    let workflow_table = lua.create_table()?;
+                    workflow_table.set("id", format!("workflow_{id}"))?; // Add prefix for consistency
+                    workflow_table.set("name", name.clone())?;
+                    workflow_table.set("type", "instance")?; // Mark as instance, not type
+                    list_table.set(i + 1, workflow_table)?;
+                }
             }
 
             Ok(list_table)
@@ -1738,7 +1770,7 @@ pub fn inject_workflow_global(
             // Use shared sync utility for async operation
             block_on_async::<_, (), LLMSpellError>(
                 &format!("workflow_remove_{workflow_id}"),
-                async move { bridge.remove_workflow(&workflow_id).await },
+                async move { bridge.remove_workflow(&workflow_id) },
                 None,
             )?;
 
@@ -1845,7 +1877,7 @@ pub fn inject_workflow_global(
                 let bridge = bridge.clone();
                 let _ = block_on_async::<_, (), LLMSpellError>(
                     &format!("workflow_clear_remove_{workflow_id}"),
-                    async move { bridge.remove_workflow(&workflow_id).await },
+                    async move { bridge.remove_workflow(&workflow_id) },
                     None,
                 );
             }
