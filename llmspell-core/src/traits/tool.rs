@@ -445,7 +445,7 @@ impl ToolSchema {
 ///         &self.metadata
 ///     }
 ///     
-///     async fn execute(
+///     async fn execute_impl(
 ///         &self,
 ///         input: AgentInput,
 ///         context: ExecutionContext,
@@ -472,7 +472,7 @@ impl ToolSchema {
 ///     }
 ///     
 ///     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-///         Ok(AgentOutput::text(format!("Tool error: {}", error)))
+///         Err(error)
 ///     }
 /// }
 /// ```

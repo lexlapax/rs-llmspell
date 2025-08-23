@@ -350,7 +350,7 @@ impl Default for ToolComposition {
 ///         &self.metadata
 ///     }
 ///     
-///     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+///     async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
 ///         // Can use tool capabilities here
 ///         let tools = self.list_available_tools().await?;
 ///         if tools.contains(&"file_search".to_string()) {

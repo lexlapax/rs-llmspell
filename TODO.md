@@ -652,14 +652,14 @@ This avoids system permission prompts and provides cleaner execution.
       - [x] No clippy warnings or errors remaining
   
   **Remaining Tasks**:
-    - [ ] **Documentation**:
-      - [ ] Document unified architecture in ARCHITECTURE.md
-      - [ ] Add clear ID scheme documentation (workflow_ prefix handling)
-      - [ ] Document table-based condition API for Lua workflows
-    - [ ] **Lua API improvements**:
-      - [ ] Fix Workflow.list() to return actual instances from ComponentRegistry with metadata
-      - [ ] Ensure Workflow.list() shows all registered instances with proper types
-    - [ ] **Testing Protocol** - Verify nested workflows work end-to-end:
+    - [x] **Documentation**:
+      - [x] Document unified architecture in workflow-unified-architecture.md (✓ comprehensive docs created)
+      - [x] Add clear ID scheme documentation (workflow_ prefix handling) (✓ documented in unified architecture)
+      - [x] Document table-based condition API for Lua workflows (✓ in communication-manager README)
+    - [x] **Lua API improvements**:
+      - [x] Fix Workflow.list() to return actual instances from ComponentRegistry with metadata (✓ returns id, type, description, features)
+      - [x] Ensure Workflow.list() shows all registered instances with proper types (✓ working)
+    - [x] **Testing Protocol** - Verify nested workflows work end-to-end (✓ confirmed in process-orchestrator):
     ```bash
     # Test process-orchestrator nested workflows
     ./target/debug/llmspell --debug -c examples/script-users/applications/process-orchestrator/config.toml \

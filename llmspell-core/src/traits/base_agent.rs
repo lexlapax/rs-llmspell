@@ -41,17 +41,13 @@ use std::time::Instant;
 ///         &self.metadata
 ///     }
 ///     
-///     async fn execute(
+///     async fn execute_impl(
 ///         &self,
 ///         input: AgentInput,
 ///         context: ExecutionContext,
 ///     ) -> Result<AgentOutput> {
-///         // Validate input first
-///         self.validate_input(&input).await?;
-///         
 ///         // Process the input
 ///         let result = format!("Processed: {}", input.text);
-///         
 ///         Ok(AgentOutput::text(result))
 ///     }
 ///     
@@ -66,7 +62,7 @@ use std::time::Instant;
 ///     }
 ///     
 ///     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-///         Ok(AgentOutput::text(format!("Error handled: {}", error)))
+///         Err(error)
 ///     }
 /// }
 /// ```

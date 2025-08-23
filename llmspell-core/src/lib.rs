@@ -57,7 +57,7 @@
 //!         &self.metadata
 //!     }
 //!     
-//!     async fn execute(
+//!     async fn execute_impl(
 //!         &self,
 //!         input: AgentInput,
 //!         context: ExecutionContext,
@@ -71,7 +71,7 @@
 //!     }
 //!     
 //!     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-//!         Ok(AgentOutput::text(format!("Error: {}", error)))
+//!         Err(error)
 //!     }
 //! }
 //! ```
