@@ -670,6 +670,11 @@ struct WorkflowBuilder {
     // Loop workflow fields
     loop_condition: Option<WorkflowCondition>,
     max_iterations: Option<usize>,
+    loop_iterator_type: Option<String>, // "range", "collection", or "while"
+    loop_range_start: Option<i64>,
+    loop_range_end: Option<i64>,
+    loop_range_step: Option<i64>,
+    loop_collection: Option<Vec<serde_json::Value>>,
     // Parallel workflow fields
     max_concurrency: Option<usize>,
 }
@@ -690,6 +695,11 @@ impl WorkflowBuilder {
             else_steps: Vec::new(),
             loop_condition: None,
             max_iterations: None,
+            loop_iterator_type: None,
+            loop_range_start: None,
+            loop_range_end: None,
+            loop_range_step: None,
+            loop_collection: None,
             max_concurrency: None,
         }
     }
@@ -710,6 +720,12 @@ impl UserData for WorkflowBuilder {
         });
 
         methods.add_method_mut("loop_workflow", |_, this, ()| {
+            this.workflow_type = Some("loop".to_string());
+            Ok(this.clone())
+        });
+
+        // Alias for convenience
+        methods.add_method_mut("loop", |_, this, ()| {
             this.workflow_type = Some("loop".to_string());
             Ok(this.clone())
         });
@@ -824,6 +840,37 @@ impl UserData for WorkflowBuilder {
         });
 
         // Loop workflow specific methods
+        methods.add_method_mut("with_range", |_, this, params: Table| {
+            this.loop_iterator_type = Some("range".to_string());
+            if let Ok(start) = params.get::<_, i64>("start") {
+                this.loop_range_start = Some(start);
+            }
+            if let Ok(end) = params.get::<_, i64>("end") {
+                this.loop_range_end = Some(end);
+            }
+            if let Ok(step) = params.get::<_, i64>("step") {
+                this.loop_range_step = Some(step);
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_collection", |_, this, values: Table| {
+            this.loop_iterator_type = Some("collection".to_string());
+            let mut collection = Vec::new();
+            for (_, value) in values.pairs::<mlua::Value, mlua::Value>().flatten() {
+                collection.push(lua_value_to_json(value)?);
+            }
+            this.loop_collection = Some(collection);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_while", |_, this, _condition: String| {
+            this.loop_iterator_type = Some("while".to_string());
+            // Store the condition string - it will be evaluated in Rust
+            this.loop_condition = Some(Box::new(move |_| true)); // Placeholder
+            Ok(this.clone())
+        });
+
         methods.add_method_mut("loop_condition", |_, this, _func: mlua::Function| {
             // Store Lua function for loop condition
             this.loop_condition = Some(Box::new(move |_value| {
@@ -936,6 +983,54 @@ impl UserData for WorkflowBuilder {
                                 error_strategy,
                             )
                             .await
+                    } else if workflow_type == "loop" {
+                        // For loop workflows, use special creation method with iterator config
+                        let iterator_type = this
+                            .loop_iterator_type
+                            .clone()
+                            .unwrap_or_else(|| "range".to_string());
+
+                        // Build iterator params based on type
+                        let iterator_params = match iterator_type.as_str() {
+                            "range" => {
+                                let mut params = serde_json::Map::new();
+                                if let Some(start) = this.loop_range_start {
+                                    params.insert("start".to_string(), serde_json::json!(start));
+                                }
+                                if let Some(end) = this.loop_range_end {
+                                    params.insert("end".to_string(), serde_json::json!(end));
+                                }
+                                if let Some(step) = this.loop_range_step {
+                                    params.insert("step".to_string(), serde_json::json!(step));
+                                }
+                                Some(serde_json::Value::Object(params))
+                            }
+                            "collection" => {
+                                let mut params = serde_json::Map::new();
+                                if let Some(ref values) = this.loop_collection {
+                                    params.insert("values".to_string(), serde_json::json!(values));
+                                }
+                                Some(serde_json::Value::Object(params))
+                            }
+                            "while" => {
+                                let mut params = serde_json::Map::new();
+                                params.insert("condition".to_string(), serde_json::json!("true"));
+                                Some(serde_json::Value::Object(params))
+                            }
+                            _ => None,
+                        };
+
+                        bridge
+                            .create_loop_workflow(
+                                workflow_name_clone.clone(),
+                                iterator_type,
+                                iterator_params,
+                                final_steps,
+                                this.max_iterations,
+                                workflow_config,
+                                error_strategy,
+                            )
+                            .await
                     } else {
                         bridge
                             .create_workflow(
@@ -980,6 +1075,11 @@ impl Clone for WorkflowBuilder {
             else_steps: self.else_steps.clone(),
             loop_condition: None, // Can't clone closures, will be set fresh
             max_iterations: self.max_iterations,
+            loop_iterator_type: self.loop_iterator_type.clone(),
+            loop_range_start: self.loop_range_start,
+            loop_range_end: self.loop_range_end,
+            loop_range_step: self.loop_range_step,
+            loop_collection: self.loop_collection.clone(),
             max_concurrency: self.max_concurrency,
         }
     }

@@ -327,7 +327,7 @@ local incident_routing_workflow = Workflow.builder()
     -- Use "always" condition for demo (would use shared_data_equals with severity in production)
     :condition({ 
         type = "always"  -- Demo: always takes critical path
-        -- Future: type = "shared_data_equals", key = "severity", value = "CRITICAL"
+        -- ✅ NOW WORKING: type = "shared_data_equals", key = "severity", value = "CRITICAL"
     })
     
     -- THEN branch: Critical incident path
@@ -386,7 +386,7 @@ local master_orchestration_workflow = Workflow.builder()
     -- Conditional routing (using "never" to demonstrate else branch)
     :condition({ 
         type = "never"  -- Demo: always takes standard path (else branch)
-        -- Future: type = "shared_data_equals", key = "process_type", value = "INCIDENT"
+        -- ✅ NOW WORKING: type = "shared_data_equals", key = "process_type", value = "INCIDENT"
     })
     
     -- THEN branch: Incident handling path

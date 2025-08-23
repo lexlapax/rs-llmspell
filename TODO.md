@@ -472,6 +472,25 @@ This avoids system permission prompts and provides cleaner execution.
     - **process-orchestrator**: Two conditional workflows - incident routing and master orchestration
   - [x] **Test Coverage**: Created `/tmp/test_conditional_fix.lua` verifying all conditions work
   - [x] **SharedDataEquals**: ✅ FIXED - Now uses unified state system from ExecutionContext
+  
+  **Critical State Integration Fix (2025-08-22)**:
+  - [x] **Bug Found**: ConditionalWorkflow used its own StateManager instead of unified state
+  - [x] **Root Cause**: `conditional.rs:274` had internal state_manager, not using context.state
+  - [x] **Fix 1 - conditional.rs:490-521**: Modified execute_with_state to read from context.state
+    - Reads workflow-specific keys: `workflow:{id}:shared:{key}`
+    - Falls back to global shared keys: `shared:{key}`
+    - Only uses internal state_manager if no unified state available
+  - [x] **Fix 2 - state_adapter.rs:385-397**: Fixed NoScopeStateAdapter::list_keys
+    - Was returning empty Vec, now properly filters and strips "custom::" prefix
+  - [x] **Fix 3 - workflows.rs:1515-1534**: Updated set_workflow_shared_data
+    - Writes to StateManager that workflows actually use via NoScopeStateAdapter
+    - Writes to both workflow-specific and global namespaces
+  - [x] **Tests Added - conditional.rs:1936-2172**: 
+    - test_shared_data_equals_with_unified_state: Verifies priority-based branching
+    - test_shared_data_exists_with_unified_state: Verifies key existence checking
+  - [x] **Clippy Warnings Fixed**:
+    - Removed unused `condition` field from WorkflowBuilder
+    - Fixed manual strip_prefix, match patterns, format strings
   - [x] **Testing Protocol**:
     ```bash
     # Test communication-manager conditional routing

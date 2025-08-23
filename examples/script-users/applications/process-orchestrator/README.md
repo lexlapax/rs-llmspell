@@ -69,7 +69,7 @@ The process orchestrator now uses the new table-based conditional API:
 :conditional()
 :condition({ 
     type = "never"  -- Demo: always takes else_branch (standard path)
-    -- Future: type = "shared_data_equals", key = "process_type", value = "INCIDENT"
+    -- ✅ NOW WORKING: type = "shared_data_equals", key = "process_type", value = "INCIDENT"
 })
 
 -- THEN branch: Incident handling
@@ -81,7 +81,7 @@ The process orchestrator now uses the new table-based conditional API:
 -- Incident Routing Workflow
 :condition({ 
     type = "always"  -- Demo: always takes then_branch (critical path)
-    -- Future: type = "shared_data_equals", key = "severity", value = "CRITICAL"
+    -- ✅ NOW WORKING: type = "shared_data_equals", key = "severity", value = "CRITICAL"
 })
 ```
 

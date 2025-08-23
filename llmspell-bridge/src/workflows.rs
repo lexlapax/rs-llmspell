@@ -1492,6 +1492,131 @@ impl WorkflowBridge {
         Ok(workflow_id)
     }
 
+    /// Create a loop workflow with iterator configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow creation fails
+    #[allow(clippy::too_many_arguments)]
+    pub async fn create_loop_workflow(
+        &self,
+        name: String,
+        iterator_type: String,
+        iterator_params: Option<serde_json::Value>,
+        steps: Vec<WorkflowStep>,
+        max_iterations: Option<usize>,
+        config: llmspell_workflows::WorkflowConfig,
+        error_strategy: Option<llmspell_workflows::ErrorStrategy>,
+    ) -> Result<String> {
+        use llmspell_workflows::r#loop::LoopWorkflowBuilder;
+
+        let mut builder = LoopWorkflowBuilder::new(name.clone()).with_workflow_config(config);
+
+        // Add registry if available
+        if let Some(ref reg) = self.standardized_factory.registry {
+            builder = builder.with_registry(reg.clone());
+        }
+
+        // Configure iterator based on type
+        match iterator_type.as_str() {
+            "range" => {
+                if let Some(serde_json::Value::Object(params)) = iterator_params {
+                    let start = params
+                        .get("start")
+                        .and_then(serde_json::Value::as_i64)
+                        .unwrap_or(1);
+                    let mut end = params
+                        .get("end")
+                        .and_then(serde_json::Value::as_i64)
+                        .unwrap_or(10);
+                    let step = params
+                        .get("step")
+                        .and_then(serde_json::Value::as_i64)
+                        .unwrap_or(1);
+
+                    // Apply max_iterations limit if specified
+                    if let Some(max) = max_iterations {
+                        let max_end = start + (i64::try_from(max).unwrap_or(i64::MAX) - 1) * step;
+                        if step > 0 && max_end < end {
+                            end = max_end + 1; // +1 because range is exclusive at end
+                        } else if step < 0 && max_end > end {
+                            end = max_end - 1;
+                        }
+                    }
+
+                    builder = builder.with_range(start, end, step);
+                } else {
+                    // Default range with max_iterations applied
+                    let mut end = 10;
+                    if let Some(max) = max_iterations {
+                        end = 1 + i64::try_from(max).unwrap_or(10);
+                    }
+                    builder = builder.with_range(1, end, 1);
+                }
+            }
+            "collection" => {
+                if let Some(serde_json::Value::Object(params)) = iterator_params {
+                    if let Some(serde_json::Value::Array(values)) = params.get("values") {
+                        let mut collection = values.clone();
+                        // Apply max_iterations limit if specified
+                        if let Some(max) = max_iterations {
+                            collection.truncate(max);
+                        }
+                        builder = builder.with_collection(collection);
+                    }
+                } else {
+                    // Default to empty collection
+                    builder = builder.with_collection(Vec::<serde_json::Value>::new());
+                }
+            }
+            "while" => {
+                if let Some(serde_json::Value::Object(params)) = iterator_params {
+                    let condition = params
+                        .get("condition")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("true")
+                        .to_string();
+                    let max = max_iterations.unwrap_or(100);
+                    builder = builder.with_while_condition(condition, max);
+                } else {
+                    // Default while condition with max iterations
+                    builder = builder.with_while_condition("true", max_iterations.unwrap_or(10));
+                }
+            }
+            _ => {
+                // Default to range if unknown type
+                builder = builder.with_range(1, 5, 1);
+            }
+        }
+
+        // Add steps
+        for step in steps {
+            builder = builder.add_step(step);
+        }
+
+        // Apply error strategy
+        if let Some(strategy) = error_strategy {
+            builder = builder.with_error_strategy(strategy);
+        }
+
+        let workflow = builder.build()?;
+        let workflow_executor = Box::new(LoopWorkflowExecutor {
+            workflow,
+            name,
+            state_manager: self.standardized_factory.state_manager.clone(),
+        });
+
+        let workflow_id = format!("workflow_{}", uuid::Uuid::new_v4());
+        let mut workflows = self.active_workflows.write().await;
+        workflows.insert(workflow_id.clone(), Arc::new(workflow_executor));
+
+        self.metrics
+            .workflows_created
+            .fetch_add(1, Ordering::Relaxed);
+
+        Ok(workflow_id)
+    }
+
     /// Set shared data for a workflow
     ///
     /// # Errors

@@ -59,7 +59,7 @@ Communication Management (Conditional Workflow)
 │   └── Analyze Sentiment (Agent)
 │
 ├── Condition: { type = "always" }  // Demo: takes then_branch
-│   // Future: { type = "shared_data_equals", key = "sentiment", value = "NEGATIVE" }
+│   // ✅ NOW WORKING: { type = "shared_data_equals", key = "sentiment", value = "NEGATIVE" }
 │
 ├── THEN Branch (Escalation Path)
 │   ├── Escalate Response (Agent) - Urgent empathetic response
@@ -89,7 +89,8 @@ Communication Management (Conditional Workflow)
     type = "always"     -- Always executes then_branch
     -- OR
     type = "never"      -- Always executes else_branch
-    -- Future: type = "shared_data_equals", key = "sentiment", value = "NEGATIVE"
+    -- ✅ NOW WORKING: type = "shared_data_equals", key = "sentiment", value = "NEGATIVE"
+    -- ✅ NOW WORKING: type = "shared_data_exists", key = "user_id"
 })
 
 -- Separate then/else step methods
