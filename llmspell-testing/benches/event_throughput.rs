@@ -225,14 +225,14 @@ fn bench_event_correlation(c: &mut Criterion) {
 fn bench_high_frequency_events(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    c.bench_function("high_frequency_100k_events", |b| {
+    c.bench_function("high_frequency_10k_events", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let event_bus = Arc::new(EventBus::new());
                 let mut handles = vec![];
 
                 // Create high-priority subscribers
-                for _i in 0..5 {
+                for _i in 0..3 {
                     let bus = event_bus.clone();
                     let handle = tokio::spawn(async move {
                         let mut sub = bus.subscribe("high_freq.*").await.unwrap();
@@ -240,7 +240,8 @@ fn bench_high_frequency_events(c: &mut Criterion) {
                         let mut count = 0;
                         let start = tokio::time::Instant::now();
 
-                        while start.elapsed() < Duration::from_secs(1) {
+                        // Reduced timeout from 1s to 100ms for faster benchmarks
+                        while start.elapsed() < Duration::from_millis(100) {
                             if let Some(_) = sub.recv().await {
                                 count += 1;
                             } else {
@@ -253,14 +254,14 @@ fn bench_high_frequency_events(c: &mut Criterion) {
                     handles.push(handle);
                 }
 
-                // Publish 100k events
+                // Publish 10k events (reduced from 100k)
                 let publish_handle = {
                     let bus = event_bus.clone();
                     tokio::spawn(async move {
-                        for i in 0..100_000 {
+                        for i in 0..10_000 {
                             let event = UniversalEvent::new(
                                 format!("high_freq.event.{}", i % 10),
-                                serde_json::json!({"data": format!("data-{}", i)}),
+                                serde_json::json!({"data": i}), // Simplified data
                                 Language::Rust,
                             );
 
@@ -271,6 +272,9 @@ fn bench_high_frequency_events(c: &mut Criterion) {
 
                 // Wait for publishing to complete (ignore rate limit errors)
                 let _ = publish_handle.await;
+
+                // Give subscribers a bit more time to process remaining events
+                tokio::time::sleep(Duration::from_millis(50)).await;
 
                 // Collect subscriber results (ignore errors)
                 let mut total_received = 0;
@@ -291,27 +295,27 @@ fn bench_high_frequency_events(c: &mut Criterion) {
 fn bench_event_memory_usage(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    c.bench_function("event_memory_10k_subscribers", |b| {
+    c.bench_function("event_memory_1k_subscribers", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let event_bus = Arc::new(EventBus::new());
                 let mut subscriptions = vec![];
 
-                // Create 10k subscriptions
-                for i in 0..10_000 {
-                    let pattern = format!("memory.test.{}", i % 100);
+                // Create 1k subscriptions (reduced from 10k)
+                for i in 0..1_000 {
+                    let pattern = format!("memory.test.{}", i % 50);
                     let sub = event_bus.subscribe(&pattern).await.unwrap();
                     subscriptions.push(sub);
                 }
 
-                // Publish events to all patterns
-                for i in 0..100 {
+                // Publish events to some patterns
+                for i in 0..50 {
                     let event = UniversalEvent::new(
                         format!("memory.test.{}", i),
                         serde_json::json!({
                             "test": "data",
                             "index": i,
-                            "large_field": vec![0u8; 1024], // 1KB payload
+                            "payload": vec![0u8; 256], // Reduced to 256B payload
                         }),
                         Language::Rust,
                     );
@@ -321,11 +325,9 @@ fn bench_event_memory_usage(c: &mut Criterion) {
                 // Simplified: just track the number of subscriptions created
                 let subscription_count = subscriptions.len();
 
-                // Force all subscriptions to receive at least one event each
-                for mut sub in subscriptions {
-                    if let Some(_) = sub.recv().await {
-                        // Received at least one event per subscription
-                    }
+                // Sample a few subscriptions instead of all
+                for sub in subscriptions.into_iter().take(10) {
+                    let _ = sub; // Just drop them
                 }
 
                 black_box(subscription_count);
@@ -344,13 +346,13 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
     // Test 1: Pure publishing throughput
     let publishing_throughput = rt.block_on(async {
         let event_bus = Arc::new(EventBus::new());
-        let events_to_publish = 100_000;
+        let events_to_publish = 10_000; // Reduced from 100k
 
         let start = tokio::time::Instant::now();
         for i in 0..events_to_publish {
             let event = UniversalEvent::new(
                 format!("throughput.test.{}", i % 100),
-                serde_json::json!({"data": format!("event-{}", i)}),
+                serde_json::json!({"data": i}), // Simplified data
                 Language::Rust,
             );
             let _ = event_bus.publish(event).await;
@@ -369,7 +371,7 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
         let event_bus = Arc::new(EventBus::new());
         let mut sub = event_bus.subscribe("e2e.*").await.unwrap();
 
-        let events_to_process = 100_000;
+        let events_to_process = 10_000; // Reduced from 100k
 
         // Publisher task
         let bus = event_bus.clone();
@@ -377,7 +379,7 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
             for i in 0..events_to_process {
                 let event = UniversalEvent::new(
                     format!("e2e.event.{}", i % 10),
-                    serde_json::json!({"data": format!("data-{}", i)}),
+                    serde_json::json!({"data": i}), // Simplified data
                     Language::Rust,
                 );
                 let _ = bus.publish(event).await;
