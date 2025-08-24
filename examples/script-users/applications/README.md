@@ -2,6 +2,8 @@
 
 **Status**: 🚧 **Under Active Development** - This README reflects our current planning and will be updated as we implement the versioned inheritance architecture described below.
 
+> **📦 Single Binary Distribution**: These applications are embedded in the `llmspell` binary! Users can run them with `llmspell apps <app-name>` without any path configuration. See [EMBEDDED_NOTICE.md](EMBEDDED_NOTICE.md) for details.
+
 **Universal → Professional Progression**: Applications start with problems every computer user faces, then evolve naturally toward professional automation. No "hello world" examples - every application addresses genuine problems that progress from universal user pain points to sophisticated professional automation.
 
 ## Learning Philosophy

@@ -32,6 +32,9 @@ indicatif = "0.17"
 tokio-stream = { workspace = true }
 chrono = { workspace = true }
 toml = { workspace = true }
+once_cell = { workspace = true }
+uuid = { workspace = true }
+dialoguer = "0.11"
 
 [dev-dependencies]
 assert_cmd = "2.0"

@@ -1,0 +1,39 @@
+# Universal Layer Configuration - Research Collector
+# Simple configuration for everyday research needs
+
+[runtime]
+name = "research-collector"
+description = "Universal research automation"
+
+# Single provider with fallback for reliability
+[providers.openai]
+name = "openai"
+api_key_env = "OPENAI_API_KEY"
+api_base = "https://api.openai.com/v1"
+default_model = "gpt-4o-mini"
+timeout_seconds = 30
+
+# Basic tools for research
+[tools]
+file_operations = { enabled = true }
+web_search = { enabled = true }
+http_request = { enabled = true }
+text_manipulator = { enabled = true }
+
+# Simple workflow configuration
+[workflows]
+enabled = true
+max_concurrent = 2  # Simple parallel search
+timeout_seconds = 60
+
+# No state for universal simplicity
+[state]
+enabled = false
+
+# No sessions for basic research
+[sessions]
+enabled = false
+
+# No events tracking
+[events]
+enabled = false

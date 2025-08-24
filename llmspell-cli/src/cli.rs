@@ -173,6 +173,76 @@ pub enum Commands {
 
     /// Backup and restore state data
     Backup(crate::commands::backup::BackupCommand),
+
+    /// Run example applications
+    Apps {
+        /// Application to run (file-organizer, research-collector, etc.)
+        #[command(subcommand)]
+        app: Option<AppsSubcommand>,
+    },
+
+    /// Interactive setup for first-time users
+    Setup {
+        /// Force overwrite existing configuration
+        #[arg(short, long)]
+        force: bool,
+    },
+}
+
+/// Available example applications
+#[derive(Subcommand, Debug)]
+pub enum AppsSubcommand {
+    /// List all available applications
+    List,
+    
+    /// Organize messy files with AI categorization
+    FileOrganizer {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    
+    /// Research any topic thoroughly
+    ResearchCollector {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    
+    /// Create content efficiently
+    ContentCreator {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    
+    /// Manage business communications
+    CommunicationManager {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    
+    /// Orchestrate complex processes
+    ProcessOrchestrator {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    
+    /// Review code for quality and security
+    CodeReviewAssistant {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+    
+    /// Create complete web applications
+    WebappCreator {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
 }
 
 impl Cli {

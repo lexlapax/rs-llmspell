@@ -1,6 +1,7 @@
 //! ABOUTME: Command handler implementations
 //! ABOUTME: Executes CLI commands with multi-engine support
 
+pub mod apps;
 pub mod backup;
 pub mod exec;
 pub mod info;
@@ -9,6 +10,7 @@ pub mod keys;
 pub mod providers;
 pub mod repl;
 pub mod run;
+pub mod setup;
 pub mod validate;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
@@ -48,6 +50,10 @@ pub async fn execute_command(
         Commands::Backup(backup_cmd) => {
             backup::execute_backup(backup_cmd, &runtime_config, output_format).await
         }
+        Commands::Apps { app } => {
+            apps::execute_apps_command(app, engine, runtime_config, output_format).await
+        }
+        Commands::Setup { force } => setup::run_interactive_setup(force).await,
     }
 }
 
