@@ -4,7 +4,7 @@
 **Available Tools**: 34 production tools  
 **Features**: Agents, Workflows, Tools, Persistent State Management, Hooks, Events, Sessions
 
-**🔗 Navigation**: [← Project Home](../README.md) | [Documentation Hub](../docs/README.md) | [User Guide](../docs/user-guide/README.md) | **[📚 EXAMPLE INDEX](EXAMPLE-INDEX.md)**
+**🔗 Navigation**: [← Project Home](../README.md) | [Documentation Hub](../docs/README.md) | [User Guide](../docs/user-guide/README.md)
 
 ---
 

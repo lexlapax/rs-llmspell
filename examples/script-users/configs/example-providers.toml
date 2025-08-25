@@ -6,9 +6,7 @@ default_engine = "lua"
 
 # Provider configuration
 [providers]
-default_provider = "openai"
 
-# Clean hierarchy - no more nested providers.providers
 [providers.openai]
 provider_type = "openai"
 api_key_env = "OPENAI_API_KEY"
@@ -16,15 +14,15 @@ model = "gpt-4"
 
 [providers.anthropic]
 provider_type = "anthropic"
-api_key_env = "ANTHROPIC_API_KEY"
+api_key_env = "ANTHROPIC_API_KEY"  
 model = "claude-3-opus-20240229"
 
 # Engine configuration (optional)
 [engines.lua]
-security_level = "safe"
+security_level = "Safe"
 
 [engines.javascript]
-security_level = "safe"
+security_level = "Safe"
 
 # Runtime configuration (optional)
 [runtime]

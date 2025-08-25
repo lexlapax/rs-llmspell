@@ -1459,7 +1459,7 @@ docs/archives/technical/           # Archive outdated/redundant files
 
 ### **MASS DELETION TASKS**:
 
-**7.4.5.1** - **Infrastructure Cleanup with Validation** (45 minutes):
+##### 7.4.5.1 - **Infrastructure Cleanup with Validation** (45 minutes):
 ```
 ❌ DELETE: 4 broken shell scripts (run-all-*.sh) referencing missing files
 ❌ DELETE: tests-as-examples/ (belongs in tests/, not examples) - 6 files  
@@ -1475,7 +1475,7 @@ docs/archives/technical/           # Archive outdated/redundant files
 5. Update examples/README.md to remove references to deleted files/directories
 ```
 
-**7.4.5.2** - **Getting Started Simplification with Full Validation** (75 minutes):
+##### 7.4.5.2 - **Getting Started Simplification with Full Validation** (75 minutes):
 ```
 ❌ DELETE: 6 duplicate subdirectories (01-hello-world/, 02-first-tool/, etc.)
 ❌ DELETE: 4 conflicting numbered files (01-agent-basics.lua, 02-first-tools.lua, etc.)
@@ -1547,7 +1547,7 @@ Each example MUST have detailed header including:
 - Add "Next steps" navigation between examples
 ```
 
-**7.4.5.3** - **Cookbook Curation with Production Validation** (90 minutes):
+##### 7.4.5.3 - **Cookbook Curation with Production Validation** (90 minutes):
 ```
 ❌ DELETE: 22 redundant patterns keeping only 8 production-essential ones
 ✅ CRITERIA: Must teach unique pattern, must be production-ready, must use canonical APIs
@@ -1627,7 +1627,7 @@ Each cookbook pattern MUST have detailed header:
 - Add "Production Ready" validation tags to all patterns
 ```
 
-**7.4.5.4** - **Application Validation with Comprehensive Testing** (60 minutes):
+##### 7.4.5.4 - **Application Validation with Comprehensive Testing** (60 minutes):
 ```
 ✅ KEEP ALL: All 7 working applications (valuable Universal→Professional progression)
 🔄 UPDATE: Application documentation for canonical API compliance only
@@ -1701,7 +1701,7 @@ VALIDATION TASKS:
 - Update main examples/README.md with working application showcase
 ```
 
-**7.4.5.5** - **Create Quality Rust Examples with Full Validation** (120 minutes):
+#####  7.4.5.5 - **Create Quality Rust Examples with Full Validation** (120 minutes):
 ```
 🆕 CREATE: 6 high-quality Rust examples following docs/user-guide/api/rust/README.md exactly
 ✅ FOCUS: Custom components, extension patterns, production usage
