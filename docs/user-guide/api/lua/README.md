@@ -369,27 +369,43 @@ Adds a parallel step (shorthand).
 
 **Parameters:** Same as `add_step`
 
-#### :add_condition(table) → WorkflowBuilder
-Adds a conditional branch.
+#### :condition(table) → WorkflowBuilder
+Sets the condition for a conditional workflow.
 
 **Parameters:**
 - `condition: table` - Condition configuration
-  - `expression: string` - Condition expression
-  - `then_branch: table` - Steps if true
-  - `else_branch: table` - Steps if false
+  - `type: string` - Condition type ("always", "never", "shared_data_equals", "shared_data_exists")
+  - `key: string` - State key (for shared_data conditions)
+  - `value: any` - Expected value (for shared_data_equals)
 
 **Example:**
 ```lua
-builder:add_condition({
-    expression = "result > 0",
-    then_branch = {
-        {name = "positive", type = "tool", tool = "positive-handler"}
-    },
-    else_branch = {
-        {name = "negative", type = "tool", tool = "negative-handler"}
-    }
+-- Always true condition
+builder:condition({type = "always"})
+
+-- Check if shared data equals value
+builder:condition({
+    type = "shared_data_equals",
+    key = "priority",
+    value = "urgent"
+})
+
+-- Check if shared data exists
+builder:condition({
+    type = "shared_data_exists", 
+    key = "user_id"
 })
 ```
+
+#### :add_then_step(table) → WorkflowBuilder
+Adds a step to execute when condition is true.
+
+**Parameters:** Same as `add_step`
+
+#### :add_else_step(table) → WorkflowBuilder  
+Adds a step to execute when condition is false.
+
+**Parameters:** Same as `add_step`
 
 #### :build() → Workflow
 Creates the workflow.
@@ -407,14 +423,22 @@ local workflow = builder:build()
 Executes the workflow.
 
 **Parameters:**
-- `context: table` - Execution context
-  - `state: table` - Initial state data
-  - `timeout: integer` - Overall timeout in seconds
+- `context: table` - Execution context (can be empty `{}`)
+  - Any key-value pairs passed as input to the workflow
 
-**Returns:** `table` - Execution result
-- `success: boolean` - Execution success
-- `data: table` - Result data
-- `error: string` - Error if failed
+**Returns:** `table` - AgentOutput object
+- `text: string` - Summary text (check for "completed successfully")
+- `metadata: table` - Execution metadata
+- Other fields per AgentOutput structure
+
+#### workflow:set_shared_data(string, any) → nil
+Sets shared data for conditional workflows.
+
+**Parameters:**
+- `key: string` - Data key
+- `value: any` - Data value
+
+**Note:** Must be called before execute() for conditional workflows
 
 **Example:**
 ```lua

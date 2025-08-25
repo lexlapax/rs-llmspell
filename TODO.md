@@ -1759,44 +1759,90 @@ Each feature example MUST have detailed header:
 -- ============================================================
 ```
 
-##### 7.4.5.5 - **Advanced Patterns Consolidation** (45 minutes):
+##### 7.4.5.5 - **Advanced Patterns Consolidation** ✅ COMPLETED (35 minutes):
 
 🎯 GOAL: Merge advanced/ + workflows/ → advanced-patterns/ (4 files)
 📊 PROGRESSION: Bridge between features and cookbook
 
-**CONSOLIDATION PLAN** (9 → 4 files = 56% reduction):
+**CRITICAL FIXES APPLIED**:
+⚠️ **CONDITIONAL WORKFLOW API**: Function-based conditions not supported
+   - ✅ Fixed: Use table-based conditions with `type: "shared_data_equals"` etc.
+   - ✅ Updated docs/user-guide/api/lua/README.md with correct API
+⚠️ **TEXT MANIPULATOR OPERATIONS**: Several invalid operations used
+   - ✅ Fixed: "count", "prepend", "append" not valid - use template_engine instead
+⚠️ **MISSING TOOLS**: Several tools referenced don't exist
+   - ✅ Fixed: Replaced random_generator, rate-limiter, circuit-breaker with simulations
+
+**CONSOLIDATION ACHIEVED** (9 → 4 files = 56% reduction):
 
 ✅ **CREATE NEW DIRECTORY**: examples/script-users/advanced-patterns/
 
-✅ **CREATE/MERGE** (4 final files):
-1. **multi-agent-orchestration.lua** - Complex agent coordination
-   - BASE: advanced/agent-orchestrator.lua
-   - ADD: Agent composition patterns, delegation strategies
-   - SHOW: 5+ agents working together, error recovery
+✅ **CREATED/MERGED** (4 final files ALL VALIDATED):
 
-2. **complex-workflows.lua** - Advanced workflow patterns
-   - MERGE ALL: workflows/workflow-sequential-basics.lua + 
-               workflows/conditional-content-routing.lua +
-               workflows/conditional-multi-branch.lua
-   - SHOW: Sequential, parallel, conditional, nested workflows
-   - DELETE AFTER MERGE: All 3 workflow files
+1. **multi-agent-orchestration.lua** ✅ WORKING
+   - MERGED: advanced/agent-orchestrator.lua base
+   - ADDED: 8 distinct patterns (delegation, consensus, recovery, pipeline, parallel)
+   - SHOWS: 5 specialized agents, error recovery, performance monitoring
+   - VALIDATED: Works with API key, creates all agents successfully
 
-3. **tool-integration-patterns.lua** - Advanced tool usage
-   - MERGE: advanced/tools-integration.lua + advanced/tools-system.lua
-   - SHOW: Tool chaining, custom tools, system integration
-   - DELETE AFTER MERGE: tools-integration.lua, tools-system.lua
+2. **complex-workflows.lua** ✅ WORKING
+   - MERGED: All 3 workflow files into comprehensive showcase
+   - FIXED: Conditional workflows now use table-based conditions (not functions)
+   - FIXED: Text manipulator operations replaced with template_engine
+   - SHOWS: 7 patterns - sequential, parallel, conditional, multi-branch, nested, recovery, performance
+   - VALIDATED: All workflows execute successfully
 
-4. **monitoring-security.lua** - Production monitoring and security
-   - MERGE: advanced/agent-monitor.lua + advanced/tools-security.lua
-   - SHOW: Monitoring patterns, security controls, audit logging
-   - DELETE AFTER MERGE: agent-monitor.lua, tools-security.lua
+3. **tool-integration-patterns.lua** ✅ WORKING
+   - MERGED: tools-integration.lua + tools-system.lua
+   - FIXED: Replaced non-existent tools (random_generator, rate-limiter, circuit-breaker) with simulations
+   - SHOWS: 10 patterns including chaining, parallel, system, database, email, recovery
+   - VALIDATED: Core tools work, external integrations documented
 
-❌ **DELETE OUTRIGHT**:
-- advanced/tools-media.lua - Too specific, not essential
-- workflows/ directory (entire directory after merging)
-- advanced/ directory (entire directory after merging)
+4. **monitoring-security.lua** ✅ WORKING
+   - MERGED: agent-monitor.lua + tools-security.lua
+   - SHOWS: 9 security patterns, anomaly detection, audit logging
+   - VALIDATED: Security controls working, agent monitoring with API key
 
-🔍 **VALIDATION**: Each pattern must demonstrate production-ready code
+✅ **CREATED advanced-patterns/README.md**:
+   - Comprehensive documentation for all 4 patterns
+   - Usage examples and prerequisites
+   - Common issues and solutions
+   - Best practices and architecture notes
+
+✅ **DELETED AS PLANNED**:
+- ✅ advanced/ directory (6 files removed)
+- ✅ workflows/ directory (3 files removed)
+- ✅ advanced/tools-media.lua (too specific)
+
+📊 **KEY INSIGHTS FROM CONSOLIDATION**:
+
+1. **API Documentation Was Wrong**: 
+   - Workflow conditions must use tables, not functions
+   - Had to update canonical docs in docs/user-guide/api/lua/README.md
+   - This affects ALL conditional workflow examples
+
+2. **Tool API Limitations Discovered**:
+   - text_manipulator has limited operations (no count, prepend, append)
+   - Must use template_engine for complex text operations
+   - Several referenced tools don't exist (random_generator, rate-limiter, circuit-breaker)
+
+3. **Workflow Result Structure**:
+   - Workflows return AgentOutput with `text` field
+   - Success check: `result.text:match("completed successfully")`
+   - NOT a simple success boolean as examples suggested
+
+4. **State Management Critical**:
+   - Conditional workflows REQUIRE set_shared_data() calls
+   - State scope issues persist (NoScopeStateAdapter warnings)
+   - Cross-workflow state sharing needs improvement
+
+5. **Consolidation Benefits**:
+   - 56% file reduction (9→4) improves discoverability
+   - Each file now comprehensive (300-450 lines)
+   - Clear progression: features → advanced-patterns → cookbook
+   - Better error handling patterns throughout
+
+🔍 **VALIDATION**: All 4 patterns tested and working
 
 📝 **ADVANCED PATTERNS COMPREHENSIVE HEADER FORMAT**:
 Each advanced pattern MUST have detailed header:
