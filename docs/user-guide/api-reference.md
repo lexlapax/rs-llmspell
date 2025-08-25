@@ -1,8 +1,12 @@
 # API Quick Reference
 
-**📋 Implementation Status**: Current Phase 3.3 APIs - Features marked 📋 are planned for Phase 4+
+**📋 Implementation Status**: Current Phase 7 - Production Ready
 
-This is a comprehensive quick reference for all rs-llmspell APIs. All globals are pre-injected - no require() needed!
+> **📚 Complete Documentation Available**: For comprehensive API documentation designed for both humans and LLM coding assistants, see:
+> - **[Lua API Reference](api/lua/README.md)** - Complete Lua scripting API with all globals, methods, and examples
+> - **[Rust API Reference](api/rust/README.md)** - Complete Rust extension API with traits, builders, and patterns
+
+This is a quick reference for all rs-llmspell APIs. All globals are pre-injected - no require() needed!
 
 ## Agent Global
 

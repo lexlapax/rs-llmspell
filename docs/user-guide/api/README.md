@@ -1,16 +1,45 @@
 # LLMSpell API Documentation
 
+**Version**: 0.6.0  
+**Purpose**: Central index for all LLMSpell API documentation
+
+> **🤖 LLM-Optimized Documentation**: This documentation is specifically structured for consumption by LLM-based coding assistants like Claude Code, GitHub Copilot, and others, while remaining human-readable.
+
 ## Overview
 LLMSpell provides comprehensive APIs for both Rust developers and script users. The platform offers identical functionality across all supported languages with consistent patterns and behaviors.
 
 ## Documentation Structure
 
-### [Rust API](./rust/index.html)
-Complete Rust API documentation generated from source code with:
-- All public traits, structs, and functions
-- Implementation details and examples
-- Cross-crate dependencies
-- Performance characteristics
+### 📘 [Lua API](./lua/README.md)
+**Complete Lua API Reference** - Comprehensive documentation for all Lua scripting capabilities.
+
+**Coverage:**
+- 15 Global objects (Agent, Tool, Workflow, State, Session, Hook, Event, Config, Provider, Debug, JSON, Args, Streaming, Artifact, Replay)
+- 100+ Methods with full type signatures
+- Complete parameter and return type documentation
+- Error conditions and handling patterns
+- Practical examples for every API method
+
+**Key Globals:**
+- `Agent` - LLM agent creation and execution
+- `Tool` - Tool invocation and management
+- `Workflow` - Workflow orchestration patterns
+- `State` - Persistent state management
+- `Session` - Session and artifact handling
+- `Hook` - Lifecycle hooks and interception
+- `Event` - Event emission and subscription
+
+### 📙 [Rust API](./rust/README.md)
+**Complete Rust API Reference** - Comprehensive documentation for extending LLMSpell with Rust.
+
+**Coverage:**
+- Core traits (BaseComponent, Executable, Agent, Tool, Workflow)
+- Builder patterns for all components
+- Component Registry system
+- Complete error type hierarchy
+- Bridge APIs for language integration
+- Testing utilities and macros
+- Performance optimization guidelines
 
 **Key Crates:**
 - `llmspell-core` - Core traits and types
@@ -18,21 +47,9 @@ Complete Rust API documentation generated from source code with:
 - `llmspell-tools` - Tool implementations
 - `llmspell-workflows` - Workflow orchestration
 - `llmspell-bridge` - Script language integration
-
-### [Lua API](./lua/index.md)
-Comprehensive Lua scripting API with:
-- Agent creation and management
-- Tool invocation
-- Workflow orchestration
-- State persistence
-- Event handling
-
-**Core Modules:**
-- `Agent` - LLM agent operations
-- `Tool` - Tool ecosystem access
-- `Workflow` - Process orchestration
-- `State` - Persistence management
-- `Session` - Session handling
+- `llmspell-state-persistence` - State management
+- `llmspell-hooks` - Hook system
+- `llmspell-events` - Event system
 
 ## Quick Start
 
