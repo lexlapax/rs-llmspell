@@ -1,11 +1,53 @@
--- Cookbook: State Versioning - Managing State History and Evolution
--- Purpose: Implement patterns for versioning state changes and managing history
--- Prerequisites: State persistence enabled in config (optional for enhanced features)
--- Expected Output: Demonstration of state versioning patterns
--- Version: 0.7.0
--- Tags: cookbook, state, versioning, history, production
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 08 - State Management v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: Enterprise state management with versioning and persistence
+-- Pattern Category: State & Data Management
+--
+-- Purpose: Production state management patterns including versioning, persistence,
+--          migration, and distributed state handling for LLMSpell applications.
+--          Essential for maintaining application state across restarts and scaling.
+-- Architecture: Versioned state with migration support and conflict resolution
+-- Crates Showcased: llmspell-state-persistence, llmspell-bridge
+-- Key Features:
+--   • State versioning and history tracking
+--   • State migration patterns
+--   • Conflict resolution strategies
+--   • Distributed state synchronization
+--   • State backup and recovery
+--   • Scoped state management (global, workflow, agent)
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Optional: State persistence config for enhanced features
+--   • No API keys required
+--
+-- HOW TO RUN:
+-- # With state persistence:
+-- ./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
+--   run examples/script-users/cookbook/state-management.lua
+--
+-- # Without persistence (in-memory only):
+-- ./target/debug/llmspell run examples/script-users/cookbook/state-management.lua
+--
+-- EXPECTED OUTPUT:
+-- 5 state patterns demonstrated:
+-- 1. Versioned state with history tracking
+-- 2. State migration from v1 to v2 schema
+-- 3. Conflict resolution with merge strategies
+-- 4. State snapshots and rollback
+-- 5. Scoped state isolation
+--
+-- Time to Complete: <3 seconds
+-- Production Notes: Use persistent backend for production, implement regular
+--                   backups, version all schema changes, use distributed locks
+--                   for concurrent access, monitor state size and growth.
+-- ============================================================
 
-print("=== State Versioning Patterns ===\n")
+print("=== State Management Patterns ===")
+print("Pattern 08: PRODUCTION - Enterprise state versioning and persistence\n")
 
 -- ============================================================
 -- Pattern 1: Simple Version Control

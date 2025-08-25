@@ -1,14 +1,47 @@
--- Example: Agent Coordinator  
--- Purpose: Demonstrates multi-agent coordination and collaboration patterns
--- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variable, cookbook.toml config, Tools: file_operations
--- Expected Output: Multi-agent coordination examples including sequential pipelines and parallel execution
--- Version: 0.7.0
--- Tags: agent, coordination, advanced
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 04 - Multi-Agent Coordination v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: Enterprise multi-agent systems for complex workflows
+-- Pattern Category: Agent Orchestration & Collaboration
+--
+-- Purpose: Production patterns for coordinating multiple AI agents in complex
+--          workflows. Demonstrates delegation, collaboration, consensus building,
+--          and orchestration patterns essential for enterprise AI systems.
+-- Architecture: Multi-agent orchestration with role specialization
+-- Crates Showcased: llmspell-agents, llmspell-workflows, llmspell-bridge
+-- Key Features:
+--   • Agent role specialization (researcher, analyst, reviewer)
+--   • Sequential agent pipelines
+--   • Parallel agent execution
+--   • Agent delegation patterns
+--   • Consensus building among agents
+--   • Result aggregation and synthesis
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Provider configured (OpenAI or Anthropic)
+--   • Config: Use -c flag with appropriate config file
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
+--   run examples/script-users/cookbook/multi-agent-coordination.lua
+--
+-- EXPECTED OUTPUT:
+-- 3 coordination patterns demonstrated:
+-- 1. Sequential pipeline: research → analysis → review
+-- 2. Parallel execution: multiple agents working simultaneously
+-- 3. Delegation pattern: coordinator delegating to specialists
+--
+-- Time to Complete: <30 seconds (depends on API latency)
+-- Production Notes: Implement agent pools for scaling, use message queues for
+--                   async coordination, monitor agent performance metrics,
+--                   implement fallback chains for agent failures.
+-- ============================================================
 
--- ABOUTME: Agent coordinator example demonstrating multi-agent orchestration
--- ABOUTME: Shows how agents can coordinate with each other to solve complex problems
-
-print("=== Agent Coordinator Example ===\n")
+print("=== Agent Coordinator Example ===")
+print("Pattern 04: PRODUCTION - Multi-agent orchestration patterns\n")
 
 -- Create specialized agents
 local agents = {}

@@ -1,11 +1,47 @@
--- Cookbook: Webhook Integration - Event-Driven External Integrations
--- Purpose: Implement patterns for webhook handling and external service integration
--- Prerequisites: Tools: webhook_caller (for production use), network access for external webhooks
--- Expected Output: Demonstration of webhook integration patterns
--- Version: 0.7.0
--- Tags: cookbook, webhooks, integration, events, production
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 05 - Webhook Integration v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: External system integration via webhooks
+-- Pattern Category: Integration & Event Processing
+--
+-- Purpose: Production webhook integration patterns for connecting LLMSpell
+--          to external systems. Implements webhook sending, retry logic,
+--          signature verification, and event processing for enterprise integrations.
+-- Architecture: Event-driven webhook handling with reliability patterns
+-- Crates Showcased: llmspell-tools (webhook_caller), llmspell-bridge
+-- Key Features:
+--   • Webhook sending with retry logic
+--   • Signature verification for security
+--   • Event batching for efficiency
+--   • Circuit breaker for failing endpoints
+--   • Webhook response handling
+--   • Dead letter queue patterns
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Network access for webhook testing
+--   • Optional: webhook_caller tool for production use
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/cookbook/webhook-integration.lua
+--
+-- EXPECTED OUTPUT:
+-- 4 webhook patterns demonstrated:
+-- 1. Basic webhook sending with retry
+-- 2. Batched webhook events
+-- 3. Webhook with signature verification
+-- 4. Circuit breaker for failing webhooks
+--
+-- Time to Complete: <5 seconds
+-- Production Notes: Implement webhook signing for security, use queues for
+--                   reliability, monitor webhook latency and success rates,
+--                   implement idempotency keys to prevent duplicate processing.
+-- ============================================================
 
-print("=== Webhook Integration Patterns ===\n")
+print("=== Webhook Integration Patterns ===")
+print("Pattern 05: PRODUCTION - External system integration\n")
 
 -- ============================================================
 -- Pattern 1: Webhook Handler with Validation

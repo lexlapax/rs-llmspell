@@ -1,11 +1,48 @@
--- Cookbook: Rate Limiting - API Rate Limit Management
--- Purpose: Implement rate limiting patterns to prevent API abuse and manage quotas
--- Prerequisites: None
--- Expected Output: Demonstration of various rate limiting strategies
--- Version: 0.7.0
--- Tags: cookbook, rate-limiting, api-protection, throttling, production
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 02 - Rate Limiting Patterns v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: API rate limit management for enterprise integrations
+-- Pattern Category: Performance & Resource Management
+--
+-- Purpose: Production-ready rate limiting patterns for API protection and quota
+--          management. Implements token bucket, sliding window, and adaptive
+--          rate limiting algorithms essential for preventing API abuse and
+--          ensuring fair resource usage in multi-tenant systems.
+-- Architecture: Token bucket and sliding window algorithms with statistics
+-- Crates Showcased: llmspell-tools, llmspell-bridge
+-- Key Features:
+--   • Token bucket algorithm for burst handling
+--   • Sliding window rate limiter for smooth traffic
+--   • Adaptive rate limiting based on response codes
+--   • Multi-tier rate limiting (per-user, per-API)
+--   • Rate limit statistics and monitoring
+--   • Backoff strategies for rate limit responses
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • No API keys required (simulation only)
+--   • No external dependencies
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/cookbook/rate-limiting.lua
+--
+-- EXPECTED OUTPUT:
+-- 4 rate limiting patterns demonstrated:
+-- 1. Token bucket showing 10 requests with refill
+-- 2. Sliding window with smooth request distribution
+-- 3. Adaptive rate limiting adjusting to errors
+-- 4. Multi-tier limiting with user and API quotas
+--
+-- Time to Complete: <2 seconds
+-- Production Notes: Configure limits based on API provider SLAs, implement
+--                   distributed rate limiting for multi-instance deployments,
+--                   use Redis or similar for shared state across instances.
+-- ============================================================
 
-print("=== Rate Limiting Patterns ===\n")
+print("=== Rate Limiting Patterns ===")
+print("Pattern 02: PRODUCTION - API rate limit management\n")
 
 -- ============================================================
 -- Pattern 1: Token Bucket Algorithm

@@ -1,11 +1,50 @@
--- Cookbook: Comprehensive Error Handling Patterns
--- Purpose: Production-ready error handling strategies for LLMSpell scripts
--- Prerequisites: Tools: uuid_generator (for demonstrations)
--- Expected Output: Demonstration of various error handling patterns
--- Version: 0.7.0
--- Tags: cookbook, error-handling, resilience, production
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 01 - Error Handling Patterns v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: Enterprise-grade error handling for resilient automation
+-- Pattern Category: Error Handling & Recovery
+--
+-- Purpose: Comprehensive error handling patterns for production LLMSpell scripts.
+--          Demonstrates safe invocation, retry strategies, circuit breakers,
+--          graceful degradation, and error aggregation. Essential for building
+--          reliable automation that handles failures elegantly.
+-- Architecture: Defensive programming with error boundaries and recovery strategies
+-- Crates Showcased: llmspell-tools, llmspell-agents, llmspell-bridge
+-- Key Features:
+--   • Safe tool invocation with detailed error information
+--   • Retry mechanisms with exponential backoff
+--   • Circuit breaker pattern for failing services
+--   • Graceful degradation strategies
+--   • Error aggregation and reporting
+--   • Production logging patterns
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • No API keys required (uses local tools)
+--   • Write access to /tmp for logging
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/cookbook/error-handling.lua
+--
+-- EXPECTED OUTPUT:
+-- 6 error handling patterns demonstrated:
+-- 1. Safe tool invocation with UUID generation
+-- 2. Retry with backoff showing 3 attempts
+-- 3. Circuit breaker preventing cascading failures
+-- 4. Graceful degradation with fallback values
+-- 5. Error aggregation collecting multiple errors
+-- 6. Production error logging with structured data
+--
+-- Time to Complete: <3 seconds
+-- Production Notes: Use circuit breakers for external services, implement
+--                   proper logging to observability platforms, set appropriate
+--                   timeout and retry limits based on SLAs.
+-- ============================================================
 
-print("=== Error Handling Cookbook ===\n")
+print("=== Error Handling Cookbook ===")
+print("Pattern 01: PRODUCTION - Enterprise error handling strategies\n")
 
 -- ============================================================
 -- Pattern 1: Safe Tool Invocation with Detailed Error Info

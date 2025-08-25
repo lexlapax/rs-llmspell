@@ -1,11 +1,48 @@
--- Cookbook: Response Caching Patterns
--- Purpose: Implement various caching strategies for performance optimization
--- Prerequisites: None
--- Expected Output: Demonstration of caching patterns and strategies
--- Version: 0.7.0
--- Tags: cookbook, caching, performance, optimization, production
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 03 - Caching Patterns v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: High-performance caching for reduced latency and API costs
+-- Pattern Category: Performance & Optimization
+--
+-- Purpose: Production caching strategies for LLMSpell applications. Implements
+--          LRU, TTL-based, and write-through caching patterns to minimize API
+--          calls, reduce latency, and optimize costs in production systems.
+-- Architecture: Multi-tier caching with eviction policies and invalidation strategies
+-- Crates Showcased: llmspell-tools, llmspell-state, llmspell-bridge
+-- Key Features:
+--   • Simple in-memory cache with size limits
+--   • LRU (Least Recently Used) cache implementation
+--   • TTL-based expiration with automatic cleanup
+--   • Write-through and lazy-loading patterns
+--   • Cache hit/miss statistics and monitoring
+--   • Cache invalidation strategies for consistency
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • No API keys required (simulation only)
+--   • Optional: State persistence for distributed caching
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/cookbook/caching.lua
+--
+-- EXPECTED OUTPUT:
+-- 5 caching patterns demonstrated:
+-- 1. Simple in-memory cache with hit/miss tracking
+-- 2. LRU cache with 3-item capacity showing eviction
+-- 3. TTL cache with 2-second expiration
+-- 4. Write-through cache pattern
+-- 5. Lazy-loading cache with computed values
+--
+-- Time to Complete: <3 seconds
+-- Production Notes: Use distributed caching (Redis) for multi-instance setups,
+--                   implement cache stampede protection, monitor hit ratios,
+--                   size caches based on memory constraints and access patterns.
+-- ============================================================
 
-print("=== Caching Patterns Cookbook ===\n")
+print("=== Caching Patterns Cookbook ===")
+print("Pattern 03: PRODUCTION - High-performance caching strategies\n")
 
 -- ============================================================
 -- Pattern 1: Simple In-Memory Cache

@@ -1,11 +1,48 @@
--- Cookbook: Performance Monitoring - Track and Optimize System Performance
--- Purpose: Implement patterns for monitoring, measuring, and optimizing performance
--- Prerequisites: Performance monitoring tools (optional for enhanced metrics)
--- Expected Output: Demonstration of performance monitoring patterns
--- Version: 0.7.0
--- Tags: cookbook, performance, monitoring, optimization, metrics
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 06 - Performance Monitoring v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: Production performance monitoring and optimization
+-- Pattern Category: Observability & Metrics
+--
+-- Purpose: Comprehensive performance monitoring patterns for production LLMSpell
+--          applications. Implements timing, metrics collection, bottleneck
+--          detection, and performance optimization strategies.
+-- Architecture: Metrics collection with statistical analysis and reporting
+-- Crates Showcased: llmspell-debug (via Debug global), llmspell-bridge
+-- Key Features:
+--   • Operation timing with Debug.timer()
+--   • Memory usage monitoring
+--   • Throughput and latency tracking
+--   • Performance bottleneck detection
+--   • Resource utilization metrics
+--   • Performance report generation
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • No API keys required
+--   • Debug global available
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/cookbook/performance-monitoring.lua
+--
+-- EXPECTED OUTPUT:
+-- 5 monitoring patterns demonstrated:
+-- 1. Operation timing with millisecond precision
+-- 2. Throughput monitoring (ops/sec)
+-- 3. Memory usage tracking
+-- 4. Latency percentiles (p50, p95, p99)
+-- 5. Performance report generation
+--
+-- Time to Complete: <3 seconds
+-- Production Notes: Export metrics to Prometheus/Grafana, set up alerting
+--                   for performance degradation, use distributed tracing for
+--                   complex workflows, implement SLO monitoring.
+-- ============================================================
 
-print("=== Performance Monitoring Patterns ===\n")
+print("=== Performance Monitoring Patterns ===")
+print("Pattern 06: PRODUCTION - System observability and metrics\n")
 
 -- ============================================================
 -- Pattern 1: Real-time Performance Metrics

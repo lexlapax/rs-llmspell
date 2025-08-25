@@ -1,11 +1,48 @@
--- Cookbook: Input Validation - Sanitize User Input
--- Purpose: Implement comprehensive input validation patterns for security and data integrity
--- Prerequisites: Tools optional for enhanced validation features
--- Expected Output: Demonstration of input validation patterns
--- Version: 0.7.0
--- Tags: cookbook, input-validation, security, sanitization, data-integrity
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE
+-- ============================================================
+-- Pattern ID: 07 - Security Patterns v0.7.0
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: Enterprise security patterns for safe automation
+-- Pattern Category: Security & Data Integrity
+--
+-- Purpose: Production security patterns including input validation, sanitization,
+--          access control, and secure data handling for LLMSpell applications.
+--          Essential for preventing injection attacks and ensuring data integrity.
+-- Architecture: Defense-in-depth security layers with validation and sanitization
+-- Crates Showcased: llmspell-tools, llmspell-utils, llmspell-bridge
+-- Key Features:
+--   • Input validation and sanitization
+--   • SQL/Command injection prevention
+--   • Path traversal protection
+--   • Rate limiting for security
+--   • Secure credential handling
+--   • Audit logging patterns
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • No API keys required
+--   • Write access to /tmp for audit logs
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/cookbook/security-patterns.lua
+--
+-- EXPECTED OUTPUT:
+-- 5 security patterns demonstrated:
+-- 1. Input validation (email, phone, URL)
+-- 2. SQL injection prevention
+-- 3. Path traversal protection
+-- 4. Secure credential handling
+-- 5. Audit logging for security events
+--
+-- Time to Complete: <2 seconds
+-- Production Notes: Never trust user input, implement defense in depth,
+--                   use parameterized queries, encrypt sensitive data at rest,
+--                   implement comprehensive audit logging, use security headers.
+-- ============================================================
 
-print("=== Input Validation Patterns ===\n")
+print("=== Security Patterns ===")
+print("Pattern 07: PRODUCTION - Enterprise security and validation\n")
 
 -- ============================================================
 -- Pattern 1: Basic Input Sanitization
