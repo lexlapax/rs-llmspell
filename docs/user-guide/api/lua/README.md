@@ -162,29 +162,31 @@ local agent = Agent.builder()
 
 ### Agent Instance Methods
 
-#### agent:execute(table) → string
+#### agent:execute(table) → table
 Executes the agent with given input.
 
 **Parameters:**
 - `input: table` - Input parameters
-  - `prompt: string` - The prompt to process (required)
-  - `context: table` - Optional context data
+  - `text: string` - The text to process (required)
+  - `parameters: table` - Optional parameters
   - `temperature: number` - Override temperature for this execution
   - `max_tokens: integer` - Override max tokens for this execution
 
-**Returns:** `string` - Agent's response
+**Returns:** `table` - Agent's response
+  - `text: string` - The response text
+  - `metadata: table` - Optional response metadata
 
 **Errors:**
-- Throws error if prompt is missing
+- Throws error if text is missing
 - Throws error if agent execution fails
 
 **Example:**
 ```lua
 local response = agent:execute({
-    prompt = "What is 2 + 2?",
+    text = "What is 2 + 2?",
     temperature = 0.1
 })
-print(response) -- "4"
+print(response.text) -- "4"
 ```
 
 ### Agent.list() → table
@@ -216,7 +218,8 @@ Retrieves an agent by ID.
 ```lua
 local agent = Agent.get("assistant")
 if agent then
-    local response = agent:execute({prompt = "Hello"})
+    local response = agent:execute({text = "Hello"})
+    print(response.text)
 end
 ```
 
@@ -1326,7 +1329,7 @@ All API methods may throw errors. Use pcall for safe execution:
 
 ```lua
 local success, result = pcall(function()
-    return agent:execute({prompt = "test"})
+    return agent:execute({text = "test"})
 end)
 
 if success then

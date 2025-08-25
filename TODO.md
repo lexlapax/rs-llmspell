@@ -1411,7 +1411,7 @@ docs/archives/technical/           # Archive outdated/redundant files
 #### Task 7.4.5: Examples clean up, refactoring and documentation
 **Priority**: HIGH (CRITICAL - Example Overload Resolution)
 **Estimated Time**: 7 hours (with comprehensive validation + header updates)
-**Status**: READY FOR EXECUTION - **AGGRESSIVE CURATION + VALIDATION PLAN COMPLETE**
+**Status**: IN PROGRESS - **Sub-tasks 7.4.5.1-3 COMPLETED, 7.4.5.4-7 READY**
 **Assigned To**: Developer Experience Team
 
 **Description**: **EXAMPLE OVERLOAD CRISIS** - Comprehensive audit of **157 total files** reveals critical user experience problem: massive example overload causing choice paralysis. Industry standard is 10-25 examples; we have 90+ Lua examples alone. **SOLUTION: AGGRESSIVE CURATION, NOT FIXING.**
@@ -1423,39 +1423,77 @@ docs/archives/technical/           # Archive outdated/redundant files
 4. **Broken Infrastructure** - Shell scripts reference non-existent files
 5. **Quality vs Quantity** - Better to have 25 excellent examples than 90 mediocre ones
 
-**AGGRESSIVE CURATION PLAN** (157 → 32 files = 80% reduction):
+**AGGRESSIVE CURATION PLAN** (157 → 29 files = 82% reduction):
 
-**CURATED STRUCTURE** (32 total examples - within industry range):
+**FINAL CURATED STRUCTURE** (29 total examples achieving clear progression):
+```
+📚 LEARNING PROGRESSION (Script Users):
+getting-started/ (5) → features/ (5) → advanced-patterns/ (4) → cookbook/ (8) → applications/ (7)
+   BEGINNER              INTERMEDIATE        ADVANCED            EXPERT         PROFESSIONAL
+   
+⚙️ EXTENSION PATH (Rust Developers):
+rust-developers/ (6 examples) - Custom components and production patterns
+```
+
+**SUB-TASK EXECUTION PLAN**:
 
 **🚀 Getting Started** (5 examples) - **10-minute success**:
 ```
-✅ KEEP: 00-hello-world.lua, 01-first-tool.lua, 02-first-agent.lua, 03-first-workflow.lua, 04-error-handling.lua  
-❌ DELETE: All 6 duplicate subdirectories, numbering conflicts, extra examples
+✅ COMPLETED IN 7.4.5.2: Clean 5-file progression with comprehensive headers
 ```
 
-**🔍 Core Features** (6 examples) - **30-minute exploration**:
+**🔍 Core Features** (5 examples) - **30-minute exploration**:
 ```
-✅ KEEP BEST: state-persistence.lua, multimodal.lua, agent-coordination.lua, workflow-patterns.lua, filesystem-tools.lua, streaming.lua
-❌ DELETE: 6 redundant feature examples with overlapping functionality
+📋 PLANNED IN 7.4.5.4: Consolidate 13 → 5 essential feature demonstrations
+✅ KEEP/MERGE: agent-basics, tool-basics, state-persistence, workflow-basics, provider-info
+❌ DELETE: 8 redundant files with overlapping functionality
 ```
 
-**⚙️ Production Cookbook** (8 examples) - **Expert patterns**:
+**⚙️ Advanced Patterns** (4 examples) - **Bridge to production**:
 ```
-✅ KEEP BEST: error-handling.lua (454 lines, excellent), rate-limiting.lua, caching.lua, multi-agent-coordination.lua, webhook-integration.lua, performance-monitoring.lua, security-patterns.lua, state-management.lua
-❌ DELETE: 22 redundant cookbook patterns (73% reduction)
+📋 PLANNED IN 7.4.5.5: Merge advanced/ + workflows/ → advanced-patterns/ (4 files)
+✅ CREATE: multi-agent-orchestration, complex-workflows, tool-integration-patterns, monitoring-security
+❌ DELETE: workflows/ and advanced/ directories entirely after consolidation
+```
+
+**📖 Production Cookbook** (8 examples) - **Expert patterns**:
+```
+✅ COMPLETED IN 7.4.5.3: 8 production-essential patterns with comprehensive headers
 ```
 
 **🏗️ Applications** (7 examples) - **Complete complexity progression**:
 ```
-✅ KEEP ALL: file-organizer (Universal-3), research-collector (Universal-2), content-creator (Power-4), communication-manager (Business-5), process-orchestrator (Professional-8), code-review-assistant (Professional-7), webapp-creator (Expert-21)
-✅ REASON: Working examples demonstrating Universal→Professional progression (2→21 agents)
+📋 PLANNED IN 7.4.5.6: Validate all 7 applications, update documentation
+✅ KEEP ALL: Demonstrates Universal→Professional progression (2→21 agents)
 ```
 
 **🔧 Rust Developers** (6 examples) - **Extension patterns**:
 ```
+📋 PLANNED IN 7.4.5.7: Create 6 high-quality Rust examples
 ✅ CREATE: custom-tool.rs, custom-agent.rs, extension-pattern.rs, builder-pattern.rs, async-patterns.rs, integration-test.rs
-❌ DELETE: Existing minimal rust-developers/ content, replace with quality examples
 ```
+
+**🎯 FINAL RESULT AFTER ALL 7.4.5 SUB-TASKS**:
+```
+examples/
+├── script-users/
+│   ├── getting-started/     (5 files)  ✅ COMPLETED
+│   ├── features/            (5 files)  📋 READY (7.4.5.4)
+│   ├── advanced-patterns/   (4 files)  📋 READY (7.4.5.5) [NEW]
+│   ├── cookbook/            (8 files)  ✅ COMPLETED
+│   ├── applications/        (7 files)  📋 READY (7.4.5.6)
+│   └── configs/             (unchanged)
+└── rust-developers/         (6 files)  📋 READY (7.4.5.7)
+
+TOTAL: 29 Lua + 6 Rust = 35 files (from original 157)
+REDUCTION: 78% fewer files with 100% better quality
+CLEAR PROGRESSION: beginner → intermediate → advanced → expert → professional
+```
+
+**DIRECTORIES TO DELETE AFTER CONSOLIDATION**:
+- `examples/script-users/advanced/` (merge into advanced-patterns/)
+- `examples/script-users/workflows/` (merge into advanced-patterns/)
+- Any remaining test/debug directories
 
 **MASS DELETION TASKS**:
 
@@ -1637,7 +1675,153 @@ Each cookbook pattern MUST have detailed header:
 - Add "Production Ready" validation tags to all patterns
 
 
-##### 7.4.5.4 - **Application Validation with Comprehensive Testing** (60 minutes):
+##### 7.4.5.4 - **Features Curation with Aggressive Consolidation** ✅ COMPLETED (50 minutes):
+
+🎯 GOAL: Reduce features/ from 13 → 5 essential feature demonstrations
+📊 PROGRESSION: Bridge between getting-started and advanced-patterns
+
+**CRITICAL API ISSUES DISCOVERED**:
+⚠️ **DUPLICATE EXECUTION METHODS**: Both `invoke()` and `execute()` exist but do identical things
+   - Both call `bridge.execute_agent()` 
+   - Violates consolidation principle from Phase 6
+   - TODO: Remove `invoke()`, keep only `execute()` as standard
+⚠️ **WRONG API DOCUMENTATION**: Docs show `prompt` but implementation expects `text`
+   - ✅ Fixed: Updated docs/user-guide/api/lua/README.md to show correct `text` parameter
+   - ✅ Fixed: Updated all examples to use `execute()` with `text`
+
+**COMPLETED ACTIONS** (13 → 5 files achieved):
+
+✅ **CREATED/MERGED** (3 new files):
+1. **agent-basics.lua** - ✅ Created with comprehensive headers
+   - Shows Agent.builder(), execute() (NOT invoke), provider flexibility
+   - Fixed API: Uses execute({text: "..."}) not invoke({prompt: "..."})
+   
+2. **tool-basics.lua** - ✅ Created with all working tools
+   - File operations, UUID, encoding, hashing, text manipulation
+   - Fixed: Removed json_processor examples (operation names wrong)
+   
+3. **workflow-basics.lua** - ✅ Created with clear patterns
+   - Sequential, parallel, parameterized workflows
+   - Clean builder pattern demonstration
+
+✅ **KEPT AS-IS** (2 files):
+4. **state-persistence.lua** - Already comprehensive
+5. **provider-info.lua** - Essential for discovery
+
+✅ **DELETED** (11 files):
+- agent-creation.lua, agent-api-comprehensive.lua, agent-data-processor.lua
+- comprehensive-demo.lua, debug-globals.lua, multimodal.lua
+- streaming-responses.lua, state-persistence-basics.lua
+- filesystem-tools.lua, utility-tools.lua, tools-workflow-chaining.lua
+
+✅ **DOCUMENTATION FIXES**:
+- Updated docs/user-guide/api/lua/README.md: execute({text}) not execute({prompt})
+- Updated features/README.md with new 5-file structure
+- Added progression path and common issues
+
+✅ **VALIDATION RESULTS** (All 5 files tested and working):
+1. **agent-basics.lua** - ✅ Works with API key, creates agents, executes correctly
+2. **tool-basics.lua** - ✅ All tools validated: file ops, UUID, encoding, hash, text, calc
+3. **workflow-basics.lua** - ✅ FIXED and validated: Sequential, parallel, parameterized all work
+4. **state-persistence.lua** - ✅ Works, returns nil without persistence (expected)
+5. **provider-info.lua** - ✅ Works, shows 0 providers without config (expected)
+
+✅ **CRITICAL FIXES DURING VALIDATION**:
+- Tool outputs are in `result.field` not direct fields (e.g., `result.uuid` not `uuid`)
+- Calculator needs `input` not `expression`
+- Text manipulator replace needs `options: {from, to}` not `pattern/replacement`
+- File operations return `text` not `content`
+- JSON processor doesn't support `stringify` - only `query`, `validate`, `stream`
+- **Workflow execution returns AgentOutput** with `text` field containing "completed successfully"
+  - NOT a direct `success` field - check `result.text:match("completed successfully")`
+  - Failed workflows throw errors - must use pcall for proper error handling
+  - Examined Rust code: llmspell-workflows/src/sequential.rs:479-485 confirms pattern
+
+📝 **FEATURES COMPREHENSIVE HEADER FORMAT**:
+Each feature example MUST have detailed header:
+```lua
+-- ============================================================
+-- LLMSPELL FEATURES SHOWCASE  
+-- ============================================================
+-- Feature ID: ## - [Feature Name] v#.#.#
+-- Complexity Level: INTERMEDIATE
+-- Real-World Use Case: [Specific practical scenario]
+-- Feature Category: [Agents|Tools|State|Workflows|Providers]
+--
+-- Purpose: [What feature this demonstrates]
+-- Architecture: [Technical approach]
+-- Key Capabilities: [Bullet list of what users learn]
+-- Prerequisites: [Requirements if any]
+-- HOW TO RUN: [Exact command]
+-- EXPECTED OUTPUT: [Validated output]
+-- Time to Complete: [Validated time]
+-- Next Steps: [Point to advanced-patterns or cookbook]
+-- ============================================================
+```
+
+##### 7.4.5.5 - **Advanced Patterns Consolidation** (45 minutes):
+
+🎯 GOAL: Merge advanced/ + workflows/ → advanced-patterns/ (4 files)
+📊 PROGRESSION: Bridge between features and cookbook
+
+**CONSOLIDATION PLAN** (9 → 4 files = 56% reduction):
+
+✅ **CREATE NEW DIRECTORY**: examples/script-users/advanced-patterns/
+
+✅ **CREATE/MERGE** (4 final files):
+1. **multi-agent-orchestration.lua** - Complex agent coordination
+   - BASE: advanced/agent-orchestrator.lua
+   - ADD: Agent composition patterns, delegation strategies
+   - SHOW: 5+ agents working together, error recovery
+
+2. **complex-workflows.lua** - Advanced workflow patterns
+   - MERGE ALL: workflows/workflow-sequential-basics.lua + 
+               workflows/conditional-content-routing.lua +
+               workflows/conditional-multi-branch.lua
+   - SHOW: Sequential, parallel, conditional, nested workflows
+   - DELETE AFTER MERGE: All 3 workflow files
+
+3. **tool-integration-patterns.lua** - Advanced tool usage
+   - MERGE: advanced/tools-integration.lua + advanced/tools-system.lua
+   - SHOW: Tool chaining, custom tools, system integration
+   - DELETE AFTER MERGE: tools-integration.lua, tools-system.lua
+
+4. **monitoring-security.lua** - Production monitoring and security
+   - MERGE: advanced/agent-monitor.lua + advanced/tools-security.lua
+   - SHOW: Monitoring patterns, security controls, audit logging
+   - DELETE AFTER MERGE: agent-monitor.lua, tools-security.lua
+
+❌ **DELETE OUTRIGHT**:
+- advanced/tools-media.lua - Too specific, not essential
+- workflows/ directory (entire directory after merging)
+- advanced/ directory (entire directory after merging)
+
+🔍 **VALIDATION**: Each pattern must demonstrate production-ready code
+
+📝 **ADVANCED PATTERNS COMPREHENSIVE HEADER FORMAT**:
+Each advanced pattern MUST have detailed header:
+```lua
+-- ============================================================
+-- LLMSPELL ADVANCED PATTERNS SHOWCASE  
+-- ============================================================
+-- Pattern ID: ## - [Pattern Name] v#.#.#
+-- Complexity Level: ADVANCED
+-- Real-World Use Case: [Production scenario requiring this pattern]
+-- Pattern Category: [Orchestration|Workflows|Integration|Monitoring]
+--
+-- Purpose: [Complex problem this pattern solves]
+-- Architecture: [Multi-component approach]
+-- Key Techniques: [Advanced techniques demonstrated]
+-- Prerequisites: [API keys, configs, understanding of basics]
+-- HOW TO RUN: [Commands with configuration]
+-- EXPECTED OUTPUT: [Complex output validation]
+-- Time to Complete: [Validated execution time]
+-- Production Notes: [Scaling, error handling, monitoring]
+-- Related Patterns: [Links to cookbook and applications]
+-- ============================================================
+```
+
+##### 7.4.5.6 - **Application Validation with Comprehensive Testing** (60 minutes):
 
 ✅ KEEP ALL: All 7 working applications (valuable Universal→Professional progression)
 🔄 UPDATE: Application documentation for canonical API compliance only
@@ -1712,7 +1896,7 @@ VALIDATION TASKS:
 - Update main examples/README.md with working application showcase
 
 
-#####  7.4.5.5 - **Create Quality Rust Examples with Full Validation** (120 minutes):
+##### 7.4.5.7 - **Create Quality Rust Examples with Full Validation** (120 minutes):
 
 🆕 CREATE: 6 high-quality Rust examples following docs/user-guide/api/rust/README.md exactly
 ✅ FOCUS: Custom components, extension patterns, production usage

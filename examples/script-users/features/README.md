@@ -1,83 +1,148 @@
-# Feature Demonstrations
+# LLMSpell Features - Core Capabilities
 
-Comprehensive examples demonstrating LLMSpell features.
+**Level**: INTERMEDIATE  
+**Time**: 30 minutes  
+**Prerequisites**: Completed getting-started examples
 
-## 📚 Available Features
+## 📚 Overview
 
-### Agents
-- `agents-comprehensive.lua` - All agent capabilities
-- `agents-async.lua` - Async agent operations
-- `agents-streaming.lua` - Streaming responses
-- `agents-multi-provider.lua` - Using multiple providers
+This directory contains 5 essential feature demonstrations that bridge the gap between basic getting-started examples and advanced production patterns.
 
-### Tools (34+ built-in)
-- `tools-filesystem.lua` - File operations
-- `tools-web.lua` - Web requests and scraping
-- `tools-data.lua` - Data processing
-- `tools-communication.lua` - Email, webhooks
-- `tools-system.lua` - System information
-- `tools-utility.lua` - Utilities and helpers
-- `tools-media.lua` - Image and media processing
-- `tools-search.lua` - Search capabilities
+## 🎯 Learning Progression
 
-### Workflows
-- `workflow-sequential.lua` - Step-by-step execution
-- `workflow-parallel.lua` - Concurrent operations
-- `workflow-conditional.lua` - Branching logic
-- `workflow-loop.lua` - Iteration patterns
-- `workflow-nested.lua` - Complex compositions
-
-### State Management
-- `state-persistence.lua` - Saving and loading
-- `state-scoped.lua` - Isolated contexts
-- `state-migration.lua` - Schema evolution
-- `state-backends.lua` - Different storage options
-
-### Events
-- `events-pubsub.lua` - Publish/subscribe
-- `events-patterns.lua` - Pattern matching
-- `events-correlation.lua` - Event correlation
-- `events-cross-language.lua` - Lua/Rust events
-
-### Hooks
-- `hooks-lifecycle.lua` - Component lifecycle
-- `hooks-priority.lua` - Execution order
-- `hooks-modification.lua` - Data transformation
-- `hooks-metrics.lua` - Performance monitoring
-
-### Sessions
-- `sessions-artifacts.lua` - Artifact management
-- `sessions-replay.lua` - Session replay
-- `sessions-access.lua` - Access control
-- `sessions-multi-user.lua` - Multi-user support
-
-## 🎯 How to Use These Examples
-
-1. **Explore a Feature**: Pick the feature you need
-2. **Run the Example**: Execute with appropriate configuration
-3. **Modify and Learn**: Change parameters to understand behavior
-4. **Combine Features**: Mix patterns for your use case
-
-## 🔧 Configuration
-
-Most examples need API keys or configuration:
-
-```bash
-# Set API keys
-export OPENAI_API_KEY="your-key"
-export ANTHROPIC_API_KEY="your-key"
-
-# Run with custom config
-llmspell --config custom.toml run workflow-parallel.lua
+```
+getting-started/ → features/ (YOU ARE HERE) → advanced-patterns/ → cookbook/ → applications/
+   BEGINNER        INTERMEDIATE                   ADVANCED          EXPERT      PROFESSIONAL
 ```
 
-## 📖 Feature Documentation
+## 📖 Feature Examples
 
-Detailed documentation for each feature:
-- [Agent API](../../../docs/user-guide/agent-api.md)
-- [Tool Reference](../../../docs/user-guide/tool-reference.md)
-- [Workflow Guide](../../../docs/user-guide/workflow-api.md)
-- [State Management](../../../docs/user-guide/state-management.md)
-- [Events Guide](../../../docs/user-guide/events-guide.md)
-- [Hooks Guide](../../../docs/user-guide/hooks-guide.md)
-- [Session Management](../../../docs/user-guide/session-management.md)
+### 1. agent-basics.lua
+**Core agent functionality**
+- Agent.builder() pattern
+- execute() method (standard API)
+- Provider flexibility
+- Agent discovery
+
+```bash
+# Requires API key
+OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users/features/agent-basics.lua
+```
+
+### 2. tool-basics.lua
+**Essential tool operations**
+- Tool.invoke() for file operations
+- UUID generation, encoding, hashing
+- Tool discovery
+- Error handling patterns
+
+```bash
+# No API key needed
+./target/debug/llmspell run examples/script-users/features/tool-basics.lua
+```
+
+### 3. workflow-basics.lua
+**Workflow orchestration patterns**
+- Workflow.builder() construction
+- Sequential vs parallel execution
+- Data flow between steps
+- Parameterized workflows
+
+```bash
+# No API key needed
+./target/debug/llmspell run examples/script-users/features/workflow-basics.lua
+```
+
+### 4. state-persistence.lua
+**State management features**
+- State.save() with scopes (global, custom, workflow, agent, tool)
+- State.load() and State.delete()
+- Atomic operations
+- Conflict resolution
+
+```bash
+# Requires state-enabled config
+./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
+    run examples/script-users/features/state-persistence.lua
+```
+
+### 5. provider-info.lua
+**Provider discovery and configuration**
+- List available providers
+- Check provider capabilities
+- Model enumeration
+- Configuration validation
+
+```bash
+# No API key needed
+./target/debug/llmspell run examples/script-users/features/provider-info.lua
+```
+
+## 🔑 Key Concepts
+
+### Execution Model
+- **Synchronous API**: All operations block until complete
+- **Single execution method**: Use `agent:execute()` not `invoke()`
+- **Structured responses**: Returns tables with `text` and metadata
+
+### Error Handling
+```lua
+local success, result = pcall(function()
+    return agent:execute({text = "Hello"})
+end)
+if success then
+    print(result.text)
+else
+    print("Error: " .. tostring(result))
+end
+```
+
+### Builder Pattern
+All major components use fluent builder pattern:
+```lua
+local agent = Agent.builder()
+    :name("assistant")
+    :model("openai/gpt-3.5-turbo")
+    :temperature(0.7)
+    :build()
+```
+
+## 🚀 Next Steps
+
+After mastering these features:
+1. Explore **advanced-patterns/** for complex orchestration
+2. Study **cookbook/** for production-ready patterns
+3. Review **applications/** for complete systems
+
+## 📝 Common Issues
+
+### API Key Not Set
+```bash
+export OPENAI_API_KEY="your-key-here"
+export ANTHROPIC_API_KEY="your-key-here"
+```
+
+### Wrong Method Name
+- ✅ Use: `agent:execute({text = "..."})`
+- ❌ Don't use: `agent:invoke()` or `agent:execute({prompt = "..."})`
+
+### State API Requires Scope
+- ✅ Use: `State.save("global", "key", value)`
+- ❌ Don't use: `State.save("key", value)`
+
+## 📊 Execution Times
+
+| Example | Time | API Key Required |
+|---------|------|-----------------|
+| agent-basics.lua | 8s | Yes |
+| tool-basics.lua | 3s | No |
+| workflow-basics.lua | 2s | No |
+| state-persistence.lua | 5s | No |
+| provider-info.lua | 1s | No |
+
+## 🔗 Related Documentation
+
+- [Lua API Reference](../../../docs/user-guide/api/lua/README.md)
+- [Getting Started](../getting-started/README.md)
+- [Advanced Patterns](../advanced-patterns/README.md)
+- [Cookbook](../cookbook/README.md)
