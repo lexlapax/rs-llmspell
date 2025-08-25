@@ -18,7 +18,13 @@ members = [
     "llmspell-utils",
     "llmspell-state-persistence",
     "llmspell-state-traits",
-    "llmspell-sessions"
+    "llmspell-sessions",
+    "examples/rust-developers/extension-pattern-example",
+    "examples/rust-developers/builder-pattern-example", 
+    "examples/rust-developers/custom-tool-example",
+    "examples/rust-developers/custom-agent-example",
+    "examples/rust-developers/async-patterns-example",
+    "examples/rust-developers/integration-test-example"
 ]
 
 [workspace.package]

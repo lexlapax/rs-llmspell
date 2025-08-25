@@ -30,6 +30,11 @@
 ### 🔮 Historical Reference
 - **[master-architecture-vision.md](master-architecture-vision.md)** - Original aspirational architecture (historical reference only, NOT current state)
 
+## Component Architecture References
+
+### 🐛 Debug Infrastructure
+- **[debug-infrastructure-architecture.md](debug-infrastructure-architecture.md)** - Complete debug system architecture (global manager, thread safety, performance optimization)
+
 ---
 
 ## Quick Navigation Guide

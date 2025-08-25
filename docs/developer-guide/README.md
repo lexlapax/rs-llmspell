@@ -36,8 +36,9 @@ The consolidated guide provides:
 - **[Test Development Guide](test-development-guide.md)** ✅ - Testing patterns
 - **[Developer Guide README](README.md)** - This document
 
-### **Example Guides** 
-**Note**: Example guides will be reorganized in Task 7.4.5 under `examples/docs/` structure
+### **Example Guides**
+- **[Examples Standards](examples-standards.md)** ✅ - Standards for all example code
+**Note**: Example guides completed in Task 7.4.5 - see [examples/](../../examples/) for working examples
 
 ### **Archived Content**
 - Historical implementation details moved to `docs/archives/developer-guide/`

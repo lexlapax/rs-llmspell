@@ -27,48 +27,71 @@
 
 Core traits define the fundamental abstractions in LLMSpell.
 
-### BaseComponent Trait
+### BaseAgent Trait
 
-Base trait for all LLMSpell components.
+Base trait for all executable components (agents, tools, workflows).
 
 ```rust
-use llmspell_core::traits::BaseComponent;
+use llmspell_core::traits::BaseAgent;
+use llmspell_core::{ComponentMetadata, ExecutionContext, Result, LLMSpellError};
+use llmspell_core::types::{AgentInput, AgentOutput};
 use async_trait::async_trait;
 
 #[async_trait]
-pub trait BaseComponent: Send + Sync {
-    /// Unique identifier for the component
-    fn id(&self) -> &str;
+pub trait BaseAgent: Send + Sync {
+    /// Component metadata (id, name, description, etc.)
+    fn metadata(&self) -> &ComponentMetadata;
     
-    /// Component type identifier
-    fn component_type(&self) -> &str;
+    /// Main execution method - implement your logic here
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput>;
     
-    /// Human-readable description
-    fn description(&self) -> Option<&str> {
-        None
+    /// Validate input before execution (optional override)
+    async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+        Ok(())
     }
     
-    /// Component metadata
-    fn metadata(&self) -> Option<serde_json::Value> {
-        None
+    /// Handle errors gracefully (optional override)
+    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+        Err(error)
     }
 }
 ```
 
 **Implementation Example:**
 ```rust
-struct MyComponent {
-    id: String,
+use llmspell_core::{ComponentMetadata, ExecutionContext, Result};
+use llmspell_core::types::{AgentInput, AgentOutput};
+
+struct MyCustomAgent {
+    metadata: ComponentMetadata,
+}
+
+impl MyCustomAgent {
+    pub fn new() -> Self {
+        Self {
+            metadata: ComponentMetadata::new("my_agent", "Custom Agent"),
+        }
+    }
 }
 
 #[async_trait]
-impl BaseComponent for MyComponent {
-    fn id(&self) -> &str {
-        &self.id
+impl BaseAgent for MyCustomAgent {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
     }
     
-    fn component_type(&self) -> &str {
-        "custom"
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        // Your custom logic here
+        let result = format!("Processed: {}", input.text);
+        Ok(AgentOutput::text(result))
     }
 }
 ```
@@ -236,74 +259,114 @@ Tool system for extending functionality.
 
 ### Tool Trait
 
-Core trait for tool implementations.
+Core trait for tool implementations. Tools extend BaseAgent with schema validation and categorization.
 
 ```rust
-use llmspell_tools::traits::Tool;
+use llmspell_core::traits::{BaseAgent, Tool};
+use llmspell_core::traits::tool::{ToolCategory, SecurityLevel, ToolSchema};
 
 #[async_trait]
-pub trait Tool: BaseComponent + Send + Sync {
-    /// Tool input type
-    type Input: DeserializeOwned + Send;
-    
-    /// Tool output type
-    type Output: Serialize + Send;
-    
-    /// Executes the tool
-    async fn execute(
-        &self,
-        input: Self::Input,
-    ) -> Result<Self::Output, ToolError>;
-    
-    /// Tool parameter schema
-    fn schema(&self) -> serde_json::Value;
+pub trait Tool: BaseAgent {
+    /// Get tool category for organization
+    fn category(&self) -> ToolCategory;
+
+    /// Get security level required
+    fn security_level(&self) -> SecurityLevel;
+
+    /// Get parameter schema for validation
+    fn schema(&self) -> ToolSchema;
+
+    /// Get security requirements (optional override)
+    fn security_requirements(&self) -> SecurityRequirements {
+        SecurityRequirements {
+            level: self.security_level(),
+            ..Default::default()
+        }
+    }
 }
 ```
 
 ### Creating Custom Tools
 
 ```rust
-use llmspell_tools::{Tool, ToolError};
+use llmspell_core::{
+    ComponentMetadata, ExecutionContext, Result,
+    traits::{BaseAgent, Tool},
+    traits::tool::{ToolCategory, SecurityLevel, ToolSchema, ParameterDef, ParameterType},
+    types::{AgentInput, AgentOutput}
+};
+use async_trait::async_trait;
+use serde_json::json;
 
-pub struct FileTool;
-
-#[derive(Deserialize)]
-pub struct FileInput {
-    pub path: String,
-    pub operation: String,
+pub struct FileSearchTool {
+    metadata: ComponentMetadata,
 }
 
-#[derive(Serialize)]
-pub struct FileOutput {
-    pub success: bool,
-    pub content: Option<String>,
+impl FileSearchTool {
+    pub fn new() -> Self {
+        Self {
+            metadata: ComponentMetadata::new("file_search", "File Search Tool"),
+        }
+    }
 }
 
 #[async_trait]
-impl Tool for FileTool {
-    type Input = FileInput;
-    type Output = FileOutput;
-    
-    async fn execute(
-        &self,
-        input: Self::Input,
-    ) -> Result<Self::Output, ToolError> {
-        // Implementation
-        Ok(FileOutput {
-            success: true,
-            content: Some("File content".to_string()),
-        })
+impl BaseAgent for FileSearchTool {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
     }
     
-    fn schema(&self) -> serde_json::Value {
-        json!({
-            "type": "object",
-            "properties": {
-                "path": {"type": "string"},
-                "operation": {"type": "string"}
-            },
-            "required": ["path", "operation"]
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        // Extract parameters from input
+        let params = input.parameters.get("parameters")
+            .ok_or_else(|| LLMSpellError::Validation {
+                message: "Missing parameters".to_string(),
+                field: Some("parameters".to_string()),
+            })?;
+        
+        // Validate parameters using schema
+        self.validate_parameters(params).await?;
+        
+        // Get the search pattern
+        let pattern = params["pattern"].as_str().unwrap_or("*");
+        
+        // Perform file search (simplified example)
+        let results = vec!["file1.txt", "file2.txt", "file3.txt"];
+        let filtered: Vec<&str> = results.into_iter()
+            .filter(|name| name.contains(pattern))
+            .collect();
+        
+        Ok(AgentOutput::text(json!(filtered).to_string()))
+    }
+}
+
+#[async_trait]
+impl Tool for FileSearchTool {
+    fn category(&self) -> ToolCategory {
+        ToolCategory::Filesystem
+    }
+    
+    fn security_level(&self) -> SecurityLevel {
+        SecurityLevel::Safe
+    }
+    
+    fn schema(&self) -> ToolSchema {
+        ToolSchema::new(
+            "file_search".to_string(),
+            "Search for files by pattern".to_string()
+        )
+        .with_parameter(ParameterDef {
+            name: "pattern".to_string(),
+            param_type: ParameterType::String,
+            description: "Search pattern (e.g., '*.txt')".to_string(),
+            required: true,
+            default: None,
         })
+        .with_returns(ParameterType::Array)
     }
 }
 ```

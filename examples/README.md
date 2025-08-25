@@ -16,51 +16,45 @@ Welcome to the LLMSpell examples! This directory contains comprehensive examples
 
 ```
 examples/
-├── hello.lua                    # Basic hello world script
-├── llmspell-demo.lua           # Comprehensive demo
-├── provider-info.lua           # Provider configuration info
-├── streaming-demo.lua          # Streaming responses
-├── multimodal-stub.lua         # Multimodal capabilities
-├── configs/                    # Configuration examples
-│   ├── llmspell.toml          # Full configuration
-│   ├── minimal.toml           # Minimal configuration
-│   ├── state-enabled.toml     # State persistence config
-│   ├── backup-enabled.toml    # Backup configuration
-│   └── migration-enabled.toml # Migration configuration
-├── state_persistence/          # State persistence examples (Phase 5)
-│   ├── basic_operations.lua   # Lua state operations
-│   ├── basic_operations.rs    # Rust state operations
-│   └── configs/               # State configs
-├── lua/
-│   ├── agents/                 # Agent examples (10 files)
-│   ├── tools/                  # Tool examples (13 files)
-│   ├── workflows/              # Workflow examples (9 files)
-│   ├── hooks/                  # Hook system examples (14 files)
-│   ├── events/                 # Event system examples (10 files)
-│   ├── state/                  # State management examples (8 files)
-│   ├── backup/                 # Backup examples (3 files)
-│   ├── migration/              # Migration examples (3 files)
-│   ├── operational_recovery/   # Recovery procedures (3 files)
-│   ├── integration/            # Real-world integration examples (5 files)
-│   ├── run-all-examples.lua    # Master runner for all examples
-│   ├── run-integration-demos.lua  # Integration demo runner
-│   └── run-performance-benchmarks.lua  # Performance testing runner
-└── *.sh                        # Legacy runner scripts
+├── script-users/               # Lua scripting examples
+│   ├── getting-started/       # 5 progressive learning scripts (00-04)
+│   ├── features/              # 5 core feature demonstrations
+│   ├── cookbook/              # 8 common patterns and recipes
+│   ├── advanced-patterns/     # 4 complex use cases
+│   ├── applications/          # 7 production-ready applications
+│   └── configs/               # Configuration examples
+└── rust-developers/           # Rust integration examples
+    ├── custom-tool-example/   # Tool creation fundamentals
+    ├── custom-agent-example/  # Agent implementation patterns
+    ├── async-patterns-example/ # Concurrent programming patterns
+    ├── extension-pattern-example/ # Plugin architecture
+    ├── builder-pattern-example/ # Configuration patterns
+    └── integration-test-example/ # Testing strategies
 ```
 
 ## 🚀 Quick Start
 
-### Basic Examples
+### Script Users (Lua)
 
 ```bash
-# Run hello world
-llmspell run examples/hello.lua
+# Start with basics
+llmspell run examples/script-users/getting-started/00-hello-world.lua
 
-# Run comprehensive demo
-llmspell run examples/llmspell-demo.lua
+# Try tools and agents
+llmspell run examples/script-users/getting-started/01-first-tool.lua
+llmspell run examples/script-users/getting-started/02-first-agent.lua
 
-# Check provider configuration
-llmspell run examples/provider-info.lua
+# Explore features
+llmspell run examples/script-users/features/tool-basics.lua
+llmspell run examples/script-users/features/agent-basics.lua
+```
+
+### Rust Developers
+
+```bash
+cd examples/rust-developers/custom-tool-example && cargo run
+cd examples/rust-developers/custom-agent-example && cargo run
+cd examples/rust-developers/async-patterns-example && cargo run
 ```
 
 ### Agent Examples (Requires API Keys)
@@ -525,30 +519,28 @@ System performance targets (measured in benchmarks):
 
 ---
 
-## 🆕 New Organized Structure (Phase 7)
+## 🆕 New Organized Structure (Phase 7 Complete)
 
-Starting with Phase 7, we're reorganizing examples for better discoverability:
+Phase 7 examples have been completely reorganized for better learning paths:
 
 ### For Script Users (Lua)
-Located in `script-users/`:
-- **getting-started/** - Progressive learning path (0-5)
-- **features/** - Comprehensive feature demonstrations
-- **cookbook/** - Common patterns and recipes
-- **applications/** - Complete production examples
+**Location**: [`script-users/`](script-users/)
+- **getting-started/** - Progressive learning path (5 Lua scripts: 00-04)
+- **features/** - Core feature demonstrations (5 focused examples)
+- **cookbook/** - Common patterns and recipes (8 practical patterns)
+- **advanced-patterns/** - Complex use cases (4 advanced scenarios) 
+- **applications/** - Production-ready applications (7 complete apps)
 
 ### For Rust Developers
-Located in `rust-developers/`:
-- **getting-started/** - Embedding LLMSpell basics
-- **api-usage/** - API demonstrations
-- **patterns/** - Design patterns
-- **extensions/** - Creating custom components
+**Location**: [`rust-developers/`](rust-developers/)
+- **custom-tool-example/** - BaseAgent + Tool trait fundamentals
+- **custom-agent-example/** - Agent personalities and specializations  
+- **async-patterns-example/** - Concurrent execution, streaming, pipelines
+- **extension-pattern-example/** - Plugin/extension architecture
+- **builder-pattern-example/** - Fluent APIs and configuration
+- **integration-test-example/** - Comprehensive testing strategies
 
-### Test Examples
-Located in `tests-as-examples/`:
-- **integration/** - Integration test examples
-- **benchmarks/** - Performance benchmarks
-
-**Migration in Progress**: Examples are being migrated to this new structure. Both old and new locations will work during the transition.
+**All examples are working and tested** - Phase 7 consolidation complete!
 
 ---
 
