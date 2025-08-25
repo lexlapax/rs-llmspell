@@ -6,7 +6,14 @@
 
 > **🔧 COMPREHENSIVE REFERENCE**: Complete documentation for all 37 built-in tools across 10 categories. Each tool includes usage examples, parameters, and security considerations.
 
-**🔗 Navigation**: [← User Guide](README.md) | [Documentation Hub](../README.md) | [Examples](../../examples/) | [External Tools Guide](external-tools-guide.md)
+**🔗 Navigation**: [← User Guide](README.md) | [Documentation Hub](../README.md) | [Example Index](example-index.md) | [Examples](../../examples/) | [External Tools Guide](external-tools-guide.md)
+
+## Example References
+- **Basic Tool Usage**: [`05-use-tools.lua`](../../examples/script-users/getting-started/05-use-tools.lua)
+- **Filesystem Tools**: [`filesystem-tools.lua`](../../examples/script-users/features/filesystem-tools.lua)
+- **Utility Tools**: [`utility-tools.lua`](../../examples/script-users/features/utility-tools.lua)
+- **Tool Integration**: [`tools-integration.lua`](../../examples/script-users/advanced/tools-integration.lua)
+- **Tool-Workflow Chaining**: [`tools-workflow-chaining.lua`](../../examples/script-users/features/tools-workflow-chaining.lua)
 
 ---
 

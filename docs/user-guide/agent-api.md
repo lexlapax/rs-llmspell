@@ -57,6 +57,12 @@ local response = agent:execute({
 })
 ```
 
+### Examples
+- **Basic Usage**: [`02-first-agent.lua`](../../examples/script-users/getting-started/02-first-agent.lua)
+- **Advanced Creation**: [`agent-creation.lua`](../../examples/script-users/features/agent-creation.lua)
+- **Comprehensive API**: [`agent-api-comprehensive.lua`](../../examples/script-users/features/agent-api-comprehensive.lua)
+- **Data Processing**: [`agent-data-processor.lua`](../../examples/script-users/features/agent-data-processor.lua)
+
 ## Synchronous API Design
 
 ### Why Synchronous?

@@ -14,6 +14,10 @@ The Workflow API enables script-based orchestration of agents and tools with ful
 
 Executes steps one after another in order.
 
+**Examples:**
+- [`workflow-sequential-basics.lua`](../../examples/script-users/workflows/workflow-sequential-basics.lua)
+- [`03-first-workflow.lua`](../../examples/script-users/getting-started/03-first-workflow.lua)
+
 ```lua
 local workflow = Workflow.sequential({
     name = "data_pipeline",
@@ -102,6 +106,9 @@ local workflow = Workflow.conditional({
 ### Loop Workflow ✅ **Fully Available**
 
 Iterates over collections or conditions.
+
+**Examples:**
+- [`workflow-loop.lua`](../../examples/script-users/workflows/workflow-loop.lua)
 
 ```lua
 -- Range-based loop

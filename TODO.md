@@ -990,13 +990,315 @@ This avoids system permission prompts and provides cleaner execution.
 ---
 
 ### Set 2: Documentation Improvements
-See `/TODO-DONE.md` for completed documentation tasks.
+
+#### Task 7.3.13: Example Documentation Integration
+**Priority**: MEDIUM
+**Estimated Time**: 3 hours
+**Status**: ✅ DONE
+**Assigned To**: Documentation Team
+**Dependencies**: Task 7.3.6
+
+**Description**: Integrate examples into main documentation with proper cross-references.
+
+**Implementation Steps**:
+1. [x] **Documentation Updates** (1.5 hours):
+   - [x] Update user guide with example links
+   - [x] Add examples to API documentation
+   - [x] Create example index
+   - [x] Update getting started guide
+
+2. [x] **Cross-Reference System** (1 hour):
+   - [x] Link examples from feature docs
+   - [x] Create example search system
+   - [x] Add "See Also" sections
+   - [x] Build example graph
+
+3. [x] **Discovery Enhancement** (30 min):
+   - [x] Add example finder tool
+   - [x] Create tag-based search
+   - [x] Implement full-text search
+   - [x] Add recommendation system
+
+**Integration Points**:
+- [x] User guide references
+- [x] API documentation
+- [x] Developer guide
+- [x] README files
+- [x] Website/docs site
+
+**Acceptance Criteria**:
+- [x] All docs reference relevant examples
+- [x] Example index created
+- [x] Search system implemented
+- [x] Cross-references complete
+- [x] Discovery tools working
+
+---
 
 ### Set 3: Example and Tutorial Updates  
 See `/TODO-DONE.md` for completed example tasks.
 
-### Set 4: Testing and Quality Assurance
-See `/TODO-DONE.md` for completed testing tasks.
+### Set 4: Documentation Cleanup
+
+#### Task 7.4.1: rs-llmspell browseable API documentation 
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Status**: NOT DONE
+**Assigned To**: Documentation Lead
+
+**Description**: Ensure a complete set of coherent API documentation are created for Rust and Lua. They should be under `docs/user-guide/api/rust/` and `docs/user-guide/api/lua/`. Redo everything already there.
+
+**Implementation Steps**:
+1. [ ] **Rust API Documentation** (2 hours):
+   - [ ] Generate rustdoc for all public APIs
+   - [ ] Create navigation structure
+   - [ ] Add usage examples to each module
+   - [ ] Link to user guide sections
+
+2. [ ] **Lua API Documentation** (2 hours):
+   - [ ] Document all exposed Lua globals (Agent, Tool, Workflow, State, etc.)
+   - [ ] Create method reference for each global
+   - [ ] Include type information and return values
+   - [ ] Add practical examples for each method
+
+**Acceptance Criteria**:
+- [ ] Complete Rust API reference generated
+- [ ] Complete Lua API reference written
+- [ ] All methods documented with examples
+- [ ] Cross-linked with user guide
+
+---
+
+#### Task 7.4.2: User Guide Standardization
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Status**: NOT DONE
+**Assigned To**: Documentation Lead
+
+**Description**: Ensure all user guide documentation follows consistent format and terminology. Requires Megathink to analyze what we have now vs what we actually need for a very user-friendly user-guide.
+
+**Target Documents** (30+ files):
+- `docs/user-guide/advanced/performance-tips.md`
+- `docs/user-guide/advanced/hooks-overview.md`
+- `docs/user-guide/configuration/`
+- `docs/user-guide/session-artifact-api.md`
+- `docs/user-guide/providers.md`
+- `docs/user-guide/api-reference-agents-workflows.md`
+- `docs/user-guide/cross-language-integration.md`
+- `docs/user-guide/state-management-best-practices.md`
+- `docs/user-guide/builtin-hooks-reference.md`
+- `docs/user-guide/tool-reference.md`
+- `docs/user-guide/hooks-guide.md`
+- `docs/user-guide/state-management.md`
+- `docs/user-guide/hook-patterns.md`
+- `docs/user-guide/getting-started.md`
+- `docs/user-guide/README.md`
+- `docs/user-guide/events-guide.md`
+- `docs/user-guide/tutorial-agents-workflows.md`
+- `docs/user-guide/examples/hooks-events-cookbook.md`
+- `docs/user-guide/agent-api.md`
+- `docs/user-guide/workflow-api.md`
+- `docs/user-guide/hooks-events-overview.md`
+- `docs/user-guide/external-tools-guide.md`
+- `docs/user-guide/state-persistence-guide.md`
+- `docs/user-guide/api-reference.md`
+- `docs/user-guide/session-management.md`
+- [ ] All other user-facing docs
+
+**Standardization Requirements**:
+1. [ ] **Consistent Structure**:
+   ```markdown
+   # Document Title
+   
+   ## Overview
+   Brief introduction to the topic
+   
+   ## Prerequisites
+   What users need to know/have
+   
+   ## Quick Start
+   Minimal working example
+   
+   ## Detailed Usage
+   Comprehensive explanations
+   
+   ## Examples
+   Multiple use cases
+   
+   ## Troubleshooting
+   Common issues and solutions
+   
+   ## API Reference
+   Links to relevant rustdoc
+   ```
+
+2. [ ] **Terminology Consistency**:
+   - [ ] Agent vs Assistant
+   - [ ] Tool vs Function
+   - [ ] Session vs Context
+   - [ ] Create terminology glossary
+
+**Acceptance Criteria**:
+- [ ] All guides follow template
+- [ ] Terminology consistent
+- [ ] Examples tested and working
+- [ ] Cross-references valid
+
+---
+
+#### Task 7.4.3: Technical Documentation Cleanup
+**Priority**: MEDIUM
+**Estimated Time**: 3 hours
+**Status**: NOT DONE
+**Assigned To**: Architecture Team
+
+**Description**: Update technical documentation to reflect current implementation. Requires Megathink to analyze what we have now vs what we actually need for a very user-friendly technical-guide which is different from the developer-guide in 7.4.4 below. Do not modify `docs/technical/master-architecture-vision.md`.
+
+**Target Documents** (12+ files):
+- `docs/technical/security-architecture.md`
+- `docs/technical/phase-6.5.1-review-checklist.md`
+- `docs/technical/tool-bridge-architecture.md`
+- `docs/technical/workflow-bridge-implementation.md`
+- `docs/technical/hook-event-architecture.md`
+- `docs/technical/session-artifact-api-design.md`
+- `docs/technical/README.md`
+- `docs/technical/backup-retention-design.md`
+- `docs/technical/hook-implementation.md`
+- `docs/technical/state-architecture.md`
+- `docs/technical/global-injection-architecture.md`
+- [ ] All design documents
+
+**Updates Required**:
+1. [ ] **Architecture Sync** (1.5 hours):
+   - [ ] Update diagrams to match code
+   - [ ] Fix outdated type names
+   - [ ] Add new components
+   - [ ] Document ComponentRegistry architecture
+
+2. [ ] **Design Decision Records** (1 hour):
+   - [ ] Document why Service → Manager
+   - [ ] Explain builder pattern choices
+   - [ ] Note performance tradeoffs
+   - [ ] Record architectural decisions from 7.3.12 series
+
+3. [ ] **Future Considerations** (30 min):
+   - [ ] Extension points
+   - [ ] Versioning strategy
+   - [ ] Post-1.0 stability commitments
+
+**Acceptance Criteria**:
+- [ ] Diagrams match implementation
+- [ ] No outdated information
+- [ ] Design decisions recorded
+- [ ] Future roadmap clear
+
+---
+
+#### Task 7.4.4: Developer Guide Enhancement
+**Priority**: MEDIUM
+**Estimated Time**: 4 hours
+**Status**: NOT DONE
+**Assigned To**: Developer Experience Team
+
+**Description**: Enhance developer guide with contribution guidelines and patterns. Requires Megathink to analyze what we have now vs what we actually need for a very user-friendly developer-guide which is different from the technical-guide in 7.4.3 above.
+
+**Target Documents** (13+ files):
+- `docs/developer-guide/`
+- `docs/developer-guide/synchronous-api-patterns.md`
+- `docs/developer-guide/workflow-examples-guide.md`
+- `docs/developer-guide/agent-examples-guide.md`
+- `docs/developer-guide/security-guide.md`
+- `docs/developer-guide/README.md`
+- `docs/developer-guide/implementing-resource-limits.md`
+- `docs/developer-guide/tool-development-guide.md`
+- `docs/developer-guide/test-organization.md`
+- `docs/developer-guide/session-artifact-implementation.md`
+- `docs/developer-guide/workflow-bridge-guide.md`
+- `docs/developer-guide/test-categorization.md`
+- `docs/developer-guide/hook-development-guide.md`
+- `docs/developer-guide/agent-testing-guide.md`
+
+**New Sections to Add**:
+1. [ ] **API Design Guidelines** (2 hours):
+   ```markdown
+   ## API Design Guidelines
+   
+   ### Naming Conventions
+   - Use `new()` for simple constructors
+   - Use `get_*()` for accessors
+   - Use `*Manager` suffix for service components
+   
+   ### Error Handling
+   - All fallible operations return Result<T>
+   - Provide context with errors
+   - Use error chaining
+   
+   ### Async Patterns
+   - Mark async traits with Send + Sync
+   - Document cancellation safety
+   - Provide sync wrappers for scripts
+   ```
+
+2. [ ] **Contributing Guide** (1 hour):
+   - [ ] Code style requirements
+   - [ ] Testing requirements
+   - [ ] Documentation standards
+   - [ ] PR process
+
+3. [ ] **Common Patterns** (1 hour):
+   - [ ] Registry pattern usage
+   - [ ] Factory pattern examples
+   - [ ] State management patterns
+   - [ ] Hook integration patterns
+
+**Acceptance Criteria**:
+- [ ] API guidelines comprehensive
+- [ ] Contributing guide clear
+- [ ] Pattern examples working
+- [ ] Review process documented
+
+---
+
+#### Task 7.4.5: Example Code Audit
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Status**: NOT DONE
+**Assigned To**: Quality Team
+
+**Description**: Audit and update all example code to use standardized APIs.
+
+**Target Examples**:
+- `examples/` directory
+- [ ] Documentation inline examples
+- [ ] Test examples
+- [ ] README examples
+
+**Audit Checklist**:
+1. [ ] **API Usage** (1.5 hours):
+   - [ ] Uses latest API names
+   - [ ] Follows naming conventions
+   - [ ] Demonstrates best practices
+   - [ ] Includes error handling
+
+2. [ ] **Completeness** (1 hour):
+   - [ ] All major features shown
+   - [ ] Progressive complexity
+   - [ ] Real-world scenarios
+   - [ ] Performance examples
+
+3. [ ] **Testing** (30 min):
+   - [ ] All examples compile
+   - [ ] All examples run
+   - [ ] Output documented
+   - [ ] CI integration
+
+**Acceptance Criteria**:
+- [ ] All examples updated
+- [ ] Examples tested in CI
+- [ ] Documentation references correct
+- [ ] No deprecated API usage
+
+---
 
 ### Set 5: Release Preparation
 To be scheduled after completion of Sets 1-4.

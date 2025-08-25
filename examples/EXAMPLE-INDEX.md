@@ -54,25 +54,51 @@ Enterprise process orchestration with full platform capabilities.
 
 ## Core Concept Examples
 
-### Agents
-- **[agent-simple.lua](lua/agents/)** - Basic agent creation
-- **[agent-memory.lua](lua/agents/)** - Agents with conversation memory
-- **[agent-templates.lua](lua/agents/)** - Using agent templates
+### Getting Started (Beginner)
+- **[01-hello-llmspell.lua](script-users/getting-started/01-hello-llmspell.lua)** - First script with basic agent
+- **[02-first-agent.lua](script-users/getting-started/02-first-agent.lua)** - Creating and using agents
+- **[03-first-workflow.lua](script-users/getting-started/03-first-workflow.lua)** - Introduction to workflows
+- **[04-save-state.lua](script-users/getting-started/04-save-state.lua)** - State persistence basics
+- **[05-use-tools.lua](script-users/getting-started/05-use-tools.lua)** - Working with tools
 
-### Workflows
-- **[workflow-sequential.lua](lua/workflows/)** - Sequential execution
-- **[workflow-parallel.lua](lua/workflows/)** - Parallel execution
-- **[workflow-conditional.lua](lua/workflows/)** - Conditional branching
+### Agent Examples
+- **[agent-creation.lua](script-users/features/agent-creation.lua)** - Agent builder patterns
+- **[agent-data-processor.lua](script-users/features/agent-data-processor.lua)** - Data processing with agents
+- **[agent-api-comprehensive.lua](script-users/features/agent-api-comprehensive.lua)** - Complete agent API usage
+- **[agent-monitor.lua](script-users/advanced/agent-monitor.lua)** - Agent monitoring
+- **[agent-orchestrator.lua](script-users/advanced/agent-orchestrator.lua)** - Multi-agent orchestration
 
-### Tools
-- **[tools-showcase.lua](lua/tools/)** - All available tools
-- **[tools-filesystem.lua](lua/tools/)** - File operations
-- **[tools-web.lua](lua/tools/)** - Web tools (search, fetch)
+### Workflow Examples
+- **[workflow-sequential-basics.lua](script-users/workflows/workflow-sequential-basics.lua)** - Sequential execution
+- **[workflow-parallel-basics.lua](script-users/workflows/workflow-parallel-basics.lua)** - Parallel execution
+- **[workflow-conditional.lua](script-users/workflows/workflow-conditional.lua)** - Conditional logic
+- **[workflow-loop.lua](script-users/workflows/workflow-loop.lua)** - Loop patterns
+- **[workflow-nested.lua](script-users/workflows/workflow-nested.lua)** - Nested workflows
+- **[workflow-complex.lua](script-users/workflows/workflow-complex.lua)** - Complex orchestration
+
+### Tool Examples
+- **[filesystem-tools.lua](script-users/features/filesystem-tools.lua)** - File system operations
+- **[utility-tools.lua](script-users/features/utility-tools.lua)** - Utility tool usage
+- **[tools-workflow-chaining.lua](script-users/features/tools-workflow-chaining.lua)** - Chaining tools in workflows
+- **[tools-integration.lua](script-users/advanced/tools-integration.lua)** - External tool integration
+- **[tools-media.lua](script-users/advanced/tools-media.lua)** - Media processing tools
+- **[tools-security.lua](script-users/advanced/tools-security.lua)** - Security tools
 
 ### State Management
-- **[state-basic.lua](lua/state/)** - Basic state operations
-- **[state-persistence.lua](lua/state/)** - Persistent state
-- **[state-sessions.lua](lua/state/)** - Session management
+- **[state-persistence-basics.lua](script-users/features/state-persistence-basics.lua)** - State fundamentals
+- **[state-workflow-integration.lua](script-users/cookbook/state-workflow-integration.lua)** - State in workflows
+
+### Advanced Features
+- **[streaming-responses.lua](script-users/features/streaming-responses.lua)** - Streaming agent responses
+- **[multimodal.lua](script-users/features/multimodal.lua)** - Image and media processing
+- **[debug-globals.lua](script-users/features/debug-globals.lua)** - Debug infrastructure usage
+- **[comprehensive-demo.lua](script-users/features/comprehensive-demo.lua)** - Full feature demonstration
+
+### Cookbook Patterns
+- **[multi-agent-coordination.lua](script-users/cookbook/multi-agent-coordination.lua)** - Agent coordination
+- **[agent-composition.lua](script-users/cookbook/agent-composition.lua)** - Composing agent behaviors
+- **[workflow-composition.lua](script-users/cookbook/workflow-composition.lua)** - Composing workflows
+- **[error-recovery.lua](script-users/cookbook/error-recovery.lua)** - Error recovery patterns
 
 ## Learning Path
 
@@ -175,9 +201,61 @@ When adding new examples:
 4. Update this index with your example
 5. Test with `-c` flag usage
 
+## Example Search by Tag
+
+### Difficulty Tags
+- **#beginner**: Getting started examples (01-05)
+- **#intermediate**: Features and basic workflows
+- **#advanced**: Complex patterns and integrations
+- **#expert**: Production applications (20+ agents)
+
+### Feature Tags
+- **#agents**: Agent creation and orchestration
+- **#tools**: Tool usage and integration
+- **#workflows**: Workflow patterns
+- **#state**: State management
+- **#streaming**: Real-time responses
+- **#multimodal**: Image/media processing
+- **#debug**: Debugging features
+- **#production**: Complete applications
+
+### Quick Example Finder
+
+| Need | Example | Location |
+|------|---------|----------|
+| First script | `01-hello-llmspell.lua` | `getting-started/` |
+| Create agent | `agent-creation.lua` | `features/` |
+| Build workflow | `workflow-sequential-basics.lua` | `workflows/` |
+| Use tools | `filesystem-tools.lua` | `features/` |
+| Save state | `state-persistence-basics.lua` | `features/` |
+| Multi-agent | `agent-orchestrator.lua` | `advanced/` |
+| Complex workflow | `workflow-complex.lua` | `workflows/` |
+| Production app | `webapp-creator` | `applications/` |
+
+### Finding Examples with Shell
+
+```bash
+# Find all agent examples
+find examples -name "*agent*.lua" -type f
+
+# Find beginner examples
+ls examples/script-users/getting-started/*.lua
+
+# Find by content
+grep -r "Tool.invoke" examples --include="*.lua"
+
+# Use the example finder tool
+./tools/find-examples.sh agent
+./tools/find-examples.sh --tag beginner
+./tools/find-examples.sh --feature workflow
+```
+
 ## See Also
 
 - [CONFIG-PROGRESSION.md](script-users/applications/CONFIG-PROGRESSION.md) - Configuration architecture
 - [README.md](script-users/applications/README.md) - Application overview
 - [User Guide](../docs/user-guide/) - Complete documentation
-- [API Reference](../docs/api/) - Detailed API docs
+- [Getting Started](../docs/user-guide/getting-started.md) - New user guide
+- [Agent API](../docs/user-guide/agent-api.md) - Agent reference
+- [Workflow API](../docs/user-guide/workflow-api.md) - Workflow reference
+- [Tool Reference](../docs/user-guide/tool-reference.md) - Tool documentation
