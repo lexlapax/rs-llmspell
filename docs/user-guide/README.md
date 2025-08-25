@@ -1,258 +1,158 @@
-# rs-llmspell User Guide
+# LLMSpell User Guide
 
-⚠️ **EVOLVING DOCUMENTATION**: This user guide reflects the current v0.5.0 release with Phase 5 complete. Features are marked with implementation status:
-- ✅ **Fully Available**: Tested and production-ready (Phases 0-5)
-- 🚧 **In Development**: Currently being implemented (Phase 6)  
-- 📋 **Planned Feature**: Designed but not yet available (Phase 7+)
-- ❌ **Not Available**: Future or removed features
+**Version**: 0.6.0  
+**Status**: Phase 7 - API Standardization  
+**Last Updated**: August 2025
 
-**Current Project Status**: Phase 5 Complete (v0.5.0) - Persistent State Management
+> **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 7 essential documents.
 
-**🔗 Navigation**: [← Documentation Hub](../README.md) | [Project Home](../../README.md) | [Developer Guide](../developer-guide/) | [Technical Docs](../technical/)
+**🔗 Quick Links**: [Get Started](getting-started.md) | [API Docs](api/README.md) | [Examples](../../examples/EXAMPLE-INDEX.md) | [Support](https://github.com/yourusername/rs-llmspell/issues)
 
-Welcome to the rs-llmspell user documentation! This guide will help you write powerful LLM automation scripts using Lua.
+## 📖 Essential Documentation (7 Files)
 
-## 📚 Documentation Index
+### 1. [Getting Started](getting-started.md)
+**Quick start in under 5 minutes**
+- Installation and setup
+- Your first script
+- Quick examples
 
-### Getting Started
-- **[Getting Started Guide](getting-started.md)** - Start here! Learn about globals, basic patterns, and error handling
-  - Pre-injected globals (Agent, Tool, Workflow, State, JSON, etc.)
-  - Basic usage patterns
-  - Error handling best practices
-  - Migration from require() syntax
-  - Common troubleshooting
+### 2. [Core Concepts](concepts.md)
+**Understand LLMSpell architecture**
+- Component model (BaseAgent trait)
+- Agents, Tools, Workflows
+- State management
+- Execution context
+- Security model
 
-### Core APIs
-- **[Agent API](agent-api.md)** - Create and interact with LLM agents
-  - Creating agents with different providers (OpenAI, Anthropic, etc.)
-  - Executing prompts and getting completions
-  - Tool integration with agents
-  - Performance characteristics
+### 3. [Configuration](configuration.md)
+**Complete configuration guide**
+- LLM providers (OpenAI, Anthropic, Ollama, Groq)
+- Security settings
+- Resource limits
+- External API setup
+- Environment variables
 
-- **[Workflow API](workflow-api.md)** - Build multi-step automations with advanced patterns
-  - Sequential workflows for step-by-step execution
-  - Conditional branching based on results
-  - Loop patterns for iterative processing
-  - Parallel execution for concurrent tasks
-  - Advanced tool integration patterns
+### 4. [API Documentation](api/README.md)
+**Comprehensive API reference**
+- **[Lua API](api/lua/README.md)** - All 15 globals with 100+ methods
+- **[Rust API](api/rust/README.md)** - Traits, builders, and extension guide
 
-- **[External Tools Guide](external-tools-guide.md)** - External integration tools
-  - Web tools (scraper, API tester, webhook caller)
-  - Communication tools (email, database)
-  - Quick reference and examples
-  - Security and performance tips
+### 5. [Troubleshooting](troubleshooting.md)
+**Solutions to common problems**
+- Common issues and fixes
+- Debugging techniques
+- Performance optimization
+- Error messages explained
 
-### State & Data Management
-- **[State Management](state-management.md)** - Share data between script components
-  - Thread-safe in-memory storage
-  - Workflow state sharing patterns
-  - Common patterns (counters, caching, progress tracking)
-  - State persistence with multiple backends (Memory, Sled, RocksDB)
-  - Schema migrations and backup/recovery
-  - See [State Management Guide](../state-management/) for full persistence features
+### 6. [Examples](../../examples/EXAMPLE-INDEX.md)
+**Learn by doing**
+- 50+ working examples
+- Universal → Professional progression
+- Real-world applications
+- Best practices demonstrated
 
-- **[Session and Artifact API](session-artifact-api.md)** 🚧 - Session management and content storage
-  - Create and manage conversation sessions
-  - Store and retrieve artifacts (tool outputs, agent responses)
-  - Session lifecycle (active, suspended, completed)
-  - Content-addressed storage with automatic compression
-  - Rich metadata and tagging support
-
-### Configuration
-- **[Configuration Guide](configuration/configuration.md)** - Configure security, resources, and deployment
-  - Security settings and best practices
-  - Resource limits and quotas
-  - Tool-specific configurations
-  - Deployment configurations (dev/staging/prod)
-  - Monitoring and logging setup
-  - Incident response procedures
-
-- **[LLM Provider Configuration](providers.md)** - Configure LLM providers (OpenAI, Anthropic, etc.)
-  - Provider/model hierarchical syntax
-  - Supported providers and models
-  - Configuration methods and best practices
-  - Provider-specific features
-  - Troubleshooting common issues
-
-- **[API Setup Guides](configuration/api-setup-guides.md)** - Set up external API providers
-  - Provider-specific setup instructions
-  - API key management
-  - Rate limiting configuration
-
-### Hooks and Events
-- **[Hooks & Events Overview](hooks-events-overview.md)** - Introduction to extensibility systems
-  - Understanding hooks vs events
-  - Architecture and performance characteristics
-  - Quick start examples
-  - When to use each system
-
-- **[Hooks Guide](hooks-guide.md)** - Comprehensive hook system documentation
-  - All 40+ hook points with descriptions
-  - 9 HookResult types for control flow
-  - Priority system and execution order
-  - CircuitBreaker protection (<5% overhead)
-  - Practical examples and patterns
-
-- **[Events Guide](events-guide.md)** - Master the event system
-  - UniversalEvent format and pattern subscriptions
-  - FlowController and backpressure handling
-  - 90K+ events/sec throughput
-  - Event persistence and replay
-  - Cross-language event propagation
-
-- **[Built-in Hooks Reference](builtin-hooks-reference.md)** - Production-ready hooks
-  - 18+ built-in hooks for common use cases
-  - Security, caching, rate limiting, monitoring
-  - Configuration and performance impact
-  - Combining hooks for complex scenarios
-
-- **[Hook Patterns](hook-patterns.md)** - Common patterns and recipes
-  - Composite hooks (Sequential, Parallel, Voting)
-  - Cross-component coordination
-  - Error handling and recovery
-  - Performance monitoring patterns
-
-- **[Cross-Language Integration](cross-language-integration.md)** - Multi-language support
-  - Hook and event system across Lua/JS/Rust
-  - Language adapters and serialization
-  - Performance considerations
-  - Security and sandboxing
-
-### Advanced Topics
-- **[Performance Tips](advanced/performance-tips.md)** - Optimization strategies
-  - Script optimization techniques
-  - Resource usage patterns
-  - Caching strategies
-
-### Tutorials & Examples
-- **[Tutorial: Agents & Workflows](tutorial-agents-workflows.md)** - Step-by-step tutorial
-  - Learn agents from basics to advanced patterns
-  - Master all 4 workflow types with examples
-  - Combine agents and workflows effectively
-  - Performance optimization techniques
-
-- **[Examples Directory](../../examples/)** - Working code examples
-  - 10+ agent examples
-  - 13+ tool examples  
-  - 9+ workflow examples
-  - Complete demos and benchmarks
-
-### Reference
-- **[Tool Reference](tool-reference.md)** - Complete reference for all 34 tools
-  - Detailed documentation for every tool
-  - Usage examples and parameters
-  - Security levels and best practices
-  - Performance characteristics
-
-- **[Agent & Workflow API Reference](api-reference-agents-workflows.md)** - Comprehensive API docs
-  - Complete method signatures
-  - All parameters and options
-  - Template syntax and references
-  - Integration patterns
-
-- **[API Reference](api-reference.md)** - Quick reference for all globals
-  - Global objects (Agent, Tool, Workflow, State, etc.)
-  - Quick method lookup
-  - Common patterns
+### 7. This README
+**Navigation hub** - You are here!
 
 ## 🚀 Quick Start
 
-```lua
--- Your first rs-llmspell script
-local agent = Agent.create({
-    provider = "openai",
-    model = "gpt-4"
-})
+```bash
+# Install and build
+git clone https://github.com/yourusername/rs-llmspell.git
+cd rs-llmspell
+cargo build --release
 
-local result = agent:complete("Hello, world!")
-print(result)
+# Set API key
+export OPENAI_API_KEY="sk-..."
+
+# Run your first script
+./target/release/llmspell exec '
+  local agent = Agent.builder()
+    :model("openai/gpt-4o-mini")
+    :build()
+  print(agent:execute({prompt = "Hello!"}).response)
+'
 ```
 
-## 📖 Reading Order
+## 🧩 Available Globals (15)
 
-1. **New Users**: Start with [Getting Started](getting-started.md) to understand the basics
-2. **LLM Tasks**: Learn about [Agents](agent-api.md) for AI-powered interactions
-3. **Automation**: Explore [Workflows](workflow-api.md) for complex multi-step processes
-4. **Data Sharing**: Use [State Management](state-management.md) for coordination
-5. **Deployment**: Configure with the [Configuration Guide](configuration.md)
-6. **Reference**: Keep the [API Reference](api-reference.md) handy while coding
+All globals are pre-injected - no `require()` needed!
 
-## 🔍 Finding Help
+| Global | Purpose | Example |
+|--------|---------|---------|
+| **Agent** | LLM interactions | `Agent.builder():model("openai/gpt-4"):build()` |
+| **Tool** | Execute tools | `Tool.invoke("web-search", {query = "..."})` |
+| **Workflow** | Orchestration | `Workflow.sequential({steps = {...}})` |
+| **State** | Data persistence | `State.set("key", value)` |
+| **Session** | Session management | `Session.create({name = "..."})` |
+| **Artifact** | Content storage | `Artifact.store(session_id, type, name, content)` |
+| **Hook** | Intercept execution | `Hook.register("BeforeAgentExecution", handler)` |
+| **Event** | Async notifications | `Event.publish("user.action", data)` |
+| **Config** | Configuration access | `Config.get("providers.openai")` |
+| **Provider** | Provider management | `Provider.list()` |
+| **Debug** | Debugging utilities | `Debug.info("message", "module")` |
+| **JSON** | JSON operations | `JSON.parse(string)` |
+| **Streaming** | Stream handling | `Streaming.create()` |
+| **Replay** | Event replay | `Replay.start()` |
+| **ARGS** | Script arguments | `ARGS.input` or `ARGS[1]` |
 
-- **Examples**: Check the `/examples` directory for working scripts
-- **API Questions**: See the [API Reference](api-reference.md)
-- **Configuration Issues**: Check the [Configuration Guide](configuration.md)
-- **Troubleshooting**: Each guide includes a troubleshooting section
-- **GitHub Issues**: Report bugs and feature requests in the project repository
+## 🎯 Common Tasks
 
-## 📋 Prerequisites
-
-- Basic Lua knowledge (syntax, tables, functions)
-- Understanding of LLM concepts (prompts, completions, tokens)
-- Access to LLM API keys (OpenAI, Anthropic, etc.)
-- rs-llmspell installed and configured
-
-## 🎯 Common Use Cases
-
-### Text Processing
+### Chat with AI
 ```lua
-local agent = Agent.create({provider = "openai", model = "gpt-4"})
-local summary = agent:complete("Summarize this text: " .. long_text)
+local agent = Agent.builder()
+    :model("openai/gpt-4o-mini")
+    :build()
+local response = agent:execute({prompt = "Explain quantum computing"})
+print(response.response)
 ```
 
-### Data Pipeline
+### Build Workflows
 ```lua
 local workflow = Workflow.sequential({
-    name = "data_processor",
+    name = "pipeline",
     steps = {
-        {name = "fetch", tool = "http_client", input = {url = api_url}},
-        {name = "parse", tool = "json_parser", input = "$fetch.output"},
-        {name = "analyze", agent = agent, prompt = "Analyze: $parse.output"}
+        {name = "fetch", tool = "web-fetch", input = {url = "..."}},
+        {name = "analyze", agent = agent, prompt = "Analyze: $fetch"}
     }
 })
-local results = workflow:execute()
 ```
 
-### Tool Discovery
+### Use Tools
 ```lua
-local tools = Tool.list()
-for _, tool in ipairs(tools) do
-    print(tool.name .. ": " .. tool.description)
-end
+local result = Tool.invoke("web-search", {
+    query = "LLMSpell documentation",
+    max_results = 10
+})
 ```
 
-## 🛠️ Available Tools
+## 📊 Key Metrics
 
-rs-llmspell includes **34 built-in tools** across 9 categories:
-- File operations (read, write, search)
-- Network tools (HTTP, webhooks, scrapers)
-- Data processing (JSON, CSV, text)
-- System utilities (process execution, environment)
-- And many more!
+| Operation | Performance | Limit |
+|-----------|------------|-------|
+| Agent creation | ~10ms | - |
+| Tool execution | <10ms overhead | - |
+| State read/write | <1ms / <5ms | - |
+| Event throughput | 90K/sec | - |
+| Memory per script | - | 512MB default |
+| Script timeout | - | 5 minutes |
 
-Use `Tool.list()` to discover all available tools and their capabilities.
+## 🔍 Learning Path
 
-## 🔒 Security Note
+1. **Beginners** → [Getting Started](getting-started.md) (5 min)
+2. **Understanding** → [Core Concepts](concepts.md) (10 min)
+3. **Building** → [Examples](../../examples/EXAMPLE-INDEX.md) (hands-on)
+4. **Configuring** → [Configuration](configuration.md) (as needed)
+5. **Debugging** → [Troubleshooting](troubleshooting.md) (when stuck)
+6. **Reference** → [API Docs](api/README.md) (lookup)
 
-rs-llmspell includes comprehensive security features:
-- Sandboxed execution environment
-- Resource limits and quotas
-- Path traversal prevention
-- Rate limiting
-- See the [Configuration Guide](configuration.md) for security settings
+## 🆘 Need Help?
 
-## 📈 Performance
+- **Issues?** Check [Troubleshooting](troubleshooting.md)
+- **Questions?** Review [Examples](../../examples/EXAMPLE-INDEX.md)
+- **Bugs?** Report on [GitHub](https://github.com/yourusername/rs-llmspell/issues)
+- **API Details?** See [Lua API](api/lua/README.md) or [Rust API](api/rust/README.md)
 
-- Agent creation: ~10ms
-- Tool execution: <10ms overhead
-- Workflow operations: <20ms overhead
-- State access: <1ms (in-memory)
+---
 
-## 🗺️ Roadmap
-
-- **✅ Completed**: Phases 0-5 including persistent state, hooks, events, and 34 tools
-- **🚀 Next**: Phase 6 - Session Management & Agent Upgrades
-- **📋 Future**: Phase 7+ - GUI, Python support, vector storage, enterprise features
-- **🎯 Target**: Version 1.0 with stable API (Q4 2025)
-
-Happy scripting with rs-llmspell! 🚀
+**Version 0.6.0** | Phase 7 - API Standardization | [Changelog](../../CHANGELOG.md)
