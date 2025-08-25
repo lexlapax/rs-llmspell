@@ -1,5 +1,7 @@
 # Session and Artifact Implementation Guide
 
+✅ **CURRENT**: Phase 6 implementation details for Session and Artifact management system.
+
 This guide covers the implementation details of the Session and Artifact management system for developers working on or extending llmspell.
 
 ## Architecture Overview

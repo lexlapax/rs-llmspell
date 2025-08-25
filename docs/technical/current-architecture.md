@@ -215,6 +215,34 @@ pub enum SecurityLevel {
 - Resource limit enforcement
 - Network domain whitelisting
 
+### 10. Debug Infrastructure (1,890 LOC)
+
+#### llmspell-utils/debug & llmspell-bridge
+**Comprehensive Debug System** (Phase 7):
+
+**Architecture Layers**:
+```
+Script Layer (Lua/JS) → Debug Global API
+     ↓
+Bridge Layer → DebugBridge (thread-safe wrapper)
+     ↓  
+Core Layer → DebugManager (global singleton)
+```
+
+**Core Components**:
+- **DebugManager**: Global singleton via LazyLock with atomic operations
+- **Performance Profiler**: Statistical analysis with percentiles
+- **Module Filtering**: Hierarchical, wildcard, and regex patterns
+- **Stack Trace Collection**: Lua-specific frame capture
+- **Object Dumping**: Circular reference detection
+
+**Key Features**:
+- Zero-cost when disabled (atomic bool check)
+- Thread-safe with interior mutability
+- <10ms operation overhead
+- Circular buffer for captured entries
+- Pluggable output handlers
+
 ---
 
 ## Performance Characteristics

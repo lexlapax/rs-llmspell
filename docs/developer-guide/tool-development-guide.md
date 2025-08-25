@@ -500,6 +500,56 @@ async fn process_large_data(&self, data: &[u8]) -> Result<Vec<u8>, LLMError> {
 
 ---
 
+## Resource Limit Implementation Details
+
+### Basic Resource Limiting
+
+```rust
+use llmspell_utils::resource_limits::{ResourceLimits, ResourceTracker, MemoryGuard};
+
+// Create resource limits
+let limits = ResourceLimits {
+    max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
+    max_cpu_time_ms: Some(5_000),             // 5 seconds
+    max_operations: Some(10_000),             // 10K operations
+    max_file_size_bytes: Some(50 * 1024 * 1024), // 50MB max file
+    max_concurrent_ops: Some(100),            // 100 concurrent operations
+    operation_timeout_ms: Some(30_000),       // 30 second timeout
+};
+
+// Create tracker
+let tracker = ResourceTracker::new(limits);
+
+// Track operations and CPU time together
+track_operation!(tracker)?; // Macro calls both track_operation() and check_cpu_time()
+
+// Track memory with auto-cleanup
+let _memory_guard = MemoryGuard::new(&tracker, 1_000_000)?; // 1MB
+// Memory is automatically released when guard drops
+```
+
+### Memory Guards Pattern
+
+```rust
+{
+    // Allocate memory with automatic cleanup
+    let _guard = MemoryGuard::new(&tracker, 1_000_000)?;
+    
+    // Memory is tracked while guard is in scope
+    process_data();
+    
+} // Memory automatically released when guard drops
+```
+
+### Performance Considerations
+
+- Resource tracking adds minimal overhead (<1% in most cases)
+- Use `track_operation!` macro in tight loops for combined tracking
+- Consider batching operations to reduce tracking overhead
+- Memory guards have zero-cost abstractions when limits aren't exceeded
+
+---
+
 ## Phase 7 Tool Implementation Examples
 
 ### **PDF Processor Tool**
