@@ -1408,13 +1408,468 @@ docs/archives/technical/           # Archive outdated/redundant files
 
 ---
 
-#### Task 7.4.5: Examples clean up, refactoring and codumentation
-**Priority**: MEDIUM
-**Estimated Time**: 4 hours
-**Status**: ✅ DONE
+#### Task 7.4.5: Examples clean up, refactoring and documentation
+**Priority**: HIGH (CRITICAL - Example Overload Resolution)
+**Estimated Time**: 7 hours (with comprehensive validation + header updates)
+**Status**: READY FOR EXECUTION - **AGGRESSIVE CURATION + VALIDATION PLAN COMPLETE**
 **Assigned To**: Developer Experience Team
 
-**Description**: Take an inventory of everything in examples/ directory. There are way too many files. The only files that work and valid are under examples/script-users/applications/. the rest are either invalid, not representative of the state of implementation, or simply too much.
+**Description**: **EXAMPLE OVERLOAD CRISIS** - Comprehensive audit of **157 total files** reveals critical user experience problem: massive example overload causing choice paralysis. Industry standard is 10-25 examples; we have 90+ Lua examples alone. **SOLUTION: AGGRESSIVE CURATION, NOT FIXING.**
+
+**CRITICAL PROBLEM IDENTIFIED**:
+1. **157 TOTAL FILES** - Absolutely overwhelming for users (vs industry standard 15-25)
+2. **90 Lua Examples** - Causes choice paralysis and maintenance nightmare
+3. **30 Cookbook Patterns** - Too many to find relevant patterns quickly  
+4. **Broken Infrastructure** - Shell scripts reference non-existent files
+5. **Quality vs Quantity** - Better to have 25 excellent examples than 90 mediocre ones
+
+**AGGRESSIVE CURATION PLAN** (157 → 32 files = 80% reduction):
+
+### **CURATED STRUCTURE** (32 total examples - within industry range):
+
+**🚀 Getting Started** (5 examples) - **10-minute success**:
+```
+✅ KEEP: 00-hello-world.lua, 01-first-tool.lua, 02-first-agent.lua, 03-first-workflow.lua, 04-error-handling.lua  
+❌ DELETE: All 6 duplicate subdirectories, numbering conflicts, extra examples
+```
+
+**🔍 Core Features** (6 examples) - **30-minute exploration**:
+```
+✅ KEEP BEST: state-persistence.lua, multimodal.lua, agent-coordination.lua, workflow-patterns.lua, filesystem-tools.lua, streaming.lua
+❌ DELETE: 6 redundant feature examples with overlapping functionality
+```
+
+**⚙️ Production Cookbook** (8 examples) - **Expert patterns**:
+```
+✅ KEEP BEST: error-handling.lua (454 lines, excellent), rate-limiting.lua, caching.lua, multi-agent-coordination.lua, webhook-integration.lua, performance-monitoring.lua, security-patterns.lua, state-management.lua
+❌ DELETE: 22 redundant cookbook patterns (73% reduction)
+```
+
+**🏗️ Applications** (7 examples) - **Complete complexity progression**:
+```
+✅ KEEP ALL: file-organizer (Universal-3), research-collector (Universal-2), content-creator (Power-4), communication-manager (Business-5), process-orchestrator (Professional-8), code-review-assistant (Professional-7), webapp-creator (Expert-21)
+✅ REASON: Working examples demonstrating Universal→Professional progression (2→21 agents)
+```
+
+**🔧 Rust Developers** (6 examples) - **Extension patterns**:
+```
+✅ CREATE: custom-tool.rs, custom-agent.rs, extension-pattern.rs, builder-pattern.rs, async-patterns.rs, integration-test.rs
+❌ DELETE: Existing minimal rust-developers/ content, replace with quality examples
+```
+
+### **MASS DELETION TASKS**:
+
+**7.4.5.1** - **Infrastructure Cleanup with Validation** (45 minutes):
+```
+❌ DELETE: 4 broken shell scripts (run-all-*.sh) referencing missing files
+❌ DELETE: tests-as-examples/ (belongs in tests/, not examples) - 6 files  
+❌ DELETE: lua/debug/ (orphaned, not integrated) - 4 files
+❌ DELETE: .bak/.old files - 2 files
+❌ DELETE: EXAMPLE-INDEX.md (redundant navigation)
+
+🔍 VALIDATION STEPS:
+1. Before deletion: Run `find examples/ -name "*.sh" -exec {} \;` to identify all broken scripts
+2. Verify no working examples reference deleted files: `grep -r "debug/" examples/script-users/`
+3. After deletion: Run `./target/debug/llmspell --help` to ensure no broken references
+4. Test remaining examples structure: `ls -la examples/` shows clean organization
+5. Update examples/README.md to remove references to deleted files/directories
+```
+
+**7.4.5.2** - **Getting Started Simplification with Full Validation** (75 minutes):
+```
+❌ DELETE: 6 duplicate subdirectories (01-hello-world/, 02-first-tool/, etc.)
+❌ DELETE: 4 conflicting numbered files (01-agent-basics.lua, 02-first-tools.lua, etc.)
+✅ RESULT: Clean 5-file progression (00→04) taking 32 minutes total
+
+🔍 COMPREHENSIVE VALIDATION - Each of 5 kept examples:
+1. **00-hello-world.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua 2>&1 | tee hello-output.log
+   # Expected: "Hello from LLMSpell!" + version info in <2 seconds
+   ```
+
+2. **01-first-tool.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua 2>&1 | tee tool-output.log
+   # Expected: File operations demo, create/read/exists checks in <5 seconds
+   ```
+
+3. **02-first-agent.lua** (requires API key):
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users/getting-started/02-first-agent.lua 2>&1 | tee agent-output.log
+   # Expected: Agent creation, simple prompt/response in <10 seconds
+   ```
+
+4. **03-first-workflow.lua** (requires API key):
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua 2>&1 | tee workflow-output.log
+   # Expected: Sequential workflow execution in <15 seconds
+   ```
+
+5. **04-error-handling.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/getting-started/04-error-handling.lua 2>&1 | tee error-output.log
+   # Expected: Demonstrates error patterns, graceful failure handling in <5 seconds
+   ```
+
+📝 COMPREHENSIVE HEADER UPDATES (Following applications/code-review-assistant/main.lua format):
+Each example MUST have detailed header including:
+```lua
+-- ============================================================
+-- LLMSPELL [CATEGORY] SHOWCASE  
+-- ============================================================
+-- Example ID: ## - [Example Name] v#.#.#
+-- Complexity Level: [BEGINNER|INTERMEDIATE|ADVANCED]
+-- Real-World Use Case: [Specific practical application]
+--
+-- Purpose: [Detailed description of what this example teaches]
+-- Architecture: [Technical approach used]
+-- Crates Showcased: [Specific llmspell crates demonstrated]
+-- Key Features:
+--   • [Feature 1]
+--   • [Feature 2] 
+--   • [Feature 3]
+--
+-- Prerequisites:
+--   • [Specific requirements - API keys, config files, etc.]
+--
+-- HOW TO RUN:
+-- [Exact command line with examples]
+--
+-- EXPECTED OUTPUT:
+-- [Captured actual output from validation testing]
+--
+-- Time to Complete: [Validated execution time]
+-- ============================================================
+```
+- Update getting-started/README.md with working examples and execution times
+- Verify all headers follow this comprehensive format (not just basic STANDARDS.md)
+- Add "Next steps" navigation between examples
+```
+
+**7.4.5.3** - **Cookbook Curation with Production Validation** (90 minutes):
+```
+❌ DELETE: 22 redundant patterns keeping only 8 production-essential ones
+✅ CRITERIA: Must teach unique pattern, must be production-ready, must use canonical APIs
+
+🔍 VALIDATION - Each of 8 kept cookbook patterns:
+1. **error-handling.lua** (454 lines, exemplary):
+   ```bash
+   ./target/debug/llmspell run examples/script-users/cookbook/error-handling.lua 2>&1 | tee cookbook-error-output.log
+   # Expected: 6 error handling patterns demonstrated, all complete successfully
+   ```
+
+2. **rate-limiting.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/cookbook/rate-limiting.lua 2>&1 | tee cookbook-rate-output.log
+   # Expected: Rate limiting strategies, backoff patterns demonstrated
+   ```
+
+3. **caching.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/cookbook/caching.lua 2>&1 | tee cookbook-cache-output.log
+   # Expected: Cache patterns, invalidation strategies working
+   ```
+
+4. **multi-agent-coordination.lua**:
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users/cookbook/multi-agent-coordination.lua 2>&1 | tee cookbook-multi-output.log
+   # Expected: Multiple agents coordinating, delegation patterns working
+   ```
+
+5. **webhook-integration.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/cookbook/webhook-integration.lua 2>&1 | tee cookbook-webhook-output.log
+   # Expected: External system integration patterns demonstrated
+   ```
+
+6. **performance-monitoring.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/cookbook/performance-monitoring.lua 2>&1 | tee cookbook-perf-output.log
+   # Expected: Performance tracking, metrics collection working
+   ```
+
+7. **security-patterns.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/cookbook/security-patterns.lua 2>&1 | tee cookbook-security-output.log
+   # Expected: Input validation, access control patterns working
+   ```
+
+8. **state-management.lua**:
+   ```bash
+   ./target/debug/llmspell run examples/script-users/cookbook/state-management.lua 2>&1 | tee cookbook-state-output.log
+   # Expected: State persistence, versioning patterns working
+   ```
+
+📝 COOKBOOK COMPREHENSIVE HEADER UPDATES:
+Each cookbook pattern MUST have detailed header:
+```lua
+-- ============================================================
+-- LLMSPELL COOKBOOK SHOWCASE  
+-- ============================================================
+-- Pattern ID: ## - [Pattern Name] v#.#.#
+-- Complexity Level: PRODUCTION
+-- Real-World Use Case: [Specific enterprise/production scenario]
+-- Pattern Category: [Error Handling|Performance|Security|etc.]
+--
+-- Purpose: [Production problem this pattern solves]
+-- Architecture: [Technical implementation approach]
+-- Key Features: [Bullet list of capabilities]
+-- Prerequisites: [Specific requirements]
+-- HOW TO RUN: [Exact commands]
+-- EXPECTED OUTPUT: [Captured validation output]
+-- Time to Complete: [Validated execution time]
+-- Production Notes: [Deployment considerations]
+-- ============================================================
+```
+- Update cookbook/README.md with only 8 essential patterns
+- Create cross-reference matrix: getting-started → features → cookbook → applications
+- Add "Production Ready" validation tags to all patterns
+```
+
+**7.4.5.4** - **Application Validation with Comprehensive Testing** (60 minutes):
+```
+✅ KEEP ALL: All 7 working applications (valuable Universal→Professional progression)
+🔄 UPDATE: Application documentation for canonical API compliance only
+
+🔍 FULL APPLICATION TESTING - All 7 applications:
+1. **file-organizer** (Universal-3 agents):
+   ```bash
+   mkdir -p /tmp/test-files && touch /tmp/test-files/document.pdf /tmp/test-files/image.jpg
+   ./target/debug/llmspell -c examples/script-users/applications/file-organizer/config.toml run examples/script-users/applications/file-organizer/main.lua 2>&1 | tee app-file-organizer.log
+   # Expected: 3 agents created, files organized by category in <15 seconds
+   ```
+
+2. **research-collector** (Universal-2 agents):
+   ```bash
+   ./target/debug/llmspell -c examples/script-users/applications/research-collector/config.toml run examples/script-users/applications/research-collector/main.lua 2>&1 | tee app-research-collector.log
+   # Expected: 2 agents created, research synthesis in <20 seconds
+   ```
+
+3. **content-creator** (Power-4 agents):
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell -c examples/script-users/applications/content-creator/config.toml run examples/script-users/applications/content-creator/main.lua 2>&1 | tee app-content-creator.log
+   # Expected: 4 agents created, content generation pipeline in <30 seconds
+   ```
+
+4. **communication-manager** (Business-5 agents):
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell -c examples/script-users/applications/communication-manager/config.toml run examples/script-users/applications/communication-manager/main.lua 2>&1 | tee app-communication-manager.log
+   # Expected: 5 agents created, communication workflow in <25 seconds
+   ```
+
+5. **process-orchestrator** (Professional-8 agents):
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell -c examples/script-users/applications/process-orchestrator/config.toml run examples/script-users/applications/process-orchestrator/main.lua 2>&1 | tee app-process-orchestrator.log
+   # Expected: 8 agents created, nested workflows in <30 seconds
+   ```
+
+6. **code-review-assistant** (Professional-7 agents):
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell -c examples/script-users/applications/code-review-assistant/config.toml run examples/script-users/applications/code-review-assistant/main.lua 2>&1 | tee app-code-review.log
+   # Expected: 7 agents created, code analysis workflow in <45 seconds
+   ```
+
+7. **webapp-creator** (Expert-21 agents):
+   ```bash
+   OPENAI_API_KEY=$OPENAI_API_KEY ANTHROPIC_API_KEY=$ANTHROPIC_API_KEY ./target/debug/llmspell -c examples/script-users/applications/webapp-creator/config.toml run examples/script-users/applications/webapp-creator/main.lua -- --input user-input-ecommerce.lua --output /tmp/webapp-validation 2>&1 | tee app-webapp-creator.log
+   # Expected: 21 agents created, complete web app generation in <180 seconds
+   ```
+
+📝 APPLICATION HEADER VALIDATION (Already following comprehensive format):
+All applications already have detailed headers following the pattern:
+```lua
+-- ============================================================
+-- LLMSPELL APPLICATION SHOWCASE
+-- ============================================================
+-- Application ID: ## - [App Name] v#.#.#
+-- Complexity Level: [1-3] [BASIC|INTERMEDIATE|ADVANCED]
+-- Real-World Use Case: [Specific business scenario]
+-- Purpose: [What the application accomplishes]
+-- Architecture: [Technical approach]
+-- Crates Showcased: [llmspell crates used]
+-- Key Features: [Bullet list]
+-- Prerequisites: [API keys, config files, etc.]
+-- HOW TO RUN: [Exact commands with examples]
+-- ============================================================
+```
+VALIDATION TASKS:
+- Verify all 7 applications maintain this comprehensive header format
+- Update EXPECTED OUTPUT sections with captured validation results
+- Update Time to Complete with validated execution times
+- Confirm Universal→Professional progression documentation (2→21 agents)
+- Update main examples/README.md with working application showcase
+```
+
+**7.4.5.5** - **Create Quality Rust Examples with Full Validation** (120 minutes):
+```
+🆕 CREATE: 6 high-quality Rust examples following docs/user-guide/api/rust/README.md exactly
+✅ FOCUS: Custom components, extension patterns, production usage
+
+🔍 RUST EXAMPLE CREATION AND VALIDATION:
+1. **custom-tool.rs** - BaseComponent + Tool trait implementation:
+   ```bash
+   cd examples/rust-developers/
+   cargo new --bin custom-tool-example
+   # Create src/main.rs implementing BaseTool trait
+   cargo build 2>&1 | tee rust-custom-tool.log
+   cargo run 2>&1 | tee rust-custom-tool-run.log
+   # Expected: Clean compilation, tool registration and execution demo
+   ```
+
+2. **custom-agent.rs** - BaseComponent + Agent trait implementation:
+   ```bash
+   cargo new --bin custom-agent-example  
+   # Create src/main.rs implementing BaseAgent trait with ExecutionContext
+   cargo build 2>&1 | tee rust-custom-agent.log
+   cargo run 2>&1 | tee rust-custom-agent-run.log
+   # Expected: Clean compilation, agent creation and execute() demo
+   ```
+
+3. **extension-pattern.rs** - Component registry extension:
+   ```bash
+   cargo new --bin extension-pattern-example
+   # Create src/main.rs showing extension registration patterns
+   cargo build 2>&1 | tee rust-extension.log
+   cargo run 2>&1 | tee rust-extension-run.log
+   # Expected: Clean compilation, component registry usage demo
+   ```
+
+4. **builder-pattern.rs** - Builder implementation:
+   ```bash
+   cargo new --bin builder-pattern-example
+   # Create src/main.rs showing AgentBuilder/ToolBuilder patterns
+   cargo build 2>&1 | tee rust-builder.log
+   cargo run 2>&1 | tee rust-builder-run.log
+   # Expected: Clean compilation, fluent builder API demo
+   ```
+
+5. **async-patterns.rs** - Async trait implementation:
+   ```bash
+   cargo new --bin async-patterns-example
+   # Create src/main.rs showing async execution patterns with Send + Sync
+   cargo build 2>&1 | tee rust-async.log  
+   cargo run 2>&1 | tee rust-async-run.log
+   # Expected: Clean compilation, async execution demo
+   ```
+
+6. **integration-test.rs** - Full integration example:
+   ```bash
+   cargo new --bin integration-test-example
+   # Create src/main.rs showing complete LLMSpell integration
+   cargo build 2>&1 | tee rust-integration.log
+   cargo run 2>&1 | tee rust-integration-run.log
+   # Expected: Clean compilation, full workflow demo
+   ```
+
+📝 RUST COMPREHENSIVE HEADER AND DOCUMENTATION:
+Each Rust example MUST have detailed header:
+```rust
+//! ============================================================
+//! LLMSPELL RUST DEVELOPERS SHOWCASE
+//! ============================================================
+//! Example ID: ## - [Example Name] v#.#.#
+//! Complexity Level: [BEGINNER|INTERMEDIATE|ADVANCED]
+//! Real-World Use Case: [Specific extension/integration scenario]
+//! 
+//! Purpose: [What Rust pattern this demonstrates]
+//! Architecture: [Trait implementations, async patterns, etc.]
+//! Crates Showcased: [llmspell-core, llmspell-tools, etc.]
+//! Key Features:
+//!   • [Trait implementation details]
+//!   • [Error handling patterns]
+//!   • [Async/Send+Sync compliance]
+//!
+//! Prerequisites:
+//!   • [Rust version, dependencies, etc.]
+//!
+//! HOW TO RUN:
+//! ```bash
+//! [Exact cargo commands]
+//! ```
+//!
+//! EXPECTED OUTPUT:
+//! [Captured validation output]
+//!
+//! Time to Complete: [Compilation + execution time]
+//! ============================================================
+```
+
+VALIDATION REQUIREMENTS:
+- Each example MUST compile with zero warnings: `cargo clippy -- -D warnings`
+- Each example MUST follow docs/user-guide/api/rust/README.md trait signatures exactly
+- Update rust-developers/README.md with all 6 working examples
+- Add Cargo.toml dependencies and version requirements
+- Cross-reference with docs/user-guide/api/rust/README.md as authority
+- Add "Getting Started" → "Advanced Patterns" progression documentation
+```
+
+**CURATED PEDAGOGICAL FLOW**:
+1. **🚀 Foundation** (10 min): getting-started/ - 5 files, immediate success  
+2. **🔍 Discovery** (30 min): features/ - 6 files, explore capabilities
+3. **⚙️ Production** (2 hours): cookbook/ - 8 essential patterns  
+4. **🏗️ Implementation** (4 hours): applications/ - 7 complete apps (Universal→Professional)
+5. **🔧 Extension** (expert): rust-developers/ - 6 quality examples
+
+**SUCCESS METRICS**:
+- ✅ **80% reduction**: 157 → 32 files (eliminates choice paralysis)
+- ✅ **Industry alignment**: 32 examples within 25-35 standard range
+- ✅ **Quality focus**: Keep only excellent, unique, production-ready examples
+- ✅ **Working applications preserved**: All 7 Universal→Professional progression apps
+- ✅ **Canonical API compliance**: 100% alignment with docs/user-guide/api/
+
+**CURATION VALIDATION CRITERIA**:
+```
+Getting Started (5):
+✅ Each example teaches unique concept: ___/5
+✅ Linear 10-minute progression: ___/5
+
+Features (6):  
+✅ No overlapping functionality: ___/6
+✅ Canonical API patterns: ___/6
+
+Cookbook (8):
+✅ Production-ready patterns only: ___/8
+✅ Unique problem solutions: ___/8
+
+Applications (7):
+✅ All working as claimed: ___/7  
+✅ Clear complexity progression: ___/7
+
+Rust (6):
+✅ BaseComponent trait examples: ___/6
+✅ Extension pattern coverage: ___/6
+```
+
+**COMPREHENSIVE VALIDATION SUMMARY** (All subtasks include validation):
+```
+📊 EXECUTION VALIDATION MATRIX:
+- 5 Getting Started examples: Each tested with ./target/debug/llmspell run + output capture
+- 6 Features examples: Each validated for unique functionality and API compliance  
+- 8 Cookbook patterns: Each tested for production readiness and canonical APIs
+- 7 Applications: Each tested with proper config files and agent count validation
+- 6 Rust examples: Each compiled with cargo build + clippy + execution testing
+
+📝 COMPREHENSIVE HEADER AND DOCUMENTATION VALIDATION:
+- All examples MUST have detailed headers following applications/code-review-assistant/main.lua format
+- Headers include: ID, complexity, real-world use case, purpose, architecture, features, prerequisites, HOW TO RUN, EXPECTED OUTPUT, execution time
+- All examples updated with actual captured output in EXPECTED OUTPUT sections
+- All README.md files updated to reflect only working examples
+- Cross-references validated between docs/user-guide/api/ and examples/
+- Navigation paths tested: getting-started → features → cookbook → applications
+
+🎯 SUCCESS CRITERIA:
+✅ Zero broken examples after curation (all 32 examples work)
+✅ 100% canonical API compliance (docs/user-guide/api/ authority)
+✅ All examples have comprehensive headers with detailed metadata
+✅ All documentation reflects actual behavior (no aspirational claims)
+✅ EXPECTED OUTPUT sections contain actual captured validation results
+✅ Execution times documented and validated (<2sec to 180sec range)
+✅ User journey flows tested and documented (10min to 4hour paths)
+✅ All headers follow applications/code-review-assistant/main.lua comprehensive format
+```
+
+**TOTAL IMPACT**: Transform 157-file example overload into rigorously validated 32-example library with 100% working examples, canonical API compliance, and industry-standard curation.
 
 --- 
 
