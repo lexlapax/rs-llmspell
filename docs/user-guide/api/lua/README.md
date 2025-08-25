@@ -502,88 +502,133 @@ Lists all registered workflows.
 
 ## State API
 
-The State global provides persistent state management.
+The State global provides persistent state management with scoped namespaces.
 
-### State.save(string, string) → boolean
-Saves a value to state.
+### State.save(string, string, string) → nil
+Saves a value to state within a scope.
 
 **Parameters:**
+- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
 - `key: string` - State key
-- `value: string` - Value to save (must be string)
+- `value: string` - Value to save (serialized as JSON)
 
-**Returns:** `boolean` - Save success
+**Returns:** `nil`
 
 **Example:**
 ```lua
-local success = State.save("user_preference", "dark_mode")
+State.save("global", "user_preference", "dark_mode")
+State.save("custom", "session_data", "active")
 ```
 
-### State.load(string) → string|nil
-Loads a value from state.
+### State.load(string, string) → any|nil
+Loads a value from state within a scope.
 
 **Parameters:**
+- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
 - `key: string` - State key
 
-**Returns:** `string|nil` - Saved value or nil if not found
+**Returns:** `any|nil` - Saved value (deserialized from JSON) or nil if not found
 
 **Example:**
 ```lua
-local value = State.load("user_preference")
+local value = State.load("global", "user_preference")
 if value then
     print("Preference:", value)
 end
 ```
 
-### State.exists(string) → boolean
-Checks if a key exists in state.
+### State.delete(string, string) → nil
+Deletes a key from state within a scope.
 
 **Parameters:**
+- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
 - `key: string` - State key
 
-**Returns:** `boolean` - Whether key exists
+**Returns:** `nil`
 
 **Example:**
 ```lua
-if State.exists("user_preference") then
-    -- Key exists
-end
+State.delete("global", "old_key")
 ```
 
-### State.delete(string) → boolean
-Deletes a key from state.
+### State.list_keys(string) → table
+Lists all state keys within a scope.
 
 **Parameters:**
-- `key: string` - State key
+- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
 
-**Returns:** `boolean` - Deletion success
-
-**Example:**
-```lua
-State.delete("old_key")
-```
-
-### State.list() → table
-Lists all state keys.
-
-**Returns:** `table` - Array of state keys
+**Returns:** `table` - Array of state keys in the specified scope
 
 **Example:**
 ```lua
-local keys = State.list()
+local keys = State.list_keys("global")
 for i, key in ipairs(keys) do
-    print(key, State.load(key))
+    local value = State.load("global", key)
+    print(key, value)
 end
 ```
 
-### State.clear() → boolean
-Clears all state data.
+### Workflow-specific helpers
 
-**Returns:** `boolean` - Clear success
+#### State.workflow_get(string, string) → any|nil
+Gets state for a specific workflow step.
+
+**Parameters:**
+- `workflow_id: string` - Workflow identifier
+- `step_name: string` - Step name
+
+**Returns:** `any|nil` - Step state or nil
 
 **Example:**
 ```lua
-State.clear()
+local data = State.workflow_get("my_workflow", "step_1")
 ```
+
+#### State.workflow_list(string) → table
+Lists all steps with state in a workflow.
+
+**Parameters:**
+- `workflow_id: string` - Workflow identifier
+
+**Returns:** `table` - Array of step names
+
+### Agent-specific helpers
+
+#### State.agent_get(string, string) → any|nil
+Gets state for a specific agent.
+
+**Parameters:**
+- `agent_id: string` - Agent identifier
+- `key: string` - State key
+
+**Returns:** `any|nil` - Agent state or nil
+
+#### State.agent_set(string, string, any) → nil
+Sets state for a specific agent.
+
+**Parameters:**
+- `agent_id: string` - Agent identifier
+- `key: string` - State key
+- `value: any` - Value to store
+
+### Tool-specific helpers
+
+#### State.tool_get(string, string) → any|nil
+Gets state for a specific tool.
+
+**Parameters:**
+- `tool_name: string` - Tool name
+- `key: string` - State key
+
+**Returns:** `any|nil` - Tool state or nil
+
+#### State.tool_set(string, string, any) → nil
+Sets state for a specific tool.
+
+**Parameters:**
+- `tool_name: string` - Tool name
+- `key: string` - State key
+- `value: any` - Value to store
 
 ---
 
@@ -862,46 +907,229 @@ print("Default model:", provider.default_model)
 
 ## Debug API
 
-The Debug global provides debugging utilities.
+The Debug global provides comprehensive debugging, logging, and performance monitoring capabilities.
 
-### Debug.enabled() → boolean
-Checks if debug mode is enabled.
+### Logging Methods
 
-**Returns:** `boolean` - Debug mode status
-
-**Example:**
-```lua
-if Debug.enabled() then
-    print("Debug: Processing started")
-end
-```
-
-### Debug.log(string, any) → nil
-Logs a debug message.
+#### Debug.log(level, message, [module])
+Log a message at the specified level.
 
 **Parameters:**
-- `level: string` - Log level ("trace", "debug", "info", "warn", "error")
-- `message: any` - Message to log
+- `level: string` - Log level ("error", "warn", "info", "debug", "trace")
+- `message: string` - The message to log
+- `module: string` (optional) - Module name for filtering
 
 **Example:**
 ```lua
-Debug.log("info", "Processing file: " .. filename)
-Debug.log("error", "Failed to open file")
+Debug.log("info", "Operation completed", "workflow.step1")
 ```
 
-### Debug.inspect(any) → string
-Inspects a value (pretty-prints tables).
+#### Debug.error(message, [module])
+Log an error message.
+
+**Example:**
+```lua
+Debug.error("Connection failed", "network.client")
+```
+
+#### Debug.warn(message, [module])
+Log a warning message.
+
+#### Debug.info(message, [module])
+Log an info message.
+
+#### Debug.debug(message, [module])
+Log a debug message.
+
+#### Debug.trace(message, [module])
+Log a trace message.
+
+#### Debug.logWithData(level, message, data, [module])
+Log a message with structured metadata.
 
 **Parameters:**
-- `value: any` - Value to inspect
-
-**Returns:** `string` - Formatted representation
+- `level: string` - Log level
+- `message: string` - Message text
+- `data: table` - Structured data to include
+- `module: string` (optional) - Module name
 
 **Example:**
 ```lua
-local data = {name = "test", values = {1, 2, 3}}
-print(Debug.inspect(data))
+Debug.logWithData("info", "User action", {
+    user_id = "123",
+    action = "login",
+    duration_ms = 150
+}, "auth.tracking")
 ```
+
+### Performance Timing
+
+#### Debug.timer(name) → timer
+Create a new performance timer.
+
+**Parameters:**
+- `name: string` - Timer name for reporting
+
+**Returns:** Timer object with methods:
+- `timer:stop()` - Stop timer and return duration in milliseconds
+- `timer:lap(name)` - Record a lap/checkpoint
+- `timer:elapsed()` - Get elapsed time without stopping
+
+**Example:**
+```lua
+local timer = Debug.timer("data_processing")
+-- Do work...
+timer:lap("data_loaded")
+-- More work...
+local duration = timer:stop()
+print("Operation took " .. duration .. "ms")
+```
+
+### Configuration
+
+#### Debug.setLevel(level)
+Set the global debug level.
+
+**Parameters:**
+- `level: string` - Debug level ("off", "error", "warn", "info", "debug", "trace")
+
+#### Debug.getLevel() → string
+Get the current debug level.
+
+#### Debug.setEnabled(enabled)
+Enable or disable debugging entirely.
+
+#### Debug.isEnabled() → boolean
+Check if debugging is enabled.
+
+### Module Filtering
+
+#### Debug.addModuleFilter(pattern, enabled)
+Add a simple module filter rule.
+
+**Parameters:**
+- `pattern: string` - Filter pattern (supports wildcards)
+- `enabled: boolean` - Whether to enable or disable matching modules
+
+**Example:**
+```lua
+Debug.addModuleFilter("workflow.*", true)  -- Enable workflow modules
+Debug.addModuleFilter("*.test", false)     -- Disable test modules
+```
+
+#### Debug.addAdvancedFilter(pattern, pattern_type, enabled)
+Add an advanced filter rule with specific pattern type.
+
+**Parameters:**
+- `pattern: string` - Filter pattern
+- `pattern_type: string` - Pattern type ("exact", "wildcard", "regex", "hierarchical")
+- `enabled: boolean` - Whether to enable or disable
+
+#### Debug.clearModuleFilters()
+Remove all module filter rules.
+
+#### Debug.removeModuleFilter(pattern) → boolean
+Remove a specific filter pattern.
+
+#### Debug.setDefaultFilterEnabled(enabled)
+Set the default behavior when no filter rules match.
+
+#### Debug.getFilterSummary() → table
+Get a summary of current filter configuration.
+
+### Object Dumping
+
+#### Debug.dump(value, [label]) → string
+Dump a Lua value with default formatting.
+
+**Example:**
+```lua
+local data = {name = "test", items = {1, 2, 3}}
+print(Debug.dump(data, "test_data"))
+```
+
+#### Debug.dumpCompact(value, [label]) → string
+Dump a value in compact (one-line) format.
+
+#### Debug.dumpVerbose(value, [label]) → string
+Dump a value with verbose details including types and addresses.
+
+#### Debug.dumpWithOptions(value, options, [label]) → string
+Dump a value with custom formatting options.
+
+**Options:**
+- `max_depth: number` - Maximum nesting depth
+- `indent_size: number` - Spaces per indent level
+- `max_string_length: number` - Max string length before truncation
+- `show_types: boolean` - Include type information
+- `compact_mode: boolean` - Use compact formatting
+
+### Stack Traces
+
+#### Debug.stackTrace([options]) → string
+Capture and format a stack trace.
+
+**Options:**
+- `max_depth: number` - Maximum stack depth
+- `capture_locals: boolean` - Include local variables
+- `include_source: boolean` - Include source information
+
+#### Debug.stackTraceJson([options]) → string
+Capture stack trace and return as JSON.
+
+### Memory Monitoring
+
+#### Debug.memoryStats() → table
+Get current memory statistics.
+
+**Returns:** Table with:
+- `used_bytes: number` - Used memory
+- `allocated_bytes: number` - Allocated memory
+- `resident_bytes: number` - Resident memory
+- `collections: number` - GC collection count
+
+#### Debug.memorySnapshot() → table
+Take a memory usage snapshot.
+
+### Event Recording
+
+#### Debug.recordEvent(timer_id, event_name, [metadata]) → boolean
+Record a custom event within a timer's measurement.
+
+**Example:**
+```lua
+local timer = Debug.timer("operation")
+Debug.recordEvent(timer.id, "initialization", {config_loaded = true})
+-- Do work...
+Debug.recordEvent(timer.id, "completion", {items_processed = 100})
+timer:stop()
+```
+
+### Captured Entries
+
+#### Debug.getCapturedEntries([limit]) → table
+Get captured debug entries.
+
+**Returns:** Array of entry tables with:
+- `timestamp: string` - ISO 8601 timestamp
+- `level: string` - Log level
+- `message: string` - Log message
+- `module: string` - Module name (optional)
+- `metadata: table` - Structured metadata (optional)
+
+#### Debug.clearCaptured()
+Clear all captured debug entries.
+
+### Performance Reports
+
+#### Debug.performanceReport() → string
+Generate a text-based performance report.
+
+#### Debug.jsonReport() → string
+Generate a JSON performance report for external tools.
+
+#### Debug.flameGraph() → string
+Generate flame graph compatible output for tools like speedscope.
 
 ---
 

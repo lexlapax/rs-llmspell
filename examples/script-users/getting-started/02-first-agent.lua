@@ -1,11 +1,43 @@
--- Example: 02-first-agent.lua
--- Author: LLMSpell Examples  
--- Purpose: First introduction to creating and using an agent
--- Learning: Basic agent creation and conversation
+-- ============================================================
+-- LLMSPELL GETTING STARTED SHOWCASE
+-- ============================================================
+-- Example ID: 02 - First Agent v0.7.0
+-- Complexity Level: BEGINNER
+-- Real-World Use Case: Creating AI assistants for automation and support
+--
+-- Purpose: Learn how to create and interact with LLM agents. Demonstrates
+--          agent builder pattern, configuration options, and basic prompting.
+--          This is your gateway to AI-powered automation in LLMSpell.
+-- Architecture: Agent builder pattern with provider abstraction
+-- Crates Showcased: llmspell-agents, llmspell-bridge
+-- Key Features:
+--   • Agent builder pattern
+--   • Provider detection and selection
+--   • System prompt configuration
+--   • Synchronous agent invocation
+--   • Response handling
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Provider configured (see configs/example-providers.toml)
+--   • Network connectivity for API calls
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
+--   run examples/script-users/getting-started/02-first-agent.lua
+--
+-- EXPECTED OUTPUT:
+-- Available providers: openai, anthropic (or configured providers)
+-- Agent created successfully
+-- Agent response: "2 + 2 equals 4"
+-- Agent info: provider and model details
+--
+-- Time to Complete: <10 seconds
+-- ============================================================
 
 print("=== LLMSpell: Your First Agent ===")
-print("This example shows how to create and talk to an AI agent!")
-print()
+print("Example 02: BEGINNER - Creating and using AI agents")
+print("Showcasing: Agent builder pattern and basic interaction\n")
 
 -- First, let's check what providers are available
 print("1. Checking available providers...")

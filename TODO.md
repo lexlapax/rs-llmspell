@@ -1425,7 +1425,7 @@ docs/archives/technical/           # Archive outdated/redundant files
 
 **AGGRESSIVE CURATION PLAN** (157 → 32 files = 80% reduction):
 
-### **CURATED STRUCTURE** (32 total examples - within industry range):
+**CURATED STRUCTURE** (32 total examples - within industry range):
 
 **🚀 Getting Started** (5 examples) - **10-minute success**:
 ```
@@ -1457,15 +1457,15 @@ docs/archives/technical/           # Archive outdated/redundant files
 ❌ DELETE: Existing minimal rust-developers/ content, replace with quality examples
 ```
 
-### **MASS DELETION TASKS**:
+**MASS DELETION TASKS**:
 
-##### 7.4.5.1 - **Infrastructure Cleanup with Validation** (45 minutes):
+##### 7.4.5.1 - **Infrastructure Cleanup with Validation** ✅ COMPLETED (45 minutes):
 ```
-❌ DELETE: 4 broken shell scripts (run-all-*.sh) referencing missing files
-❌ DELETE: tests-as-examples/ (belongs in tests/, not examples) - 6 files  
-❌ DELETE: lua/debug/ (orphaned, not integrated) - 4 files
-❌ DELETE: .bak/.old files - 2 files
-❌ DELETE: EXAMPLE-INDEX.md (redundant navigation)
+✅ DELETED: 4 broken shell scripts (run-all-*.sh) referencing missing files
+✅ DELETED: tests-as-examples/ (belongs in tests/, not examples) - 6 files  
+✅ DELETED: lua/debug/ (orphaned, not integrated) - 4 files
+✅ DELETED: 2 .bak/.old files 
+✅ DELETED: EXAMPLE-INDEX.md (redundant navigation)
 
 🔍 VALIDATION STEPS:
 1. Before deletion: Run `find examples/ -name "*.sh" -exec {} \;` to identify all broken scripts
@@ -1475,11 +1475,17 @@ docs/archives/technical/           # Archive outdated/redundant files
 5. Update examples/README.md to remove references to deleted files/directories
 ```
 
-##### 7.4.5.2 - **Getting Started Simplification with Full Validation** (75 minutes):
+##### 7.4.5.2 - **Getting Started Simplification with Full Validation** ✅ COMPLETED (75 minutes):
 ```
-❌ DELETE: 6 duplicate subdirectories (01-hello-world/, 02-first-tool/, etc.)
-❌ DELETE: 4 conflicting numbered files (01-agent-basics.lua, 02-first-tools.lua, etc.)
+✅ DELETED: 6 duplicate subdirectories (01-hello-world/, 02-first-tool/, etc.)
+✅ DELETED: 4 conflicting numbered files (01-agent-basics.lua, 02-first-tools.lua, etc.)
+✅ DELETED: Redundant QUICKSTART.md (merged into README.md)
 ✅ RESULT: Clean 5-file progression (00→04) taking 32 minutes total
+✅ FIXED: State API documentation updated to match implementation (requires scope parameter)
+✅ FIXED: Config files corrected (security_level="Safe" case sensitivity)
+✅ UPDATED: All 5 examples with comprehensive headers per format spec
+✅ UPDATED: README.md with correct file names, execution times, and common patterns
+✅ ADDED: features/state-persistence.lua demonstrating proper State API with scopes
 
 🔍 COMPREHENSIVE VALIDATION - Each of 5 kept examples:
 1. **00-hello-world.lua**:
@@ -1500,20 +1506,20 @@ docs/archives/technical/           # Archive outdated/redundant files
    # Expected: Agent creation, simple prompt/response in <10 seconds
    ```
 
-4. **03-first-workflow.lua** (requires API key):
+4. **03-first-workflow.lua** (no API key required):
    ```bash
-   OPENAI_API_KEY=$OPENAI_API_KEY ./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua 2>&1 | tee workflow-output.log
-   # Expected: Sequential workflow execution in <15 seconds
+   ./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua 2>&1 | tee workflow-output.log
+   # Expected: Sequential workflow execution in <20 milliseconds
    ```
 
-5. **04-error-handling.lua**:
+5. **04-handle-errors.lua** (renamed from 04-save-state.lua - State API requires scopes):
    ```bash
-   ./target/debug/llmspell run examples/script-users/getting-started/04-error-handling.lua 2>&1 | tee error-output.log
+   ./target/debug/llmspell run examples/script-users/getting-started/04-handle-errors.lua 2>&1 | tee error-output.log
    # Expected: Demonstrates error patterns, graceful failure handling in <5 seconds
    ```
 
-📝 COMPREHENSIVE HEADER UPDATES (Following applications/code-review-assistant/main.lua format):
-Each example MUST have detailed header including:
+✅ COMPREHENSIVE HEADER UPDATES COMPLETED:
+All 5 examples now have detailed headers following the format:
 ```lua
 -- ============================================================
 -- LLMSPELL [CATEGORY] SHOWCASE  
@@ -1542,9 +1548,9 @@ Each example MUST have detailed header including:
 -- Time to Complete: [Validated execution time]
 -- ============================================================
 ```
-- Update getting-started/README.md with working examples and execution times
-- Verify all headers follow this comprehensive format (not just basic STANDARDS.md)
-- Add "Next steps" navigation between examples
+✅ Updated getting-started/README.md with correct file names and validated execution times
+✅ All headers verified to follow comprehensive format (not just basic STANDARDS.md)
+✅ Merged QUICKSTART.md content into README.md and deleted redundant file
 ```
 
 ##### 7.4.5.3 - **Cookbook Curation with Production Validation** (90 minutes):
@@ -1873,45 +1879,17 @@ Rust (6):
 
 --- 
 
-#### Task 7.4.6: Example Code Audit
+#### Task 7.4.7: Documentation README.mds in docs/ and examples/ need to be consistent and UX improvements
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: NOT DONE
 **Assigned To**: Quality Team
 
-**Description**: Audit and update all example code to use standardized APIs.
-
-**Target Examples**:
-- `examples/` directory
-- [ ] Documentation inline examples
-- [ ] Test examples
-- [ ] README examples
-
-**Audit Checklist**:
-1. [ ] **API Usage** (1.5 hours):
-   - [ ] Uses latest API names
-   - [ ] Follows naming conventions
-   - [ ] Demonstrates best practices
-   - [ ] Includes error handling
-
-2. [ ] **Completeness** (1 hour):
-   - [ ] All major features shown
-   - [ ] Progressive complexity
-   - [ ] Real-world scenarios
-   - [ ] Performance examples
-
-3. [ ] **Testing** (30 min):
-   - [ ] All examples compile
-   - [ ] All examples run
-   - [ ] Output documented
-   - [ ] CI integration
-
-**Acceptance Criteria**:
-- [ ] All examples updated
-- [ ] Examples tested in CI
-- [ ] Documentation references correct
-- [ ] No deprecated API usage
-
+- docs/user-guide/
+- docs/technical/
+- docs/developer-guide/
+- examples/
+- documents in project root
 ---
 
 ### Set 5: Release Preparation

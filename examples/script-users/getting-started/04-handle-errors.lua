@@ -1,11 +1,47 @@
--- Example: 05-handle-errors.lua
--- Author: LLMSpell Examples
--- Purpose: Introduction to proper error handling in LLMSpell scripts
--- Learning: How to handle errors gracefully and provide good user feedback
+-- ============================================================
+-- LLMSPELL GETTING STARTED SHOWCASE
+-- ============================================================
+-- Example ID: 04 - Error Handling v0.7.0
+-- Complexity Level: BEGINNER
+-- Real-World Use Case: Robust automation with graceful error recovery
+--
+-- Purpose: Learn essential error handling patterns for production scripts.
+--          Demonstrates pcall for error catching, result validation, fallback
+--          strategies, and user-friendly error reporting. Critical for reliability.
+-- Architecture: Defensive programming with error boundaries
+-- Crates Showcased: llmspell-tools, llmspell-agents, llmspell-state, llmspell-bridge
+-- Key Features:
+--   • Safe function wrapping with pcall
+--   • Result validation patterns
+--   • Graceful degradation strategies
+--   • Informative error messages
+--   • State API error handling with scopes
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Optional: API keys for agent testing
+--   • Optional: State-enabled config for state testing
+--
+-- HOW TO RUN:
+-- # Basic (no state):
+-- ./target/debug/llmspell run examples/script-users/getting-started/04-handle-errors.lua
+--
+-- # With state enabled:
+-- ./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
+--   run examples/script-users/getting-started/04-handle-errors.lua
+--
+-- EXPECTED OUTPUT:
+-- File operation errors handled gracefully
+-- Agent creation errors caught and reported
+-- State operations with proper scope handling
+-- Best practices demonstrated
+--
+-- Time to Complete: <5 seconds
+-- ============================================================
 
 print("=== LLMSpell: Handling Errors ===")
-print("This example shows how to handle errors gracefully in your scripts!")
-print()
+print("Example 04: BEGINNER - Production-ready error handling")
+print("Showcasing: Defensive programming and graceful recovery\n")
 
 print("1. Basic error handling with tool operations...")
 
@@ -102,26 +138,31 @@ print("3. Error handling with state operations...")
 local function safe_state_operation(operation, key, value)
     print("   Attempting state " .. operation .. " for key: " .. key)
     
-    local result
-    if operation == "get" then
-        result = State and State.get(key)
-    elseif operation == "set" then
-        result = State and State.set(key, value)
-    else
-        print("   ❌ Unknown operation: " .. operation)
-        return nil
-    end
-    
     if not State then
         print("   ⚠️  State not available (run with state-enabled config)")
         return nil
     end
     
-    if result and result.success then
-        print("   ✅ State " .. operation .. " successful")
-        return result.result
+    local success, result
+    if operation == "get" then
+        success, result = pcall(function()
+            return State.load("global", key)
+        end)
+    elseif operation == "set" then
+        success, result = pcall(function()
+            State.save("global", key, value)
+            return true
+        end)
     else
-        print("   ❌ State " .. operation .. " failed: " .. (result and result.error or "Unknown error"))
+        print("   ❌ Unknown operation: " .. operation)
+        return nil
+    end
+    
+    if success then
+        print("   ✅ State " .. operation .. " successful")
+        return result
+    else
+        print("   ❌ State " .. operation .. " failed: " .. tostring(result))
         return nil
     end
 end

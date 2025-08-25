@@ -1,11 +1,43 @@
--- Example: 03-first-workflow.lua
--- Author: LLMSpell Examples
--- Purpose: First introduction to workflows - chaining steps together
--- Learning: Sequential workflow creation and execution
+-- ============================================================
+-- LLMSPELL GETTING STARTED SHOWCASE
+-- ============================================================
+-- Example ID: 03 - First Workflow v0.7.0
+-- Complexity Level: BEGINNER
+-- Real-World Use Case: Multi-step automation and process orchestration
+--
+-- Purpose: Learn workflow creation and execution. Demonstrates how to chain
+--          multiple tools together in a sequential workflow, pass data between
+--          steps, and handle workflow results. Foundation for complex automation.
+-- Architecture: Sequential workflow pattern with step chaining
+-- Crates Showcased: llmspell-workflows, llmspell-tools, llmspell-bridge
+-- Key Features:
+--   • Workflow builder pattern
+--   • Sequential step execution
+--   • Multiple tool orchestration
+--   • Data flow between steps
+--   • Result aggregation
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Write access to /tmp directory
+--   • No API keys required
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua
+--
+-- EXPECTED OUTPUT:
+-- Workflow created with 4 steps
+-- Step 1: Generated UUID v4
+-- Step 2: Got current timestamp
+-- Step 3: Calculated hash
+-- Step 4: Created summary file at /tmp/workflow_[uuid].txt
+--
+-- Time to Complete: <20 milliseconds
+-- ============================================================
 
 print("=== LLMSpell: Your First Workflow ===")
-print("This example shows how to create a workflow that chains multiple steps!")
-print()
+print("Example 03: BEGINNER - Creating multi-step workflows")
+print("Showcasing: Sequential workflow orchestration\n")
 
 print("1. Creating a simple multi-step workflow...")
 print("   This workflow will:")

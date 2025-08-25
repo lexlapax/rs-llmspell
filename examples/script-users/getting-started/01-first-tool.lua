@@ -1,14 +1,44 @@
--- Example: 01-first-tool.lua
--- Author: LLMSpell Examples
--- Purpose: First introduction to using a single tool
--- Learning: Basic tool invocation with the file_operations tool
+-- ============================================================
+-- LLMSPELL GETTING STARTED SHOWCASE
+-- ============================================================
+-- Example ID: 01 - First Tool v0.7.0
+-- Complexity Level: BEGINNER
+-- Real-World Use Case: File management and basic I/O operations
+--
+-- Purpose: Learn fundamental tool invocation patterns with file_operations tool.
+--          Demonstrates how to call tools, pass parameters, and handle results.
+--          This is the foundation for all tool-based automation in LLMSpell.
+-- Architecture: Synchronous tool invocation via Tool.invoke()
+-- Crates Showcased: llmspell-tools (file_operations), llmspell-bridge
+-- Key Features:
+--   • Tool invocation syntax
+--   • Parameter passing patterns
+--   • Result handling (success and error cases)
+--   • File creation, reading, and existence checking
+--
+-- Prerequisites:
+--   • LLMSpell installed and built
+--   • Write access to /tmp directory
+--   • No API keys required
+--
+-- HOW TO RUN:
+-- ./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
+--
+-- EXPECTED OUTPUT:
+-- File created: /tmp/my_first_file.txt (50 bytes written)
+-- File content: "Hello from LLMSpell! This is my first tool usage."
+-- File exists: true
+-- All operations completed successfully
+--
+-- Time to Complete: <5 seconds
+-- ============================================================
 
 print("=== LLMSpell: Your First Tool ===")
-print("This example shows how to use your very first tool!")
-print()
+print("Example 01: BEGINNER - Learning tool invocation patterns")
+print("Showcasing: file_operations tool for basic I/O\n")
 
--- LLMSpell provides many tools out of the box
--- Let's start with the file_operations tool, which can create, read and write files
+-- LLMSpell provides 34+ tools out of the box
+-- We'll start with file_operations for create, read, and check operations
 
 print("1. Creating a test file...")
 local result = Tool.invoke("file_operations", {
