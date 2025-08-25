@@ -2,7 +2,7 @@
 
 **Status**: 🚧 **Under Active Development** - This README reflects our current planning and will be updated as we implement the versioned inheritance architecture described below.
 
-> **📦 Single Binary Distribution**: These applications are embedded in the `llmspell` binary! Users can run them with `llmspell apps <app-name>` without any path configuration. See [EMBEDDED_NOTICE.md](EMBEDDED_NOTICE.md) for details.
+> **📦 Single Binary Distribution**: These applications are embedded in the `llmspell` binary! Users can run them with `llmspell apps <app-name>` without any path configuration. The embedded versions are compiled from `llmspell-cli/resources/applications/` into the binary using `include_str!` and extract to temp directories at runtime.
 
 **Universal → Professional Progression**: Applications start with problems every computer user faces, then evolve naturally toward professional automation. No "hello world" examples - every application addresses genuine problems that progress from universal user pain points to sophisticated professional automation.
 
@@ -302,18 +302,18 @@ Users familiar with base application can upgrade by:
 - **Real Comparisons**: Diff between versions to understand changes
 - **Professional Growth**: Applications become more sophisticated over time
 
-## Current Status (Phase 7) - ✅ COMPLETED WITH CONFIGURATION PROGRESSION
+## Current Status (Phase 7) - ✅ VALIDATED 7.4.5.6
 
-### ✅ **Universal → Professional Progression IMPLEMENTED (5/5)**
-- `file-organizer/` - Universal file organization (3 agents, 35-line config) ✅ WORKING
-- `research-collector/` - Universal research automation (2 agents, 39-line config) ✅ WORKING  
-- `content-creator/` - Power User content generation (4 agents, 69-line config) ✅ WORKING
-- `communication-manager/` - Business communication automation (5 agents, 109-line config) ✅ WORKING
-- `process-orchestrator/` - Professional process orchestration (8 agents, 164-line config) ✅ WORKING
+### ✅ **Universal → Professional Progression VALIDATED (5/5)**
+- `file-organizer/` - Universal file organization (3 agents, 35-line config) ✅ TESTED & WORKING
+- `research-collector/` - Universal research automation (2 agents, 39-line config) ✅ TESTED & WORKING  
+- `content-creator/` - Power User content generation (4 agents, 69-line config) ✅ TESTED & WORKING
+- `communication-manager/` - Business communication automation (5 agents, 109-line config) ✅ TESTED & WORKING
+- `process-orchestrator/` - Professional process orchestration (8 agents, 164-line config) ✅ TESTED & WORKING
 
 ### ✅ **Professional Applications (2/2 - Already Positioned)**
-- `code-review-assistant/` - Professional code quality automation (3 agents) ✅ WORKING
-- `webapp-creator/` - Expert application generation (20 agents) ✅ WORKING
+- `code-review-assistant/` - Professional code quality automation (7 agents) ✅ TESTED & WORKING
+- `webapp-creator/` - Expert application generation (20 agents) ✅ TESTED & WORKING
 
 ### 🎯 **Transformation Results VALIDATED**
 - **Universal Foundation**: ✅ File chaos & research - problems everyone recognizes

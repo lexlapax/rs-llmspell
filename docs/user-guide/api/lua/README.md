@@ -407,6 +407,118 @@ Adds a step to execute when condition is false.
 
 **Parameters:** Same as `add_step`
 
+#### :parallel() → WorkflowBuilder
+Sets workflow to parallel execution mode.
+
+**Returns:** `WorkflowBuilder` - Builder for method chaining
+
+**Example:**
+```lua
+local workflow = Workflow.builder()
+    :name("parallel_tasks")
+    :parallel()
+    :max_concurrency(3)  -- Optional: limit concurrent executions
+    :add_step({name = "task1", type = "tool", tool = "processor"})
+    :add_step({name = "task2", type = "tool", tool = "analyzer"})
+    :build()
+```
+
+#### :conditional() → WorkflowBuilder
+Sets workflow to conditional execution mode.
+
+**Returns:** `WorkflowBuilder` - Builder for method chaining
+
+**Example:**
+```lua
+local workflow = Workflow.builder()
+    :name("conditional_flow")
+    :conditional()
+    :condition({type = "shared_data_equals", key = "priority", value = "urgent"})
+    :add_then_step({name = "urgent_handler", type = "agent", agent = "urgent_processor"})
+    :add_else_step({name = "normal_handler", type = "agent", agent = "normal_processor"})
+    :build()
+```
+
+#### :loop() → WorkflowBuilder
+Sets workflow to loop execution mode.
+
+**Returns:** `WorkflowBuilder` - Builder for method chaining
+
+#### :with_range(table) → WorkflowBuilder
+Configure range-based iteration for loop workflows.
+
+**Parameters:**
+- `range: table` - Range configuration
+  - `start: integer` - Starting value (inclusive)
+  - `["end"]: integer` - Ending value (exclusive)
+  - `step: integer` - Step increment (default: 1)
+
+**Example:**
+```lua
+local workflow = Workflow.builder()
+    :name("range_loop")
+    :loop()
+    :with_range({start = 1, ["end"] = 10, step = 1})
+    :max_iterations(5)  -- Safety limit
+    :add_step({name = "process_item", type = "tool", tool = "processor"})
+    :build()
+```
+
+#### :with_collection(table) → WorkflowBuilder
+Configure collection-based iteration for loop workflows.
+
+**Parameters:**
+- `items: table` - Array of items to iterate over
+
+**Example:**
+```lua
+local workflow = Workflow.builder()
+    :name("collection_loop")
+    :loop()
+    :with_collection({"file1.txt", "file2.txt", "file3.txt"})
+    :add_step({name = "process_file", type = "tool", tool = "file_processor"})
+    :build()
+```
+
+#### :with_while(string) → WorkflowBuilder
+Configure condition-based iteration for loop workflows.
+
+**Parameters:**
+- `condition: string` - Condition expression to evaluate
+
+**Example:**
+```lua
+local workflow = Workflow.builder()
+    :name("while_loop")
+    :loop()
+    :with_while("condition_expression")
+    :max_iterations(10)  -- Required safety limit
+    :add_step({name = "process_while", type = "tool", tool = "processor"})
+    :build()
+```
+
+#### :max_concurrency(integer) → WorkflowBuilder
+Set maximum concurrent executions for parallel workflows.
+
+**Parameters:**
+- `limit: integer` - Maximum number of concurrent steps
+
+**Example:**
+```lua
+builder:max_concurrency(3)  -- Limit to 3 concurrent steps
+```
+
+#### :max_iterations(integer) → WorkflowBuilder
+Set maximum iterations for loop workflows (safety limit).
+
+**Parameters:**
+- `limit: integer` - Maximum number of iterations
+
+**Example:**
+```lua
+builder:max_iterations(100)  -- Prevent infinite loops
+```
+
 #### :build() → Workflow
 Creates the workflow.
 
