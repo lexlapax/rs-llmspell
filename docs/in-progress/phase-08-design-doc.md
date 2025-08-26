@@ -7,6 +7,7 @@
 **Timeline**: Weeks 28-29 (2 weeks)  
 **Priority**: HIGH (Foundation for Memory System)  
 **Dependencies**: Phase 7 Infrastructure Consolidation ✅  
+**Research Archive**: `docs/archives/memory-design-phase08-research.md`
 **Crate Structure**: New `llmspell-rag` crate, enhanced `llmspell-tools`, bridge integration
 
 > **📋 Vector Storage Foundation**: This phase establishes the essential vector storage and retrieval infrastructure that will serve as the foundation for Phase 9's Adaptive Temporal Knowledge Graph memory system. Focus on production-ready HNSW indexing with BGE-M3 embeddings and ColBERT v2 late interaction.

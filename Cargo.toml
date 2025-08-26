@@ -19,6 +19,7 @@ members = [
     "llmspell-state-persistence",
     "llmspell-state-traits",
     "llmspell-sessions",
+    "llmspell-rag",
     "examples/rust-developers/extension-pattern-example",
     "examples/rust-developers/builder-pattern-example", 
     "examples/rust-developers/custom-tool-example",

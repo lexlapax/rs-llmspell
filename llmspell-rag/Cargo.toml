@@ -1,0 +1,67 @@
+[package]
+name = "llmspell-rag"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["rag", "vector", "embeddings", "retrieval", "llm"]
+categories = ["text-processing", "database", "memory-management"]
+description = "Vector storage and RAG (Retrieval-Augmented Generation) infrastructure for llmspell"
+
+[dependencies]
+# Core dependencies
+llmspell-core = { path = "../llmspell-core" }
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-providers = { path = "../llmspell-providers" }
+llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-state-traits = { path = "../llmspell-state-traits" }
+llmspell-sessions = { path = "../llmspell-sessions" }
+llmspell-security = { path = "../llmspell-security" }
+
+# Vector storage
+hnsw = "0.11"  # HNSW vector index implementation
+
+# Async runtime
+tokio = { version = "1.35", features = ["full"] }
+async-trait = "0.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Utilities
+tracing = "0.1"
+parking_lot = "0.12"
+dashmap = "5.5"
+uuid = { version = "1.7", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Token counting for chunking
+tiktoken-rs = "0.5"
+
+[dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
+criterion = "0.5"
+tempfile = "3.9"
+mockall = "0.12"
+
+# Benchmarks will be added when implementation is complete
+# [[bench]]
+# name = "vector_bench"
+# harness = false
+
+# [[bench]]
+# name = "embedding_bench"
+# harness = false
+
+# [[bench]]
+# name = "tenant_bench"
+# harness = false
+
+[lints]
+workspace = true
