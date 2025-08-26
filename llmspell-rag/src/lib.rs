@@ -83,6 +83,9 @@ pub mod chunking;
 /// Retrieval implementations
 pub mod retrieval;
 
+/// Multi-tenant RAG integration
+pub mod multi_tenant_integration;
+
 /// Prelude for convenient imports
 pub mod prelude {
 
@@ -110,7 +113,15 @@ pub mod prelude {
         EmbeddingProviderType, LateInteractionModel, TokenEmbeddings,
     };
 
-    // Multi-tenant exports moved to llmspell-tenancy crate
+    // Multi-tenant RAG integration
+    pub use crate::multi_tenant_integration::{
+        MultiTenantRAG, TenantUsageMetrics, TenantVectorConfig,
+    };
+
+    // State integration
+    pub use crate::state_integration::{
+        StateAwareVectorStorage, TenantVectorStats, VectorOperationMetadata,
+    };
 
     pub use llmspell_state_traits::StateScope;
 }

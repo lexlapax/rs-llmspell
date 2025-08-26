@@ -5,6 +5,6 @@ pub mod policies;
 
 pub use context::{RequestMetadata, SecurityContext, SecurityContextBuilder};
 pub use policies::{
-    AccessControlPolicy, AccessDecision, EnhancedSecurityManager, OperationContext, SecurityFilter, 
+    AccessControlPolicy, AccessDecision, EnhancedSecurityManager, OperationContext, SecurityFilter,
     SecurityPolicy, TenantAccessControlPolicy, VectorAccessPolicy, VectorSecurityManager,
 };

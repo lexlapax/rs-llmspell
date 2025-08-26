@@ -780,10 +780,10 @@ This ensures clean separation of concerns, reusability across all components, an
 **Description**: Add access control policies to `llmspell-security` crate.
 
 **Acceptance Criteria:**
-- [ ] Access control trait defined
-- [ ] RLS-style filters work
-- [ ] Audit logging integrated
-- [ ] Policy evaluation <1ms
+- [x] Access control trait defined
+- [x] RLS-style filters work
+- [x] Audit logging integrated
+- [x] Policy evaluation <1ms
 
 **Implementation Steps:**
 1. Create access control module structure:
@@ -806,11 +806,11 @@ This ensures clean separation of concerns, reusability across all components, an
 5. Add security tests
 
 **Definition of Done:**
-- [ ] Policies enforced correctly
-- [ ] Cross-tenant access blocked
-- [ ] Audit trail complete
-- [ ] Rate limits work
-- [ ] Zero clippy warnings from `scripts/quality-check-minimal.sh`
+- [x] Policies enforced correctly
+- [x] Cross-tenant access blocked
+- [x] Audit trail complete
+- [x] Rate limits work
+- [x] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
 ### Task 8.5.3: Create RAG-Specific Integration
 **Priority**: HIGH  
