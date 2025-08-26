@@ -1,8 +1,10 @@
 //! Access control policies and RLS-style security
 
+pub mod context;
 pub mod policies;
 
+pub use context::{RequestMetadata, SecurityContext, SecurityContextBuilder};
 pub use policies::{
-    AccessDecision, OperationContext, SecurityFilter, SecurityPolicy, VectorAccessPolicy,
-    VectorSecurityManager,
+    AccessControlPolicy, AccessDecision, EnhancedSecurityManager, OperationContext, SecurityFilter, 
+    SecurityPolicy, TenantAccessControlPolicy, VectorAccessPolicy, VectorSecurityManager,
 };

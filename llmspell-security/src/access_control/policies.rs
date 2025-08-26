@@ -10,6 +10,7 @@ use tokio::sync::RwLock;
 use tracing::debug;
 
 use crate::audit::{AuditEvent, AuditLogger};
+use super::context::SecurityContext;
 
 /// Security decision for an operation
 #[derive(Debug, Clone, PartialEq)]
@@ -63,6 +64,29 @@ pub trait SecurityPolicy: Send + Sync {
 
     /// Get policy name
     fn name(&self) -> &str;
+
+    /// Get policy priority (higher = evaluated first)
+    fn priority(&self) -> i32 {
+        0
+    }
+}
+
+/// Enhanced access control policy trait with SecurityContext support
+#[async_trait]
+pub trait AccessControlPolicy: Send + Sync {
+    /// Evaluate access using enhanced security context
+    async fn evaluate_access(&self, security_context: &SecurityContext, operation: &str, resource: &str) -> Result<AccessDecision>;
+
+    /// Check if the policy applies to the given context
+    fn applies_to(&self, security_context: &SecurityContext, operation: &str) -> bool;
+
+    /// Get policy identifier
+    fn policy_id(&self) -> &str;
+
+    /// Get policy version for cache invalidation
+    fn version(&self) -> u32 {
+        1
+    }
 
     /// Get policy priority (higher = evaluated first)
     fn priority(&self) -> i32 {
@@ -368,6 +392,246 @@ impl VectorSecurityManager {
     }
 }
 
+/// Tenant-aware access control policy using SecurityContext
+#[derive(Debug, Clone)]
+pub struct TenantAccessControlPolicy {
+    /// Policy identifier
+    policy_id: String,
+    /// Default tenant for operations when none specified
+    default_tenant: Option<String>,
+    /// Admin roles that get global access
+    admin_roles: HashSet<String>,
+}
+
+impl TenantAccessControlPolicy {
+    /// Create a new tenant access control policy
+    pub fn new(policy_id: impl Into<String>) -> Self {
+        Self {
+            policy_id: policy_id.into(),
+            default_tenant: None,
+            admin_roles: HashSet::from_iter(["admin".to_string(), "super_admin".to_string()]),
+        }
+    }
+
+    /// Set default tenant for operations
+    pub fn with_default_tenant(mut self, tenant_id: impl Into<String>) -> Self {
+        self.default_tenant = Some(tenant_id.into());
+        self
+    }
+
+    /// Add admin role
+    pub fn with_admin_role(mut self, role: impl Into<String>) -> Self {
+        self.admin_roles.insert(role.into());
+        self
+    }
+
+    /// Check if user has admin access
+    fn has_admin_access(&self, security_context: &SecurityContext) -> bool {
+        security_context.roles.iter().any(|role| self.admin_roles.contains(role))
+    }
+
+    /// Get effective tenant ID for the operation
+    fn get_effective_tenant(&self, security_context: &SecurityContext) -> Option<String> {
+        security_context.tenant_id.clone()
+            .or_else(|| self.default_tenant.clone())
+    }
+}
+
+#[async_trait]
+impl AccessControlPolicy for TenantAccessControlPolicy {
+    async fn evaluate_access(
+        &self,
+        security_context: &SecurityContext,
+        _operation: &str,
+        resource: &str,
+    ) -> Result<AccessDecision> {
+        // Validate context first
+        security_context.validate()?;
+
+        // Admin users get full access
+        if self.has_admin_access(security_context) {
+            return Ok(AccessDecision::Allow);
+        }
+
+        // Determine effective tenant
+        let effective_tenant = self.get_effective_tenant(security_context);
+        
+        // For tenant-specific operations, enforce tenant isolation
+        if resource.starts_with("tenant:") {
+            let resource_tenant = resource.strip_prefix("tenant:").unwrap_or("");
+            
+            match &effective_tenant {
+                Some(user_tenant) if user_tenant == resource_tenant => {
+                    // User can access their own tenant's resources
+                    Ok(AccessDecision::Allow)
+                }
+                Some(_) => {
+                    // User trying to access different tenant's resources
+                    Ok(AccessDecision::Deny(format!(
+                        "Cross-tenant access denied: user tenant '{}' cannot access '{}'",
+                        effective_tenant.unwrap(), resource
+                    )))
+                }
+                None => {
+                    // No tenant context for tenant-specific resource
+                    Ok(AccessDecision::Deny(
+                        "Tenant context required for tenant-specific resources".to_string()
+                    ))
+                }
+            }
+        } else {
+            // Non-tenant resources - apply filters based on user's tenant
+            if let Some(tenant_id) = effective_tenant {
+                let filter = SecurityFilter {
+                    field: "tenant_id".to_string(),
+                    allowed_values: HashSet::from_iter([tenant_id]),
+                    exclude: false,
+                };
+                Ok(AccessDecision::AllowWithFilters(vec![filter]))
+            } else {
+                // Global access for non-tenant operations
+                Ok(AccessDecision::Allow)
+            }
+        }
+    }
+
+    fn applies_to(&self, security_context: &SecurityContext, _operation: &str) -> bool {
+        // Policy applies to all requests with valid principals
+        !security_context.principal.is_empty()
+    }
+
+    fn policy_id(&self) -> &str {
+        &self.policy_id
+    }
+
+    fn priority(&self) -> i32 {
+        100 // High priority for tenant isolation
+    }
+}
+
+/// Enhanced security manager supporting both old and new policy types
+pub struct EnhancedSecurityManager {
+    /// Traditional security policies (for future compatibility)
+    #[allow(dead_code)]
+    policies: Arc<RwLock<Vec<Arc<dyn SecurityPolicy>>>>,
+    /// Enhanced access control policies
+    access_policies: Arc<RwLock<Vec<Arc<dyn AccessControlPolicy>>>>,
+    /// Audit logger
+    audit_logger: Arc<AuditLogger>,
+    /// Decision cache
+    decision_cache: Arc<RwLock<HashMap<String, (AccessDecision, std::time::Instant)>>>,
+    /// Cache TTL
+    cache_ttl: u64,
+}
+
+impl EnhancedSecurityManager {
+    /// Create a new enhanced security manager
+    pub fn new(audit_logger: Arc<AuditLogger>) -> Self {
+        Self {
+            policies: Arc::new(RwLock::new(Vec::new())),
+            access_policies: Arc::new(RwLock::new(Vec::new())),
+            audit_logger,
+            decision_cache: Arc::new(RwLock::new(HashMap::new())),
+            cache_ttl: 60,
+        }
+    }
+
+    /// Add an access control policy
+    pub async fn add_access_policy(&self, policy: Arc<dyn AccessControlPolicy>) {
+        let mut policies = self.access_policies.write().await;
+        policies.push(policy);
+        policies.sort_by_key(|p| -p.priority());
+    }
+
+    /// Evaluate access using SecurityContext
+    pub async fn evaluate_access(
+        &self,
+        security_context: &SecurityContext,
+        operation: &str,
+        resource: &str,
+    ) -> Result<AccessDecision> {
+        let cache_key = format!(
+            "{}:{}:{}:{}:{}",
+            security_context.principal,
+            security_context.tenant_id.as_deref().unwrap_or(""),
+            operation,
+            resource,
+            security_context.roles.join(",")
+        );
+
+        // Check cache
+        {
+            let cache = self.decision_cache.read().await;
+            if let Some((decision, timestamp)) = cache.get(&cache_key) {
+                if timestamp.elapsed().as_secs() < self.cache_ttl {
+                    return Ok(decision.clone());
+                }
+            }
+        }
+
+        let policies = self.access_policies.read().await;
+        let mut final_decision = AccessDecision::Deny("No applicable policies".to_string());
+        let mut filters = Vec::new();
+
+        for policy in policies.iter() {
+            if policy.applies_to(security_context, operation) {
+                match policy.evaluate_access(security_context, operation, resource).await? {
+                    AccessDecision::Deny(reason) => {
+                        final_decision = AccessDecision::Deny(reason);
+                        break;
+                    }
+                    AccessDecision::Allow => {
+                        final_decision = AccessDecision::Allow;
+                    }
+                    AccessDecision::AllowWithFilters(mut policy_filters) => {
+                        filters.append(&mut policy_filters);
+                        final_decision = AccessDecision::Allow;
+                    }
+                }
+            }
+        }
+
+        if !filters.is_empty() && matches!(final_decision, AccessDecision::Allow) {
+            final_decision = AccessDecision::AllowWithFilters(filters);
+        }
+
+        // Log audit event
+        let event = match &final_decision {
+            AccessDecision::Allow | AccessDecision::AllowWithFilters(_) => {
+                AuditEvent::AccessGranted {
+                    principal: security_context.principal.clone(),
+                    operation: operation.to_string(),
+                    resource: resource.to_string(),
+                    metadata: security_context.attributes.clone(),
+                }
+            }
+            AccessDecision::Deny(reason) => AuditEvent::AccessDenied {
+                principal: security_context.principal.clone(),
+                operation: operation.to_string(),
+                resource: resource.to_string(),
+                reason: reason.clone(),
+                metadata: security_context.attributes.clone(),
+            },
+        };
+
+        self.audit_logger.log(event).await?;
+
+        // Cache decision
+        {
+            let mut cache = self.decision_cache.write().await;
+            cache.insert(cache_key, (final_decision.clone(), std::time::Instant::now()));
+            cache.retain(|_, (_, timestamp)| timestamp.elapsed().as_secs() < self.cache_ttl * 2);
+        }
+
+        Ok(final_decision)
+    }
+
+    /// Clear decision cache
+    pub async fn clear_cache(&self) {
+        self.decision_cache.write().await.clear();
+    }
+}
+
 /// Default security policies
 pub mod defaults {
     use super::*;
@@ -402,6 +666,20 @@ pub mod defaults {
                 .grant_operation(principal, "update")
                 .grant_operation(principal, "delete")
                 .grant_tenant_access(principal, tenant_id),
+        )
+    }
+
+    /// Create tenant-aware access control policy
+    pub fn tenant_access_control_policy() -> Arc<dyn AccessControlPolicy> {
+        Arc::new(TenantAccessControlPolicy::new("default-tenant-policy"))
+    }
+
+    /// Create admin access control policy
+    pub fn admin_access_control_policy() -> Arc<dyn AccessControlPolicy> {
+        Arc::new(
+            TenantAccessControlPolicy::new("admin-access-policy")
+                .with_admin_role("admin")
+                .with_admin_role("super_admin")
         )
     }
 }
@@ -468,5 +746,152 @@ mod tests {
 
         let decision = policy.evaluate(&context).await;
         assert!(matches!(decision, AccessDecision::Deny(_)));
+    }
+
+    #[tokio::test]
+    async fn test_tenant_access_control_policy() {
+        let policy = TenantAccessControlPolicy::new("test-tenant-policy");
+        
+        let context = SecurityContext::new("user1")
+            .with_tenant_id("tenant1")
+            .with_roles(vec!["user".to_string()]);
+
+        // Test access to own tenant resource
+        let decision = policy.evaluate_access(&context, "search", "tenant:tenant1").await.unwrap();
+        assert!(matches!(decision, AccessDecision::Allow));
+
+        // Test access to different tenant resource
+        let decision = policy.evaluate_access(&context, "search", "tenant:tenant2").await.unwrap();
+        assert!(matches!(decision, AccessDecision::Deny(_)));
+
+        // Test admin access
+        let admin_context = SecurityContext::new("admin")
+            .with_tenant_id("tenant1")
+            .with_roles(vec!["admin".to_string()]);
+        
+        let decision = policy.evaluate_access(&admin_context, "delete", "tenant:tenant2").await.unwrap();
+        assert!(matches!(decision, AccessDecision::Allow));
+    }
+
+    #[tokio::test]
+    async fn test_rls_style_filtering() {
+        let policy = TenantAccessControlPolicy::new("filtering-policy");
+        
+        let context = SecurityContext::new("user1")
+            .with_tenant_id("tenant1")
+            .with_roles(vec!["user".to_string()]);
+
+        // Test non-tenant resource gets filtered
+        let decision = policy.evaluate_access(&context, "search", "global-resource").await.unwrap();
+        
+        if let AccessDecision::AllowWithFilters(filters) = decision {
+            assert_eq!(filters.len(), 1);
+            assert_eq!(filters[0].field, "tenant_id");
+            assert!(filters[0].allowed_values.contains("tenant1"));
+            assert!(!filters[0].exclude);
+        } else {
+            panic!("Expected AllowWithFilters, got {:?}", decision);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_security_manager() {
+        let audit_logger = Arc::new(AuditLogger::new());
+        let manager = EnhancedSecurityManager::new(audit_logger);
+        
+        // Add a tenant policy
+        let policy = Arc::new(TenantAccessControlPolicy::new("test-policy"));
+        manager.add_access_policy(policy).await;
+
+        let context = SecurityContext::new("user1")
+            .with_tenant_id("tenant1")
+            .with_roles(vec!["user".to_string()]);
+
+        // Test evaluation
+        let decision = manager.evaluate_access(&context, "search", "tenant:tenant1").await.unwrap();
+        assert!(matches!(decision, AccessDecision::Allow));
+
+        // Test caching - second call should be faster
+        let decision2 = manager.evaluate_access(&context, "search", "tenant:tenant1").await.unwrap();
+        assert!(matches!(decision2, AccessDecision::Allow));
+    }
+
+    #[tokio::test]
+    async fn test_apply_filters_functionality() {
+        let mut metadata = HashMap::new();
+        metadata.insert("tenant_id".to_string(), serde_json::Value::String("tenant1".to_string()));
+        metadata.insert("user_id".to_string(), serde_json::Value::String("user123".to_string()));
+
+        // Test include filter
+        let filter = SecurityFilter {
+            field: "tenant_id".to_string(),
+            allowed_values: HashSet::from_iter(["tenant1".to_string()]),
+            exclude: false,
+        };
+
+        assert!(VectorSecurityManager::apply_filters(&metadata, std::slice::from_ref(&filter)));
+
+        // Test exclude filter
+        let exclude_filter = SecurityFilter {
+            field: "tenant_id".to_string(),
+            allowed_values: HashSet::from_iter(["tenant2".to_string()]),
+            exclude: true,
+        };
+
+        assert!(VectorSecurityManager::apply_filters(&metadata, &[exclude_filter]));
+
+        // Test failed include
+        let failed_filter = SecurityFilter {
+            field: "tenant_id".to_string(),
+            allowed_values: HashSet::from_iter(["tenant2".to_string()]),
+            exclude: false,
+        };
+
+        assert!(!VectorSecurityManager::apply_filters(&metadata, &[failed_filter]));
+    }
+
+    /// High priority policy for testing
+    struct HighPriorityPolicy {
+        policy_id: String,
+    }
+
+    #[async_trait]
+    impl AccessControlPolicy for HighPriorityPolicy {
+        async fn evaluate_access(&self, _security_context: &SecurityContext, _operation: &str, _resource: &str) -> Result<AccessDecision> {
+            Ok(AccessDecision::Allow)
+        }
+
+        fn applies_to(&self, _security_context: &SecurityContext, _operation: &str) -> bool {
+            true
+        }
+
+        fn policy_id(&self) -> &str {
+            &self.policy_id
+        }
+
+        fn priority(&self) -> i32 {
+            200 // Higher than TenantAccessControlPolicy
+        }
+    }
+
+    #[tokio::test] 
+    async fn test_policy_priority_ordering() {
+        let audit_logger = Arc::new(AuditLogger::new());
+        let manager = EnhancedSecurityManager::new(audit_logger);
+        
+        // Add policies with different priorities
+        let low_priority = Arc::new(TenantAccessControlPolicy::new("low-priority"));
+        let high_priority = Arc::new(HighPriorityPolicy {
+            policy_id: "high-priority".to_string(),
+        });
+
+        manager.add_access_policy(low_priority).await;
+        manager.add_access_policy(high_priority).await;
+
+        // Verify policies are ordered by priority
+        let policies = manager.access_policies.read().await;
+        assert_eq!(policies.len(), 2);
+        assert_eq!(policies[0].policy_id(), "high-priority"); // Higher priority first
+        assert_eq!(policies[1].policy_id(), "low-priority");
     }
 }

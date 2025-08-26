@@ -19,6 +19,7 @@ llmspell-state-traits = { path = "../llmspell-state-traits" }
 llmspell-sessions = { path = "../llmspell-sessions" }
 llmspell-security = { path = "../llmspell-security" }
 llmspell-storage = { path = "../llmspell-storage" }
+llmspell-tenancy = { path = "../llmspell-tenancy" }
 
 # Vector storage
 hnsw = "0.11"  # HNSW vector index implementation
