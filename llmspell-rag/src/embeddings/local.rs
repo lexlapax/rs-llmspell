@@ -15,7 +15,7 @@ use super::provider::EmbeddingModel;
 ///
 /// TODO: In future phases, integrate with:
 /// - candle for BGE-M3, E5 models
-/// - ONNX runtime for FastEmbed models
+/// - ONNX runtime for `FastEmbed` models
 /// - llama.cpp for BERT-based models
 #[derive(Debug)]
 pub struct LocalEmbedding {
@@ -40,22 +40,26 @@ impl LocalEmbedding {
     }
 
     /// Create BGE-M3 placeholder
+    #[must_use]
     pub fn bge_m3() -> Self {
         Self::new("BAAI/bge-m3", 1024)
     }
 
     /// Create E5-large placeholder
+    #[must_use]
     pub fn e5_large() -> Self {
         Self::new("intfloat/e5-large-v2", 1024)
     }
 
     /// Create multilingual E5 placeholder
+    #[must_use]
     pub fn multilingual_e5() -> Self {
         Self::new("intfloat/multilingual-e5-large", 1024)
     }
 
     /// Enable deterministic mock embeddings for testing
-    pub fn with_deterministic(mut self, deterministic: bool) -> Self {
+    #[must_use]
+    pub const fn with_deterministic(mut self, deterministic: bool) -> Self {
         self.deterministic = deterministic;
         self
     }
@@ -64,6 +68,7 @@ impl LocalEmbedding {
     ///
     /// Creates a pseudo-random but deterministic (if enabled) vector
     /// based on the input text hash.
+    #[allow(clippy::cast_precision_loss)]
     fn generate_mock_embedding(&self, text: &str) -> Vec<f32> {
         if self.deterministic {
             // Generate deterministic embeddings based on text hash
@@ -174,17 +179,15 @@ impl EmbeddingModel for LocalEmbedding {
 ///     config: BGEConfig,
 /// }
 /// ```
-
-/// Future: ONNX-based FastEmbed implementation
+/// Future: ONNX-based `FastEmbed` implementation
 ///
 /// ```ignore
-/// pub struct ONNXFastEmbed {
+/// pub struct `ONNXFastEmbed` {
 ///     session: ort::Session,
 ///     tokenizer: tokenizers::Tokenizer,
 ///     model_id: String,
 /// }
 /// ```
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -205,8 +208,7 @@ mod tests {
             let norm: f32 = embedding.iter().map(|x| x * x).sum::<f32>().sqrt();
             assert!(
                 (norm - 1.0).abs() < 0.001,
-                "Embedding not normalized: {}",
-                norm
+                "Embedding not normalized: {norm}"
             );
         }
 

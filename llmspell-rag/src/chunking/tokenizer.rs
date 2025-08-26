@@ -15,7 +15,7 @@ pub trait TokenCounter: Send + Sync {
     fn name(&self) -> &str;
 }
 
-/// Tiktoken-based token counter for OpenAI models
+/// Tiktoken-based token counter for `OpenAI` models
 #[derive(Debug)]
 pub struct TiktokenCounter {
     /// The underlying BPE tokenizer
@@ -27,6 +27,10 @@ pub struct TiktokenCounter {
 
 impl TiktokenCounter {
     /// Create tokenizer for specific model
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tokenizer cannot be created
     pub fn for_model(model: &str) -> Result<Self> {
         let (tokenizer, model_name) = match model {
             // GPT-4 and GPT-3.5-turbo use cl100k_base
@@ -63,8 +67,12 @@ impl TiktokenCounter {
         })
     }
 
-    /// Create default tokenizer (cl100k_base)
-    pub fn default() -> Result<Self> {
+    /// Create default tokenizer (`cl100k_base`)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tokenizer cannot be created
+    pub fn new_default() -> Result<Self> {
         Ok(Self {
             tokenizer: cl100k_base()?,
             model_name: "cl100k_base".to_string(),
@@ -96,13 +104,13 @@ pub struct CharacterTokenCounter {
 impl CharacterTokenCounter {
     /// Create with custom characters per token
     #[must_use]
-    pub fn new(chars_per_token: usize) -> Self {
+    pub const fn new(chars_per_token: usize) -> Self {
         Self { chars_per_token }
     }
 
     /// Create with default estimate (4 chars per token)
     #[must_use]
-    pub fn default_estimate() -> Self {
+    pub const fn default_estimate() -> Self {
         Self { chars_per_token: 4 }
     }
 }
@@ -121,7 +129,7 @@ impl TokenCounter for CharacterTokenCounter {
             .collect()
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "character_estimate"
     }
 }
@@ -132,6 +140,7 @@ pub struct TokenCounterFactory;
 
 impl TokenCounterFactory {
     /// Create token counter for a specific model
+    #[must_use]
     pub fn for_model(model: &str) -> Box<dyn TokenCounter> {
         match TiktokenCounter::for_model(model) {
             Ok(counter) => Box::new(counter),
@@ -140,8 +149,9 @@ impl TokenCounterFactory {
     }
 
     /// Create default token counter
-    pub fn default() -> Box<dyn TokenCounter> {
-        match TiktokenCounter::default() {
+    #[must_use]
+    pub fn new_default() -> Box<dyn TokenCounter> {
+        match TiktokenCounter::new_default() {
             Ok(counter) => Box::new(counter),
             Err(_) => Box::new(CharacterTokenCounter::default_estimate()),
         }
@@ -190,7 +200,7 @@ mod tests {
 
         for model in models {
             let counter = TiktokenCounter::for_model(model);
-            assert!(counter.is_ok(), "Failed to create tokenizer for {}", model);
+            assert!(counter.is_ok(), "Failed to create tokenizer for {model}");
         }
     }
 
@@ -199,7 +209,7 @@ mod tests {
         let counter = TokenCounterFactory::for_model("gpt-4");
         assert_eq!(counter.name(), "cl100k_base");
 
-        let default = TokenCounterFactory::default();
+        let default = TokenCounterFactory::new_default();
         assert!(!default.name().is_empty());
     }
 

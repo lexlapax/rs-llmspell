@@ -87,6 +87,7 @@ impl EmbeddingCache {
     }
 
     /// Generate cache key from text content
+    #[must_use]
     pub fn generate_key(text: &str) -> String {
         use std::collections::hash_map::DefaultHasher;
         let mut hasher = DefaultHasher::new();
@@ -255,8 +256,10 @@ mod tests {
 
     #[test]
     fn test_lru_eviction() {
-        let mut config = CacheConfig::default();
-        config.max_entries = 3;
+        let config = CacheConfig {
+            max_entries: 3,
+            ..Default::default()
+        };
         let cache = EmbeddingCache::new(config);
 
         // Fill cache
@@ -278,8 +281,10 @@ mod tests {
 
     #[test]
     fn test_ttl_expiration() {
-        let mut config = CacheConfig::default();
-        config.ttl = Some(Duration::from_millis(100));
+        let config = CacheConfig {
+            ttl: Some(Duration::from_millis(100)),
+            ..Default::default()
+        };
         let cache = EmbeddingCache::new(config);
 
         cache.put("test".to_string(), vec![1.0]).unwrap();

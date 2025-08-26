@@ -1,4 +1,4 @@
-//! OpenAI embedding provider implementation
+//! `OpenAI` embedding provider implementation
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -9,7 +9,7 @@ use std::env;
 
 use super::provider::{EmbeddingModel, EmbeddingProviderConfig};
 
-/// OpenAI embedding model implementation
+/// `OpenAI` embedding model implementation
 #[derive(Debug)]
 pub struct OpenAIEmbedding {
     /// Model name (e.g., text-embedding-3-small, text-embedding-3-large)
@@ -35,11 +35,15 @@ pub struct OpenAIEmbedding {
 }
 
 impl OpenAIEmbedding {
-    /// Create new OpenAI embedding provider
+    /// Create new `OpenAI` embedding provider
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the API key is not found or the model is not supported
     pub fn new(config: &EmbeddingProviderConfig) -> Result<Self> {
         let api_key = if let Some(env_var) = &config.api_key_env {
             env::var(env_var).map_err(|_| LLMSpellError::Configuration {
-                message: format!("API key environment variable '{}' not set", env_var),
+                message: format!("API key environment variable '{env_var}' not set"),
                 source: None,
             })?
         } else {
@@ -59,8 +63,7 @@ impl OpenAIEmbedding {
         let (default_dimensions, cost_per_1k_tokens) = match config.model.as_str() {
             "text-embedding-3-small" => (1536, 0.00002),
             "text-embedding-3-large" => (3072, 0.00013),
-            "text-embedding-ada-002" => (1536, 0.00010),
-            _ => (1536, 0.00010), // Default to ada-002 pricing
+            _ => (1536, 0.00010),
         };
 
         Ok(Self {
@@ -75,6 +78,10 @@ impl OpenAIEmbedding {
     }
 
     /// Create from environment variables
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `OPENAI_API_KEY` environment variable is not set
     pub fn from_env(model: &str) -> Result<Self> {
         let config = EmbeddingProviderConfig {
             model: model.to_string(),
@@ -118,7 +125,7 @@ impl EmbeddingModel for OpenAIEmbedding {
             .send()
             .await
             .map_err(|e| LLMSpellError::Provider {
-                message: format!("Failed to send embedding request: {}", e),
+                message: format!("Failed to send embedding request: {e}"),
                 provider: Some("OpenAI".to_string()),
                 source: Some(Box::new(e)),
             })?;
@@ -130,7 +137,7 @@ impl EmbeddingModel for OpenAIEmbedding {
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_string());
             return Err(LLMSpellError::Provider {
-                message: format!("OpenAI API error ({}): {}", status, error_text),
+                message: format!("OpenAI API error ({status}): {error_text}"),
                 provider: Some("OpenAI".to_string()),
                 source: None,
             }
@@ -139,7 +146,7 @@ impl EmbeddingModel for OpenAIEmbedding {
 
         let result: EmbeddingResponse =
             response.json().await.map_err(|e| LLMSpellError::Provider {
-                message: format!("Failed to parse embedding response: {}", e),
+                message: format!("Failed to parse embedding response: {e}"),
                 provider: Some("OpenAI".to_string()),
                 source: Some(Box::new(e)),
             })?;
@@ -191,7 +198,7 @@ impl EmbeddingModel for OpenAIEmbedding {
     }
 }
 
-/// OpenAI embedding request structure
+/// `OpenAI` embedding request structure
 #[derive(Debug, Serialize)]
 struct EmbeddingRequest {
     input: Vec<String>,
@@ -204,7 +211,7 @@ struct EmbeddingRequest {
     user: Option<String>,
 }
 
-/// OpenAI embedding response structure
+/// `OpenAI` embedding response structure
 #[derive(Debug, Deserialize)]
 struct EmbeddingResponse {
     data: Vec<EmbeddingData>,

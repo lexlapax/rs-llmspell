@@ -28,14 +28,14 @@ impl EmbeddingFactory {
     /// Create an embedding model instance
     ///
     /// Routes to the appropriate provider based on configuration:
-    /// - OpenAI: text-embedding-3-small/large, ada-002
+    /// - `OpenAI`: text-embedding-3-small/large, ada-002
     /// - Local: BGE-M3, E5 models (mock implementation for now)
     /// - Others: Return error (not yet implemented)
     ///
     /// # Errors
     ///
     /// Returns an error if the provider is not supported or configuration is invalid
-    pub async fn create_model(&self) -> Result<Arc<dyn EmbeddingModel>> {
+    pub fn create_model(&self) -> Result<Arc<dyn EmbeddingModel>> {
         match &self.config.provider_type {
             EmbeddingProviderType::OpenAI => {
                 let model = OpenAIEmbedding::new(&self.config)?;
@@ -88,16 +88,23 @@ impl EmbeddingFactory {
     }
 
     /// Get total tokens used across all embedding calls
+    #[must_use]
     pub fn total_tokens_used(&self) -> usize {
         self.total_tokens_used
             .load(std::sync::atomic::Ordering::Relaxed)
     }
 
     /// Estimate total cost based on tokens used
-    pub async fn estimated_cost(&self) -> Result<f64> {
-        let model = self.create_model().await?;
+    /// Calculate the estimated cost based on token usage
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if model creation fails
+    pub fn estimated_cost(&self) -> Result<f64> {
+        let model = self.create_model()?;
         let tokens = self.total_tokens_used();
         let cost_per_token = model.cost_per_token().unwrap_or(0.0);
+        #[allow(clippy::cast_precision_loss)]
         Ok(tokens as f64 * cost_per_token)
     }
 
@@ -159,7 +166,7 @@ mod tests {
         };
 
         let factory = EmbeddingFactory::new(config);
-        let model = factory.create_model().await.unwrap();
+        let model = factory.create_model().unwrap();
 
         assert_eq!(model.model_id(), "text-embedding-3-small");
         assert_eq!(model.dimensions(), 1536);
@@ -178,7 +185,7 @@ mod tests {
         };
 
         let factory = EmbeddingFactory::new(config);
-        let model = factory.create_model().await.unwrap();
+        let model = factory.create_model().unwrap();
 
         assert_eq!(model.model_id(), "BAAI/bge-m3");
         assert_eq!(model.dimensions(), 512);
@@ -194,7 +201,7 @@ mod tests {
         };
 
         let factory = EmbeddingFactory::new(config);
-        let result = factory.create_model().await;
+        let result = factory.create_model();
 
         assert!(result.is_err());
         let err = result.err().unwrap();
@@ -215,8 +222,8 @@ mod tests {
         assert_eq!(factory.total_tokens_used(), 0);
 
         // Local models have zero cost
-        let cost = factory.estimated_cost().await.unwrap();
-        assert_eq!(cost, 0.0);
+        let cost = factory.estimated_cost().unwrap();
+        assert!((cost - 0.0).abs() < f64::EPSILON);
 
         // Reset should work
         factory.reset_tracking();

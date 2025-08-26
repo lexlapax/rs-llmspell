@@ -82,6 +82,10 @@ impl DocumentChunk {
 /// Trait for chunking strategies
 pub trait ChunkingStrategy: Send + Sync {
     /// Split text into chunks
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if chunking fails due to invalid configuration or tokenization issues
     fn chunk(&self, text: &str, config: &ChunkingConfig) -> Result<Vec<DocumentChunk>>;
 
     /// Get strategy name
@@ -94,6 +98,7 @@ pub trait ChunkingStrategy: Send + Sync {
 /// Sliding window chunking strategy
 ///
 /// Splits text into fixed-size overlapping chunks
+#[derive(Default)]
 pub struct SlidingWindowChunker {
     /// Optional tokenizer for accurate token counting
     tokenizer: Option<Box<dyn super::tokenizer::TokenCounter>>,
@@ -104,12 +109,6 @@ impl std::fmt::Debug for SlidingWindowChunker {
         f.debug_struct("SlidingWindowChunker")
             .field("has_tokenizer", &self.tokenizer.is_some())
             .finish()
-    }
-}
-
-impl Default for SlidingWindowChunker {
-    fn default() -> Self {
-        Self { tokenizer: None }
     }
 }
 
@@ -128,7 +127,7 @@ impl SlidingWindowChunker {
     }
 
     /// Find the next sentence boundary
-    fn find_sentence_boundary(&self, text: &str, start: usize, max_pos: usize) -> usize {
+    fn find_sentence_boundary(text: &str, start: usize, max_pos: usize) -> usize {
         let search_text = &text[start..max_pos.min(text.len())];
 
         // Look for sentence endings
@@ -140,7 +139,7 @@ impl SlidingWindowChunker {
                     || text
                         .chars()
                         .nth(next_pos / ch.len_utf8())
-                        .map_or(false, char::is_whitespace)
+                        .is_some_and(char::is_whitespace)
                 {
                     return next_pos;
                 }
@@ -152,7 +151,7 @@ impl SlidingWindowChunker {
     }
 
     /// Find the next paragraph boundary
-    fn find_paragraph_boundary(&self, text: &str, start: usize, max_pos: usize) -> usize {
+    fn find_paragraph_boundary(text: &str, start: usize, max_pos: usize) -> usize {
         let search_text = &text[start..max_pos.min(text.len())];
 
         // Look for double newlines
@@ -186,9 +185,9 @@ impl ChunkingStrategy for SlidingWindowChunker {
 
             // Adjust for boundaries if configured
             let chunk_end = if config.respect_paragraphs {
-                self.find_paragraph_boundary(text, current_pos, estimated_end)
+                Self::find_paragraph_boundary(text, current_pos, estimated_end)
             } else if config.respect_sentences {
-                self.find_sentence_boundary(text, current_pos, estimated_end)
+                Self::find_sentence_boundary(text, current_pos, estimated_end)
             } else {
                 estimated_end.min(text.len())
             };
@@ -225,40 +224,42 @@ impl ChunkingStrategy for SlidingWindowChunker {
         Ok(chunks)
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "sliding_window"
     }
 
     fn estimate_tokens(&self, text: &str) -> usize {
-        if let Some(tokenizer) = &self.tokenizer {
-            tokenizer.count_tokens(text)
-        } else {
-            // Rough estimate: 1 token per 4 characters
-            text.len() / 4
-        }
+        self.tokenizer.as_ref().map_or_else(
+            || text.len() / 4, // Rough estimate: 1 token per 4 characters
+            |tokenizer| tokenizer.count_tokens(text),
+        )
     }
 }
 
 impl SlidingWindowChunker {
     /// Estimate byte size for a given token count
     fn estimate_chunk_size(&self, text: &str, start: usize, target_tokens: usize) -> usize {
-        if let Some(tokenizer) = &self.tokenizer {
-            // Use tokenizer for accurate estimation
-            let mut end = start;
+        self.tokenizer.as_ref().map_or_else(
+            || {
+                // Simple estimation without tokenizer: ~4 chars per token
+                let estimated_chars = target_tokens * 4;
+                start + estimated_chars.min(text.len() - start)
+            },
+            |tokenizer| {
+                // Use tokenizer for accurate estimation
+                let mut end = start;
 
-            for ch in text[start..].chars() {
-                end += ch.len_utf8();
-                let token_count = tokenizer.count_tokens(&text[start..end]);
-                if token_count >= target_tokens {
-                    break;
+                for ch in text[start..].chars() {
+                    end += ch.len_utf8();
+                    let token_count = tokenizer.count_tokens(&text[start..end]);
+                    if token_count >= target_tokens {
+                        break;
+                    }
                 }
-            }
 
-            end
-        } else {
-            // Rough estimate: 4 characters per token
-            start + (target_tokens * 4).min(text.len() - start)
-        }
+                end
+            },
+        )
     }
 }
 
@@ -275,7 +276,7 @@ pub struct SemanticChunker {
 impl SemanticChunker {
     /// Create new semantic chunker
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             similarity_threshold: 0.5,
         }
@@ -283,7 +284,7 @@ impl SemanticChunker {
 
     /// Set similarity threshold
     #[must_use]
-    pub fn with_threshold(mut self, threshold: f32) -> Self {
+    pub const fn with_threshold(mut self, threshold: f32) -> Self {
         self.similarity_threshold = threshold;
         self
     }
@@ -297,7 +298,7 @@ impl ChunkingStrategy for SemanticChunker {
         chunker.chunk(text, config)
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "semantic"
     }
 
