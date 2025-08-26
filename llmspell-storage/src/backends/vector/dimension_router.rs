@@ -8,9 +8,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info};
 
-use crate::embeddings::DimensionMapper;
-use crate::storage::hnsw::HNSWVectorStorage;
-use crate::traits::{
+use super::hnsw::HNSWVectorStorage;
+use crate::vector_storage::{
     HNSWConfig, ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };
 use llmspell_state_traits::StateScope;
@@ -30,10 +29,11 @@ pub struct DimensionRouter {
     /// Map of dimension size to storage instance
     storages: DashMap<usize, Arc<HNSWVectorStorage>>,
 
-    /// Dimension mapper for handling conversions
-    #[allow(dead_code)]
-    mapper: DimensionMapper,
-
+    // TODO: Handle dimension mapping dependency from llmspell-rag
+    // This should be injected or handled at a higher level
+    // /// Dimension mapper for handling conversions
+    // #[allow(dead_code)]
+    // mapper: DimensionMapper,
     /// Default HNSW configuration for new indices
     default_config: HNSWConfig,
 
@@ -64,12 +64,13 @@ impl DimensionRouter {
     /// Create a new dimension router
     #[must_use]
     pub fn new(config: HNSWConfig) -> Self {
+        // TODO: Handle dimension configuration dependency
         // Standard dimension configuration
-        let dimension_config = crate::embeddings::DimensionConfig::default();
+        // let dimension_config = crate::embeddings::DimensionConfig::default();
 
         Self {
             storages: DashMap::new(),
-            mapper: DimensionMapper::new(dimension_config),
+            // mapper: DimensionMapper::new(dimension_config),
             default_config: config,
             allow_reduction: true,
             stats: Arc::new(DashMap::new()),

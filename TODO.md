@@ -236,6 +236,272 @@
 - [x] Documentation complete
 - [x] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
+### Task 8.2.4: Refactor Vector Storage to llmspell-storage ✅
+**Priority**: CRITICAL  
+**Estimated Time**: 6 hours  
+**Assignee**: Architecture Team Lead
+
+**Description**: Move vector storage from llmspell-rag to llmspell-storage to maintain proper architectural separation.
+
+**Reasoning:**
+- **Architectural Integrity**: Storage is foundational infrastructure, RAG is application-level
+- **Dependency Management**: Prevents circular dependencies, allows other crates to use vector storage
+- **Industry Standard**: Follows LangChain/Chroma/Qdrant pattern of separating storage from RAG logic
+- **Single Responsibility**: Each crate maintains focused purpose
+- **Future Flexibility**: Agents, workflows, sessions can use vectors without RAG dependency
+
+**Acceptance Criteria:**
+- [x] All vector storage code moved to llmspell-storage
+- [x] llmspell-rag depends on llmspell-storage for vectors
+- [x] All existing tests pass
+- [x] No circular dependencies
+- [x] Clean compilation with no warnings
+
+### Task 8.2.4.1: Create Vector Module Structure in llmspell-storage
+**Priority**: CRITICAL  
+**Estimated Time**: 1 hour  
+**Assignee**: Storage Team
+
+**Implementation Steps:**
+1. Create directory structure in llmspell-storage:
+   ```
+   llmspell-storage/src/
+   ├── backends/
+   │   └── vector/
+   │       ├── mod.rs
+   │       ├── hnsw.rs
+   │       ├── dimension_router.rs
+   │       └── metadata_index.rs
+   └── vector_storage.rs
+   ```
+2. Create `vector_storage.rs` with vector-specific traits
+3. Update `lib.rs` to expose vector module
+4. Add vector module exports to `backends/mod.rs`
+5. Ensure module structure follows existing pattern
+
+**Definition of Done:**
+- [x] Directory structure created
+- [x] Module files initialized with proper headers
+- [x] Modules properly exposed in lib.rs
+
+### Task 8.2.4.2: Move Vector Storage Traits ✅
+**Priority**: CRITICAL  
+**Estimated Time**: 1.5 hours  
+**Assignee**: Storage Team
+
+**Implementation Steps:**
+1. Move traits from `llmspell-rag/src/traits.rs`:
+   - `VectorStorage` trait
+   - `VectorEntry` struct
+   - `VectorQuery` struct
+   - `VectorResult` struct
+   - `StorageStats` struct
+   - `ScopedStats` struct
+   - `HNSWConfig` struct
+   - `DistanceMetric` enum
+2. Place in `llmspell-storage/src/vector_storage.rs`
+3. Update imports to use `llmspell_state_traits::StateScope`
+4. Add necessary dependencies to llmspell-storage/Cargo.toml:
+   - `async-trait`
+   - `dashmap`
+   - `parking_lot`
+5. Ensure traits are re-exported from lib.rs
+
+**Definition of Done:**
+- [x] All vector traits moved
+- [x] Imports updated
+- [x] Dependencies added to Cargo.toml
+- [x] Traits accessible from llmspell-storage
+
+### Task 8.2.4.3: Move Vector Storage Implementations ✅
+**Priority**: CRITICAL  
+**Estimated Time**: 2 hours  
+**Assignee**: Storage Team
+
+**Implementation Steps:**
+1. Move implementation files:
+   - `llmspell-rag/src/storage/hnsw.rs` → `llmspell-storage/src/backends/vector/hnsw.rs`
+   - `llmspell-rag/src/storage/dimension_router.rs` → `llmspell-storage/src/backends/vector/dimension_router.rs`
+   - `llmspell-rag/src/storage/metadata_index.rs` → `llmspell-storage/src/backends/vector/metadata_index.rs`
+2. Update imports in moved files:
+   - Change `crate::traits` to `crate::vector_storage`
+   - Update relative imports to absolute paths
+3. Update `backends/vector/mod.rs` to expose implementations:
+   ```rust
+   pub mod hnsw;
+   pub mod dimension_router;
+   pub mod metadata_index;
+   
+   pub use hnsw::HNSWVectorStorage;
+   pub use dimension_router::DimensionRouter;
+   pub use metadata_index::{MetadataIndex, MetadataQueryOptimizer};
+   ```
+4. Remove old storage directory from llmspell-rag
+
+**Definition of Done:**
+- [x] All implementation files moved
+- [x] Imports updated in all files
+- [x] Module exports configured
+- [x] Old files removed from llmspell-rag
+
+### Task 8.2.4.4: Update llmspell-rag Dependencies ✅
+**Priority**: HIGH  
+**Estimated Time**: 1 hour  
+**Assignee**: RAG Team
+
+**Implementation Steps:**
+1. Update `llmspell-rag/Cargo.toml`:
+   - Add dependency: `llmspell-storage = { path = "../llmspell-storage" }`
+   - Keep hnsw dependency (may be needed for future RAG-specific features)
+2. Update imports in llmspell-rag:
+   - Change `crate::storage::*` to `llmspell_storage::backends::vector::*`
+   - Change `crate::traits::*` to `llmspell_storage::vector_storage::*`
+3. Update `llmspell-rag/src/lib.rs`:
+   - Remove storage module
+   - Remove traits module (or keep only RAG-specific traits)
+   - Re-export commonly used vector types from llmspell-storage
+4. Clean up any remaining references
+
+**Definition of Done:**
+- [x] Cargo.toml updated
+- [x] All imports updated
+- [x] lib.rs cleaned up
+- [x] No dangling references
+
+### Task 8.2.4.5: Fix Compilation Issues ✅
+**Priority**: HIGH  
+**Estimated Time**: 1 hour  
+**Assignee**: Full Team
+
+**Implementation Steps:**
+1. Run `cargo build --workspace` and fix errors:
+   - Missing imports
+   - Type mismatches
+   - Visibility issues (pub vs pub(crate))
+2. Check each crate individually:
+   ```bash
+   cargo build -p llmspell-storage
+   cargo build -p llmspell-rag
+   ```
+3. Fix any feature flag issues
+4. Resolve any trait implementation conflicts
+5. Update any hardcoded paths in tests
+
+**Definition of Done:**
+- [x] Workspace builds successfully
+- [x] llmspell-storage builds independently
+- [x] llmspell-rag builds independently
+- [x] No compilation warnings
+
+### Task 8.2.4.6: Update and Run Tests ✅
+**Priority**: HIGH  
+**Estimated Time**: 1.5 hours  
+**Assignee**: Test Team
+
+**Implementation Steps:**
+1. Move vector storage tests to llmspell-storage:
+   - Unit tests from implementation files
+   - Integration tests if any
+2. Update test imports to use new paths
+3. Run tests for llmspell-storage:
+   ```bash
+   cargo test -p llmspell-storage --all-features
+   ```
+4. Create integration test in llmspell-rag that uses llmspell-storage vectors
+5. Run full test suite:
+   ```bash
+   cargo test --workspace --all-features
+   ```
+6. Fix any failing tests
+
+**Definition of Done:**
+- [x] All tests moved appropriately
+- [x] Tests pass in llmspell-storage
+- [x] Integration test created
+- [x] All workspace tests pass
+
+### Task 8.2.4.7: Run Clippy and Fix Warnings ✅
+**Priority**: HIGH  
+**Estimated Time**: 1 hour  
+**Assignee**: Quality Team
+
+**Implementation Steps:**
+1. Run clippy on llmspell-storage:
+   ```bash
+   cargo clippy -p llmspell-storage --all-features --all-targets -- -D warnings
+   ```
+2. Fix any warnings:
+   - Unused imports
+   - Dead code
+   - Missing documentation
+   - Visibility issues
+3. Run clippy on llmspell-rag:
+   ```bash
+   cargo clippy -p llmspell-rag --all-features --all-targets -- -D warnings
+   ```
+4. Run pedantic clippy and fix critical issues:
+   ```bash
+   cargo clippy -p llmspell-storage --all-features --all-targets -- -W clippy::pedantic
+   ```
+5. Run quality check script:
+   ```bash
+   ./scripts/quality-check-minimal.sh
+   ```
+
+**Definition of Done:**
+- [x] No clippy warnings with -D warnings
+- [x] Critical pedantic warnings fixed
+- [x] quality-check-minimal.sh passes
+
+### Task 8.2.4.8: Update Documentation ✅
+**Priority**: MEDIUM  
+**Estimated Time**: 1 hour  
+**Assignee**: Documentation Team
+
+**Implementation Steps:**
+1. Update module documentation in llmspell-storage:
+   - Add vector storage section to lib.rs docs
+   - Document the architectural decision
+   - Add usage examples
+2. Update llmspell-rag documentation:
+   - Remove vector storage references
+   - Add note about using llmspell-storage for vectors
+   - Update examples to show proper imports
+3. Update architecture diagram if needed
+4. Add migration note to CHANGELOG or release notes
+5. Update any README files affected
+
+**Definition of Done:**
+- [x] llmspell-storage docs include vector storage
+- [x] llmspell-rag docs updated
+- [x] Examples work correctly
+- [x] Architecture documented
+
+### Task 8.2.4.9: Validate No Circular Dependencies ✅
+**Priority**: CRITICAL  
+**Estimated Time**: 30 minutes  
+**Assignee**: Architecture Team
+
+**Implementation Steps:**
+1. Check dependency graph:
+   ```bash
+   cargo tree -p llmspell-storage --no-dedupe
+   cargo tree -p llmspell-rag --no-dedupe
+   ```
+2. Ensure llmspell-storage doesn't depend on llmspell-rag
+3. Verify other crates can now use vector storage:
+   - llmspell-agents could use vectors
+   - llmspell-sessions could use vectors
+   - llmspell-workflows could use vectors
+4. Document the clean dependency chain
+5. Run `cargo build --workspace` one final time
+
+**Definition of Done:**
+- [x] No circular dependencies detected
+- [x] Clean dependency graph
+- [x] Documentation of dependencies
+- [x] Full workspace builds
+- [x] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 ---
 
 ## Phase 8.3: Embedding Pipeline (Days 3-4)

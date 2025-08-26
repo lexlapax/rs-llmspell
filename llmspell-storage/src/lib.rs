@@ -13,6 +13,7 @@
 //!
 //! - **MemoryBackend**: In-memory storage for testing and temporary data
 //! - **SledBackend**: Embedded database for persistent local storage
+//! - **Vector Storage**: HNSW-based vector storage with dimension routing and metadata filtering
 //! - Custom backends can be implemented via the `StorageBackend` trait
 //!
 //! # Examples
@@ -98,7 +99,14 @@
 
 pub mod backends;
 pub mod traits;
+pub mod vector_storage;
 
 // Re-export commonly used types
 pub use backends::{MemoryBackend, SledBackend};
 pub use traits::{StorageBackend, StorageBackendType, StorageCharacteristics, StorageSerialize};
+
+// Re-export vector storage types
+pub use vector_storage::{
+    DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
+    VectorEntry, VectorQuery, VectorResult, VectorStorage,
+};

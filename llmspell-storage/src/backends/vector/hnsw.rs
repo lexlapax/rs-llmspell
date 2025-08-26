@@ -11,9 +11,9 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use crate::traits::hnsw::{DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats};
-use crate::traits::storage::{
-    ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
+use crate::vector_storage::{
+    DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
+    VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };
 use llmspell_state_traits::StateScope;
 
