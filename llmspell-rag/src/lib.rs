@@ -67,8 +67,7 @@ pub mod embeddings;
 /// RAG pipeline orchestration
 pub mod pipeline;
 
-/// Multi-tenant isolation and management
-pub mod multi_tenant;
+// Multi-tenant functionality moved to llmspell-tenancy crate
 
 /// State persistence integration
 pub mod state_integration;
@@ -76,8 +75,7 @@ pub mod state_integration;
 /// Session management integration
 pub mod session_integration;
 
-/// Security policies and access control
-pub mod security;
+// Security functionality moved to llmspell-security crate
 
 /// Document chunking strategies
 pub mod chunking;
@@ -112,10 +110,7 @@ pub mod prelude {
         EmbeddingProviderType, LateInteractionModel, TokenEmbeddings,
     };
 
-    // Multi-tenant exports will be added when implemented
-    // pub use crate::multi_tenant::{
-    //     MultiTenantVectorManager, TenantUsageTracker, TenantLimits,
-    // };
+    // Multi-tenant exports moved to llmspell-tenancy crate
 
     pub use llmspell_state_traits::StateScope;
 }

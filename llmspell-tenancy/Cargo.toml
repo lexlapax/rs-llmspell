@@ -1,0 +1,45 @@
+[package]
+name = "llmspell-tenancy"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+keywords = ["multi-tenant", "tenancy", "isolation", "usage-tracking"]
+categories = ["data-structures", "memory-management"]
+description = "Multi-tenant infrastructure for llmspell with isolation and usage tracking"
+
+[dependencies]
+# Core dependencies
+llmspell-state-traits = { path = "../llmspell-state-traits" }
+llmspell-storage = { path = "../llmspell-storage" }
+
+# Async runtime
+async-trait = "0.1"
+tokio = { version = "1.35", features = ["sync", "time"] }
+
+# Data structures
+dashmap = "5.5"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Error handling
+anyhow = "1.0"
+
+# Logging
+tracing = "0.1"
+
+# UUID for tenant IDs
+uuid = { version = "1.7", features = ["v4", "serde"] }
+
+# Time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+[dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
+tokio = { version = "1.35", features = ["full", "test-util"] }
+
+[lints]
+workspace = true

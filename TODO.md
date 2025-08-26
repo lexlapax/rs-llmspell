@@ -669,124 +669,213 @@
 
 ## Phase 8.5: Multi-Tenant Architecture (Days 5-6)
 
-### Task 8.5.1: Implement Tenant Manager
-**Priority**: CRITICAL  
-**Estimated Time**: 5 hours  
-**Assignee**: Multi-Tenant Team Lead
+**Architectural Approach**: Hybrid Multi-Crate Design
 
-**Description**: Build multi-tenant vector manager with isolation.
+**Reasoning**: After analyzing the codebase architecture, we're taking a hybrid approach that:
+- Creates a new `llmspell-tenancy` crate for reusable multi-tenant infrastructure (following the pattern of `llmspell-state-persistence`, `llmspell-sessions`)
+- Extends `llmspell-security` with access control policies (where security belongs)
+- Keeps only RAG-specific integration in `llmspell-rag` (avoiding monolithic design)
+
+This ensures clean separation of concerns, reusability across all components, and maintains architectural consistency with the rest of the codebase. Multi-tenancy is a cross-cutting concern that will be needed by agents, workflows, and tools - not just RAG.
+
+### Task 8.5.0: Refactor and Move Existing Code
+**Priority**: CRITICAL (MUST DO FIRST)
+**Estimated Time**: 2 hours
+**Assignee**: Architecture Team
+
+**Description**: Move incorrectly placed multi-tenant code to proper crates per hybrid architecture.
 
 **Acceptance Criteria:**
-- [ ] Tenant creation/deletion works
-- [ ] Namespace isolation enforced
-- [ ] Usage tracking accurate
-- [ ] Limits enforced
+- [x] Files moved to correct locations
+- [x] Dependencies updated
+- [x] Code compiles without errors
+- [x] Tests still pass
 
 **Implementation Steps:**
-1. Create `src/multi_tenant/manager.rs`:
-   - Implement `MultiTenantVectorManager`
-   - Namespace-per-tenant strategy
-   - Usage tracking per tenant
-2. Create `src/multi_tenant/usage.rs`:
-   - Implement `TenantUsageTracker`
-   - Cost calculation
-   - Limit enforcement
-3. Tenant lifecycle management
-4. Test isolation between tenants
-5. Benchmark overhead
+1. Create new `llmspell-tenancy` crate structure:
+   ```
+   cargo new --lib llmspell-tenancy
+   ```
+2. Move files from `llmspell-rag`:
+   - `src/multi_tenant/manager.rs` → `llmspell-tenancy/src/manager.rs`
+   - `src/multi_tenant/usage.rs` → `llmspell-tenancy/src/usage.rs`
+   - Remove `src/multi_tenant.rs` and `src/multi_tenant/` directory
+3. Move security files to `llmspell-security`:
+   - `src/security/policies.rs` → `llmspell-security/src/access_control/policies.rs`
+   - `src/security/audit.rs` → `llmspell-security/src/audit.rs`
+   - Remove `src/security.rs` and `src/security/` directory
+4. Keep in `llmspell-rag`:
+   - `src/state_integration.rs` (this is RAG-specific)
+   - Create new `src/multi_tenant_integration.rs` for RAG-specific tenant code
+5. Update Cargo.toml dependencies:
+   - Add `llmspell-tenancy` to workspace
+   - Update `llmspell-rag` to depend on `llmspell-tenancy`
+   - Update `llmspell-security` dependencies
 
 **Definition of Done:**
-- [ ] Tenant isolation verified
+- [x] All files in correct crates
+- [x] No duplicate code
+- [x] Clean compilation
+- [x] Dependencies properly structured
+
+**Status**: ✅ COMPLETED
+- Created new `llmspell-tenancy` crate with multi-tenant infrastructure
+- Moved security policies to `llmspell-security/src/access_control/`
+- Fixed all compilation errors and clippy warnings
+- All tests passing for affected crates (llmspell-tenancy, llmspell-security, llmspell-rag)
+- Fixed flaky stress test in llmspell-events
+
+### Task 8.5.1: Create Core Tenancy Infrastructure
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: Multi-Tenant Team Lead
+
+**Description**: Build core multi-tenant infrastructure in new `llmspell-tenancy` crate.
+
+**Acceptance Criteria:**
+- [ ] Tenant registry works
 - [ ] Usage tracking accurate
-- [ ] Limits enforced properly
+- [ ] Resource limits enforced
+- [ ] StateScope integration complete
+
+**Implementation Steps:**
+1. Set up `llmspell-tenancy` crate structure:
+   - Core traits in `src/traits.rs`
+   - Manager in `src/manager.rs` (already moved)
+   - Usage tracking in `src/usage.rs` (already moved)
+   - Registry in `src/registry.rs` (new)
+2. Refactor `TenantManager` to be generic:
+   - Remove RAG-specific code
+   - Add trait-based extension points
+   - Integrate with StateScope from `llmspell-state-traits`
+3. Implement `TenantRegistry`:
+   - Tenant discovery
+   - Metadata management
+   - Lifecycle hooks
+4. Add usage tracking hooks:
+   - Event emission for all operations
+   - Integration with `llmspell-events`
+5. Create comprehensive tests
+
+**Definition of Done:**
+- [ ] Tenant creation/deletion works
+- [ ] Usage metrics accurate
+- [ ] Resource limits enforced
 - [ ] Performance overhead <5%
 
-### Task 8.5.2: Implement Security Policies
+### Task 8.5.2: Extend Security with Access Control
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Security Team
 
-**Description**: Add RLS-style security policies for vector operations.
+**Description**: Add access control policies to `llmspell-security` crate.
 
 **Acceptance Criteria:**
-- [ ] Access policies defined
-- [ ] Operation validation works
-- [ ] RLS filters applied
-- [ ] Cross-tenant access blocked
+- [ ] Access control trait defined
+- [ ] RLS-style filters work
+- [ ] Audit logging integrated
+- [ ] Policy evaluation <1ms
 
 **Implementation Steps:**
-1. Create `src/security/policies.rs`:
-   - Define `VectorAccessPolicy`
-   - Implement `VectorSecurityManager`
-   - RLS filter application
-2. Operation validation
-3. Rate limiting per tenant
-4. Audit logging
-5. Security tests
+1. Create access control module structure:
+   - `src/access_control/mod.rs`
+   - `src/access_control/policies.rs` (already moved)
+   - `src/access_control/context.rs` (new)
+   - `src/audit.rs` (already moved)
+2. Define core security traits:
+   - `AccessControlPolicy` trait
+   - `SecurityContext` with tenant info
+   - `AccessDecision` enum
+3. Implement RLS-style filtering:
+   - Row-level security filters
+   - Metadata-based filtering
+   - Scope-based isolation
+4. Integrate audit logging:
+   - Security event tracking
+   - Compliance logging
+   - Performance monitoring
+5. Add security tests
 
 **Definition of Done:**
 - [ ] Policies enforced correctly
 - [ ] Cross-tenant access blocked
-- [ ] Rate limits work
 - [ ] Audit trail complete
+- [ ] Rate limits work
 
-### Task 8.5.3: Implement State Integration
+### Task 8.5.3: Create RAG-Specific Integration
 **Priority**: HIGH  
-**Estimated Time**: 4 hours  
+**Estimated Time**: 3 hours  
 **Assignee**: Integration Team
 
-**Description**: Integrate with StateManager for scope-aware storage.
+**Description**: Integrate multi-tenancy with RAG pipeline in `llmspell-rag`.
 
 **Acceptance Criteria:**
-- [ ] StateScope binding works
-- [ ] Metadata tracked in state
-- [ ] Cleanup on scope deletion
-- [ ] State persistence works
+- [ ] Vector storage tenant-aware
+- [ ] Embeddings cost tracked
+- [ ] RAG pipeline isolated
+- [ ] State integration works
 
 **Implementation Steps:**
-1. Create `src/state_integration.rs`:
-   - Implement `StateAwareVectorStorage`
-   - Scope to namespace mapping
-   - State metadata tracking
-2. Automatic scope binding
-3. Cleanup handlers
-4. Test state integration
-5. Verify persistence
+1. Create `src/multi_tenant_integration.rs`:
+   - `MultiTenantRAG` wrapper
+   - Tenant-aware vector routing
+   - Cost tracking for embeddings
+2. Update `StateAwareVectorStorage`:
+   - Use `TenantManager` from `llmspell-tenancy`
+   - Add tenant context to operations
+   - Track usage metrics
+3. Implement tenant-specific collections:
+   - Namespace per tenant in HNSW
+   - Metadata isolation
+   - Query routing
+4. Add RAG-specific usage metrics:
+   - Embedding generation costs
+   - Storage usage per tenant
+   - Query performance metrics
+5. Integration tests
+
+**Definition of Done:**
+- [ ] Tenant isolation in vectors
+- [ ] Usage tracking accurate
+- [ ] State properly scoped
+- [ ] Tests comprehensive
+
+### Task 8.5.4: Add Session and State Integration
+**Priority**: HIGH  
+**Estimated Time**: 3 hours  
+**Assignee**: Integration Team
+
+**Description**: Integrate tenancy with existing state and session systems.
+
+**Acceptance Criteria:**
+- [ ] StateScope extended for tenants
+- [ ] Session-tenant binding works
+- [ ] Cleanup cascades properly
+- [ ] TTL management works
+
+**Implementation Steps:**
+1. Extend StateScope usage:
+   - Use `Custom("tenant:xxx")` pattern
+   - Add helper methods in `llmspell-tenancy`
+   - Document scope hierarchy
+2. Session integration:
+   - Bind sessions to tenants
+   - Track session costs per tenant
+   - TTL for tenant resources
+3. Cleanup handlers:
+   - Cascade deletion on tenant removal
+   - State cleanup on scope deletion
+   - Vector cleanup on expiration
+4. Add migration support:
+   - Tenant data migration
+   - Schema evolution support
+   - Backup/restore per tenant
+5. End-to-end tests
 
 **Definition of Done:**
 - [ ] Scopes properly bound
-- [ ] Metadata in state
-- [ ] Cleanup works
-- [ ] Tests pass
-
-### Task 8.5.4: Implement Session Integration  
-**Priority**: HIGH  
-**Estimated Time**: 4 hours  
-**Assignee**: Integration Team
-
-**Description**: Add session-aware RAG with artifact storage.
-
-**Acceptance Criteria:**
-- [ ] Session collections work
-- [ ] TTL expiration works
-- [ ] Artifacts stored
-- [ ] Session isolation enforced
-
-**Implementation Steps:**
-1. Create `src/session_integration.rs`:
-   - Implement `SessionAwareRAGPipeline`
-   - Session vector collections
-   - TTL management
-2. Artifact storage for queries
-3. Session lifecycle hooks
-4. Test session isolation
-5. Verify TTL cleanup
-
-**Definition of Done:**
-- [ ] Sessions properly isolated
-- [ ] TTL expiration works
-- [ ] Artifacts tracked
-- [ ] Tests comprehensive
+- [ ] Sessions isolated by tenant
+- [ ] Cleanup works correctly
 - [ ] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
 ---
