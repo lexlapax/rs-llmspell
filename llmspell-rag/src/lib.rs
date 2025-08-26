@@ -123,6 +123,12 @@ pub mod prelude {
         StateAwareVectorStorage, TenantVectorStats, VectorOperationMetadata,
     };
 
+    // Session integration
+    pub use crate::session_integration::{
+        scope_helpers, IngestStats, SessionAwareRAGPipeline, SessionVectorCollection,
+        SessionVectorResult,
+    };
+
     pub use llmspell_state_traits::StateScope;
 }
 
