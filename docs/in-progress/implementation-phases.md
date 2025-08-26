@@ -4,13 +4,13 @@
 **Date**: June 2025  
 **Status**: Implementation Roadmap  
 
-> **📋 Complete Implementation Guide**: This document defines all 22 implementation phases for rs-llmspell, from MVP foundation through advanced production features.
+> **📋 Complete Implementation Guide**: This document defines all implementation phases for rs-llmspell, from MVP foundation through advanced production features. Currently includes 18 core phases with additional future enhancements.
 
 ---
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 22-phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria.
+Rs-LLMSpell follows a carefully structured 18+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes a new Phase 9 for the Adaptive Memory System, a critical component for agent intelligence.
 
 ### Phase Categories
 
@@ -18,11 +18,13 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 - **MVP Completion** (Phase 3): Tool enhancement, agent infrastructure, and bridge integration
 - **Production Infrastructure** (Phases 4-6): Hook system, state management, and sessions
 - **Infrastructure Consolidation** (Phase 7): Foundational solidification for production readiness
-- **Advanced Features** (Phases 8-11): Vector storage, workflow orchestration, REPL, and daemon mode
-- **Extended Features** (Phases 12-14): MCP protocols and JavaScript engine
-- **Platform Support** (Phases 15-16): Library mode and cross-platform support
-- **Production Optimization** (Phase 17): Performance and security hardening
-- **Additional Enhancements** (Phases 18-22): Extended tools, A2A protocols, multimodal, and AI/ML tools
+- **Advanced Features** (Phases 8-9): Vector storage and adaptive memory system
+- **Advanced Integration** (Phases 10-12): Workflow orchestration, REPL, and daemon mode
+- **Protocol Support** (Phases 13-14): MCP client and server integration
+- **Language Extensions** (Phase 15): JavaScript engine support
+- **Platform Support** (Phases 16-17): Library mode and cross-platform support
+- **Production Optimization** (Phase 18): Performance and security hardening
+- **Future Enhancements** (Phases 19+): Extended tools, A2A protocols, multimodal, and AI/ML tools
 
 ---
 
@@ -314,7 +316,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 - Agent lifecycle hooks integration with **ReplayableHook trait for Phase 5 persistence**
 - **CircuitBreaker for automatic performance protection (<5% overhead guaranteed)**
 - **UniversalEvent format for cross-language event propagation**
-- **DistributedHookContext for future A2A protocol support (Phase 16-17)**
+- **DistributedHookContext for future A2A protocol support (Phase 17-18)**
 - **CompositeHook patterns (Sequential, Parallel, FirstMatch, Voting)**
 - **Enhanced HookResult enum (Continue, Modified, Cancel, Redirect, Replace, Retry, Fork, Cache, Skipped)**
 
@@ -496,8 +498,8 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ### **Phase 8: Vector Storage and Search Infrastructure (Weeks 28-29)**
 
-**Goal**: Implement vector storage backends and advanced search capabilities
-**Priority**: MEDIUM (Advanced Features)
+**Goal**: Implement vector storage backends and advanced search capabilities as foundation for memory system
+**Priority**: MEDIUM (Advanced Features - Critical for Phase 9 Memory)
 **Dependencies**: Requires Phase 6 Session Management for search context
 **Phase 4 Integration**: High-frequency embedding events handled by FlowController, with CachingHook for embedding reuse and performance monitoring.
 
@@ -506,44 +508,179 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 - `llmspell-rag` crate with RAG patterns and document chunking
 - `SemanticSearchTool` implementation using vector storage
 - `CodeSearchTool` implementation with tree-sitter integration
-- Agent memory system integration with vector storage
 - **Integration with CachingHook for embedding caching**
 - **Event-driven vector indexing with backpressure control**
 - **Performance monitoring for vector operations**
 
 **Essential Components**:
-- Vector similarity search algorithms (cosine, euclidean, dot product)
-- HNSW indexing for performance
-- Document chunking and embedding strategies
-- Tree-sitter parser integration for code analysis
-- Integration with external vector databases 
+- **HNSW Indexing**: Hierarchical Navigable Small World graphs for <300ms P95 latency
+  - Parallel index building (85% build time reduction)
+  - Dynamic dataset support for insert/delete without rebuild
+  - Hybrid HNSW-IF for billion-scale datasets
+- **Embedding Strategy**: 
+  - BGE-M3 model support (8192 token context, multi-lingual)
+  - ColBERT v2 late interaction for fine-grained relevance
+  - Hybrid retrieval: dense + sparse + multi-vector
+- **Chunking Strategies**:
+  - SentenceSplitter (best performance per benchmarks)
+  - Landmark Embeddings for chunking-free approach
+  - Adaptive chunking based on document structure
+- **Optimization Techniques**:
+  - d-HNSW disaggregated memory architecture
+  - Representative index caching for compute efficiency
+  - Dimensional reduction for performance
+  - Software-level caching for hot paths
+
+**Memory System Preparation**:
+- Episodic memory foundation via vector embeddings
+- Temporal metadata support in vector storage
+- Event capture infrastructure for memory ingestion
+- Hybrid search API (vector + keyword + future graph)
 
 **Success Criteria**:
 - [ ] Vector storage backends operational (memory, disk-based)
+- [ ] HNSW index with <300ms P95 query latency
+- [ ] BGE-M3 embedding model integrated
 - [ ] Semantic search with embeddings functional
 - [ ] Code search with AST parsing and symbol extraction working
 - [ ] RAG pipeline patterns implemented
-- [ ] Agent memory can store and retrieve semantic information
-- [ ] Performance acceptable for medium datasets (<10k vectors)
+- [ ] Performance acceptable for 100k+ vectors
 - [ ] **Embedding cache hit rate >80% for repeated content**
 - [ ] **Vector indexing handles high-frequency updates via backpressure**
+- [ ] Temporal metadata stored with vectors for Phase 9
 
 **Testing Requirements**:
 - Vector similarity search accuracy tests
+- HNSW index performance benchmarks
+- BGE-M3 embedding quality validation
 - RAG pipeline integration tests
 - Code parsing and search validation
 - Performance benchmarks for vector operations
-- Agent memory integration tests
 - **Embedding cache effectiveness tests**
 - **Backpressure handling under load tests**
+- Temporal metadata persistence tests
+
+**Research Notes**:
+- Zep achieves 94.8% accuracy using BGE-M3 embeddings
+- HNSW with disaggregated memory reduces latency by 85%
+- ColBERT v2 + SentenceSplitter best for RAG retrieval
+- Hybrid retrieval (dense + sparse + multi-vector) critical for accuracy
 
 ---
 
-### **Phase 9: Advanced Workflow Features (Weeks 30-31)**
+### **Phase 9: Adaptive Memory System (Weeks 30-35)**
+
+**Goal**: Implement Adaptive Temporal Knowledge Graph (A-TKG) memory architecture
+**Priority**: HIGH (Core AI Capability)
+**Dependencies**: Requires Phase 8 Vector Storage as foundation
+**Research Foundation**: Based on Zep/Graphiti (94.8% DMR accuracy) and Mem0 (26% improvement over OpenAI)
+
+**Memory Architecture Overview**:
+- **Working Memory**: Immediate session context (managed by `llmspell-state`)
+- **Episodic Memory**: Raw interactions indexed by vectors (built on Phase 8 `llmspell-rag`)
+- **Semantic Memory**: Temporal Knowledge Graph storing facts, entities, relationships
+- **Adaptive Consolidation**: LLM-driven memory management (add/update/delete logic)
+
+**Phase 9.1: Foundational Episodic Memory (Week 30)**:
+- Create `llmspell-memory` crate with core data structures
+- Implement `InteractionLog` and `MemoryItem` types
+- Integrate with `llmspell-events` for interaction capture
+- Asynchronous ingestion pipeline via hooks
+- Basic vector retrieval using Phase 8 infrastructure
+- Memory persistence via `llmspell-storage`
+
+**Phase 9.2: Temporal Knowledge Graph Foundation (Weeks 31-32)**:
+- **New Crate: `llmspell-graph`**
+  - Bi-temporal data model (event time + ingestion time)
+  - Node/Edge structures with temporal validity intervals
+  - Entity resolution and deduplication
+  - Incremental graph updates without full rebuild
+- **Graph Storage Backend**:
+  - Embedded Rust solution (primary)
+  - Neo4j adapter (enterprise)
+  - Storage trait abstraction via `llmspell-storage`
+- **Knowledge Extraction Pipeline**:
+  - LLM-driven entity/relationship extraction
+  - Temporal information parsing
+  - Contradiction detection and resolution
+
+**Phase 9.3: Hybrid Retrieval System (Week 33)**:
+- **Memory Orchestrator** in `llmspell-memory`:
+  - Unified API for all memory types
+  - Query planning and routing logic
+  - Result fusion and re-ranking
+- **Hybrid Search Strategy**:
+  - Vector search for semantic similarity (episodic)
+  - Graph traversal for relationships (semantic)
+  - BM25 keyword search for exact matches
+  - Temporal filtering for point-in-time queries
+- **Performance Targets**:
+  - P95 latency <300ms (matching Zep benchmark)
+  - No LLM calls during retrieval
+  - Support for 1M+ memory items
+
+**Phase 9.4: Adaptive Consolidation (Week 34)**:
+- **Memory Consolidation Pipeline** (Mem0-inspired):
+  - Periodic review of memory items
+  - LLM-driven decisions: Add/Update/Delete/Ignore
+  - Importance scoring based on usage patterns
+  - Conflict resolution for contradictions
+- **Episodic Summarization**:
+  - Compress old interactions into summaries
+  - Extract key facts into TKG
+  - Prune detailed events beyond threshold
+- **Adaptive Feedback Loops**:
+  - Track memory item usage via hooks
+  - Adjust importance scores based on outcomes
+  - Self-improving relevance ranking
+
+**Phase 9.5: Integration and Polish (Week 35)**:
+- **Script API** (`MemoryGlobal`):
+  - `Memory.store()` - Store new memories
+  - `Memory.search()` - Semantic search
+  - `Memory.graphQuery()` - Graph traversal
+  - `Memory.buildContext()` - Unified context assembly
+- **Agent Integration**:
+  - Automatic memory injection into agent context
+  - Memory-aware tool selection
+  - Cross-session continuity
+- **Observability**:
+  - Memory growth metrics
+  - Retrieval performance monitoring
+  - Consolidation effectiveness tracking
+
+**Success Criteria**:
+- [ ] A-TKG architecture fully operational
+- [ ] 94%+ accuracy on memory benchmarks (target: Zep level)
+- [ ] P95 retrieval latency <300ms
+- [ ] Bi-temporal queries working correctly
+- [ ] Memory consolidation reduces storage by >50%
+- [ ] Cross-session agent continuity functional
+- [ ] Graph supports 100k+ entities, 1M+ relationships
+- [ ] Hybrid retrieval outperforms vector-only by >15%
+
+**Testing Requirements**:
+- Memory accuracy benchmarks (DMR, LongMemEval)
+- Temporal reasoning test suite
+- Graph consistency validation
+- Consolidation effectiveness tests
+- Cross-session continuity tests
+- Performance stress tests (1M+ items)
+- Hybrid retrieval accuracy comparison
+
+**Research References**:
+- Zep/Graphiti: Temporal Knowledge Graph Architecture (arXiv:2501.13956)
+- Mem0: Scalable Long-Term Memory (arXiv:2504.19413)
+- Graph RAG vs Vector RAG benchmarks showing 80% vs 50.83% accuracy
+- BGE-M3 + ColBERT v2 for optimal retrieval performance
+
+---
+
+### **Phase 10: Advanced Workflow Features (Weeks 36-37)**
 
 **Goal**: Enhance basic workflows with enterprise-grade features leveraging full infrastructure
 **Priority**: MEDIUM (Advanced Orchestration)
-**Dependencies**: Requires Phase 7 Vector Storage and all infrastructure phases
+**Dependencies**: Requires Phase 8 Vector Storage and Phase 9 Memory System
 **Phase 4 Integration**: CompositeHook and Fork/Retry patterns from Phase 4 enable advanced workflow orchestration with less custom code.
 
 **Components**:
@@ -569,7 +706,8 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 - [ ] Workflow state persists across sessions (Phase 5 integration)
 - [ ] Workflow lifecycle hooks firing correctly (Phase 4 integration)
 - [ ] Session context preserved in workflows (Phase 6 integration)
-- [ ] Vector storage enables workflow context search (Phase 7 integration)
+- [ ] Vector storage enables workflow context search (Phase 8 integration)
+- [ ] Memory system provides cross-workflow context (Phase 9 integration)
 - [ ] Advanced streaming and parallel patterns functional
 - [ ] Workflow monitoring and observability operational
 - [ ] Performance optimization delivers measurable improvements
@@ -593,11 +731,11 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ## Advanced Integration Phases
 
-### **Phase 10: REPL Interactive Mode (Weeks 32-33)**
+### **Phase 11: REPL Interactive Mode (Weeks 38-39)**
 
 **Goal**: Implement interactive REPL for development and debugging  
 **Priority**: MEDIUM (Developer Experience)
-**Dependencies**: Requires Phase 9 Multimodal Tools for media preview
+**Dependencies**: Requires Phase 10 Advanced Workflows for complex interactions
 **Phase 4 Integration**: Hook introspection for debugging, real-time event stream visualization, and performance monitoring display.
 
 **Components**:
@@ -637,7 +775,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ---
 
-### **Phase 11: Daemon and Service Mode (Weeks 34-35)**
+### **Phase 12: Daemon and Service Mode (Weeks 40-41)**
 
 **Goal**: Implement long-running daemon mode with scheduler  
 **Priority**: LOW (Advanced Feature)
@@ -684,7 +822,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ---
 
-### **Phase 12: MCP Tool Integration (Weeks 36-37)**
+### **Phase 13: MCP Tool Integration (Weeks 42-43)**
 
 **Goal**: Support Model Control Protocol for external tools  
 **Priority**: LOW (Advanced Integration)
@@ -711,7 +849,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ---
 
-### **Phase 13: MCP Server Mode (Weeks 38-39)**
+### **Phase 14: MCP Server Mode (Weeks 44-45)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol  
 **Priority**: LOW (Advanced Integration)
@@ -738,7 +876,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ---
 
-### **Phase 14: JavaScript Engine Support (Weeks 40-41)**
+### **Phase 15: JavaScript Engine Support (Weeks 46-47)**
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
@@ -791,7 +929,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ## Production Optimization Phase
 
-### **Phase 15: Library Mode Support (Weeks 42-43)**
+### **Phase 16: Library Mode Support (Weeks 48-49)**
 
 **Goal**: Support usage as native module in external runtimes  
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -820,7 +958,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ## Additional Enhancement Phases
 
-### **Phase 16: Cross-Platform Support (Weeks 44-45)**
+### **Phase 17: Cross-Platform Support (Weeks 50-51)**
 
 **Goal**: Full Windows support and cross-platform compatibility  
 **Priority**: MEDIUM (Platform Coverage)
@@ -848,7 +986,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 ---
 ## Platform Support Phases
 
-### **Phase 17: Production Optimization (Weeks 46-47)**
+### **Phase 18: Production Optimization (Weeks 52-53)**
 
 **Goal**: Performance optimization and production hardening  
 **Priority**: HIGH (Production Readiness)
@@ -911,7 +1049,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 - Security review
 
 ---
-### **Phase 19: A2A Client Support (Weeks 50-51)**
+### **Phase 19: A2A Client Support (Weeks 54-55)**
 
 **Goal**: Agent-to-Agent communication as client  
 **Priority**: LOW (Advanced Networking)
@@ -938,7 +1076,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ---
 
-### **Phase 20: A2A Server Support (Weeks 52-53)**
+### **Phase 20: A2A Server Support (Weeks 56-57)**
 
 **Goal**: Expose local agents via A2A protocol  
 **Priority**: LOW (Advanced Networking)
@@ -965,11 +1103,11 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ---
 
-### **Phase 21: Multimodal Tools Implementation (Weeks 54-55)**
+### **Phase 21: Multimodal Tools Implementation (Weeks 58-59)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
-**Dependencies**: Requires Phase 8 Workflow Orchestration for multimodal workflows
+**Dependencies**: Requires Phase 10 Advanced Workflows for multimodal workflows
 **Phase 4 Integration**: Media processing hooks enable dynamic parameter adjustment, progress tracking, and cost monitoring for expensive operations.
 
 **Components**:
@@ -1025,7 +1163,7 @@ Rs-LLMSpell follows a carefully structured 22-phase implementation approach that
 
 ---
 
-### **Phase 22: AI/ML Complex Tools (Weeks 56-57)**
+### **Phase 22: AI/ML Complex Tools (Weeks 60-61)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
