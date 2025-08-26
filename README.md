@@ -1,6 +1,10 @@
 # rs-llmspell
 
-Scriptable LLM interactions via Lua and JavaScript - Cast scripting spells to animate LLM golems
+**Scriptable LLM interactions via Lua and JavaScript** - Cast scripting spells to animate LLM golems
+
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [📊 Technical Docs](docs/technical/)
+
+---
 
 ## Overview
 

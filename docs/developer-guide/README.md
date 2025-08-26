@@ -1,10 +1,16 @@
-# Developer Documentation
+# Developer Guide
+
+**Build and extend rs-llmspell - comprehensive contributor documentation**
+
+**🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [User Guide](../user-guide/) | [Technical Docs](../technical/)
+
+---
+
+## Overview
 
 ✅ **CURRENT**: Phase 7 developer documentation for contributors
 
 Welcome to the rs-llmspell developer documentation! This guide helps contributors understand the codebase, implement new features, and maintain the project.
-
-**🔗 Navigation**: [← Documentation Hub](../README.md) | [Project Home](../../README.md) | [User Guide](../user-guide/) | [Technical Docs](../technical/)
 
 ## 🚀 Quick Start
 

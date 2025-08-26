@@ -1,9 +1,10 @@
 # LLMSpell API Documentation
 
-**Version**: 0.6.0  
-**Purpose**: Central index for all LLMSpell API documentation
+**Complete API reference for Lua and Rust interfaces**
 
-> **🤖 LLM-Optimized Documentation**: This documentation is specifically structured for consumption by LLM-based coding assistants like Claude Code, GitHub Copilot, and others, while remaining human-readable.
+**🔗 Navigation**: [← User Guide](../) | [Docs Hub](../../) | [Lua API](lua/) | [Rust API](rust/)
+
+---
 
 ## Overview
 LLMSpell provides comprehensive APIs for both Rust developers and script users. The platform offers identical functionality across all supported languages with consistent patterns and behaviors.

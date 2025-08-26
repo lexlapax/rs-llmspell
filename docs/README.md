@@ -1,10 +1,10 @@
-# Rs-LLMSpell Documentation
+# Rs-LLMSpell Documentation Hub
 
-**Scriptable LLM interactions via Lua** - Cast scripting spells to animate LLM golems
+**Complete documentation for scriptable LLM interactions**
 
-> **📖 Documentation Hub**: Complete documentation for rs-llmspell v0.6.0 (Phase 7 Complete). All documentation has been consolidated, validated, and organized for clarity.
+**🔗 Navigation**: [← Project Home](../README.md) | [Examples](../examples/) | [Contributing](../CONTRIBUTING.md)
 
-**🔗 Project**: [← Main README](../README.md) | **Status**: Phase 7 Complete (v0.6.0) | **Target**: Version 1.0
+> **📖 Documentation Hub**: All documentation for rs-llmspell v0.6.0 (Phase 7 Complete). Consolidated, validated, and organized for clarity.
 
 ---
 

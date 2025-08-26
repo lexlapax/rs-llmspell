@@ -1,10 +1,8 @@
 # LLMSpell Examples
 
-**Current Version**: Phase 7 (v0.7.0)  
-**Available Tools**: 34 production tools  
-**Features**: Agents, Workflows, Tools, Persistent State Management, Hooks, Events, Sessions
+**Learn by example - comprehensive demonstrations of LLMSpell capabilities**
 
-**🔗 Navigation**: [← Project Home](../README.md) | [Documentation Hub](../docs/README.md) | [User Guide](../docs/user-guide/README.md)
+**🔗 Navigation**: [← Project Home](../) | [Docs Hub](../docs/) | [User Guide](../docs/user-guide/) | [Developer Guide](../docs/developer-guide/)
 
 ---
 

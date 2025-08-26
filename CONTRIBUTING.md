@@ -2,9 +2,31 @@
 
 Thank you for your interest in contributing to rs-llmspell! This guide will help you get started.
 
-## Quick Start
+**🔗 Navigation**: [← Project Home](README.md) | [Developer Guide](docs/developer-guide/) | [Documentation](docs/)
 
-For detailed development setup and workflows, see the [Developer Guide](docs/developer-guide/README.md).
+---
+
+## ⚡ Quick Start
+
+For comprehensive development setup and workflows, see the **[Developer Guide](docs/developer-guide/README.md)**.
+
+### Quick Commands Reference
+
+```bash
+# Before committing (fast - seconds)
+./scripts/quality-check-minimal.sh
+
+# Before PR (comprehensive - 5+ minutes)  
+./scripts/quality-check.sh
+
+# Run specific tests
+cargo test -p llmspell-tools
+cargo test -p llmspell-agents
+
+# Check specific crate
+cargo check -p llmspell-bridge
+cargo clippy -p llmspell-core
+```
 
 ## Development Workflow
 

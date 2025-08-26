@@ -1,12 +1,16 @@
 # LLMSpell User Guide
 
-**Version**: 0.6.0  
-**Status**: Phase 7 - API Standardization  
-**Last Updated**: August 2025
+**Learn to build powerful LLM-driven applications with rs-llmspell**
+
+**🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [Examples](../../examples/) | [API Reference](api/)
+
+---
+
+## Overview
 
 > **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 7 essential documents.
 
-**🔗 Quick Links**: [Get Started](getting-started.md) | [API Docs](api/README.md) | [Examples](../../examples/EXAMPLE-INDEX.md) | [Support](https://github.com/yourusername/rs-llmspell/issues)
+**Version**: 0.6.0 | **Status**: Phase 7 Complete | **Last Updated**: August 2025
 
 ## 📖 Essential Documentation (7 Files)
 

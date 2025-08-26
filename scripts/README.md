@@ -1,6 +1,33 @@
 # Scripts Directory
 
-This directory contains utility scripts for development, testing, and quality assurance.
+**Quality assurance and utility scripts for LLMSpell development**
+
+**🔗 Navigation**: [← Project Root](../) | [Developer Guide](../docs/developer-guide/) | [Contributing](../CONTRIBUTING.md)
+
+---
+
+## Overview
+
+This directory contains utility scripts for development, testing, quality assurance, and user-friendly application launching.
+
+## User Scripts
+
+### llmspell-easy.sh
+**Purpose**: User-friendly launcher for LLMSpell applications
+**Usage**: `./scripts/llmspell-easy.sh [app-name]`
+
+Features:
+- Auto-detects llmspell binary location
+- Checks and guides API key setup
+- Simplified application launching
+- Interactive setup wizard for first-time users
+
+Examples:
+```bash
+./scripts/llmspell-easy.sh                # List available apps
+./scripts/llmspell-easy.sh file-organizer  # Run file organizer
+./scripts/llmspell-easy.sh help           # Show help
+```
 
 ## Quality Check Scripts
 

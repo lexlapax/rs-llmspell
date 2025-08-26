@@ -1,6 +1,8 @@
 # Script Users Examples
 
-Examples for users writing Lua scripts to interact with LLMSpell.
+**Lua scripting examples for LLMSpell - from basics to production applications**
+
+**🔗 Navigation**: [← Examples](../) | [Project Home](../../) | [Getting Started](getting-started/) | [Applications](applications/)
 
 ## 📚 Categories
 

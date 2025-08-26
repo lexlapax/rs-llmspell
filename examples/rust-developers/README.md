@@ -1,6 +1,8 @@
 # Rust Developer Examples
 
-Examples for developers embedding LLMSpell in Rust applications.
+**Comprehensive Rust integration patterns for LLMSpell**
+
+**🔗 Navigation**: [← Examples](../) | [Project Home](../../) | [Developer Guide](../../docs/developer-guide/) | [API Docs](../../docs/user-guide/api/rust/)
 
 ## 📚 Examples
 

@@ -1,6 +1,8 @@
 # llmspell-core
 
-Core traits, types, and infrastructure for the LLMSpell system.
+**Core traits, types, and infrastructure for the LLMSpell system**
+
+**🔗 Navigation**: [← Project Root](../) | [Documentation](../docs/) | [Examples](../examples/)
 
 ## Overview
 
