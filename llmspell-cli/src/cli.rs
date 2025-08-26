@@ -194,49 +194,49 @@ pub enum Commands {
 pub enum AppsSubcommand {
     /// List all available applications
     List,
-    
+
     /// Organize messy files with AI categorization
     FileOrganizer {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
     },
-    
+
     /// Research any topic thoroughly
     ResearchCollector {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
     },
-    
+
     /// Create content efficiently
     ContentCreator {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
     },
-    
+
     /// Manage business communications
     CommunicationManager {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
     },
-    
+
     /// Orchestrate complex processes
     ProcessOrchestrator {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
     },
-    
+
     /// Review code for quality and security
     CodeReviewAssistant {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
     },
-    
+
     /// Create complete web applications
     WebappCreator {
         /// Script arguments

@@ -1,14 +1,60 @@
 # rs-llmspell
 
-**Scriptable LLM interactions via Lua and JavaScript** - Cast scripting spells to animate LLM golems
+**Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination at scale
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [📊 Technical Docs](docs/technical/)
+**🎉 Version 0.7.0 - First MVP Release**
+
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🚀 Get Started](#-quick-start)
 
 ---
 
-## Overview
+## 🌟 Production Ready
 
-Rs-LLMSpell provides script-driven workflows for LLM interactions with 34 built-in tools, agent coordination, persistent state management, session lifecycle management, and a powerful hook/event system for extensibility. Currently v0.6.0 (Phase 6 complete), working toward 1.0 release.
+rs-llmspell v0.7.0 is our **first production-ready MVP**, capable of orchestrating complex AI workflows with enterprise-grade reliability. Successfully validated through WebApp Creator - orchestrating **20 AI agents** to generate complete applications in **4.5 minutes**.
+
+## ✨ Key Features
+
+### 🤖 Multi-Agent Orchestration
+- Coordinate 2-20+ AI agents in complex workflows
+- Sequential, parallel, and conditional execution patterns
+- Real-time state sharing between agents
+- Automatic error recovery and retry logic
+
+### 🛠️ 34+ Built-in Tools
+- File operations, web search, data processing
+- JSON/YAML manipulation, text transformation
+- API testing, webhook calling, database connectivity
+- All tools run in secure sandboxes
+
+### 📦 7 Production Applications
+Progressive complexity from Universal to Expert:
+- **file-organizer** (2 agents): Organize messy files automatically
+- **content-creator** (4 agents): Multi-format content generation
+- **communication-manager** (5 agents): Business email automation
+- **code-review-assistant** (8 agents): Automated code analysis
+- **webapp-creator** (20 agents): Full-stack application generation
+
+### 🔒 Enterprise Security
+- Mandatory sandboxing for all tool executions
+- Filesystem/network/process isolation
+- Configurable security boundaries
+- Audit logging and compliance features
+
+### ⚡ Blazing Performance
+- Agent creation: **2-3ms** (94% faster than target)
+- Tool initialization: **1-2ms**
+- State operations: **<1ms**
+- WebApp generation: **4.5 minutes** for 20 agents
+
+## Platform Support
+
+| Platform | Status | Notes |
+|----------|--------|-------|
+| macOS 15.7 (ARM64) | ✅ Fully Tested | All features working on Apple Silicon |
+| Linux | ⏳ Testing Pending | Expected to work, formal testing in progress |
+| Windows | ⏳ Testing Pending | Expected to work, formal testing in progress |
+
+> **Note**: v0.7.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64). Linux and Windows testing is in progress. Please report any platform-specific issues.
 
 ## Quick Example
 
@@ -102,7 +148,9 @@ Session.resume(session.id)
 local artifacts = Artifact.list(session.id)
 ```
 
-## Installation
+## 🚀 Quick Start
+
+### Easy Installation (Recommended)
 
 ```bash
 # Clone and build
@@ -110,37 +158,76 @@ git clone https://github.com/lexlapax/rs-llmspell
 cd rs-llmspell
 cargo build --release
 
-# Run examples
-./target/release/llmspell run examples/hello.lua
+# Use the friendly launcher with setup wizard
+./scripts/llmspell-easy.sh
+
+# Run your first application!
+./scripts/llmspell-easy.sh file-organizer
 ```
 
-## Features
+### Try Production Applications
 
+```bash
+# Organize messy files (2 agents, <30s)
+./scripts/llmspell-easy.sh file-organizer
+
+# Generate content (4 agents, <1min)
+./scripts/llmspell-easy.sh content-creator
+
+# Review code (8 agents, <2min)
+./scripts/llmspell-easy.sh code-review-assistant
+
+# Build a web app (20 agents, 4.5min)
+./scripts/llmspell-easy.sh webapp-creator
+```
+
+## 📊 Comprehensive Feature Set
+
+### Core Capabilities
 - **34 Production Tools**: File operations, web scraping, data processing, system utilities
-- **Agent Coordination**: Create and orchestrate LLM agents with different models
-- **Workflow Patterns**: Sequential, parallel, conditional, and loop execution
+- **Multi-Agent Coordination**: Orchestrate 2-20+ LLM agents with different models and roles
+- **Workflow Patterns**: Sequential, parallel, conditional, and recursive execution
 - **Session Management**: Long-running sessions with suspend/resume, artifacts, and replay
-- **Persistent State Management**: Multi-backend persistence with migration and backup support
+- **State Persistence**: RocksDB/SQLite backends with migrations and atomic backups
 - **Hook System**: 40+ extensibility points with <1% performance overhead
 - **Event Bus**: Cross-language event propagation at >90K events/sec
-- **Built-in Hooks**: Logging, metrics, caching, rate limiting, retry, cost tracking, and security
-- **State Persistence**: Sled/RocksDB backends, schema migrations, atomic backups
-- **Artifact Storage**: Content-addressed storage with versioning and compression
-- **Session Replay**: Full session replay capability with hook execution history
-- **Security**: Comprehensive sandboxing, resource limits, and sensitive data protection
-- **Multi-Provider**: Support for OpenAI, Anthropic, and local models
+- **Security Sandbox**: Mandatory isolation for all tool executions
+- **Multi-Provider**: OpenAI, Anthropic, Ollama, and custom providers
 
-## Current Status
+### Enterprise Features
+- **Audit Logging**: Complete execution history with replay capability
+- **Cost Tracking**: Per-agent and per-workflow cost monitoring
+- **Rate Limiting**: Global and per-resource rate limits
+- **Error Recovery**: Automatic retry with exponential backoff
+- **Resource Limits**: Memory, CPU, and token constraints
+- **Compliance**: Data retention policies and PII protection
 
-- **v0.6.0 Released**: Session management with artifacts and replay capabilities (2025-08-01)
-- **v0.5.0 Released**: Persistent state management with enterprise features (2025-07-29)
-- **v0.4.0 Released**: Hook and event system with cross-language support (2025-07-25)
-- **v0.3.0 Released**: 34 tools, agent infrastructure, and workflows (2025-07-23)
-- **Phase 6 Complete**: Production-ready session management with 39/39 tasks done
-- **Pre-1.0 Software**: Breaking changes expected in Phase 7 (API standardization)
-- **Production-Ready Components**: Sessions, state persistence, tools, hooks, and events
-- See [CHANGELOG.md](CHANGELOG.md) for detailed version history
-- See [RELEASE_NOTES_v0.6.0.md](RELEASE_NOTES_v0.6.0.md) for latest release
+## 🎯 Roadmap
+
+### Current: v0.7.0 - First MVP ✅
+- Production-ready infrastructure
+- 7 working applications
+- Enterprise security
+- Complete documentation
+
+### Upcoming Feature Additions (Phases 8-16)
+
+#### Near Term (Q3 2025)
+- **Phase 8**: Visual Workflow Designer - Drag-and-drop UI
+- **Phase 9**: Distributed Execution - Multi-node orchestration
+- **Phase 10**: LLM Router - Intelligent model selection
+
+#### Medium Term (Q4 2025)
+- **Phase 11**: Fine-tuning Integration - Custom model training
+- **Phase 12**: JavaScript Bridge - Full JS/TypeScript support
+- **Phase 13**: IDE Plugins - VSCode and IntelliJ integration
+
+#### Long Term (2026)
+- **Phase 14**: Cloud Platform - Managed service offering
+- **Phase 15**: Mobile SDKs - iOS and Android libraries
+- **Phase 16**: Python Bridge - Complete Python integration
+
+*Note: From v0.7.0 onwards, updates will primarily add features rather than breaking existing functionality.*
 
 ## Documentation
 
@@ -174,13 +261,8 @@ cat docs/developer-guide/README.md
 
 ## License
 
-This project is dual-licensed under:
-
-- Apache License, Version 2.0 ([LICENSE-APACHE](LICENSE-APACHE))
-- MIT License ([LICENSE-MIT](LICENSE-MIT))
-
-You may choose either license for your use.
+This project is licensed under the Apache License, Version 2.0. See [LICENSE-APACHE](LICENSE-APACHE) for details.
 
 ---
 
-**Current Focus**: Phase 7 - API consistency and standardization across all crates for 1.0 release.
+**🎉 v0.7.0 Released**: First production-ready MVP with 7 working applications and enterprise features. See [Release Notes](RELEASE_NOTES_v0.7.0.md) for details.

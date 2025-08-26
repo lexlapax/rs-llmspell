@@ -9,43 +9,43 @@ use std::path::PathBuf;
 pub async fn run_interactive_setup(force: bool) -> Result<()> {
     println!("🎉 Welcome to LLMSpell Setup!\n");
     println!("This wizard will help you get started with LLMSpell applications.\n");
-    
+
     // Check for existing config
     let config_path = dirs::home_dir()
         .map(|h| h.join(".llmspell").join("config.toml"))
         .unwrap_or_else(|| PathBuf::from("llmspell.toml"));
-    
+
     if config_path.exists() && !force {
         let overwrite = Confirm::with_theme(&ColorfulTheme::default())
             .with_prompt("Configuration already exists. Overwrite?")
             .default(false)
             .interact()?;
-        
+
         if !overwrite {
             println!("Setup cancelled. Use --force to overwrite existing configuration.");
             return Ok(());
         }
     }
-    
+
     // Step 1: Choose AI provider
     println!("\n📋 Step 1: Choose your AI provider\n");
-    
+
     let providers = vec!["OpenAI (Recommended)", "Anthropic", "Both", "Skip for now"];
     let provider_choice = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Which AI provider would you like to use?")
         .items(&providers)
         .default(0)
         .interact()?;
-    
+
     let mut config = llmspell_config::LLMSpellConfig::default();
-    
+
     // Step 2: Get API keys
     match provider_choice {
         0 | 2 => {
             // OpenAI
             println!("\n🔑 Step 2: OpenAI API Key\n");
             println!("Get your API key from: https://platform.openai.com/api-keys\n");
-            
+
             let api_key: String = Input::with_theme(&ColorfulTheme::default())
                 .with_prompt("Enter your OpenAI API key")
                 .validate_with(|input: &String| {
@@ -56,10 +56,10 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
                     }
                 })
                 .interact_text()?;
-            
+
             // Save to environment variable
             std::env::set_var("OPENAI_API_KEY", &api_key);
-            
+
             // Add to config
             config.providers.providers.insert(
                 "openai".to_string(),
@@ -82,13 +82,13 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
         }
         _ => {}
     }
-    
+
     match provider_choice {
         1 | 2 => {
             // Anthropic
             println!("\n🔑 Step 2: Anthropic API Key\n");
             println!("Get your API key from: https://console.anthropic.com/settings/keys\n");
-            
+
             let api_key: String = Input::with_theme(&ColorfulTheme::default())
                 .with_prompt("Enter your Anthropic API key")
                 .validate_with(|input: &String| {
@@ -99,10 +99,10 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
                     }
                 })
                 .interact_text()?;
-            
+
             // Save to environment variable
             std::env::set_var("ANTHROPIC_API_KEY", &api_key);
-            
+
             // Add to config
             config.providers.providers.insert(
                 "anthropic".to_string(),
@@ -125,41 +125,41 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
         }
         _ => {}
     }
-    
+
     // Step 3: Choose first application
     println!("\n🚀 Step 3: Choose your first application\n");
-    
+
     let apps = vec![
         "file-organizer - Organize messy files (Simple)",
         "research-collector - Research any topic (Simple)",
         "content-creator - Create content efficiently (Intermediate)",
         "Skip - I'll explore on my own",
     ];
-    
+
     let app_choice = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Which application would you like to try first?")
         .items(&apps)
         .default(0)
         .interact()?;
-    
+
     // Step 4: Save configuration
     println!("\n💾 Step 4: Saving configuration...\n");
-    
+
     // Create config directory if it doesn't exist
     if let Some(parent) = config_path.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    
+
     // Save config
     let config_content = toml::to_string_pretty(&config)?;
     std::fs::write(&config_path, config_content)?;
-    
+
     println!("✅ Configuration saved to: {}", config_path.display());
-    
+
     // Step 5: Show next steps
     println!("\n🎉 Setup Complete!\n");
     println!("You're ready to use LLMSpell. Here's how to get started:\n");
-    
+
     match app_choice {
         0 => {
             println!("Run File Organizer:");
@@ -171,7 +171,9 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
             println!("Run Research Collector:");
             println!("  llmspell apps research-collector\n");
             println!("Or with the traditional command:");
-            println!("  llmspell run examples/script-users/applications/research-collector/main.lua");
+            println!(
+                "  llmspell run examples/script-users/applications/research-collector/main.lua"
+            );
         }
         2 => {
             println!("Run Content Creator:");
@@ -186,8 +188,8 @@ pub async fn run_interactive_setup(force: bool) -> Result<()> {
             println!("  llmspell apps <app-name>");
         }
     }
-    
+
     println!("\n📚 For more help: llmspell --help");
-    
+
     Ok(())
 }

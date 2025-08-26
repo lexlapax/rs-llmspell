@@ -4,7 +4,7 @@
 //! Example ID: 03 - Async Patterns v1.0.0
 //! Complexity Level: ADVANCED
 //! Real-World Use Case: Concurrent tool execution, streaming operations, timeouts and async composition
-//! 
+//!
 //! Purpose: Demonstrates async patterns with LLMSpell tools and agents
 //! Architecture: BaseAgent + Tool traits with async execution patterns
 //! Crates Showcased: llmspell-core (BaseAgent, Tool), tokio, futures
@@ -35,9 +35,9 @@ use anyhow::Result;
 use async_trait::async_trait;
 use futures::{future, stream, StreamExt};
 use llmspell_core::{
-    ComponentMetadata, ExecutionContext, LLMSpellError, BaseAgent, Tool,
-    traits::tool::{ToolCategory, SecurityLevel, ToolSchema, ParameterDef, ParameterType},
-    types::{AgentInput, AgentOutput}
+    traits::tool::{ParameterDef, ParameterType, SecurityLevel, ToolCategory, ToolSchema},
+    types::{AgentInput, AgentOutput},
+    BaseAgent, ComponentMetadata, ExecutionContext, LLMSpellError, Tool,
 };
 use serde_json::json;
 use std::time::{Duration, Instant};
@@ -76,12 +76,16 @@ impl BaseAgent for SlowTool {
         _context: ExecutionContext,
     ) -> Result<AgentOutput, LLMSpellError> {
         // Extract input data
-        let data = input.parameters.get("input")
+        let data = input
+            .parameters
+            .get("input")
             .and_then(|v| v.as_str())
             .unwrap_or(&input.text);
 
-        info!("SlowTool {} starting {}ms operation with data: {}", 
-              self.metadata.name, self.delay_ms, data);
+        info!(
+            "SlowTool {} starting {}ms operation with data: {}",
+            self.metadata.name, self.delay_ms, data
+        );
 
         // Simulate async work
         let start = Instant::now();
@@ -110,7 +114,7 @@ impl BaseAgent for SlowTool {
             "error": error.to_string(),
             "success": false
         });
-        
+
         Ok(AgentOutput::text(error_response.to_string()))
     }
 }
@@ -185,41 +189,43 @@ async fn concurrent_tools() -> Result<()> {
     // Sequential execution (for comparison)
     println!("   Sequential execution:");
     let start = Instant::now();
-    
+
     let input1 = AgentInput::text("data1").with_parameter("input", json!("data1"));
     let input2 = AgentInput::text("data2").with_parameter("input", json!("data2"));
     let input3 = AgentInput::text("data3").with_parameter("input", json!("data3"));
-    
+
     let _r1 = fast_tool.execute_impl(input1, context.clone()).await?;
     let _r2 = medium_tool.execute_impl(input2, context.clone()).await?;
     let _r3 = slow_tool.execute_impl(input3, context.clone()).await?;
-    
+
     let sequential_time = start.elapsed();
     println!("   ⏱️  Sequential time: {:?}", sequential_time);
 
     // Concurrent execution
     println!("\n   Concurrent execution:");
     let start = Instant::now();
-    
+
     let input1 = AgentInput::text("data1").with_parameter("input", json!("data1"));
     let input2 = AgentInput::text("data2").with_parameter("input", json!("data2"));
     let input3 = AgentInput::text("data3").with_parameter("input", json!("data3"));
-    
+
     let (r1, r2, r3) = join!(
         fast_tool.execute_impl(input1, context.clone()),
         medium_tool.execute_impl(input2, context.clone()),
         slow_tool.execute_impl(input3, context.clone())
     );
-    
+
     // Check results
     let _ = r1?;
     let _ = r2?;
     let _ = r3?;
-    
+
     let concurrent_time = start.elapsed();
     println!("   ⏱️  Concurrent time: {:?}", concurrent_time);
-    println!("   🚀 Speedup: {:.2}x", 
-             sequential_time.as_millis() as f64 / concurrent_time.as_millis() as f64);
+    println!(
+        "   🚀 Speedup: {:.2}x",
+        sequential_time.as_millis() as f64 / concurrent_time.as_millis() as f64
+    );
 
     Ok(())
 }
@@ -235,7 +241,7 @@ async fn streaming_operations() -> Result<()> {
 
     // Process stream items concurrently (up to 3 at a time)
     println!("   Processing stream with concurrency limit of 3:");
-    
+
     let tool = SlowTool::new("stream_processor".to_string(), 200);
     let context = ExecutionContext::new();
 
@@ -254,12 +260,16 @@ async fn streaming_operations() -> Result<()> {
         .await;
 
     let success_count = results.iter().filter(|r| r.is_ok()).count();
-    println!("   ✅ Successfully processed {}/{} chunks", success_count, results.len());
+    println!(
+        "   ✅ Successfully processed {}/{} chunks",
+        success_count,
+        results.len()
+    );
 
     // Demonstrate async iteration with early termination
     println!("\n   Async iteration with early termination:");
     let mut count_stream = stream::iter(1..=10);
-    
+
     while let Some(num) = count_stream.next().await {
         println!("   Processing number: {}", num);
         if num >= 5 {
@@ -281,18 +291,21 @@ async fn timeout_patterns() -> Result<()> {
 
     // Attempt with timeout
     println!("   Attempting operation with 1-second timeout:");
-    
+
     let input = AgentInput::text("timeout_test").with_parameter("input", json!("timeout_test"));
-    
+
     let result = time::timeout(
         Duration::from_secs(1),
-        slow_tool.execute_impl(input, context.clone())
-    ).await;
+        slow_tool.execute_impl(input, context.clone()),
+    )
+    .await;
 
     match result {
         Ok(Ok(output)) => {
-            println!("   ✅ Operation completed: First 100 chars: {}", 
-                    output.text.chars().take(100).collect::<String>());
+            println!(
+                "   ✅ Operation completed: First 100 chars: {}",
+                output.text.chars().take(100).collect::<String>()
+            );
         }
         Ok(Err(e)) => {
             println!("   ❌ Operation failed: {}", e);
@@ -304,13 +317,14 @@ async fn timeout_patterns() -> Result<()> {
 
     // Retry with longer timeout
     println!("\n   Retrying with 3-second timeout:");
-    
+
     let input = AgentInput::text("retry_test").with_parameter("input", json!("retry_test"));
-    
+
     let result = time::timeout(
         Duration::from_secs(3),
-        slow_tool.execute_impl(input, context)
-    ).await;
+        slow_tool.execute_impl(input, context),
+    )
+    .await;
 
     match result {
         Ok(Ok(output)) => {
@@ -409,7 +423,7 @@ async fn pipeline_pattern() -> Result<()> {
     // Process multiple items through pipeline
     let items = vec!["item1", "item2", "item3"];
     let context = ExecutionContext::new();
-    
+
     println!("\n   Processing {} items through pipeline:", items.len());
     let start = Instant::now();
 
@@ -419,53 +433,57 @@ async fn pipeline_pattern() -> Result<()> {
         let s2 = stage2.clone();
         let s3 = stage3.clone();
         let context = context.clone();
-        
+
         async move {
             // Stage 1
             let input1 = AgentInput::text(item).with_parameter("input", json!(item));
             let r1 = s1.execute_impl(input1, context.clone()).await?;
-            
+
             // Extract data from stage 1 output
-            let stage1_data = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r1.text) {
-                parsed.get("processed")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("stage1_default")
-                    .to_string()
-            } else {
-                "stage1_fallback".to_string()
-            };
-            
+            let stage1_data =
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r1.text) {
+                    parsed
+                        .get("processed")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("stage1_default")
+                        .to_string()
+                } else {
+                    "stage1_fallback".to_string()
+                };
+
             // Stage 2
             let input2 = AgentInput::text(&stage1_data).with_parameter("input", json!(stage1_data));
             let r2 = s2.execute_impl(input2, context.clone()).await?;
-            
+
             // Extract data from stage 2 output
-            let stage2_data = if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r2.text) {
-                parsed.get("processed")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("stage2_default")
-                    .to_string()
-            } else {
-                "stage2_fallback".to_string()
-            };
-            
+            let stage2_data =
+                if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&r2.text) {
+                    parsed
+                        .get("processed")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("stage2_default")
+                        .to_string()
+                } else {
+                    "stage2_fallback".to_string()
+                };
+
             // Stage 3
             let input3 = AgentInput::text(&stage2_data).with_parameter("input", json!(stage2_data));
             let r3 = s3.execute_impl(input3, context).await?;
-            
+
             Ok::<_, LLMSpellError>((item, r3))
         }
     });
 
     // Execute all pipelines concurrently
     let results: Vec<_> = future::try_join_all(pipeline_futures).await?;
-    
+
     let elapsed = start.elapsed();
-    
+
     for (item, _result) in results {
         println!("   ✅ Completed pipeline for: {}", item);
     }
-    
+
     println!("   ⏱️  Total pipeline time: {:?}", elapsed);
     println!("   (Note: Items processed concurrently through all stages)");
 
