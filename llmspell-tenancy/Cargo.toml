@@ -11,6 +11,7 @@ description = "Multi-tenant infrastructure for llmspell with isolation and usage
 
 [dependencies]
 # Core dependencies
+llmspell-events = { path = "../llmspell-events" }
 llmspell-state-traits = { path = "../llmspell-state-traits" }
 llmspell-storage = { path = "../llmspell-storage" }
 

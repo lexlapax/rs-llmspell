@@ -16,9 +16,17 @@
 #![allow(clippy::explicit_iter_loop)]
 
 pub mod manager;
+pub mod registry;
+pub mod traits;
 pub mod usage;
 
-pub use manager::{MultiTenantVectorManager, TenantConfig, TenantInfo, TenantLimits};
+pub use manager::{MultiTenantVectorManager, TenantInfo};
+pub use registry::{DefaultTenantRegistry, FilteredTenantRegistry};
+pub use traits::{
+    IsolationMode, MultiTenancyConfig, TenantConfig, TenantExtension, TenantLifecycleHook,
+    TenantLimits, TenantOperationResult, TenantRegistry, TenantResourceManager, TenantScoped,
+    UsageTracked,
+};
 pub use usage::{CostEstimate, CostRates, TenantUsageTracker, UsageMetrics, UsageReport};
 
 /// Library version

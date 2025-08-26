@@ -426,7 +426,10 @@ mod tests {
         };
 
         let decision = policy.evaluate(&context).await;
-        assert!(matches!(decision, AccessDecision::Allow | AccessDecision::AllowWithFilters(_)));
+        assert!(matches!(
+            decision,
+            AccessDecision::Allow | AccessDecision::AllowWithFilters(_)
+        ));
     }
 
     #[tokio::test]

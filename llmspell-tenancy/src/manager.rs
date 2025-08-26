@@ -7,70 +7,16 @@ use llmspell_state_traits::StateScope;
 use llmspell_storage::{
     ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::sync::RwLock;
 use tracing::{debug, info, warn};
 
+use super::traits::{TenantConfig, TenantLimits};
 use super::usage::{TenantUsageTracker, UsageMetrics};
-
-/// Tenant-specific configuration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TenantConfig {
-    /// Unique tenant identifier
-    pub tenant_id: String,
-
-    /// Display name for the tenant
-    pub name: String,
-
-    /// Resource limits for this tenant
-    pub limits: TenantLimits,
-
-    /// Whether the tenant is active
-    pub active: bool,
-
-    /// Custom metadata
-    pub metadata: HashMap<String, serde_json::Value>,
-
-    /// Creation timestamp
-    pub created_at: SystemTime,
-
-    /// Last activity timestamp
-    pub last_accessed: SystemTime,
-}
-
-/// Resource limits for a tenant
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TenantLimits {
-    /// Maximum number of vectors
-    pub max_vectors: Option<usize>,
-
-    /// Maximum total storage in bytes
-    pub max_storage_bytes: Option<usize>,
-
-    /// Maximum queries per second
-    pub max_queries_per_second: Option<u32>,
-
-    /// Maximum embedding dimensions
-    pub max_dimensions: Option<usize>,
-
-    /// Whether to allow overflow (soft limits)
-    pub allow_overflow: bool,
-}
-
-impl Default for TenantLimits {
-    fn default() -> Self {
-        Self {
-            max_vectors: Some(1_000_000),
-            max_storage_bytes: Some(1_073_741_824), // 1GB
-            max_queries_per_second: Some(100),
-            max_dimensions: Some(4096),
-            allow_overflow: false,
-        }
-    }
-}
+use llmspell_events::{EventBus, Language, UniversalEvent};
+use serde_json::json;
 
 /// Tenant runtime information
 #[derive(Debug, Clone)]
@@ -98,6 +44,9 @@ pub struct MultiTenantVectorManager {
 
     /// Default limits for new tenants
     default_limits: TenantLimits,
+
+    /// Event bus for notifications
+    event_bus: Option<Arc<EventBus>>,
 }
 
 impl MultiTenantVectorManager {
@@ -108,6 +57,38 @@ impl MultiTenantVectorManager {
             tenants: DashMap::new(),
             usage_tracker: Arc::new(TenantUsageTracker::new()),
             default_limits: TenantLimits::default(),
+            event_bus: None,
+        }
+    }
+
+    /// Create with event bus for notifications
+    pub fn with_event_bus(storage: Arc<dyn VectorStorage>, event_bus: Arc<EventBus>) -> Self {
+        Self {
+            storage,
+            tenants: DashMap::new(),
+            usage_tracker: Arc::new(TenantUsageTracker::new()),
+            default_limits: TenantLimits::default(),
+            event_bus: Some(event_bus),
+        }
+    }
+
+    /// Emit an event to the event bus
+    async fn emit_event(&self, tenant_id: &str, event_type: &str, data: serde_json::Value) {
+        if let Some(bus) = &self.event_bus {
+            let event = UniversalEvent::new(
+                format!("tenant.{}.{}", tenant_id, event_type),
+                json!({
+                    "tenant_id": tenant_id,
+                    "event": event_type,
+                    "timestamp": SystemTime::now(),
+                    "data": data,
+                }),
+                Language::Rust,
+            );
+
+            if let Err(e) = bus.publish(event).await {
+                warn!("Failed to emit tenant event: {}", e);
+            }
         }
     }
 
@@ -134,7 +115,7 @@ impl MultiTenantVectorManager {
 
         // Create tenant info
         let tenant_info = TenantInfo {
-            config,
+            config: config.clone(),
             usage,
             scope,
         };
@@ -142,6 +123,17 @@ impl MultiTenantVectorManager {
         // Store tenant
         self.tenants
             .insert(tenant_id.clone(), Arc::new(RwLock::new(tenant_info)));
+
+        // Emit creation event
+        self.emit_event(
+            &tenant_id,
+            "created",
+            json!({
+                "name": config.name,
+                "limits": config.limits,
+            }),
+        )
+        .await;
 
         info!("Created tenant: {}", tenant_id);
         Ok(())
@@ -165,6 +157,16 @@ impl MultiTenantVectorManager {
 
         // Clean up usage tracking
         self.usage_tracker.remove_tenant(tenant_id).await?;
+
+        // Emit deletion event
+        self.emit_event(
+            tenant_id,
+            "deleted",
+            json!({
+                "vectors_deleted": deleted_count,
+            }),
+        )
+        .await;
 
         info!(
             "Deleted tenant {} with {} vectors",
@@ -272,7 +274,7 @@ impl MultiTenantVectorManager {
                     }
                 }
             }
-            
+
             tenant_info.scope.clone()
         }; // Read lock released here
 
@@ -289,7 +291,8 @@ impl MultiTenantVectorManager {
         {
             let mut tenant_info = tenant.write().await;
             tenant_info.usage.vector_count += vectors.len();
-            tenant_info.usage.storage_bytes += vectors.iter().map(|v| v.embedding.len() * 4).sum::<usize>();
+            tenant_info.usage.storage_bytes +=
+                vectors.iter().map(|v| v.embedding.len() * 4).sum::<usize>();
             tenant_info.usage.insert_count += 1;
         }
 
@@ -301,6 +304,17 @@ impl MultiTenantVectorManager {
                 vectors.iter().map(|v| v.embedding.len() * 4).sum(), // f32 = 4 bytes
             )
             .await?;
+
+        // Emit insert event
+        self.emit_event(
+            tenant_id,
+            "vectors_inserted",
+            json!({
+                "count": vectors.len(),
+                "vector_ids": ids,
+            }),
+        )
+        .await;
 
         debug!("Inserted {} vectors for tenant {}", ids.len(), tenant_id);
         Ok(ids)
@@ -334,6 +348,17 @@ impl MultiTenantVectorManager {
 
         // Update usage metrics
         self.usage_tracker.record_search(tenant_id).await?;
+
+        // Emit search event
+        self.emit_event(
+            tenant_id,
+            "vectors_searched",
+            json!({
+                "results_count": results.len(),
+                "query_type": "similarity",
+            }),
+        )
+        .await;
 
         debug!(
             "Search returned {} results for tenant {}",
@@ -503,6 +528,7 @@ mod tests {
             metadata: HashMap::new(),
             created_at: SystemTime::now(),
             last_accessed: SystemTime::now(),
+            custom_config: None,
         };
 
         manager.create_tenant(config).await.unwrap();
@@ -527,6 +553,7 @@ mod tests {
                 metadata: HashMap::new(),
                 created_at: SystemTime::now(),
                 last_accessed: SystemTime::now(),
+                custom_config: None,
             };
             manager.create_tenant(config).await.unwrap();
         }
@@ -569,11 +596,13 @@ mod tests {
                 max_queries_per_second: Some(10),
                 max_dimensions: Some(3),
                 allow_overflow: false,
+                custom_limits: HashMap::new(),
             },
             active: true,
             metadata: HashMap::new(),
             created_at: SystemTime::now(),
             last_accessed: SystemTime::now(),
+            custom_config: None,
         };
 
         manager.create_tenant(config).await.unwrap();
