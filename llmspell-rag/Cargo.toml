@@ -45,6 +45,12 @@ chrono = { version = "0.4", features = ["serde"] }
 # Token counting for chunking
 tiktoken-rs = "0.5"
 
+# HTTP client for API calls
+reqwest = { version = "0.11", features = ["json"] }
+
+# Random number generation for mock embeddings
+rand = "0.8"
+
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
 criterion = "0.5"
