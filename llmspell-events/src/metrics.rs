@@ -137,7 +137,9 @@ impl MetricsCollector {
 
                 // Calculate current EPS
                 let current_eps = if elapsed > 0.0 {
-                    (current_event_count - last_event_count) as f64 / elapsed
+                    #[allow(clippy::cast_precision_loss)]
+                    let event_diff = (current_event_count - last_event_count) as f64 / elapsed;
+                    event_diff
                 } else {
                     0.0
                 };
@@ -192,24 +194,27 @@ impl MetricsCollector {
 
                     let len = sorted_samples.len();
                     metrics_guard.real_time_analytics.latency_percentiles = LatencyPercentiles {
-                        p50: sorted_samples[len * 50 / 100],
-                        p90: sorted_samples[len * 90 / 100],
-                        p95: sorted_samples[len * 95 / 100],
-                        p99: sorted_samples[len * 99 / 100],
+                        p50: sorted_samples[(len * 50) / 100],
+                        p90: sorted_samples[(len * 90) / 100],
+                        p95: sorted_samples[(len * 95) / 100],
+                        p99: sorted_samples[(len * 99) / 100],
                     };
                 }
 
                 // Calculate error rate
                 let total_errors = *error_count.read();
                 metrics_guard.real_time_analytics.error_rate = if current_event_count > 0 {
-                    total_errors as f64 / current_event_count as f64 * 100.0
+                    #[allow(clippy::cast_precision_loss)]
+                    let error_rate = total_errors as f64 / current_event_count as f64 * 100.0;
+                    error_rate
                 } else {
                     0.0
                 };
 
                 // Update memory usage (approximate)
-                metrics_guard.real_time_analytics.memory_usage_bytes =
-                    (samples.len() * std::mem::size_of::<Duration>()) as u64;
+                #[allow(clippy::cast_possible_truncation)]
+                let memory_bytes = (samples.len() * std::mem::size_of::<Duration>()) as u64;
+                metrics_guard.real_time_analytics.memory_usage_bytes = memory_bytes;
 
                 metrics_guard.real_time_analytics.last_updated = SystemTime::now();
 
@@ -235,15 +240,21 @@ impl MetricsCollector {
 
         // Update average processing time (exponential moving average)
         let alpha = 0.1; // Smoothing factor
+        #[allow(clippy::cast_precision_loss)]
         let current_avg = metrics.avg_processing_time.as_nanos() as f64;
+        #[allow(clippy::cast_precision_loss)]
         let new_time = processing_time.as_nanos() as f64;
         let new_avg = alpha * new_time + (1.0 - alpha) * current_avg;
-        metrics.avg_processing_time = Duration::from_nanos(new_avg as u64);
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let new_avg_nanos = new_avg as u64;
+        metrics.avg_processing_time = Duration::from_nanos(new_avg_nanos);
 
         // Update events per second
         let elapsed = self.start_time.elapsed().as_secs_f64();
         if elapsed > 0.0 {
-            metrics.current_events_per_second = metrics.total_events as f64 / elapsed;
+            #[allow(clippy::cast_precision_loss)]
+            let eps = metrics.total_events as f64 / elapsed;
+            metrics.current_events_per_second = eps;
             if metrics.current_events_per_second > metrics.peak_events_per_second {
                 metrics.peak_events_per_second = metrics.current_events_per_second;
             }
@@ -276,9 +287,12 @@ impl MetricsCollector {
             p99_latency: metrics.real_time_analytics.latency_percentiles.p99,
             error_rate: metrics.real_time_analytics.error_rate,
             throughput_trend: metrics.real_time_analytics.throughput_trend,
-            memory_usage_mb: metrics.real_time_analytics.memory_usage_bytes as f64
-                / 1024.0
-                / 1024.0,
+            memory_usage_mb: {
+                #[allow(clippy::cast_precision_loss)]
+                let memory_mb =
+                    metrics.real_time_analytics.memory_usage_bytes as f64 / 1024.0 / 1024.0;
+                memory_mb
+            },
             uptime_seconds: self.start_time.elapsed().as_secs(),
         }
     }

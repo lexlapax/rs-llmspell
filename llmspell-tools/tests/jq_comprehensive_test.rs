@@ -3,13 +3,9 @@
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
-
-#[tokio::test]
-async fn test_comprehensive_jq_syntax() {
-    let tool = JsonProcessorTool::default();
-
-    // Test data
-    let data = json!({
+// Helper function to create test data
+fn create_test_data() -> serde_json::Value {
+    json!({
         "users": [
             {"name": "Alice", "age": 30, "skills": ["rust", "python"]},
             {"name": "Bob", "age": 25, "skills": ["javascript", "go"]},
@@ -20,14 +16,19 @@ async fn test_comprehensive_jq_syntax() {
             {"name": "Project B", "lead": "Bob", "status": "completed"},
             {"name": "Project C", "lead": "Charlie", "status": "active"}
         ]
-    });
+    })
+}
 
-    // Test 1: Pipes
+#[tokio::test]
+async fn test_jq_pipes_and_sort() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test pipes").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".users | map(.name) | sort"
         }),
     );
@@ -37,13 +38,18 @@ async fn test_comprehensive_jq_syntax() {
         .unwrap();
     let result: Vec<String> = serde_json::from_str(&output.text).unwrap();
     assert_eq!(result, vec!["Alice", "Bob", "Charlie"]);
+}
 
-    // Test 2: map
+#[tokio::test]
+async fn test_jq_map_operations() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test map").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".projects | map({project: .name, manager: .lead})"
         }),
     );
@@ -54,13 +60,18 @@ async fn test_comprehensive_jq_syntax() {
     let result: Vec<serde_json::Value> = serde_json::from_str(&output.text).unwrap();
     assert_eq!(result[0]["project"], "Project A");
     assert_eq!(result[0]["manager"], "Alice");
+}
 
-    // Test 3: select (filtering)
+#[tokio::test]
+async fn test_jq_select_filtering() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test select").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".users[] | select(.age > 26) | .name"
         }),
     );
@@ -70,13 +81,18 @@ async fn test_comprehensive_jq_syntax() {
         .unwrap();
     let result: Vec<String> = serde_json::from_str(&output.text).unwrap();
     assert_eq!(result, vec!["Alice", "Charlie"]);
+}
 
-    // Test 4: reduce
+#[tokio::test]
+async fn test_jq_reduce_operations() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test reduce").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".users | map(.age) | add / length"
         }),
     );
@@ -85,14 +101,19 @@ async fn test_comprehensive_jq_syntax() {
         .await
         .unwrap();
     let result: f64 = serde_json::from_str(&output.text).unwrap();
-    assert_eq!(result, 30.0); // Average age
+    assert!((result - 30.0).abs() < f64::EPSILON); // Average age
+}
 
-    // Test 5: group_by
+#[tokio::test]
+async fn test_jq_group_by() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test group_by").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".projects | group_by(.status) | map({status: .[0].status, count: length})"
         }),
     );
@@ -102,13 +123,18 @@ async fn test_comprehensive_jq_syntax() {
         .unwrap();
     let result: Vec<serde_json::Value> = serde_json::from_str(&output.text).unwrap();
     assert_eq!(result.len(), 2); // active and completed
+}
 
-    // Test 6: Complex nested operations
+#[tokio::test]
+async fn test_jq_complex_nested_operations() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test complex").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".users | map(select(.skills | contains([\"rust\"]))) | map({name, skill_count: (.skills | length)})"
         }),
     );
@@ -124,13 +150,18 @@ async fn test_comprehensive_jq_syntax() {
     assert!(result
         .iter()
         .any(|u| u["name"] == "Charlie" && u["skill_count"] == 3));
+}
 
-    // Test 7: Object construction
+#[tokio::test]
+async fn test_jq_object_construction() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test object construction").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": "{total_users: (.users | length), avg_age: (.users | map(.age) | add / length), active_projects: (.projects | map(select(.status == \"active\")) | length)}"
         }),
     );
@@ -142,13 +173,18 @@ async fn test_comprehensive_jq_syntax() {
     assert_eq!(result["total_users"], 3);
     assert_eq!(result["avg_age"], 30.0);
     assert_eq!(result["active_projects"], 2);
+}
 
-    // Test 8: Array slicing and indexing
+#[tokio::test]
+async fn test_jq_array_slicing_and_indexing() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test array ops").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".users[1:] | map(.name)"
         }),
     );
@@ -158,8 +194,12 @@ async fn test_comprehensive_jq_syntax() {
         .unwrap();
     let result: Vec<String> = serde_json::from_str(&output.text).unwrap();
     assert_eq!(result, vec!["Bob", "Charlie"]);
+}
 
-    // Test 9: String operations
+#[tokio::test]
+async fn test_jq_string_operations() {
+    let tool = JsonProcessorTool::default();
+
     let input = AgentInput::text("test string ops").with_parameter(
         "parameters".to_string(),
         json!({
@@ -174,13 +214,18 @@ async fn test_comprehensive_jq_syntax() {
         .unwrap();
     let result: String = serde_json::from_str(&output.text).unwrap();
     assert_eq!(result, "HELLO WORLD");
+}
 
-    // Test 10: Type operations
+#[tokio::test]
+async fn test_jq_type_operations() {
+    let tool = JsonProcessorTool::default();
+    let data = create_test_data();
+
     let input = AgentInput::text("test type ops").with_parameter(
         "parameters".to_string(),
         json!({
             "operation": "query",
-            "input": data.clone(),
+            "input": data,
             "query": ".users | map({name, is_adult: (.age >= 18)})"
         }),
     );
@@ -191,7 +236,6 @@ async fn test_comprehensive_jq_syntax() {
     let result: Vec<serde_json::Value> = serde_json::from_str(&output.text).unwrap();
     assert!(result.iter().all(|u| u["is_adult"] == true));
 }
-
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();

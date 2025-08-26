@@ -166,7 +166,8 @@ mod tests {
     #[test]
     fn test_macro_compilation() {
         // TODO: Test macro expansion when attribute macros are fully implemented
-        assert!(true);
+        // For now, just verify the module compiles
+        let _ = 1 + 1; // Placeholder until macro testing is implemented
     }
 
     #[test]

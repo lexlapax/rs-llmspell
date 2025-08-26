@@ -4,13 +4,18 @@
 use llmspell_bridge::globals::types::GlobalContext;
 use llmspell_bridge::lua::globals::event::inject_event_global;
 use llmspell_bridge::{ComponentRegistry, ProviderManager};
+use llmspell_config::providers::ProviderManagerConfig;
 use mlua::Lua;
 use std::sync::Arc;
 
 async fn create_test_environment() -> (Lua, GlobalContext) {
     let lua = Lua::new();
     let registry = Arc::new(ComponentRegistry::new());
-    let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+    let providers = Arc::new(
+        ProviderManager::new(ProviderManagerConfig::default())
+            .await
+            .unwrap(),
+    );
     let context = GlobalContext::new(registry, providers);
 
     inject_event_global(&lua, &context).unwrap();
@@ -177,14 +182,14 @@ async fn test_event_stats() {
 
     let result: mlua::Result<bool> = lua
         .load(
-            r#"
+            r"
         local stats = Event.get_stats()
         
         -- Verify stats structure
         return stats ~= nil and 
                stats.event_bus_stats ~= nil and 
                stats.bridge_stats ~= nil
-    "#,
+    ",
         )
         .eval();
 

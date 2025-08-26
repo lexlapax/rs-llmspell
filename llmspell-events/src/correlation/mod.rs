@@ -339,13 +339,15 @@ impl EventCorrelationTracker {
             .read()
             .unwrap()
             .values()
-            .map(|v| v.len())
+            .map(Vec::len)
             .sum::<usize>();
         let contexts_count = self.contexts.read().unwrap().len();
 
         // Rough estimate: each event ~1KB, each link ~200B, each context ~500B
+        #[allow(clippy::cast_possible_truncation)]
+        let total_events_usize = stats.total_events as usize;
         stats.estimated_memory_usage =
-            (stats.total_events as usize * 1024) + (links_count * 200) + (contexts_count * 500);
+            (total_events_usize * 1024) + (links_count * 200) + (contexts_count * 500);
 
         stats
     }
@@ -476,7 +478,6 @@ mod tests {
     use super::*;
     use crate::universal_event::{Language, UniversalEvent};
     use serde_json::Value;
-
     #[test]
     fn test_correlation_context_creation() {
         let root_context = CorrelationContext::new_root();
@@ -488,7 +489,6 @@ mod tests {
         assert_eq!(child_context.parent_id, Some(root_context.correlation_id));
         assert_ne!(child_context.correlation_id, root_context.correlation_id);
     }
-
     #[test]
     fn test_event_tracking() {
         let tracker = EventCorrelationTracker::default();
@@ -507,7 +507,6 @@ mod tests {
         assert_eq!(stats.total_events, 1);
         assert_eq!(stats.active_correlations, 1);
     }
-
     #[test]
     fn test_event_links() {
         let tracker = EventCorrelationTracker::default();
@@ -529,7 +528,6 @@ mod tests {
         let stats = tracker.get_stats();
         assert_eq!(stats.total_links, 1);
     }
-
     #[test]
     fn test_correlation_cleanup() {
         let config = CorrelationConfig {
@@ -551,7 +549,6 @@ mod tests {
         let events = tracker.get_events(&correlation_id);
         assert_eq!(events.len(), 2); // Should only keep the last 2 events
     }
-
     #[test]
     fn test_context_metadata() {
         let context = CorrelationContext::new_root()

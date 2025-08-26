@@ -455,11 +455,17 @@ impl MigrationPlanner {
         transformations: &[DataTransformation],
     ) -> std::time::Duration {
         let base_duration = std::time::Duration::from_secs(60); // 1 minute base
-        let step_duration = std::time::Duration::from_secs(30 * steps.len() as u64);
+        #[allow(clippy::cast_possible_truncation)]
+        let steps_len_u64 = steps.len() as u64;
+        let step_duration = std::time::Duration::from_secs(30 * steps_len_u64);
         let transform_duration = std::time::Duration::from_secs(
             transformations
                 .iter()
-                .map(|t| t.field_mappings.len() as u64 * 10)
+                .map(|t| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let field_mappings_len_u64 = t.field_mappings.len() as u64;
+                    field_mappings_len_u64 * 10
+                })
                 .sum(),
         );
 
@@ -524,11 +530,15 @@ impl MigrationPlanner {
         };
 
         let average_migration_complexity = if !self.compatibility_cache.is_empty() {
-            self.compatibility_cache
+            #[allow(clippy::cast_precision_loss)]
+            let sum_f64 = self
+                .compatibility_cache
                 .values()
                 .map(|r| r.field_changes.len())
-                .sum::<usize>() as f64
-                / self.compatibility_cache.len() as f64
+                .sum::<usize>() as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let len_f64 = self.compatibility_cache.len() as f64;
+            sum_f64 / len_f64
         } else {
             0.0
         };
@@ -575,7 +585,6 @@ mod tests {
         );
         schema
     }
-
     #[test]
     fn test_migration_planner_creation() {
         let planner = MigrationPlanner::new();
@@ -584,7 +593,6 @@ mod tests {
         assert_eq!(stats.total_schemas, 0);
         assert_eq!(stats.total_compatibility_checks, 0);
     }
-
     #[test]
     fn test_schema_registration() {
         let mut planner = MigrationPlanner::new();
@@ -596,7 +604,6 @@ mod tests {
         assert!(planner.schema_registry.contains_key(&version));
         assert_eq!(planner.get_migration_stats().total_schemas, 1);
     }
-
     #[test]
     fn test_no_op_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -613,7 +620,6 @@ mod tests {
         assert_eq!(plan.risk_level, RiskLevel::Low);
         assert!(!plan.requires_backup);
     }
-
     #[test]
     fn test_simple_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -649,7 +655,6 @@ mod tests {
         // Validate the plan
         planner.validate_plan(&plan).unwrap();
     }
-
     #[test]
     fn test_breaking_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -683,7 +688,6 @@ mod tests {
         // Note: warnings may be empty if compatibility checker doesn't generate them
         // for major version changes, which is expected behavior
     }
-
     #[test]
     fn test_field_mapping_creation() {
         let mut planner = MigrationPlanner::new();
@@ -713,7 +717,6 @@ mod tests {
             _ => panic!("Expected Transform mapping"),
         }
     }
-
     #[test]
     fn test_migration_path_finding() {
         let mut planner = MigrationPlanner::new();
@@ -733,7 +736,6 @@ mod tests {
         assert_eq!(path[0], v1_0_0);
         assert_eq!(path[1], v1_2_0);
     }
-
     #[test]
     fn test_plan_validation() {
         let planner = MigrationPlanner::new();
@@ -761,7 +763,6 @@ mod tests {
             Err(MigrationPlannerError::ValidationFailed { .. })
         ));
     }
-
     #[test]
     fn test_migration_stats() {
         let mut planner = MigrationPlanner::new();

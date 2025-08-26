@@ -143,7 +143,6 @@ pub fn safe_to_json<T: Serialize>(value: &T) -> Result<Value, String> {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_no_circular_reference() {
         let value = json!({
@@ -159,7 +158,6 @@ mod tests {
         let mut detector = CircularReferenceDetector::new();
         assert!(detector.check_value(&value).is_ok());
     }
-
     #[test]
     fn test_circular_reference_detection() {
         // Create a value that would have circular reference if we could
@@ -182,7 +180,6 @@ mod tests {
             assert!(detector.visit_stack.contains(&hash));
         }
     }
-
     #[test]
     fn test_safe_serialize() {
         #[derive(Serialize)]

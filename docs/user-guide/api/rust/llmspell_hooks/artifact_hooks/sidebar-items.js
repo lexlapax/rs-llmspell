@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["add_artifact_to_context","event_to_hook_point","get_artifact_from_context","is_artifact_hook_point"],"struct":["ArtifactHookPoints"]};

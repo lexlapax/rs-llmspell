@@ -5,9 +5,10 @@
 mod tests {
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
-        providers::{ProviderManager, ProviderManagerConfig},
+        providers::ProviderManager,
         registry::ComponentRegistry,
     };
+    use llmspell_config::providers::ProviderManagerConfig;
     use std::sync::Arc;
 
     #[tokio::test(flavor = "multi_thread")]
@@ -36,7 +37,7 @@ mod tests {
                     "Streaming global not found"
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -74,12 +75,28 @@ mod tests {
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("exists").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasNext").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasIsDone").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasCollect").and_then(|v| v.as_bool()), Some(true));
+                assert_eq!(
+                    obj.get("exists")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasNext")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasIsDone")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasCollect")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -94,7 +111,8 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Register tools with the registry
-        llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+        let tools_config = llmspell_config::tools::ToolsConfig::default();
+        llmspell_bridge::tools::register_all_tools(&registry, &tools_config).unwrap();
 
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -124,11 +142,23 @@ mod tests {
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("toolExists").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasTools").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("toolWorks").and_then(|v| v.as_bool()), Some(true));
+                assert_eq!(
+                    obj.get("toolExists")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasTools")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("toolWorks")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -143,7 +173,8 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
         // Register tools with the registry
-        llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+        let tools_config = llmspell_config::tools::ToolsConfig::default();
+        llmspell_bridge::tools::register_all_tools(&registry, &tools_config).unwrap();
 
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -158,8 +189,8 @@ mod tests {
                 name = "test_seq",
                 description = "Test sequential workflow",
                 steps = {
-                    {name = "step1", tool = "uuid_generator", input = {}},
-                    {name = "step2", tool = "hash_calculator", input = {algorithm = "sha256", input = "test"}}
+                    {name = "step1", type = "tool", tool = "uuid_generator", input = {}},
+                    {name = "step2", type = "tool", tool = "hash_calculator", input = {algorithm = "sha256", input = "test"}}
                 }
             })
             
@@ -168,8 +199,8 @@ mod tests {
                 name = "test_par", 
                 description = "Test parallel workflow",
                 steps = {
-                    {name = "task1", tool = "uuid_generator", input = {}},
-                    {name = "task2", tool = "date_time_handler", input = {operation = "now"}}
+                    {name = "task1", type = "tool", tool = "uuid_generator", input = {}},
+                    {name = "task2", type = "tool", tool = "date_time_handler", input = {operation = "now"}}
                 }
             })
             
@@ -188,7 +219,8 @@ mod tests {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
                 assert_eq!(
-                    obj.get("workflowExists").and_then(|v| v.as_bool()),
+                    obj.get("workflowExists")
+                        .and_then(serde_json::value::Value::as_bool),
                     Some(true)
                 );
                 assert_eq!(
@@ -200,15 +232,17 @@ mod tests {
                     Some("parallel")
                 );
                 assert_eq!(
-                    obj.get("seqHasExecute").and_then(|v| v.as_bool()),
+                    obj.get("seqHasExecute")
+                        .and_then(serde_json::value::Value::as_bool),
                     Some(true)
                 );
                 assert_eq!(
-                    obj.get("parHasExecute").and_then(|v| v.as_bool()),
+                    obj.get("parHasExecute")
+                        .and_then(serde_json::value::Value::as_bool),
                     Some(true)
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -232,7 +266,7 @@ mod tests {
         // For now, this should work as we have a basic implementation
         match stream_result {
             Ok(_) => println!("Streaming execution succeeded"),
-            Err(e) => panic!("Streaming execution failed: {:?}", e),
+            Err(e) => panic!("Streaming execution failed: {e:?}"),
         }
     }
 }

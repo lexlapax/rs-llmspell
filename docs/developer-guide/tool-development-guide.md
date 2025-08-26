@@ -1,6 +1,6 @@
 # Tool Development Guide
 
-✅ **Current Implementation**: This guide reflects actual Phase 3.3 APIs and patterns used in the 34 existing tools.
+✅ **Current Implementation**: This guide reflects actual Phase 3.3 and Phase 7 APIs and patterns used in the 37 existing tools.
 
 This guide explains how to create new tools for rs-llmspell using current APIs and established patterns.
 
@@ -15,10 +15,11 @@ Tools are reusable components that perform specific tasks like file operations, 
 - Integrates with the agent and workflow systems
 
 ### **Current Tool Ecosystem**
-rs-llmspell has **34 production tools** across 9 categories:
+rs-llmspell has **37 production tools** across 10 categories (including 3 new Phase 7 tools):
 - **API Tools** (2): GraphQL, HTTP requests
 - **Communication** (2): Database, Email
-- **Data Processing** (2): CSV, JSON
+- **Data Processing** (4): CSV, JSON, Graph builder (Phase 7), Data validation
+- **Document & Academic** (2): PDF processor (Phase 7), Citation formatter (Phase 7)
 - **File System** (5): Operations, Search, Watch, Convert, Archive
 - **Media** (3): Audio, Image, Video processing
 - **Search** (1): Web search
@@ -237,31 +238,71 @@ mod tests {
 
 ## Common Tool Patterns
 
-### **File Operations Tool Pattern**
+### **File Operations Tool Pattern (Mandatory Sandbox Architecture)**
+
+**CRITICAL**: All filesystem-accessing tools MUST use the bridge-provided sandbox. Never create your own sandbox.
 
 ```rust
-use llmspell_security::{SandboxContext, FileSandbox};
+use llmspell_security::sandbox::FileSandbox;
 use std::path::Path;
+use std::sync::Arc;
+
+#[derive(Clone)]
+pub struct YourFileTool {
+    metadata: ComponentMetadata,
+    config: YourFileToolConfig,
+    sandbox: Arc<FileSandbox>,  // ✅ MANDATORY: Bridge-provided sandbox
+}
 
 impl YourFileTool {
+    /// Create a new file tool - MUST accept sandbox parameter
+    #[must_use]
+    pub fn new(config: YourFileToolConfig, sandbox: Arc<FileSandbox>) -> Self {
+        Self {
+            metadata: ComponentMetadata::new(
+                "your_file_tool".to_string(),
+                "Description of your file tool".to_string(),
+            ),
+            config,
+            sandbox,  // ✅ Store bridge-provided sandbox
+        }
+    }
+
+    /// Safe file operation using bridge-provided sandbox
     async fn safe_file_operation(&self, path: &str) -> Result<String, LLMError> {
-        // Create sandbox context
-        let context = SandboxContext::new(
-            "file-operation".to_string(),
-            self.security_requirements(),
-            self.resource_limits(),
-        );
+        // ✅ Use bridge-provided sandbox (never create your own)
+        let validated_path = self.sandbox.validate_path(Path::new(path))?;
         
-        // Validate path using file sandbox
-        let file_sandbox = FileSandbox::new(context)?;
-        let validated_path = file_sandbox.validate_path(Path::new(path))?;
-        
-        // Perform file operation
+        // Perform file operation on validated path
         let content = tokio::fs::read_to_string(validated_path).await?;
         Ok(content)
     }
 }
 ```
+
+**Bridge Registration Pattern**:
+```rust
+// In llmspell-bridge/src/tools.rs
+fn register_file_system_tools(
+    registry: &Arc<ComponentRegistry>,
+    file_sandbox: Arc<FileSandbox>,  // Bridge creates shared sandbox
+) -> Result<(), Box<dyn std::error::Error>> {
+    let your_tool_sandbox = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry,
+        "your_file_tool",
+        your_tool_sandbox.clone(),
+        move || YourFileTool::new(YourFileToolConfig::default(), your_tool_sandbox),
+    )?;
+    Ok(())
+}
+```
+
+**Security Benefits**:
+- ✅ Consistent security policy across ALL tools
+- ✅ Bridge configures sandbox with user's allowed paths
+- ✅ No tool can bypass security restrictions
+- ✅ Shared sandbox reduces memory overhead
 
 ### **Network Tool Pattern**
 
@@ -456,6 +497,169 @@ async fn process_large_data(&self, data: &[u8]) -> Result<Vec<u8>, LLMError> {
     Ok(processed)
 }
 ```
+
+---
+
+## Resource Limit Implementation Details
+
+### Basic Resource Limiting
+
+```rust
+use llmspell_utils::resource_limits::{ResourceLimits, ResourceTracker, MemoryGuard};
+
+// Create resource limits
+let limits = ResourceLimits {
+    max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
+    max_cpu_time_ms: Some(5_000),             // 5 seconds
+    max_operations: Some(10_000),             // 10K operations
+    max_file_size_bytes: Some(50 * 1024 * 1024), // 50MB max file
+    max_concurrent_ops: Some(100),            // 100 concurrent operations
+    operation_timeout_ms: Some(30_000),       // 30 second timeout
+};
+
+// Create tracker
+let tracker = ResourceTracker::new(limits);
+
+// Track operations and CPU time together
+track_operation!(tracker)?; // Macro calls both track_operation() and check_cpu_time()
+
+// Track memory with auto-cleanup
+let _memory_guard = MemoryGuard::new(&tracker, 1_000_000)?; // 1MB
+// Memory is automatically released when guard drops
+```
+
+### Memory Guards Pattern
+
+```rust
+{
+    // Allocate memory with automatic cleanup
+    let _guard = MemoryGuard::new(&tracker, 1_000_000)?;
+    
+    // Memory is tracked while guard is in scope
+    process_data();
+    
+} // Memory automatically released when guard drops
+```
+
+### Performance Considerations
+
+- Resource tracking adds minimal overhead (<1% in most cases)
+- Use `track_operation!` macro in tight loops for combined tracking
+- Consider batching operations to reduce tracking overhead
+- Memory guards have zero-cost abstractions when limits aren't exceeded
+
+---
+
+## Phase 7 Tool Implementation Examples
+
+### **PDF Processor Tool**
+The PDF processor demonstrates handling synchronous libraries in async contexts:
+
+```rust
+// llmspell-tools/src/document/pdf_processor.rs
+use tokio::task::spawn_blocking;
+
+async fn extract_text(&self, file_path: &str) -> Result<ToolOutput> {
+    // pdf-extract is synchronous, so use spawn_blocking
+    let text = spawn_blocking(move || {
+        pdf_extract::extract_text(file_path)
+    })
+    .await
+    .context("Failed to spawn blocking task")?
+    .context("PDF extraction failed")?;
+    
+    tool_success(json!({
+        "operation": "extract_text",
+        "success": true,
+        "result": {
+            "text": text,
+            "page_count": text.lines().filter(|l| l.contains("Page")).count()
+        }
+    }))
+}
+```
+
+**Key lessons:**
+- Use `spawn_blocking` for synchronous libraries
+- Add timeout protection for long operations
+- Handle large files with resource limits
+
+### **Citation Formatter Tool**
+The citation formatter shows complex data validation and formatting:
+
+```rust
+// llmspell-tools/src/document/citation_formatter.rs
+async fn format_citation(&self, input: &CitationInput) -> Result<ToolOutput> {
+    // Validate citation data structure
+    self.validate_citation_data(&input.citation)?;
+    
+    // Use hayagriva for formatting
+    let formatted = match input.format.as_str() {
+        "apa" => self.format_apa(&input.citation),
+        "mla" => self.format_mla(&input.citation),
+        "chicago" => self.format_chicago(&input.citation),
+        _ => return Err(tool_error("Unsupported format", Some("validation")))
+    }?;
+    
+    tool_success(json!({
+        "operation": "format_citation",
+        "success": true,
+        "result": {
+            "formatted": formatted,
+            "format": input.format
+        }
+    }))
+}
+```
+
+**Key lessons:**
+- Validate complex input structures
+- Support multiple output formats
+- Return structured responses with metadata
+
+### **Graph Builder Tool**
+The graph builder demonstrates serializable data structures:
+
+```rust
+// llmspell-tools/src/data/graph_builder.rs
+use petgraph::{Graph, Directed, Undirected};
+use serde::{Serialize, Deserialize};
+
+#[derive(Serialize, Deserialize)]
+struct SerializableGraph {
+    graph_type: String,
+    nodes: Vec<Node>,
+    edges: Vec<Edge>,
+    metadata: Option<serde_json::Value>,
+}
+
+async fn build_graph(&self, input: &GraphInput) -> Result<ToolOutput> {
+    let mut graph = if input.directed {
+        Graph::<String, f64, Directed>::new()
+    } else {
+        Graph::<String, f64, Undirected>::new()
+    };
+    
+    // Add nodes and edges
+    for node in &input.nodes {
+        graph.add_node(node.label.clone());
+    }
+    
+    // Convert to serializable format
+    let serializable = self.to_serializable(&graph);
+    
+    tool_success(json!({
+        "operation": "build_graph",
+        "success": true,
+        "result": serializable
+    }))
+}
+```
+
+**Key lessons:**
+- Use serializable wrapper types for complex structures
+- Support multiple graph types (directed/undirected)
+- Provide analysis capabilities (shortest path, connectivity)
 
 ---
 

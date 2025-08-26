@@ -5,6 +5,7 @@ use super::test_framework::*;
 use serde_json::json;
 
 /// Authentication bypass test vectors
+#[must_use]
 pub fn auth_bypass_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -75,6 +76,7 @@ pub fn auth_bypass_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Token manipulation test vectors
+#[must_use]
 pub fn token_manipulation_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -138,6 +140,7 @@ pub fn token_manipulation_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Authorization bypass test vectors
+#[must_use]
 pub fn authorization_bypass_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -196,6 +199,7 @@ pub fn authorization_bypass_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Privilege escalation test vectors
+#[must_use]
 pub fn privilege_escalation_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -241,6 +245,7 @@ pub fn privilege_escalation_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Password attack test vectors
+#[must_use]
 pub fn password_attack_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -284,6 +289,7 @@ pub fn password_attack_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Multi-factor authentication bypass tests
+#[must_use]
 pub fn mfa_bypass_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -330,6 +336,7 @@ pub fn mfa_bypass_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Session management attack tests
+#[must_use]
 pub fn session_attack_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -372,6 +379,7 @@ pub fn session_attack_tests() -> Vec<SecurityTestCase> {
 }
 
 /// API authentication tests
+#[must_use]
 pub fn api_auth_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -416,6 +424,7 @@ pub fn api_auth_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Create all authentication and authorization test cases
+#[must_use]
 pub fn all_auth_tests() -> Vec<SecurityTestCase> {
     let mut tests = Vec::new();
     tests.extend(auth_bypass_tests());
@@ -432,7 +441,6 @@ pub fn all_auth_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_auth_test_creation() {
         let tests = all_auth_tests();
@@ -444,7 +452,7 @@ mod tests {
             .map(|t| t.name.split('_').next().unwrap_or(""))
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         assert!(categories.contains(&"AUTH".to_string()));
@@ -456,7 +464,6 @@ mod tests {
         assert!(categories.contains(&"SESSION".to_string()));
         assert!(categories.contains(&"API".to_string()));
     }
-
     #[test]
     fn test_critical_auth_tests() {
         let tests = all_auth_tests();
@@ -478,28 +485,26 @@ mod tests {
             .iter()
             .any(|t| t.name == "MFA_BYPASS_ATTEMPT"));
     }
-
     #[test]
     fn test_authentication_category_coverage() {
         let tests = all_auth_tests();
-        let auth_tests: Vec<_> = tests
+        let auth_tests_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::Authentication))
-            .collect();
+            .count();
 
         // Should have comprehensive authentication test coverage
-        assert!(auth_tests.len() > 15);
+        assert!(auth_tests_count > 15);
     }
-
     #[test]
     fn test_authorization_category_coverage() {
         let tests = all_auth_tests();
-        let authz_tests: Vec<_> = tests
+        let authz_tests_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::Authorization))
-            .collect();
+            .count();
 
         // Should have authorization test coverage
-        assert!(authz_tests.len() > 5);
+        assert!(authz_tests_count > 5);
     }
 }

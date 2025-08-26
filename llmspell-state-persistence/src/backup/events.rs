@@ -351,7 +351,6 @@ impl Default for BackupEventBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_backup_event_to_universal() {
         let event = BackupEvent::BackupStarted {
@@ -365,7 +364,6 @@ mod tests {
         assert_eq!(universal.event_type, "backup.started");
         assert_eq!(universal.language, Language::Rust);
     }
-
     #[test]
     fn test_event_builder() {
         let builder = BackupEventBuilder::new();

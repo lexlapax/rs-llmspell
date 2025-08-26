@@ -235,7 +235,6 @@ impl ServicePresets {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_config_validation() {
         // Valid config
@@ -262,7 +261,6 @@ mod tests {
         };
         assert!(config.validate().is_err());
     }
-
     #[test]
     fn test_builder_methods() {
         let config = CircuitBreakerConfig::new()

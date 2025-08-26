@@ -435,6 +435,7 @@ impl HookExecutor {
             return true;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let avg_hook_time = total_hook_time.as_secs_f64() / total_executions as f64;
         let overhead_ratio = avg_hook_time / self.config.max_execution_time.as_secs_f64();
 
@@ -637,7 +638,6 @@ mod tests {
     use crate::traits::FnHook;
     use crate::types::HookPoint;
     use tokio;
-
     #[tokio::test]
     async fn test_hook_executor_basic() {
         let executor = HookExecutor::new();
@@ -659,7 +659,6 @@ mod tests {
         let metrics = executor.get_metrics("test_hook").unwrap();
         assert_eq!(metrics.execution_count, 1);
     }
-
     #[tokio::test]
     async fn test_circuit_breaker_protection() {
         let config = HookExecutorConfig {
@@ -701,7 +700,6 @@ mod tests {
             _ => panic!("Expected Skipped result"),
         }
     }
-
     #[tokio::test]
     async fn test_slow_hook_detection() {
         let config = HookExecutorConfig {
@@ -745,7 +743,6 @@ mod tests {
             _ => panic!("Expected Skipped result due to slow execution"),
         }
     }
-
     #[tokio::test]
     async fn test_hook_cancellation() {
         let executor = HookExecutor::new();
@@ -775,7 +772,6 @@ mod tests {
         assert!(matches!(results[0], HookResult::Continue));
         assert!(matches!(results[1], HookResult::Cancel(_)));
     }
-
     #[tokio::test]
     async fn test_custom_hook_configuration() {
         let executor = HookExecutor::new();

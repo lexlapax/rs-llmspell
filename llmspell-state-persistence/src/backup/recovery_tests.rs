@@ -41,7 +41,6 @@ mod tests {
 
         (state_manager, backup_manager, temp_dir)
     }
-
     #[tokio::test]
     async fn test_basic_backup_and_restore() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -90,7 +89,6 @@ mod tests {
             .unwrap();
         assert_eq!(restored2, Some(json!({"value": "data2"})));
     }
-
     #[tokio::test]
     async fn test_incremental_backup_chain() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -163,7 +161,6 @@ mod tests {
             .unwrap();
         assert_eq!(inc2, Some(json!({"version": 3})));
     }
-
     #[tokio::test]
     async fn test_restore_with_validation() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -199,7 +196,6 @@ mod tests {
             .await
             .unwrap();
     }
-
     #[tokio::test]
     async fn test_dry_run_restore() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -239,7 +235,6 @@ mod tests {
             .unwrap();
         assert_eq!(value, Some(json!({"modified": true})));
     }
-
     #[tokio::test]
     async fn test_backup_before_restore() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -295,7 +290,6 @@ mod tests {
         let backups_after = backup_manager.list_backups().await.unwrap();
         assert_eq!(backups_after.len(), count_before + 1);
     }
-
     #[tokio::test]
     async fn test_restore_nonexistent_backup() {
         let (_state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -308,7 +302,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Backup not found"));
     }
-
     #[tokio::test]
     async fn test_concurrent_backup_operations() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;

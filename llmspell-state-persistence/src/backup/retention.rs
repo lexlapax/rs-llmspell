@@ -239,11 +239,17 @@ impl RetentionPolicy for CompositePolicy {
         let mut should_retain = false;
         let mut highest_priority = RetentionPriority::Low;
         let mut reasons = Vec::new();
+        let mut count_based_decision: Option<bool> = None;
 
         for policy in &self.policies {
             let decision = policy.evaluate(backup, context);
 
-            // If any policy says to retain, we retain
+            // Special handling for count-based policy - it should override other policies
+            if policy.name() == "CountBasedPolicy" {
+                count_based_decision = Some(decision.should_retain);
+            }
+
+            // If any policy says to retain, we retain (unless overridden by count policy)
             if decision.should_retain {
                 should_retain = true;
             }
@@ -254,6 +260,11 @@ impl RetentionPolicy for CompositePolicy {
             }
 
             reasons.push(format!("{}: {}", policy.name(), decision.reason));
+        }
+
+        // Count-based policy overrides other retention decisions
+        if let Some(count_retain) = count_based_decision {
+            should_retain = count_retain;
         }
 
         RetentionDecision {
@@ -297,14 +308,12 @@ impl RetentionReport {
 mod tests {
     use super::*;
     use crate::backup::BackupStats;
-
     #[test]
     fn test_retention_priority_ordering() {
         assert!(RetentionPriority::Critical > RetentionPriority::Important);
         assert!(RetentionPriority::Important > RetentionPriority::Standard);
         assert!(RetentionPriority::Standard > RetentionPriority::Low);
     }
-
     #[test]
     fn test_time_based_policy() {
         let policy = TimeBasedPolicy::new(Duration::from_secs(7 * 24 * 3600)); // 7 days

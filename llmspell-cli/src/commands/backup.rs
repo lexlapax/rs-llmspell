@@ -3,7 +3,7 @@
 
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
-use llmspell_bridge::RuntimeConfig;
+use llmspell_config::LLMSpellConfig;
 use llmspell_state_persistence::backup::{BackupManager, RestoreOptions};
 use llmspell_state_persistence::manager::StateManager;
 use serde_json::json;
@@ -88,7 +88,7 @@ pub enum BackupSubcommand {
 /// Execute backup command
 pub async fn execute_backup(
     cmd: BackupCommand,
-    config: &RuntimeConfig,
+    config: &LLMSpellConfig,
     output_format: OutputFormat,
 ) -> Result<()> {
     // Initialize state infrastructure if needed
@@ -132,7 +132,7 @@ pub async fn execute_backup(
 
 /// Initialize backup infrastructure
 async fn initialize_backup_infrastructure(
-    _config: &RuntimeConfig,
+    _config: &LLMSpellConfig,
 ) -> Result<(Arc<StateManager>, Arc<BackupManager>)> {
     use llmspell_state_persistence::config::{BackupConfig, StorageBackendType};
 
@@ -397,6 +397,7 @@ async fn show_backup_info(
 /// Format bytes to human-readable string
 fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    #[allow(clippy::cast_precision_loss)]
     let mut size = bytes as f64;
     let mut unit_index = 0;
 
@@ -406,7 +407,9 @@ fn format_bytes(bytes: u64) -> String {
     }
 
     if unit_index == 0 {
-        format!("{} {}", size as u64, UNITS[unit_index])
+        #[allow(clippy::cast_possible_truncation)]
+        let size_u64 = size as u64;
+        format!("{} {}", size_u64, UNITS[unit_index])
     } else {
         format!("{:.1} {}", size, UNITS[unit_index])
     }

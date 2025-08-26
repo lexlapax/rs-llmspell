@@ -1,5 +1,5 @@
 //! ABOUTME: Agent trait for LLM-powered components
-//! ABOUTME: Extends BaseAgent with conversation management and LLM provider integration
+//! ABOUTME: Extends `BaseAgent` with conversation management and LLM provider integration
 
 use super::base_agent::BaseAgent;
 use crate::Result;
@@ -65,6 +65,7 @@ pub struct ConversationMessage {
 
 impl ConversationMessage {
     /// Create a new conversation message
+    #[must_use]
     pub fn new(role: MessageRole, content: String) -> Self {
         Self {
             role,
@@ -74,16 +75,19 @@ impl ConversationMessage {
     }
 
     /// Create a system message
+    #[must_use]
     pub fn system(content: String) -> Self {
         Self::new(MessageRole::System, content)
     }
 
     /// Create a user message
+    #[must_use]
     pub fn user(content: String) -> Self {
         Self::new(MessageRole::User, content)
     }
 
     /// Create an assistant message
+    #[must_use]
     pub fn assistant(content: String) -> Self {
         Self::new(MessageRole::Assistant, content)
     }
@@ -266,14 +270,12 @@ mod tests {
     use crate::ComponentMetadata;
     use crate::ExecutionContext;
     use std::collections::VecDeque;
-
     #[test]
     fn test_message_role_display() {
         assert_eq!(MessageRole::System.to_string(), "system");
         assert_eq!(MessageRole::User.to_string(), "user");
         assert_eq!(MessageRole::Assistant.to_string(), "assistant");
     }
-
     #[test]
     fn test_conversation_message_creation() {
         let content = "Test message".to_string();
@@ -292,7 +294,6 @@ mod tests {
         let assistant_msg = ConversationMessage::assistant("Assistant response".to_string());
         assert_eq!(assistant_msg.role, MessageRole::Assistant);
     }
-
     #[test]
     fn test_conversation_message_serialization() {
         let msg = ConversationMessage::user("Test".to_string());
@@ -303,7 +304,6 @@ mod tests {
         assert_eq!(msg.role, deserialized.role);
         assert_eq!(msg.content, deserialized.content);
     }
-
     #[test]
     fn test_agent_config_default() {
         let config = AgentConfig::default();
@@ -313,7 +313,6 @@ mod tests {
         assert_eq!(config.temperature, Some(0.7));
         assert_eq!(config.max_tokens, Some(2000));
     }
-
     #[test]
     fn test_agent_config_serialization() {
         let config = AgentConfig {
@@ -362,7 +361,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,
@@ -406,7 +405,6 @@ mod tests {
             Ok(())
         }
     }
-
     #[tokio::test]
     async fn test_agent_conversation_management() {
         let agent = MockLLMAgent::new();
@@ -441,7 +439,6 @@ mod tests {
         agent.clear_conversation().await.unwrap();
         assert_eq!(agent.conversation_length().await.unwrap(), 0);
     }
-
     #[tokio::test]
     async fn test_agent_conversation_trimming() {
         let config = AgentConfig {
@@ -482,7 +479,6 @@ mod tests {
         assert_eq!(conversation[0].role, MessageRole::System);
         assert!(conversation[1].content.contains("Message 4")); // Should keep latest messages
     }
-
     #[tokio::test]
     async fn test_agent_config_usage() {
         let agent = MockLLMAgent::new();

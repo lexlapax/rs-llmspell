@@ -510,7 +510,7 @@ mod tests {
 ## Additional Resources
 
 ### Documentation
-- Architecture: `/docs/technical/rs-llmspell-final-architecture.md`
+- Architecture: `/docs/technical/master-architecture-vision.md`
 - Phase Plan: `/docs/in-progress/implementation-phases.md`
 - API Docs: Run `cargo doc --open`
 

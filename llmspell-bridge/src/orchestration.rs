@@ -1,6 +1,8 @@
 //! ABOUTME: Workflow-based orchestration patterns for complex agent systems
 //! ABOUTME: Provides high-level orchestration capabilities using workflow primitives
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -55,6 +57,63 @@ impl Default for ResourceLimits {
     }
 }
 
+impl ResourceLimits {
+    /// Create a new builder for `ResourceLimits`
+    #[must_use]
+    pub fn builder() -> ResourceLimitsBuilder {
+        ResourceLimitsBuilder::new()
+    }
+}
+
+/// Builder for `ResourceLimits`
+#[derive(Debug, Clone)]
+pub struct ResourceLimitsBuilder {
+    limits: ResourceLimits,
+}
+
+impl ResourceLimitsBuilder {
+    /// Create a new builder with default limits
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            limits: ResourceLimits::default(),
+        }
+    }
+
+    /// Set maximum concurrent workflows
+    #[must_use]
+    pub const fn max_concurrent_workflows(mut self, max: usize) -> Self {
+        self.limits.max_concurrent_workflows = max;
+        self
+    }
+
+    /// Set maximum total agent invocations
+    #[must_use]
+    pub const fn max_agent_invocations(mut self, max: usize) -> Self {
+        self.limits.max_agent_invocations = max;
+        self
+    }
+
+    /// Set maximum memory usage in MB
+    #[must_use]
+    pub const fn max_memory_mb(mut self, max: usize) -> Self {
+        self.limits.max_memory_mb = max;
+        self
+    }
+
+    /// Build the `ResourceLimits`
+    #[must_use]
+    pub const fn build(self) -> ResourceLimits {
+        self.limits
+    }
+}
+
+impl Default for ResourceLimitsBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Default for OrchestrationConfig {
     fn default() -> Self {
         Self {
@@ -64,6 +123,77 @@ impl Default for OrchestrationConfig {
             allow_parallel: true,
             resource_limits: ResourceLimits::default(),
         }
+    }
+}
+
+impl OrchestrationConfig {
+    /// Create a new builder for `OrchestrationConfig`
+    #[must_use]
+    pub fn builder() -> OrchestrationConfigBuilder {
+        OrchestrationConfigBuilder::new()
+    }
+}
+
+/// Builder for `OrchestrationConfig`
+#[derive(Debug, Clone)]
+pub struct OrchestrationConfigBuilder {
+    config: OrchestrationConfig,
+}
+
+impl OrchestrationConfigBuilder {
+    /// Create a new builder with default configuration
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            config: OrchestrationConfig::default(),
+        }
+    }
+
+    /// Set the orchestration strategy
+    #[must_use]
+    pub const fn strategy(mut self, strategy: OrchestrationStrategy) -> Self {
+        self.config.strategy = strategy;
+        self
+    }
+
+    /// Set the maximum orchestration depth
+    #[must_use]
+    pub const fn max_depth(mut self, depth: usize) -> Self {
+        self.config.max_depth = depth;
+        self
+    }
+
+    /// Set the timeout in seconds
+    #[must_use]
+    pub const fn timeout_seconds(mut self, timeout: u64) -> Self {
+        self.config.timeout_seconds = timeout;
+        self
+    }
+
+    /// Set whether to allow parallel orchestration branches
+    #[must_use]
+    pub const fn allow_parallel(mut self, allow: bool) -> Self {
+        self.config.allow_parallel = allow;
+        self
+    }
+
+    /// Set the resource limits
+    #[must_use]
+    pub const fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+        self.config.resource_limits = limits;
+        self
+    }
+
+    /// Build the `OrchestrationConfig`
+    #[must_use]
+    pub const fn build(self) -> OrchestrationConfig {
+        self.config
+    }
+}
+
+impl Default for OrchestrationConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -136,6 +266,73 @@ pub struct RetryConfig {
     pub exponential_backoff: bool,
 }
 
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_attempts: 3,
+            backoff_ms: 1000,
+            exponential_backoff: false,
+        }
+    }
+}
+
+impl RetryConfig {
+    /// Create a new builder for `RetryConfig`
+    #[must_use]
+    pub fn builder() -> RetryConfigBuilder {
+        RetryConfigBuilder::new()
+    }
+}
+
+/// Builder for `RetryConfig`
+#[derive(Debug, Clone)]
+pub struct RetryConfigBuilder {
+    config: RetryConfig,
+}
+
+impl RetryConfigBuilder {
+    /// Create a new builder with default configuration
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            config: RetryConfig::default(),
+        }
+    }
+
+    /// Set maximum retry attempts
+    #[must_use]
+    pub const fn max_attempts(mut self, attempts: usize) -> Self {
+        self.config.max_attempts = attempts;
+        self
+    }
+
+    /// Set backoff in milliseconds
+    #[must_use]
+    pub const fn backoff_ms(mut self, ms: u64) -> Self {
+        self.config.backoff_ms = ms;
+        self
+    }
+
+    /// Set whether to use exponential backoff
+    #[must_use]
+    pub const fn exponential_backoff(mut self, exponential: bool) -> Self {
+        self.config.exponential_backoff = exponential;
+        self
+    }
+
+    /// Build the `RetryConfig`
+    #[must_use]
+    pub const fn build(self) -> RetryConfig {
+        self.config
+    }
+}
+
+impl Default for RetryConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Success criteria for orchestration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SuccessCriteria {
@@ -187,6 +384,7 @@ struct OrchestrationMetrics {
 
 impl OrchestrationRuntime {
     /// Create new orchestration runtime
+    #[must_use]
     pub fn new(config: OrchestrationConfig) -> Self {
         Self {
             _config: config,
@@ -196,7 +394,11 @@ impl OrchestrationRuntime {
     }
 
     /// Start orchestration from plan
-    pub async fn start_orchestration(&mut self, plan: OrchestrationPlan) -> Result<String> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if orchestration startup fails
+    pub fn start_orchestration(&mut self, plan: OrchestrationPlan) -> Result<String> {
         let orchestration_id = format!("orch_{}", uuid::Uuid::new_v4());
 
         // Initialize orchestration state
@@ -204,7 +406,7 @@ impl OrchestrationRuntime {
         context.insert("global".to_string(), plan.global_context.clone());
 
         let state = OrchestrationState {
-            plan: plan.clone(),
+            plan,
             _context: context,
             completed_nodes: Vec::new(),
             failed_nodes: Vec::new(),
@@ -231,24 +433,25 @@ impl OrchestrationRuntime {
                 completed_nodes: state.completed_nodes.len(),
                 failed_nodes: state.failed_nodes.len(),
                 total_nodes: count_nodes(&state.plan.root_workflow),
-                is_complete: self.is_orchestration_complete(state),
-                is_successful: self.is_orchestration_successful(state),
+                is_complete: Self::is_orchestration_complete(state),
+                is_successful: Self::is_orchestration_successful(state),
             })
     }
 
     /// Check if orchestration is complete
-    fn is_orchestration_complete(&self, state: &OrchestrationState) -> bool {
+    fn is_orchestration_complete(state: &OrchestrationState) -> bool {
         let total_nodes = count_nodes(&state.plan.root_workflow);
         state.completed_nodes.len() + state.failed_nodes.len() >= total_nodes
     }
 
     /// Check if orchestration is successful
-    fn is_orchestration_successful(&self, state: &OrchestrationState) -> bool {
-        if !self.is_orchestration_complete(state) {
+    fn is_orchestration_successful(state: &OrchestrationState) -> bool {
+        if !Self::is_orchestration_complete(state) {
             return false;
         }
 
         let total_nodes = count_nodes(&state.plan.root_workflow);
+        #[allow(clippy::cast_precision_loss)]
         let success_rate = state.completed_nodes.len() as f64 / total_nodes as f64;
 
         success_rate >= state.plan.success_criteria.min_success_rate
@@ -286,6 +489,7 @@ pub struct OrchestrationTemplates;
 
 impl OrchestrationTemplates {
     /// Create a data processing pipeline orchestration
+    #[must_use]
     pub fn data_pipeline_orchestration() -> OrchestrationPlan {
         OrchestrationPlan {
             id: uuid::Uuid::new_v4().to_string(),
@@ -311,11 +515,13 @@ impl OrchestrationTemplates {
                             store_in_context: true,
                             context_key: Some("raw_data".to_string()),
                             propagate_errors: true,
-                            retry_config: Some(RetryConfig {
-                                max_attempts: 3,
-                                backoff_ms: 1000,
-                                exponential_backoff: true,
-                            }),
+                            retry_config: Some(
+                                RetryConfig::builder()
+                                    .max_attempts(3)
+                                    .backoff_ms(1000)
+                                    .exponential_backoff(true)
+                                    .build(),
+                            ),
                         },
                     },
                     WorkflowNode {
@@ -382,6 +588,7 @@ impl OrchestrationTemplates {
     }
 
     /// Create a multi-agent research orchestration
+    #[must_use]
     pub fn research_orchestration() -> OrchestrationPlan {
         OrchestrationPlan {
             id: uuid::Uuid::new_v4().to_string(),
@@ -481,14 +688,12 @@ impl OrchestrationTemplates {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_orchestration_plan_creation() {
         let plan = OrchestrationTemplates::data_pipeline_orchestration();
         assert_eq!(plan.name, "Data Processing Pipeline");
         assert_eq!(count_nodes(&plan.root_workflow), 4); // root + 3 children
     }
-
     #[tokio::test]
     async fn test_orchestration_runtime() {
         let _runtime = OrchestrationRuntime::new(OrchestrationConfig::default());
@@ -497,6 +702,6 @@ mod tests {
         // Runtime would execute the plan
         // This is a simplified test
         assert_eq!(plan.name, "Research Orchestration");
-        assert_eq!(plan.success_criteria.min_success_rate, 0.8);
+        assert!((plan.success_criteria.min_success_rate - 0.8).abs() < f64::EPSILON);
     }
 }

@@ -4,13 +4,13 @@
 use crate::cli::{OutputFormat, ScriptEngine};
 use crate::output::{format_output, print_stream};
 use anyhow::Result;
-use llmspell_bridge::RuntimeConfig;
+use llmspell_config::LLMSpellConfig;
 
 /// Execute inline script code
 pub async fn execute_inline_script(
     code: String,
     engine: ScriptEngine,
-    runtime_config: RuntimeConfig,
+    runtime_config: LLMSpellConfig,
     stream: bool,
     output_format: OutputFormat,
 ) -> Result<()> {

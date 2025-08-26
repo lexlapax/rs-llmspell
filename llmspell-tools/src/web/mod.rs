@@ -4,7 +4,7 @@
 mod api_tester;
 mod sitemap_crawler;
 mod url_analyzer;
-mod web_scraper;
+pub mod web_scraper;
 mod webhook_caller;
 mod webpage_monitor;
 

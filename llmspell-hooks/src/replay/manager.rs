@@ -429,7 +429,6 @@ impl ReplayManager {
 mod tests {
     use super::*;
     use crate::{ComponentId, ComponentType, HookPoint};
-
     #[test]
     fn test_parameter_modification_parsing() {
         let modification = ParameterModification {
@@ -447,7 +446,6 @@ mod tests {
             vec!["context", "data", "test_key"]
         );
     }
-
     #[test]
     fn test_replay_config_builder() {
         let config = ReplayConfig {

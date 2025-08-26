@@ -126,7 +126,7 @@ impl ModelSpecifier {
     /// ```
     pub fn parse_with_base_url(spec: &str, base_url: Option<&str>) -> Result<Self, LLMSpellError> {
         let mut model_spec = Self::parse(spec)?;
-        model_spec.base_url = base_url.map(|url| url.to_string());
+        model_spec.base_url = base_url.map(str::to_string);
         Ok(model_spec)
     }
 
@@ -166,7 +166,6 @@ impl FromStr for ModelSpecifier {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_parse_model_only() {
         let spec = ModelSpecifier::parse("gpt-4").unwrap();
@@ -176,7 +175,6 @@ mod tests {
         assert!(!spec.has_provider());
         assert!(!spec.has_base_url());
     }
-
     #[test]
     fn test_parse_provider_model() {
         let spec = ModelSpecifier::parse("openai/gpt-4").unwrap();
@@ -186,7 +184,6 @@ mod tests {
         assert!(spec.has_provider());
         assert!(!spec.has_base_url());
     }
-
     #[test]
     fn test_parse_nested_provider() {
         let spec = ModelSpecifier::parse("openrouter/deepseek/model").unwrap();
@@ -195,14 +192,12 @@ mod tests {
         assert_eq!(spec.base_url, None);
         assert!(spec.has_provider());
     }
-
     #[test]
     fn test_parse_deeply_nested() {
         let spec = ModelSpecifier::parse("a/b/c/d/model").unwrap();
         assert_eq!(spec.model, "model");
         assert_eq!(spec.provider, Some("a/b/c/d".to_string()));
     }
-
     #[test]
     fn test_parse_empty_string() {
         let result = ModelSpecifier::parse("");
@@ -211,13 +206,11 @@ mod tests {
             assert!(message.contains("empty"));
         }
     }
-
     #[test]
     fn test_parse_whitespace_only() {
         let result = ModelSpecifier::parse("   ");
         assert!(result.is_err());
     }
-
     #[test]
     fn test_parse_with_base_url() {
         let spec =
@@ -229,14 +222,12 @@ mod tests {
         assert_eq!(spec.base_url, Some("https://api.custom.com/v1".to_string()));
         assert!(spec.has_base_url());
     }
-
     #[test]
     fn test_parse_with_base_url_none() {
         let spec = ModelSpecifier::parse_with_base_url("openai/gpt-4", None).unwrap();
         assert_eq!(spec.base_url, None);
         assert!(!spec.has_base_url());
     }
-
     #[test]
     fn test_constructor_methods() {
         let spec1 = ModelSpecifier::new("gpt-4");
@@ -252,7 +243,6 @@ mod tests {
         assert_eq!(spec3.provider, Some("openai".to_string()));
         assert_eq!(spec3.base_url, Some("https://api.custom.com".to_string()));
     }
-
     #[test]
     fn test_provider_or_default() {
         let spec1 = ModelSpecifier::new("gpt-4");
@@ -261,7 +251,6 @@ mod tests {
         let spec2 = ModelSpecifier::with_provider("openai", "gpt-4");
         assert_eq!(spec2.provider_or_default("default"), "openai");
     }
-
     #[test]
     fn test_to_string() {
         let spec1 = ModelSpecifier::new("gpt-4");
@@ -273,20 +262,17 @@ mod tests {
         let spec3 = ModelSpecifier::parse("openrouter/deepseek/model").unwrap();
         assert_eq!(spec3.to_string(), "openrouter/deepseek/model");
     }
-
     #[test]
     fn test_display_trait() {
         let spec = ModelSpecifier::with_provider("openai", "gpt-4");
         assert_eq!(format!("{}", spec), "openai/gpt-4");
     }
-
     #[test]
     fn test_from_str_trait() {
         let spec: ModelSpecifier = "openai/gpt-4".parse().unwrap();
         assert_eq!(spec.model, "gpt-4");
         assert_eq!(spec.provider, Some("openai".to_string()));
     }
-
     #[test]
     fn test_serde_serialization() {
         let spec = ModelSpecifier::with_base_url("openai", "gpt-4", "https://api.custom.com");
@@ -298,7 +284,6 @@ mod tests {
         let deserialized: ModelSpecifier = serde_json::from_str(&serialized).unwrap();
         assert_eq!(spec, deserialized);
     }
-
     #[test]
     fn test_edge_cases() {
         // Test with special characters in model names
@@ -310,7 +295,6 @@ mod tests {
         assert_eq!(spec.model, "claude-3-opus-20240229");
         assert_eq!(spec.provider, Some("anthropic".to_string()));
     }
-
     #[test]
     fn test_clone_and_eq() {
         let spec1 = ModelSpecifier::with_provider("openai", "gpt-4");

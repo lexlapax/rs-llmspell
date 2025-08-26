@@ -1,6 +1,8 @@
 // ABOUTME: Performance benchmarks for state persistence operations
 // ABOUTME: Measures latency, throughput, memory usage, and overhead of state operations
 
+// Benchmark file
+
 use base64::Engine;
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use llmspell_agents::{agents::basic::BasicAgent, builder::AgentBuilder, state::StatePersistence};

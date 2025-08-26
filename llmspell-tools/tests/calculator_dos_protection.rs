@@ -1,7 +1,7 @@
 // ABOUTME: Comprehensive security tests for CalculatorTool DoS protection
 // ABOUTME: Tests enhanced protection against various attack vectors
 
-//! Security tests for CalculatorTool DoS protection
+//! Security tests for `CalculatorTool` `DoS` protection
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::util::CalculatorTool;
@@ -24,22 +24,19 @@ async fn try_evaluate(expression: &str) -> Result<Value, String> {
             let elapsed = start.elapsed();
             // Ensure it completed within reasonable time
             if elapsed.as_millis() > 200 {
-                return Err(format!("Evaluation took too long: {:?}", elapsed));
+                return Err(format!("Evaluation took too long: {elapsed:?}"));
             }
 
             let output: Value = serde_json::from_str(&result.text).map_err(|e| e.to_string())?;
 
             if output["success"] == false {
                 // Extract error message from error.message field
-                if let Some(error) = output.get("error") {
-                    if let Some(message) = error.get("message") {
-                        Err(message.as_str().unwrap_or("Unknown error").to_string())
-                    } else {
-                        Err("Unknown error".to_string())
-                    }
-                } else {
-                    Err("Unknown error".to_string())
-                }
+                Err(output
+                    .get("error")
+                    .and_then(|error| error.get("message"))
+                    .and_then(|message| message.as_str())
+                    .unwrap_or("Unknown error")
+                    .to_string())
             } else {
                 Ok(output)
             }
@@ -47,7 +44,6 @@ async fn try_evaluate(expression: &str) -> Result<Value, String> {
         Err(e) => Err(e.to_string()),
     }
 }
-
 #[tokio::test]
 async fn test_basic_complexity_limits() {
     // Test expression length limit
@@ -63,12 +59,15 @@ async fn test_basic_complexity_limits() {
     assert!(result.unwrap_err().to_lowercase().contains("too deep"));
 
     // Test operation count limit (need more than 100 operations)
-    let many_ops = (0..110).map(|i| format!("{} + ", i)).collect::<String>() + "0";
+    let many_ops = (0..110).fold(String::new(), |mut acc, i| {
+        acc.push_str(&i.to_string());
+        acc.push_str(" + ");
+        acc
+    }) + "0";
     let result = try_evaluate(&many_ops).await;
     assert!(result.is_err());
     assert!(result.unwrap_err().to_lowercase().contains("operations"));
 }
-
 #[tokio::test]
 async fn test_enhanced_pattern_detection() {
     // Test banned patterns - very large nested power
@@ -76,11 +75,13 @@ async fn test_enhanced_pattern_detection() {
     assert!(
         result.is_err() || {
             // If it evaluates, it should return infinity
-            if let Ok(ref output) = result {
-                output["result"]["result"].as_str() == Some("Infinity")
-            } else {
-                false
-            }
+            matches!(
+                result
+                    .as_ref()
+                    .ok()
+                    .and_then(|output| output["result"]["result"].as_str()),
+                Some("Infinity")
+            )
         }
     );
 
@@ -100,7 +101,6 @@ async fn test_enhanced_pattern_detection() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_lowercase().contains("large number"));
 }
-
 #[tokio::test]
 async fn test_exponential_growth_prevention() {
     // Test large exponents
@@ -130,18 +130,17 @@ async fn test_exponential_growth_prevention() {
         }
     );
 }
-
 #[tokio::test]
 async fn test_memory_limits() {
     // Test with way too many variables
     let mut vars = json!({});
     for i in 0..1000 {
-        vars[format!("var{}", i)] = json!(i as f64);
+        vars[format!("var{i}")] = json!(f64::from(i));
     }
 
     // Create an expression that uses many variables
     let expr = (0..100)
-        .map(|i| format!("var{}", i))
+        .map(|i| format!("var{i}"))
         .collect::<Vec<_>>()
         .join(" + ");
 
@@ -161,7 +160,6 @@ async fn test_memory_limits() {
         assert_eq!(json["success"], false);
     }
 }
-
 #[tokio::test]
 async fn test_recursive_depth_limits() {
     // Test deeply nested function calls
@@ -180,7 +178,6 @@ async fn test_recursive_depth_limits() {
     let result = try_evaluate(expr).await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_timeout_enforcement() {
     // This is actually safe and should pass
@@ -189,7 +186,7 @@ async fn test_timeout_enforcement() {
 
     // Test with many function calls to exceed limits
     let complex = (0..60)
-        .map(|i| format!("sin({})", i))
+        .map(|i| format!("sin({i})"))
         .collect::<Vec<_>>()
         .join(" + ");
     let result = try_evaluate(&complex).await;
@@ -200,7 +197,6 @@ async fn test_timeout_enforcement() {
             || err_msg.to_lowercase().contains("operations")
     );
 }
-
 #[tokio::test]
 async fn test_safe_expressions_still_work() {
     // Ensure legitimate expressions still work
@@ -222,20 +218,16 @@ async fn test_safe_expressions_still_work() {
             let value = res.as_f64().unwrap();
             assert!(
                 (value - expected).abs() < 0.0001,
-                "Expression {} = {} (expected {})",
-                expr,
-                value,
-                expected
+                "Expression {expr} = {value} (expected {expected})"
             );
         }
     }
 }
-
 #[tokio::test]
 async fn test_variable_limit_enforcement() {
     // Test too many unique variables in expression
     let expr = (0..60)
-        .map(|i| format!("var{}", i))
+        .map(|i| format!("var{i}"))
         .collect::<Vec<_>>()
         .join(" + ");
     let result = try_evaluate(&expr).await;
@@ -247,7 +239,6 @@ async fn test_variable_limit_enforcement() {
             || err_msg.to_lowercase().contains("variables")
     );
 }
-
 #[tokio::test]
 async fn test_dos_attack_patterns() {
     // Pattern 1: Very deep nesting
@@ -262,7 +253,7 @@ async fn test_dos_attack_patterns() {
 
     // Pattern 3: CPU exhaustion with many trig functions (exceed function limit)
     let trig_spam = (0..60)
-        .map(|i| format!("sin({}) + cos({}) + tan({})", i, i, i))
+        .map(|i| format!("sin({i}) + cos({i}) + tan({i})"))
         .collect::<Vec<_>>()
         .join(" + ");
     let result = try_evaluate(&trig_spam).await;
@@ -274,7 +265,6 @@ async fn test_dos_attack_patterns() {
     let result2 = try_evaluate("((1 + 2").await; // Unmatched parentheses
     assert!(result.is_err() || result2.is_err());
 }
-
 #[tokio::test]
 async fn test_edge_cases() {
     // Empty expression
@@ -296,7 +286,6 @@ async fn test_edge_cases() {
     assert!(result.is_ok());
     assert!(elapsed.as_millis() < 100); // Should be very fast
 }
-
 #[tokio::test]
 async fn test_performance_consistency() {
     // Run multiple safe expressions and ensure consistent performance
@@ -313,12 +302,10 @@ async fn test_performance_consistency() {
         let result = try_evaluate(expr).await;
         let elapsed = start.elapsed();
 
-        assert!(result.is_ok(), "Expression {} failed", expr);
+        assert!(result.is_ok(), "Expression {expr} failed");
         assert!(
             elapsed.as_millis() < 50,
-            "Expression {} took too long: {:?}",
-            expr,
-            elapsed
+            "Expression {expr} took too long: {elapsed:?}"
         );
     }
 }

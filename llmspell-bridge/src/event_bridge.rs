@@ -10,15 +10,31 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use uuid::Uuid;
 
+/// Event filter criteria for advanced pattern matching
+#[derive(Debug, Clone)]
+pub struct EventFilter {
+    /// Event type pattern
+    pub event_type: Option<String>,
+    /// Source component pattern
+    pub source: Option<String>,
+    /// Target component pattern
+    pub target: Option<String>,
+    /// Correlation ID filter
+    pub correlation_id: Option<uuid::Uuid>,
+    /// Additional metadata filters
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
 /// Subscription handle for managing event subscriptions
 #[derive(Debug, Clone)]
 pub struct SubscriptionHandle {
     pub id: String,
     pub pattern: String,
     pub language: EventLanguage,
+    pub filter: Option<EventFilter>,
 }
 
-/// EventBridge for cross-language event communication
+/// `EventBridge` for cross-language event communication
 pub struct EventBridge {
     /// Underlying event bus
     event_bus: Arc<EventBus>,
@@ -30,8 +46,12 @@ pub struct EventBridge {
 }
 
 impl EventBridge {
-    /// Create a new EventBridge with default EventBus
-    pub async fn new(context: Arc<GlobalContext>) -> Result<Self> {
+    /// Create a new `EventBridge` with default `EventBus`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `EventBridge` initialization fails
+    pub fn new(context: Arc<GlobalContext>) -> Result<Self> {
         let event_bus = Arc::new(EventBus::new());
 
         Ok(Self {
@@ -41,7 +61,8 @@ impl EventBridge {
         })
     }
 
-    /// Create a new EventBridge with custom EventBus
+    /// Create a new `EventBridge` with custom `EventBus`
+    #[must_use]
     pub fn with_event_bus(context: Arc<GlobalContext>, event_bus: Arc<EventBus>) -> Self {
         Self {
             event_bus,
@@ -51,6 +72,10 @@ impl EventBridge {
     }
 
     /// Publish an event to the event bus
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event publication fails
     pub async fn publish_event(&self, event: UniversalEvent) -> Result<()> {
         self.event_bus
             .publish(event)
@@ -58,8 +83,31 @@ impl EventBridge {
             .with_context(|| "Failed to publish event to event bus")
     }
 
+    /// Publish an event with correlation ID for hook integration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event publication fails
+    pub async fn publish_correlated_event(
+        &self,
+        mut event: UniversalEvent,
+        correlation_id: uuid::Uuid,
+    ) -> Result<()> {
+        // Set correlation ID in event metadata
+        event.metadata.correlation_id = correlation_id;
+
+        self.event_bus
+            .publish(event)
+            .await
+            .with_context(|| "Failed to publish correlated event to event bus")
+    }
+
     /// Subscribe to events matching a pattern
-    pub async fn subscribe_pattern(
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription to the pattern fails
+    pub async fn subscribe_events(
         &self,
         pattern: &str,
         language: EventLanguage,
@@ -71,13 +119,50 @@ impl EventBridge {
             .event_bus
             .subscribe(pattern)
             .await
-            .with_context(|| format!("Failed to subscribe to pattern: {}", pattern))?;
+            .with_context(|| format!("Failed to subscribe to pattern: {pattern}"))?;
 
         // Store subscription metadata
         let handle = SubscriptionHandle {
             id: subscription_id.clone(),
             pattern: pattern.to_string(),
             language,
+            filter: None,
+        };
+
+        {
+            let mut subscriptions = self.subscriptions.write();
+            subscriptions.insert(subscription_id.clone(), handle);
+        }
+
+        Ok((subscription_id, receiver))
+    }
+
+    /// Subscribe to events with advanced filtering
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription to the filtered pattern fails
+    pub async fn subscribe_events_filtered(
+        &self,
+        pattern: &str,
+        language: EventLanguage,
+        filter: EventFilter,
+    ) -> Result<(String, UnboundedReceiver<UniversalEvent>)> {
+        let subscription_id = Uuid::new_v4().to_string();
+
+        // Subscribe to the pattern through the event bus
+        let receiver = self
+            .event_bus
+            .subscribe(pattern)
+            .await
+            .with_context(|| format!("Failed to subscribe to filtered pattern: {pattern}"))?;
+
+        // Store subscription metadata with filter
+        let handle = SubscriptionHandle {
+            id: subscription_id.clone(),
+            pattern: pattern.to_string(),
+            language,
+            filter: Some(filter),
         };
 
         {
@@ -89,37 +174,41 @@ impl EventBridge {
     }
 
     /// Unsubscribe from events
-    pub async fn unsubscribe(&self, subscription_id: &str) -> Result<bool> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unsubscription fails
+    pub fn unsubscribe(&self, subscription_id: &str) -> Result<bool> {
         let mut subscriptions = self.subscriptions.write();
 
-        if let Some(_handle) = subscriptions.remove(subscription_id) {
-            // Note: EventBus doesn't currently support explicit unsubscribe
-            // The receiver will be dropped when the script context is cleaned up
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        // Note: EventBus doesn't currently support explicit unsubscribe
+        // The receiver will be dropped when the script context is cleaned up
+        Ok(subscriptions.remove(subscription_id).is_some())
     }
 
     /// List active subscriptions
+    #[must_use]
     pub fn list_subscriptions(&self) -> Vec<SubscriptionHandle> {
         let subscriptions = self.subscriptions.read();
         subscriptions.values().cloned().collect()
     }
 
     /// Get subscription count
+    #[must_use]
     pub fn subscription_count(&self) -> usize {
         let subscriptions = self.subscriptions.read();
         subscriptions.len()
     }
 
     /// Get the underlying event bus reference
-    pub fn event_bus(&self) -> &Arc<EventBus> {
+    #[must_use]
+    pub const fn event_bus(&self) -> &Arc<EventBus> {
         &self.event_bus
     }
 
     /// Get event bus statistics
-    pub async fn get_stats(&self) -> serde_json::Value {
+    #[must_use]
+    pub fn get_stats(&self) -> serde_json::Value {
         let stats = self.event_bus.get_stats();
         let subscription_count = self.subscription_count();
 
@@ -138,13 +227,14 @@ impl EventBridge {
 
     /// Get subscription breakdown by language
     fn get_subscriptions_by_language(&self) -> HashMap<String, usize> {
-        let subscriptions = self.subscriptions.read();
         let mut by_language = HashMap::new();
-
-        for handle in subscriptions.values() {
-            let language_str = format!("{:?}", handle.language);
-            *by_language.entry(language_str).or_insert(0) += 1;
-        }
+        {
+            let subscriptions = self.subscriptions.read();
+            for handle in subscriptions.values() {
+                let language_str = format!("{:?}", handle.language);
+                *by_language.entry(language_str).or_insert(0) += 1;
+            }
+        } // Explicitly drop the lock here
 
         by_language
     }
@@ -154,30 +244,33 @@ impl EventBridge {
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     use llmspell_events::Language;
 
     async fn create_test_context() -> Arc<GlobalContext> {
         let registry = Arc::new(ComponentRegistry::new());
-        let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+        let providers = Arc::new(
+            ProviderManager::new(ProviderManagerConfig::default())
+                .await
+                .unwrap(),
+        );
         Arc::new(GlobalContext::new(registry, providers))
     }
-
     #[tokio::test]
     async fn test_event_bridge_creation() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         assert_eq!(bridge.subscription_count(), 0);
     }
-
     #[tokio::test]
     async fn test_event_publish_and_subscribe() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         // Subscribe to events
         let (sub_id, mut receiver) = bridge
-            .subscribe_pattern("test.*", Language::Rust)
+            .subscribe_events("test.*", Language::Rust)
             .await
             .unwrap();
         assert_eq!(bridge.subscription_count(), 1);
@@ -192,32 +285,32 @@ mod tests {
         bridge.publish_event(event.clone()).await.unwrap();
 
         // Receive the event
-        let received = tokio::time::timeout(std::time::Duration::from_millis(100), receiver.recv())
-            .await
-            .unwrap()
-            .unwrap();
+        let received_event =
+            tokio::time::timeout(std::time::Duration::from_millis(100), receiver.recv())
+                .await
+                .unwrap()
+                .unwrap();
 
-        assert_eq!(received.event_type, "test.example");
-        assert_eq!(received.language, Language::Rust);
+        assert_eq!(received_event.event_type, "test.example");
+        assert_eq!(received_event.language, Language::Rust);
 
         // Unsubscribe
-        let unsubscribed = bridge.unsubscribe(&sub_id).await.unwrap();
+        let unsubscribed = bridge.unsubscribe(&sub_id).unwrap();
         assert!(unsubscribed);
         assert_eq!(bridge.subscription_count(), 0);
     }
-
     #[tokio::test]
     async fn test_subscription_management() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         // Create multiple subscriptions
         let (sub1, _) = bridge
-            .subscribe_pattern("user.*", Language::Lua)
+            .subscribe_events("user.*", Language::Lua)
             .await
             .unwrap();
         let (_sub2, _) = bridge
-            .subscribe_pattern("system.*", Language::Rust)
+            .subscribe_events("system.*", Language::Rust)
             .await
             .unwrap();
 
@@ -232,30 +325,29 @@ mod tests {
         assert_eq!(sub1_handle.language, Language::Lua);
 
         // Unsubscribe one
-        bridge.unsubscribe(&sub1).await.unwrap();
+        bridge.unsubscribe(&sub1).unwrap();
         assert_eq!(bridge.subscription_count(), 1);
     }
-
     #[tokio::test]
     async fn test_stats() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         // Create subscriptions with different languages
         let (_sub1, _) = bridge
-            .subscribe_pattern("test1.*", Language::Lua)
+            .subscribe_events("test1.*", Language::Lua)
             .await
             .unwrap();
         let (_sub2, _) = bridge
-            .subscribe_pattern("test2.*", Language::Rust)
+            .subscribe_events("test2.*", Language::Rust)
             .await
             .unwrap();
         let (_sub3, _) = bridge
-            .subscribe_pattern("test3.*", Language::Lua)
+            .subscribe_events("test3.*", Language::Lua)
             .await
             .unwrap();
 
-        let stats = bridge.get_stats().await;
+        let stats = bridge.get_stats();
 
         // Verify structure
         assert!(stats["event_bus_stats"].is_object());

@@ -1,5 +1,7 @@
-//! ABOUTME: Agent templates system for pre-configured agent patterns
-//! ABOUTME: Provides schema, base traits, implementations, customization, and validation for agent templates
+//! ABOUTME: Agent templates system for pre-configured patterns
+//! ABOUTME: Schema, traits, implementations, and validation
+
+#![allow(clippy::too_long_first_doc_paragraph)] // Module doc comments are intentionally brief
 
 /// Template schema definitions
 pub mod schema;
@@ -47,6 +49,11 @@ pub mod prelude {
 }
 
 /// Create and register all built-in templates
+///
+/// # Panics
+///
+/// Panics if template registration fails (e.g., duplicate template IDs).
+#[must_use]
 pub fn create_builtin_templates() -> TemplateFactory {
     let mut factory = TemplateFactory::new();
 
@@ -95,7 +102,6 @@ pub fn create_builtin_templates() -> TemplateFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_builtin_templates() {
         let factory = create_builtin_templates();
@@ -119,7 +125,6 @@ mod tests {
         let monitor_templates = factory.get_templates_by_category(&TemplateCategory::Monitoring);
         assert!(!monitor_templates.is_empty());
     }
-
     #[test]
     fn test_template_search() {
         let factory = create_builtin_templates();

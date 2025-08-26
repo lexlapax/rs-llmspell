@@ -40,21 +40,22 @@ fn create_test_replay_session(_session_id: SessionId) -> ReplaySession {
         ));
     }
 
-    let mut errors = Vec::new();
-    errors.push(ReplayError {
-        timestamp: SystemTime::now(),
-        execution_id: Uuid::new_v4(),
-        hook_id: "hook_1".to_string(),
-        error_message: "Test error 1".to_string(),
-        error_type: ReplayErrorType::ExecutionError,
-    });
-    errors.push(ReplayError {
-        timestamp: SystemTime::now(),
-        execution_id: Uuid::new_v4(),
-        hook_id: "hook_2".to_string(),
-        error_message: "Test error 2".to_string(),
-        error_type: ReplayErrorType::ValidationError,
-    });
+    let errors = vec![
+        ReplayError {
+            timestamp: SystemTime::now(),
+            execution_id: Uuid::new_v4(),
+            hook_id: "hook_1".to_string(),
+            error_message: "Test error 1".to_string(),
+            error_type: ReplayErrorType::ExecutionError,
+        },
+        ReplayError {
+            timestamp: SystemTime::now(),
+            execution_id: Uuid::new_v4(),
+            hook_id: "hook_2".to_string(),
+            error_message: "Test error 2".to_string(),
+            error_type: ReplayErrorType::ValidationError,
+        },
+    ];
 
     ReplaySession {
         config: llmspell_hooks::persistence::ReplaySessionConfig::default(),
@@ -65,7 +66,6 @@ fn create_test_replay_session(_session_id: SessionId) -> ReplaySession {
         start_time: SystemTime::now(),
     }
 }
-
 #[test]
 fn test_session_debugger_creation() {
     let debugger = SessionDebugger::new();
@@ -75,7 +75,6 @@ fn test_session_debugger_creation() {
     assert!(debugger.get_all_states(&session_id).is_err());
     assert!(debugger.get_timeline(&session_id).is_none());
 }
-
 #[test]
 fn test_import_replay_session() {
     let debugger = SessionDebugger::new();
@@ -93,7 +92,6 @@ fn test_import_replay_session() {
     let error_analysis = debugger.analyze_errors(&session_id);
     assert_eq!(error_analysis.total_errors, 2);
 }
-
 #[test]
 fn test_inspect_state_at_timestamp() {
     let debugger = SessionDebugger::new();
@@ -138,7 +136,6 @@ fn test_inspect_state_at_timestamp() {
     let state = result.unwrap();
     assert_eq!(state.hook_id, "hook_4");
 }
-
 #[test]
 fn test_state_comparison() {
     let state1 = SessionState {
@@ -191,7 +188,6 @@ fn test_state_comparison() {
     assert!(comparison.summary.contains("1 result differences"));
     assert!(comparison.summary.contains("1 metadata differences"));
 }
-
 #[test]
 fn test_compare_states_at_different_times() {
     let debugger = SessionDebugger::new();
@@ -203,15 +199,15 @@ fn test_compare_states_at_different_times() {
 
     let mut states = VecDeque::new();
 
-    let mut state1 = create_test_captured_state("hook_1", Uuid::new_v4());
-    state1.timestamp = time1;
-    state1.context_snapshot = json!({"value": 1});
-    states.push_back(state1);
+    let mut first_state = create_test_captured_state("hook_1", Uuid::new_v4());
+    first_state.timestamp = time1;
+    first_state.context_snapshot = json!({"value": 1});
+    states.push_back(first_state);
 
-    let mut state2 = create_test_captured_state("hook_2", Uuid::new_v4());
-    state2.timestamp = time2;
-    state2.context_snapshot = json!({"value": 2});
-    states.push_back(state2);
+    let mut second_state = create_test_captured_state("hook_2", Uuid::new_v4());
+    second_state.timestamp = time2;
+    second_state.context_snapshot = json!({"value": 2});
+    states.push_back(second_state);
 
     // Import states
     {
@@ -223,7 +219,6 @@ fn test_compare_states_at_different_times() {
     let comparison = debugger.compare_states(&session_id, time1, time2).unwrap();
     assert!(!comparison.context_diffs.is_empty());
 }
-
 #[test]
 fn test_timeline_navigation() {
     let debugger = SessionDebugger::new();
@@ -273,7 +268,6 @@ fn test_timeline_navigation() {
         .navigate_to_timeline_point(&session_id, 10)
         .is_err());
 }
-
 #[test]
 fn test_error_analysis() {
     let errors = vec![
@@ -320,7 +314,6 @@ fn test_error_analysis() {
         Some(("ExecutionError".to_string(), 2))
     );
 }
-
 #[test]
 fn test_error_rate_calculation() {
     let base_time = SystemTime::now() - Duration::from_secs(3600); // 1 hour ago
@@ -356,7 +349,6 @@ fn test_error_rate_calculation() {
     let rate = analysis.error_rate.unwrap();
     assert!((rate - 3.0).abs() < 0.1); // Allow small floating point difference
 }
-
 #[test]
 fn test_export_debug_data() {
     let debugger = SessionDebugger::new();
@@ -388,7 +380,6 @@ fn test_export_debug_data() {
     assert_eq!(debug_data.timeline.unwrap().len(), 1);
     assert_eq!(debug_data.error_analysis.total_errors, 2);
 }
-
 #[test]
 fn test_clear_session_data() {
     let debugger = SessionDebugger::new();
@@ -411,7 +402,6 @@ fn test_clear_session_data() {
     let error_analysis = debugger.analyze_errors(&session_id);
     assert_eq!(error_analysis.total_errors, 0);
 }
-
 #[test]
 fn test_add_error() {
     let debugger = SessionDebugger::new();
@@ -436,7 +426,6 @@ fn test_add_error() {
     assert_eq!(analysis.total_errors, 1);
     assert_eq!(analysis.errors_by_hook.get("test_hook").unwrap(), &1);
 }
-
 #[test]
 fn test_state_comparison_with_arrays() {
     let state1 = SessionState {
@@ -470,7 +459,6 @@ fn test_state_comparison_with_arrays() {
     let comparison = StateComparison::compare(&state1, &state2);
     assert!(!comparison.context_diffs.is_empty());
 }
-
 #[test]
 fn test_hook_result_comparison() {
     let debugger = SessionDebugger::new();
@@ -488,7 +476,6 @@ fn test_hook_result_comparison() {
     assert!(!comparison.identical);
     assert!(comparison.difference_type.is_some());
 }
-
 #[test]
 fn test_session_state_from_captured() {
     let captured = CapturedState {
@@ -514,7 +501,6 @@ fn test_session_state_from_captured() {
     assert!(session_state.result.contains("Modified"));
     assert_eq!(session_state.metadata, captured.metadata);
 }
-
 #[test]
 fn test_timeline_entry_conversion() {
     let executions = vec![
@@ -552,7 +538,6 @@ fn test_timeline_entry_conversion() {
     assert_eq!(timeline[1].hook_id, "hook_2");
     assert_eq!(timeline[1].duration, Duration::from_millis(200));
 }
-
 #[test]
 fn test_state_inspection_empty_session() {
     let debugger = SessionDebugger::new();
@@ -562,7 +547,6 @@ fn test_state_inspection_empty_session() {
     let result = debugger.inspect_state_at(&session_id, SystemTime::now());
     assert!(result.is_err());
 }
-
 #[test]
 fn test_metadata_comparison() {
     let state1 = SessionState {
@@ -593,7 +577,6 @@ fn test_metadata_comparison() {
     let comparison = StateComparison::compare(&state1, &state2);
     assert_eq!(comparison.metadata_diffs.len(), 3); // 1 changed, 1 added, 1 removed
 }
-
 #[test]
 fn test_debug_data_serialization() {
     let debug_data = SessionDebugData {
@@ -634,7 +617,6 @@ fn test_debug_data_serialization() {
     assert!(serialized.contains("timeline"));
     assert!(serialized.contains("error_analysis"));
 }
-
 #[test]
 fn test_comparison_with_nested_objects() {
     let state1 = SessionState {

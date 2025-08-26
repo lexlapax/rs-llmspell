@@ -116,7 +116,6 @@ impl StorageBackend for MemoryBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_memory_backend_basic_operations() {
         let backend = MemoryBackend::new();
@@ -134,7 +133,6 @@ mod tests {
         backend.delete("key1").await.unwrap();
         assert!(!backend.exists("key1").await.unwrap());
     }
-
     #[tokio::test]
     async fn test_memory_backend_batch_operations() {
         let backend = MemoryBackend::new();
@@ -157,7 +155,6 @@ mod tests {
         assert!(!backend.exists("key1").await.unwrap());
         assert!(!backend.exists("key2").await.unwrap());
     }
-
     #[tokio::test]
     async fn test_memory_backend_prefix_scan() {
         let backend = MemoryBackend::new();

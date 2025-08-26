@@ -30,19 +30,23 @@ use tracing::{debug, info};
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum GraphQLOperation {
+    /// Standard GraphQL query operation for fetching data
     Query,
+    /// GraphQL mutation operation for modifying data
     Mutation,
+    /// GraphQL subscription for real-time data updates
     Subscription,
+    /// Schema introspection query for discovering API structure
     Introspection,
 }
 
 impl std::fmt::Display for GraphQLOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GraphQLOperation::Query => write!(f, "query"),
-            GraphQLOperation::Mutation => write!(f, "mutation"),
-            GraphQLOperation::Subscription => write!(f, "subscription"),
-            GraphQLOperation::Introspection => write!(f, "introspection"),
+            Self::Query => write!(f, "query"),
+            Self::Mutation => write!(f, "mutation"),
+            Self::Subscription => write!(f, "subscription"),
+            Self::Introspection => write!(f, "introspection"),
         }
     }
 }
@@ -52,12 +56,12 @@ impl std::str::FromStr for GraphQLOperation {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "query" => Ok(GraphQLOperation::Query),
-            "mutation" => Ok(GraphQLOperation::Mutation),
-            "subscription" => Ok(GraphQLOperation::Subscription),
-            "introspection" => Ok(GraphQLOperation::Introspection),
+            "query" => Ok(Self::Query),
+            "mutation" => Ok(Self::Mutation),
+            "subscription" => Ok(Self::Subscription),
+            "introspection" => Ok(Self::Introspection),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown GraphQL operation: {}", s),
+                message: format!("Unknown GraphQL operation: {s}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -67,9 +71,12 @@ impl std::str::FromStr for GraphQLOperation {
 /// GraphQL request structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQLRequest {
+    /// The GraphQL query string
     pub query: String,
+    /// Variables for parameterized queries
     #[serde(skip_serializing_if = "Option::is_none")]
     pub variables: Option<Value>,
+    /// Name of the operation to execute if query contains multiple operations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_name: Option<String>,
 }
@@ -77,10 +84,13 @@ pub struct GraphQLRequest {
 /// GraphQL response structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQLResponse {
+    /// The data returned by the operation
     #[serde(skip_serializing_if = "Option::is_none")]
     pub data: Option<Value>,
+    /// Any errors that occurred during execution
     #[serde(skip_serializing_if = "Option::is_none")]
     pub errors: Option<Vec<GraphQLError>>,
+    /// Additional metadata about the response
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Value>,
 }
@@ -88,18 +98,25 @@ pub struct GraphQLResponse {
 /// GraphQL error structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GraphQLError {
+    /// Error message
     pub message: String,
+    /// Locations in the query where the error occurred
     #[serde(skip_serializing_if = "Option::is_none")]
     pub locations: Option<Vec<ErrorLocation>>,
+    /// Path to the field that caused the error
     #[serde(skip_serializing_if = "Option::is_none")]
     pub path: Option<Vec<Value>>,
+    /// Additional error information
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Value>,
 }
 
+/// Location of an error in the GraphQL query
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ErrorLocation {
+    /// Line number in the query
     pub line: u32,
+    /// Column number in the query
     pub column: u32,
 }
 
@@ -114,7 +131,7 @@ pub struct SchemaCacheEntry {
 impl SchemaCacheEntry {
     fn is_expired(&self) -> bool {
         let age = Utc::now().signed_duration_since(self.cached_at);
-        age.num_seconds() as u64 > self.ttl_seconds
+        u64::try_from(age.num_seconds().max(0)).unwrap_or(u64::MAX) > self.ttl_seconds
     }
 }
 
@@ -154,13 +171,17 @@ pub struct GraphQLQueryTool {
 }
 
 impl GraphQLQueryTool {
+    /// Creates a new GraphQL query tool with the given configuration.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP client cannot be created or rate limiter setup fails.
     pub fn new(config: GraphQLConfig) -> Result<Self> {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
             .user_agent(&config.user_agent)
             .build()
             .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
                 source: None,
             })?;
 
@@ -194,7 +215,7 @@ impl GraphQLQueryTool {
         }
 
         let response = req.send().await.map_err(|e| LLMSpellError::Network {
-            message: format!("GraphQL request failed: {}", e),
+            message: format!("GraphQL request failed: {e}"),
             source: None,
         })?;
 
@@ -208,7 +229,7 @@ impl GraphQLQueryTool {
 
         let graphql_response: GraphQLResponse =
             response.json().await.map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to parse GraphQL response: {}", e),
+                message: format!("Failed to parse GraphQL response: {e}"),
                 tool_name: Some("graphql_query".to_string()),
                 source: None,
             })?;
@@ -217,7 +238,7 @@ impl GraphQLQueryTool {
         if let Some(errors) = &graphql_response.errors {
             if !errors.is_empty() && graphql_response.data.is_none() {
                 return Err(LLMSpellError::Tool {
-                    message: format!("GraphQL errors: {:?}", errors),
+                    message: format!("GraphQL errors: {errors:?}"),
                     tool_name: Some("graphql_query".to_string()),
                     source: None,
                 });
@@ -275,7 +296,7 @@ impl GraphQLQueryTool {
     ) -> Result<Value> {
         info!("Fetching GraphQL schema from {}", endpoint);
 
-        let introspection_query = r#"
+        let introspection_query = r"
             query IntrospectionQuery {
                 __schema {
                     queryType { name }
@@ -343,7 +364,7 @@ impl GraphQLQueryTool {
                     }
                 }
             }
-        "#;
+        ";
 
         let request = GraphQLRequest {
             query: introspection_query.to_string(),
@@ -361,7 +382,7 @@ impl GraphQLQueryTool {
     }
 
     /// Validate variables against expected types
-    fn validate_variables(&self, variables: &Value) -> Result<()> {
+    fn validate_variables(variables: &Value) -> Result<()> {
         // Basic validation - ensure it's an object
         if !variables.is_object() {
             return Err(LLMSpellError::Validation {
@@ -375,7 +396,7 @@ impl GraphQLQueryTool {
     }
 
     /// Estimate query depth
-    fn estimate_query_depth(&self, query: &str) -> u32 {
+    fn estimate_query_depth(query: &str) -> u32 {
         // Simple depth estimation based on brace nesting
         let mut depth: u32 = 0;
         let mut max_depth = 0;
@@ -397,7 +418,7 @@ impl GraphQLQueryTool {
     }
 
     /// Parse parameters from input
-    fn parse_parameters(&self, params: &Value) -> Result<GraphQLParameters> {
+    fn parse_parameters(params: &Value) -> Result<GraphQLParameters> {
         let operation_str = extract_optional_string(params, "operation").unwrap_or("query");
         let operation: GraphQLOperation = operation_str.parse()?;
 
@@ -454,11 +475,15 @@ impl BaseAgent for GraphQLQueryTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
-        let parameters = self.parse_parameters(params)?;
+        let parameters = Self::parse_parameters(params)?;
 
         info!(
             "Executing GraphQL {} to {}",
@@ -467,13 +492,10 @@ impl BaseAgent for GraphQLQueryTool {
 
         // Validate query depth if configured
         if let Some(max_depth) = self.config.max_query_depth {
-            let depth = self.estimate_query_depth(&parameters.query);
+            let depth = Self::estimate_query_depth(&parameters.query);
             if depth > max_depth {
                 return Err(LLMSpellError::Validation {
-                    message: format!(
-                        "Query depth {} exceeds maximum allowed {}",
-                        depth, max_depth
-                    ),
+                    message: format!("Query depth {depth} exceeds maximum allowed {max_depth}"),
                     field: Some("query".to_string()),
                 });
             }
@@ -481,7 +503,7 @@ impl BaseAgent for GraphQLQueryTool {
 
         // Validate variables if provided
         if let Some(ref vars) = parameters.variables {
-            self.validate_variables(vars)?;
+            Self::validate_variables(vars)?;
         }
 
         let result = match parameters.operation {
@@ -580,7 +602,7 @@ impl BaseAgent for GraphQLQueryTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("GraphQL query error: {}", error)))
+        Ok(AgentOutput::text(format!("GraphQL query error: {error}")))
     }
 }
 
@@ -667,7 +689,6 @@ impl Tool for GraphQLQueryTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -684,21 +705,19 @@ mod tests {
         );
         assert!("invalid".parse::<GraphQLOperation>().is_err());
     }
-
     #[test]
     fn test_query_depth_estimation() {
-        let tool = GraphQLQueryTool::default();
+        let _tool = GraphQLQueryTool::default();
 
         let simple_query = "{ user { name } }";
-        assert_eq!(tool.estimate_query_depth(simple_query), 2);
+        assert_eq!(GraphQLQueryTool::estimate_query_depth(simple_query), 2);
 
         let nested_query = "{ user { posts { comments { author { name } } } } }";
-        assert_eq!(tool.estimate_query_depth(nested_query), 5);
+        assert_eq!(GraphQLQueryTool::estimate_query_depth(nested_query), 5);
 
         let flat_query = "{ user posts comments }";
-        assert_eq!(tool.estimate_query_depth(flat_query), 1);
+        assert_eq!(GraphQLQueryTool::estimate_query_depth(flat_query), 1);
     }
-
     #[test]
     fn test_schema_cache_expiry() {
         let entry = SchemaCacheEntry {
@@ -715,7 +734,6 @@ mod tests {
         };
         assert!(!fresh_entry.is_expired());
     }
-
     #[tokio::test]
     async fn test_graphql_tool_creation() {
         let config = GraphQLConfig::default();

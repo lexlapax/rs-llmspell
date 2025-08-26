@@ -19,7 +19,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
     extract_required_string, response::ResponseBuilder,
@@ -32,7 +32,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 /// Image format types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageFormat {
     Png,
@@ -47,26 +47,28 @@ pub enum ImageFormat {
 
 impl ImageFormat {
     /// Detect format from file extension
+    #[must_use]
     pub fn from_extension(path: &Path) -> Self {
         match path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .as_deref()
         {
             Some("png") => Self::Png,
-            Some("jpg") | Some("jpeg") => Self::Jpeg,
+            Some("jpg" | "jpeg") => Self::Jpeg,
             Some("gif") => Self::Gif,
             Some("webp") => Self::Webp,
             Some("bmp") => Self::Bmp,
-            Some("tiff") | Some("tif") => Self::Tiff,
+            Some("tiff" | "tif") => Self::Tiff,
             Some("ico") => Self::Ico,
             _ => Self::Unknown,
         }
     }
 
     /// Get MIME type for the format
-    pub fn mime_type(&self) -> &'static str {
+    #[must_use]
+    pub const fn mime_type(&self) -> &'static str {
         match self {
             Self::Png => "image/png",
             Self::Jpeg => "image/jpeg",
@@ -89,11 +91,13 @@ pub struct ImageDimensions {
 
 impl ImageDimensions {
     /// Calculate aspect ratio
+    #[must_use]
     pub fn aspect_ratio(&self) -> f64 {
-        self.width as f64 / self.height as f64
+        f64::from(self.width) / f64::from(self.height)
     }
 
     /// Get orientation
+    #[must_use]
     pub fn orientation(&self) -> &'static str {
         match self.aspect_ratio() {
             r if r > 1.2 => "landscape",
@@ -164,13 +168,13 @@ impl Default for ImageProcessorConfig {
 pub struct ImageProcessorTool {
     metadata: ComponentMetadata,
     config: ImageProcessorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl ImageProcessorTool {
     /// Create a new image processor tool
-    pub fn new(config: ImageProcessorConfig) -> Self {
+    #[must_use]
+    pub fn new(config: ImageProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "image_processor".to_string(),
@@ -178,27 +182,12 @@ impl ImageProcessorTool {
                     .to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new image processor tool with sandbox context
-    pub fn with_sandbox(
-        config: ImageProcessorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "image_processor".to_string(),
-                "Image file processing for format conversion, resizing, and metadata extraction"
-                    .to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
     /// Detect image format from file
+    #[allow(clippy::unused_async)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<ImageFormat> {
         // First try extension-based detection
         let format = ImageFormat::from_extension(file_path);
@@ -219,10 +208,17 @@ impl ImageProcessorTool {
     }
 
     /// Extract metadata from image file
-    async fn extract_metadata(&self, file_path: &Path) -> LLMResult<ImageMetadata> {
+    async fn extract_metadata(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<ImageMetadata> {
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
         // Get file size
-        let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to read file metadata: {}", e),
+        let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
+            message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("image_processor".to_string()),
             source: None,
         })?;
@@ -246,7 +242,7 @@ impl ImageProcessorTool {
 
         // Create basic metadata
         let metadata = ImageMetadata {
-            format: format.clone(),
+            format,
             dimensions: None,
             color_mode: None,
             bit_depth: None,
@@ -267,6 +263,7 @@ impl ImageProcessorTool {
     }
 
     /// Resize image
+    #[allow(clippy::unused_async)]
     async fn resize_image(
         &self,
         _input_path: &Path,
@@ -286,6 +283,7 @@ impl ImageProcessorTool {
     }
 
     /// Convert image format
+    #[allow(clippy::unused_async)]
     async fn convert_format(
         &self,
         _input_path: &Path,
@@ -295,7 +293,7 @@ impl ImageProcessorTool {
         // Check if conversion is supported
         if !self.config.supported_formats.contains(&target_format) {
             return Err(LLMSpellError::Tool {
-                message: format!("Conversion to {:?} format is not supported", target_format),
+                message: format!("Conversion to {target_format:?} format is not supported"),
                 tool_name: Some("image_processor".to_string()),
                 source: None,
             });
@@ -312,6 +310,7 @@ impl ImageProcessorTool {
     }
 
     /// Crop image
+    #[allow(clippy::unused_async)]
     async fn crop_image(
         &self,
         _input_path: &Path,
@@ -331,6 +330,7 @@ impl ImageProcessorTool {
     }
 
     /// Rotate image
+    #[allow(clippy::unused_async)]
     async fn rotate_image(
         &self,
         _input_path: &Path,
@@ -348,6 +348,7 @@ impl ImageProcessorTool {
     }
 
     /// Generate thumbnail
+    #[allow(clippy::unused_async)]
     async fn generate_thumbnail(
         &self,
         _input_path: &Path,
@@ -366,6 +367,7 @@ impl ImageProcessorTool {
     }
 
     /// Validate processing parameters
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -374,8 +376,7 @@ impl ImageProcessorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: detect, metadata, resize, convert, crop, rotate, thumbnail",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: detect, metadata, resize, convert, crop, rotate, thumbnail"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -409,7 +410,7 @@ impl ImageProcessorTool {
             for field in ["x", "y", "width", "height"] {
                 if params.get(field).is_none() {
                     return Err(LLMSpellError::Validation {
-                        message: format!("{} is required for crop operation", field),
+                        message: format!("{field} is required for crop operation"),
                         field: Some(field.to_string()),
                     });
                 }
@@ -426,7 +427,8 @@ impl BaseAgent for ImageProcessorTool {
         &self.metadata
     }
 
-    async fn execute(
+    #[allow(clippy::too_many_lines)]
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -446,7 +448,7 @@ impl BaseAgent for ImageProcessorTool {
                 let format = self.detect_format(path).await?;
 
                 let response = ResponseBuilder::success("detect")
-                    .with_message(format!("Detected image format: {:?}", format))
+                    .with_message(format!("Detected image format: {format:?}"))
                     .with_result(json!({
                         "file_path": file_path,
                         "format": format,
@@ -459,23 +461,26 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "metadata" => {
+                use std::fmt::Write;
+
                 let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
-                let metadata = self.extract_metadata(path).await?;
+                let metadata = self.extract_metadata(path, &self.sandbox).await?;
 
                 let mut message = format!("Image file: {:?} format", metadata.format);
 
                 if let Some(dims) = &metadata.dimensions {
-                    message.push_str(&format!(
+                    let _ = write!(
+                        message,
                         ", {}x{} pixels ({})",
                         dims.width,
                         dims.height,
                         dims.orientation()
-                    ));
+                    );
                 }
 
-                message.push_str(&format!(", Size: {} bytes", metadata.file_size));
+                let _ = write!(message, ", Size: {} bytes", metadata.file_size);
 
                 let response = ResponseBuilder::success("metadata")
                     .with_message(message)
@@ -491,8 +496,16 @@ impl BaseAgent for ImageProcessorTool {
             "resize" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let width = extract_optional_u64(params, "width").map(|w| w as u32);
-                let height = extract_optional_u64(params, "height").map(|h| h as u32);
+                let width = extract_optional_u64(params, "width").map(|w| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let width_val = w.min(u64::from(u32::MAX)) as u32;
+                    width_val
+                });
+                let height = extract_optional_u64(params, "height").map(|h| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let height_val = h.min(u64::from(u32::MAX)) as u32;
+                    height_val
+                });
                 let maintain_aspect_ratio =
                     extract_optional_bool(params, "maintain_aspect_ratio").unwrap_or(true);
 
@@ -506,10 +519,7 @@ impl BaseAgent for ImageProcessorTool {
                 .await?;
 
                 let response = ResponseBuilder::success("resize")
-                    .with_message(format!(
-                        "Resized image from {} to {}",
-                        input_path, output_path
-                    ))
+                    .with_message(format!("Resized image from {input_path} to {output_path}"))
                     .with_result(json!({
                         "source_path": input_path,
                         "target_path": output_path,
@@ -525,15 +535,16 @@ impl BaseAgent for ImageProcessorTool {
             "convert" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let target_format = extract_optional_string(params, "target_format")
-                    .map(|s| match s.to_lowercase().as_str() {
+                let target_format = extract_optional_string(params, "target_format").map_or_else(
+                    || ImageFormat::from_extension(Path::new(output_path)),
+                    |s| match s.to_lowercase().as_str() {
                         "png" => ImageFormat::Png,
                         "jpeg" | "jpg" => ImageFormat::Jpeg,
                         "gif" => ImageFormat::Gif,
                         "webp" => ImageFormat::Webp,
                         _ => ImageFormat::Unknown,
-                    })
-                    .unwrap_or_else(|| ImageFormat::from_extension(Path::new(output_path)));
+                    },
+                );
 
                 self.convert_format(
                     Path::new(input_path),
@@ -544,8 +555,7 @@ impl BaseAgent for ImageProcessorTool {
 
                 let response = ResponseBuilder::success("convert")
                     .with_message(format!(
-                        "Converted image from {} to {} ({:?} format)",
-                        input_path, output_path, target_format
+                        "Converted image from {input_path} to {output_path} ({target_format:?} format)"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -561,35 +571,49 @@ impl BaseAgent for ImageProcessorTool {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
 
-                let x = params.get("x").and_then(|v| v.as_u64()).ok_or_else(|| {
-                    LLMSpellError::Validation {
+                let x = params
+                    .get("x")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| LLMSpellError::Validation {
                         message: "x is required".to_string(),
                         field: Some("x".to_string()),
-                    }
-                })? as u32;
+                    })?
+                    .min(u64::from(u32::MAX));
+                #[allow(clippy::cast_possible_truncation)]
+                let x = x as u32;
 
-                let y = params.get("y").and_then(|v| v.as_u64()).ok_or_else(|| {
-                    LLMSpellError::Validation {
+                let y = params
+                    .get("y")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| LLMSpellError::Validation {
                         message: "y is required".to_string(),
                         field: Some("y".to_string()),
-                    }
-                })? as u32;
+                    })?
+                    .min(u64::from(u32::MAX));
+                #[allow(clippy::cast_possible_truncation)]
+                let y = y as u32;
 
                 let width = params
                     .get("width")
-                    .and_then(|v| v.as_u64())
+                    .and_then(serde_json::Value::as_u64)
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "width is required".to_string(),
                         field: Some("width".to_string()),
-                    })? as u32;
+                    })?
+                    .min(u64::from(u32::MAX));
+                #[allow(clippy::cast_possible_truncation)]
+                let width = width as u32;
 
                 let height = params
                     .get("height")
-                    .and_then(|v| v.as_u64())
+                    .and_then(serde_json::Value::as_u64)
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "height is required".to_string(),
                         field: Some("height".to_string()),
-                    })? as u32;
+                    })?
+                    .min(u64::from(u32::MAX));
+                #[allow(clippy::cast_possible_truncation)]
+                let height = height as u32;
 
                 self.crop_image(
                     Path::new(input_path),
@@ -603,8 +627,7 @@ impl BaseAgent for ImageProcessorTool {
 
                 let response = ResponseBuilder::success("crop")
                     .with_message(format!(
-                        "Cropped image from {} to {} ({}x{} at {}, {})",
-                        input_path, output_path, width, height, x, y
+                        "Cropped image from {input_path} to {output_path} ({width}x{height} at {x}, {y})"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -622,15 +645,19 @@ impl BaseAgent for ImageProcessorTool {
             "rotate" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let degrees = params.get("degrees").and_then(|v| v.as_i64()).unwrap_or(90) as i32;
+                let degrees = params
+                    .get("degrees")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(90);
+                #[allow(clippy::cast_possible_truncation)]
+                let degrees = degrees as i32;
 
                 self.rotate_image(Path::new(input_path), Path::new(output_path), degrees)
                     .await?;
 
                 let response = ResponseBuilder::success("rotate")
                     .with_message(format!(
-                        "Rotated image {} degrees from {} to {}",
-                        degrees, input_path, output_path
+                        "Rotated image {degrees} degrees from {input_path} to {output_path}"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -645,12 +672,16 @@ impl BaseAgent for ImageProcessorTool {
             "thumbnail" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let max_width = extract_optional_u64(params, "max_width")
-                    .map(|w| w as u32)
-                    .unwrap_or(200);
-                let max_height = extract_optional_u64(params, "max_height")
-                    .map(|h| h as u32)
-                    .unwrap_or(200);
+                let max_width = extract_optional_u64(params, "max_width").map_or(200, |w| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let width_val = w as u32;
+                    width_val
+                });
+                let max_height = extract_optional_u64(params, "max_height").map_or(200, |h| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let height_val = h as u32;
+                    height_val
+                });
 
                 self.generate_thumbnail(
                     Path::new(input_path),
@@ -662,8 +693,7 @@ impl BaseAgent for ImageProcessorTool {
 
                 let response = ResponseBuilder::success("thumbnail")
                     .with_message(format!(
-                        "Generated thumbnail from {} to {} (max {}x{})",
-                        input_path, output_path, max_width, max_height
+                        "Generated thumbnail from {input_path} to {output_path} (max {max_width}x{max_height})"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -691,10 +721,7 @@ impl BaseAgent for ImageProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Image processor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Image processor error: {error}")))
     }
 }
 
@@ -813,32 +840,38 @@ impl Tool for ImageProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
+
     use std::fs;
     use tempfile::TempDir;
 
-    fn create_test_tool() -> ImageProcessorTool {
-        let config = ImageProcessorConfig::default();
-        ImageProcessorTool::new(config)
+    fn create_test_image_processor_with_temp_dir() -> (ImageProcessorTool, TempDir) {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_image".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        let tool = ImageProcessorTool::new(ImageProcessorConfig::default(), sandbox);
+        (tool, temp_dir)
     }
 
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
+    fn create_test_image_processor() -> ImageProcessorTool {
+        create_test_image_processor_with_temp_dir().0
     }
-
     #[tokio::test]
     async fn test_format_detection_by_extension() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
 
         // Test various extensions
@@ -862,7 +895,6 @@ mod tests {
             assert_eq!(format, expected_format);
         }
     }
-
     #[tokio::test]
     async fn test_mime_types() {
         assert_eq!(ImageFormat::Png.mime_type(), "image/png");
@@ -871,7 +903,6 @@ mod tests {
         assert_eq!(ImageFormat::Webp.mime_type(), "image/webp");
         assert_eq!(ImageFormat::Unknown.mime_type(), "application/octet-stream");
     }
-
     #[tokio::test]
     async fn test_image_dimensions() {
         let landscape = ImageDimensions {
@@ -892,25 +923,20 @@ mod tests {
             width: 1000,
             height: 1000,
         };
-        assert_eq!(square.aspect_ratio(), 1.0);
+        assert!((square.aspect_ratio() - 1.0).abs() < f64::EPSILON);
         assert_eq!(square.orientation(), "square");
     }
-
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_image_processor_with_temp_dir();
         let file_path = temp_dir.path().join("image.png");
 
         fs::write(&file_path, b"dummy png content").unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -921,22 +947,18 @@ mod tests {
         assert!(result.text.contains("Png"));
         assert!(result.text.contains("Size: 17 bytes"));
     }
-
     #[tokio::test]
     async fn test_format_detection_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.jpeg");
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -945,92 +967,89 @@ mod tests {
 
         assert!(result.text.contains("Detected image format: Jpeg"));
     }
-
     #[tokio::test]
     async fn test_file_size_limit() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_image_size_limit".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ImageProcessorConfig {
             max_file_size: 10, // Very small limit
             ..Default::default()
         };
-        let tool = ImageProcessorTool::new(config);
+        let tool = ImageProcessorTool::new(config, sandbox);
 
-        let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("large.png");
 
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
     }
-
     #[tokio::test]
     async fn test_resize_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let input_path = temp_dir.path().join("input.png");
         let output_path = temp_dir.path().join("output.png");
 
         fs::write(&input_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Resize image",
-            json!({
-                "operation": "resize",
-                "source_path": input_path.to_str().unwrap(),
-                "target_path": output_path.to_str().unwrap(),
-                "width": 100
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "resize"),
+            ("source_path", input_path.to_str().unwrap()),
+            ("target_path", output_path.to_str().unwrap()),
+            ("width", "100"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not implemented"));
     }
-
     #[tokio::test]
     async fn test_convert_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let input_path = temp_dir.path().join("input.png");
         let output_path = temp_dir.path().join("output.jpg");
 
         fs::write(&input_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Convert image",
-            json!({
-                "operation": "convert",
-                "source_path": input_path.to_str().unwrap(),
-                "target_path": output_path.to_str().unwrap(),
-                "target_format": "jpeg"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "convert"),
+            ("source_path", input_path.to_str().unwrap()),
+            ("target_path", output_path.to_str().unwrap()),
+            ("target_format", "jpeg"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not implemented"));
     }
-
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1039,18 +1058,12 @@ mod tests {
             .to_string()
             .contains("Invalid operation"));
     }
-
     #[tokio::test]
     async fn test_missing_required_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "metadata")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1060,14 +1073,11 @@ mod tests {
             .contains("Missing required parameter 'file_path'"));
 
         // Missing width and height for resize
-        let input = create_test_input(
-            "Resize image",
-            json!({
-                "operation": "resize",
-                "source_path": "/tmp/input.png",
-                "target_path": "/tmp/output.png"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "resize"),
+            ("source_path", "/tmp/input.png"),
+            ("target_path", "/tmp/output.png"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1076,24 +1086,19 @@ mod tests {
             .to_string()
             .contains("At least one of width or height"));
     }
-
     #[tokio::test]
     async fn test_crop_parameter_validation() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
         // Missing crop parameters
-        let input = create_test_input(
-            "Crop image",
-            json!({
-                "operation": "crop",
-                "source_path": "/tmp/input.png",
-                "target_path": "/tmp/output.png",
-                "x": 0,
-                "y": 0,
-                "width": 100
-                // Missing height
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "crop"),
+            ("source_path", "/tmp/input.png"),
+            ("target_path", "/tmp/output.png"),
+            ("x", "0"),
+            ("y", "0"),
+            ("width", "100"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1102,10 +1107,9 @@ mod tests {
             .to_string()
             .contains("height is required"));
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "image_processor");
@@ -1124,22 +1128,15 @@ mod tests {
         assert!(params.iter().any(|p| p.name == "height"));
         assert!(params.iter().any(|p| p.name == "degrees"));
     }
-
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_image_processor_with_temp_dir();
         let file_path = temp_dir.path().join("test.png");
 
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_input(
-            "Process image",
-            json!({
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![("file_path", file_path.to_str().unwrap())]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -1148,24 +1145,16 @@ mod tests {
 
         assert!(result.text.contains("Image file"));
     }
-
     #[tokio::test]
     async fn test_empty_file_path() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": ""
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "detect"), ("file_path", "")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
-
     #[tokio::test]
     async fn test_supported_formats() {
         let config = ImageProcessorConfig::default();

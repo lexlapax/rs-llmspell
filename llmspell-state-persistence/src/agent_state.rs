@@ -148,8 +148,11 @@ impl PersistentAgentState {
 
         performance.invocation_count += 1;
         performance.total_duration_ms += duration_ms;
-        performance.average_duration_ms =
-            performance.total_duration_ms as f64 / performance.invocation_count as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let total_duration_f64 = performance.total_duration_ms as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let invocation_count_f64 = performance.invocation_count as f64;
+        performance.average_duration_ms = total_duration_f64 / invocation_count_f64;
         performance.last_used = SystemTime::now();
 
         self.touch();
@@ -259,7 +262,6 @@ pub trait PersistentAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_persistent_agent_state_creation() {
         let state = PersistentAgentState::new("agent_123".to_string(), "assistant".to_string());
@@ -270,7 +272,6 @@ mod tests {
         assert!(state.hook_registrations.is_empty());
         assert!(state.correlation_context.is_none());
     }
-
     #[test]
     fn test_agent_state_serialization() {
         use llmspell_storage::StorageSerialize;

@@ -36,6 +36,7 @@ impl Default for SitemapCrawlerTool {
 }
 
 impl SitemapCrawlerTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -103,16 +104,18 @@ impl BaseAgent for SitemapCrawlerTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "SitemapCrawler error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("SitemapCrawler error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let follow_sitemaps = extract_optional_bool(params, "follow_sitemaps").unwrap_or(true);
+        #[allow(clippy::cast_possible_truncation)]
         let max_urls = extract_optional_u64(params, "max_urls").unwrap_or(1000) as usize;
         let timeout_secs = extract_optional_u64(params, "timeout").unwrap_or(30);
 
@@ -181,7 +184,7 @@ struct SitemapStats {
 }
 
 impl SitemapStats {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             sitemaps_processed: 0,
             index_files_found: 0,
@@ -229,7 +232,7 @@ impl SitemapCrawlerTool {
                 .get(url)
                 .send()
                 .await
-                .map_err(|e| component_error(format!("Failed to fetch sitemap: {}", e)))?;
+                .map_err(|e| component_error(format!("Failed to fetch sitemap: {e}")))?;
 
             if !response.status().is_success() {
                 return Err(component_error(format!(
@@ -242,7 +245,7 @@ impl SitemapCrawlerTool {
             let xml_content = response
                 .text()
                 .await
-                .map_err(|e| component_error(format!("Failed to read sitemap content: {}", e)))?;
+                .map_err(|e| component_error(format!("Failed to read sitemap content: {e}")))?;
 
             stats.sitemaps_processed += 1;
 
@@ -271,8 +274,10 @@ impl SitemapCrawlerTool {
             }
 
             // Parse as regular sitemap
-            let urls = self.parse_sitemap(&xml_content)?;
-            stats.total_urls_discovered += urls.len() as u32;
+            let urls = self.parse_sitemap(&xml_content);
+            #[allow(clippy::cast_possible_truncation)]
+            let urls_len_u32 = urls.len() as u32;
+            stats.total_urls_discovered += urls_len_u32;
 
             for url_entry in urls {
                 if all_urls.len() >= options.max_urls {
@@ -280,7 +285,7 @@ impl SitemapCrawlerTool {
                 }
                 if url_entry
                     .get("has_metadata")
-                    .and_then(|m| m.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false)
                 {
                     stats.urls_with_metadata += 1;
@@ -292,6 +297,7 @@ impl SitemapCrawlerTool {
         })
     }
 
+    #[allow(clippy::unused_self)]
     fn parse_sitemap_index(&self, xml_content: &str) -> std::result::Result<Vec<String>, ()> {
         // Simple XML parsing for sitemap index
         let mut urls = Vec::new();
@@ -324,7 +330,8 @@ impl SitemapCrawlerTool {
         }
     }
 
-    fn parse_sitemap(&self, xml_content: &str) -> Result<Vec<Value>> {
+    #[allow(clippy::unused_self)]
+    fn parse_sitemap(&self, xml_content: &str) -> Vec<Value> {
         let mut urls = Vec::new();
         let lines: Vec<&str> = xml_content.lines().collect();
 
@@ -399,6 +406,6 @@ impl SitemapCrawlerTool {
             }
         }
 
-        Ok(urls)
+        urls
     }
 }

@@ -27,12 +27,13 @@ pub enum AlertSeverity {
 
 impl AlertSeverity {
     /// Get color code for severity
-    pub fn color(&self) -> &'static str {
+    #[must_use]
+    pub const fn color(&self) -> &'static str {
         match self {
-            AlertSeverity::Info => "🟢",
-            AlertSeverity::Warning => "🟡",
-            AlertSeverity::Critical => "🟠",
-            AlertSeverity::Emergency => "🔴",
+            Self::Info => "🟢",
+            Self::Warning => "🟡",
+            Self::Critical => "🟠",
+            Self::Emergency => "🔴",
         }
     }
 }
@@ -40,10 +41,10 @@ impl AlertSeverity {
 impl std::fmt::Display for AlertSeverity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AlertSeverity::Info => write!(f, "Info"),
-            AlertSeverity::Warning => write!(f, "Warning"),
-            AlertSeverity::Critical => write!(f, "Critical"),
-            AlertSeverity::Emergency => write!(f, "Emergency"),
+            Self::Info => write!(f, "Info"),
+            Self::Warning => write!(f, "Warning"),
+            Self::Critical => write!(f, "Critical"),
+            Self::Emergency => write!(f, "Emergency"),
         }
     }
 }
@@ -90,6 +91,7 @@ pub struct Alert {
 
 impl Alert {
     /// Create a new alert
+    #[must_use]
     pub fn new(
         rule_id: String,
         severity: AlertSeverity,
@@ -114,6 +116,7 @@ impl Alert {
     }
 
     /// Add detail to the alert
+    #[must_use]
     pub fn with_detail(mut self, key: String, value: serde_json::Value) -> Self {
         self.details.insert(key, value);
         self
@@ -139,16 +142,20 @@ impl Alert {
     }
 
     /// Get alert duration
+    #[must_use]
     pub fn duration(&self) -> Duration {
-        if let Some(resolved_at) = self.resolved_at {
-            (resolved_at - self.triggered_at)
-                .to_std()
-                .unwrap_or_default()
-        } else {
-            (Utc::now() - self.triggered_at)
-                .to_std()
-                .unwrap_or_default()
-        }
+        self.resolved_at.map_or_else(
+            || {
+                (Utc::now() - self.triggered_at)
+                    .to_std()
+                    .unwrap_or_default()
+            },
+            |resolved_at| {
+                (resolved_at - self.triggered_at)
+                    .to_std()
+                    .unwrap_or_default()
+            },
+        )
     }
 }
 
@@ -200,7 +207,7 @@ pub enum AlertCondition {
 impl std::fmt::Debug for AlertCondition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AlertCondition::MetricThreshold {
+            Self::MetricThreshold {
                 metric_name,
                 operator,
                 threshold,
@@ -212,12 +219,12 @@ impl std::fmt::Debug for AlertCondition {
                 .field("threshold", threshold)
                 .field("duration", duration)
                 .finish(),
-            AlertCondition::HealthStatus { status, duration } => f
+            Self::HealthStatus { status, duration } => f
                 .debug_struct("HealthStatus")
                 .field("status", status)
                 .field("duration", duration)
                 .finish(),
-            AlertCondition::ErrorRate {
+            Self::ErrorRate {
                 rate_percent,
                 duration,
             } => f
@@ -225,7 +232,7 @@ impl std::fmt::Debug for AlertCondition {
                 .field("rate_percent", rate_percent)
                 .field("duration", duration)
                 .finish(),
-            AlertCondition::Custom(_) => f.write_str("Custom(AlertEvaluator)"),
+            Self::Custom(_) => f.write_str("Custom(AlertEvaluator)"),
         }
     }
 }
@@ -249,14 +256,15 @@ pub enum ThresholdOperator {
 
 impl ThresholdOperator {
     /// Evaluate a value against a threshold
+    #[must_use]
     pub fn evaluate(&self, value: f64, threshold: f64) -> bool {
         match self {
-            ThresholdOperator::GreaterThan => value > threshold,
-            ThresholdOperator::GreaterThanOrEqual => value >= threshold,
-            ThresholdOperator::LessThan => value < threshold,
-            ThresholdOperator::LessThanOrEqual => value <= threshold,
-            ThresholdOperator::Equal => (value - threshold).abs() < f64::EPSILON,
-            ThresholdOperator::NotEqual => (value - threshold).abs() >= f64::EPSILON,
+            Self::GreaterThan => value > threshold,
+            Self::GreaterThanOrEqual => value >= threshold,
+            Self::LessThan => value < threshold,
+            Self::LessThanOrEqual => value <= threshold,
+            Self::Equal => (value - threshold).abs() < f64::EPSILON,
+            Self::NotEqual => (value - threshold).abs() >= f64::EPSILON,
         }
     }
 }
@@ -322,6 +330,11 @@ pub struct AlertManager {
 
 impl AlertManager {
     /// Create a new alert manager
+    ///
+    /// # Panics
+    ///
+    /// Panics if creating `Arc<RwLock<_>>` fails (should never happen)
+    #[must_use]
     pub fn new(config: AlertConfig) -> Self {
         Self {
             config,
@@ -334,16 +347,35 @@ impl AlertManager {
     }
 
     /// Register an alert rule
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn register_rule(&self, rule: AlertRule) {
         self.rules.write().unwrap().insert(rule.id.clone(), rule);
     }
 
     /// Register a notification channel
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned.
     pub fn register_channel(&self, name: String, channel: Arc<dyn NotificationChannel>) {
         self.channels.write().unwrap().insert(name, channel);
     }
 
     /// Evaluate all rules
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Rule evaluation fails
+    /// - Alert triggering fails
+    /// - Notification sending fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
     pub async fn evaluate_rules(&self, context: AlertContext<'_>) -> Result<()> {
         let rules_to_evaluate: Vec<AlertRule> = {
             let rules = self.rules.read().unwrap();
@@ -363,17 +395,18 @@ impl AlertManager {
                     operator,
                     threshold,
                     ..
-                } => {
-                    if let Some(metric) = context.metrics.get(metric_name) {
-                        match metric {
-                            MetricValue::Counter(v) => operator.evaluate(*v as f64, *threshold),
-                            MetricValue::Gauge(v) => operator.evaluate(*v, *threshold),
-                            _ => false,
+                } => context
+                    .metrics
+                    .get(metric_name)
+                    .is_some_and(|metric| match metric {
+                        MetricValue::Counter(v) => {
+                            #[allow(clippy::cast_precision_loss)]
+                            let v_f64 = *v as f64;
+                            operator.evaluate(v_f64, *threshold)
                         }
-                    } else {
-                        false
-                    }
-                }
+                        MetricValue::Gauge(v) => operator.evaluate(*v, *threshold),
+                        _ => false,
+                    }),
                 AlertCondition::HealthStatus { status, .. } => context.health == Some(status),
                 AlertCondition::ErrorRate { rate_percent, .. } => {
                     // Calculate error rate from metrics
@@ -384,7 +417,11 @@ impl AlertManager {
                         match (total, failed) {
                             (MetricValue::Counter(t), MetricValue::Counter(f)) => {
                                 if *t > 0 {
-                                    let rate = (*f as f64 / *t as f64) * 100.0;
+                                    #[allow(clippy::cast_precision_loss)]
+                                    let f_f64 = *f as f64;
+                                    #[allow(clippy::cast_precision_loss)]
+                                    let t_f64 = *t as f64;
+                                    let rate = (f_f64 / t_f64) * 100.0;
                                     rate >= *rate_percent
                                 } else {
                                     false
@@ -410,12 +447,10 @@ impl AlertManager {
     /// Check if a rule is in cooldown
     fn is_in_cooldown(&self, rule_id: &str) -> bool {
         let last_triggers = self.last_trigger_times.read().unwrap();
-        if let Some(last_trigger) = last_triggers.get(rule_id) {
+        last_triggers.get(rule_id).is_some_and(|last_trigger| {
             let elapsed = (Utc::now() - *last_trigger).to_std().unwrap_or_default();
             elapsed < self.config.default_cooldown
-        } else {
-            false
-        }
+        })
     }
 
     /// Trigger an alert
@@ -487,6 +522,10 @@ impl AlertManager {
     }
 
     /// Add alert to history
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned or if `Duration` conversion fails
     fn add_to_history(&self, alert: Alert) {
         let mut history = self.history.write().unwrap();
 
@@ -500,6 +539,11 @@ impl AlertManager {
     }
 
     /// Get active alerts
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn get_active_alerts(&self) -> Vec<Alert> {
         self.active_alerts
             .read()
@@ -510,33 +554,68 @@ impl AlertManager {
     }
 
     /// Acknowledge an alert
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the alert is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn acknowledge_alert(&self, alert_id: &str) -> Result<()> {
-        if let Some(alert) = self.active_alerts.write().unwrap().get_mut(alert_id) {
-            alert.acknowledge();
-            Ok(())
-        } else {
-            Err(llmspell_core::LLMSpellError::Component {
-                message: format!("Alert {} not found", alert_id),
-                source: None,
-            })
-        }
+        self.active_alerts
+            .write()
+            .unwrap()
+            .get_mut(alert_id)
+            .map_or_else(
+                || {
+                    Err(llmspell_core::LLMSpellError::Component {
+                        message: format!("Alert {alert_id} not found"),
+                        source: None,
+                    })
+                },
+                |alert| {
+                    alert.acknowledge();
+                    Ok(())
+                },
+            )
     }
 
     /// Resolve an alert
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the alert is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn resolve_alert(&self, alert_id: &str) -> Result<()> {
-        if let Some(mut alert) = self.active_alerts.write().unwrap().remove(alert_id) {
-            alert.resolve();
-            self.add_to_history(alert);
-            Ok(())
-        } else {
-            Err(llmspell_core::LLMSpellError::Component {
-                message: format!("Alert {} not found", alert_id),
-                source: None,
-            })
-        }
+        self.active_alerts
+            .write()
+            .unwrap()
+            .remove(alert_id)
+            .map_or_else(
+                || {
+                    Err(llmspell_core::LLMSpellError::Component {
+                        message: format!("Alert {alert_id} not found"),
+                        source: None,
+                    })
+                },
+                |mut alert| {
+                    alert.resolve();
+                    self.add_to_history(alert);
+                    Ok(())
+                },
+            )
     }
 
     /// Get alert statistics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned.
+    #[must_use]
     pub fn get_statistics(&self) -> AlertStatistics {
         let active = self.active_alerts.read().unwrap();
         let history = self.history.read().unwrap();
@@ -546,21 +625,23 @@ impl AlertManager {
             *severity_counts.entry(alert.severity).or_insert(0) += 1;
         }
 
-        let avg_resolution_time = if !history.is_empty() {
+        let avg_resolution_time = if history.is_empty() {
+            None
+        } else {
             let total_duration: Duration = history
                 .iter()
                 .filter(|a| a.resolved_at.is_some())
-                .map(|a| a.duration())
+                .map(Alert::duration)
                 .sum();
             let resolved_count = history.iter().filter(|a| a.resolved_at.is_some()).count();
 
             if resolved_count > 0 {
-                Some(total_duration / resolved_count as u32)
+                #[allow(clippy::cast_possible_truncation)]
+                let resolved_count_u32 = resolved_count as u32;
+                Some(total_duration / resolved_count_u32)
             } else {
                 None
             }
-        } else {
-            None
         };
 
         AlertStatistics {
@@ -613,7 +694,6 @@ impl NotificationChannel for ConsoleNotificationChannel {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_threshold_operators() {
         assert!(ThresholdOperator::GreaterThan.evaluate(10.0, 5.0));
@@ -623,7 +703,6 @@ mod tests {
         assert!(ThresholdOperator::Equal.evaluate(5.0, 5.0));
         assert!(!ThresholdOperator::Equal.evaluate(5.0, 6.0));
     }
-
     #[test]
     fn test_alert_creation() {
         let mut alert = Alert::new(
@@ -647,7 +726,6 @@ mod tests {
         assert_eq!(alert.state, AlertState::Resolved);
         assert!(alert.resolved_at.is_some());
     }
-
     #[test]
     fn test_alert_rule() {
         let rule = AlertRule {
@@ -669,7 +747,6 @@ mod tests {
         assert!(rule.enabled);
         assert_eq!(rule.severity, AlertSeverity::Warning);
     }
-
     #[tokio::test]
     async fn test_alert_manager() {
         let manager = AlertManager::new(AlertConfig::default());

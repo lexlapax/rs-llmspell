@@ -45,13 +45,13 @@ pub enum HttpMethod {
 impl std::fmt::Display for HttpMethod {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            HttpMethod::Get => write!(f, "GET"),
-            HttpMethod::Post => write!(f, "POST"),
-            HttpMethod::Put => write!(f, "PUT"),
-            HttpMethod::Delete => write!(f, "DELETE"),
-            HttpMethod::Patch => write!(f, "PATCH"),
-            HttpMethod::Head => write!(f, "HEAD"),
-            HttpMethod::Options => write!(f, "OPTIONS"),
+            Self::Get => write!(f, "GET"),
+            Self::Post => write!(f, "POST"),
+            Self::Put => write!(f, "PUT"),
+            Self::Delete => write!(f, "DELETE"),
+            Self::Patch => write!(f, "PATCH"),
+            Self::Head => write!(f, "HEAD"),
+            Self::Options => write!(f, "OPTIONS"),
         }
     }
 }
@@ -61,15 +61,15 @@ impl std::str::FromStr for HttpMethod {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_uppercase().as_str() {
-            "GET" => Ok(HttpMethod::Get),
-            "POST" => Ok(HttpMethod::Post),
-            "PUT" => Ok(HttpMethod::Put),
-            "DELETE" => Ok(HttpMethod::Delete),
-            "PATCH" => Ok(HttpMethod::Patch),
-            "HEAD" => Ok(HttpMethod::Head),
-            "OPTIONS" => Ok(HttpMethod::Options),
+            "GET" => Ok(Self::Get),
+            "POST" => Ok(Self::Post),
+            "PUT" => Ok(Self::Put),
+            "DELETE" => Ok(Self::Delete),
+            "PATCH" => Ok(Self::Patch),
+            "HEAD" => Ok(Self::Head),
+            "OPTIONS" => Ok(Self::Options),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown HTTP method: {}", s),
+                message: format!("Unknown HTTP method: {s}"),
                 field: Some("method".to_string()),
             }),
         }
@@ -116,7 +116,7 @@ impl Default for RetryConfig {
 
 impl From<RetryConfig> for SharedRetryConfig {
     fn from(config: RetryConfig) -> Self {
-        SharedRetryConfig::new(config.max_attempts)
+        Self::new(config.max_attempts)
             .with_initial_delay(Duration::from_millis(config.initial_delay_ms))
             .with_max_delay(Duration::from_millis(config.max_delay_ms))
             .with_backoff_factor(config.backoff_factor)
@@ -192,6 +192,13 @@ pub struct HttpRequestTool {
 }
 
 impl HttpRequestTool {
+    /// Create a new HTTP request tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Rate limiter configuration is invalid
+    /// - HTTP client creation fails
     pub fn new(config: HttpRequestConfig) -> Result<Self> {
         // Create rate limiter using shared utility
         let rate_limiter = if let Some(rpm) = config.rate_limit_per_minute {
@@ -201,7 +208,7 @@ impl HttpRequestTool {
                     .sliding_window()
                     .build()
                     .map_err(|e| LLMSpellError::Internal {
-                        message: format!("Failed to create rate limiter: {}", e),
+                        message: format!("Failed to create rate limiter: {e}"),
                         source: None,
                     })?,
             )
@@ -219,7 +226,7 @@ impl HttpRequestTool {
             })
             .build()
             .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
                 source: None,
             })?;
 
@@ -235,6 +242,7 @@ impl HttpRequestTool {
     }
 
     /// Apply authentication to request
+    #[allow(clippy::unused_self)]
     fn apply_auth(
         &self,
         mut request: reqwest::RequestBuilder,
@@ -255,6 +263,12 @@ impl HttpRequestTool {
     }
 
     /// Execute request with retry logic (using shared utility)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Rate limit is exceeded
+    /// - HTTP request fails after all retries
     async fn execute_with_retry(
         &self,
         method: Method,
@@ -273,7 +287,7 @@ impl HttpRequestTool {
                 .acquire()
                 .await
                 .map_err(|e| LLMSpellError::RateLimit {
-                    message: format!("Rate limit exceeded: {}", e),
+                    message: format!("Rate limit exceeded: {e}"),
                     retry_after: None,
                 })?;
         }
@@ -300,7 +314,7 @@ impl HttpRequestTool {
 
             // Execute request
             request.send().await.map_err(|e| LLMSpellError::Tool {
-                message: format!("HTTP request failed: {}", e),
+                message: format!("HTTP request failed: {e}"),
                 tool_name: Some("http_request".to_string()),
                 source: None,
             })
@@ -310,7 +324,7 @@ impl HttpRequestTool {
         match result {
             Ok(response) => Ok(response),
             Err(retry_error) => Err(LLMSpellError::Tool {
-                message: format!("HTTP request failed: {}", retry_error),
+                message: format!("HTTP request failed: {retry_error}"),
                 tool_name: Some("http_request".to_string()),
                 source: None,
             }),
@@ -318,6 +332,10 @@ impl HttpRequestTool {
     }
 
     /// Parse response based on content type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if response parsing fails
     async fn parse_response(&self, response: Response) -> Result<HttpResponse> {
         let status = response.status();
         let headers = response
@@ -333,21 +351,21 @@ impl HttpRequestTool {
             .unwrap_or("");
 
         let body = if content_type.contains("application/json") {
-            match response.json::<Value>().await {
-                Ok(json) => ResponseBody::Json(json),
-                Err(_) => ResponseBody::Text(String::new()),
-            }
+            response
+                .json::<Value>()
+                .await
+                .map_or_else(|_| ResponseBody::Text(String::new()), ResponseBody::Json)
         } else if content_type.contains("text/") || content_type.contains("xml") {
-            match response.text().await {
-                Ok(text) => ResponseBody::Text(text),
-                Err(_) => ResponseBody::Text(String::new()),
-            }
+            response
+                .text()
+                .await
+                .map_or_else(|_| ResponseBody::Text(String::new()), ResponseBody::Text)
         } else {
             // Binary content
-            match response.bytes().await {
-                Ok(bytes) => ResponseBody::Binary(bytes.to_vec()),
-                Err(_) => ResponseBody::Binary(Vec::new()),
-            }
+            response.bytes().await.map_or_else(
+                |_| ResponseBody::Binary(Vec::new()),
+                |bytes| ResponseBody::Binary(bytes.to_vec()),
+            )
         };
 
         Ok(HttpResponse {
@@ -359,6 +377,14 @@ impl HttpRequestTool {
     }
 
     /// Parse parameters from input
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Invalid HTTP method is specified
+    /// - Required URL parameter is missing
+    /// - Parameter parsing fails
+    #[allow(clippy::unused_self)]
     fn parse_parameters(&self, params: &Value) -> Result<HttpRequestParams> {
         let method_str = extract_optional_string(params, "method").unwrap_or("GET");
         let method: HttpMethod = method_str.parse()?;
@@ -373,11 +399,9 @@ impl HttpRequestTool {
 
         let body = params.get("body").cloned();
 
-        let auth = if let Some(auth_obj) = params.get("auth") {
+        let auth = params.get("auth").map_or(AuthType::None, |auth_obj| {
             serde_json::from_value(auth_obj.clone()).unwrap_or(AuthType::None)
-        } else {
-            AuthType::None
-        };
+        });
 
         let retry_config = params
             .get("retry")
@@ -456,11 +480,13 @@ impl Tool for HttpRequestTool {
 
 impl HttpRequestTool {
     /// Check if this tool supports hook integration
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         json!({
             "tool_name": self.metadata().name,
@@ -505,6 +531,13 @@ impl HttpRequestTool {
 
     /// Demonstrate hook-aware execution for HTTP requests
     /// This method showcases how the HTTP request tool works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The HTTP request fails
+    /// - Hook execution fails
+    /// - Response parsing fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
@@ -513,6 +546,8 @@ impl HttpRequestTool {
         headers: Option<&std::collections::HashMap<String, String>>,
         body: Option<&str>,
     ) -> Result<AgentOutput> {
+        use crate::lifecycle::HookableToolExecution;
+
         let mut params = json!({
             "method": method,
             "input": url,
@@ -532,7 +567,6 @@ impl HttpRequestTool {
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait
-        use crate::lifecycle::HookableToolExecution;
         self.execute_with_hooks(input, context, tool_executor).await
     }
 }
@@ -543,7 +577,11 @@ impl BaseAgent for HttpRequestTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let request_params = self.parse_parameters(params)?;
 
@@ -572,7 +610,7 @@ impl BaseAgent for HttpRequestTool {
             })
             .await
             .map_err(|e| LLMSpellError::Tool {
-                message: format!("Request timeout: {}", e),
+                message: format!("Request timeout: {e}"),
                 tool_name: Some("http_request".to_string()),
                 source: None,
             })?;
@@ -611,14 +649,13 @@ impl BaseAgent for HttpRequestTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("HTTP request error: {}", error)))
+        Ok(AgentOutput::text(format!("HTTP request error: {error}")))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_hook_integration_metadata() {
         let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
@@ -640,7 +677,6 @@ mod tests {
         assert!(metadata["supported_methods"].is_array());
         assert!(metadata["authentication_types"].is_array());
     }
-
     #[tokio::test]
     async fn test_http_request_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -663,7 +699,6 @@ mod tests {
         // The network request may fail, but hook integration should not panic
         assert!(result.is_ok() || result.is_err());
     }
-
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_http() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

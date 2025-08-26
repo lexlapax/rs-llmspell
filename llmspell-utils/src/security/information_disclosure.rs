@@ -406,7 +406,6 @@ impl LoggingFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_sensitive_data_masking() {
         let config = InfoDisclosureConfig::default();
@@ -425,7 +424,6 @@ mod tests {
             assert!(result.contains(expected), "Input: {input}, Got: {result}");
         }
     }
-
     #[test]
     fn test_path_sanitization() {
         let config = InfoDisclosureConfig::default();
@@ -443,7 +441,6 @@ mod tests {
             assert!(result.contains(expected), "Input: {input}, Got: {result}");
         }
     }
-
     #[test]
     fn test_debug_info_filtering() {
         let config = InfoDisclosureConfig::default();
@@ -461,7 +458,6 @@ mod tests {
             assert_eq!(result, expected);
         }
     }
-
     #[test]
     fn test_error_sanitization() {
         let config = InfoDisclosureConfig::production();
@@ -481,7 +477,6 @@ mod tests {
         assert!(sanitized.error_code.starts_with("ERR_"));
         assert_eq!(sanitized.category, None); // database not in allowed list
     }
-
     #[test]
     fn test_development_vs_production() {
         let dev_config = InfoDisclosureConfig::development();
@@ -493,7 +488,6 @@ mod tests {
         assert!(!dev_config.sanitize_paths);
         assert!(prod_config.sanitize_paths);
     }
-
     #[test]
     fn test_logging_filter() {
         let config = InfoDisclosureConfig::default();
@@ -511,7 +505,6 @@ mod tests {
         let mostly_safe = "Processing request for user ID 123";
         assert!(!filter.should_filter(mostly_safe));
     }
-
     #[test]
     fn test_error_categorization() {
         let preventer = Arc::new(InfoDisclosurePreventer::production());

@@ -1,6 +1,8 @@
 //! ABOUTME: Agent metrics collection and reporting
 //! ABOUTME: Provides counters, gauges, histograms for monitoring agent behavior
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -59,6 +61,7 @@ pub struct Counter {
 
 impl Counter {
     /// Create a new counter
+    #[must_use]
     pub fn new() -> Self {
         Self {
             value: Arc::new(AtomicU64::new(0)),
@@ -76,6 +79,7 @@ impl Counter {
     }
 
     /// Get the current value
+    #[must_use]
     pub fn get(&self) -> u64 {
         self.value.load(Ordering::Relaxed)
     }
@@ -100,6 +104,7 @@ pub struct Gauge {
 
 impl Gauge {
     /// Create a new gauge
+    #[must_use]
     pub fn new() -> Self {
         Self {
             value: Arc::new(RwLock::new(0.0)),
@@ -142,6 +147,7 @@ impl Gauge {
     }
 
     /// Get the current value
+    #[must_use]
     pub fn get(&self) -> f64 {
         self.value.read().map(|v| *v).unwrap_or(0.0)
     }
@@ -164,6 +170,7 @@ pub struct Histogram {
 
 impl Histogram {
     /// Create a new histogram with given buckets
+    #[must_use]
     pub fn new(buckets: Vec<f64>) -> Self {
         let bucket_counts = buckets
             .iter()
@@ -179,6 +186,7 @@ impl Histogram {
     }
 
     /// Create a histogram with default buckets
+    #[must_use]
     pub fn with_defaults() -> Self {
         Self::new(vec![
             0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0,
@@ -204,6 +212,7 @@ impl Histogram {
     }
 
     /// Get the current histogram data
+    #[must_use]
     pub fn get(&self) -> MetricValue {
         let sum = self.sum.read().map(|v| *v).unwrap_or(0.0);
         let count = self.count.load(Ordering::Relaxed);
@@ -231,6 +240,7 @@ pub struct Timer {
 
 impl Timer {
     /// Create a new timer
+    #[must_use]
     pub fn new(histogram: Arc<Histogram>) -> Self {
         Self {
             start: Instant::now(),
@@ -270,6 +280,7 @@ pub struct AgentMetrics {
 
 impl AgentMetrics {
     /// Create new agent metrics
+    #[must_use]
     pub fn new(agent_id: String) -> Self {
         Self {
             agent_id,
@@ -285,6 +296,7 @@ impl AgentMetrics {
     }
 
     /// Start timing a request
+    #[must_use]
     pub fn start_request(&self) -> Timer {
         self.requests_active.inc();
         Timer::new(Arc::new(Histogram::with_defaults()))
@@ -390,6 +402,7 @@ pub struct MetricRegistry {
 
 impl MetricRegistry {
     /// Create a new metric registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(RwLock::new(HashMap::new())),
@@ -398,6 +411,15 @@ impl MetricRegistry {
     }
 
     /// Register a metric
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error, but the Result type is provided for future
+    /// extensibility (e.g., validation of metric names or handling registration conflicts).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn register(&self, name: String, metric: Arc<dyn MetricAccess>) -> Result<()> {
         let mut metrics = self.metrics.write().unwrap();
         metrics.insert(name, metric);
@@ -405,11 +427,21 @@ impl MetricRegistry {
     }
 
     /// Get a metric
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<Arc<dyn MetricAccess>> {
         self.metrics.read().unwrap().get(name).cloned()
     }
 
     /// Get or create agent metrics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn get_agent_metrics(&self, agent_id: &str) -> Arc<AgentMetrics> {
         let mut agent_metrics = self.agent_metrics.write().unwrap();
         agent_metrics
@@ -419,6 +451,7 @@ impl MetricRegistry {
     }
 
     /// Collect all metrics
+    #[must_use]
     pub fn collect(&self) -> HashMap<String, MetricValue> {
         let mut result = HashMap::new();
 
@@ -432,39 +465,39 @@ impl MetricRegistry {
         // Collect agent metrics
         if let Ok(agents) = self.agent_metrics.read() {
             for (agent_id, metrics) in agents.iter() {
-                let prefix = format!("agent.{}", agent_id);
+                let prefix = format!("agent.{agent_id}");
                 result.insert(
-                    format!("{}.requests_total", prefix),
+                    format!("{prefix}.requests_total"),
                     MetricValue::Counter(metrics.requests_total.get()),
                 );
                 result.insert(
-                    format!("{}.requests_failed", prefix),
+                    format!("{prefix}.requests_failed"),
                     MetricValue::Counter(metrics.requests_failed.get()),
                 );
                 result.insert(
-                    format!("{}.requests_active", prefix),
+                    format!("{prefix}.requests_active"),
                     MetricValue::Gauge(metrics.requests_active.get()),
                 );
                 result.insert(
-                    format!("{}.request_duration", prefix),
+                    format!("{prefix}.request_duration"),
                     metrics.request_duration.get(),
                 );
                 result.insert(
-                    format!("{}.tool_invocations", prefix),
+                    format!("{prefix}.tool_invocations"),
                     MetricValue::Counter(metrics.tool_invocations.get()),
                 );
                 result.insert(
-                    format!("{}.memory_bytes", prefix),
+                    format!("{prefix}.memory_bytes"),
                     MetricValue::Gauge(metrics.memory_bytes.get()),
                 );
                 result.insert(
-                    format!("{}.cpu_percent", prefix),
+                    format!("{prefix}.cpu_percent"),
                     MetricValue::Gauge(metrics.cpu_percent.get()),
                 );
 
                 // Add custom metrics
                 for (custom_name, custom_metric) in &metrics.custom {
-                    result.insert(format!("{}.{}", prefix, custom_name), custom_metric.value());
+                    result.insert(format!("{prefix}.{custom_name}"), custom_metric.value());
                 }
             }
         }
@@ -491,7 +524,6 @@ impl Default for MetricRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_counter() {
         let counter = Counter::new();
@@ -506,8 +538,8 @@ mod tests {
         counter.reset();
         assert_eq!(counter.get(), 0);
     }
-
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_gauge() {
         let gauge = Gauge::new();
         assert_eq!(gauge.get(), 0.0);
@@ -524,7 +556,6 @@ mod tests {
         gauge.sub(3.5);
         assert_eq!(gauge.get(), 50.0);
     }
-
     #[test]
     fn test_histogram() {
         let hist = Histogram::new(vec![0.1, 0.5, 1.0, 5.0]);
@@ -550,8 +581,8 @@ mod tests {
             _ => panic!("Expected histogram value"),
         }
     }
-
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_agent_metrics() {
         let metrics = AgentMetrics::new("test-agent".to_string());
 
@@ -580,7 +611,6 @@ mod tests {
         assert_eq!(metrics.memory_bytes.get(), 1024.0 * 1024.0);
         assert_eq!(metrics.cpu_percent.get(), 25.5);
     }
-
     #[test]
     fn test_metric_registry() {
         let registry = MetricRegistry::new();

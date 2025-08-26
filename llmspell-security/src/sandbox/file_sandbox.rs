@@ -309,7 +309,6 @@ mod tests {
         let sandbox = FileSandbox::new(context).unwrap();
         (sandbox, temp_dir)
     }
-
     #[tokio::test]
     async fn test_file_operations() {
         let (mut sandbox, temp_dir) = create_test_sandbox().await;
@@ -340,7 +339,6 @@ mod tests {
         let metadata = sandbox.file_metadata(&test_file).await.unwrap();
         assert!(metadata.is_file());
     }
-
     #[tokio::test]
     async fn test_directory_operations() {
         let (mut sandbox, temp_dir) = create_test_sandbox().await;
@@ -354,7 +352,6 @@ mod tests {
         let entries = sandbox.list_dir(temp_dir.path()).await.unwrap();
         assert!(entries.contains(&test_dir));
     }
-
     #[tokio::test]
     async fn test_path_traversal_protection() {
         let (mut sandbox, _temp_dir) = create_test_sandbox().await;
@@ -378,7 +375,6 @@ mod tests {
             _ => panic!("Expected Security error"),
         }
     }
-
     #[tokio::test]
     async fn test_unauthorized_path_access() {
         let (mut sandbox, _temp_dir) = create_test_sandbox().await;
@@ -396,7 +392,6 @@ mod tests {
             _ => panic!("Expected SecurityViolation"),
         }
     }
-
     #[tokio::test]
     async fn test_file_deletion() {
         let (mut sandbox, temp_dir) = create_test_sandbox().await;

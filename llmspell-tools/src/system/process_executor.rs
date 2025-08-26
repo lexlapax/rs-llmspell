@@ -1,6 +1,7 @@
 // ABOUTME: Process execution tool with security sandboxing and resource controls
 // ABOUTME: Provides safe execution of system processes with configurable permissions and limits
 
+use crate::lifecycle::HookableToolExecution;
 use async_trait::async_trait;
 use llmspell_core::{
     traits::{
@@ -10,7 +11,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     // NEW: Error handling with information disclosure prevention
     error_handling::{ErrorContext, SafeErrorHandler},
@@ -52,6 +53,24 @@ pub struct ProcessResult {
     pub timed_out: bool,
 }
 
+/// I/O capture configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IoCapture {
+    /// Whether to capture stdout
+    pub stdout: bool,
+    /// Whether to capture stderr
+    pub stderr: bool,
+}
+
+/// Execution permissions configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionPermissions {
+    /// Whether to allow arbitrary command execution
+    pub allow_arbitrary_commands: bool,
+    /// Whether to inherit current process environment
+    pub inherit_environment: bool,
+}
+
 /// Process executor tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessExecutorConfig {
@@ -63,18 +82,14 @@ pub struct ProcessExecutorConfig {
     pub allowed_executables: Vec<String>,
     /// Blocked executable patterns
     pub blocked_executables: Vec<String>,
-    /// Whether to allow arbitrary command execution
-    pub allow_arbitrary_commands: bool,
+    /// Execution permissions
+    pub permissions: ExecutionPermissions,
     /// Default working directory
     pub default_working_directory: Option<PathBuf>,
-    /// Whether to capture stdout
-    pub capture_stdout: bool,
-    /// Whether to capture stderr
-    pub capture_stderr: bool,
+    /// I/O capture settings
+    pub io_capture: IoCapture,
     /// Environment variables to pass to processes
     pub allowed_env_vars: Vec<String>,
-    /// Whether to inherit current process environment
-    pub inherit_environment: bool,
 }
 
 impl Default for ProcessExecutorConfig {
@@ -128,10 +143,15 @@ impl Default for ProcessExecutorConfig {
                 "killall".to_string(),
                 "pkill".to_string(),
             ],
-            allow_arbitrary_commands: false,
+            permissions: ExecutionPermissions {
+                allow_arbitrary_commands: false,
+                inherit_environment: false,
+            },
             default_working_directory: None,
-            capture_stdout: true,
-            capture_stderr: true,
+            io_capture: IoCapture {
+                stdout: true,
+                stderr: true,
+            },
             allowed_env_vars: vec![
                 "PATH".to_string(),
                 "HOME".to_string(),
@@ -142,7 +162,6 @@ impl Default for ProcessExecutorConfig {
                 "LC_ALL".to_string(),
                 "TZ".to_string(),
             ],
-            inherit_environment: false,
         }
     }
 }
@@ -151,14 +170,14 @@ impl Default for ProcessExecutorConfig {
 pub struct ProcessExecutorTool {
     metadata: ComponentMetadata,
     config: ProcessExecutorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
     error_handler: SafeErrorHandler,
 }
 
 impl ProcessExecutorTool {
     /// Create a new process executor tool
-    pub fn new(config: ProcessExecutorConfig) -> Self {
+    #[must_use]
+    pub fn new(config: ProcessExecutorConfig, sandbox: Arc<FileSandbox>) -> Self {
         // Determine if in production mode based on config
         let is_production = !cfg!(debug_assertions);
 
@@ -168,83 +187,69 @@ impl ProcessExecutorTool {
                 "Safe process execution with security controls and resource limits".to_string(),
             ),
             config,
-            sandbox_context: None,
-            error_handler: SafeErrorHandler::new(is_production),
-        }
-    }
-
-    /// Create a new process executor tool with sandbox context
-    pub fn with_sandbox(
-        config: ProcessExecutorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        let is_production = !cfg!(debug_assertions);
-
-        Self {
-            metadata: ComponentMetadata::new(
-                "process_executor".to_string(),
-                "Safe process execution with security controls and resource limits".to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
             error_handler: SafeErrorHandler::new(is_production),
         }
     }
 
     /// Check if an executable is allowed to be executed
-    fn is_executable_allowed(&self, executable: &str) -> LLMResult<bool> {
+    #[allow(clippy::cognitive_complexity)]
+    fn is_executable_allowed(&self, executable: &str) -> bool {
         // Check blocked executables first (takes precedence)
         for blocked in &self.config.blocked_executables {
-            if executable == blocked || executable.ends_with(&format!("/{}", blocked)) {
+            if executable == blocked || executable.ends_with(&format!("/{blocked}")) {
                 debug!("Executable '{}' is blocked", executable);
-                return Ok(false);
+                return false;
             }
         }
 
         // If arbitrary commands are allowed, allow it
-        if self.config.allow_arbitrary_commands {
-            return Ok(true);
+        if self.config.permissions.allow_arbitrary_commands {
+            return true;
         }
 
         // Check allowed executables
         for allowed in &self.config.allowed_executables {
-            if executable == allowed || executable.ends_with(&format!("/{}", allowed)) {
+            if executable == allowed || executable.ends_with(&format!("/{allowed}")) {
                 debug!("Executable '{}' is allowed", executable);
-                return Ok(true);
+                return true;
             }
         }
 
         debug!("Executable '{}' is not in allowed list", executable);
-        Ok(false)
+        false
     }
 
     /// Resolve executable path
+    #[allow(clippy::unused_async)]
     async fn resolve_executable(&self, executable: &str) -> LLMResult<PathBuf> {
         // If it's already a full path, validate it exists
         let exe_path = Path::new(executable);
         if exe_path.is_absolute() {
             if exe_path.exists() {
                 return Ok(exe_path.to_path_buf());
-            } else {
-                return Err(LLMSpellError::Validation {
-                    message: format!("Executable not found: {}", executable),
-                    field: Some("executable".to_string()),
-                });
             }
+            return Err(LLMSpellError::Validation {
+                message: format!("Executable not found: {executable}"),
+                field: Some("executable".to_string()),
+            });
         }
 
         // Try to find in PATH
-        if let Some(path) = find_executable(executable) {
-            Ok(path)
-        } else {
-            Err(LLMSpellError::Validation {
-                message: format!("Executable not found in PATH: {}", executable),
-                field: Some("executable".to_string()),
-            })
-        }
+        find_executable(executable).map_or_else(
+            || {
+                Err(LLMSpellError::Validation {
+                    message: format!("Executable not found in PATH: {executable}"),
+                    field: Some("executable".to_string()),
+                })
+            },
+            Ok,
+        )
     }
 
     /// Execute a process with the given arguments
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     async fn execute_process(
         &self,
         executable: &str,
@@ -258,9 +263,9 @@ impl ProcessExecutorTool {
         let exe_path = self.resolve_executable(executable).await?;
 
         // Check if executable is allowed
-        if !self.is_executable_allowed(exe_path.to_str().unwrap_or(executable))? {
+        if !self.is_executable_allowed(exe_path.to_str().unwrap_or(executable)) {
             return Err(LLMSpellError::Security {
-                message: format!("Execution of '{}' is not permitted", executable),
+                message: format!("Execution of '{executable}' is not permitted"),
                 violation_type: Some("executable_blocked".to_string()),
             });
         }
@@ -277,17 +282,24 @@ impl ProcessExecutorTool {
 
         // Set working directory
         if let Some(dir) = working_dir.or(self.config.default_working_directory.as_deref()) {
+            // Validate working directory using sandbox
+            if let Err(e) = self.sandbox.validate_path(dir) {
+                return Err(LLMSpellError::Security {
+                    message: format!("Working directory access denied: {e}"),
+                    violation_type: Some("path_validation".to_string()),
+                });
+            }
             cmd.current_dir(dir);
         }
 
         // Configure stdio
-        if self.config.capture_stdout {
+        if self.config.io_capture.stdout {
             cmd.stdout(Stdio::piped());
         } else {
             cmd.stdout(Stdio::null());
         }
 
-        if self.config.capture_stderr {
+        if self.config.io_capture.stderr {
             cmd.stderr(Stdio::piped());
         } else {
             cmd.stderr(Stdio::null());
@@ -296,7 +308,7 @@ impl ProcessExecutorTool {
         cmd.stdin(Stdio::null()); // Don't allow stdin input for security
 
         // Set environment variables
-        if !self.config.inherit_environment {
+        if !self.config.permissions.inherit_environment {
             cmd.env_clear();
         }
 
@@ -310,7 +322,7 @@ impl ProcessExecutorTool {
         }
 
         // Add default environment variables if inheriting
-        if self.config.inherit_environment {
+        if self.config.permissions.inherit_environment {
             for var in &self.config.allowed_env_vars {
                 if let Ok(value) = std::env::var(var) {
                     cmd.env(var, value);
@@ -357,13 +369,14 @@ impl ProcessExecutorTool {
                     stdout: stdout_str,
                     stderr: stderr_str,
                     success: output.status.success(),
-                    execution_time_ms: execution_time.as_millis() as u64,
+                    execution_time_ms: u64::try_from(execution_time.as_millis())
+                        .unwrap_or(u64::MAX),
                     timed_out: false,
                 }
             }
             Ok(Err(e)) => {
                 return Err(LLMSpellError::Tool {
-                    message: format!("Failed to execute process: {}", e),
+                    message: format!("Failed to execute process: {e}"),
                     tool_name: Some("process_executor".to_string()),
                     source: None,
                 });
@@ -394,6 +407,7 @@ impl ProcessExecutorTool {
     }
 
     /// Validate execution parameters
+    #[allow(clippy::unused_async)]
     async fn validate_execution_parameters(
         &self,
         params: &HashMap<String, serde_json::Value>,
@@ -434,15 +448,24 @@ impl ProcessExecutorTool {
         // Validate working directory if provided
         if let Some(work_dir) = params.get("working_directory").and_then(|v| v.as_str()) {
             let dir_path = Path::new(work_dir);
+
+            // Validate path using sandbox
+            if let Err(e) = self.sandbox.validate_path(dir_path) {
+                return Err(LLMSpellError::Security {
+                    message: format!("Working directory access denied: {e}"),
+                    violation_type: Some("path_validation".to_string()),
+                });
+            }
+
             if !dir_path.exists() {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Working directory does not exist: {}", work_dir),
+                    message: format!("Working directory does not exist: {work_dir}"),
                     field: Some("working_directory".to_string()),
                 });
             }
             if !dir_path.is_dir() {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Working directory is not a directory: {}", work_dir),
+                    message: format!("Working directory is not a directory: {work_dir}"),
                     field: Some("working_directory".to_string()),
                 });
             }
@@ -458,7 +481,7 @@ impl BaseAgent for ProcessExecutorTool {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -490,18 +513,13 @@ impl BaseAgent for ProcessExecutorTool {
             .unwrap_or_default();
 
         let working_dir_str = extract_optional_string(params, "working_directory");
-        let working_dir = if let Some(dir) = working_dir_str.as_ref() {
+        let working_dir = working_dir_str.as_ref().and_then(|dir| {
             // Sanitize path to prevent directory traversal
-            match sanitizer.sanitize_path(dir) {
-                Ok(safe_path) => Some(safe_path),
-                Err(_) => {
-                    warn!("Invalid working directory path detected: {}", dir);
-                    None
-                }
-            }
-        } else {
-            None
-        };
+            sanitizer.sanitize_path(dir).ok().or_else(|| {
+                warn!("Invalid working directory path detected: {}", dir);
+                None
+            })
+        });
         let working_dir_path = working_dir.as_deref().map(Path::new);
 
         let env_vars: Option<HashMap<String, String>> =
@@ -581,7 +599,7 @@ impl BaseAgent for ProcessExecutorTool {
 
         Ok(AgentOutput::text(
             serde_json::to_string_pretty(&safe_response)
-                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+                .unwrap_or_else(|_| format!("{safe_response:?}")),
         ))
     }
 }
@@ -634,11 +652,13 @@ impl Tool for ProcessExecutorTool {
 
 impl ProcessExecutorTool {
     /// Check if this tool supports hook integration
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         json!({
             "tool_name": self.metadata().name,
@@ -688,6 +708,10 @@ impl ProcessExecutorTool {
 
     /// Demonstrate hook-aware execution for process execution
     /// This method showcases how the process executor tool works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the process execution fails or hook execution fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
@@ -713,7 +737,6 @@ impl ProcessExecutorTool {
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait
-        use crate::lifecycle::HookableToolExecution;
         self.execute_with_hooks(input, context, tool_executor).await
     }
 }
@@ -721,47 +744,64 @@ impl ProcessExecutorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use tempfile::TempDir;
 
-    fn create_test_tool() -> ProcessExecutorTool {
+    fn create_test_process_executor() -> ProcessExecutorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_process_executor".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig::default();
-        ProcessExecutorTool::new(config)
+        ProcessExecutorTool::new(config, sandbox)
     }
 
     fn create_test_tool_with_custom_config() -> ProcessExecutorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_process_executor_custom".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig {
             max_execution_time_seconds: 5,
             max_output_size: 1024,
             ..Default::default()
         };
-        ProcessExecutorTool::new(config)
+        ProcessExecutorTool::new(config, sandbox)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
-
     #[tokio::test]
     async fn test_execute_simple_command() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
-        let input = create_test_input(
-            "Execute echo command",
-            json!({
-                "executable": "echo",
-                "arguments": ["Hello", "World"]
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "echo"),
+            ("arguments", r#"["Hello", "World"]"#),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -769,53 +809,46 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("executed successfully"));
     }
-
     #[tokio::test]
     async fn test_execute_blocked_command() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
-        let input = create_test_input(
-            "Execute blocked command",
-            json!({
-                "executable": "rm",
-                "arguments": ["-rf", "/"]
-            }),
-        );
+        let input =
+            create_test_tool_input(vec![("executable", "rm"), ("arguments", r#"["-rf", "/"]"#)]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not permitted"));
     }
-
     #[tokio::test]
     async fn test_execute_nonexistent_command() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
-        let input = create_test_input(
-            "Execute nonexistent command",
-            json!({
-                "executable": "nonexistent_command_12345",
-                "arguments": ["arg1"]
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "nonexistent_command_12345"),
+            ("arguments", r#"["arg1"]"#),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
-
     #[tokio::test]
     async fn test_execute_with_working_directory() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        use llmspell_testing::tool_helpers::create_test_sandbox_with_temp_dir;
 
-        let input = create_test_input(
-            "Execute pwd in temp directory",
-            json!({
-                "executable": "pwd",
-                "working_directory": temp_dir.path().to_string_lossy()
-            }),
-        );
+        let temp_dir = TempDir::new().unwrap();
+        let temp_path = temp_dir.path().to_str().unwrap();
+
+        // Create a sandbox that allows access to the temp directory
+        let sandbox = create_test_sandbox_with_temp_dir("process_executor_workdir", temp_path);
+        let config = ProcessExecutorConfig::default();
+        let tool = ProcessExecutorTool::new(config, sandbox);
+
+        let input = create_test_tool_input(vec![
+            ("executable", "pwd"),
+            ("working_directory", temp_path),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -823,23 +856,19 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("executed successfully"));
     }
-
     #[tokio::test]
     async fn test_execute_with_environment_vars() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
-        let env = json!({
+        let _env = json!({
             "TEST_VAR": "test_value"
         });
 
-        let input = create_test_input(
-            "Execute command with environment",
-            json!({
-                "executable": "echo",
-                "arguments": ["$TEST_VAR"],
-                "environment": env
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "echo"),
+            ("arguments", r#"["$TEST_VAR"]"#),
+            ("environment", "env"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -847,19 +876,15 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("executed successfully"));
     }
-
     #[tokio::test]
     async fn test_executable_validation() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test dangerous characters
-        let input1 = create_test_input(
-            "Execute with dangerous chars",
-            json!({
-                "executable": "echo; rm -rf /",
-                "arguments": ["test"]
-            }),
-        );
+        let input1 = create_test_tool_input(vec![
+            ("executable", "echo; rm -rf /"),
+            ("arguments", "[\"test\"]"),
+        ]);
 
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
@@ -869,13 +894,10 @@ mod tests {
             .contains("dangerous characters"));
 
         // Test path traversal
-        let input2 = create_test_input(
-            "Execute with path traversal",
-            json!({
-                "executable": "../../../bin/echo",
-                "arguments": ["test"]
-            }),
-        );
+        let input2 = create_test_tool_input(vec![
+            ("executable", "../../../bin/echo"),
+            ("arguments", "[\"test\"]"),
+        ]);
 
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
@@ -884,10 +906,9 @@ mod tests {
             .to_string()
             .contains("dangerous characters"));
     }
-
     #[tokio::test]
     async fn test_missing_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Missing executable
         let input1 = AgentInput {
@@ -905,54 +926,56 @@ mod tests {
             .contains("Missing parameters object"));
 
         // Empty executable
-        let input2 = create_test_input(
-            "Empty executable",
-            json!({
-                "executable": ""
-            }),
-        );
+        let input2 = create_test_tool_input(vec![("executable", "")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2.unwrap_err().to_string().contains("cannot be empty"));
     }
-
     #[tokio::test]
     async fn test_working_directory_validation() {
-        let tool = create_test_tool();
+        use llmspell_testing::tool_helpers::create_test_sandbox;
 
-        // Nonexistent directory
-        let input = create_test_input(
-            "Nonexistent working directory",
-            json!({
-                "executable": "echo",
-                "working_directory": "/nonexistent/directory/12345"
-            }),
+        // Create a sandbox that allows access to the nonexistent path for testing
+        let sandbox = create_test_sandbox(
+            "process_executor_validation",
+            vec![
+                "/tmp",
+                "/usr/bin",
+                "/bin",
+                "/nonexistent", // Allow the parent path so we can test the existence check
+            ],
         );
+        let config = ProcessExecutorConfig::default();
+        let tool = ProcessExecutorTool::new(config, sandbox);
+
+        // Nonexistent directory - now we should get "does not exist" since it passes sandbox check
+        let input = create_test_tool_input(vec![
+            ("executable", "echo"),
+            ("working_directory", "/nonexistent/directory/12345"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
-
     #[tokio::test]
     async fn test_executable_allowed_check() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test allowed executable
-        assert!(tool.is_executable_allowed("echo").unwrap());
-        assert!(tool.is_executable_allowed("/bin/echo").unwrap());
+        assert!(tool.is_executable_allowed("echo"));
+        assert!(tool.is_executable_allowed("/bin/echo"));
 
         // Test blocked executable
-        assert!(!tool.is_executable_allowed("rm").unwrap());
-        assert!(!tool.is_executable_allowed("/bin/rm").unwrap());
+        assert!(!tool.is_executable_allowed("rm"));
+        assert!(!tool.is_executable_allowed("/bin/rm"));
 
         // Test unknown executable (should be denied by default)
-        assert!(!tool.is_executable_allowed("unknown_command").unwrap());
+        assert!(!tool.is_executable_allowed("unknown_command"));
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "process_executor");
@@ -968,7 +991,6 @@ mod tests {
         assert!(required_params.contains(&"executable".to_string()));
         assert_eq!(required_params.len(), 1);
     }
-
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -977,10 +999,9 @@ mod tests {
         assert_eq!(tool.config.max_execution_time_seconds, 5);
         assert_eq!(tool.config.max_output_size, 1024);
     }
-
     #[tokio::test]
     async fn test_resolve_executable() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test resolving a common executable
         let result = tool.resolve_executable("echo").await;
@@ -990,37 +1011,74 @@ mod tests {
         let result = tool.resolve_executable("nonexistent_command_12345").await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_arbitrary_commands_disabled() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_arbitrary_disabled".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig {
-            allow_arbitrary_commands: false,
+            permissions: ExecutionPermissions {
+                allow_arbitrary_commands: false,
+                inherit_environment: false,
+            },
             ..Default::default()
         };
-        let tool = ProcessExecutorTool::new(config);
+        let tool = ProcessExecutorTool::new(config, sandbox);
 
         // Should not allow arbitrary commands
-        assert!(!tool.is_executable_allowed("arbitrary_command").unwrap());
+        assert!(!tool.is_executable_allowed("arbitrary_command"));
     }
-
     #[tokio::test]
     async fn test_arbitrary_commands_enabled() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/tmp")
+            .with_file_access("/usr/bin")
+            .with_file_access("/bin");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_arbitrary_enabled".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = ProcessExecutorConfig {
-            allow_arbitrary_commands: true,
+            permissions: ExecutionPermissions {
+                allow_arbitrary_commands: true,
+                inherit_environment: false,
+            },
             ..Default::default()
         };
-        let tool = ProcessExecutorTool::new(config);
+        let tool = ProcessExecutorTool::new(config, sandbox);
 
         // Should allow arbitrary commands (unless blocked)
-        assert!(tool.is_executable_allowed("arbitrary_command").unwrap());
+        assert!(tool.is_executable_allowed("arbitrary_command"));
 
         // But still respect blocked list
-        assert!(!tool.is_executable_allowed("rm").unwrap());
+        assert!(!tool.is_executable_allowed("rm"));
     }
-
     #[test]
     fn test_hook_integration_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test that the tool supports hooks
         assert!(tool.supports_hooks());
@@ -1040,11 +1098,10 @@ mod tests {
         // Verify security critical flag
         assert_eq!(metadata["resource_limits"]["security_critical"], true);
     }
-
     #[tokio::test]
     async fn test_process_executor_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         let config = ToolLifecycleConfig::default();
         let tool_executor = ToolExecutor::new(config, None, None);
@@ -1058,11 +1115,10 @@ mod tests {
         // May succeed or fail based on system, but should not panic
         assert!(result.is_ok() || result.is_err());
     }
-
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_process() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Verify the tool implements HookableToolExecution
         let config = ToolLifecycleConfig::default();

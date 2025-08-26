@@ -1,6 +1,8 @@
 //! ABOUTME: Distributed context synchronization for multi-node deployments
 //! ABOUTME: Provides context replication, consistency, and node discovery
 
+#![allow(clippy::significant_drop_tightening)]
+
 use async_trait::async_trait;
 use llmspell_core::execution_context::{ContextScope, ExecutionContext};
 use llmspell_core::{LLMSpellError, Result};
@@ -27,7 +29,7 @@ pub struct NodeInfo {
 }
 
 /// Node status
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeStatus {
     /// Node is healthy and accepting requests
     Healthy,
@@ -55,7 +57,7 @@ pub struct DistributedContext {
 }
 
 /// Context replication strategy
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReplicationStrategy {
     /// No replication
     None,
@@ -121,7 +123,7 @@ pub trait NodeDiscovery: Send + Sync {
 }
 
 /// Consistency level for distributed operations
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConsistencyLevel {
     /// Eventually consistent
     Eventual,
@@ -145,7 +147,7 @@ struct ConsistencyManager {
 }
 
 /// Conflict resolution strategy
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConflictResolution {
     /// Last write wins
     LastWriteWins,
@@ -235,6 +237,12 @@ impl DistributedContext {
     }
 
     /// Initialize distributed context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Node registration fails
+    /// - Initial node refresh fails
     pub async fn initialize(&self) -> Result<()> {
         // Register with discovery service
         self.discovery.register(self.local_node.clone()).await?;
@@ -243,12 +251,16 @@ impl DistributedContext {
         self.refresh_nodes().await?;
 
         // Start heartbeat task
-        self.start_heartbeat().await;
+        self.start_heartbeat();
 
         Ok(())
     }
 
     /// Refresh node list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if node discovery fails
     pub async fn refresh_nodes(&self) -> Result<()> {
         let discovered = self.discovery.discover().await?;
         let mut nodes = self.nodes.write().await;
@@ -264,6 +276,10 @@ impl DistributedContext {
     }
 
     /// Replicate context to other nodes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if replication to any node fails
     pub async fn replicate(&self, context: &ExecutionContext) -> Result<()> {
         let replication = self.replication.read().await;
 
@@ -310,6 +326,12 @@ impl DistributedContext {
     }
 
     /// Sync context from remote node
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Node communication fails
+    /// - Context synchronization fails
     pub async fn sync_from(&self, context_id: &str, node_id: &str) -> Result<ExecutionContext> {
         self.send_to_node(
             node_id,
@@ -328,6 +350,10 @@ impl DistributedContext {
     }
 
     /// Handle incoming sync message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message handling fails
     pub async fn handle_sync_message(&self, message: SyncMessage) -> Result<()> {
         match message {
             SyncMessage::SyncRequest {
@@ -418,24 +444,27 @@ impl DistributedContext {
     async fn send_to_node(&self, node_id: &str, _message: SyncMessage) -> Result<()> {
         let nodes = self.nodes.read().await;
 
-        if let Some(node) = nodes.get(node_id) {
-            // In real implementation, would send over network
-            tracing::info!(
-                target_node = %node_id,
-                address = %node.address,
-                "Sending sync message"
-            );
-            Ok(())
-        } else {
-            Err(LLMSpellError::Component {
-                message: format!("Node not found: {}", node_id),
-                source: None,
-            })
-        }
+        nodes.get(node_id).map_or_else(
+            || {
+                Err(LLMSpellError::Component {
+                    message: format!("Node not found: {node_id}"),
+                    source: None,
+                })
+            },
+            |node| {
+                // In real implementation, would send over network
+                tracing::info!(
+                    target_node = %node_id,
+                    address = %node.address,
+                    "Sending sync message"
+                );
+                Ok(())
+            },
+        )
     }
 
     /// Start heartbeat task
-    async fn start_heartbeat(&self) {
+    fn start_heartbeat(&self) {
         let discovery = self.discovery.clone();
         let node_id = self.local_node.id.clone();
 
@@ -489,7 +518,11 @@ pub struct ContextSync {
 
 impl ContextSync {
     /// Create new sync service
-    pub fn new(distributed: Arc<DistributedContext>, sync_rx: mpsc::Receiver<SyncMessage>) -> Self {
+    #[must_use]
+    pub const fn new(
+        distributed: Arc<DistributedContext>,
+        sync_rx: mpsc::Receiver<SyncMessage>,
+    ) -> Self {
         Self {
             distributed,
             sync_rx,
@@ -512,6 +545,7 @@ pub struct MockNodeDiscovery {
 }
 
 impl MockNodeDiscovery {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             nodes: Arc::new(RwLock::new(Vec::new())),
@@ -556,7 +590,6 @@ impl NodeDiscovery for MockNodeDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_distributed_context_creation() {
         let discovery = Arc::new(MockNodeDiscovery::new());
@@ -566,7 +599,6 @@ mod tests {
         assert_eq!(dist_ctx.local_node.id, "node1");
         assert_eq!(dist_ctx.local_node.status, NodeStatus::Healthy);
     }
-
     #[tokio::test]
     async fn test_node_discovery() {
         let discovery = Arc::new(MockNodeDiscovery::new());
@@ -590,11 +622,10 @@ mod tests {
 
         dist_ctx.initialize().await.unwrap();
 
-        let nodes = dist_ctx.nodes.read().await;
-        assert_eq!(nodes.len(), 1);
-        assert!(nodes.contains_key("node1"));
+        let registered_nodes = dist_ctx.nodes.read().await;
+        assert_eq!(registered_nodes.len(), 1);
+        assert!(registered_nodes.contains_key("node1"));
     }
-
     #[tokio::test]
     async fn test_replication_strategies() {
         let discovery = Arc::new(MockNodeDiscovery::new());
@@ -613,7 +644,6 @@ mod tests {
         let replication = dist_ctx.replication.read().await;
         assert_eq!(replication.pending.len(), 0);
     }
-
     #[tokio::test]
     async fn test_cluster_stats() {
         let discovery = Arc::new(MockNodeDiscovery::new());
@@ -621,8 +651,8 @@ mod tests {
         // Register some nodes
         for i in 1..4 {
             let node = NodeInfo {
-                id: format!("node{}", i),
-                address: format!("localhost:808{}", i),
+                id: format!("node{i}"),
+                address: format!("localhost:808{i}"),
                 capabilities: vec!["context_sync".to_string()],
                 status: if i == 3 {
                     NodeStatus::Overloaded

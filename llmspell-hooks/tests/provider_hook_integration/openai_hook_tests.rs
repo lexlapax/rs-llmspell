@@ -7,7 +7,6 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
 use tracing_subscriber;
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_hook_execution_and_persistence() -> Result<()> {
@@ -82,7 +81,6 @@ async fn test_openai_hook_execution_and_persistence() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_cost_tracking_hook() -> Result<()> {
@@ -128,7 +126,6 @@ async fn test_openai_cost_tracking_hook() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_rate_limiting_hook() -> Result<()> {

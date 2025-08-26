@@ -49,7 +49,7 @@ async fn main() -> anyhow::Result<()> {
     let duration = start.elapsed();
 
     println!("Result: {}", output.text);
-    println!("Execution time: {:?}", duration);
+    println!("Execution time: {duration:?}");
 
     if !output.tool_calls.is_empty() {
         println!("\nTools used:");
@@ -75,7 +75,7 @@ async fn main() -> anyhow::Result<()> {
     let duration = start.elapsed();
 
     println!("Result: {}", output.text);
-    println!("Execution time: {:?}", duration);
+    println!("Execution time: {duration:?}");
 
     if !output.tool_calls.is_empty() {
         println!("\nTool execution sequence:");
@@ -116,7 +116,7 @@ async fn main() -> anyhow::Result<()> {
     let duration = start.elapsed();
 
     println!("Result: {}", output.text);
-    println!("Execution time: {:?}", duration);
+    println!("Execution time: {duration:?}");
     println!("Note: Parallel execution should be faster than sequential");
 
     // Example 5: Tool selection based on context
@@ -159,7 +159,7 @@ async fn main() -> anyhow::Result<()> {
 mod tests {
     use super::*;
     use llmspell_agents::templates::AgentTemplate;
-    use llmspell_testing::fixtures::create_test_context;
+    use llmspell_testing::environment_helpers::create_test_context;
 
     #[tokio::test]
     async fn test_tool_orchestrator_basic() {

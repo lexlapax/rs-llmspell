@@ -189,7 +189,6 @@ pub fn parse_artifact_type(type_str: &str) -> Result<ArtifactType, String> {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_json_to_create_options_full() {
         let json = json!({
@@ -212,7 +211,6 @@ mod tests {
         assert_eq!(options.metadata.get("key2"), Some(&json!(42)));
         assert!(options.parent_session_id.is_some());
     }
-
     #[test]
     fn test_json_to_create_options_minimal() {
         let json = json!({});
@@ -224,7 +222,6 @@ mod tests {
         assert!(options.metadata.is_empty());
         assert!(options.parent_session_id.is_none());
     }
-
     #[test]
     fn test_json_to_create_options_invalid_parent_id() {
         let json = json!({
@@ -235,7 +232,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid parent session ID"));
     }
-
     #[test]
     fn test_json_to_create_options_non_object() {
         let json = json!("not an object");
@@ -243,7 +239,6 @@ mod tests {
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Expected object for session options");
     }
-
     #[test]
     fn test_json_to_create_options_invalid_tags() {
         let json = json!({
@@ -254,7 +249,6 @@ mod tests {
         // Only string values should be kept
         assert_eq!(options.tags, vec!["valid-tag"]);
     }
-
     #[test]
     fn test_json_to_session_query_full() {
         let json = json!({
@@ -279,7 +273,6 @@ mod tests {
         assert_eq!(query.offset, Some(5));
         assert_eq!(query.sort_by, SessionSortBy::CreatedAt);
     }
-
     #[test]
     fn test_json_to_session_query_invalid_status() {
         let json = json!({
@@ -290,7 +283,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Unknown session status"));
     }
-
     #[test]
     fn test_json_to_session_query_invalid_dates() {
         let json = json!({
@@ -301,7 +293,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Invalid created_after date"));
     }
-
     #[test]
     fn test_json_to_session_query_invalid_sort_by() {
         let json = json!({
@@ -312,7 +303,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("Unknown sort by option"));
     }
-
     #[test]
     fn test_session_metadata_to_json() {
         let metadata = SessionMetadata {
@@ -348,7 +338,6 @@ mod tests {
         assert!(json["parent_session_id"].is_string());
         assert_eq!(json["custom_metadata"]["key"], "value");
     }
-
     #[test]
     fn test_artifact_metadata_to_json() {
         let artifact_metadata = ArtifactMetadata {
@@ -383,7 +372,6 @@ mod tests {
         assert_eq!(json["created_by"], "user");
         assert_eq!(json["is_compressed"], false);
     }
-
     #[test]
     fn test_parse_session_status_all_variants() {
         assert_eq!(
@@ -407,13 +395,11 @@ mod tests {
             SessionStatus::Failed
         );
     }
-
     #[test]
     fn test_parse_session_status_invalid() {
         assert!(parse_session_status("invalid").is_err());
         assert!(parse_session_status("").is_err());
     }
-
     #[test]
     fn test_parse_sort_by_all_variants() {
         assert_eq!(
@@ -430,7 +416,6 @@ mod tests {
         );
         assert_eq!(parse_sort_by("name").unwrap(), SessionSortBy::Name);
     }
-
     #[test]
     fn test_parse_artifact_type_all_variants() {
         assert_eq!(
@@ -450,7 +435,6 @@ mod tests {
             ArtifactType::SystemGenerated
         );
     }
-
     #[test]
     fn test_parse_artifact_type_custom() {
         match parse_artifact_type("custom_type").unwrap() {
@@ -458,7 +442,6 @@ mod tests {
             _ => panic!("Expected custom type"),
         }
     }
-
     #[test]
     fn test_parse_artifact_type_empty() {
         assert!(parse_artifact_type("").is_err());
@@ -467,7 +450,6 @@ mod tests {
             "Artifact type cannot be empty"
         );
     }
-
     #[test]
     fn test_json_to_session_query_large_values() {
         let json = json!({
@@ -481,7 +463,6 @@ mod tests {
             assert!(result.is_err());
         }
     }
-
     #[test]
     fn test_edge_case_mixed_type_arrays() {
         // Test that non-string values in tag arrays are filtered out

@@ -131,7 +131,6 @@ impl HookReplayManager for TestReplayManager {
             .collect())
     }
 }
-
 #[tokio::test]
 async fn test_basic_hook_replay() -> Result<()> {
     // Create hook and replay manager
@@ -190,7 +189,6 @@ async fn test_basic_hook_replay() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_parameter_modification() -> Result<()> {
     let modification = ParameterModification {

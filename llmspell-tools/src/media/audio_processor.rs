@@ -18,7 +18,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_string, extract_parameters, extract_required_string, response::ResponseBuilder,
 };
@@ -29,7 +29,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 /// Audio format types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AudioFormat {
     Wav,
@@ -42,11 +42,12 @@ pub enum AudioFormat {
 
 impl AudioFormat {
     /// Detect format from file extension
+    #[must_use]
     pub fn from_extension(path: &Path) -> Self {
         match path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .as_deref()
         {
             Some("wav") => Self::Wav,
@@ -116,13 +117,13 @@ impl Default for AudioProcessorConfig {
 pub struct AudioProcessorTool {
     metadata: ComponentMetadata,
     config: AudioProcessorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl AudioProcessorTool {
     /// Create a new audio processor tool
-    pub fn new(config: AudioProcessorConfig) -> Self {
+    #[must_use]
+    pub fn new(config: AudioProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "audio_processor".to_string(),
@@ -130,27 +131,12 @@ impl AudioProcessorTool {
                     .to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new audio processor tool with sandbox context
-    pub fn with_sandbox(
-        config: AudioProcessorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "audio_processor".to_string(),
-                "Audio file processing for format detection, metadata extraction, and conversions"
-                    .to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
     /// Detect audio format from file
+    #[allow(clippy::unused_async)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<AudioFormat> {
         // First try extension-based detection
         let format = AudioFormat::from_extension(file_path);
@@ -167,10 +153,17 @@ impl AudioProcessorTool {
     }
 
     /// Extract metadata from audio file
-    async fn extract_metadata(&self, file_path: &Path) -> LLMResult<AudioMetadata> {
+    async fn extract_metadata(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<AudioMetadata> {
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
         // Get file size
-        let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to read file metadata: {}", e),
+        let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
+            message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("audio_processor".to_string()),
             source: None,
         })?;
@@ -208,7 +201,7 @@ impl AudioProcessorTool {
 
         // For WAV files, we can extract some basic information
         if format == AudioFormat::Wav && self.config.analyze_properties {
-            if let Ok(wav_info) = self.analyze_wav_file(file_path).await {
+            if let Ok(wav_info) = self.analyze_wav_file(file_path, sandbox).await {
                 metadata.sample_rate = Some(wav_info.sample_rate);
                 metadata.channels = Some(wav_info.channels);
                 metadata.duration_seconds = wav_info.duration_seconds;
@@ -234,12 +227,20 @@ impl AudioProcessorTool {
     }
 
     /// Analyze WAV file structure
-    async fn analyze_wav_file(&self, file_path: &Path) -> LLMResult<WavInfo> {
+    #[allow(clippy::unused_async)]
+    async fn analyze_wav_file(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<WavInfo> {
         use std::fs::File;
         use std::io::{Read, Seek, SeekFrom};
 
-        let mut file = File::open(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to open WAV file: {}", e),
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
+        let mut file = File::open(&safe_path).map_err(|e| LLMSpellError::Tool {
+            message: format!("Failed to open WAV file: {e}"),
             tool_name: Some("audio_processor".to_string()),
             source: None,
         })?;
@@ -248,7 +249,7 @@ impl AudioProcessorTool {
         let mut riff_header = [0u8; 12];
         file.read_exact(&mut riff_header)
             .map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to read RIFF header: {}", e),
+                message: format!("Failed to read RIFF header: {e}"),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
             })?;
@@ -281,12 +282,16 @@ impl AudioProcessorTool {
                 let mut fmt_data = vec![0u8; 16.min(chunk_size as usize)];
                 file.read_exact(&mut fmt_data)
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to read fmt chunk: {}", e),
+                        message: format!("Failed to read fmt chunk: {e}"),
                         tool_name: Some("audio_processor".to_string()),
                         source: None,
                     })?;
 
-                let channels = u16::from_le_bytes([fmt_data[2], fmt_data[3]]) as u8;
+                let channels_u16 = u16::from_le_bytes([fmt_data[2], fmt_data[3]]);
+                #[allow(clippy::cast_lossless)]
+                let u8_max_u16 = u8::MAX as u16;
+                #[allow(clippy::cast_possible_truncation)]
+                let channels = channels_u16.min(u8_max_u16) as u8;
                 let sample_rate =
                     u32::from_le_bytes([fmt_data[4], fmt_data[5], fmt_data[6], fmt_data[7]]);
                 let byte_rate =
@@ -319,13 +324,13 @@ impl AudioProcessorTool {
                     }
 
                     // Skip this chunk
-                    if file.seek(SeekFrom::Current(size as i64)).is_err() {
+                    if file.seek(SeekFrom::Current(i64::from(size))).is_err() {
                         break;
                     }
                 }
 
                 let duration_seconds = if byte_rate > 0 {
-                    Some(data_size as f64 / byte_rate as f64)
+                    Some(f64::from(data_size) / f64::from(byte_rate))
                 } else {
                     None
                 };
@@ -342,7 +347,7 @@ impl AudioProcessorTool {
             }
 
             // Skip to next chunk
-            if file.seek(SeekFrom::Current(chunk_size as i64)).is_err() {
+            if file.seek(SeekFrom::Current(i64::from(chunk_size))).is_err() {
                 break;
             }
         }
@@ -364,7 +369,7 @@ impl AudioProcessorTool {
         // Check if conversion is supported
         if !self.config.supported_formats.contains(&target_format) {
             return Err(LLMSpellError::Tool {
-                message: format!("Conversion to {:?} format is not supported", target_format),
+                message: format!("Conversion to {target_format:?} format is not supported"),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
             });
@@ -384,7 +389,7 @@ impl AudioProcessorTool {
         if source_format == AudioFormat::Wav && target_format == AudioFormat::Wav {
             // Simple file copy for same format
             std::fs::copy(source_path, target_path).map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to copy audio file: {}", e),
+                message: format!("Failed to copy audio file: {e}"),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
             })?;
@@ -397,8 +402,7 @@ impl AudioProcessorTool {
         } else {
             Err(LLMSpellError::Tool {
                 message: format!(
-                    "Conversion from {:?} to {:?} is not implemented in this basic version. Advanced audio processing will be added in Phase 3+",
-                    source_format, target_format
+                    "Conversion from {source_format:?} to {target_format:?} is not implemented in this basic version. Advanced audio processing will be added in Phase 3+"
                 ),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
@@ -407,6 +411,7 @@ impl AudioProcessorTool {
     }
 
     /// Validate processing parameters
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -415,8 +420,7 @@ impl AudioProcessorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: detect, metadata, convert",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: detect, metadata, convert"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -476,7 +480,7 @@ impl BaseAgent for AudioProcessorTool {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -496,7 +500,7 @@ impl BaseAgent for AudioProcessorTool {
                 let format = self.detect_format(path).await?;
 
                 let response = ResponseBuilder::success("detect")
-                    .with_message(format!("Detected audio format: {:?}", format))
+                    .with_message(format!("Detected audio format: {format:?}"))
                     .with_result(json!({
                         "file_path": file_path,
                         "format": format,
@@ -511,7 +515,7 @@ impl BaseAgent for AudioProcessorTool {
                 let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
-                let metadata = self.extract_metadata(path).await?;
+                let metadata = self.extract_metadata(path, &self.sandbox).await?;
 
                 let mut message = format!(
                     "Audio file: {} ({:?})",
@@ -520,11 +524,13 @@ impl BaseAgent for AudioProcessorTool {
                 );
 
                 if let Some(duration) = metadata.duration_seconds {
-                    message.push_str(&format!(", Duration: {:.1}s", duration));
+                    use std::fmt::Write;
+                    let _ = write!(message, ", Duration: {duration:.1}s");
                 }
 
                 if let Some(sample_rate) = metadata.sample_rate {
-                    message.push_str(&format!(", Sample rate: {}Hz", sample_rate));
+                    use std::fmt::Write;
+                    let _ = write!(message, ", Sample rate: {sample_rate}Hz");
                 }
 
                 let response = ResponseBuilder::success("metadata")
@@ -542,13 +548,14 @@ impl BaseAgent for AudioProcessorTool {
                 let source_path = extract_required_string(params, "source_path")?;
                 let target_path = extract_required_string(params, "target_path")?;
 
-                let target_format = extract_optional_string(params, "target_format")
-                    .map(|s| match s.to_lowercase().as_str() {
+                let target_format = extract_optional_string(params, "target_format").map_or_else(
+                    || AudioFormat::from_extension(Path::new(target_path)),
+                    |s| match s.to_lowercase().as_str() {
                         "wav" => AudioFormat::Wav,
                         "mp3" => AudioFormat::Mp3,
                         _ => AudioFormat::Unknown,
-                    })
-                    .unwrap_or_else(|| AudioFormat::from_extension(Path::new(target_path)));
+                    },
+                );
 
                 let input = Path::new(source_path);
                 let output = Path::new(target_path);
@@ -558,8 +565,7 @@ impl BaseAgent for AudioProcessorTool {
 
                 let response = ResponseBuilder::success("convert")
                     .with_message(format!(
-                        "Converted audio from {} to {} ({:?} format)",
-                        source_path, target_path, target_format
+                        "Converted audio from {source_path} to {target_path} ({target_format:?} format)"
                     ))
                     .with_result(json!({
                         "source_path": source_path,
@@ -587,10 +593,7 @@ impl BaseAgent for AudioProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Audio processor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Audio processor error: {error}")))
     }
 }
 
@@ -651,27 +654,34 @@ impl Tool for AudioProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
+
     use std::fs;
     use tempfile::TempDir;
 
-    fn create_test_tool() -> AudioProcessorTool {
-        let config = AudioProcessorConfig::default();
-        AudioProcessorTool::new(config)
+    fn create_test_audio_processor_with_temp_dir() -> (AudioProcessorTool, TempDir) {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_audio".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        let tool = AudioProcessorTool::new(AudioProcessorConfig::default(), sandbox);
+        (tool, temp_dir)
     }
 
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
+    fn create_test_audio_processor() -> AudioProcessorTool {
+        create_test_audio_processor_with_temp_dir().0
     }
 
     fn create_test_wav_file(path: &Path) -> std::io::Result<()> {
@@ -700,10 +710,9 @@ mod tests {
 
         Ok(())
     }
-
     #[tokio::test]
     async fn test_format_detection_by_extension() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
 
         // Test various extensions
@@ -724,38 +733,34 @@ mod tests {
             assert_eq!(format, expected_format);
         }
     }
-
     #[tokio::test]
     async fn test_wav_file_analysis() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_audio_processor_with_temp_dir();
         let wav_path = temp_dir.path().join("test.wav");
 
         create_test_wav_file(&wav_path).unwrap();
 
-        let metadata = tool.extract_metadata(&wav_path).await.unwrap();
+        let metadata = tool
+            .extract_metadata(&wav_path, &tool.sandbox)
+            .await
+            .unwrap();
 
         assert_eq!(metadata.format, AudioFormat::Wav);
         assert_eq!(metadata.sample_rate, Some(44100));
         assert_eq!(metadata.channels, Some(2));
         assert_eq!(metadata.bit_rate, Some(44100 * 2 * 16)); // 1411200 bps
     }
-
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_audio_processor_with_temp_dir();
         let file_path = temp_dir.path().join("audio.mp3");
 
         fs::write(&file_path, b"dummy mp3 content").unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -765,22 +770,18 @@ mod tests {
         assert!(result.text.contains("Audio file"));
         assert!(result.text.contains("Mp3"));
     }
-
     #[tokio::test]
     async fn test_format_detection_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.wav");
 
         create_test_wav_file(&file_path).unwrap();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -789,52 +790,59 @@ mod tests {
 
         assert!(result.text.contains("Detected audio format: Wav"));
     }
-
     #[tokio::test]
     async fn test_file_size_limit() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_size_limit".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = AudioProcessorConfig {
             max_file_size: 10, // Very small limit
             ..Default::default()
         };
-        let tool = AudioProcessorTool::new(config);
+        let tool = AudioProcessorTool::new(config, sandbox);
 
-        let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("large.wav");
 
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
     }
-
     #[tokio::test]
     async fn test_wav_to_wav_conversion() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let source_path = temp_dir.path().join("input.wav");
         let target_path = temp_dir.path().join("output.wav");
 
         create_test_wav_file(&source_path).unwrap();
 
-        let input = create_test_input(
-            "Convert audio",
-            json!({
-                "operation": "convert",
-                "source_path": source_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap(),
-                "target_format": "wav"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "convert"),
+            ("source_path", source_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
+            ("target_format", "wav"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -844,41 +852,31 @@ mod tests {
         assert!(result.text.contains("Converted audio"));
         assert!(target_path.exists());
     }
-
     #[tokio::test]
     async fn test_unsupported_conversion() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let source_path = temp_dir.path().join("input.wav");
         let target_path = temp_dir.path().join("output.flac");
 
         create_test_wav_file(&source_path).unwrap();
 
-        let input = create_test_input(
-            "Convert audio",
-            json!({
-                "operation": "convert",
-                "source_path": source_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap(),
-                "target_format": "flac"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "convert"),
+            ("source_path", source_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
+            ("target_format", "flac"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not supported"));
     }
-
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -887,18 +885,12 @@ mod tests {
             .to_string()
             .contains("Invalid operation"));
     }
-
     #[tokio::test]
     async fn test_missing_required_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "metadata")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -907,10 +899,9 @@ mod tests {
             .to_string()
             .contains("file_path is required"));
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "audio_processor");
@@ -929,22 +920,15 @@ mod tests {
         assert!(params.iter().any(|p| p.name == "target_path"));
         assert!(params.iter().any(|p| p.name == "target_format"));
     }
-
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_audio_processor_with_temp_dir();
         let file_path = temp_dir.path().join("test.wav");
 
         create_test_wav_file(&file_path).unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_input(
-            "Process audio",
-            json!({
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![("file_path", file_path.to_str().unwrap())]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -953,35 +937,24 @@ mod tests {
 
         assert!(result.text.contains("Audio file"));
     }
-
     #[tokio::test]
     async fn test_empty_file_path() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": ""
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "detect"), ("file_path", "")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
-
     #[tokio::test]
     async fn test_file_not_found() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": "/non/existent/file.wav"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", "/non/existent/file.wav"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

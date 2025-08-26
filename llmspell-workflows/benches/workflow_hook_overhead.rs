@@ -1,7 +1,13 @@
 // ABOUTME: Performance benchmarks for workflow hook overhead
 // ABOUTME: Validates <3% overhead requirement for hook execution
 
+// Benchmark for workflow hook overhead
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use llmspell_core::traits::base_agent::BaseAgent;
+use llmspell_core::types::AgentInput;
+use llmspell_core::ExecutionContext;
+use llmspell_testing::workflow_helpers::create_test_steps;
 use llmspell_workflows::{
     conditional::{ConditionalBranch, ConditionalWorkflow},
     conditions::Condition,
@@ -13,20 +19,6 @@ use llmspell_workflows::{
 };
 use serde_json::json;
 use std::sync::Arc;
-
-fn create_test_steps(count: usize) -> Vec<WorkflowStep> {
-    (0..count)
-        .map(|i| {
-            WorkflowStep::new(
-                format!("step_{}", i),
-                StepType::Custom {
-                    function_name: "test".to_string(),
-                    parameters: json!({"index": i}),
-                },
-            )
-        })
-        .collect()
-}
 
 fn benchmark_sequential_workflow(c: &mut Criterion) {
     let mut group = c.benchmark_group("sequential_workflow");
@@ -45,7 +37,10 @@ fn benchmark_sequential_workflow(c: &mut Criterion) {
                         .add_steps(create_test_steps(count))
                         .build();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -68,7 +63,10 @@ fn benchmark_sequential_workflow(c: &mut Criterion) {
                         .add_steps(create_test_steps(count))
                         .build();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -106,7 +104,10 @@ fn benchmark_conditional_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -139,7 +140,10 @@ fn benchmark_conditional_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -174,7 +178,10 @@ fn benchmark_loop_workflow(c: &mut Criterion) {
                         .build()
                         .unwrap();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -205,7 +212,10 @@ fn benchmark_loop_workflow(c: &mut Criterion) {
                         .build()
                         .unwrap();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -244,7 +254,10 @@ fn benchmark_parallel_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build().unwrap();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -279,7 +292,10 @@ fn benchmark_parallel_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build().unwrap();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -303,7 +319,10 @@ fn benchmark_hook_overhead(c: &mut Criterion) {
                 .add_steps(create_test_steps(10))
                 .build();
 
-            let result = workflow.execute().await.unwrap();
+            let result = workflow
+                .execute(AgentInput::text("bench"), ExecutionContext::default())
+                .await
+                .unwrap();
             black_box(result);
         });
     });
@@ -321,7 +340,10 @@ fn benchmark_hook_overhead(c: &mut Criterion) {
                 .add_steps(create_test_steps(10))
                 .build();
 
-            let result = workflow.execute().await.unwrap();
+            let result = workflow
+                .execute(AgentInput::text("bench"), ExecutionContext::default())
+                .await
+                .unwrap();
             black_box(result);
         });
     });
@@ -341,7 +363,10 @@ fn benchmark_hook_overhead(c: &mut Criterion) {
                 .add_branch(branch2)
                 .build();
 
-            let result = workflow.execute().await.unwrap();
+            let result = workflow
+                .execute(AgentInput::text("bench"), ExecutionContext::default())
+                .await
+                .unwrap();
             black_box(result);
         });
     });
@@ -366,7 +391,10 @@ fn benchmark_hook_overhead(c: &mut Criterion) {
                 .add_branch(branch2)
                 .build();
 
-            let result = workflow.execute().await.unwrap();
+            let result = workflow
+                .execute(AgentInput::text("bench"), ExecutionContext::default())
+                .await
+                .unwrap();
             black_box(result);
         });
     });

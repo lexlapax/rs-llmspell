@@ -125,7 +125,9 @@ impl RetryMetrics {
         if self.total_operations == 0 {
             0.0
         } else {
-            self.retry_attempts as f64 / self.total_operations as f64
+            #[allow(clippy::cast_precision_loss)]
+            let rate = self.retry_attempts as f64 / self.total_operations as f64;
+            rate
         }
     }
 
@@ -133,7 +135,9 @@ impl RetryMetrics {
         if self.retry_attempts == 0 {
             0.0
         } else {
-            self.successful_retries as f64 / self.retry_attempts as f64
+            #[allow(clippy::cast_precision_loss)]
+            let rate = self.successful_retries as f64 / self.retry_attempts as f64;
+            rate
         }
     }
 }
@@ -261,13 +265,23 @@ impl RetryHook {
                 multiplier,
                 max,
             } => {
-                let delay = base.as_millis() as f64 * multiplier.powf(state.attempts as f64);
-                Duration::from_millis(delay.min(max.as_millis() as f64) as u64)
+                #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
+                let base_f64 = base.as_millis() as f64;
+                #[allow(clippy::cast_lossless)]
+                let attempts_f64 = f64::from(state.attempts);
+                let delay = base_f64 * multiplier.powf(attempts_f64);
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let delay_ms = delay.min(max.as_millis() as f64) as u64;
+                Duration::from_millis(delay_ms)
             }
             BackoffStrategy::Fibonacci { base, max } => {
                 let fib = self.fibonacci(state.attempts);
-                let delay = base.as_millis() as u64 * fib;
-                Duration::from_millis(delay.min(max.as_millis() as u64))
+                #[allow(clippy::cast_possible_truncation)]
+                let base_ms = base.as_millis() as u64;
+                let delay = base_ms * fib;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_ms = max.as_millis() as u64;
+                Duration::from_millis(delay.min(max_ms))
             }
         };
 
@@ -276,17 +290,23 @@ impl RetryHook {
             JitterStrategy::None => base_delay,
             JitterStrategy::Full => {
                 let mut rng = rand::thread_rng();
-                Duration::from_millis(rng.gen_range(0..=base_delay.as_millis() as u64))
+                #[allow(clippy::cast_possible_truncation)]
+                let max_ms = base_delay.as_millis() as u64;
+                Duration::from_millis(rng.gen_range(0..=max_ms))
             }
             JitterStrategy::Equal => {
                 let mut rng = rand::thread_rng();
-                let half = base_delay.as_millis() as u64 / 2;
-                Duration::from_millis(rng.gen_range(half..=base_delay.as_millis() as u64))
+                #[allow(clippy::cast_possible_truncation)]
+                let base_ms = base_delay.as_millis() as u64;
+                let half = base_ms / 2;
+                Duration::from_millis(rng.gen_range(half..=base_ms))
             }
             JitterStrategy::Decorrelated { .. } => {
                 let mut rng = rand::thread_rng();
                 let previous = state.last_delay.unwrap_or(base_delay);
+                #[allow(clippy::cast_possible_truncation)]
                 let min = base_delay.as_millis() as u64;
+                #[allow(clippy::cast_possible_truncation)]
                 let max = (previous.as_millis() as u64 * 3).min(60000); // Cap at 60s
                 Duration::from_millis(rng.gen_range(min..=max))
             }
@@ -431,7 +451,9 @@ impl Hook for RetryHook {
         // Update metrics
         {
             let mut metrics = self.metrics.write().unwrap();
-            metrics.total_delay_ms += delay.as_millis() as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let delay_ms = delay.as_millis() as u64;
+            metrics.total_delay_ms += delay_ms;
         }
 
         // Add retry metadata
@@ -502,6 +524,124 @@ impl MetricHook for RetryHook {
     }
 }
 
+#[async_trait]
+impl ReplayableHook for RetryHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with retry config
+        let mut context_data = ctx.data.clone();
+
+        // Add retry configuration for replay
+        context_data.insert(
+            "_retry_config".to_string(),
+            serde_json::json!({
+                "max_attempts": self.config.max_attempts,
+                "backoff_strategy": match &self.config.backoff_strategy {
+                    BackoffStrategy::Fixed(d) => {
+                        #[allow(clippy::cast_possible_truncation)]
+                        let delay_ms = d.as_millis() as u64;
+                        serde_json::json!({
+                            "type": "fixed",
+                            "delay_ms": delay_ms
+                        })
+                    },
+                    BackoffStrategy::Linear { base, increment } => {
+                        #[allow(clippy::cast_possible_truncation)]
+                        let base_ms = base.as_millis() as u64;
+                        #[allow(clippy::cast_possible_truncation)]
+                        let increment_ms = increment.as_millis() as u64;
+                        serde_json::json!({
+                            "type": "linear",
+                            "base_ms": base_ms,
+                            "increment_ms": increment_ms
+                        })
+                    },
+                    BackoffStrategy::Exponential { base, multiplier, max } => {
+                        #[allow(clippy::cast_possible_truncation)]
+                        let base_ms = base.as_millis() as u64;
+                        #[allow(clippy::cast_possible_truncation)]
+                        let max_ms = max.as_millis() as u64;
+                        serde_json::json!({
+                            "type": "exponential",
+                            "base_ms": base_ms,
+                            "multiplier": multiplier,
+                            "max_ms": max_ms
+                        })
+                    },
+                    BackoffStrategy::Fibonacci { base, max } => {
+                        #[allow(clippy::cast_possible_truncation)]
+                        let base_ms = base.as_millis() as u64;
+                        #[allow(clippy::cast_possible_truncation)]
+                        let max_ms = max.as_millis() as u64;
+                        serde_json::json!({
+                            "type": "fibonacci",
+                            "base_ms": base_ms,
+                            "max_ms": max_ms
+                        })
+                    },
+                },
+                "jitter_strategy": match &self.config.jitter_strategy {
+                    JitterStrategy::None => "none",
+                    JitterStrategy::Full => "full",
+                    JitterStrategy::Equal => "equal",
+                    JitterStrategy::Decorrelated { .. } => "decorrelated",
+                },
+                "retry_on_timeout": self.config.retry_on_timeout,
+                "retry_on_rate_limit": self.config.retry_on_rate_limit,
+                "retryable_errors_count": self.config.retryable_errors.len(),
+                "non_retryable_errors_count": self.config.non_retryable_errors.len(),
+            }),
+        );
+
+        // Add retry state if present
+        let retry_states = self.attempt_tracker.read();
+        if let Some(state) = retry_states.get(&ctx.correlation_id.to_string()) {
+            #[allow(clippy::cast_possible_truncation)]
+            let last_delay_ms = state.last_delay.map(|d| d.as_millis() as u64);
+            #[allow(clippy::cast_possible_truncation)]
+            let total_delay_ms = state.total_delay.as_millis() as u64;
+            context_data.insert(
+                "_retry_state".to_string(),
+                serde_json::json!({
+                    "attempts": state.attempts,
+                    "last_delay_ms": last_delay_ms,
+                    "total_delay_ms": total_delay_ms,
+                }),
+            );
+        }
+
+        // Add metrics snapshot
+        let metrics = self.metrics.read().unwrap();
+        context_data.insert(
+            "_retry_metrics".to_string(),
+            serde_json::to_value(&*metrics)?,
+        );
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the retry-specific data from context
+        context.data.remove("_retry_config");
+        context.data.remove("_retry_state");
+        context.data.remove("_retry_metrics");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -513,7 +653,6 @@ mod tests {
         context.insert_metadata("error".to_string(), error.to_string());
         context
     }
-
     #[tokio::test]
     async fn test_retry_hook_basic() {
         let hook = RetryHook::new();
@@ -526,7 +665,6 @@ mod tests {
         assert_eq!(context.get_metadata("retry_attempt").unwrap(), "1");
         assert!(context.get_metadata("retry_delay_ms").is_some());
     }
-
     #[tokio::test]
     async fn test_retry_hook_non_retryable() {
         let hook = RetryHook::new();
@@ -535,7 +673,6 @@ mod tests {
         let result = hook.execute(&mut context).await.unwrap();
         assert!(matches!(result, HookResult::Continue));
     }
-
     #[tokio::test]
     async fn test_retry_hook_max_attempts() {
         let hook = RetryHook::new().with_max_attempts(2);
@@ -553,7 +690,6 @@ mod tests {
         let metrics = hook.metrics();
         assert_eq!(metrics.max_attempts_reached, 1);
     }
-
     #[tokio::test]
     async fn test_backoff_strategies() {
         // Test fixed backoff
@@ -586,7 +722,6 @@ mod tests {
             assert!(delay <= Duration::from_millis(450));
         }
     }
-
     #[tokio::test]
     async fn test_jitter_strategies() {
         // Test full jitter
@@ -607,7 +742,6 @@ mod tests {
         assert!(unique_delays.len() > 1);
         assert!(delays.iter().all(|&d| d <= 1000));
     }
-
     #[tokio::test]
     async fn test_retryable_patterns() {
         let hook = RetryHook::new()
@@ -629,7 +763,6 @@ mod tests {
         let result = hook.execute(&mut context).await.unwrap();
         assert!(matches!(result, HookResult::Continue));
     }
-
     #[tokio::test]
     async fn test_retry_metrics() {
         let hook = RetryHook::new().with_max_attempts(3);
@@ -650,7 +783,6 @@ mod tests {
         assert_eq!(metrics.retry_rate(), 1.0);
         assert_eq!(metrics.success_rate(), 1.0);
     }
-
     #[test]
     fn test_fibonacci_calculation() {
         let hook = RetryHook::new();
@@ -661,7 +793,6 @@ mod tests {
         assert_eq!(hook.fibonacci(4), 5);
         assert_eq!(hook.fibonacci(5), 8);
     }
-
     #[test]
     fn test_hook_metadata() {
         let hook = RetryHook::new();
@@ -674,7 +805,6 @@ mod tests {
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"retry".to_string()));
     }
-
     #[test]
     fn test_retry_config_defaults() {
         let config = RetryConfig::default();
@@ -683,97 +813,5 @@ mod tests {
         assert!(config.retry_on_rate_limit);
         assert!(config.retryable_errors.contains("timeout"));
         assert!(config.retryable_errors.contains("connection_error"));
-    }
-}
-
-#[async_trait]
-impl ReplayableHook for RetryHook {
-    fn is_replayable(&self) -> bool {
-        true
-    }
-
-    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
-        // Create a serializable version of the context with retry config
-        let mut context_data = ctx.data.clone();
-
-        // Add retry configuration for replay
-        context_data.insert(
-            "_retry_config".to_string(),
-            serde_json::json!({
-                "max_attempts": self.config.max_attempts,
-                "backoff_strategy": match &self.config.backoff_strategy {
-                    BackoffStrategy::Fixed(d) => serde_json::json!({
-                        "type": "fixed",
-                        "delay_ms": d.as_millis()
-                    }),
-                    BackoffStrategy::Linear { base, increment } => serde_json::json!({
-                        "type": "linear",
-                        "base_ms": base.as_millis(),
-                        "increment_ms": increment.as_millis()
-                    }),
-                    BackoffStrategy::Exponential { base, multiplier, max } => serde_json::json!({
-                        "type": "exponential",
-                        "base_ms": base.as_millis(),
-                        "multiplier": multiplier,
-                        "max_ms": max.as_millis()
-                    }),
-                    BackoffStrategy::Fibonacci { base, max } => serde_json::json!({
-                        "type": "fibonacci",
-                        "base_ms": base.as_millis(),
-                        "max_ms": max.as_millis()
-                    }),
-                },
-                "jitter_strategy": match &self.config.jitter_strategy {
-                    JitterStrategy::None => "none",
-                    JitterStrategy::Full => "full",
-                    JitterStrategy::Equal => "equal",
-                    JitterStrategy::Decorrelated { .. } => "decorrelated",
-                },
-                "retry_on_timeout": self.config.retry_on_timeout,
-                "retry_on_rate_limit": self.config.retry_on_rate_limit,
-                "retryable_errors_count": self.config.retryable_errors.len(),
-                "non_retryable_errors_count": self.config.non_retryable_errors.len(),
-            }),
-        );
-
-        // Add retry state if present
-        let retry_states = self.attempt_tracker.read();
-        if let Some(state) = retry_states.get(&ctx.correlation_id.to_string()) {
-            context_data.insert(
-                "_retry_state".to_string(),
-                serde_json::json!({
-                    "attempts": state.attempts,
-                    "last_delay_ms": state.last_delay.map(|d| d.as_millis()),
-                    "total_delay_ms": state.total_delay.as_millis(),
-                }),
-            );
-        }
-
-        // Add metrics snapshot
-        let metrics = self.metrics.read().unwrap();
-        context_data.insert(
-            "_retry_metrics".to_string(),
-            serde_json::to_value(&*metrics)?,
-        );
-
-        let mut replay_context = ctx.clone();
-        replay_context.data = context_data;
-
-        Ok(serde_json::to_vec(&replay_context)?)
-    }
-
-    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
-        let mut context: HookContext = serde_json::from_slice(data)?;
-
-        // Remove the retry-specific data from context
-        context.data.remove("_retry_config");
-        context.data.remove("_retry_state");
-        context.data.remove("_retry_metrics");
-
-        Ok(context)
-    }
-
-    fn replay_id(&self) -> String {
-        format!("{}:{}", self.metadata.name, self.metadata.version)
     }
 }

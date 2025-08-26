@@ -111,6 +111,7 @@ pub struct ServiceCheckerTool {
 
 impl ServiceCheckerTool {
     /// Create a new service checker tool
+    #[must_use]
     pub fn new(config: ServiceCheckerConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -124,6 +125,7 @@ impl ServiceCheckerTool {
     }
 
     /// Create a new service checker tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: ServiceCheckerConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -171,7 +173,7 @@ impl ServiceCheckerTool {
 
         // Check allowed domains
         for allowed in &self.config.allowed_domains {
-            if domain == allowed || domain.ends_with(&format!(".{}", allowed)) {
+            if domain == allowed || domain.ends_with(&format!(".{allowed}")) {
                 debug!("Domain '{}' is allowed", domain);
                 return true;
             }
@@ -182,6 +184,7 @@ impl ServiceCheckerTool {
     }
 
     /// Parse target into host and port
+    #[allow(clippy::unused_self)]
     fn parse_target(&self, target: &str) -> LLMResult<(String, u16)> {
         if let Some(pos) = target.rfind(':') {
             let host = target[..pos].to_string();
@@ -189,7 +192,7 @@ impl ServiceCheckerTool {
             let port = port_str
                 .parse::<u16>()
                 .map_err(|_| LLMSpellError::Validation {
-                    message: format!("Invalid port number: {}", port_str),
+                    message: format!("Invalid port number: {port_str}"),
                     field: Some("target".to_string()),
                 })?;
 
@@ -203,13 +206,15 @@ impl ServiceCheckerTool {
     }
 
     /// Check TCP port connectivity
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     async fn check_tcp_port(
         &self,
         host: &str,
         port: u16,
         timeout_duration: Duration,
     ) -> ServiceCheckResult {
-        let target = format!("{}:{}", host, port);
+        let target = format!("{host}:{port}");
         let start_time = Instant::now();
 
         debug!("Checking TCP port: {}", target);
@@ -221,7 +226,7 @@ impl ServiceCheckerTool {
                 available: false,
                 response_time_ms: 0,
                 status: "Port check not allowed".to_string(),
-                error: Some(format!("Port {} is not allowed", port)),
+                error: Some(format!("Port {port} is not allowed")),
                 metadata: HashMap::new(),
             };
         }
@@ -233,7 +238,7 @@ impl ServiceCheckerTool {
                 available: false,
                 response_time_ms: 0,
                 status: "Domain check not allowed".to_string(),
-                error: Some(format!("Domain '{}' is not allowed", host)),
+                error: Some(format!("Domain '{host}' is not allowed")),
                 metadata: HashMap::new(),
             };
         }
@@ -245,7 +250,8 @@ impl ServiceCheckerTool {
                 return ServiceCheckResult {
                     target: target.clone(),
                     available: false,
-                    response_time_ms: start_time.elapsed().as_millis() as u64,
+                    response_time_ms: u64::try_from(start_time.elapsed().as_millis())
+                        .unwrap_or(u64::MAX),
                     status: "DNS resolution failed".to_string(),
                     error: Some(e.to_string()),
                     metadata: HashMap::new(),
@@ -257,7 +263,8 @@ impl ServiceCheckerTool {
             return ServiceCheckResult {
                 target: target.clone(),
                 available: false,
-                response_time_ms: start_time.elapsed().as_millis() as u64,
+                response_time_ms: u64::try_from(start_time.elapsed().as_millis())
+                    .unwrap_or(u64::MAX),
                 status: "No addresses resolved".to_string(),
                 error: Some("DNS resolution returned no addresses".to_string()),
                 metadata: HashMap::new(),
@@ -268,7 +275,8 @@ impl ServiceCheckerTool {
         let socket_addr = socket_addrs[0];
         match timeout(timeout_duration, TcpStream::connect(socket_addr)).await {
             Ok(Ok(_stream)) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 info!("TCP port {} available in {}ms", target, response_time);
                 ServiceCheckResult {
                     target,
@@ -285,7 +293,8 @@ impl ServiceCheckerTool {
                 }
             }
             Ok(Err(e)) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 warn!("TCP port {} connection failed: {}", target, e);
                 ServiceCheckResult {
                     target,
@@ -301,7 +310,8 @@ impl ServiceCheckerTool {
                 }
             }
             Err(_) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 warn!("TCP port {} check timed out", target);
                 ServiceCheckResult {
                     target,
@@ -320,6 +330,8 @@ impl ServiceCheckerTool {
     }
 
     /// Check HTTP/HTTPS service health
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     async fn check_http_service(
         &self,
         url: &str,
@@ -373,7 +385,7 @@ impl ServiceCheckerTool {
                 available: false,
                 response_time_ms: 0,
                 status: "Domain check not allowed".to_string(),
-                error: Some(format!("Domain '{}' is not allowed", domain)),
+                error: Some(format!("Domain '{domain}' is not allowed")),
                 metadata: HashMap::new(),
             };
         }
@@ -383,7 +395,7 @@ impl ServiceCheckerTool {
             .timeout(timeout_duration)
             .build()
             .map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
                 tool_name: Some("service_checker".to_string()),
                 source: None,
             })
@@ -392,7 +404,8 @@ impl ServiceCheckerTool {
         // Make HEAD request to check service availability
         match client.head(url).send().await {
             Ok(response) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 let status_code = response.status().as_u16();
                 let is_available =
                     response.status().is_success() || response.status().is_redirection();
@@ -406,11 +419,11 @@ impl ServiceCheckerTool {
                     target: url.to_string(),
                     available: is_available,
                     response_time_ms: response_time,
-                    status: format!("HTTP {}", status_code),
+                    status: format!("HTTP {status_code}"),
                     error: if is_available {
                         None
                     } else {
-                        Some(format!("HTTP error {}", status_code))
+                        Some(format!("HTTP error {status_code}"))
                     },
                     metadata: {
                         let mut meta = HashMap::new();
@@ -426,7 +439,8 @@ impl ServiceCheckerTool {
                 }
             }
             Err(e) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 warn!("HTTP service {} check failed: {}", url, e);
 
                 let (status, error_msg) = if e.is_timeout() {
@@ -462,7 +476,8 @@ impl BaseAgent for ServiceCheckerTool {
         &self.metadata
     }
 
-    async fn execute(
+    #[allow(clippy::too_many_lines)]
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -480,8 +495,7 @@ impl BaseAgent for ServiceCheckerTool {
             _ => {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Invalid check_type: {}. Supported types: tcp, http, https, dns",
-                        check_type
+                        "Invalid check_type: {check_type}. Supported types: tcp, http, https, dns"
                     ),
                     field: Some("check_type".to_string()),
                 });
@@ -523,7 +537,7 @@ impl BaseAgent for ServiceCheckerTool {
                 let url = if target.starts_with("http://") || target.starts_with("https://") {
                     target.to_string()
                 } else {
-                    format!("http://{}", target)
+                    format!("http://{target}")
                 };
                 self.check_http_service(&url, timeout_duration).await
             }
@@ -533,7 +547,7 @@ impl BaseAgent for ServiceCheckerTool {
                 } else if target.starts_with("http://") {
                     target.replace("http://", "https://")
                 } else {
-                    format!("https://{}", target)
+                    format!("https://{target}")
                 };
                 self.check_http_service(&url, timeout_duration).await
             }
@@ -543,7 +557,8 @@ impl BaseAgent for ServiceCheckerTool {
                 match target.to_socket_addrs() {
                     Ok(addrs) => {
                         let addr_list: Vec<SocketAddr> = addrs.collect();
-                        let response_time = start_time.elapsed().as_millis() as u64;
+                        let response_time =
+                            u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                         ServiceCheckResult {
                             target: target.to_string(),
                             available: !addr_list.is_empty(),
@@ -567,7 +582,8 @@ impl BaseAgent for ServiceCheckerTool {
                         }
                     }
                     Err(e) => {
-                        let response_time = start_time.elapsed().as_millis() as u64;
+                        let response_time =
+                            u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                         ServiceCheckResult {
                             target: target.to_string(),
                             available: false,
@@ -624,10 +640,7 @@ impl BaseAgent for ServiceCheckerTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Service checker error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Service checker error: {error}")))
     }
 }
 
@@ -675,9 +688,9 @@ impl Tool for ServiceCheckerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
 
-    fn create_test_tool() -> ServiceCheckerTool {
+    fn create_test_service_checker() -> ServiceCheckerTool {
         let config = ServiceCheckerConfig::default();
         ServiceCheckerTool::new(config)
     }
@@ -691,33 +704,15 @@ mod tests {
         };
         ServiceCheckerTool::new(config)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
-
     #[tokio::test]
     async fn test_tcp_check_localhost() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check TCP port",
-            json!({
-                "target": "127.0.0.1:22",
-                "check_type": "tcp",
-                "timeout_seconds": 1
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "127.0.0.1:22"),
+            ("check_type", "tcp"),
+            ("timeout_seconds", "1"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -726,19 +721,15 @@ mod tests {
         // Note: SSH port might not be open, so we just check the tool doesn't crash
         assert!(result.text.contains("127.0.0.1:22"));
     }
-
     #[tokio::test]
     async fn test_http_check_invalid_url() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check HTTP service",
-            json!({
-                "target": "http://nonexistent-domain-12345.invalid",
-                "check_type": "http",
-                "timeout_seconds": 1
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "http://nonexistent-domain-12345.invalid"),
+            ("check_type", "http"),
+            ("timeout_seconds", "1"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -746,18 +737,11 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("not available"));
     }
-
     #[tokio::test]
     async fn test_dns_check_localhost() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check DNS resolution",
-            json!({
-                "target": "localhost:80",
-                "check_type": "dns"
-            }),
-        );
+        let input = create_test_tool_input(vec![("target", "localhost:80"), ("check_type", "dns")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -765,18 +749,14 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("localhost"));
     }
-
     #[tokio::test]
     async fn test_blocked_port() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
-        let input = create_test_input(
-            "Check blocked port",
-            json!({
-                "target": "127.0.0.1:7", // Echo port (blocked by default)
-                "check_type": "tcp"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "127.0.0.1:7"), // Echo port (blocked by default)
+            ("check_type", "tcp"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -785,18 +765,14 @@ mod tests {
         assert!(result.text.contains("not available"));
         assert!(result.text.contains("not allowed") || result.text.contains("blocked"));
     }
-
     #[tokio::test]
     async fn test_blocked_domain() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
-        let input = create_test_input(
-            "Check blocked domain",
-            json!({
-                "target": "evil.example.com:80",
-                "check_type": "tcp"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "evil.example.com:80"),
+            ("check_type", "tcp"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -804,18 +780,12 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("not available"));
     }
-
     #[tokio::test]
     async fn test_invalid_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         // Missing target
-        let input1 = create_test_input(
-            "Missing target",
-            json!({
-                "check_type": "tcp"
-            }),
-        );
+        let input1 = create_test_tool_input(vec![("check_type", "tcp")]);
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
         assert!(result1
@@ -824,12 +794,7 @@ mod tests {
             .contains("Missing required parameter 'target'"));
 
         // Missing check_type
-        let input2 = create_test_input(
-            "Missing check type",
-            json!({
-                "target": "localhost:80"
-            }),
-        );
+        let input2 = create_test_tool_input(vec![("target", "localhost:80")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2
@@ -838,13 +803,8 @@ mod tests {
             .contains("Missing required parameter 'check_type'"));
 
         // Invalid check_type
-        let input3 = create_test_input(
-            "Invalid check type",
-            json!({
-                "target": "localhost:80",
-                "check_type": "invalid"
-            }),
-        );
+        let input3 =
+            create_test_tool_input(vec![("target", "localhost:80"), ("check_type", "invalid")]);
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
         assert!(result3
@@ -853,34 +813,24 @@ mod tests {
             .contains("Invalid check_type"));
 
         // Empty target
-        let input4 = create_test_input(
-            "Empty target",
-            json!({
-                "target": "",
-                "check_type": "tcp"
-            }),
-        );
+        let input4 = create_test_tool_input(vec![("target", ""), ("check_type", "tcp")]);
         let result4 = tool.execute(input4, ExecutionContext::default()).await;
         assert!(result4.is_err());
         assert!(result4.unwrap_err().to_string().contains("cannot be empty"));
 
         // Excessive timeout
-        let input5 = create_test_input(
-            "Excessive timeout",
-            json!({
-                "target": "localhost:80",
-                "check_type": "tcp",
-                "timeout_seconds": 100
-            }),
-        );
+        let input5 = create_test_tool_input(vec![
+            ("target", "localhost:80"),
+            ("check_type", "tcp"),
+            ("timeout_seconds", "100"),
+        ]);
         let result5 = tool.execute(input5, ExecutionContext::default()).await;
         assert!(result5.is_err());
         assert!(result5.unwrap_err().to_string().contains("exceeds maximum"));
     }
-
     #[tokio::test]
     async fn test_target_parsing() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         // Valid target
         let result1 = tool.parse_target("localhost:80");
@@ -905,10 +855,9 @@ mod tests {
             .to_string()
             .contains("Invalid port number"));
     }
-
     #[tokio::test]
     async fn test_port_and_domain_validation() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         // Test port validation
         assert!(tool.is_port_allowed(80)); // Allowed
@@ -929,10 +878,9 @@ mod tests {
         let tool_permissive = ServiceCheckerTool::new(config);
         assert!(tool_permissive.is_domain_allowed("example.com"));
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "service_checker");
@@ -952,7 +900,6 @@ mod tests {
         assert!(required_params.contains(&"check_type".to_string()));
         assert_eq!(required_params.len(), 2);
     }
-
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -962,19 +909,15 @@ mod tests {
         assert_eq!(tool.config.max_timeout_seconds, 10);
         assert!(tool.config.allow_any_domain);
     }
-
     #[tokio::test]
     async fn test_https_url_transformation() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check HTTPS service",
-            json!({
-                "target": "http://httpbin.org/status/200",
-                "check_type": "https",
-                "timeout_seconds": 5
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "http://httpbin.org/status/200"),
+            ("check_type", "https"),
+            ("timeout_seconds", "5"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())

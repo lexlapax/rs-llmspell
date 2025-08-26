@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["OverflowResult","OverflowStrategy"],"struct":["BlockHandler","DropNewestHandler","DropOldestHandler","OverflowConfig","OverflowHandlerFactory","RejectHandler"],"trait":["OverflowHandler"]};

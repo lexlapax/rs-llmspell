@@ -254,7 +254,6 @@ pub struct PolicyEvaluationResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_policy_manager_creation() {
         let config = SessionPolicyConfig::default();
@@ -269,7 +268,7 @@ mod tests {
     }
 
     // TODO: Enable this test once we implement actual hook registration
-    #[ignore]
+    #[ignore = "Pending hook registration implementation"]
     #[tokio::test]
     async fn test_policy_registration() {
         let config = SessionPolicyConfig::default();
@@ -285,12 +284,13 @@ mod tests {
         assert!(!hook_registry.get_hooks(&HookPoint::SessionStart).is_empty());
         assert!(!hook_registry.get_hooks(&HookPoint::SessionEnd).is_empty());
     }
-
     #[tokio::test]
     async fn test_policy_composition_patterns() {
         // Test sequential composition
-        let mut config = SessionPolicyConfig::default();
-        config.composition_pattern = PolicyComposition::Sequential;
+        let config = SessionPolicyConfig {
+            composition_pattern: PolicyComposition::Sequential,
+            ..Default::default()
+        };
 
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
@@ -298,8 +298,10 @@ mod tests {
         manager.register_policies().unwrap();
 
         // Test parallel composition
-        let mut config = SessionPolicyConfig::default();
-        config.composition_pattern = PolicyComposition::Parallel;
+        let config = SessionPolicyConfig {
+            composition_pattern: PolicyComposition::Parallel,
+            ..Default::default()
+        };
 
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
@@ -307,8 +309,10 @@ mod tests {
         manager.register_policies().unwrap();
 
         // Test voting composition
-        let mut config = SessionPolicyConfig::default();
-        config.composition_pattern = PolicyComposition::Voting { threshold: 0.6 };
+        let config = SessionPolicyConfig {
+            composition_pattern: PolicyComposition::Voting { threshold: 0.6 },
+            ..Default::default()
+        };
 
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());

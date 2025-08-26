@@ -19,7 +19,6 @@ fn create_test_metadata(service: &str) -> ApiKeyMetadata {
         usage_count: 0,
     }
 }
-
 #[test]
 fn test_api_key_manager_basic_operations() {
     let manager = ApiKeyManager::new();
@@ -48,7 +47,6 @@ fn test_api_key_manager_basic_operations() {
     assert_eq!(create_entry.service, "test_service");
     assert_eq!(create_entry.action, ApiKeyAction::Create);
 }
-
 #[test]
 fn test_api_key_rotation() {
     let manager = ApiKeyManager::new();
@@ -78,7 +76,6 @@ fn test_api_key_rotation() {
         .expect("Rotation entry not found");
     assert_eq!(rotation_entry.service, "rotation_service");
 }
-
 #[test]
 fn test_environment_variable_loading() {
     let mut manager = ApiKeyManager::new();
@@ -105,7 +102,6 @@ fn test_environment_variable_loading() {
     std::env::remove_var("LLMSPELL_API_KEY_OPENAI");
     std::env::remove_var("LLMSPELL_API_KEY_ANTHROPIC");
 }
-
 #[test]
 fn test_configuration_file_loading() {
     let manager = ApiKeyManager::new();
@@ -130,7 +126,6 @@ fn test_configuration_file_loading() {
         Some("slack_webhook_456".to_string())
     );
 }
-
 #[test]
 fn test_persistent_storage_integration() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -179,7 +174,6 @@ fn test_persistent_storage_integration() {
         );
     }
 }
-
 #[test]
 fn test_key_expiration() {
     let manager = ApiKeyManager::new();
@@ -208,7 +202,6 @@ fn test_key_expiration() {
         .expect("Metadata not found");
     assert!(metadata.expires_at.is_some());
 }
-
 #[test]
 fn test_audit_log_limits() {
     let manager = ApiKeyManager::new();
@@ -233,7 +226,6 @@ fn test_audit_log_limits() {
     let full_log = manager.get_audit_log(None);
     assert!(full_log.len() >= 20);
 }
-
 #[test]
 fn test_key_usage_tracking() {
     let manager = ApiKeyManager::new();
@@ -257,7 +249,6 @@ fn test_key_usage_tracking() {
     assert_eq!(metadata.usage_count, 5);
     assert!(metadata.last_used.is_some());
 }
-
 #[test]
 fn test_invalid_operations() {
     let manager = ApiKeyManager::new();

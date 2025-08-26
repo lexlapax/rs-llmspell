@@ -34,6 +34,7 @@ impl Default for WebpageMonitorTool {
 }
 
 impl WebpageMonitorTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -101,13 +102,14 @@ impl BaseAgent for WebpageMonitorTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "WebpageMonitor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("WebpageMonitor error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let previous_content = extract_optional_string(params, "previous_content");
@@ -115,12 +117,12 @@ impl BaseAgent for WebpageMonitorTool {
         let ignore_whitespace = params
             .get("parameters")
             .and_then(|p| p.get("ignore_whitespace"))
-            .and_then(|w| w.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(true);
         let timeout = params
             .get("parameters")
             .and_then(|p| p.get("timeout"))
-            .and_then(|t| t.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(30);
 
         // Validate URL
@@ -153,7 +155,7 @@ impl BaseAgent for WebpageMonitorTool {
         };
 
         // Compare content
-        let changes = self.compare_content(prev_content, &current_content, ignore_whitespace);
+        let changes = Self::compare_content(prev_content, &current_content, ignore_whitespace);
         let has_changes = !changes.is_empty();
 
         let result = json!({
@@ -194,7 +196,7 @@ impl WebpageMonitorTool {
             .get(url)
             .send()
             .await
-            .map_err(|e| component_error(format!("Failed to fetch URL: {}", e)))?;
+            .map_err(|e| component_error(format!("Failed to fetch URL: {e}")))?;
 
         if !response.status().is_success() {
             return Err(component_error(format!(
@@ -207,7 +209,7 @@ impl WebpageMonitorTool {
         let body = response
             .text()
             .await
-            .map_err(|e| component_error(format!("Failed to read response body: {}", e)))?;
+            .map_err(|e| component_error(format!("Failed to read response body: {e}")))?;
 
         // If selector provided, extract specific content
         if let Some(sel) = selector {
@@ -221,7 +223,7 @@ impl WebpageMonitorTool {
 
                     if elements.is_empty() {
                         return Err(validation_error(
-                            format!("No elements found for selector: {}", sel),
+                            format!("No elements found for selector: {sel}"),
                             Some("selector".to_string()),
                         ));
                     }
@@ -229,7 +231,7 @@ impl WebpageMonitorTool {
                     Ok(elements.join("\n"))
                 }
                 Err(e) => Err(validation_error(
-                    format!("Invalid CSS selector: {}", e),
+                    format!("Invalid CSS selector: {e}"),
                     Some("selector".to_string()),
                 )),
             }
@@ -237,25 +239,26 @@ impl WebpageMonitorTool {
             // Return full text content
             let document = Html::parse_document(&body);
             let body_selector = Selector::parse("body").unwrap();
-            if let Some(body_element) = document.select(&body_selector).next() {
-                let text: String = body_element.text().collect::<Vec<_>>().join(" ");
-                Ok(text.split_whitespace().collect::<Vec<_>>().join(" "))
-            } else {
-                // Fallback to full document text
-                Ok(document
-                    .root_element()
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join(" ")
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" "))
-            }
+            document.select(&body_selector).next().map_or_else(
+                || {
+                    Ok(document
+                        .root_element()
+                        .text()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" "))
+                },
+                |body_element| {
+                    let text: String = body_element.text().collect::<Vec<_>>().join(" ");
+                    Ok(text.split_whitespace().collect::<Vec<_>>().join(" "))
+                },
+            )
         }
     }
 
     fn compare_content(
-        &self,
         old_content: &str,
         new_content: &str,
         ignore_whitespace: bool,

@@ -12,6 +12,13 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 /// Inject Artifact global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_artifact_global(
     lua: &Lua,
     _context: &GlobalContext,
@@ -28,7 +35,7 @@ pub fn inject_artifact_global(
 
             // Parse session ID
             let session_id = SessionId::from_str(&session_id_str)
-                .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+                .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
             // Parse artifact type
             let artifact_type =
@@ -96,7 +103,7 @@ pub fn inject_artifact_global(
 
         // Parse session ID
         let session_id = SessionId::from_str(&session_id_str)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         // Parse artifact ID from table
         let content_hash: String = artifact_id_table.get("content_hash")?;
@@ -104,7 +111,7 @@ pub fn inject_artifact_global(
         let sequence: u64 = artifact_id_table.get("sequence")?;
 
         let artifact_session_id = SessionId::from_str(&artifact_session_id_str)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid artifact session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid artifact session ID: {e}")))?;
 
         let artifact_id = ArtifactId::new(content_hash, artifact_session_id, sequence);
 
@@ -127,7 +134,7 @@ pub fn inject_artifact_global(
         // Content - always return as Lua string (which can hold binary data)
         let content = result
             .get_content()
-            .map_err(|e| LuaError::RuntimeError(format!("Failed to get content: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Failed to get content: {e}")))?;
 
         // Convert Vec<u8> to Lua string (which can hold binary data)
         let content_str = lua.create_string(&content)?;
@@ -146,7 +153,7 @@ pub fn inject_artifact_global(
                 .ok_or_else(|| LuaError::RuntimeError("No current session set".to_string()))?
         } else {
             SessionId::from_str(&session_id_str)
-                .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?
+                .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?
         };
 
         let bridge = list_bridge.clone();
@@ -175,7 +182,7 @@ pub fn inject_artifact_global(
 
         // Parse session ID
         let session_id = SessionId::from_str(&session_id_str)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         // Parse artifact ID from table
         let content_hash: String = artifact_id_table.get("content_hash")?;
@@ -183,7 +190,7 @@ pub fn inject_artifact_global(
         let sequence: u64 = artifact_id_table.get("sequence")?;
 
         let artifact_session_id = SessionId::from_str(&artifact_session_id_str)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid artifact session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid artifact session ID: {e}")))?;
 
         let artifact_id = ArtifactId::new(content_hash, artifact_session_id, sequence);
 
@@ -198,7 +205,7 @@ pub fn inject_artifact_global(
     })?;
     artifact_table.set("delete", delete_fn)?;
 
-    // storeFile method - store a file as an artifact
+    // store_file method - store a file as an artifact
     let store_file_bridge = artifact_bridge.clone();
     let store_file_fn =
         lua.create_function(move |lua, args: (String, String, String, Option<Table>)| {
@@ -206,7 +213,7 @@ pub fn inject_artifact_global(
 
             // Parse session ID
             let session_id = SessionId::from_str(&session_id_str)
-                .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+                .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
             // Parse artifact type
             let artifact_type =
@@ -249,10 +256,10 @@ pub fn inject_artifact_global(
             id_table.set("sequence", result.sequence)?;
             Ok(id_table)
         })?;
-    artifact_table.set("storeFile", store_file_fn)?;
+    artifact_table.set("store_file", store_file_fn)?;
 
     // query method - query artifacts with filters
-    let query_bridge = artifact_bridge.clone();
+    let query_bridge = artifact_bridge;
     let query_fn = lua.create_function(move |lua, query_table: Option<Table>| {
         // Convert Lua table to ArtifactQuery
         let query = if let Some(table) = query_table {
@@ -260,10 +267,10 @@ pub fn inject_artifact_global(
 
             // Parse session_id
             if let Ok(Some(session_id_str)) = table.get::<_, Option<String>>("session_id") {
-                artifact_query.session_id =
-                    Some(SessionId::from_str(&session_id_str).map_err(|e| {
-                        LuaError::RuntimeError(format!("Invalid session ID: {}", e))
-                    })?);
+                artifact_query.session_id = Some(
+                    SessionId::from_str(&session_id_str)
+                        .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?,
+                );
             }
 
             // Parse artifact_type

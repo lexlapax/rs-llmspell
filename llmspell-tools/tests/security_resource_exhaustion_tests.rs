@@ -3,17 +3,22 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::{CsvAnalyzerTool, JsonProcessorTool},
+    data::{
+        csv_analyzer::CsvAnalyzerConfig, json_processor::JsonProcessorConfig, CsvAnalyzerTool,
+        JsonProcessorTool,
+    },
     fs::ArchiveHandlerTool,
-    util::{CalculatorTool, HashCalculatorTool, TextManipulatorTool},
+    util::{
+        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+        CalculatorTool, HashCalculatorTool, TextManipulatorTool,
+    },
 };
 use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-
 #[tokio::test]
 async fn test_hash_calculator_large_input_limit() {
-    let hash_tool = HashCalculatorTool::new(Default::default());
+    let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
 
     // Try to hash extremely large data
     let large_data = "A".repeat(100_000_000); // 100MB
@@ -34,8 +39,7 @@ async fn test_hash_calculator_large_input_limit() {
     // Should either fail or complete quickly (not hang)
     assert!(
         elapsed < Duration::from_secs(5),
-        "Hash operation took too long: {:?}",
-        elapsed
+        "Hash operation took too long: {elapsed:?}"
     );
 
     // If it succeeded, memory should not be exhausted
@@ -44,10 +48,9 @@ async fn test_hash_calculator_large_input_limit() {
         let _test_alloc = vec![0u8; 1024];
     }
 }
-
 #[tokio::test]
 async fn test_json_processor_recursive_query_limit() {
-    let json_tool = JsonProcessorTool::new(Default::default());
+    let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
 
     // Create deeply nested JSON
     let mut nested = json!({"value": "bottom"});
@@ -71,14 +74,12 @@ async fn test_json_processor_recursive_query_limit() {
     // Should complete in reasonable time
     assert!(
         elapsed < Duration::from_secs(2),
-        "JSON query took too long: {:?}",
-        elapsed
+        "JSON query took too long: {elapsed:?}"
     );
 }
-
 #[tokio::test]
 async fn test_text_manipulator_regex_bomb_protection() {
-    let text_tool = TextManipulatorTool::new(Default::default());
+    let text_tool = TextManipulatorTool::new(TextManipulatorConfig::default());
 
     // Regex bomb patterns
     let dangerous_patterns = vec![
@@ -106,13 +107,10 @@ async fn test_text_manipulator_regex_bomb_protection() {
         // Should fail fast or complete quickly
         assert!(
             elapsed < Duration::from_millis(100),
-            "Regex operation took too long: {:?} for pattern: {}",
-            elapsed,
-            pattern
+            "Regex operation took too long: {elapsed:?} for pattern: {pattern}"
         );
     }
 }
-
 #[tokio::test]
 async fn test_calculator_computation_limit() {
     let calc_tool = CalculatorTool::new();
@@ -140,9 +138,7 @@ async fn test_calculator_computation_limit() {
         // Should fail or complete quickly
         assert!(
             elapsed < Duration::from_millis(500),
-            "Calculation took too long: {:?} for expression: {}",
-            elapsed,
-            expr
+            "Calculation took too long: {elapsed:?} for expression: {expr}"
         );
 
         // TODO: Calculator should validate computation complexity to prevent DoS
@@ -152,23 +148,20 @@ async fn test_calculator_computation_limit() {
             let response: serde_json::Value = serde_json::from_str(&output.text).unwrap();
             // For now, just log that expensive computation succeeded (known issue)
             if response["success"].as_bool() == Some(true) {
-                println!(
-                    "WARNING: Expensive computation succeeded (known issue): {}",
-                    expr
-                );
+                println!("WARNING: Expensive computation succeeded (known issue): {expr}");
             }
         }
     }
 }
-
 #[tokio::test]
 async fn test_csv_analyzer_large_file_limit() {
-    let csv_tool = CsvAnalyzerTool::new(Default::default());
+    let csv_tool = CsvAnalyzerTool::new(CsvAnalyzerConfig::default());
 
     // Generate large CSV data
     let mut csv_data = String::from("id,name,value\n");
     for i in 0..1_000_000 {
-        csv_data.push_str(&format!("{},name{},{}\n", i, i, i * 100));
+        use std::fmt::Write;
+        let _ = writeln!(&mut csv_data, "{},name{},{}", i, i, i * 100);
     }
 
     let input = AgentInput::text("analyze").with_parameter(
@@ -187,8 +180,7 @@ async fn test_csv_analyzer_large_file_limit() {
     // Should either fail with size limit or complete in reasonable time
     assert!(
         elapsed < Duration::from_secs(5),
-        "CSV analysis took too long: {:?}",
-        elapsed
+        "CSV analysis took too long: {elapsed:?}"
     );
 
     if let Ok(output) = result {
@@ -201,7 +193,6 @@ async fn test_csv_analyzer_large_file_limit() {
         );
     }
 }
-
 #[tokio::test]
 async fn test_archive_handler_zip_bomb_protection() {
     use llmspell_security::sandbox::{FileSandbox, SandboxContext};
@@ -240,12 +231,11 @@ async fn test_archive_handler_zip_bomb_protection() {
         "Archive extraction should have limits"
     );
 }
-
 #[tokio::test]
 async fn test_concurrent_resource_usage() {
     use tokio::task::JoinSet;
 
-    let hash_tool = Arc::new(HashCalculatorTool::new(Default::default()));
+    let hash_tool = Arc::new(HashCalculatorTool::new(HashCalculatorConfig::default()));
     let mut tasks = JoinSet::new();
 
     // Spawn many concurrent operations
@@ -257,7 +247,7 @@ async fn test_concurrent_resource_usage() {
                 json!({
                     "operation": "hash",
                     "algorithm": "sha256",
-                    "input": format!("test data {}", i).repeat(1000)
+                    "input": format!("test data {i}").repeat(1000)
                 }),
             );
 
@@ -281,15 +271,12 @@ async fn test_concurrent_resource_usage() {
     // Should complete all operations in reasonable time
     assert!(
         elapsed < Duration::from_secs(10),
-        "Concurrent operations took too long: {:?}",
-        elapsed
+        "Concurrent operations took too long: {elapsed:?}"
     );
 
     // Most operations should succeed
     assert!(
         success_count > 80,
-        "Too many failures in concurrent execution: {} successes, {} errors",
-        success_count,
-        error_count
+        "Too many failures in concurrent execution: {success_count} successes, {error_count} errors"
     );
 }

@@ -1,5 +1,5 @@
 //! ABOUTME: Streaming types for agent responses and chunk-based communication
-//! ABOUTME: Provides AgentStream, AgentChunk, and related types for streaming LLM interactions
+//! ABOUTME: Provides `AgentStream`, `AgentChunk`, and related types for streaming LLM interactions
 
 use crate::error::LLMSpellError;
 use chrono::{DateTime, Utc};
@@ -13,7 +13,7 @@ use std::pin::Pin;
 ///
 /// This stream is pinned and boxed to allow for dynamic dispatch across
 /// different stream implementations. Each item in the stream is a Result
-/// containing either an AgentChunk or an error.
+/// containing either an `AgentChunk` or an error.
 ///
 /// # Examples
 ///
@@ -140,12 +140,12 @@ pub enum ChunkContent {
 impl fmt::Display for ChunkContent {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ChunkContent::Text(text) => write!(f, "Text: {}", text),
+            ChunkContent::Text(text) => write!(f, "Text: {text}"),
             ChunkContent::ToolCallProgress { tool_name, .. } => {
-                write!(f, "ToolCallProgress: {}", tool_name)
+                write!(f, "ToolCallProgress: {tool_name}")
             }
             ChunkContent::ToolCallComplete { tool_name, .. } => {
-                write!(f, "ToolCallComplete: {}", tool_name)
+                write!(f, "ToolCallComplete: {tool_name}")
             }
             ChunkContent::Media {
                 mime_type, caption, ..
@@ -156,11 +156,11 @@ impl fmt::Display for ChunkContent {
                     mime_type,
                     caption
                         .as_ref()
-                        .map(|c| format!(": {}", c))
+                        .map(|c| format!(": {c}"))
                         .unwrap_or_default()
                 )
             }
-            ChunkContent::Control(msg) => write!(f, "Control: {}", msg),
+            ChunkContent::Control(msg) => write!(f, "Control: {msg}"),
         }
     }
 }
@@ -193,11 +193,11 @@ impl fmt::Display for ChunkMetadata {
         }
 
         if let Some(count) = self.token_count {
-            parts.push(format!("{} tokens", count));
+            parts.push(format!("{count} tokens"));
         }
 
         if let Some(model) = &self.model {
-            parts.push(format!("model={}", model));
+            parts.push(format!("model={model}"));
         }
 
         if let Some(step) = &self.reasoning_step {
@@ -281,7 +281,7 @@ impl fmt::Display for ControlMessage {
                     f,
                     "StreamStart{}",
                     expected_chunks
-                        .map(|n| format!(" (expecting {} chunks)", n))
+                        .map(|n| format!(" (expecting {n} chunks)"))
                         .unwrap_or_default()
                 )
             }
@@ -297,14 +297,14 @@ impl fmt::Display for ControlMessage {
                 )
             }
             ControlMessage::StreamCancelled { reason } => {
-                write!(f, "StreamCancelled: {}", reason)
+                write!(f, "StreamCancelled: {reason}")
             }
             ControlMessage::Heartbeat => write!(f, "Heartbeat"),
             ControlMessage::RateLimit { remaining, .. } => {
-                write!(f, "RateLimit ({} remaining)", remaining)
+                write!(f, "RateLimit ({remaining} remaining)")
             }
             ControlMessage::Custom { message_type, .. } => {
-                write!(f, "Custom[{}]", message_type)
+                write!(f, "Custom[{message_type}]")
             }
         }
     }
@@ -313,7 +313,6 @@ impl fmt::Display for ControlMessage {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_agent_chunk_serialization() {
         let chunk = AgentChunk {
@@ -332,7 +331,6 @@ mod tests {
         assert_eq!(chunk.content, deserialized.content);
         assert_eq!(chunk.metadata, deserialized.metadata);
     }
-
     #[test]
     fn test_chunk_content_variants_serialization() {
         let test_cases = vec![
@@ -361,7 +359,6 @@ mod tests {
             assert_eq!(content, deserialized);
         }
     }
-
     #[test]
     fn test_chunk_metadata_serialization() {
         let metadata = ChunkMetadata {
@@ -380,7 +377,6 @@ mod tests {
 
         assert_eq!(metadata, deserialized);
     }
-
     #[test]
     fn test_control_message_variants_serialization() {
         let test_cases = vec![
@@ -413,7 +409,6 @@ mod tests {
             assert_eq!(message, deserialized);
         }
     }
-
     #[test]
     fn test_display_implementations() {
         let chunk = AgentChunk {
@@ -446,7 +441,6 @@ mod tests {
 
         assert_eq!(format!("{}", control), "StreamEnd (20 chunks in 2000ms)");
     }
-
     #[test]
     fn test_default_chunk_metadata() {
         let metadata = ChunkMetadata::default();

@@ -135,7 +135,7 @@ now I'm going to ask you a series of questions about the architecture documented
 
 ### Section 2: Changes to architecture document and implementation plan
 **Instructions** Read Section 1 questions, answers and todos and propose a detailed change to the the documents in the task sections outlined below: for each question below, first answer the first task `Changes to document`, then pause and ask if you should do the second part `Applied changes to document`, one at a time.
-- [ ] **Task/question 2.1** changes to overall architecture in `/docs/technical/rs-llmspell-final-architecture.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE*-DONE.md` and `/TODO.md` which captures current Phase 2 done tasks.. Ensure the entire document makes holistic architecture sense, do not just add new sections, the updates may need to be interspersed across sections.
+- [ ] **Task/question 2.1** changes to overall architecture in `/docs/technical/master-architecture-vision.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE*-DONE.md` and `/TODO.md` which captures current Phase 2 done tasks.. Ensure the entire document makes holistic architecture sense, do not just add new sections, the updates may need to be interspersed across sections.
     - [x] **Task 2.1.1** Changes to document
       
       **1. Tool Catalog Updates (Section: Complete Built-in Tools Catalog)**

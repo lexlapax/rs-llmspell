@@ -13,7 +13,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
-use llmspell_security::sandbox::{FileSandbox, SandboxContext};
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_bool, extract_optional_string, extract_parameters, extract_required_string,
     file_utils, response::ResponseBuilder,
@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// File operation types
@@ -53,16 +54,16 @@ pub enum FileOperation {
 impl std::fmt::Display for FileOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FileOperation::Read => write!(f, "read"),
-            FileOperation::Write => write!(f, "write"),
-            FileOperation::Append => write!(f, "append"),
-            FileOperation::Delete => write!(f, "delete"),
-            FileOperation::CreateDir => write!(f, "create_dir"),
-            FileOperation::ListDir => write!(f, "list_dir"),
-            FileOperation::Copy => write!(f, "copy"),
-            FileOperation::Move => write!(f, "move"),
-            FileOperation::Metadata => write!(f, "metadata"),
-            FileOperation::Exists => write!(f, "exists"),
+            Self::Read => write!(f, "read"),
+            Self::Write => write!(f, "write"),
+            Self::Append => write!(f, "append"),
+            Self::Delete => write!(f, "delete"),
+            Self::CreateDir => write!(f, "create_dir"),
+            Self::ListDir => write!(f, "list_dir"),
+            Self::Copy => write!(f, "copy"),
+            Self::Move => write!(f, "move"),
+            Self::Metadata => write!(f, "metadata"),
+            Self::Exists => write!(f, "exists"),
         }
     }
 }
@@ -72,18 +73,18 @@ impl std::str::FromStr for FileOperation {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "read" => Ok(FileOperation::Read),
-            "write" => Ok(FileOperation::Write),
-            "append" => Ok(FileOperation::Append),
-            "delete" => Ok(FileOperation::Delete),
-            "create_dir" | "mkdir" => Ok(FileOperation::CreateDir),
-            "list_dir" | "ls" | "dir" => Ok(FileOperation::ListDir),
-            "copy" | "cp" => Ok(FileOperation::Copy),
-            "move" | "mv" | "rename" => Ok(FileOperation::Move),
-            "metadata" | "stat" | "info" => Ok(FileOperation::Metadata),
-            "exists" => Ok(FileOperation::Exists),
+            "read" => Ok(Self::Read),
+            "write" => Ok(Self::Write),
+            "append" => Ok(Self::Append),
+            "delete" => Ok(Self::Delete),
+            "create_dir" | "mkdir" => Ok(Self::CreateDir),
+            "list_dir" | "ls" | "dir" => Ok(Self::ListDir),
+            "copy" | "cp" => Ok(Self::Copy),
+            "move" | "mv" | "rename" => Ok(Self::Move),
+            "metadata" | "stat" | "info" => Ok(Self::Metadata),
+            "exists" => Ok(Self::Exists),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown file operation: {}", s),
+                message: format!("Unknown file operation: {s}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -93,6 +94,8 @@ impl std::str::FromStr for FileOperation {
 /// File operations configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileOperationsConfig {
+    /// Allowed file paths for security (used in `SecurityRequirements`)
+    pub allowed_paths: Vec<String>,
     /// Enable atomic writes
     pub atomic_writes: bool,
     /// Maximum file size for operations (in bytes)
@@ -108,6 +111,7 @@ pub struct FileOperationsConfig {
 impl Default for FileOperationsConfig {
     fn default() -> Self {
         Self {
+            allowed_paths: vec!["/tmp".to_string()], // Default to /tmp only
             atomic_writes: true,
             max_file_size: 100 * 1024 * 1024, // 100MB
             max_dir_entries: 10000,
@@ -121,34 +125,24 @@ impl Default for FileOperationsConfig {
 pub struct FileOperationsTool {
     metadata: ComponentMetadata,
     config: FileOperationsConfig,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl FileOperationsTool {
-    pub fn new(config: FileOperationsConfig) -> Self {
+    #[must_use]
+    pub fn new(config: FileOperationsConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "file-operations-tool".to_string(),
                 "Safe file system operations with sandboxing".to_string(),
             ),
             config,
+            sandbox,
         }
     }
 
-    /// Create a file sandbox from context
-    fn create_sandbox(&self, context: &ExecutionContext) -> Result<FileSandbox> {
-        let sandbox_context = SandboxContext::new(
-            format!(
-                "file_ops_{}",
-                context.session_id.as_deref().unwrap_or("default")
-            ),
-            self.security_requirements(),
-            self.resource_limits(),
-        );
-
-        FileSandbox::new(sandbox_context)
-    }
-
     /// Perform read operation
+    #[allow(clippy::unused_async)]
     async fn read_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<String> {
         info!("Reading file: {:?}", path);
 
@@ -167,7 +161,7 @@ impl FileOperationsTool {
                 source: None,
             })?;
 
-        if metadata.size as usize > self.config.max_file_size {
+        if usize::try_from(metadata.size).unwrap_or(usize::MAX) > self.config.max_file_size {
             return Err(LLMSpellError::Validation {
                 message: format!(
                     "File size {} exceeds maximum allowed size {}",
@@ -201,6 +195,7 @@ impl FileOperationsTool {
     }
 
     /// Perform write operation with optional atomic write
+    #[allow(clippy::unused_async)]
     async fn write_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
         info!("Writing file: {:?}", path);
 
@@ -238,6 +233,7 @@ impl FileOperationsTool {
     }
 
     /// Perform append operation
+    #[allow(clippy::unused_async)]
     async fn append_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
         info!("Appending to file: {:?}", path);
 
@@ -247,7 +243,7 @@ impl FileOperationsTool {
         // Read existing content first to check total size
         let existing_size = if file_utils::file_exists(&safe_path) {
             file_utils::get_metadata(&safe_path)
-                .map(|m| m.size as usize)
+                .map(|m| usize::try_from(m.size).unwrap_or(usize::MAX))
                 .unwrap_or(0)
         } else {
             0
@@ -279,6 +275,7 @@ impl FileOperationsTool {
     }
 
     /// Delete file
+    #[allow(clippy::unused_async)]
     async fn delete_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!("Deleting file: {:?}", path);
 
@@ -317,6 +314,7 @@ impl FileOperationsTool {
     }
 
     /// Create directory
+    #[allow(clippy::unused_async)]
     async fn create_dir(&self, path: &Path, recursive: bool, sandbox: &FileSandbox) -> Result<()> {
         info!("Creating directory: {:?} (recursive: {})", path, recursive);
 
@@ -362,6 +360,7 @@ impl FileOperationsTool {
     }
 
     /// List directory contents
+    #[allow(clippy::unused_async)]
     async fn list_dir(&self, path: &Path, sandbox: &FileSandbox) -> Result<Vec<Value>> {
         info!("Listing directory: {:?}", path);
 
@@ -412,6 +411,7 @@ impl FileOperationsTool {
     }
 
     /// Copy file
+    #[allow(clippy::unused_async)]
     async fn copy_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!("Copying file from {:?} to {:?}", from, to);
 
@@ -431,7 +431,7 @@ impl FileOperationsTool {
                 source: None,
             })?;
 
-        if metadata.size as usize > self.config.max_file_size {
+        if usize::try_from(metadata.size).unwrap_or(usize::MAX) > self.config.max_file_size {
             return Err(LLMSpellError::Validation {
                 message: format!(
                     "File size {} exceeds maximum allowed size {}",
@@ -455,6 +455,7 @@ impl FileOperationsTool {
     }
 
     /// Move/rename file
+    #[allow(clippy::unused_async)]
     async fn move_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!("Moving file from {:?} to {:?}", from, to);
 
@@ -474,7 +475,7 @@ impl FileOperationsTool {
     }
 
     /// Get file metadata
-    async fn get_metadata(&self, path: &Path, sandbox: &FileSandbox) -> Result<Value> {
+    fn get_metadata(path: &Path, sandbox: &FileSandbox) -> Result<Value> {
         info!("Getting metadata for: {:?}", path);
 
         // Validate path
@@ -519,7 +520,7 @@ impl FileOperationsTool {
     }
 
     /// Check if file exists
-    async fn file_exists(&self, path: &Path, sandbox: &FileSandbox) -> Result<bool> {
+    fn file_exists(path: &Path, sandbox: &FileSandbox) -> Result<bool> {
         debug!("Checking if file exists: {:?}", path);
 
         // Validate path
@@ -529,6 +530,7 @@ impl FileOperationsTool {
     }
 
     /// Parse parameters from input
+    #[allow(clippy::unused_self)]
     fn parse_parameters(&self, params: &Value) -> Result<FileParameters> {
         let operation_str = extract_required_string(params, "operation")?;
         let operation: FileOperation = operation_str.parse()?;
@@ -582,25 +584,24 @@ struct FileParameters {
     recursive: bool,
 }
 
-impl Default for FileOperationsTool {
-    fn default() -> Self {
-        Self::new(FileOperationsConfig::default())
-    }
-}
-
 #[async_trait]
 impl BaseAgent for FileOperationsTool {
     fn metadata(&self) -> &ComponentMetadata {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    #[allow(clippy::too_many_lines)]
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
         let parameters = self.parse_parameters(params)?;
 
-        // Create sandbox
-        let sandbox = self.create_sandbox(&context)?;
+        // Use provided sandbox from bridge
+        let sandbox = &self.sandbox;
 
         info!("Executing file operation: {}", parameters.operation);
 
@@ -610,58 +611,75 @@ impl BaseAgent for FileOperationsTool {
                     message: "Read operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = self.read_file(&path, &sandbox).await?;
+                let file_content = self.read_file(&path, sandbox).await?;
                 let response = ResponseBuilder::success("read")
                     .with_message(format!(
                         "Read {} bytes from {}",
-                        content.len(),
+                        file_content.len(),
                         path.display()
                     ))
                     .with_result(json!({
-                        "input": &content,
-                        "size": content.len()
+                        "input": &file_content,
+                        "size": file_content.len()
                     }))
-                    .with_file_info(path.to_string_lossy(), Some(content.len() as u64))
+                    .with_file_info(path.to_string_lossy(), Some(file_content.len() as u64))
                     .build();
-                (content, response)
+                (file_content, response)
             }
             FileOperation::Write => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
                     message: "Write operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
+                let write_content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
                     message: "Write operation requires 'input' parameter".to_string(),
                     field: Some("input".to_string()),
                 })?;
-                self.write_file(&path, &content, &sandbox).await?;
-                ResponseBuilder::success("write")
-                    .with_message(format!(
-                        "Wrote {} bytes to {}",
-                        content.len(),
-                        path.display()
-                    ))
-                    .with_file_info(path.to_string_lossy(), Some(content.len() as u64))
-                    .build_for_output()
+
+                // Handle write operation with graceful error handling
+                match self.write_file(&path, &write_content, sandbox).await {
+                    Ok(()) => ResponseBuilder::success("write")
+                        .with_message(format!(
+                            "Wrote {} bytes to {}",
+                            write_content.len(),
+                            path.display()
+                        ))
+                        .with_file_info(path.to_string_lossy(), Some(write_content.len() as u64))
+                        .build_for_output(),
+                    Err(e) => {
+                        // Return graceful error response instead of propagating error
+                        ResponseBuilder::error("write", e.to_string())
+                            .with_message(format!("Write operation failed: {e}"))
+                            .with_result(json!({
+                                "path": path.display().to_string(),
+                                "error_type": match &e {
+                                    LLMSpellError::Security { .. } => "security_violation",
+                                    LLMSpellError::Validation { .. } => "validation_error",
+                                    _ => "execution_error"
+                                }
+                            }))
+                            .build_for_output()
+                    }
+                }
             }
             FileOperation::Append => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
                     message: "Append operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
+                let append_content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
                     message: "Append operation requires 'input' parameter".to_string(),
                     field: Some("input".to_string()),
                 })?;
-                self.append_file(&path, &content, &sandbox).await?;
+                self.append_file(&path, &append_content, sandbox).await?;
                 ResponseBuilder::success("append")
                     .with_message(format!(
                         "Appended {} bytes to {}",
-                        content.len(),
+                        append_content.len(),
                         path.display()
                     ))
                     .with_result(json!({
-                        "appended_size": content.len()
+                        "appended_size": append_content.len()
                     }))
                     .with_file_info(path.to_string_lossy(), None)
                     .build_for_output()
@@ -671,7 +689,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Delete operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                self.delete_file(&path, &sandbox).await?;
+                self.delete_file(&path, sandbox).await?;
                 ResponseBuilder::success("delete")
                     .with_message(format!("Deleted file: {}", path.display()))
                     .with_file_info(path.to_string_lossy(), None)
@@ -682,7 +700,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "CreateDir operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                self.create_dir(&path, parameters.recursive, &sandbox)
+                self.create_dir(&path, parameters.recursive, sandbox)
                     .await?;
                 ResponseBuilder::success("create_dir")
                     .with_message(format!("Created directory: {}", path.display()))
@@ -697,7 +715,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "ListDir operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let entries = self.list_dir(&path, &sandbox).await?;
+                let entries = self.list_dir(&path, sandbox).await?;
                 ResponseBuilder::success("list_dir")
                     .with_message(format!(
                         "Found {} entries in {}",
@@ -724,7 +742,7 @@ impl BaseAgent for FileOperationsTool {
                         message: "Copy operation requires 'target_path' parameter".to_string(),
                         field: Some("target_path".to_string()),
                     })?;
-                self.copy_file(&from, &to, &sandbox).await?;
+                self.copy_file(&from, &to, sandbox).await?;
                 ResponseBuilder::success("copy")
                     .with_message(format!("Copied {} to {}", from.display(), to.display()))
                     .with_result(json!({
@@ -746,7 +764,7 @@ impl BaseAgent for FileOperationsTool {
                         message: "Move operation requires 'target_path' parameter".to_string(),
                         field: Some("target_path".to_string()),
                     })?;
-                self.move_file(&from, &to, &sandbox).await?;
+                self.move_file(&from, &to, sandbox).await?;
                 ResponseBuilder::success("move")
                     .with_message(format!("Moved {} to {}", from.display(), to.display()))
                     .with_result(json!({
@@ -760,7 +778,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Metadata operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let metadata = self.get_metadata(&path, &sandbox).await?;
+                let metadata = Self::get_metadata(&path, sandbox)?;
                 ResponseBuilder::success("metadata")
                     .with_message(format!("Retrieved metadata for {}", path.display()))
                     .with_result(metadata)
@@ -771,7 +789,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Exists operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let exists = self.file_exists(&path, &sandbox).await?;
+                let exists = Self::file_exists(&path, sandbox)?;
                 ResponseBuilder::success("exists")
                     .with_message(format!(
                         "Path {} {}",
@@ -819,10 +837,7 @@ impl BaseAgent for FileOperationsTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "File operation error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("File operation error: {error}")))
     }
 }
 
@@ -892,7 +907,7 @@ impl Tool for FileOperationsTool {
     fn security_requirements(&self) -> SecurityRequirements {
         SecurityRequirements {
             level: SecurityLevel::Privileged,
-            file_permissions: vec!["/tmp".to_string()], // Default to /tmp only
+            file_permissions: self.config.allowed_paths.clone(), // Use configured allowed paths
             network_permissions: vec![],
             env_permissions: vec![],
             custom_requirements: HashMap::new(),
@@ -908,11 +923,13 @@ impl Tool for FileOperationsTool {
 
 impl FileOperationsTool {
     /// Check if this tool supports hook integration
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         json!({
             "tool_name": self.metadata().name,
@@ -951,20 +968,30 @@ impl FileOperationsTool {
 
     /// Demonstrate hook-aware execution for file operations
     /// This method showcases how the file operations tool works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Invalid operation is specified
+    /// - File path is invalid or inaccessible
+    /// - Hook execution fails
+    /// - Tool execution fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
         operation: &str,
         path: &str,
-        content: Option<&str>,
+        file_content: Option<&str>,
     ) -> Result<AgentOutput> {
+        use crate::lifecycle::HookableToolExecution;
+
         let mut params = json!({
             "operation": operation,
             "path": path,
             "hook_integration": true  // Flag to indicate this is a hook demo
         });
 
-        if let Some(content) = content {
+        if let Some(content) = file_content {
             params["input"] = json!(content);
         }
 
@@ -973,7 +1000,6 @@ impl FileOperationsTool {
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait
-        use crate::lifecycle::HookableToolExecution;
         self.execute_with_hooks(input, context, tool_executor).await
     }
 }
@@ -981,7 +1007,25 @@ impl FileOperationsTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+    use llmspell_security::sandbox::SandboxContext;
+    use serde_json::json;
+    use std::sync::Arc;
+    use tempfile::TempDir;
 
+    /// Create a test `FileOperationsTool` with a default sandbox
+    fn create_test_file_operations_tool() -> FileOperationsTool {
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context =
+            SandboxContext::new("test".to_string(), security_requirements, resource_limits);
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        FileOperationsTool::new(FileOperationsConfig::default(), sandbox)
+    }
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -1002,18 +1046,14 @@ mod tests {
         );
         assert!("invalid".parse::<FileOperation>().is_err());
     }
-
     #[tokio::test]
     async fn test_file_operations_tool_creation() {
-        let config = FileOperationsConfig::default();
-        let tool = FileOperationsTool::new(config);
-
+        let tool = create_test_file_operations_tool();
         assert_eq!(tool.metadata().name, "file-operations-tool");
     }
-
     #[test]
     fn test_parse_parameters_standardized() {
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         // Test write operation with new 'input' parameter
         let params = json!({
@@ -1037,10 +1077,9 @@ mod tests {
         assert_eq!(parsed.source_path, Some(PathBuf::from("/tmp/source.txt")));
         assert_eq!(parsed.target_path, Some(PathBuf::from("/tmp/target.txt")));
     }
-
     #[test]
     fn test_hook_integration_metadata() {
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         // Test that the tool supports hooks
         assert!(tool.supports_hooks());
@@ -1057,11 +1096,10 @@ mod tests {
         assert!(metadata["security_considerations"].is_array());
         assert_eq!(metadata["security_level"], "Privileged");
     }
-
     #[tokio::test]
     async fn test_file_operations_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         let config = ToolLifecycleConfig::default();
         let tool_executor = ToolExecutor::new(config, None, None);
@@ -1080,11 +1118,10 @@ mod tests {
         // and should return a proper response structure
         assert!(result.is_ok() || result.is_err());
     }
-
     #[tokio::test]
     async fn test_hookable_tool_execution_trait() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
-        let tool = FileOperationsTool::default();
+        let tool = create_test_file_operations_tool();
 
         // Verify the tool implements HookableToolExecution
         // This is automatic via the blanket implementation

@@ -6,7 +6,7 @@ use llmspell_core::types::{
     AgentInput, AgentOutput, ColorSpace, ImageFormat, ImageMetadata, MediaContent, MediaType,
     ToolOutput,
 };
-use llmspell_core::{ExecutionContext, LLMSpellError, Result};
+use llmspell_core::{LLMSpellError, Result};
 use mlua::{Error as LuaError, Lua, Table, Value as LuaValue};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -14,6 +14,13 @@ use std::collections::HashMap;
 // ===== Core Lua <-> JSON conversions =====
 
 /// Convert Lua value to JSON value
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - String conversion fails
+/// - Table conversion fails
+/// - Unsupported Lua type is provided
 pub fn lua_value_to_json(value: LuaValue) -> mlua::Result<JsonValue> {
     match value {
         LuaValue::Nil => Ok(JsonValue::Null),
@@ -21,9 +28,7 @@ pub fn lua_value_to_json(value: LuaValue) -> mlua::Result<JsonValue> {
         LuaValue::Integer(i) => Ok(JsonValue::Number(i.into())),
         LuaValue::Number(n) => {
             if n.is_finite() {
-                Ok(serde_json::Number::from_f64(n)
-                    .map(JsonValue::Number)
-                    .unwrap_or(JsonValue::Null))
+                Ok(serde_json::Number::from_f64(n).map_or(JsonValue::Null, JsonValue::Number))
             } else {
                 Ok(JsonValue::Null)
             }
@@ -39,6 +44,13 @@ pub fn lua_value_to_json(value: LuaValue) -> mlua::Result<JsonValue> {
 }
 
 /// Convert Lua table to JSON value
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table iteration fails
+/// - Value conversion fails
+/// - Key conversion fails
 pub fn lua_table_to_json(table: Table) -> mlua::Result<JsonValue> {
     // Check if it's an array by looking for numeric keys starting at 1
     let len = table.raw_len();
@@ -77,11 +89,19 @@ pub fn lua_table_to_json(table: Table) -> mlua::Result<JsonValue> {
 }
 
 /// Convert JSON value to Lua value
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - String creation fails
+/// - Table creation fails
+/// - Setting table values fails
 pub fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result<LuaValue<'lua>> {
     match json {
         JsonValue::Null => Ok(LuaValue::Nil),
         JsonValue::Bool(b) => Ok(LuaValue::Boolean(*b)),
         JsonValue::Number(n) => {
+            #[allow(clippy::option_if_let_else)] // Complex pattern
             if let Some(i) = n.as_i64() {
                 Ok(LuaValue::Integer(i))
             } else if let Some(f) = n.as_f64() {
@@ -110,8 +130,15 @@ pub fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result
 
 // ===== Agent conversions =====
 
-/// Convert Lua table to AgentInput
-pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentInput> {
+/// Convert Lua table to `AgentInput`
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Required fields are missing
+/// - Media content parsing fails
+/// - Value conversion fails
+pub fn lua_table_to_agent_input(lua: &Lua, table: &Table) -> mlua::Result<AgentInput> {
     // Extract text (required)
     let text: String = table.get("text").unwrap_or_default();
 
@@ -126,7 +153,7 @@ pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentIn
     }
 
     // Extract context (optional) - for now we don't support full ExecutionContext from Lua
-    let _context: Option<ExecutionContext> = None;
+    // let _context: Option<ExecutionContext> = None;
 
     // Extract output_modalities (optional)
     let mut output_modalities = Vec::new();
@@ -149,31 +176,39 @@ pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentIn
     if let Ok(media_table) = table.get::<_, Table>("media") {
         // Handle array of media items
         for entry in media_table.sequence_values::<Table>().flatten() {
-            if let Ok(media_content) = parse_media_content(lua, entry) {
+            if let Ok(media_content) = parse_media_content(lua, &entry) {
                 media.push(media_content);
             }
         }
     } else if let Ok(media_table) = table.get::<_, Table>("image") {
         // Legacy single image support
-        if let Ok(media_content) = parse_media_content(lua, media_table) {
+        if let Ok(media_content) = parse_media_content(lua, &media_table) {
             media.push(media_content);
         }
     }
 
-    Ok(AgentInput {
-        text,
-        parameters,
-        context: None,
-        output_modalities,
-        media,
-    })
+    let mut builder = AgentInput::builder()
+        .text(text)
+        .output_modalities(output_modalities);
+
+    // Add parameters
+    for (key, value) in parameters {
+        builder = builder.parameter(key, value);
+    }
+
+    // Add media
+    for media_item in media {
+        builder = builder.add_media(media_item);
+    }
+
+    Ok(builder.build())
 }
 
 /// Parse media content from Lua table
-fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
+fn parse_media_content(_lua: &Lua, table: &Table) -> mlua::Result<MediaContent> {
     let base64: String = table.get("base64")?;
     let data = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &base64)
-        .map_err(|e| LuaError::RuntimeError(format!("Failed to decode base64 image: {}", e)))?;
+        .map_err(|e| LuaError::RuntimeError(format!("Failed to decode base64 image: {e}")))?;
 
     let format = table
         .get::<_, String>("format")
@@ -188,7 +223,7 @@ fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
             _ => None,
         })
         .unwrap_or(ImageFormat::Png);
-
+    #[allow(clippy::option_if_let_else)] // Complex pattern
     let metadata = if let Ok(width) = table.get::<_, u32>("width") {
         if let Ok(height) = table.get::<_, u32>("height") {
             let color_space = table
@@ -230,12 +265,47 @@ fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
     })
 }
 
-/// Convert AgentOutput to Lua table
-pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table> {
+/// Convert `AgentOutput` to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - Setting table values fails
+/// - Media encoding fails
+pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table<'_>> {
     let table = lua.create_table()?;
 
-    // Set text
-    table.set("text", output.text)?;
+    // Check if text contains structured JSON response from tools
+    // This provides a better API where tools return structured data directly accessible in Lua
+    if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&output.text) {
+        // Check if this is a structured tool response with success/result/error format
+        if let serde_json::Value::Object(obj) = &json_value {
+            if obj.contains_key("success")
+                || obj.contains_key("result")
+                || obj.contains_key("operation")
+            {
+                // This is a structured tool response - flatten it to top level for easy access
+                // e.g., result.success, result.result.text instead of parsing JSON in Lua
+                for (key, value) in obj {
+                    table.set(key.as_str(), json_to_lua_value(lua, value)?)?;
+                }
+                // Also preserve original text for backward compatibility
+                table.set("_raw_text", output.text.clone())?;
+            } else {
+                // Generic JSON object - store both parsed and raw
+                table.set("data", json_to_lua_value(lua, &json_value)?)?;
+                table.set("text", output.text.clone())?;
+            }
+        } else {
+            // Non-object JSON (array, primitive) - store both parsed and raw
+            table.set("data", json_to_lua_value(lua, &json_value)?)?;
+            table.set("text", output.text.clone())?;
+        }
+    } else {
+        // Not JSON - set as plain text
+        table.set("text", output.text)?;
+    }
 
     // Set metadata
     let metadata_table = lua.create_table()?;
@@ -261,42 +331,41 @@ pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result
         let media_array = lua.create_table()?;
         for (i, media) in output.media.iter().enumerate() {
             let media_table = lua.create_table()?;
-            match media {
-                MediaContent::Image {
-                    data,
-                    format,
-                    metadata,
-                } => {
-                    media_table.set(
-                        "base64",
-                        base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data),
-                    )?;
-                    media_table.set("type", "image")?;
-                    media_table.set(
-                        "format",
-                        match format {
-                            ImageFormat::Png => "png",
-                            ImageFormat::Jpeg => "jpeg",
-                            ImageFormat::Webp => "webp",
-                            ImageFormat::Gif => "gif",
-                            ImageFormat::Svg => "svg",
-                            ImageFormat::Tiff => "tiff",
-                        },
-                    )?;
-                    media_table.set("width", metadata.width)?;
-                    media_table.set("height", metadata.height)?;
-                    media_table.set(
-                        "color_space",
-                        match metadata.color_space {
-                            ColorSpace::RGB => "rgb",
-                            ColorSpace::RGBA => "rgba",
-                            ColorSpace::Grayscale => "grayscale",
-                            ColorSpace::CMYK => "cmyk",
-                        },
-                    )?;
-                }
-                _ => {} // Other media types not yet supported
+            if let MediaContent::Image {
+                data,
+                format,
+                metadata,
+            } = media
+            {
+                media_table.set(
+                    "base64",
+                    base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data),
+                )?;
+                media_table.set("type", "image")?;
+                media_table.set(
+                    "format",
+                    match format {
+                        ImageFormat::Png => "png",
+                        ImageFormat::Jpeg => "jpeg",
+                        ImageFormat::Webp => "webp",
+                        ImageFormat::Gif => "gif",
+                        ImageFormat::Svg => "svg",
+                        ImageFormat::Tiff => "tiff",
+                    },
+                )?;
+                media_table.set("width", metadata.width)?;
+                media_table.set("height", metadata.height)?;
+                media_table.set(
+                    "color_space",
+                    match metadata.color_space {
+                        ColorSpace::RGB => "rgb",
+                        ColorSpace::RGBA => "rgba",
+                        ColorSpace::Grayscale => "grayscale",
+                        ColorSpace::CMYK => "cmyk",
+                    },
+                )?;
             }
+            // Other media types not yet supported
 
             media_array.set(i + 1, media_table)?;
         }
@@ -309,12 +378,23 @@ pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result
 // ===== Tool conversions =====
 
 /// Convert Lua table to tool input (JSON)
+///
+/// # Errors
+///
+/// Returns an error if table to JSON conversion fails
 pub fn lua_table_to_tool_input(_lua: &Lua, table: Table) -> mlua::Result<JsonValue> {
     lua_table_to_json(table)
 }
 
 /// Convert tool output to Lua table
-pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<Table> {
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - JSON to Lua conversion fails
+/// - Setting table values fails
+pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<Table<'_>> {
     let table = lua.create_table()?;
 
     // Set success status
@@ -340,36 +420,53 @@ pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<T
 // ===== Workflow conversions =====
 
 /// Convert Lua table to workflow parameters
+///
+/// # Errors
+///
+/// Returns an error if table to JSON conversion fails
 pub fn lua_table_to_workflow_params(_lua: &Lua, table: Table) -> Result<JsonValue> {
     lua_table_to_json(table).map_err(|e| LLMSpellError::Component {
-        message: format!("Failed to convert Lua table to workflow params: {}", e),
+        message: format!("Failed to convert Lua table to workflow params: {e}"),
         source: None,
     })
 }
 
-/// Convert workflow result to Lua table  
-pub fn workflow_result_to_lua_table(lua: &Lua, result: serde_json::Value) -> mlua::Result<Table> {
-    match json_to_lua_value(lua, &result)? {
-        LuaValue::Table(table) => Ok(table),
-        _ => {
-            // If it's not a table, wrap it in one
-            let table = lua.create_table()?;
-            table.set("result", json_to_lua_value(lua, &result)?)?;
-            Ok(table)
-        }
+/// Convert workflow result to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - JSON to Lua conversion fails
+/// - Table creation fails
+pub fn workflow_result_to_lua_table<'lua>(
+    lua: &'lua Lua,
+    result: &serde_json::Value,
+) -> mlua::Result<Table<'lua>> {
+    if let LuaValue::Table(table) = json_to_lua_value(lua, result)? {
+        Ok(table)
+    } else {
+        // If it's not a table, wrap it in one
+        let table = lua.create_table()?;
+        table.set("result", json_to_lua_value(lua, result)?)?;
+        Ok(table)
     }
 }
 
-/// Convert ScriptWorkflowResult to Lua table
+/// Convert `ScriptWorkflowResult` to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - JSON to Lua conversion fails
 pub fn script_workflow_result_to_lua_table(
     lua: &Lua,
     result: crate::conversion::ScriptWorkflowResult,
-) -> mlua::Result<Table> {
+) -> mlua::Result<Table<'_>> {
     // Convert to JSON first, then to Lua
-    let json_value = serde_json::to_value(result).map_err(|e| {
-        LuaError::RuntimeError(format!("Failed to serialize workflow result: {}", e))
-    })?;
-    workflow_result_to_lua_table(lua, json_value)
+    let json_value = serde_json::to_value(result)
+        .map_err(|e| LuaError::RuntimeError(format!("Failed to serialize workflow result: {e}")))?;
+    workflow_result_to_lua_table(lua, &json_value)
 }
 
 // ===== Trait implementations =====
@@ -380,14 +477,18 @@ pub fn script_workflow_result_to_lua_table(
 impl FromScriptValue<LuaValue<'_>> for ScriptValue {
     fn from_script_value(value: LuaValue<'_>) -> Result<Self> {
         match value {
-            LuaValue::Nil => Ok(ScriptValue::Null),
-            LuaValue::Boolean(b) => Ok(ScriptValue::Bool(b)),
-            LuaValue::Integer(i) => Ok(ScriptValue::Number(i as f64)),
-            LuaValue::Number(n) => Ok(ScriptValue::Number(n)),
-            LuaValue::String(s) => Ok(ScriptValue::String(
+            LuaValue::Nil => Ok(Self::Null),
+            LuaValue::Boolean(b) => Ok(Self::Bool(b)),
+            LuaValue::Integer(i) => {
+                #[allow(clippy::cast_precision_loss)]
+                let num = i as f64;
+                Ok(Self::Number(num))
+            }
+            LuaValue::Number(n) => Ok(Self::Number(n)),
+            LuaValue::String(s) => Ok(Self::String(
                 s.to_str()
                     .map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to convert Lua string: {}", e),
+                        message: format!("Failed to convert Lua string: {e}"),
                         source: None,
                     })?
                     .to_string(),

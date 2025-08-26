@@ -35,6 +35,53 @@
 //!     }
 //! }
 //! ```
+//!
+//! ## Performance Characteristics
+//!
+//! - **Hook Execution**: <1ms overhead with CircuitBreaker protection
+//! - **Event Bus Throughput**: >90K events/sec
+//! - **Circuit Breaker**: Opens after 50ms latency (configurable)
+//! - **Cache Hit Rate**: >95% for repeated patterns
+//! - **Rate Limiting**: Token bucket with configurable rates
+//!
+//! ## Integration Example
+//!
+//! ```rust,no_run
+//! use llmspell_hooks::{
+//!     HookRegistry, HookPoint, CachingHook, CachingConfig,
+//!     RateLimitHook, LoggingHook, MetricsHook
+//! };
+//! use std::time::Duration;
+//!
+//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create registry with production-ready hooks
+//! let registry = HookRegistry::new();
+//!
+//! // Add caching for performance
+//! let mut cache_config = CachingConfig::default();
+//! cache_config.default_ttl = Duration::from_secs(60);
+//! cache_config.max_entries = 1000;
+//! let cache = CachingHook::with_config(cache_config);
+//!
+//! // Add rate limiting for cost control  
+//! let limiter = RateLimitHook::new()
+//!     .with_rate_per_second(100.0) // 100 requests per second
+//!     .with_burst(10);
+//!
+//! // Add logging hook
+//! let logger = LoggingHook::new();
+//!
+//! // Add metrics collection
+//! let metrics = MetricsHook::new();
+//!
+//! // Register hooks for specific hook points
+//! registry.register(HookPoint::BeforeAgentExecution, cache)?;
+//! registry.register(HookPoint::BeforeAgentExecution, limiter)?;
+//! registry.register(HookPoint::BeforeAgentExecution, logger)?;
+//! registry.register(HookPoint::AfterAgentExecution, metrics)?;
+//! # Ok(())
+//! # }
+//! ```
 
 // Re-export core types
 pub mod artifact_hooks;
@@ -59,7 +106,7 @@ pub mod types;
 
 // Re-export commonly used items at crate root
 pub use artifact_hooks::{event_to_hook_point, is_artifact_hook_point, ArtifactHookPoints};
-pub use circuit_breaker::{BreakerState, CircuitBreaker};
+pub use circuit_breaker::{BreakerConfig, BreakerState, CircuitBreaker};
 pub use collectors::{
     AgentOutputCollector, ArtifactCollector, ArtifactData, CollectionConfig, ToolResultCollector,
 };
@@ -90,8 +137,8 @@ pub use types::{ComponentId, ComponentType, HookMetadata, HookPoint, Language, P
 
 // Re-export built-in hooks for easy access
 pub use builtin::{
-    CachingHook, CostTrackingHook, DebuggingHook, LoggingHook, MetricsHook, RateLimitHook,
-    RetryHook, SecurityHook,
+    caching::CachingConfig, CachingHook, CostTrackingHook, DebuggingHook, LoggingHook, MetricsHook,
+    RateLimitHook, RetryHook, SecurityHook,
 };
 
 // Re-export cache types for easy access
@@ -116,7 +163,6 @@ pub mod prelude {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_crate_exports() {
         // Verify all major types are accessible
@@ -129,7 +175,6 @@ mod tests {
         let component_id = ComponentId::new(ComponentType::System, "test".to_string());
         let _context = HookContext::new(HookPoint::SystemStartup, component_id);
     }
-
     #[test]
     #[allow(clippy::len_zero)]
     fn test_version() {

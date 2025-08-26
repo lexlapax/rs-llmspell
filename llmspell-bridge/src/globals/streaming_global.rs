@@ -9,7 +9,8 @@ pub struct StreamingGlobal {}
 
 impl StreamingGlobal {
     /// Create a new Streaming global
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 }
@@ -36,7 +37,7 @@ impl GlobalObject for StreamingGlobal {
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
         crate::lua::globals::streaming::inject_streaming_global(lua, context).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Streaming global: {}", e),
+                message: format!("Failed to inject Streaming global: {e}"),
                 source: None,
             }
         })
@@ -50,7 +51,7 @@ impl GlobalObject for StreamingGlobal {
     ) -> Result<()> {
         crate::javascript::globals::streaming::inject_streaming_global(ctx, context).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Streaming global for JavaScript: {}", e),
+                message: format!("Failed to inject Streaming global for JavaScript: {e}"),
                 source: None,
             }
         })

@@ -1222,7 +1222,6 @@ mod tests {
     use super::*;
     use crate::artifact::SessionArtifact;
     use llmspell_storage::MemoryBackend;
-
     #[tokio::test]
     async fn test_artifact_storage_creation() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1231,7 +1230,6 @@ mod tests {
         assert_eq!(storage.config.max_artifact_size, 100 * 1024 * 1024);
         assert!(storage.config.enable_deduplication);
     }
-
     #[tokio::test]
     async fn test_key_generation() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1249,12 +1247,13 @@ mod tests {
         let chunk_key = storage.chunk_key(&"hash123".to_string(), 0);
         assert_eq!(chunk_key, "artifacts/chunks/hash123/0");
     }
-
     #[tokio::test]
     async fn test_storage_limits() {
         let backend = Arc::new(MemoryBackend::new());
-        let mut config = ArtifactStorageConfig::default();
-        config.max_artifact_size = 1024; // 1KB limit for testing
+        let config = ArtifactStorageConfig {
+            max_artifact_size: 1024, // 1KB limit for testing
+            ..Default::default()
+        };
 
         let storage = ArtifactStorage::new(backend, config);
         let session_id = SessionId::new();
@@ -1271,7 +1270,6 @@ mod tests {
         let result = storage.check_storage_limits(&session_id, 512).await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_store_artifact_basic() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1300,7 +1298,6 @@ mod tests {
         assert_eq!(stats.total_size, content.len());
         assert_eq!(stats.deduplicated_count, 0);
     }
-
     #[tokio::test]
     async fn test_store_artifact_versioning() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1344,7 +1341,6 @@ mod tests {
         assert_eq!(stats.artifact_count, 2);
         assert_eq!(stats.total_size, content1.len() + content2.len());
     }
-
     #[tokio::test]
     async fn test_store_artifact_deduplication() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1387,12 +1383,13 @@ mod tests {
         // Total size counts both artifacts even if deduplicated
         assert_eq!(stats.total_size, content.len() * 2);
     }
-
     #[tokio::test]
     async fn test_store_large_artifact() {
         let backend = Arc::new(MemoryBackend::new());
-        let mut config = ArtifactStorageConfig::default();
-        config.chunk_size = 1024; // 1KB chunks for testing
+        let config = ArtifactStorageConfig {
+            chunk_size: 1024, // 1KB chunks for testing
+            ..Default::default()
+        };
 
         let storage = Arc::new(ArtifactStorage::new(backend, config));
 
@@ -1418,7 +1415,6 @@ mod tests {
         assert_eq!(stats.artifact_count, 1);
         assert_eq!(stats.total_size, content.len());
     }
-
     #[tokio::test]
     async fn test_store_artifact_with_compression() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1447,7 +1443,6 @@ mod tests {
         // Size reported is original size, not compressed
         assert_eq!(stats.total_size, content.len());
     }
-
     #[tokio::test]
     async fn test_version_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1501,7 +1496,6 @@ mod tests {
             .unwrap();
         assert_eq!(all_versions.len(), 2);
     }
-
     #[tokio::test]
     async fn test_batch_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1542,7 +1536,6 @@ mod tests {
         assert!(mixed_results[2].is_some());
         assert!(mixed_results[3].is_none()); // Fake ID should be None
     }
-
     #[tokio::test]
     async fn test_paginated_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1592,7 +1585,6 @@ mod tests {
             .unwrap();
         assert_eq!(empty_page.len(), 0);
     }
-
     #[tokio::test]
     async fn test_streaming_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1632,7 +1624,6 @@ mod tests {
             .unwrap();
         assert_eq!(streamed_content, content);
     }
-
     #[tokio::test]
     async fn test_retrieval_error_cases() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1667,7 +1658,6 @@ mod tests {
         let result = storage.stream_artifact_content(&fake_id, 1024).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_list_session_artifacts() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1676,8 +1666,8 @@ mod tests {
         let session_id = SessionId::new();
 
         // Initially empty
-        let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
-        assert_eq!(artifacts.len(), 0);
+        let initial_artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+        assert_eq!(initial_artifacts.len(), 0);
 
         // Store some artifacts
         let artifact1 = SessionArtifact::new(
@@ -1701,15 +1691,14 @@ mod tests {
         let _id2 = storage.store_artifact(&artifact2).await.unwrap();
 
         // List should now return 2 artifacts
-        let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
-        assert_eq!(artifacts.len(), 2);
+        let updated_artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+        assert_eq!(updated_artifacts.len(), 2);
 
         // Verify metadata content
-        let names: Vec<String> = artifacts.iter().map(|a| a.name.clone()).collect();
+        let names: Vec<String> = updated_artifacts.iter().map(|a| a.name.clone()).collect();
         assert!(names.contains(&"input.txt".to_string()));
         assert!(names.contains(&"result.json".to_string()));
     }
-
     #[tokio::test]
     async fn test_query_artifacts_by_type() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1718,7 +1707,7 @@ mod tests {
         let session_id = SessionId::new();
 
         // Store artifacts of different types
-        let types = vec![
+        let types = [
             (ArtifactType::UserInput, "input1.txt"),
             (ArtifactType::UserInput, "input2.txt"),
             (ArtifactType::ToolResult, "result.json"),
@@ -1730,7 +1719,7 @@ mod tests {
                 session_id,
                 i as u64 + 1,
                 artifact_type.clone(),
-                name.to_string(),
+                (*name).to_string(),
                 format!("content {}", i).into_bytes(),
             )
             .unwrap();
@@ -1750,7 +1739,6 @@ mod tests {
             .iter()
             .all(|a| a.artifact_type == ArtifactType::UserInput));
     }
-
     #[tokio::test]
     async fn test_query_artifacts_by_name_pattern() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1759,7 +1747,7 @@ mod tests {
         let session_id = SessionId::new();
 
         // Store artifacts with different names
-        let names = vec![
+        let names = [
             "test_file.txt",
             "config.json",
             "test_output.log",
@@ -1771,7 +1759,7 @@ mod tests {
                 session_id,
                 i as u64 + 1,
                 ArtifactType::UserInput,
-                name.to_string(),
+                (*name).to_string(),
                 format!("content {}", i).into_bytes(),
             )
             .unwrap();
@@ -1792,7 +1780,6 @@ mod tests {
         assert!(result_names.contains(&"test_file.txt".to_string()));
         assert!(result_names.contains(&"test_output.log".to_string()));
     }
-
     #[tokio::test]
     async fn test_query_artifacts_with_tags() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1849,7 +1836,6 @@ mod tests {
             .iter()
             .all(|a| a.tags.contains(&"important".to_string())));
     }
-
     #[tokio::test]
     async fn test_query_artifacts_with_size_filters() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1858,7 +1844,7 @@ mod tests {
         let session_id = SessionId::new();
 
         // Store artifacts of different sizes
-        let sizes = vec![
+        let sizes = [
             ("small.txt", 100),
             ("medium.txt", 1000),
             ("large.txt", 5000),
@@ -1871,7 +1857,7 @@ mod tests {
                 session_id,
                 i as u64 + 1,
                 ArtifactType::UserInput,
-                name.to_string(),
+                (*name).to_string(),
                 content.into_bytes(),
             )
             .unwrap();
@@ -1893,7 +1879,6 @@ mod tests {
         assert!(result_names.contains(&"medium.txt".to_string()));
         assert!(result_names.contains(&"large.txt".to_string()));
     }
-
     #[tokio::test]
     async fn test_find_by_content_hash() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1926,7 +1911,6 @@ mod tests {
         let found = &results[0];
         assert_eq!(found.name, "file.txt");
     }
-
     #[tokio::test]
     async fn test_count_statistics() {
         let backend = Arc::new(MemoryBackend::new());

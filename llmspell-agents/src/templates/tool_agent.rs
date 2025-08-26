@@ -56,6 +56,8 @@ pub struct ToolAgentTemplate {
 
 impl ToolAgentTemplate {
     /// Create new Tool Agent template
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "tool_agent".to_string(),
@@ -217,18 +219,20 @@ impl ToolAgentTemplate {
     }
 
     /// Create Tool Agent template with custom configuration
+    #[must_use]
     pub fn with_config(mut self, config: ToolAgentConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Create specialized tool agent template
+    #[must_use]
     pub fn specialized(tools: Vec<String>) -> Self {
         let mut template = Self::new();
 
         // Create unique ID based on tools
-        let tools_str = tools.join("_").to_lowercase().replace("-", "_");
-        template.schema.metadata.id = format!("tool_agent_specialized_{}", tools_str);
+        let tools_str = tools.join("_").to_lowercase().replace('-', "_");
+        template.schema.metadata.id = format!("tool_agent_specialized_{tools_str}");
 
         // Update schema for specialized agent
         template.schema.metadata.name = format!("Specialized Tool Agent ({})", tools.join(", "));
@@ -263,6 +267,7 @@ impl ToolAgentTemplate {
     }
 
     /// Create lightweight tool agent template
+    #[must_use]
     pub fn lightweight() -> Self {
         let mut template = Self::new();
 
@@ -293,6 +298,7 @@ impl ToolAgentTemplate {
     }
 
     /// Create batch processing tool agent template
+    #[must_use]
     pub fn batch_processor() -> Self {
         let mut template = Self::new();
 
@@ -332,13 +338,14 @@ impl ToolAgentTemplate {
 
     /// Apply parameters to config
     fn apply_parameters_to_config(
-        &self,
         config: &mut ToolAgentConfig,
         params: &HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    ) {
         if let Some(max_tools) = params.get("max_tools") {
             if let Some(value) = max_tools.as_u64() {
-                config.max_tools = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_tools_usize = value as usize;
+                config.max_tools = max_tools_usize;
             }
         }
 
@@ -356,7 +363,9 @@ impl ToolAgentTemplate {
 
         if let Some(max_concurrent) = params.get("max_concurrent_tools") {
             if let Some(value) = max_concurrent.as_u64() {
-                config.max_concurrent_tools = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_concurrent_usize = value as usize;
+                config.max_concurrent_tools = max_concurrent_usize;
             }
         }
 
@@ -364,12 +373,10 @@ impl ToolAgentTemplate {
             if let Some(array) = patterns.as_array() {
                 config.tool_discovery_patterns = array
                     .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                     .collect();
             }
         }
-
-        Ok(())
     }
 }
 
@@ -397,23 +404,24 @@ impl AgentTemplate for ToolAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters)?;
+        Self::apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();
         final_config.insert("agent_type".to_string(), "tool_agent".into());
-        final_config.insert(
-            "max_tools".to_string(),
-            (agent_config.max_tools as u64).into(),
-        );
+        #[allow(clippy::cast_possible_truncation)]
+        let max_tools_u64 = agent_config.max_tools as u64;
+        final_config.insert("max_tools".to_string(), max_tools_u64.into());
         final_config.insert("tool_timeout".to_string(), agent_config.tool_timeout.into());
         final_config.insert(
             "enable_caching".to_string(),
             agent_config.enable_caching.into(),
         );
+        #[allow(clippy::cast_possible_truncation)]
+        let max_concurrent_u64 = agent_config.max_concurrent_tools as u64;
         final_config.insert(
             "max_concurrent_tools".to_string(),
-            (agent_config.max_concurrent_tools as u64).into(),
+            max_concurrent_u64.into(),
         );
         final_config.insert(
             "enable_error_recovery".to_string(),
@@ -424,7 +432,7 @@ impl AgentTemplate for ToolAgentTemplate {
             agent_config
                 .tool_discovery_patterns
                 .iter()
-                .map(|s| s.as_str())
+                .map(std::string::String::as_str)
                 .collect::<Vec<_>>()
                 .into(),
         );
@@ -504,7 +512,7 @@ impl AgentTemplate for ToolAgentTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(ToolAgentTemplate {
+        Box::new(Self {
             schema: self.schema.clone(),
             config: self.config.clone(),
         })
@@ -545,7 +553,7 @@ impl BaseAgent for MockToolAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         _input: AgentInput,
         _context: ExecutionContext,
@@ -565,7 +573,7 @@ impl BaseAgent for MockToolAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Error handled by mock agent: {}", error),
+            text: format!("Error handled by mock agent: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),
@@ -577,7 +585,6 @@ impl BaseAgent for MockToolAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_tool_agent_template_creation() {
         let template = ToolAgentTemplate::new();
@@ -590,11 +597,10 @@ mod tests {
         assert_eq!(required_params.len(), 1);
         assert_eq!(required_params[0].name, "agent_name");
     }
-
     #[tokio::test]
     async fn test_specialized_tool_agent() {
         let tools = vec!["calculator".to_string(), "file_reader".to_string()];
-        let template = ToolAgentTemplate::specialized(tools.clone());
+        let template = ToolAgentTemplate::specialized(tools);
 
         assert!(template.schema().metadata.name.contains("calculator"));
         assert!(template.schema().metadata.name.contains("file_reader"));
@@ -604,7 +610,6 @@ mod tests {
         assert!(calculator_dep.is_some());
         assert!(calculator_dep.unwrap().required);
     }
-
     #[tokio::test]
     async fn test_lightweight_tool_agent() {
         let template = ToolAgentTemplate::lightweight();
@@ -614,7 +619,6 @@ mod tests {
         assert!(!template.config.enable_caching);
         assert_eq!(template.complexity(), &ComplexityLevel::Basic);
     }
-
     #[tokio::test]
     async fn test_batch_processor_tool_agent() {
         let template = ToolAgentTemplate::batch_processor();
@@ -627,7 +631,6 @@ mod tests {
         let batch_mode = template.schema().template_config.get("batch_mode");
         assert_eq!(batch_mode, Some(&true.into()));
     }
-
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = ToolAgentTemplate::new();
@@ -646,7 +649,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_template_instantiation() {
         let template = ToolAgentTemplate::new();
@@ -667,7 +669,6 @@ mod tests {
         assert_eq!(result.applied_parameters.get("max_tools"), Some(&15.into()));
         assert_eq!(result.applied_config.get("max_tools"), Some(&15.into()));
     }
-
     #[tokio::test]
     async fn test_tool_requirements() {
         let template = ToolAgentTemplate::new();
@@ -679,7 +680,6 @@ mod tests {
         let required_tools = template.required_tools();
         assert!(required_tools.is_empty()); // Base template has no required tools
     }
-
     #[tokio::test]
     async fn test_capability_support() {
         let template = ToolAgentTemplate::new();

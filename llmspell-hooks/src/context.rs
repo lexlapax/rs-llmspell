@@ -109,7 +109,7 @@ impl HookContext {
 
     /// Get metadata
     pub fn get_metadata(&self, key: &str) -> Option<&str> {
-        self.metadata.get(key).map(|s| s.as_str())
+        self.metadata.get(key).map(String::as_str)
     }
 
     /// Check if this is an error context
@@ -213,7 +213,6 @@ mod tests {
     use super::*;
     use crate::types::ComponentType;
     use serde_json::json;
-
     #[test]
     fn test_hook_context_creation() {
         let component_id = ComponentId::new(ComponentType::Agent, "test".to_string());
@@ -225,7 +224,6 @@ mod tests {
         assert!(context.data.is_empty());
         assert!(context.metadata.is_empty());
     }
-
     #[test]
     fn test_hook_context_builder() {
         let component_id = ComponentId::new(ComponentType::Tool, "calculator".to_string());
@@ -246,7 +244,6 @@ mod tests {
         );
         assert_eq!(context.get_metadata("tool_version"), Some("1.0.0"));
     }
-
     #[test]
     fn test_child_context() {
         let component_id = ComponentId::new(ComponentType::Workflow, "pipeline".to_string());
@@ -259,7 +256,6 @@ mod tests {
         assert_eq!(child.language, parent.language);
         assert!(child.parent_context.is_some());
     }
-
     #[test]
     fn test_operation_context() {
         let component_id = ComponentId::new(ComponentType::Tool, "test".to_string());
@@ -281,7 +277,6 @@ mod tests {
         );
         assert_eq!(context.operation_result(), Some(&json!({"value": 4})));
     }
-
     #[test]
     fn test_error_context() {
         let component_id = ComponentId::new(ComponentType::Agent, "test".to_string());
@@ -299,7 +294,6 @@ mod tests {
 
         assert_eq!(context.error_message(), Some("Test error"));
     }
-
     #[test]
     fn test_context_serialization() {
         let component_id = ComponentId::new(ComponentType::System, "main".to_string());

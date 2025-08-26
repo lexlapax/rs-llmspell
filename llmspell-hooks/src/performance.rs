@@ -170,7 +170,9 @@ impl PerformanceMonitor {
             .unwrap_or(Duration::ZERO);
 
         let avg_duration = if !hook_samples.is_empty() {
-            total_duration / hook_samples.len() as u32
+            #[allow(clippy::cast_possible_truncation)]
+            let len_u32 = hook_samples.len() as u32;
+            total_duration / len_u32
         } else {
             Duration::ZERO
         };
@@ -180,7 +182,17 @@ impl PerformanceMonitor {
             durations.sort();
 
             let p50_idx = durations.len() / 2;
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss
+            )]
             let p95_idx = (durations.len() as f64 * 0.95) as usize;
+            #[allow(
+                clippy::cast_precision_loss,
+                clippy::cast_possible_truncation,
+                clippy::cast_sign_loss
+            )]
             let p99_idx = (durations.len() as f64 * 0.99) as usize;
 
             (
@@ -309,7 +321,9 @@ impl PerformanceMonitor {
         let total_duration: Duration = all_metrics.values().map(|m| m.total_duration).sum();
 
         let avg_duration = if total_executions > 0 {
-            total_duration / total_executions as u32
+            #[allow(clippy::cast_possible_truncation)]
+            let total_exec_u32 = total_executions as u32;
+            total_duration / total_exec_u32
         } else {
             Duration::ZERO
         };
@@ -341,7 +355,6 @@ impl PerformanceMonitor {
 mod tests {
     use super::*;
     use std::thread;
-
     #[test]
     fn test_performance_monitoring() {
         let monitor = PerformanceMonitor::new();
@@ -365,7 +378,6 @@ mod tests {
         assert_eq!(metrics2.execution_count, 2);
         assert_eq!(metrics2.avg_duration, Duration::from_millis(10));
     }
-
     #[test]
     fn test_execution_timer() {
         let monitor = PerformanceMonitor::new();
@@ -381,7 +393,6 @@ mod tests {
         assert_eq!(metrics.execution_count, 1);
         assert!(metrics.max_duration >= Duration::from_millis(50));
     }
-
     #[test]
     fn test_slow_hook_detection() {
         let monitor = PerformanceMonitor::new();
@@ -394,7 +405,6 @@ mod tests {
         assert_eq!(slow_hooks.len(), 1);
         assert_eq!(slow_hooks[0].0, "slow_hook");
     }
-
     #[test]
     fn test_performance_report() {
         let monitor = PerformanceMonitor::new();
@@ -415,7 +425,6 @@ mod tests {
         assert_eq!(report.slowest_hook.unwrap().0, "slow_hook");
         assert_eq!(report.slow_hooks.len(), 1);
     }
-
     #[test]
     fn test_metrics_cleanup() {
         let config = PerformanceConfig {

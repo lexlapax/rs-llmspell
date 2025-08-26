@@ -112,6 +112,10 @@ impl ProviderConfig {
     }
 
     /// Load configuration from environment variables
+    ///
+    /// NOTE: This is a fallback mechanism for provider discovery.
+    /// The main configuration loading should use the centralized config system
+    /// with the environment variable registry (llmspell-config).
     pub fn from_env(name: &str) -> Result<Self, LLMSpellError> {
         let env_prefix = format!("LLMSPELL_{}_", name.to_uppercase());
 
@@ -238,7 +242,7 @@ impl ProviderRegistry {
 
     /// Get list of registered provider names
     pub fn available_providers(&self) -> Vec<&str> {
-        self.factories.keys().map(|s| s.as_str()).collect()
+        self.factories.keys().map(String::as_str).collect()
     }
 }
 
@@ -530,7 +534,7 @@ impl ProviderManager {
         registry
             .available_providers()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(str::to_string)
             .collect()
     }
 }
@@ -544,7 +548,6 @@ impl Default for ProviderManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_provider_capabilities_default() {
         let caps = ProviderCapabilities::default();
@@ -553,7 +556,6 @@ mod tests {
         assert!(caps.max_context_tokens.is_none());
         assert!(caps.available_models.is_empty());
     }
-
     #[test]
     fn test_provider_config_creation() {
         let config = ProviderConfig::new("openai", "gpt-4");
@@ -562,7 +564,6 @@ mod tests {
         assert_eq!(config.timeout_secs, Some(30));
         assert_eq!(config.max_retries, Some(3));
     }
-
     #[test]
     fn test_provider_registry() {
         let mut registry = ProviderRegistry::new();
@@ -578,7 +579,6 @@ mod tests {
 
         assert_eq!(registry.available_providers(), vec!["mock"]);
     }
-
     #[tokio::test]
     async fn test_provider_manager_initialization() {
         let manager = ProviderManager::new();
@@ -597,7 +597,6 @@ mod tests {
         let types = manager.available_provider_types().await;
         assert!(types.contains(&"mock".to_string()));
     }
-
     #[tokio::test]
     async fn test_create_agent_from_spec_no_provider() {
         use crate::ModelSpecifier;
@@ -613,7 +612,6 @@ mod tests {
             assert!(message.contains("No provider specified"));
         }
     }
-
     #[tokio::test]
     async fn test_create_agent_from_spec_unknown_provider() {
         use crate::ModelSpecifier;
@@ -629,7 +627,6 @@ mod tests {
             assert!(message.contains("Unknown provider"));
         }
     }
-
     #[tokio::test]
     async fn test_model_specifier_base_url_precedence() {
         use crate::ModelSpecifier;
@@ -660,7 +657,6 @@ mod tests {
         // Should fail at validation (expected for our mock)
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_model_specifier_provider_extraction() {
         use crate::ModelSpecifier;

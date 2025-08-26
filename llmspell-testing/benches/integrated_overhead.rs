@@ -1,6 +1,8 @@
 // ABOUTME: System-wide integration overhead benchmarks for state persistence
 // ABOUTME: Measures performance impact when state persistence is integrated with agents, workflows, tools
 
+// Benchmark file
+
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_agents::factory::{AgentFactory, DefaultAgentFactory};
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
@@ -184,7 +186,12 @@ fn bench_workflow_system_overhead(c: &mut Criterion) {
                             builder = builder.add_step(step);
                         }
                         let workflow = builder.build();
-                        let _ = workflow.execute().await;
+                        let _ = workflow
+                            .execute(
+                                AgentInput::text("bench"),
+                                llmspell_core::ExecutionContext::default(),
+                            )
+                            .await;
 
                         start.elapsed()
                     })
@@ -231,7 +238,12 @@ fn bench_workflow_system_overhead(c: &mut Criterion) {
                             .await
                             .unwrap();
 
-                        let _ = workflow.execute().await;
+                        let _ = workflow
+                            .execute(
+                                AgentInput::text("bench"),
+                                llmspell_core::ExecutionContext::default(),
+                            )
+                            .await;
 
                         // Save workflow results
                         for i in 0..test_data.state_operations_per_component {
@@ -382,7 +394,7 @@ fn bench_full_system_integration(c: &mut Criterion) {
                     let branch = ParallelBranch {
                         name: format!("branch_{}", i),
                         description: format!("Branch {}", i),
-                        steps: vec![step.into()],
+                        steps: vec![step],
                         required: true,
                         timeout: None,
                     };
@@ -407,7 +419,13 @@ fn bench_full_system_integration(c: &mut Criterion) {
                     .unwrap();
 
                 // Execute workflow
-                let workflow_result = workflow.execute().await.unwrap();
+                let workflow_result = workflow
+                    .execute(
+                        AgentInput::text("test"),
+                        llmspell_core::ExecutionContext::default(),
+                    )
+                    .await
+                    .unwrap();
 
                 // Save workflow result
                 state_manager

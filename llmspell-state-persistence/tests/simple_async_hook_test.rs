@@ -31,7 +31,6 @@ impl Hook for CountingHook {
         self
     }
 }
-
 #[tokio::test]
 async fn test_async_hook_processor_directly() {
     // Create hook executor
@@ -92,7 +91,6 @@ async fn test_async_hook_processor_directly() {
     // Stop processor
     processor.stop().await.unwrap();
 }
-
 #[tokio::test]
 async fn test_state_manager_with_only_after_hooks() {
     // Create manager with persistence enabled so async hooks are available

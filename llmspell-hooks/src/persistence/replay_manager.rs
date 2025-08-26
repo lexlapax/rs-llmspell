@@ -493,7 +493,6 @@ impl Clone for ReplaySession {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_replay_session_config() {
         let config = ReplaySessionConfig::default();
@@ -502,7 +501,6 @@ mod tests {
         assert_eq!(config.speed_multiplier, 1.0);
         assert!(config.break_on_error);
     }
-
     #[test]
     fn test_breakpoint_conditions() {
         let bp1 = ReplayBreakpoint {

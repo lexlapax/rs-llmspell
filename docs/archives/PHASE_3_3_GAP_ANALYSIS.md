@@ -29,7 +29,7 @@ After analyzing the Google ADK workflow agents pattern (https://google.github.io
 
 ### 1.2 Evidence of the Gap
 
-**In Architecture Document** (`rs-llmspell-final-architecture.md`):
+**In Architecture Document** (`master-architecture-vision.md`):
 ```
 Workflow Patterns:
 • SequentialWorkflow

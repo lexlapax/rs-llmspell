@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CascadeDirection","ErrorSeverity","LifecycleEvent","LifecycleState"],"struct":["ComponentHealth","ComponentLifecycle","CompositeLifecycleManager","HealthCheckResult","HierarchicalLifecycleManager","LifecycleConfig"],"trait":["LifecycleEventHandler"]};

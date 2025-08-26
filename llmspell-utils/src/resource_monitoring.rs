@@ -356,7 +356,6 @@ impl ResourceTrackerExt for ResourceTracker {
 mod tests {
     use super::*;
     use crate::resource_limits::ResourceLimits;
-
     #[test]
     fn test_resource_monitor_creation() {
         let config = MonitoringConfig::default();
@@ -365,7 +364,6 @@ mod tests {
         assert_eq!(monitor.get_all_metrics().len(), 0);
         assert_eq!(monitor.get_history().len(), 0);
     }
-
     #[test]
     fn test_component_registration() {
         let monitor = ResourceMonitor::new(MonitoringConfig::default());
@@ -380,7 +378,6 @@ mod tests {
         monitor.unregister_component("test_component");
         assert_eq!(monitor.get_all_metrics().len(), 0);
     }
-
     #[test]
     fn test_event_history() {
         let monitor = ResourceMonitor::new(MonitoringConfig::default());
@@ -405,7 +402,6 @@ mod tests {
         // Note: In a real test, we'd need to wait for async processing
         // For now, just verify the event was sent
     }
-
     #[test]
     fn test_statistics_aggregation() {
         let monitor = ResourceMonitor::new(MonitoringConfig::default());

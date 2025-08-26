@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ValidationRule"],"struct":["DataValidationConfig","DataValidationTool","ValidationError","ValidationResult","ValidationRules"]};

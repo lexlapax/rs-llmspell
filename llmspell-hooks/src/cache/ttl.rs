@@ -116,7 +116,11 @@ impl TtlCacheStats {
         if self.total_gets == 0 {
             0.0
         } else {
-            self.cache_hits as f64 / self.total_gets as f64
+            #[allow(clippy::cast_precision_loss)]
+            let cache_hits_f64 = self.cache_hits as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_gets_f64 = self.total_gets as f64;
+            cache_hits_f64 / total_gets_f64
         }
     }
 
@@ -321,7 +325,9 @@ where
 
         if !expired_keys.is_empty() {
             let mut stats = self.stats.write().unwrap();
-            stats.expired_entries += expired_keys.len() as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let expired_len_u64 = expired_keys.len() as u64;
+            stats.expired_entries += expired_len_u64;
             stats.total_entries = entries.len();
         }
 
@@ -353,6 +359,7 @@ where
             }
         }
 
+        #[allow(clippy::cast_possible_truncation)]
         let expired_count = expired_keys.len() as u64;
 
         for key in expired_keys {
@@ -400,7 +407,6 @@ mod tests {
     use super::*;
     use std::thread;
     use std::time::Duration as StdDuration;
-
     #[test]
     fn test_ttl_entry_creation() {
         let entry = TtlEntry::new("test_value", Duration::from_secs(60));
@@ -410,7 +416,6 @@ mod tests {
         assert!(!entry.is_expired());
         assert!(entry.remaining_ttl() > Duration::from_secs(50));
     }
-
     #[test]
     fn test_ttl_entry_expiration() {
         let mut entry = TtlEntry::new("test_value", Duration::from_millis(100));
@@ -425,7 +430,6 @@ mod tests {
         entry.mark_accessed();
         assert_eq!(entry.access_count, 2);
     }
-
     #[test]
     fn test_ttl_entry_extension() {
         let mut entry = TtlEntry::new("test_value", Duration::from_millis(100));
@@ -436,7 +440,6 @@ mod tests {
         assert!(!entry.is_expired());
         assert!(entry.remaining_ttl() > Duration::from_millis(500));
     }
-
     #[test]
     fn test_ttl_cache_basic_operations() {
         let cache = TtlCache::new();
@@ -459,7 +462,6 @@ mod tests {
         assert_eq!(cache.len(), 0);
         assert!(cache.is_empty());
     }
-
     #[test]
     fn test_ttl_cache_expiration() {
         let config = TtlCacheConfig {
@@ -477,7 +479,6 @@ mod tests {
         let stats = cache.stats();
         assert_eq!(stats.expired_entries, 1);
     }
-
     #[test]
     fn test_ttl_cache_custom_ttl() {
         let cache = TtlCache::new();
@@ -490,7 +491,6 @@ mod tests {
         assert_eq!(cache.get(&"short"), None);
         assert_eq!(cache.get(&"long"), Some("value"));
     }
-
     #[test]
     fn test_ttl_cache_extend_on_access() {
         let config = TtlCacheConfig {
@@ -511,7 +511,6 @@ mod tests {
         thread::sleep(StdDuration::from_millis(75));
         assert_eq!(cache.get(&"key1"), Some("value1"));
     }
-
     #[test]
     fn test_ttl_cache_max_entries() {
         let config = TtlCacheConfig {
@@ -529,7 +528,6 @@ mod tests {
         assert!(cache.contains_key(&"key2"));
         assert!(!cache.contains_key(&"key3"));
     }
-
     #[test]
     fn test_ttl_cache_cleanup() {
         let config = TtlCacheConfig {
@@ -549,7 +547,6 @@ mod tests {
         assert_eq!(expired_count, 2);
         assert_eq!(cache.len(), 0);
     }
-
     #[test]
     fn test_ttl_cache_keys() {
         let cache = TtlCache::new();
@@ -562,7 +559,6 @@ mod tests {
         assert!(keys.contains(&"key1"));
         assert!(keys.contains(&"key2"));
     }
-
     #[test]
     fn test_ttl_cache_clear() {
         let cache = TtlCache::new();
@@ -575,7 +571,6 @@ mod tests {
         assert_eq!(cache.len(), 0);
         assert!(cache.is_empty());
     }
-
     #[test]
     fn test_ttl_cache_stats() {
         let cache = TtlCache::new();
@@ -597,7 +592,6 @@ mod tests {
         assert_eq!(stats.hit_ratio(), 0.5);
         assert_eq!(stats.total_puts, 1);
     }
-
     #[test]
     fn test_ttl_cache_clone() {
         let cache1 = TtlCache::new();

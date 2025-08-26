@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Selective Hook Registry"><title>llmspell_hooks::selective - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="llmspell_hooks" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31) (Homebrew)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../../static.files/storage-3a5871a4.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../llmspell_hooks/index.html">llmspell_<wbr>hooks</a><span class="version">0.6.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module selective</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#selective-hook-registry" title="Selective Hook Registry">Selective Hook Registry</a><ul><li><a href="#features" title="Features">Features</a></li><li><a href="#example" title="Example">Example</a></li></ul></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#constants" title="Constants">Constants</a></li><li><a href="#types" title="Type Aliases">Type Aliases</a></li></ul></section><div id="rustdoc-modnav"><h2 class="in-crate"><a href="../index.html">In crate llmspell_<wbr>hooks</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../index.html">llmspell_hooks</a></div><h1>Module <span>selective</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../src/llmspell_hooks/selective/mod.rs.html#4-76">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="selective-hook-registry"><a class="doc-anchor" href="#selective-hook-registry">§</a>Selective Hook Registry</h2>
+<p>This module provides a selective hook registry implementation designed for
+library mode usage where minimal memory footprint and lazy loading are critical.
+It’s designed as preparation for Phase 18 library mode support.</p>
+<h3 id="features"><a class="doc-anchor" href="#features">§</a>Features</h3>
+<ul>
+<li><strong>Feature Flag Support</strong>: Enable/disable hooks based on compile-time or runtime flags</li>
+<li><strong>Lazy Loading</strong>: Hooks are only loaded when first accessed</li>
+<li><strong>Minimal Memory</strong>: Optimized memory usage with deferred instantiation</li>
+<li><strong>Dynamic Control</strong>: Enable/disable hooks at runtime</li>
+<li><strong>Registry Filtering</strong>: Filter hooks by various criteria</li>
+<li><strong>Performance Optimized</strong>: Zero-cost abstractions when hooks are disabled</li>
+</ul>
+<h3 id="example"><a class="doc-anchor" href="#example">§</a>Example</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>llmspell_hooks::selective::{SelectiveHookRegistry, HookFeatures};
+<span class="kw">use </span>llmspell_hooks::{HookPoint, Hook, HookContext, HookResult};
+<span class="kw">use </span>async_trait::async_trait;
+<span class="kw">use </span>anyhow::Result;
+
+<span class="comment">// Define a hook
+</span><span class="kw">struct </span>MyHook;
+
+<span class="attr">#[async_trait]
+</span><span class="kw">impl </span>Hook <span class="kw">for </span>MyHook {
+    <span class="kw">fn </span>as_any(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="kw">dyn </span>std::any::Any {
+        <span class="self">self
+    </span>}
+     
+    <span class="kw">async fn </span>execute(<span class="kw-2">&amp;</span><span class="self">self</span>, context: <span class="kw-2">&amp;mut </span>HookContext) -&gt; <span class="prelude-ty">Result</span>&lt;HookResult&gt; {
+        <span class="prelude-val">Ok</span>(HookResult::Continue)
+    }
+}
+
+<span class="comment">// Create selective registry with features
+</span><span class="kw">let </span><span class="kw-2">mut </span>features = HookFeatures::default();
+features.enable_feature(<span class="string">"logging"</span>);
+features.enable_feature(<span class="string">"metrics"</span>);
+
+<span class="kw">let </span>registry = SelectiveHookRegistry::new(features);
+
+<span class="comment">// Register hook with feature flag
+</span>registry.register_with_features(
+    HookPoint::BeforeAgentExecution,
+    || Box::new(MyHook),
+    <span class="kw-2">&amp;</span>[<span class="string">"logging"</span>]
+);</code></pre></div>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.HookFeatures.html" title="struct llmspell_hooks::selective::HookFeatures">Hook<wbr>Features</a></dt><dd>Feature flags for selective hook loading</dd><dt><a class="struct" href="struct.LazyHookEntry.html" title="struct llmspell_hooks::selective::LazyHookEntry">Lazy<wbr>Hook<wbr>Entry</a></dt><dd>Lazy hook entry</dd><dt><a class="struct" href="struct.SelectiveHookRegistry.html" title="struct llmspell_hooks::selective::SelectiveHookRegistry">Selective<wbr>Hook<wbr>Registry</a></dt><dd>Selective hook registry with lazy loading and feature flags</dd><dt><a class="struct" href="struct.SelectiveRegistryConfig.html" title="struct llmspell_hooks::selective::SelectiveRegistryConfig">Selective<wbr>Registry<wbr>Config</a></dt><dd>Configuration for selective registry</dd><dt><a class="struct" href="struct.SelectiveRegistryStats.html" title="struct llmspell_hooks::selective::SelectiveRegistryStats">Selective<wbr>Registry<wbr>Stats</a></dt><dd>Statistics for selective registry</dd></dl><h2 id="constants" class="section-header">Constants<a href="#constants" class="anchor">§</a></h2><dl class="item-table"><dt><a class="constant" href="constant.SELECTIVE_REGISTRY_VERSION.html" title="constant llmspell_hooks::selective::SELECTIVE_REGISTRY_VERSION">SELECTIVE_<wbr>REGISTRY_<wbr>VERSION</a></dt></dl><h2 id="types" class="section-header">Type Aliases<a href="#types" class="anchor">§</a></h2><dl class="item-table"><dt><a class="type" href="type.HookFactory.html" title="type llmspell_hooks::selective::HookFactory">Hook<wbr>Factory</a></dt><dd>Hook factory function type</dd></dl></section></div></main></body></html>

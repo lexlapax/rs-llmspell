@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ResourceType"],"struct":["LoggingResourceHook","ResourceAllocation","ResourceLimits","ResourceManager","ResourceRequest","ResourceUsageStats","SecurityResourceHook"],"trait":["ResourceAllocationHook"]};

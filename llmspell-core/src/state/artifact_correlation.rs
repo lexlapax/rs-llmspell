@@ -19,6 +19,7 @@ impl ArtifactId {
     }
 
     /// Generate a new random artifact ID
+    #[must_use]
     pub fn generate() -> Self {
         Self(uuid::Uuid::new_v4().to_string())
     }
@@ -69,6 +70,7 @@ pub struct ArtifactMetadata {
 
 impl ArtifactMetadata {
     /// Create new artifact metadata
+    #[must_use]
     pub fn new(
         id: ArtifactId,
         artifact_type: String,
@@ -186,6 +188,7 @@ pub struct ArtifactCorrelationManager {
 
 impl ArtifactCorrelationManager {
     /// Create a new correlation manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             correlations: Arc::new(RwLock::new(HashMap::new())),
@@ -333,7 +336,6 @@ impl Default for ArtifactCorrelationManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_artifact_id() {
         let id1 = ArtifactId::new("test-artifact");
@@ -342,7 +344,6 @@ mod tests {
         let id2 = ArtifactId::generate();
         assert!(!id2.0.is_empty());
     }
-
     #[test]
     fn test_artifact_metadata() {
         let mut metadata = ArtifactMetadata::new(
@@ -361,7 +362,6 @@ mod tests {
         metadata.add_metadata("language", serde_json::json!("rust"));
         assert_eq!(metadata.metadata.get("language").unwrap(), "rust");
     }
-
     #[tokio::test]
     async fn test_correlation_manager() {
         let manager = ArtifactCorrelationManager::new();
@@ -370,7 +370,7 @@ mod tests {
 
         // Create correlation
         let correlation_id = manager
-            .correlate_creation(artifact_id.clone(), component_id.clone(), None)
+            .correlate_creation(artifact_id.clone(), component_id, None)
             .await;
 
         // Verify correlation exists
@@ -385,7 +385,6 @@ mod tests {
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0], artifact_id);
     }
-
     #[tokio::test]
     async fn test_artifact_lineage() {
         let manager = ArtifactCorrelationManager::new();
@@ -394,17 +393,13 @@ mod tests {
         // Create parent artifact
         let parent_id = ArtifactId::new("parent");
         manager
-            .correlate_creation(parent_id.clone(), component_id.clone(), None)
+            .correlate_creation(parent_id.clone(), component_id, None)
             .await;
 
         // Create child artifact
         let child_id = ArtifactId::new("child");
         manager
-            .correlate_creation(
-                child_id.clone(),
-                component_id.clone(),
-                Some(parent_id.clone()),
-            )
+            .correlate_creation(child_id.clone(), component_id, Some(parent_id.clone()))
             .await;
 
         // Create grandchild artifact

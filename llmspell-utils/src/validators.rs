@@ -472,38 +472,32 @@ mod tests {
     use super::*;
     use std::fs;
     use tempfile::TempDir;
-
     #[test]
     fn test_validate_file_size() {
         assert!(validate_file_size(100, 1000).is_ok());
         assert!(validate_file_size(2000, 1000).is_err());
     }
-
     #[test]
     fn test_validate_string_length() {
         assert!(validate_string_length("hello", 10).is_ok());
         assert!(validate_string_length("hello world", 5).is_err());
     }
-
     #[test]
     fn test_validate_not_empty() {
         assert!(validate_not_empty("hello", "field").is_ok());
         assert!(validate_not_empty("", "field").is_err());
     }
-
     #[test]
     fn test_validate_required_field() {
         assert_eq!(validate_required_field(Some(42), "field").unwrap(), 42);
         assert!(validate_required_field::<i32>(None, "field").is_err());
     }
-
     #[test]
     fn test_validate_range() {
         assert!(validate_range(&5, &1, &10, "value").is_ok());
         assert!(validate_range(&0, &1, &10, "value").is_err());
         assert!(validate_range(&11, &1, &10, "value").is_err());
     }
-
     #[test]
     fn test_validate_path_exists() {
         let temp_dir = TempDir::new().unwrap();
@@ -513,7 +507,6 @@ mod tests {
         assert!(validate_path_exists(&file_path, "file").is_ok());
         assert!(validate_path_exists(&temp_dir.path().join("missing.txt"), "file").is_err());
     }
-
     #[test]
     fn test_validate_is_file() {
         let temp_dir = TempDir::new().unwrap();
@@ -523,7 +516,6 @@ mod tests {
         assert!(validate_is_file(&file_path).is_ok());
         assert!(validate_is_file(temp_dir.path()).is_err());
     }
-
     #[test]
     fn test_validate_is_directory() {
         let temp_dir = TempDir::new().unwrap();
@@ -533,7 +525,6 @@ mod tests {
         assert!(validate_is_directory(temp_dir.path()).is_ok());
         assert!(validate_is_directory(&file_path).is_err());
     }
-
     #[test]
     fn test_validate_identifier() {
         assert!(validate_identifier("valid_name", "field").is_ok());
@@ -542,27 +533,23 @@ mod tests {
         assert!(validate_identifier("123invalid", "field").is_err());
         assert!(validate_identifier("invalid-name", "field").is_err());
     }
-
     #[test]
     fn test_validate_not_empty_collection() {
         assert!(validate_not_empty_collection(&[1, 2, 3], "list").is_ok());
         assert!(validate_not_empty_collection::<i32>(&[], "list").is_err());
     }
-
     #[test]
     fn test_validate_enum() {
         let allowed = ["a", "b", "c"];
         assert!(validate_enum(&"b", &allowed, "choice").is_ok());
         assert!(validate_enum(&"d", &allowed, "choice").is_err());
     }
-
     #[test]
     fn test_validate_url() {
         assert!(validate_url("https://example.com", "url").is_ok());
         assert!(validate_url("http://localhost:8080/path", "url").is_ok());
         assert!(validate_url("not a url", "url").is_err());
     }
-
     #[test]
     fn test_validate_email() {
         assert!(validate_email("user@example.com", "email").is_ok());
@@ -570,7 +557,6 @@ mod tests {
         assert!(validate_email("invalid", "email").is_err());
         assert!(validate_email("@example.com", "email").is_err());
     }
-
     #[test]
     fn test_validate_json_schema() {
         use serde_json::json;
@@ -590,7 +576,6 @@ mod tests {
         assert!(validate_json_schema(&valid_data, &schema).is_ok());
         assert!(validate_json_schema(&invalid_data, &schema).is_err());
     }
-
     #[test]
     fn test_validate_regex_pattern() {
         assert!(validate_regex_pattern(r"\d+").is_ok());
@@ -598,7 +583,6 @@ mod tests {
         assert!(validate_regex_pattern(r"(unclosed").is_err());
         assert!(validate_regex_pattern(r"(?P<invalid)").is_err());
     }
-
     #[test]
     fn test_validate_date_format() {
         assert!(validate_date_format("2024-01-15 14:30:00", "%Y-%m-%d %H:%M:%S").is_ok());
@@ -606,7 +590,6 @@ mod tests {
         assert!(validate_date_format("invalid date", "%Y-%m-%d").is_err());
         assert!(validate_date_format("2024-01-15", "%d/%m/%Y").is_err());
     }
-
     #[test]
     fn test_validate_safe_path() {
         let temp_dir = TempDir::new().unwrap();
@@ -624,7 +607,6 @@ mod tests {
         let home_path = Path::new("~/file.txt");
         assert!(validate_safe_path(home_path, None).is_err());
     }
-
     #[test]
     fn test_sanitize_string() {
         // Test removing control characters
@@ -634,14 +616,12 @@ mod tests {
         assert_eq!(sanitize_string("Tab\there", true), "Tab\there");
         assert_eq!(sanitize_string("Normal text!", true), "Normal text!");
     }
-
     #[test]
     fn test_validate_resource_limit() {
         assert!(validate_resource_limit(100, 1000, "memory", "MB").is_ok());
         assert!(validate_resource_limit(2000, 1000, "memory", "MB").is_err());
         assert!(validate_resource_limit(1000, 1000, "file_size", "bytes").is_ok());
     }
-
     #[test]
     fn test_validate_no_shell_injection() {
         assert!(validate_no_shell_injection("safe_command", "command").is_ok());
@@ -651,7 +631,6 @@ mod tests {
         assert!(validate_no_shell_injection("cmd1; cmd2", "command").is_err());
         assert!(validate_no_shell_injection("cmd1 | cmd2", "command").is_err());
     }
-
     #[test]
     #[cfg(unix)]
     fn test_validate_file_permissions() {

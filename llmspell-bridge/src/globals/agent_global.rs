@@ -1,6 +1,8 @@
 //! ABOUTME: Agent global object implementation for script engines
 //! ABOUTME: Provides Agent creation and management functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::agent_bridge::AgentBridge;
 use crate::ComponentRegistry;
@@ -19,6 +21,10 @@ pub struct AgentGlobal {
 
 impl AgentGlobal {
     /// Create a new Agent global
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if core provider manager creation fails
     pub async fn new(
         registry: Arc<ComponentRegistry>,
         providers: Arc<ProviderManager>,
@@ -34,6 +40,10 @@ impl AgentGlobal {
     }
 
     /// Create with state manager support
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if core provider manager creation fails
     pub async fn with_state_manager(
         registry: Arc<ComponentRegistry>,
         providers: Arc<ProviderManager>,
@@ -51,7 +61,8 @@ impl AgentGlobal {
     }
 
     /// Get the agent bridge
-    pub fn bridge(&self) -> &Arc<AgentBridge> {
+    #[must_use]
+    pub const fn bridge(&self) -> &Arc<AgentBridge> {
         &self.bridge
     }
 }
@@ -71,7 +82,7 @@ impl GlobalObject for AgentGlobal {
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
         crate::lua::globals::agent::inject_agent_global(lua, context, self.bridge.clone()).map_err(
             |e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Agent global: {}", e),
+                message: format!("Failed to inject Agent global: {e}"),
                 source: None,
             },
         )
@@ -85,7 +96,7 @@ impl GlobalObject for AgentGlobal {
     ) -> Result<()> {
         crate::javascript::globals::agent::inject_agent_global(ctx, context).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Agent global for JavaScript: {}", e),
+                message: format!("Failed to inject Agent global for JavaScript: {e}"),
                 source: None,
             }
         })

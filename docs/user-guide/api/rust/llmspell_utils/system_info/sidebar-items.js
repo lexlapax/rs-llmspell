@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["OperatingSystem"],"fn":["find_executable","format_bytes","get_all_env_vars","get_cpu_count","get_env_or","get_env_var","get_home_directory","get_hostname","get_system_info","get_temp_dir","get_username","is_env_truthy","is_running_in_container","is_running_in_vm","set_env_var_if_allowed"],"struct":["SystemInfo"]};

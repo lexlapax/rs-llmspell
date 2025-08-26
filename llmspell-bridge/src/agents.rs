@@ -1,6 +1,7 @@
 //! ABOUTME: Agent discovery and management for script bridge
 //! ABOUTME: Provides registry integration for agents from llmspell-agents crate
 
+use crate::discovery::BridgeDiscovery;
 use llmspell_agents::{AgentConfig, AgentFactory, DefaultAgentFactory};
 use llmspell_core::{Agent, LLMSpellError, Result};
 use std::collections::HashMap;
@@ -16,6 +17,7 @@ pub struct AgentDiscovery {
 
 impl AgentDiscovery {
     /// Create a new agent discovery service with provider manager
+    #[must_use]
     pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
         Self {
             factory: Arc::new(DefaultAgentFactory::new(provider_manager)),
@@ -32,26 +34,30 @@ impl AgentDiscovery {
     }
 
     /// List available agent types
-    pub async fn list_agent_types(&self) -> Vec<String> {
+    pub fn list_agent_types(&self) -> Vec<String> {
         // Use the templates from factory as agent types
         self.factory
             .list_templates()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     }
 
     /// Get available templates from the global registry
-    pub async fn list_templates(&self) -> Vec<String> {
+    pub fn list_templates(&self) -> Vec<String> {
         // For now, use the factory's templates
         self.factory
             .list_templates()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     }
 
     /// Create an agent by type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or agent creation fails
     pub async fn create_agent(
         &self,
         _agent_type: &str,
@@ -61,13 +67,13 @@ impl AgentDiscovery {
         let agent_config: AgentConfig =
             serde_json::from_value(config).map_err(|e| LLMSpellError::Validation {
                 field: Some("config".to_string()),
-                message: format!("Invalid agent configuration: {}", e),
+                message: format!("Invalid agent configuration: {e}"),
             })?;
 
         // Create the agent using the factory
         let agent = self.factory.create_agent(agent_config).await.map_err(|e| {
             LLMSpellError::Component {
-                message: format!("Failed to create agent: {}", e),
+                message: format!("Failed to create agent: {e}"),
                 source: None,
             }
         })?;
@@ -76,6 +82,10 @@ impl AgentDiscovery {
     }
 
     /// Create an agent from a template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template is not found or agent creation fails
     pub async fn create_from_template(
         &self,
         template_name: &str,
@@ -86,12 +96,16 @@ impl AgentDiscovery {
             .create_from_template(template_name)
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create agent from template: {}", e),
+                message: format!("Failed to create agent from template: {e}"),
                 source: None,
             })
     }
 
     /// Get or create a cached agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent creation fails
     pub async fn get_or_create_agent(
         &self,
         name: &str,
@@ -131,11 +145,16 @@ impl AgentDiscovery {
     }
 
     /// Get agent metadata
-    pub async fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
+    /// Get information about an agent type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent type is not found
+    pub fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
         // For now, return basic info since we don't have template details
         Ok(AgentInfo {
             name: agent_type.to_string(),
-            description: format!("Agent type: {}", agent_type),
+            description: format!("Agent type: {agent_type}"),
             category: "agent".to_string(),
             complexity: "standard".to_string(),
             required_parameters: vec!["name".to_string()],
@@ -165,33 +184,76 @@ pub struct AgentInfo {
     pub optional_parameters: Vec<String>,
 }
 
+// Implementation of unified BridgeDiscovery trait for AgentDiscovery
+#[async_trait::async_trait]
+impl BridgeDiscovery<AgentInfo> for AgentDiscovery {
+    async fn discover_types(&self) -> Vec<(String, AgentInfo)> {
+        self.list_agent_types()
+            .into_iter()
+            .filter_map(|agent_type| {
+                self.get_agent_info(&agent_type)
+                    .ok()
+                    .map(|info| (agent_type, info))
+            })
+            .collect()
+    }
+
+    async fn get_type_info(&self, type_name: &str) -> Option<AgentInfo> {
+        self.get_agent_info(type_name).ok()
+    }
+
+    async fn has_type(&self, type_name: &str) -> bool {
+        self.list_agent_types().contains(&type_name.to_string())
+    }
+
+    async fn list_types(&self) -> Vec<String> {
+        self.list_agent_types()
+    }
+
+    async fn filter_types<F>(&self, predicate: F) -> Vec<(String, AgentInfo)>
+    where
+        F: Fn(&str, &AgentInfo) -> bool + Send,
+    {
+        self.list_agent_types()
+            .into_iter()
+            .filter_map(|agent_type| {
+                self.get_agent_info(&agent_type).ok().and_then(|info| {
+                    if predicate(&agent_type, &info) {
+                        Some((agent_type, info))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    }
+}
+
 // Removed Default impl - AgentDiscovery now requires provider manager
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    async fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
+    fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
         Arc::new(llmspell_providers::ProviderManager::new())
     }
-
     #[tokio::test]
     async fn test_agent_discovery() {
-        let provider_manager = create_test_provider_manager().await;
+        let provider_manager = create_test_provider_manager();
         let discovery = AgentDiscovery::new(provider_manager);
 
         // List agent types
-        let types = discovery.list_agent_types().await;
+        let types = discovery.list_agent_types();
         assert!(!types.is_empty());
 
         // List templates
-        let templates = discovery.list_templates().await;
+        let templates = discovery.list_templates();
         assert!(!templates.is_empty());
     }
-
     #[tokio::test]
     async fn test_agent_caching() {
-        let provider_manager = create_test_provider_manager().await;
+        let provider_manager = create_test_provider_manager();
         let discovery = AgentDiscovery::new(provider_manager);
 
         let config = serde_json::json!({
@@ -213,7 +275,7 @@ mod tests {
             .get_or_create_agent("test", "basic", config.clone())
             .await;
         if let Err(e) = &agent1 {
-            eprintln!("Agent creation failed: {:?}", e);
+            eprintln!("Agent creation failed: {e:?}");
         }
         assert!(agent1.is_ok());
 

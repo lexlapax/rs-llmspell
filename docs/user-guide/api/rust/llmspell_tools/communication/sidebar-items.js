@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["database_connector","email_sender"]};

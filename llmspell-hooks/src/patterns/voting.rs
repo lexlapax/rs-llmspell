@@ -327,7 +327,6 @@ mod tests {
     use super::*;
     use crate::traits::FnHook;
     use crate::types::{ComponentId, ComponentType, HookPoint};
-
     #[tokio::test]
     async fn test_simple_majority() {
         let hook = VotingHook::builder("test_majority")
@@ -344,7 +343,6 @@ mod tests {
         // 2 out of 3 voted Continue (66.7% > 50%)
         assert!(matches!(result, HookResult::Continue));
     }
-
     #[tokio::test]
     async fn test_unanimous_requirement() {
         let hook = VotingHook::builder("test_unanimous")
@@ -361,7 +359,6 @@ mod tests {
         // No unanimous winner, defaults to Continue
         assert!(matches!(result, HookResult::Continue));
     }
-
     #[tokio::test]
     async fn test_supermajority() {
         let hook = VotingHook::builder("test_supermajority")
@@ -379,7 +376,6 @@ mod tests {
         // 3 out of 4 voted Modified (75% >= 75%)
         assert!(matches!(result, HookResult::Modified(_)));
     }
-
     #[test]
     fn test_voting_aggregator() {
         let mut aggregator = VotingAggregator::new();
@@ -396,7 +392,6 @@ mod tests {
         assert_eq!(summary["Continue"], 3);
         assert_eq!(summary["Cancel"], 1);
     }
-
     #[test]
     fn test_tie_breaker_strategies() {
         let mut aggregator = VotingAggregator::new();
@@ -419,7 +414,6 @@ mod tests {
         let winner = aggregator.get_winner(0.5, TieBreaker::PreferContinue);
         assert!(matches!(winner, HookResult::Continue));
     }
-
     #[tokio::test]
     async fn test_empty_voting() {
         let hook = VotingHook::new("empty_voting");

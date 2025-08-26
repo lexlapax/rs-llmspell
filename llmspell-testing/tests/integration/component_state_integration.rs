@@ -1,41 +1,23 @@
 // ABOUTME: Integration tests for component state persistence across tools, workflows, and hooks
 // ABOUTME: Validates state persistence integration and cross-component data consistency
 
-use llmspell_core::{ComponentMetadata, ExecutionContext};
-use llmspell_state_persistence::{
-    config::{PersistenceConfig, StorageBackendType},
-    StateManager as PersistentStateManager, StateScope,
-};
-use llmspell_tools::state::{ToolState, ToolStatePersistence, ToolStateRegistry};
+use llmspell_core::ComponentMetadata;
+use llmspell_state_persistence::StateScope;
+use llmspell_testing::state_helpers::create_test_state_manager;
+use llmspell_tools::state::{ToolState, ToolStateRegistry};
 use llmspell_workflows::state::{PersistentWorkflowState, PersistentWorkflowStateManager};
-use llmspell_workflows::{WorkflowConfig, WorkflowStatus};
-use std::sync::Arc;
+use llmspell_workflows::WorkflowConfig;
 use std::time::Duration;
 use tokio::time::sleep;
-
-/// Test helper to create a persistent state manager
-async fn create_test_persistent_state_manager() -> Arc<PersistentStateManager> {
-    let config = PersistenceConfig {
-        enabled: true,
-        ..Default::default()
-    };
-
-    Arc::new(
-        PersistentStateManager::with_backend(StorageBackendType::Memory, config)
-            .await
-            .unwrap(),
-    )
-}
 
 #[cfg(test)]
 mod component_integration_tests {
     use super::*;
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_tool_state_persistence_integration() {
-        let state_manager = create_test_persistent_state_manager().await;
-        let mut registry = ToolStateRegistry::new(state_manager.clone());
+        let state_manager = create_test_state_manager().await;
+        let _registry = ToolStateRegistry::new(state_manager.clone());
 
         // Create multiple tool states
         let tool_metadata =
@@ -46,7 +28,7 @@ mod component_integration_tests {
         let state_scope = StateScope::Custom(format!("tool_{}", tool_metadata.id));
         state_manager
             .set(
-                state_scope,
+                state_scope.clone(),
                 "state",
                 serde_json::to_value(&tool_state).unwrap(),
             )
@@ -66,9 +48,8 @@ mod component_integration_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_workflow_state_persistence_integration() {
-        let persistent_state_manager = create_test_persistent_state_manager().await;
+        let persistent_state_manager = create_test_state_manager().await;
         let config = WorkflowConfig::default();
         let workflow_id = "test-workflow".to_string();
 
@@ -89,9 +70,8 @@ mod component_integration_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_cross_component_state_sharing() {
-        let state_manager = create_test_persistent_state_manager().await;
+        let state_manager = create_test_state_manager().await;
 
         // Create tool state
         let tool_metadata =
@@ -133,14 +113,14 @@ mod component_integration_tests {
         let references_scope = StateScope::Global;
         let references = serde_json::json!({
             "tool_to_workflow": {
-                tool_metadata.id: [workflow_metadata.id.clone()]
+                tool_metadata.id.to_string(): [workflow_metadata.id.to_string()]
             },
             "workflow_to_tool": {
-                workflow_metadata.id: [tool_metadata.id.clone()]
+                workflow_metadata.id.to_string(): [tool_metadata.id.to_string()]
             }
         });
         state_manager
-            .set(references_scope, "component_references", references)
+            .set(references_scope.clone(), "component_references", references)
             .await
             .unwrap();
 
@@ -152,18 +132,19 @@ mod component_integration_tests {
         assert!(loaded_references.is_some());
 
         let refs_value = loaded_references.unwrap();
-        assert!(refs_value["tool_to_workflow"][&tool_metadata.id]
-            .as_array()
-            .unwrap()
-            .contains(&serde_json::Value::String(workflow_metadata.id.clone())));
+        assert!(
+            refs_value["tool_to_workflow"][&tool_metadata.id.to_string()]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::Value::String(workflow_metadata.id.to_string()))
+        );
 
         println!("✅ Cross-component state sharing integration successful");
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_concurrent_state_operations() {
-        let state_manager = create_test_persistent_state_manager().await;
+        let state_manager = create_test_state_manager().await;
 
         // Create multiple concurrent operations
         let mut handles = vec![];
@@ -180,7 +161,7 @@ mod component_integration_tests {
                 let tool_scope = StateScope::Custom(format!("tool_{}", component_id));
                 state_manager
                     .set(
-                        tool_scope,
+                        tool_scope.clone(),
                         "state",
                         serde_json::to_value(&tool_state).unwrap(),
                     )
@@ -211,9 +192,8 @@ mod component_integration_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_state_migration_compatibility() {
-        let state_manager = create_test_persistent_state_manager().await;
+        let state_manager = create_test_state_manager().await;
 
         // Create an "old" version of tool state (simplified structure)
         let old_tool_state = serde_json::json!({
@@ -247,7 +227,7 @@ mod component_integration_tests {
         // Store the old format
         let scope = StateScope::Custom("tool_legacy-tool".to_string());
         state_manager
-            .set(scope, "state", old_tool_state)
+            .set(scope.clone(), "state", old_tool_state)
             .await
             .unwrap();
 
@@ -277,9 +257,8 @@ mod component_integration_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_state_cleanup_and_orphan_detection() {
-        let state_manager = create_test_persistent_state_manager().await;
+        let state_manager = create_test_state_manager().await;
 
         // Create various component states
         let components = vec![
@@ -303,7 +282,7 @@ mod component_integration_tests {
         let mut active_components = Vec::new();
         let mut inactive_components = Vec::new();
 
-        for (scope_suffix, component_id, is_active) in &components {
+        for (scope_suffix, component_id, _is_active) in &components {
             let scope = StateScope::Custom(scope_suffix.to_string());
             if let Ok(Some(state_value)) = state_manager.get(scope, "state").await {
                 if state_value["active"].as_bool().unwrap_or(false) {
@@ -347,9 +326,8 @@ mod component_integration_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_state_performance_under_load() {
-        let state_manager = create_test_persistent_state_manager().await;
+        let state_manager = create_test_state_manager().await;
 
         let start_time = std::time::Instant::now();
         let num_operations = 100;

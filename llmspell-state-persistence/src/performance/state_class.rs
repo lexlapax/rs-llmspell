@@ -180,7 +180,6 @@ impl StateClassConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_state_class_properties() {
         assert!(!StateClass::Trusted.requires_circular_check());
@@ -190,7 +189,6 @@ mod tests {
         assert!(!StateClass::Ephemeral.should_persist());
         assert!(StateClass::Standard.should_persist());
     }
-
     #[test]
     fn test_state_class_inference() {
         assert_eq!(
@@ -214,7 +212,6 @@ mod tests {
             StateClass::Standard
         );
     }
-
     #[test]
     fn test_config_pattern_matching() {
         let config = StateClassConfig::production();
@@ -225,7 +222,6 @@ mod tests {
         assert_eq!(config.classify_key("secret:token"), StateClass::Sensitive);
         assert_eq!(config.classify_key("temp:cache"), StateClass::Ephemeral);
     }
-
     #[test]
     fn test_benchmark_mode() {
         let config = StateClassConfig::benchmark();

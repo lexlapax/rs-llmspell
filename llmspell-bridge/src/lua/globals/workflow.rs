@@ -1,20 +1,23 @@
 //! ABOUTME: Lua-specific Workflow global implementation
 //! ABOUTME: Provides comprehensive Lua bindings for all workflow patterns
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use crate::lua::sync_utils::block_on_async;
 use crate::workflows::{WorkflowBridge, WorkflowInfo};
 use llmspell_core::{ComponentId, LLMSpellError};
 use llmspell_workflows::{Condition, ErrorStrategy, StepType, WorkflowStep};
-use mlua::{Lua, Table, UserData, UserDataMethods, Value};
+use mlua::{AnyUserDataExt, Lua, Table, UserData, UserDataMethods, Value};
 use std::sync::Arc;
 // use std::time::Duration; // Unused for now
 use tracing::{debug, info};
+use uuid;
 
 /// Parse step configuration from Lua table
-#[allow(dead_code)]
-fn _parse_workflow_step(_lua: &Lua, step_table: Table) -> mlua::Result<WorkflowStep> {
+#[allow(clippy::cognitive_complexity)]
+fn parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
     let name: String = step_table.get("name")?;
     let step_type: String = step_table.get("type")?;
 
@@ -44,16 +47,56 @@ fn _parse_workflow_step(_lua: &Lua, step_table: Table) -> mlua::Result<WorkflowS
             WorkflowStep::new(
                 name,
                 StepType::Agent {
-                    agent_id: ComponentId::from_name(&agent_id),
+                    agent_id, // Now uses String directly
                     input,
                 },
             )
         }
         "workflow" => {
-            // Workflow steps not supported yet in StepType
-            return Err(mlua::Error::RuntimeError(
-                "Workflow steps are not yet implemented".to_string(),
-            ));
+            let workflow: mlua::AnyUserData = step_table.get("workflow")?;
+
+            // Get workflow info from the workflow userdata
+            let workflow_info: Table = workflow.call_method("get_info", ())?;
+            let workflow_id: String = workflow_info.get("id")?;
+
+            let input: Option<Table> = step_table.get("input").ok();
+            let input_value = if let Some(input_table) = input {
+                lua_value_to_json(Value::Table(input_table))?
+            } else {
+                serde_json::json!({})
+            };
+
+            // Parse the existing workflow ID - this extracts the UUID part
+            debug!("Parsing workflow ID for nested step: '{}'", workflow_id);
+
+            // Extract just the UUID part from "workflow_UUID" format
+            let uuid_str = workflow_id
+                .strip_prefix("workflow_")
+                .unwrap_or(&workflow_id);
+
+            debug!("Extracted UUID string: '{}'", uuid_str);
+
+            // Parse the UUID directly - don't create a new one!
+            let component_id = uuid::Uuid::parse_str(uuid_str).map_or_else(
+                |_| {
+                    debug!("Failed to parse UUID, falling back to parse_or_from_name");
+                    ComponentId::parse_or_from_name(&workflow_id)
+                },
+                |uuid| {
+                    debug!("Successfully parsed existing UUID: {}", uuid);
+                    ComponentId::from_uuid(uuid)
+                },
+            );
+
+            debug!("Final ComponentId: {}", component_id);
+
+            WorkflowStep::new(
+                name,
+                StepType::Workflow {
+                    workflow_id: component_id,
+                    input: input_value,
+                },
+            )
         }
         "custom" => {
             let function_name: String = step_table.get("function")?;
@@ -75,29 +118,31 @@ fn _parse_workflow_step(_lua: &Lua, step_table: Table) -> mlua::Result<WorkflowS
         }
         _ => {
             return Err(mlua::Error::RuntimeError(format!(
-                "Unknown step type: {}",
-                step_type
+                "Unknown step type: {step_type}"
             )))
         }
     };
 
-    // Parse optional step configuration
+    // Parse optional step configuration and apply to step
+    let mut final_step = step;
+
     if let Ok(timeout_ms) = step_table.get::<_, u64>("timeout_ms") {
         debug!("Step timeout requested: {}ms", timeout_ms);
+        final_step = final_step.with_timeout(std::time::Duration::from_millis(timeout_ms));
     }
 
     if let Ok(retry_count) = step_table.get::<_, u32>("retry_count") {
         debug!("Step retry count: {}", retry_count);
+        final_step = final_step.with_retry(retry_count);
     }
 
-    Ok(step)
+    Ok(final_step)
 }
 
 /// Parse error strategy from string
 #[allow(dead_code)]
 fn _parse_error_strategy(strategy: &str) -> ErrorStrategy {
     match strategy.to_lowercase().as_str() {
-        "fail_fast" | "failfast" => ErrorStrategy::FailFast,
         "continue" => ErrorStrategy::Continue,
         "retry" => ErrorStrategy::Retry {
             max_attempts: 3,
@@ -109,7 +154,8 @@ fn _parse_error_strategy(strategy: &str) -> ErrorStrategy {
 
 /// Parse condition from Lua value
 #[allow(dead_code)]
-fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
+#[allow(clippy::only_used_in_recursion)]
+fn parse_condition(lua: &Lua, condition_value: Value) -> mlua::Result<Condition> {
     match condition_value {
         Value::String(s) => {
             let condition_str = s.to_str()?;
@@ -132,8 +178,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
                         }
                     } else {
                         Err(mlua::Error::RuntimeError(format!(
-                            "Unknown condition: {}",
-                            condition_str
+                            "Unknown condition: {condition_str}"
                         )))
                     }
                 }
@@ -151,7 +196,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
 
                     for pair in conditions.pairs::<i32, Value>() {
                         let (_, cond_value) = pair?;
-                        and_conditions.push(_parse_condition(_lua, cond_value)?);
+                        and_conditions.push(parse_condition(lua, cond_value)?);
                     }
 
                     Ok(Condition::And {
@@ -164,7 +209,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
 
                     for pair in conditions.pairs::<i32, Value>() {
                         let (_, cond_value) = pair?;
-                        or_conditions.push(_parse_condition(_lua, cond_value)?);
+                        or_conditions.push(parse_condition(lua, cond_value)?);
                     }
 
                     Ok(Condition::Or {
@@ -174,7 +219,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
                 "not" => {
                     let inner: Value = t.get("condition")?;
                     Ok(Condition::Not {
-                        condition: Box::new(_parse_condition(_lua, inner)?),
+                        condition: Box::new(parse_condition(lua, inner)?),
                     })
                 }
                 "step_output_equals" | "step_result_equals" => {
@@ -206,8 +251,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
                     })
                 }
                 _ => Err(mlua::Error::RuntimeError(format!(
-                    "Unknown condition type: {}",
-                    condition_type
+                    "Unknown condition type: {condition_type}"
                 ))),
             }
         }
@@ -217,12 +261,14 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
     }
 }
 
-/// Workflow instance that wraps WorkflowBridge
+/// Workflow instance that wraps `WorkflowBridge`
 struct WorkflowInstance {
     bridge: Arc<WorkflowBridge>,
     workflow_id: String,
     name: String,
     workflow_type: String,
+    /// Store the last execution ID for output access
+    last_execution_id: Arc<parking_lot::RwLock<Option<String>>>,
 }
 
 impl UserData for WorkflowInstance {
@@ -232,6 +278,7 @@ impl UserData for WorkflowInstance {
         fields.add_field_method_get("id", |_, this| Ok(this.workflow_id.clone()));
     }
 
+    #[allow(clippy::too_many_lines)]
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // execute method
         methods.add_method("execute", |lua, this, input: Option<Table>| {
@@ -242,6 +289,9 @@ impl UserData for WorkflowInstance {
             };
 
             info!("Executing {} workflow: {}", this.workflow_type, this.name);
+
+            // Clone for async block
+            let last_execution_id = this.last_execution_id.clone();
 
             // Use shared sync utility for async operation
             let result = block_on_async::<_, serde_json::Value, LLMSpellError>(
@@ -254,6 +304,18 @@ impl UserData for WorkflowInstance {
                 None,
             )?;
 
+            // Extract and store execution_id if present - check metadata.extra first
+            let execution_id = result
+                .get("metadata")
+                .and_then(|m| m.get("extra"))
+                .and_then(|e| e.get("execution_id"))
+                .and_then(|v| v.as_str())
+                .or_else(|| result.get("execution_id").and_then(|v| v.as_str()));
+
+            if let Some(exec_id) = execution_id {
+                *last_execution_id.write() = Some(exec_id.to_string());
+            }
+
             // Convert result to Lua table
             let result_value = json_to_lua_value(lua, &result)?;
 
@@ -265,8 +327,8 @@ impl UserData for WorkflowInstance {
             }
         });
 
-        // getInfo method
-        methods.add_method("getInfo", |lua, this, ()| {
+        // get_info method
+        methods.add_method("get_info", |lua, this, ()| {
             let info_table = lua.create_table()?;
             info_table.set("id", this.workflow_id.clone())?;
             info_table.set("name", this.name.clone())?;
@@ -275,8 +337,8 @@ impl UserData for WorkflowInstance {
             Ok(info_table)
         });
 
-        // getState method (integrates with State global)
-        methods.add_method("getState", |lua, this, key: String| {
+        // get_state method (integrates with State global)
+        methods.add_method("get_state", |lua, this, key: String| {
             // Access State global if available
             if let Ok(globals) = lua.globals().get::<_, Table>("State") {
                 if let Ok(get_fn) = globals.get::<_, mlua::Function>("get") {
@@ -293,9 +355,9 @@ impl UserData for WorkflowInstance {
             Ok(mlua::Value::Table(state_table))
         });
 
-        // setState method (integrates with State global)
+        // set_state method (integrates with State global)
         methods.add_method(
-            "setState",
+            "set_state",
             |lua, this, (key, value): (String, mlua::Value)| {
                 // Access State global if available
                 if let Ok(globals) = lua.globals().get::<_, Table>("State") {
@@ -311,34 +373,75 @@ impl UserData for WorkflowInstance {
             },
         );
 
-        // onBeforeExecute method (Hook integration)
-        methods.add_method("onBeforeExecute", |lua, this, _callback: mlua::Function| {
-            // Store callback for future use in Phase 4
-            // For now, just acknowledge the registration
-            let result_table = lua.create_table()?;
-            result_table.set(
-                "message",
-                "Hook registered (Phase 4 implementation pending)",
-            )?;
-            result_table.set("workflow_id", this.workflow_id.clone())?;
-            result_table.set("hook_type", "before_execute")?;
-            Ok(result_table)
-        });
+        // set_shared_data method - Set shared data for conditional workflows
+        methods.add_method(
+            "set_shared_data",
+            |lua, this, (key, value): (String, mlua::Value)| {
+                // Store in workflow-specific shared data namespace
+                // This integrates with the State global if available
+                if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                    if let Ok(set_fn) = globals.get::<_, mlua::Function>("set") {
+                        // Use a special namespace for workflow shared data
+                        let shared_key = format!("workflow:{}:shared:{}", this.workflow_id, key);
+                        set_fn.call::<_, ()>((shared_key, value.clone()))?;
+                    }
+                }
 
-        // onAfterExecute method (Hook integration)
-        methods.add_method("onAfterExecute", |lua, this, _callback: mlua::Function| {
-            let result_table = lua.create_table()?;
-            result_table.set(
-                "message",
-                "Hook registered (Phase 4 implementation pending)",
-            )?;
-            result_table.set("workflow_id", this.workflow_id.clone())?;
-            result_table.set("hook_type", "after_execute")?;
-            Ok(result_table)
-        });
+                // Convert value to JSON for storage
+                let json_value = lua_value_to_json(value)?;
 
-        // onError method (Hook integration)
-        methods.add_method("onError", |lua, this, _callback: mlua::Function| {
+                // Store using bridge's internal state mechanism
+                let bridge = this.bridge.clone();
+                let workflow_id = this.workflow_id.clone();
+
+                block_on_async(
+                    "set_shared_data",
+                    async move {
+                        bridge
+                            .set_workflow_shared_data(&workflow_id, &key, json_value)
+                            .await
+                    },
+                    None,
+                )?;
+
+                Ok(())
+            },
+        );
+
+        // on_before_execute method (Hook integration)
+        methods.add_method(
+            "on_before_execute",
+            |lua, this, _callback: mlua::Function| {
+                // Store callback for future use in Phase 4
+                // For now, just acknowledge the registration
+                let result_table = lua.create_table()?;
+                result_table.set(
+                    "message",
+                    "Hook registered (Phase 4 implementation pending)",
+                )?;
+                result_table.set("workflow_id", this.workflow_id.clone())?;
+                result_table.set("hook_type", "before_execute")?;
+                Ok(result_table)
+            },
+        );
+
+        // on_after_execute method (Hook integration)
+        methods.add_method(
+            "on_after_execute",
+            |lua, this, _callback: mlua::Function| {
+                let result_table = lua.create_table()?;
+                result_table.set(
+                    "message",
+                    "Hook registered (Phase 4 implementation pending)",
+                )?;
+                result_table.set("workflow_id", this.workflow_id.clone())?;
+                result_table.set("hook_type", "after_execute")?;
+                Ok(result_table)
+            },
+        );
+
+        // on_error method (Hook integration)
+        methods.add_method("on_error", |lua, this, _callback: mlua::Function| {
             let result_table = lua.create_table()?;
             result_table.set(
                 "message",
@@ -347,6 +450,144 @@ impl UserData for WorkflowInstance {
             result_table.set("workflow_id", this.workflow_id.clone())?;
             result_table.set("hook_type", "on_error")?;
             Ok(result_table)
+        });
+
+        // NEW: get_output method - retrieves output from state for a specific step
+        methods.add_method("get_output", |lua, this, step_name: String| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to read the output
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(load_fn) = globals.get::<_, mlua::Function>("load") {
+                    let state_key = format!("workflow:{execution_id}:{step_name}");
+                    let scope = "Global".to_string();
+                    return load_fn.call::<_, mlua::Value>((scope, state_key));
+                }
+            }
+
+            Err(mlua::Error::RuntimeError(
+                "State global not available".to_string(),
+            ))
+        });
+
+        // NEW: get_all_outputs method - retrieves all outputs from the last execution
+        methods.add_method("get_all_outputs", |lua, this, ()| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to list and retrieve outputs
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(list_fn) = globals.get::<_, mlua::Function>("list_keys") {
+                    let prefix = format!("workflow:{execution_id}");
+
+                    // Get all keys for this workflow execution
+                    if let Ok(Value::Table(keys_table)) =
+                        list_fn.call::<_, mlua::Value>(prefix.clone())
+                    {
+                        let outputs_table = lua.create_table()?;
+
+                        // Get load function
+                        if let Ok(load_fn) = globals.get::<_, mlua::Function>("load") {
+                            // Iterate through keys and load each output
+                            for (_, key) in keys_table.pairs::<i32, String>().flatten() {
+                                // Extract step name from key
+                                if let Some(step_name) = key.strip_prefix(&format!("{prefix}:")) {
+                                    let full_key = format!("workflow:{execution_id}:{step_name}");
+                                    if let Ok(value) = load_fn
+                                        .call::<_, mlua::Value>(("Global".to_string(), full_key))
+                                    {
+                                        outputs_table.set(step_name, value)?;
+                                    }
+                                }
+                            }
+                        }
+
+                        return Ok(outputs_table);
+                    }
+                }
+            }
+
+            // Return empty table if State not available
+            lua.create_table()
+        });
+
+        // NEW: list_outputs method - lists available output keys from last execution
+        methods.add_method("list_outputs", |lua, this, ()| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to list keys
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(list_fn) = globals.get::<_, mlua::Function>("list_keys") {
+                    let prefix = format!("workflow:{execution_id}");
+                    return list_fn.call::<_, Table>(prefix);
+                }
+            }
+
+            // Return empty table if State not available
+            lua.create_table()
+        });
+
+        // NEW: clear_outputs method - cleans up state from last execution
+        methods.add_method("clear_outputs", |lua, this, ()| {
+            let execution_id = this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })?;
+
+            // Access State global to delete outputs
+            if let Ok(globals) = lua.globals().get::<_, Table>("State") {
+                if let Ok(list_fn) = globals.get::<_, mlua::Function>("list_keys") {
+                    if let Ok(delete_fn) = globals.get::<_, mlua::Function>("delete") {
+                        let prefix = format!("workflow:{execution_id}");
+
+                        // Get all keys for this workflow execution
+                        if let Ok(Value::Table(keys_table)) = list_fn.call::<_, mlua::Value>(prefix)
+                        {
+                            let mut deleted_count = 0;
+
+                            // Delete each key
+                            for (_, key) in keys_table.pairs::<i32, String>().flatten() {
+                                let full_key = format!("workflow:{execution_id}:{key}");
+                                if delete_fn
+                                    .call::<_, ()>(("Global".to_string(), full_key))
+                                    .is_ok()
+                                {
+                                    deleted_count += 1;
+                                }
+                            }
+
+                            let result = lua.create_table()?;
+                            result.set("deleted", deleted_count)?;
+                            return Ok(result);
+                        }
+                    }
+                }
+            }
+
+            let result = lua.create_table()?;
+            result.set("deleted", 0)?;
+            Ok(result)
+        });
+
+        // NEW: get_execution_id method - returns the last execution ID
+        methods.add_method("get_execution_id", |_, this, ()| {
+            this.last_execution_id.read().clone().ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "No workflow execution found. Run execute() first.".to_string(),
+                )
+            })
         });
 
         // emit method (Event integration)
@@ -414,8 +655,8 @@ impl UserData for WorkflowInstance {
             Ok(validation_result)
         });
 
-        // getMetrics method - Performance and execution metrics
-        methods.add_method("getMetrics", |lua, this, ()| {
+        // get_metrics method - Performance and execution metrics
+        methods.add_method("get_metrics", |lua, this, ()| {
             let metrics_table = lua.create_table()?;
             metrics_table.set("workflow_id", this.workflow_id.clone())?;
 
@@ -434,7 +675,451 @@ impl UserData for WorkflowInstance {
     }
 }
 
+/// Type alias for workflow condition functions
+type WorkflowCondition = Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>;
+
+/// `WorkflowBuilder` for creating workflows with method chaining
+struct WorkflowBuilder {
+    bridge: Arc<WorkflowBridge>,
+    workflow_type: Option<String>,
+    name: Option<String>,
+    description: Option<String>,
+    steps: Vec<WorkflowStep>,
+    error_strategy: Option<String>,
+    timeout_ms: Option<u64>,
+    // Conditional workflow fields
+    condition_type: Option<String>, // Store condition type
+    condition_params: Option<serde_json::Value>, // Store condition parameters
+    then_steps: Vec<WorkflowStep>,
+    else_steps: Vec<WorkflowStep>,
+    // Loop workflow fields
+    loop_condition: Option<WorkflowCondition>,
+    max_iterations: Option<usize>,
+    loop_iterator_type: Option<String>, // "range", "collection", or "while"
+    loop_range_start: Option<i64>,
+    loop_range_end: Option<i64>,
+    loop_range_step: Option<i64>,
+    loop_collection: Option<Vec<serde_json::Value>>,
+    // Parallel workflow fields
+    max_concurrency: Option<usize>,
+}
+
+impl WorkflowBuilder {
+    fn new(bridge: Arc<WorkflowBridge>) -> Self {
+        Self {
+            bridge,
+            workflow_type: None,
+            name: None,
+            description: None,
+            steps: Vec::new(),
+            error_strategy: None,
+            timeout_ms: None,
+            condition_type: None,
+            condition_params: None,
+            then_steps: Vec::new(),
+            else_steps: Vec::new(),
+            loop_condition: None,
+            max_iterations: None,
+            loop_iterator_type: None,
+            loop_range_start: None,
+            loop_range_end: None,
+            loop_range_step: None,
+            loop_collection: None,
+            max_concurrency: None,
+        }
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+impl UserData for WorkflowBuilder {
+    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        // Set workflow type
+        methods.add_method_mut("sequential", |_, this, ()| {
+            this.workflow_type = Some("sequential".to_string());
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("conditional", |_, this, ()| {
+            this.workflow_type = Some("conditional".to_string());
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("loop_workflow", |_, this, ()| {
+            this.workflow_type = Some("loop".to_string());
+            Ok(this.clone())
+        });
+
+        // Alias for convenience
+        methods.add_method_mut("loop", |_, this, ()| {
+            this.workflow_type = Some("loop".to_string());
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("parallel", |_, this, ()| {
+            this.workflow_type = Some("parallel".to_string());
+            Ok(this.clone())
+        });
+
+        // Common configuration methods
+        methods.add_method_mut("name", |_, this, name: String| {
+            this.name = Some(name);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("description", |_, this, desc: String| {
+            this.description = Some(desc);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("error_strategy", |_, this, strategy: String| {
+            this.error_strategy = Some(strategy);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("timeout_ms", |_, this, timeout: u64| {
+            this.timeout_ms = Some(timeout);
+            Ok(this.clone())
+        });
+
+        // Add step (for sequential, loop, and parallel workflows)
+        methods.add_method_mut("add_step", |lua, this, step_table: Table| {
+            let step = parse_workflow_step(lua, &step_table)?;
+            this.steps.push(step);
+            Ok(this.clone())
+        });
+
+        // Conditional workflow specific methods
+        methods.add_method_mut("condition", |_lua, this, condition_table: Table| {
+            // Parse condition from table instead of function
+            let condition_type: String = condition_table.get("type")?;
+
+            // Store condition type and parameters
+            this.condition_type = Some(condition_type.clone());
+
+            // Convert Lua table to JSON for parameters
+            let mut params = serde_json::Map::new();
+
+            match condition_type.as_str() {
+                "shared_data_equals" => {
+                    let key: String = condition_table.get("key")?;
+                    let value: mlua::Value = condition_table.get("value")?;
+
+                    params.insert("key".to_string(), serde_json::Value::String(key));
+                    params.insert("value".to_string(), lua_value_to_json(value)?);
+                }
+                "shared_data_exists" => {
+                    let key: String = condition_table.get("key")?;
+                    params.insert("key".to_string(), serde_json::Value::String(key));
+                }
+                "always" | "never" => {
+                    // No parameters needed
+                }
+                _ => {
+                    return Err(mlua::Error::RuntimeError(format!(
+                        "Unknown condition type: {condition_type}"
+                    )));
+                }
+            }
+
+            this.condition_params = Some(serde_json::Value::Object(params));
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("add_then_step", |lua, this, step_table: Table| {
+            let step = parse_workflow_step(lua, &step_table)?;
+            this.then_steps.push(step);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("add_else_step", |lua, this, step_table: Table| {
+            let step = parse_workflow_step(lua, &step_table)?;
+            this.else_steps.push(step);
+            Ok(this.clone())
+        });
+
+        // Enhanced multi-branch support: add_branch for explicit N-way routing
+        methods.add_method_mut("add_branch", |lua, this, args: (Table, Table)| {
+            let (condition_table, steps_table) = args;
+
+            // Parse condition from table
+            let _condition_type: String = condition_table
+                .get("type")
+                .unwrap_or_else(|_| "custom".to_string());
+
+            // Parse steps for this branch
+            let steps: Vec<WorkflowStep> = steps_table
+                .sequence_values::<Table>()
+                .filter_map(|step_table| {
+                    step_table
+                        .ok()
+                        .and_then(|st| parse_workflow_step(lua, &st).ok())
+                })
+                .collect();
+
+            // For now, add to else_steps (future: support proper branch structure)
+            for step in steps {
+                this.else_steps.push(step);
+            }
+
+            Ok(this.clone())
+        });
+
+        // Loop workflow specific methods
+        methods.add_method_mut("with_range", |_, this, params: Table| {
+            this.loop_iterator_type = Some("range".to_string());
+            if let Ok(start) = params.get::<_, i64>("start") {
+                this.loop_range_start = Some(start);
+            }
+            if let Ok(end) = params.get::<_, i64>("end") {
+                this.loop_range_end = Some(end);
+            }
+            if let Ok(step) = params.get::<_, i64>("step") {
+                this.loop_range_step = Some(step);
+            }
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_collection", |_, this, values: Table| {
+            this.loop_iterator_type = Some("collection".to_string());
+            let mut collection = Vec::new();
+            for (_, value) in values.pairs::<mlua::Value, mlua::Value>().flatten() {
+                collection.push(lua_value_to_json(value)?);
+            }
+            this.loop_collection = Some(collection);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("with_while", |_, this, _condition: String| {
+            this.loop_iterator_type = Some("while".to_string());
+            // Store the condition string - it will be evaluated in Rust
+            this.loop_condition = Some(Box::new(move |_| true)); // Placeholder
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("loop_condition", |_, this, _func: mlua::Function| {
+            // Store Lua function for loop condition
+            this.loop_condition = Some(Box::new(move |_value| {
+                // In a real implementation, this would evaluate the Lua function
+                true
+            }));
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_iterations", |_, this, max: usize| {
+            this.max_iterations = Some(max);
+            Ok(this.clone())
+        });
+
+        // Parallel workflow specific methods
+        methods.add_method_mut("max_concurrency", |_, this, max: usize| {
+            this.max_concurrency = Some(max);
+            Ok(this.clone())
+        });
+
+        // Build method
+        methods.add_method("build", |_lua, this, ()| {
+            let workflow_type = this.workflow_type.as_ref().ok_or_else(|| {
+                mlua::Error::RuntimeError("Workflow type not specified".to_string())
+            })?;
+
+            let name = this.name.clone().unwrap_or_else(|| {
+                format!(
+                    "workflow_{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .chars()
+                        .take(8)
+                        .collect::<String>()
+                )
+            });
+
+            // No longer need JSON config - using direct Rust structures
+
+            // Convert internal StepType to WorkflowStep directly (no JSON)
+            let workflow_steps: Vec<llmspell_workflows::WorkflowStep> = this
+                .steps
+                .iter()
+                .map(|step| llmspell_workflows::WorkflowStep {
+                    id: step.id,
+                    name: step.name.clone(),
+                    step_type: step.step_type.clone(),
+                    timeout: step.timeout, // Preserve the timeout from the parsed step
+                    retry_attempts: step.retry_attempts, // Preserve retry attempts too
+                })
+                .collect();
+
+            // Create WorkflowConfig from builder settings
+            let workflow_config = llmspell_workflows::WorkflowConfig {
+                max_execution_time: this.timeout_ms.map(std::time::Duration::from_millis),
+                default_step_timeout: std::time::Duration::from_secs(30),
+                max_retry_attempts: 3,
+                retry_delay_ms: 1000,
+                exponential_backoff: false,
+                default_error_strategy: llmspell_workflows::ErrorStrategy::FailFast,
+                continue_on_error: false,
+            };
+
+            // Convert error strategy if provided
+            let error_strategy = this.error_strategy.as_ref().map(|s| match s.as_str() {
+                "continue" => llmspell_workflows::ErrorStrategy::Continue,
+                "retry" => llmspell_workflows::ErrorStrategy::Retry {
+                    max_attempts: 3,
+                    backoff_ms: 1000,
+                },
+                _ => llmspell_workflows::ErrorStrategy::FailFast,
+            });
+
+            // For conditional workflows, we need to pass condition info and both branches
+            let final_steps = match workflow_type.as_str() {
+                "conditional" => {
+                    // For conditional workflows, we'll pass both branches
+                    // For now, use regular steps as a fallback
+                    workflow_steps
+                }
+                _ => workflow_steps,
+            };
+
+            // Create workflow using refactored method (no JSON)
+            let bridge = this.bridge.clone();
+            let workflow_name = name;
+
+            // Clone data needed for conditional workflow creation
+            let condition_type = this.condition_type.clone();
+            let condition_params = this.condition_params.clone();
+            let then_steps = this.then_steps.clone();
+            let else_steps = this.else_steps.clone();
+
+            let result = block_on_async(
+                "workflow_builder_create",
+                async move {
+                    let workflow_name_clone = workflow_name.clone();
+                    let workflow_type_clone = workflow_type.clone();
+
+                    // For conditional workflows, use special creation method
+                    if workflow_type == "conditional" {
+                        bridge
+                            .create_conditional_workflow(
+                                workflow_name_clone.clone(),
+                                condition_type,
+                                condition_params,
+                                then_steps,
+                                else_steps,
+                                workflow_config,
+                                error_strategy,
+                            )
+                            .await
+                    } else if workflow_type == "loop" {
+                        // For loop workflows, use special creation method with iterator config
+                        let iterator_type = this
+                            .loop_iterator_type
+                            .clone()
+                            .unwrap_or_else(|| "range".to_string());
+
+                        // Build iterator params based on type
+                        let iterator_params = match iterator_type.as_str() {
+                            "range" => {
+                                let mut params = serde_json::Map::new();
+                                if let Some(start) = this.loop_range_start {
+                                    params.insert("start".to_string(), serde_json::json!(start));
+                                }
+                                if let Some(end) = this.loop_range_end {
+                                    params.insert("end".to_string(), serde_json::json!(end));
+                                }
+                                if let Some(step) = this.loop_range_step {
+                                    params.insert("step".to_string(), serde_json::json!(step));
+                                }
+                                Some(serde_json::Value::Object(params))
+                            }
+                            "collection" => {
+                                let mut params = serde_json::Map::new();
+                                if let Some(ref values) = this.loop_collection {
+                                    params.insert("values".to_string(), serde_json::json!(values));
+                                }
+                                Some(serde_json::Value::Object(params))
+                            }
+                            "while" => {
+                                let mut params = serde_json::Map::new();
+                                params.insert("condition".to_string(), serde_json::json!("true"));
+                                Some(serde_json::Value::Object(params))
+                            }
+                            _ => None,
+                        };
+
+                        bridge
+                            .create_loop_workflow(
+                                workflow_name_clone.clone(),
+                                iterator_type,
+                                iterator_params,
+                                final_steps,
+                                this.max_iterations,
+                                workflow_config,
+                                error_strategy,
+                            )
+                            .await
+                    } else {
+                        bridge
+                            .create_workflow(
+                                workflow_type,
+                                workflow_name_clone.clone(),
+                                final_steps,
+                                workflow_config,
+                                error_strategy,
+                            )
+                            .await
+                    }
+                    .map(|workflow_id| WorkflowInstance {
+                        workflow_id,
+                        bridge: bridge.clone(),
+                        name: workflow_name_clone,
+                        workflow_type: workflow_type_clone,
+                        last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
+                    })
+                },
+                None,
+            )?;
+
+            Ok(result)
+        });
+    }
+}
+
+// Implement Clone for WorkflowBuilder
+impl Clone for WorkflowBuilder {
+    fn clone(&self) -> Self {
+        Self {
+            bridge: self.bridge.clone(),
+            workflow_type: self.workflow_type.clone(),
+            name: self.name.clone(),
+            description: self.description.clone(),
+            steps: self.steps.clone(),
+            error_strategy: self.error_strategy.clone(),
+            timeout_ms: self.timeout_ms,
+            condition_type: self.condition_type.clone(),
+            condition_params: self.condition_params.clone(),
+            then_steps: self.then_steps.clone(),
+            else_steps: self.else_steps.clone(),
+            loop_condition: None, // Can't clone closures, will be set fresh
+            max_iterations: self.max_iterations,
+            loop_iterator_type: self.loop_iterator_type.clone(),
+            loop_range_start: self.loop_range_start,
+            loop_range_end: self.loop_range_end,
+            loop_range_step: self.loop_range_step,
+            loop_collection: self.loop_collection.clone(),
+            max_concurrency: self.max_concurrency,
+        }
+    }
+}
+
 /// Inject Workflow global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if Lua table creation or function binding fails
+///
+/// # Panics
+///
+/// Panics if the Lua table creation or function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_workflow_global(
     lua: &Lua,
     _context: &GlobalContext,
@@ -444,7 +1129,7 @@ pub fn inject_workflow_global(
 
     // Workflow.sequential() - accepts full configuration
     let bridge_clone = workflow_bridge.clone();
-    let sequential_fn = lua.create_function(move |_lua, config: Table| {
+    let sequential_fn = lua.create_function(move |lua, config: Table| {
         let bridge = bridge_clone.clone();
 
         // Use shared sync utility for async operation
@@ -452,14 +1137,14 @@ pub fn inject_workflow_global(
             "workflow_create_sequential",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
                 })?;
-                let description: Option<String> = config.get("description").ok();
+                let _description: Option<String> = config.get("description").ok();
                 let steps: Table = config.get("steps").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow steps: {}", e),
+                    message: format!("Failed to get workflow steps: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
@@ -467,46 +1152,59 @@ pub fn inject_workflow_global(
                 let error_strategy: Option<String> = config.get("error_strategy").ok();
                 let timeout_ms: Option<u64> = config.get("timeout_ms").ok();
 
-                // Convert to JSON parameters for WorkflowFactory
-                let mut params = serde_json::json!({
-                    "name": name.clone(),
-                    "steps": []
-                });
-
-                if let Some(desc) = &description {
-                    params["description"] = serde_json::json!(desc);
-                }
-
-                if let Some(strategy) = &error_strategy {
-                    params["error_strategy"] = serde_json::json!(strategy);
-                }
-
-                if let Some(ms) = timeout_ms {
-                    params["timeout_ms"] = serde_json::json!(ms);
-                }
-
-                // Add steps to params
-                let steps_array = params["steps"].as_array_mut().unwrap();
+                // Convert Lua steps to Rust WorkflowStep structures
+                let mut workflow_steps = Vec::new();
                 for pair in steps.pairs::<i32, Table>() {
                     let (_, step_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate workflow steps: {}", e),
+                        message: format!("Failed to iterate workflow steps: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
-                    let step_json = lua_value_to_json(Value::Table(step_table)).map_err(|e| {
+
+                    // Parse step from Lua table to WorkflowStep
+                    let step = parse_workflow_step(lua, &step_table).map_err(|e| {
                         LLMSpellError::Script {
-                            message: format!("Failed to convert step to JSON: {}", e),
+                            message: format!("Failed to parse workflow step: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
                         }
                     })?;
-                    steps_array.push(step_json);
+                    workflow_steps.push(step);
                 }
 
-                // Register with workflow bridge
-                let workflow_id = bridge.create_workflow("sequential", params).await?;
+                // Create WorkflowConfig
+                let workflow_config = llmspell_workflows::WorkflowConfig {
+                    max_execution_time: timeout_ms.map(std::time::Duration::from_millis),
+                    default_step_timeout: std::time::Duration::from_secs(30),
+                    max_retry_attempts: 3,
+                    retry_delay_ms: 1000,
+                    exponential_backoff: false,
+                    default_error_strategy: llmspell_workflows::ErrorStrategy::FailFast,
+                    continue_on_error: false,
+                };
+
+                // Convert error strategy
+                let error_strat = error_strategy.as_ref().map(|s| match s.as_str() {
+                    "continue" => llmspell_workflows::ErrorStrategy::Continue,
+                    "retry" => llmspell_workflows::ErrorStrategy::Retry {
+                        max_attempts: 3,
+                        backoff_ms: 1000,
+                    },
+                    _ => llmspell_workflows::ErrorStrategy::FailFast,
+                });
+
+                // Create workflow using refactored method
+                let workflow_id = bridge
+                    .create_workflow(
+                        "sequential",
+                        name.clone(),
+                        workflow_steps,
+                        workflow_config,
+                        error_strat,
+                    )
+                    .await?;
 
                 debug!(
                     "Created and registered sequential workflow: {} ({})",
@@ -518,6 +1216,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "sequential".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -528,7 +1227,7 @@ pub fn inject_workflow_global(
 
     // Workflow.conditional() - accepts branches and conditions
     let bridge_clone = workflow_bridge.clone();
-    let conditional_fn = lua.create_function(move |_lua, config: Table| {
+    let conditional_fn = lua.create_function(move |lua, config: Table| {
         let bridge = bridge_clone.clone();
 
         // Use shared sync utility for async operation
@@ -536,73 +1235,87 @@ pub fn inject_workflow_global(
             "workflow_create_conditional",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
                 })?;
-                let description: Option<String> = config.get("description").ok();
+                let _description: Option<String> = config.get("description").ok();
                 let branches: Table =
                     config.get("branches").map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to get workflow branches: {}", e),
+                        message: format!("Failed to get workflow branches: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
-                let default_branch: Option<Table> = config.get("default_branch").ok();
+                let _default_branch: Option<Table> = config.get("default_branch").ok();
                 let error_strategy: Option<String> = config.get("error_strategy").ok();
 
-                // Convert to JSON parameters for WorkflowFactory
-                let mut params = serde_json::json!({
-                    "name": name.clone(),
-                    "branches": []
-                });
-
-                if let Some(desc) = &description {
-                    params["description"] = serde_json::json!(desc);
-                }
-
-                if let Some(strategy) = &error_strategy {
-                    params["error_strategy"] = serde_json::json!(strategy);
-                }
-
-                // Add branches to params
-                let branches_array = params["branches"].as_array_mut().unwrap();
+                // Convert branches to steps (simplified conditional workflow)
+                // For now, just use the first branch's steps
+                let mut workflow_steps = Vec::new();
                 for pair in branches.pairs::<i32, Table>() {
                     let (_, branch_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate workflow branches: {}", e),
+                        message: format!("Failed to iterate workflow branches: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
-                    let branch_json =
-                        lua_value_to_json(Value::Table(branch_table)).map_err(|e| {
-                            LLMSpellError::Script {
-                                message: format!("Failed to convert branch to JSON: {}", e),
+
+                    // Get steps from this branch
+                    if let Ok(steps_table) = branch_table.get::<_, Table>("steps") {
+                        for step_pair in steps_table.pairs::<i32, Table>() {
+                            let (_, step_table) = step_pair.map_err(|e| LLMSpellError::Script {
+                                message: format!("Failed to iterate branch steps: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
-                            }
-                        })?;
-                    branches_array.push(branch_json);
+                            })?;
+                            let step = parse_workflow_step(lua, &step_table).map_err(|e| {
+                                LLMSpellError::Script {
+                                    message: format!("Failed to parse workflow step: {e}"),
+                                    language: Some("lua".to_string()),
+                                    line: None,
+                                    source: None,
+                                }
+                            })?;
+                            workflow_steps.push(step);
+                        }
+                        break; // Just use first branch for now
+                    }
                 }
 
-                // Add default branch if provided
-                if let Some(default_table) = default_branch {
-                    let default_json =
-                        lua_value_to_json(Value::Table(default_table)).map_err(|e| {
-                            LLMSpellError::Script {
-                                message: format!("Failed to convert default branch to JSON: {}", e),
-                                language: Some("lua".to_string()),
-                                line: None,
-                                source: None,
-                            }
-                        })?;
-                    params["default_branch"] = default_json;
-                }
+                // Create WorkflowConfig
+                let workflow_config = llmspell_workflows::WorkflowConfig {
+                    max_execution_time: None,
+                    default_step_timeout: std::time::Duration::from_secs(30),
+                    max_retry_attempts: 3,
+                    retry_delay_ms: 1000,
+                    exponential_backoff: false,
+                    default_error_strategy: llmspell_workflows::ErrorStrategy::FailFast,
+                    continue_on_error: false,
+                };
 
-                // Register with workflow bridge
-                let workflow_id = bridge.create_workflow("conditional", params).await?;
+                // Convert error strategy
+                let error_strat = error_strategy.as_ref().map(|s| match s.as_str() {
+                    "continue" => llmspell_workflows::ErrorStrategy::Continue,
+                    "retry" => llmspell_workflows::ErrorStrategy::Retry {
+                        max_attempts: 3,
+                        backoff_ms: 1000,
+                    },
+                    _ => llmspell_workflows::ErrorStrategy::FailFast,
+                });
+
+                // Create workflow using refactored method
+                let workflow_id = bridge
+                    .create_workflow(
+                        "conditional",
+                        name.clone(),
+                        workflow_steps,
+                        workflow_config,
+                        error_strat,
+                    )
+                    .await?;
 
                 debug!(
                     "Created and registered conditional workflow: {} ({})",
@@ -614,6 +1327,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "conditional".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -624,7 +1338,7 @@ pub fn inject_workflow_global(
 
     // Workflow.loop() - accepts iterators and body
     let bridge_clone = workflow_bridge.clone();
-    let loop_fn = lua.create_function(move |_lua, config: Table| {
+    let loop_fn = lua.create_function(move |lua, config: Table| {
         let bridge = bridge_clone.clone();
 
         // Use shared sync utility for async operation
@@ -632,50 +1346,39 @@ pub fn inject_workflow_global(
             "workflow_create_loop",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
                 })?;
-                let description: Option<String> = config.get("description").ok();
+                let _description: Option<String> = config.get("description").ok();
                 let iterator_table: Table =
                     config.get("iterator").map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to get iterator configuration: {}", e),
+                        message: format!("Failed to get iterator configuration: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
                 let body: Table = config.get("body").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get loop body: {}", e),
+                    message: format!("Failed to get loop body: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
                 })?;
-                let break_conditions: Option<Table> = config.get("break_conditions").ok();
+                let _break_conditions: Option<Table> = config.get("break_conditions").ok();
                 let error_strategy: Option<String> = config.get("error_strategy").ok();
 
-                // Convert to JSON parameters for WorkflowFactory
-                let mut params = serde_json::json!({
-                    "name": name.clone(),
-                    "body": []
-                });
-
-                if let Some(desc) = &description {
-                    params["description"] = serde_json::json!(desc);
-                }
-
-                if let Some(strategy) = &error_strategy {
-                    params["error_strategy"] = serde_json::json!(strategy);
-                }
+                // Convert body steps to Rust WorkflowStep structures
+                let mut workflow_steps = Vec::new();
 
                 // Parse iterator configuration from the table
-                let iterator_obj = if let Ok(range) = iterator_table.get::<_, Table>("range") {
+                let _iterator_obj = if let Ok(range) = iterator_table.get::<_, Table>("range") {
                     // Range iterator
                     let start = range.get::<_, i32>("start").unwrap_or(0);
                     let end = range
                         .get::<_, i32>("end")
                         .map_err(|e| LLMSpellError::Script {
-                            message: format!("Failed to get range end: {}", e),
+                            message: format!("Failed to get range end: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
@@ -683,28 +1386,24 @@ pub fn inject_workflow_global(
                     let step = range.get::<_, i32>("step").unwrap_or(1);
 
                     serde_json::json!({
-                        "range": {
-                            "start": start,
-                            "end": end,
-                            "step": step
-                        }
+                        "type": "range",
+                        "start": start,
+                        "end": end,
+                        "step": step
                     })
                 } else if let Ok(collection) = iterator_table.get::<_, Table>("collection") {
                     // Collection iterator
                     let mut collection_vec = Vec::new();
                     for pair in collection.pairs::<i32, Value>() {
                         let (_, value) = pair.map_err(|e| LLMSpellError::Script {
-                            message: format!("Failed to iterate collection: {}", e),
+                            message: format!("Failed to iterate collection: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
                         })?;
                         collection_vec.push(lua_value_to_json(value).map_err(|e| {
                             LLMSpellError::Script {
-                                message: format!(
-                                    "Failed to convert collection item to JSON: {}",
-                                    e
-                                ),
+                                message: format!("Failed to convert collection item to JSON: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
@@ -713,7 +1412,8 @@ pub fn inject_workflow_global(
                     }
 
                     serde_json::json!({
-                        "collection": collection_vec
+                        "type": "collection",
+                        "items": collection_vec
                     })
                 } else if let Ok(condition_str) = iterator_table.get::<_, String>("while_condition")
                 {
@@ -723,7 +1423,8 @@ pub fn inject_workflow_global(
                         .unwrap_or(100);
 
                     serde_json::json!({
-                        "while_condition": condition_str,
+                        "type": "while",
+                        "condition": condition_str,
                         "max_iterations": max_iterations
                     })
                 } else {
@@ -737,56 +1438,57 @@ pub fn inject_workflow_global(
                     });
                 };
 
-                params["iterator"] = iterator_obj;
-
-                // Add body steps
-                let body_array = params["body"].as_array_mut().unwrap();
+                // Note: Iterator configuration is simplified for now (not using iterator_obj)
+                // Parse body steps directly to WorkflowStep
                 for pair in body.pairs::<i32, Table>() {
                     let (_, step_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate body steps: {}", e),
+                        message: format!("Failed to iterate body steps: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
-                    let step_json = lua_value_to_json(Value::Table(step_table)).map_err(|e| {
+                    let step = parse_workflow_step(lua, &step_table).map_err(|e| {
                         LLMSpellError::Script {
-                            message: format!("Failed to convert body step to JSON: {}", e),
+                            message: format!("Failed to parse workflow step: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
                         }
                     })?;
-                    body_array.push(step_json);
+                    workflow_steps.push(step);
                 }
 
-                // Add break conditions
-                if let Some(conditions_table) = break_conditions {
-                    let mut break_conditions_array = Vec::new();
-                    for pair in conditions_table.pairs::<i32, Value>() {
-                        let (_, condition_value) = pair.map_err(|e| LLMSpellError::Script {
-                            message: format!("Failed to iterate break conditions: {}", e),
-                            language: Some("lua".to_string()),
-                            line: None,
-                            source: None,
-                        })?;
-                        let condition_json = lua_value_to_json(condition_value).map_err(|e| {
-                            LLMSpellError::Script {
-                                message: format!(
-                                    "Failed to convert break condition to JSON: {}",
-                                    e
-                                ),
-                                language: Some("lua".to_string()),
-                                line: None,
-                                source: None,
-                            }
-                        })?;
-                        break_conditions_array.push(condition_json);
-                    }
-                    params["break_conditions"] = serde_json::json!(break_conditions_array);
-                }
+                // Create WorkflowConfig
+                let workflow_config = llmspell_workflows::WorkflowConfig {
+                    max_execution_time: None,
+                    default_step_timeout: std::time::Duration::from_secs(30),
+                    max_retry_attempts: 3,
+                    retry_delay_ms: 1000,
+                    exponential_backoff: false,
+                    default_error_strategy: llmspell_workflows::ErrorStrategy::FailFast,
+                    continue_on_error: false,
+                };
 
-                // Register with workflow bridge
-                let workflow_id = bridge.create_workflow("loop", params).await?;
+                // Convert error strategy
+                let error_strat = error_strategy.as_ref().map(|s| match s.as_str() {
+                    "continue" => llmspell_workflows::ErrorStrategy::Continue,
+                    "retry" => llmspell_workflows::ErrorStrategy::Retry {
+                        max_attempts: 3,
+                        backoff_ms: 1000,
+                    },
+                    _ => llmspell_workflows::ErrorStrategy::FailFast,
+                });
+
+                // Create workflow using refactored method
+                let workflow_id = bridge
+                    .create_workflow(
+                        "loop",
+                        name.clone(),
+                        workflow_steps,
+                        workflow_config,
+                        error_strat,
+                    )
+                    .await?;
 
                 debug!(
                     "Created and registered loop workflow: {} ({})",
@@ -798,6 +1500,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "loop".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -808,7 +1511,7 @@ pub fn inject_workflow_global(
 
     // Workflow.parallel() - accepts branches configuration
     let bridge_clone = workflow_bridge.clone();
-    let parallel_fn = lua.create_function(move |_lua, config: Table| {
+    let parallel_fn = lua.create_function(move |lua, config: Table| {
         let bridge = bridge_clone.clone();
 
         // Use shared sync utility for async operation
@@ -816,12 +1519,12 @@ pub fn inject_workflow_global(
             "workflow_create_parallel",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
                 })?;
-                let description: Option<String> = config.get("description").ok();
+                let _description: Option<String> = config.get("description").ok();
 
                 // Accept both "branches" and "steps" for API consistency
                 let branches: Table = if let Ok(branches) = config.get::<&str, Table>("branches") {
@@ -837,55 +1540,74 @@ pub fn inject_workflow_global(
                         source: None,
                     });
                 };
-                let max_concurrency: Option<usize> = config.get("max_concurrency").ok();
+                let _max_concurrency: Option<usize> = config.get("max_concurrency").ok();
                 let error_strategy: Option<String> = config.get("error_strategy").ok();
                 let timeout_ms: Option<u64> = config.get("timeout_ms").ok();
 
-                // Convert to JSON parameters for WorkflowFactory
-                let mut params = serde_json::json!({
-                    "name": name.clone(),
-                    "branches": []
-                });
-
-                if let Some(desc) = &description {
-                    params["description"] = serde_json::json!(desc);
-                }
-
-                if let Some(strategy) = &error_strategy {
-                    params["error_strategy"] = serde_json::json!(strategy);
-                }
-
-                if let Some(max) = max_concurrency {
-                    params["max_concurrency"] = serde_json::json!(max);
-                }
-
-                if let Some(ms) = timeout_ms {
-                    params["timeout_ms"] = serde_json::json!(ms);
-                }
-
-                // Add branches to params
-                let branches_array = params["branches"].as_array_mut().unwrap();
+                // Convert branches to steps (simplified parallel workflow)
+                // For now, merge all branch steps into a single list
+                let mut workflow_steps = Vec::new();
                 for pair in branches.pairs::<i32, Table>() {
                     let (_, branch_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate workflow branches: {}", e),
+                        message: format!("Failed to iterate workflow branches: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
-                    let branch_json =
-                        lua_value_to_json(Value::Table(branch_table)).map_err(|e| {
-                            LLMSpellError::Script {
-                                message: format!("Failed to convert branch to JSON: {}", e),
+
+                    // Get steps from this branch if available
+                    if let Ok(steps_table) = branch_table.get::<_, Table>("steps") {
+                        for step_pair in steps_table.pairs::<i32, Table>() {
+                            let (_, step_table) = step_pair.map_err(|e| LLMSpellError::Script {
+                                message: format!("Failed to iterate branch steps: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
-                            }
-                        })?;
-                    branches_array.push(branch_json);
+                            })?;
+                            let step = parse_workflow_step(lua, &step_table).map_err(|e| {
+                                LLMSpellError::Script {
+                                    message: format!("Failed to parse workflow step: {e}"),
+                                    language: Some("lua".to_string()),
+                                    line: None,
+                                    source: None,
+                                }
+                            })?;
+                            workflow_steps.push(step);
+                        }
+                    }
                 }
 
-                // Register with workflow bridge
-                let workflow_id = bridge.create_workflow("parallel", params).await?;
+                // Create WorkflowConfig
+                let workflow_config = llmspell_workflows::WorkflowConfig {
+                    max_execution_time: timeout_ms.map(std::time::Duration::from_millis),
+                    default_step_timeout: std::time::Duration::from_secs(30),
+                    max_retry_attempts: 3,
+                    retry_delay_ms: 1000,
+                    exponential_backoff: false,
+                    default_error_strategy: llmspell_workflows::ErrorStrategy::FailFast,
+                    continue_on_error: false,
+                };
+
+                // Convert error strategy
+                let error_strat = error_strategy.as_ref().map(|s| match s.as_str() {
+                    "continue" => llmspell_workflows::ErrorStrategy::Continue,
+                    "retry" => llmspell_workflows::ErrorStrategy::Retry {
+                        max_attempts: 3,
+                        backoff_ms: 1000,
+                    },
+                    _ => llmspell_workflows::ErrorStrategy::FailFast,
+                });
+
+                // Create workflow using refactored method
+                let workflow_id = bridge
+                    .create_workflow(
+                        "parallel",
+                        name.clone(),
+                        workflow_steps,
+                        workflow_config,
+                        error_strat,
+                    )
+                    .await?;
 
                 debug!(
                     "Created and registered parallel workflow: {} ({})",
@@ -897,6 +1619,7 @@ pub fn inject_workflow_global(
                     workflow_id,
                     name,
                     workflow_type: "parallel".to_string(),
+                    last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                 })
             },
             None,
@@ -955,30 +1678,45 @@ pub fn inject_workflow_global(
 
     // Add registry methods
 
-    // Workflow.list() - list all registered workflows
+    // Workflow.list() - list all registered workflow instances
     let bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "list",
         lua.create_function(move |lua, ()| {
             let bridge = bridge_clone.clone();
 
-            // Use shared sync utility for async operation
-            let workflows = block_on_async::<_, Vec<(String, WorkflowInfo)>, LLMSpellError>(
-                "workflow_list",
-                async move {
-                    Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(bridge.list_workflows().await)
-                },
-                None,
-            )?;
+            // Get registered workflow instances from ComponentRegistry
+            let registered_workflows = bridge.get_registered_workflows();
 
             let list_table = lua.create_table()?;
-            for (i, (id, info)) in workflows.iter().enumerate() {
-                let workflow_table = lua.create_table()?;
-                workflow_table.set("id", id.clone())?;
-                workflow_table.set("type", info.workflow_type.clone())?;
-                workflow_table.set("description", info.description.clone())?;
-                workflow_table.set("features", info.features.clone())?;
-                list_table.set(i + 1, workflow_table)?;
+
+            // If we have registered instances, return those
+            if registered_workflows.is_empty() {
+                // Fallback: show workflow types if no instances registered
+                let workflow_types = block_on_async::<_, Vec<(String, WorkflowInfo)>, LLMSpellError>(
+                    "workflow_list_types",
+                    async move {
+                        Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(bridge.get_all_workflow_info())
+                    },
+                    None,
+                )?;
+
+                for (i, (id, info)) in workflow_types.iter().enumerate() {
+                    let workflow_table = lua.create_table()?;
+                    workflow_table.set("id", id.clone())?;
+                    workflow_table.set("type", info.workflow_type.clone())?;
+                    workflow_table.set("description", info.description.clone())?;
+                    workflow_table.set("features", info.features.clone())?;
+                    list_table.set(i + 1, workflow_table)?;
+                }
+            } else {
+                for (i, (id, name)) in registered_workflows.iter().enumerate() {
+                    let workflow_table = lua.create_table()?;
+                    workflow_table.set("id", format!("workflow_{id}"))?; // Add prefix for consistency
+                    workflow_table.set("name", name.clone())?;
+                    workflow_table.set("type", "instance")?; // Mark as instance, not type
+                    list_table.set(i + 1, workflow_table)?;
+                }
             }
 
             Ok(list_table)
@@ -986,7 +1724,6 @@ pub fn inject_workflow_global(
     )?;
 
     // Workflow.get() - get a specific workflow by ID
-    let _bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "get",
         lua.create_function({
@@ -997,7 +1734,7 @@ pub fn inject_workflow_global(
                 let info = block_on_async::<_, Option<WorkflowInfo>, LLMSpellError>(
                     "workflow_get_info",
                     async move {
-                        let workflows = bridge.list_workflows().await;
+                        let workflows = bridge.get_all_workflow_info();
                         Ok::<Option<WorkflowInfo>, LLMSpellError>(
                             workflows
                                 .into_iter()
@@ -1012,8 +1749,9 @@ pub fn inject_workflow_global(
                     Ok(WorkflowInstance {
                         bridge: bridge_clone.clone(),
                         workflow_id: workflow_id.clone(),
-                        name: workflow_id.clone(), // Use workflow_id as name for now
+                        name: workflow_id, // Use workflow_id as name for now
                         workflow_type: workflow_info.workflow_type,
+                        last_execution_id: Arc::new(parking_lot::RwLock::new(None)),
                     })
                 } else {
                     Err(mlua::Error::RuntimeError("Workflow not found".to_string()))
@@ -1031,8 +1769,8 @@ pub fn inject_workflow_global(
 
             // Use shared sync utility for async operation
             block_on_async::<_, (), LLMSpellError>(
-                &format!("workflow_remove_{}", workflow_id),
-                async move { bridge.remove_workflow(&workflow_id).await },
+                &format!("workflow_remove_{workflow_id}"),
+                async move { bridge.remove_workflow(&workflow_id) },
                 None,
             )?;
 
@@ -1040,22 +1778,74 @@ pub fn inject_workflow_global(
         })?,
     )?;
 
-    // Workflow.register() - register a workflow (alias for create_workflow)
+    // Workflow.register() - register a workflow using Rust structures
     let bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "register",
-        lua.create_function(move |_lua, (workflow_type, params): (String, Table)| {
+        lua.create_function(move |lua, (workflow_type, params): (String, Table)| {
             let bridge = bridge_clone.clone();
 
-            // Convert Lua table to JSON
-            let params_json = lua_value_to_json(Value::Table(params)).map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to convert params: {}", e))
-            })?;
+            // Parse workflow name
+            let name: String = params.get("name").unwrap_or_else(|_| {
+                format!(
+                    "workflow_{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .chars()
+                        .take(8)
+                        .collect::<String>()
+                )
+            });
+
+            // Parse steps from params
+            let mut workflow_steps = Vec::new();
+            if let Ok(steps_table) = params.get::<_, Table>("steps") {
+                for pair in steps_table.pairs::<i32, Table>() {
+                    let (_, step_table) = pair.map_err(|e| {
+                        mlua::Error::RuntimeError(format!("Failed to iterate steps: {e}"))
+                    })?;
+                    let step = parse_workflow_step(lua, &step_table)?;
+                    workflow_steps.push(step);
+                }
+            }
+
+            // Create WorkflowConfig
+            let timeout_ms: Option<u64> = params.get("timeout_ms").ok();
+            let workflow_config = llmspell_workflows::WorkflowConfig {
+                max_execution_time: timeout_ms.map(std::time::Duration::from_millis),
+                default_step_timeout: std::time::Duration::from_secs(30),
+                max_retry_attempts: 3,
+                retry_delay_ms: 1000,
+                exponential_backoff: false,
+                default_error_strategy: llmspell_workflows::ErrorStrategy::FailFast,
+                continue_on_error: false,
+            };
+
+            // Parse error strategy
+            let error_strategy: Option<String> = params.get("error_strategy").ok();
+            let error_strat = error_strategy.as_ref().map(|s| match s.as_str() {
+                "continue" => llmspell_workflows::ErrorStrategy::Continue,
+                "retry" => llmspell_workflows::ErrorStrategy::Retry {
+                    max_attempts: 3,
+                    backoff_ms: 1000,
+                },
+                _ => llmspell_workflows::ErrorStrategy::FailFast,
+            });
 
             // Use shared sync utility for async operation
             let workflow_id = block_on_async::<_, String, LLMSpellError>(
-                &format!("workflow_register_{}", workflow_type),
-                async move { bridge.create_workflow(&workflow_type, params_json).await },
+                &format!("workflow_register_{workflow_type}"),
+                async move {
+                    bridge
+                        .create_workflow(
+                            &workflow_type,
+                            name,
+                            workflow_steps,
+                            workflow_config,
+                            error_strat,
+                        )
+                        .await
+                },
                 None,
             )?;
 
@@ -1076,7 +1866,7 @@ pub fn inject_workflow_global(
                 "workflow_clear_list",
                 async move {
                     Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(
-                        bridge_for_list.list_workflows().await,
+                        bridge_for_list.get_all_workflow_info(),
                     )
                 },
                 None,
@@ -1086,8 +1876,8 @@ pub fn inject_workflow_global(
             for (workflow_id, _) in workflows {
                 let bridge = bridge.clone();
                 let _ = block_on_async::<_, (), LLMSpellError>(
-                    &format!("workflow_clear_remove_{}", workflow_id),
-                    async move { bridge.remove_workflow(&workflow_id).await },
+                    &format!("workflow_clear_remove_{workflow_id}"),
+                    async move { bridge.remove_workflow(&workflow_id) },
                     None,
                 );
             }
@@ -1097,6 +1887,12 @@ pub fn inject_workflow_global(
     )?;
 
     // Note: executeAsync helper removed - all methods now use synchronous API
+
+    // Add Workflow.builder() method
+    let bridge_for_builder = workflow_bridge;
+    let builder_fn =
+        lua.create_function(move |_lua, ()| Ok(WorkflowBuilder::new(bridge_for_builder.clone())))?;
+    workflow_table.set("builder", builder_fn)?;
 
     // Set Workflow as global
     lua.globals().set("Workflow", workflow_table)?;

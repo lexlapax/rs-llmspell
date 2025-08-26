@@ -155,11 +155,13 @@ impl StateError {
     }
 
     /// Check if this error indicates a missing/not found state
+    #[must_use]
     pub fn is_not_found(&self) -> bool {
         matches!(self, Self::NotFound { .. })
     }
 
     /// Check if this error is retryable
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         matches!(
             self,
@@ -168,6 +170,7 @@ impl StateError {
     }
 
     /// Check if this error indicates a permanent failure
+    #[must_use]
     pub fn is_permanent(&self) -> bool {
         matches!(
             self,
@@ -196,7 +199,6 @@ impl From<std::io::Error> for StateError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_error_creation() {
         let err = StateError::not_found("global", "test_key");
@@ -210,7 +212,6 @@ mod tests {
         let err = StateError::serialization("invalid json");
         assert!(err.is_permanent());
     }
-
     #[test]
     fn test_error_display() {
         let err = StateError::not_found("global", "test_key");
@@ -222,7 +223,6 @@ mod tests {
         let err = StateError::serialization("invalid data");
         assert_eq!(err.to_string(), "Serialization error: invalid data");
     }
-
     #[test]
     fn test_error_conversion() {
         // Create a JSON parse error

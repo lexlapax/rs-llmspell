@@ -227,11 +227,12 @@ impl ArtifactCollector for AgentOutputCollector {
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType};
-
     #[tokio::test]
     async fn test_agent_output_collection() {
-        let mut config = CollectionConfig::default();
-        config.min_size = 10; // Lower minimum for tests
+        let config = CollectionConfig {
+            min_size: 10, // Lower minimum for tests
+            ..Default::default()
+        };
         let collector = AgentOutputCollector::with_config(config);
         let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
         let mut context = HookContext::new(HookPoint::AfterAgentExecution, component_id);
@@ -266,11 +267,12 @@ mod tests {
         // Check that artifact was added to context
         assert!(context.data.contains_key("collected_artifact"));
     }
-
     #[tokio::test]
     async fn test_text_output_collection() {
-        let mut config = CollectionConfig::default();
-        config.min_size = 10; // Lower minimum for tests
+        let config = CollectionConfig {
+            min_size: 10, // Lower minimum for tests
+            ..Default::default()
+        };
         let collector = AgentOutputCollector::with_config(config);
         let component_id = ComponentId::new(ComponentType::Agent, "writer-agent".to_string());
         let mut context = HookContext::new(HookPoint::AfterAgentExecution, component_id);
@@ -289,12 +291,13 @@ mod tests {
         assert!(artifact_data.name.ends_with(".txt"));
         assert_eq!(artifact_data.mime_type, "text/plain");
     }
-
     #[tokio::test]
     async fn test_size_limits() {
-        let mut config = CollectionConfig::default();
-        config.min_size = 10;
-        config.max_size = 100;
+        let config = CollectionConfig {
+            min_size: 10,
+            max_size: 100,
+            ..Default::default()
+        };
 
         let collector = AgentOutputCollector::with_config(config);
         let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());

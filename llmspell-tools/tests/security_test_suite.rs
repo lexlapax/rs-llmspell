@@ -7,6 +7,16 @@ use llmspell_core::{
     BaseAgent, ExecutionContext, LLMSpellError,
 };
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
+use llmspell_tools::communication::database_connector::DatabaseConnectorConfig;
+use llmspell_tools::communication::email_sender::EmailSenderConfig;
+use llmspell_tools::data::json_processor::JsonProcessorConfig;
+use llmspell_tools::fs::{FileOperationsConfig, FileSearchConfig};
+use llmspell_tools::search::WebSearchConfig;
+use llmspell_tools::system::ProcessExecutorConfig;
+use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
+use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
+use llmspell_tools::web::web_scraper::WebScraperConfig;
 use llmspell_tools::*;
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -19,7 +29,7 @@ fn create_test_context() -> ExecutionContext {
 }
 
 /// Create an agent input with the given parameters
-fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
+fn create_agent_input(params: &Value) -> AgentInput {
     // AgentInput expects parameters to be wrapped in a "parameters" object
     let mut input = AgentInput::text("");
     let wrapped_params = json!({ "parameters": params });
@@ -27,7 +37,7 @@ fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
         // Convert serde_json::Map to HashMap
         input.parameters = map.into_iter().collect();
     }
-    Ok(input)
+    input
 }
 
 /// Test path traversal attempts across file system tools
@@ -76,9 +86,7 @@ async fn test_path_traversal_prevention() {
                     !output_str.contains("root:")
                         && !output_str.contains("/etc/passwd")
                         && !output_str.contains("system32"),
-                    "Tool {} may be vulnerable to path traversal: {}",
-                    tool_name,
-                    malicious_path
+                    "Tool {tool_name} may be vulnerable to path traversal: {malicious_path}"
                 );
             }
         }
@@ -121,21 +129,13 @@ async fn test_ssrf_prevention() {
             .await;
 
             // Tools should either reject, timeout, or handle safely
-            match result {
-                Ok(Ok(output)) => {
-                    assert!(
-                        !output.text.contains("/etc/passwd") && !output.text.contains("metadata"),
-                        "Tool {} may be vulnerable to SSRF with URL: {}",
-                        tool_name,
-                        url
-                    );
-                }
-                Ok(Err(_)) => {
-                    // Tool rejected the URL - this is good
-                }
-                Err(_) => {
-                    // Timeout - this is also acceptable for SSRF prevention
-                }
+            if let Ok(Ok(output)) = result {
+                assert!(
+                    !output.text.contains("/etc/passwd") && !output.text.contains("metadata"),
+                    "Tool {tool_name} may be vulnerable to SSRF with URL: {url}"
+                );
+            } else {
+                // Tool rejected the URL or timed out - both are acceptable for SSRF prevention
             }
         }
     }
@@ -167,8 +167,7 @@ async fn test_command_injection_prevention() {
         if let Ok(output) = &result {
             assert!(
                 !output.text.contains("root:") && !output.text.contains("/etc/passwd"),
-                "ProcessExecutor may be vulnerable to command injection: {}",
-                cmd
+                "ProcessExecutor may be vulnerable to command injection: {cmd}"
             );
         }
     }
@@ -352,8 +351,7 @@ async fn test_email_header_injection() {
                 || output.text.contains("failed");
             assert!(
                 has_error,
-                "Email sender may be vulnerable to header injection with payload: {}",
-                payload
+                "Email sender may be vulnerable to header injection with payload: {payload}"
             );
         }
     }
@@ -540,14 +538,17 @@ async fn test_error_message_safety() {
 /// Helper function to execute tools directly
 async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput, LLMSpellError> {
     let context = create_test_context();
-    let input = create_agent_input(params)?;
+    let input = create_agent_input(&params);
 
     match tool_name {
         // File system tools
         "file-operations" => {
-            FileOperationsTool::new(Default::default())
-                .execute(input, context)
-                .await
+            FileOperationsTool::new(
+                FileOperationsConfig::default(),
+                create_default_test_sandbox(),
+            )
+            .execute(input, context)
+            .await
         }
         "file-search" => {
             let sandbox_context = SandboxContext {
@@ -560,7 +561,7 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
                 allowed_env_vars: vec![],
             };
             let sandbox = Arc::new(FileSandbox::new(sandbox_context)?);
-            FileSearchTool::new(Default::default(), sandbox)
+            FileSearchTool::new(FileSearchConfig::default(), sandbox)
                 .execute(input, context)
                 .await
         }
@@ -568,7 +569,7 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
 
         // Web tools
         "web-scraper" => {
-            WebScraperTool::new(Default::default())
+            WebScraperTool::new(WebScraperConfig::default())
                 .execute(input, context)
                 .await
         }
@@ -577,26 +578,29 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
         "url-analyzer" => UrlAnalyzerTool::new().execute(input, context).await,
         "sitemap-crawler" => SitemapCrawlerTool::new().execute(input, context).await,
         "web_search" => {
-            WebSearchTool::new(Default::default())?
+            WebSearchTool::new(WebSearchConfig::default())?
                 .execute(input, context)
                 .await
         }
 
         // System tools
         "process-executor" => {
-            ProcessExecutorTool::new(Default::default())
-                .execute(input, context)
-                .await
+            ProcessExecutorTool::new(
+                ProcessExecutorConfig::default(),
+                create_default_test_sandbox(),
+            )
+            .execute(input, context)
+            .await
         }
 
         // Data processing tools
         "json-processor" => {
-            JsonProcessorTool::new(Default::default())
+            JsonProcessorTool::new(JsonProcessorConfig::default())
                 .execute(input, context)
                 .await
         }
         "database-connector" => {
-            DatabaseConnectorTool::new(Default::default())?
+            DatabaseConnectorTool::new(DatabaseConnectorConfig::default())?
                 .execute(input, context)
                 .await
         }
@@ -604,25 +608,25 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
         // Utility tools
         "template-engine" => TemplateEngineTool::new().execute(input, context).await,
         "text-manipulator" => {
-            TextManipulatorTool::new(Default::default())
+            TextManipulatorTool::new(TextManipulatorConfig::default())
                 .execute(input, context)
                 .await
         }
         "uuid-generator" => {
-            UuidGeneratorTool::new(Default::default())
+            UuidGeneratorTool::new(UuidGeneratorConfig::default())
                 .execute(input, context)
                 .await
         }
 
         // Communication tools
         "email-sender" => {
-            EmailSenderTool::new(Default::default())?
+            EmailSenderTool::new(EmailSenderConfig::default())?
                 .execute(input, context)
                 .await
         }
 
         _ => Err(LLMSpellError::Tool {
-            message: format!("Unknown tool: {}", tool_name),
+            message: format!("Unknown tool: {tool_name}"),
             tool_name: Some(tool_name.to_string()),
             source: None,
         }),

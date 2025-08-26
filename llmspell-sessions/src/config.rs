@@ -257,7 +257,6 @@ impl Default for SessionManagerConfigBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_default_config() {
         let config = SessionManagerConfig::default();
@@ -266,7 +265,6 @@ mod tests {
         assert!(config.enable_compression);
         assert_eq!(config.compression_level, 3);
     }
-
     #[test]
     fn test_config_builder() {
         let config = SessionManagerConfigBuilder::new()
@@ -281,7 +279,6 @@ mod tests {
         assert!(!config.auto_persist);
         assert_eq!(config.compression_level, 9);
     }
-
     #[test]
     fn test_compression_level_clamping() {
         let config = SessionManagerConfigBuilder::new()

@@ -217,7 +217,7 @@ impl TimelineQueryExecutor {
         // Apply filters to each correlation
         let mut matching_entries = Vec::new();
         let correlations_count = correlations.len();
-        let total_events_examined = correlations.values().map(|v| v.len()).sum::<usize>();
+        let total_events_examined = correlations.values().map(Vec::len).sum::<usize>();
 
         for (correlation_id, events) in correlations {
             let timeline_entries = self.build_timeline_entries(events, correlation_id);
@@ -239,7 +239,9 @@ impl TimelineQueryExecutor {
         }
 
         result.entries = matching_entries;
-        result.execution_time_ms = start_time.elapsed().as_millis() as u64;
+        #[allow(clippy::cast_possible_truncation)]
+        let elapsed_ms = start_time.elapsed().as_millis() as u64;
+        result.execution_time_ms = elapsed_ms;
 
         // Add result metadata
         result.metadata.insert(
@@ -577,12 +579,11 @@ mod tests {
     use crate::universal_event::{Language, UniversalEvent};
     use serde_json::Value;
 
+    // Local test helper to avoid circular dependency with llmspell-testing
     fn create_test_event(event_type: &str, correlation_id: Uuid) -> UniversalEvent {
-        let mut event = UniversalEvent::new(event_type, Value::Null, Language::Rust);
-        event.metadata.correlation_id = correlation_id;
-        event
+        UniversalEvent::new(event_type, Value::Null, Language::Rust)
+            .with_correlation_id(correlation_id)
     }
-
     #[test]
     fn test_time_range() {
         let start = Utc::now() - chrono::Duration::hours(1);
@@ -598,7 +599,6 @@ mod tests {
         let future = Utc::now() + chrono::Duration::hours(1);
         assert!(!range.contains(future));
     }
-
     #[test]
     fn test_query_builder() {
         let correlation_id = Uuid::new_v4();
@@ -617,7 +617,6 @@ mod tests {
         assert!(query.root_causes_only);
         assert_eq!(query.limit, Some(100));
     }
-
     #[test]
     fn test_query_execution() {
         let tracker = EventCorrelationTracker::default();
@@ -649,7 +648,6 @@ mod tests {
         let result = executor.query_by_time_range(start, end);
         assert_eq!(result.entries.len(), 3); // All events should be in range
     }
-
     #[test]
     fn test_query_result_sorting() {
         let query = TimelineQuery::default();

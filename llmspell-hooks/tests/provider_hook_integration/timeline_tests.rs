@@ -12,7 +12,6 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
-
 #[tokio::test]
 async fn test_timeline_basic_reconstruction() {
     let fixture = HookTestFixture::new().await;
@@ -69,7 +68,6 @@ async fn test_timeline_basic_reconstruction() {
         );
     }
 }
-
 #[tokio::test]
 async fn test_timeline_with_parallel_execution() {
     let fixture = HookTestFixture::new().await;
@@ -178,7 +176,6 @@ async fn test_timeline_with_parallel_execution() {
         );
     }
 }
-
 #[tokio::test]
 async fn test_timeline_causality_chain() {
     let fixture = HookTestFixture::new().await;
@@ -270,7 +267,6 @@ async fn test_timeline_causality_chain() {
         assert!(time_c > time_b, "C should occur after B");
     }
 }
-
 #[tokio::test]
 async fn test_timeline_with_retries_and_errors() {
     let fixture = HookTestFixture::new().await;
@@ -370,7 +366,6 @@ async fn test_timeline_with_retries_and_errors() {
     assert!(retry_time > error_time, "Retry should occur after error");
     assert!(success_time > retry_time, "Success should occur after retry");
 }
-
 #[tokio::test]
 async fn test_timeline_performance_analysis() {
     let fixture = HookTestFixture::new().await;

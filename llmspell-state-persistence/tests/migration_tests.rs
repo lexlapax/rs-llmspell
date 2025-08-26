@@ -72,7 +72,6 @@ fn create_advanced_schema(version: SemanticVersion) -> EnhancedStateSchema {
 #[cfg(test)]
 mod migration_integration_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_basic_migration_engine_creation() {
         // Create storage adapter directly for testing
@@ -93,7 +92,6 @@ mod migration_integration_tests {
 
         assert!(engine.get_active_migrations().is_empty());
     }
-
     #[tokio::test]
     async fn test_schema_compatibility_validation() {
         let v1_0_0 = SemanticVersion::new(1, 0, 0);
@@ -108,7 +106,6 @@ mod migration_integration_tests {
         assert_eq!(compatibility.field_changes.len(), 2); // email and preferences added
         assert!(compatibility.migration_required);
     }
-
     #[tokio::test]
     async fn test_migration_with_state_manager() {
         let state_manager = create_test_state_manager().await.unwrap();
@@ -132,7 +129,6 @@ mod migration_integration_tests {
 
         assert_eq!(retrieved, Some(initial_state));
     }
-
     #[tokio::test]
     async fn test_migration_planner_integration() {
         let mut planner = MigrationPlanner::new();
@@ -158,7 +154,6 @@ mod migration_integration_tests {
         let paths = planner.find_migration_paths(&v1_0_0).unwrap();
         assert!(!paths.is_empty());
     }
-
     #[tokio::test]
     async fn test_data_transformation() {
         let transformer = DataTransformer::new();
@@ -197,7 +192,6 @@ mod migration_integration_tests {
         assert_eq!(state.value["name"], "Alice"); // Preserved
         assert_eq!(state.value["age"], 25); // Preserved
     }
-
     #[tokio::test]
     async fn test_migration_validation() {
         let rules = ValidationRules::strict();
@@ -254,7 +248,6 @@ mod migration_integration_tests {
         assert!(!result.passed);
         assert!(result.critical_count > 0); // Missing required fields are Critical severity
     }
-
     #[tokio::test]
     async fn test_migration_with_timeout() {
         // Create storage adapter directly for testing
@@ -304,7 +297,6 @@ mod migration_integration_tests {
             }
         }
     }
-
     #[tokio::test]
     async fn test_migration_error_handling() {
         // Create storage adapter directly for testing
@@ -339,7 +331,6 @@ mod migration_integration_tests {
             _ => panic!("Expected MigrationError"),
         }
     }
-
     #[tokio::test]
     async fn test_concurrent_migration_prevention() {
         // Create storage adapter directly for testing
@@ -396,7 +387,6 @@ mod migration_integration_tests {
 mod agent_state_migration_tests {
     use super::*;
     use llmspell_state_persistence::agent_state::*;
-
     #[tokio::test]
     async fn test_agent_state_migration() {
         let state_manager = create_test_state_manager().await.unwrap();
@@ -426,7 +416,6 @@ mod agent_state_migration_tests {
         assert_eq!(retrieved_state.agent_id, "test_agent");
         assert_eq!(retrieved_state.agent_type, "test");
     }
-
     #[tokio::test]
     async fn test_agent_conversation_migration() {
         let state_manager = create_test_state_manager().await.unwrap();
@@ -477,7 +466,6 @@ mod agent_state_migration_tests {
 mod performance_migration_tests {
     use super::*;
     use std::time::Instant;
-
     #[tokio::test]
     async fn test_migration_performance_basic() {
         let transformer = DataTransformer::new();
@@ -509,7 +497,6 @@ mod performance_migration_tests {
         // Should complete well under 1ms for simple transformations
         assert!(duration < Duration::from_millis(1));
     }
-
     #[tokio::test]
     async fn test_migration_batch_performance() {
         let transformer = DataTransformer::new();

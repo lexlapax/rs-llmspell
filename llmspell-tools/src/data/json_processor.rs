@@ -36,9 +36,9 @@ pub enum JsonOperation {
 impl std::fmt::Display for JsonOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            JsonOperation::Query => write!(f, "query"),
-            JsonOperation::Validate => write!(f, "validate"),
-            JsonOperation::Stream => write!(f, "stream"),
+            Self::Query => write!(f, "query"),
+            Self::Validate => write!(f, "validate"),
+            Self::Stream => write!(f, "stream"),
         }
     }
 }
@@ -48,11 +48,11 @@ impl std::str::FromStr for JsonOperation {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "query" | "transform" | "jq" => Ok(JsonOperation::Query),
-            "validate" => Ok(JsonOperation::Validate),
-            "stream" => Ok(JsonOperation::Stream),
+            "query" | "transform" | "jq" => Ok(Self::Query),
+            "validate" => Ok(Self::Validate),
+            "stream" => Ok(Self::Stream),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown JSON operation: {}", s),
+                message: format!("Unknown JSON operation: {s}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -87,6 +87,7 @@ pub struct JsonProcessorTool {
 }
 
 impl JsonProcessorTool {
+    #[must_use]
     pub fn new(config: JsonProcessorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -98,6 +99,7 @@ impl JsonProcessorTool {
     }
 
     /// Validate JQ query for security issues
+    #[allow(clippy::unused_self)]
     fn validate_jq_query(&self, query: &str) -> Result<()> {
         // List of dangerous JQ functions and patterns
         let dangerous_patterns = [
@@ -120,8 +122,7 @@ impl JsonProcessorTool {
             if query_lower.contains(pattern) {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Security: JQ query contains potentially dangerous function: {}",
-                        pattern
+                        "Security: JQ query contains potentially dangerous function: {pattern}"
                     ),
                     field: Some("query".to_string()),
                 });
@@ -165,7 +166,7 @@ impl JsonProcessorTool {
                 .collect::<Vec<_>>()
                 .join("; ");
             return Err(LLMSpellError::Validation {
-                message: format!("Invalid jq syntax: {}", error_msg),
+                message: format!("Invalid jq syntax: {error_msg}"),
                 field: Some("query".to_string()),
             });
         }
@@ -207,7 +208,7 @@ impl JsonProcessorTool {
                 }
                 Err(e) => {
                     return Err(LLMSpellError::Tool {
-                        message: format!("jq execution error: {}", e),
+                        message: format!("jq execution error: {e}"),
                         tool_name: Some("json_processor".to_string()),
                         source: None,
                     })
@@ -219,6 +220,7 @@ impl JsonProcessorTool {
     }
 
     /// Validate JSON against a schema
+    #[allow(clippy::unused_async)]
     async fn validate_json(&self, input: &Value, schema: &Value) -> Result<ValidationResult> {
         debug!("Validating JSON against schema");
 
@@ -226,14 +228,14 @@ impl JsonProcessorTool {
             .with_draft(Draft::Draft7)
             .compile(schema)
             .map_err(|e| LLMSpellError::Validation {
-                message: format!("Invalid JSON schema: {}", e),
+                message: format!("Invalid JSON schema: {e}"),
                 field: Some("schema".to_string()),
             })?;
 
         let validation_result = compiled.validate(input);
 
         match validation_result {
-            Ok(_) => Ok(ValidationResult {
+            Ok(()) => Ok(ValidationResult {
                 is_valid: true,
                 errors: vec![],
             }),
@@ -259,6 +261,13 @@ impl JsonProcessorTool {
     }
 
     /// Process JSON lines with streaming
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The JQ query is invalid or contains security risks
+    /// - JSON parsing fails for any line
+    /// - I/O errors occur while reading from the stream
     pub async fn process_json_stream<R: AsyncRead + Unpin>(
         &self,
         reader: R,
@@ -281,7 +290,7 @@ impl JsonProcessorTool {
             // Parse JSON line
             let value: Value =
                 serde_json::from_str(trimmed).map_err(|e| LLMSpellError::Validation {
-                    message: format!("Invalid JSON: {}", e),
+                    message: format!("Invalid JSON: {e}"),
                     field: Some("input".to_string()),
                 })?;
 
@@ -296,10 +305,11 @@ impl JsonProcessorTool {
     }
 
     /// Parse parameters from input
-    fn parse_parameters(
-        &self,
-        params: &Value,
-    ) -> Result<(JsonOperation, Option<Value>, Option<String>)> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation string cannot be parsed
+    fn parse_parameters(params: &Value) -> Result<(JsonOperation, Option<Value>, Option<String>)> {
         let operation_str = params
             .get("operation")
             .and_then(|v| v.as_str())
@@ -308,19 +318,13 @@ impl JsonProcessorTool {
 
         // Handle input - could be a JSON string or already parsed
         let input = params.get("input").map(|v| {
-            if let Some(s) = v.as_str() {
-                // Try to parse string as JSON
-                match serde_json::from_str(s) {
-                    Ok(parsed) => parsed,
-                    Err(_) => {
-                        // If parsing fails, use the string itself
-                        v.clone()
-                    }
-                }
-            } else {
-                // Already a JSON value
-                v.clone()
-            }
+            v.as_str().map_or_else(
+                || v.clone(),
+                |s| {
+                    // Try to parse string as JSON
+                    serde_json::from_str(s).unwrap_or_else(|_| v.clone())
+                },
+            )
         });
         let query = params
             .get("query")
@@ -356,11 +360,15 @@ impl BaseAgent for JsonProcessorTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
-        let (operation, input_json, query) = self.parse_parameters(params)?;
+        let (operation, input_json, query) = Self::parse_parameters(params)?;
 
         info!("Executing JSON {} operation", operation);
         eprintln!("DEBUG: input_json = {:?}", input_json);
@@ -479,10 +487,7 @@ impl BaseAgent for JsonProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "JSON processing error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("JSON processing error: {error}")))
     }
 }
 
@@ -549,11 +554,13 @@ impl Tool for JsonProcessorTool {
 
 impl JsonProcessorTool {
     /// Check if this tool supports hook integration
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         use serde_json::json;
         json!({
@@ -600,6 +607,13 @@ impl JsonProcessorTool {
 
     /// Demonstrate hook-aware execution for JSON processing
     /// This method showcases how the JSON processor tool works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool execution fails
+    /// - Hook execution fails
+    /// - JSON parsing or processing fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
@@ -607,6 +621,8 @@ impl JsonProcessorTool {
         json_data: &str,
         query_or_schema: Option<&str>,
     ) -> Result<AgentOutput> {
+        use crate::lifecycle::HookableToolExecution;
+
         let mut params = serde_json::json!({
             "operation": operation,
             "input": json_data,
@@ -618,7 +634,7 @@ impl JsonProcessorTool {
                 "query" => params["query"] = serde_json::json!(query_or_schema),
                 "validate" => params["schema"] = serde_json::json!(query_or_schema),
                 _ => {}
-            };
+            }
         }
 
         let input = AgentInput::text("JSON processing hook demonstration")
@@ -626,7 +642,6 @@ impl JsonProcessorTool {
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait
-        use crate::lifecycle::HookableToolExecution;
         self.execute_with_hooks(input, context, tool_executor).await
     }
 }
@@ -634,7 +649,6 @@ impl JsonProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -651,7 +665,6 @@ mod tests {
         );
         assert!("invalid".parse::<JsonOperation>().is_err());
     }
-
     #[tokio::test]
     async fn test_json_processor_creation() {
         let config = JsonProcessorConfig::default();
@@ -660,7 +673,6 @@ mod tests {
         // Just check that an ID exists
         assert_eq!(tool.metadata().name, "json-processor-tool");
     }
-
     #[tokio::test]
     async fn test_jq_query() {
         let tool = JsonProcessorTool::default();
@@ -696,7 +708,6 @@ mod tests {
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], serde_json::json!(30.0)); // Average age
     }
-
     #[test]
     fn test_hook_integration_metadata() {
         let tool = JsonProcessorTool::default();
@@ -717,7 +728,6 @@ mod tests {
         assert_eq!(metadata["security_level"], "Safe");
         assert!(metadata["supported_operations"].is_array());
     }
-
     #[tokio::test]
     async fn test_json_processor_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -736,7 +746,6 @@ mod tests {
         let output = result.unwrap();
         assert!(output.text.contains("success") || output.text.contains("test"));
     }
-
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_json() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

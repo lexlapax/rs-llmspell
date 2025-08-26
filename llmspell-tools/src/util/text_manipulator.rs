@@ -90,6 +90,7 @@ pub struct TextManipulatorTool {
 
 impl TextManipulatorTool {
     /// Create a new text manipulator tool
+    #[must_use]
     pub fn new(config: TextManipulatorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -129,8 +130,19 @@ impl TextManipulatorTool {
                         Some("options".to_string()),
                     )
                 })?;
-                let start = extract_required_u64(&opts, "start")? as usize;
-                let end = extract_required_u64(&opts, "end")? as usize;
+                let start =
+                    usize::try_from(extract_required_u64(&opts, "start")?).map_err(|_| {
+                        LLMSpellError::Validation {
+                            message: "Start index too large for platform".to_string(),
+                            field: Some("start".to_string()),
+                        }
+                    })?;
+                let end = usize::try_from(extract_required_u64(&opts, "end")?).map_err(|_| {
+                    LLMSpellError::Validation {
+                        message: "End index too large for platform".to_string(),
+                        field: Some("end".to_string()),
+                    }
+                })?;
                 Ok(string_utils::substring(text, start, end))
             }
             TextOperation::Split => {
@@ -141,7 +153,7 @@ impl TextManipulatorTool {
                     .unwrap_or(" ");
                 let parts = string_utils::split_by(text, delimiter);
                 Ok(serde_json::to_string(&parts).map_err(|e| {
-                    component_error(format!("Failed to serialize split result: {}", e))
+                    component_error(format!("Failed to serialize split result: {e}"))
                 })?)
             }
             TextOperation::Join => {
@@ -157,7 +169,7 @@ impl TextManipulatorTool {
                     .and_then(|v| v.get("delimiter"))
                     .and_then(|v| v.as_str())
                     .unwrap_or(" ");
-                let parts_refs: Vec<&str> = parts.iter().map(|s| s.as_str()).collect();
+                let parts_refs: Vec<&str> = parts.iter().map(std::string::String::as_str).collect();
                 Ok(string_utils::join_with(&parts_refs, delimiter))
             }
             TextOperation::SnakeCase => Ok(string_utils::to_snake_case(text)),
@@ -168,16 +180,18 @@ impl TextManipulatorTool {
                 let max_len = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "max_length"))
-                    .map(|v| v as usize)
-                    .unwrap_or(self.config.default_truncate_length);
+                    .map_or(self.config.default_truncate_length, |v| {
+                        usize::try_from(v).unwrap_or(usize::MAX)
+                    });
                 Ok(string_utils::truncate(text, max_len))
             }
             TextOperation::Indent => {
                 let spaces = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "spaces"))
-                    .map(|v| v as usize)
-                    .unwrap_or(self.config.default_indent_spaces);
+                    .map_or(self.config.default_indent_spaces, |v| {
+                        usize::try_from(v).unwrap_or(usize::MAX)
+                    });
                 Ok(string_utils::indent(text, spaces))
             }
             TextOperation::Dedent => Ok(string_utils::dedent(text)),
@@ -186,14 +200,16 @@ impl TextManipulatorTool {
                 let width = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "width"))
-                    .map(|v| v as usize)
-                    .unwrap_or(self.config.default_wrap_width);
+                    .map_or(self.config.default_wrap_width, |v| {
+                        usize::try_from(v).unwrap_or(usize::MAX)
+                    });
                 let lines = string_utils::word_wrap(text, width);
                 Ok(lines.join("\n"))
             }
         }
     }
 
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &Value) -> Result<()> {
         // Required parameters
         extract_required_string(params, "input")?;
@@ -248,13 +264,16 @@ impl TextManipulatorTool {
                 "substring" => {
                     options
                         .get("start")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                         .ok_or_else(|| {
                             validation_error("Missing 'start' parameter", Some("start".to_string()))
                         })?;
-                    options.get("end").and_then(|v| v.as_u64()).ok_or_else(|| {
-                        validation_error("Missing 'end' parameter", Some("end".to_string()))
-                    })?;
+                    options
+                        .get("end")
+                        .and_then(serde_json::Value::as_u64)
+                        .ok_or_else(|| {
+                            validation_error("Missing 'end' parameter", Some("end".to_string()))
+                        })?;
                 }
                 _ => {} // Other operations have optional parameters
             }
@@ -293,7 +312,11 @@ impl BaseAgent for TextManipulatorTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -307,7 +330,7 @@ impl BaseAgent for TextManipulatorTool {
         let operation: TextOperation =
             serde_json::from_value(json!(operation_str)).map_err(|_| {
                 validation_error(
-                    format!("Invalid operation: {}", operation_str),
+                    format!("Invalid operation: {operation_str}"),
                     Some("operation".to_string()),
                 )
             })?;
@@ -320,7 +343,7 @@ impl BaseAgent for TextManipulatorTool {
 
         // Build response using ResponseBuilder
         let response = ResponseBuilder::success(operation_str)
-            .with_message(format!("Text {} operation completed", operation_str))
+            .with_message(format!("Text {operation_str} operation completed"))
             .with_result(json!({
                 "result": result,
                 "operation": operation_str,
@@ -344,8 +367,7 @@ impl BaseAgent for TextManipulatorTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Text manipulation error: {}",
-            error
+            "Text manipulation error: {error}"
         )))
     }
 }
@@ -403,7 +425,6 @@ impl Tool for TextManipulatorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_missing_required_option() {
         let tool = TextManipulatorTool::default();
@@ -422,11 +443,9 @@ mod tests {
         let err = result.unwrap_err();
         assert!(
             err.to_string().contains("Replace operation requires"),
-            "Error was: {}",
-            err
+            "Error was: {err}"
         );
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = TextManipulatorTool::default();
@@ -439,7 +458,6 @@ mod tests {
         assert_eq!(schema.parameters.len(), 3);
         assert_eq!(schema.required_parameters(), vec!["input", "operation"]);
     }
-
     #[tokio::test]
     async fn test_all_operations() {
         let tool = TextManipulatorTool::default();
@@ -487,7 +505,7 @@ mod tests {
                     .insert("options".to_string(), opts);
             }
 
-            let input = AgentInput::text(format!("test {}", operation))
+            let input = AgentInput::text(format!("test {operation}"))
                 .with_parameter("parameters".to_string(), params);
 
             let result = tool.execute(input, context.clone()).await;
@@ -498,12 +516,11 @@ mod tests {
                     let result_text = response["result"]["result"].as_str().unwrap();
                     assert_eq!(
                         result_text, expected,
-                        "Operation {} produced unexpected result",
-                        operation
+                        "Operation {operation} produced unexpected result"
                     );
                 }
                 Err(e) => {
-                    panic!("Operation {} failed with error: {}", operation, e);
+                    panic!("Operation {operation} failed with error: {e}");
                 }
             }
         }

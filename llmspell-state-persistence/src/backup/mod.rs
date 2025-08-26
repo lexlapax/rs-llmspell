@@ -102,7 +102,6 @@ mod recovery_tests;
 #[cfg(test)]
 mod simple_tests {
     use super::*;
-
     #[test]
     fn test_restore_options_defaults() {
         let options = RestoreOptions::default();

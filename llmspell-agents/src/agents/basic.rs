@@ -31,6 +31,10 @@ pub struct BasicAgent {
 
 impl BasicAgent {
     /// Create a new basic agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent configuration is invalid
     pub fn new(config: AgentConfig) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
         let agent_id_string = metadata.id.to_string();
@@ -44,9 +48,12 @@ impl BasicAgent {
 
         // Create state machine configuration optimized for basic agents
         let state_config = StateMachineConfig {
-            enable_logging: true,
-            enable_hooks: true, // Enable hooks for basic agents
-            enable_circuit_breaker: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_logging: true,
+                enable_hooks: true, // Enable hooks for basic agents
+                enable_circuit_breaker: true,
+                ..Default::default()
+            },
             ..StateMachineConfig::default()
         };
 
@@ -67,16 +74,22 @@ impl BasicAgent {
     }
 
     /// Get configuration
-    pub fn get_config(&self) -> &AgentConfig {
+    #[must_use]
+    pub const fn get_config(&self) -> &AgentConfig {
         &self.config
     }
 
     /// Get state machine for lifecycle management
-    pub fn state_machine(&self) -> &Arc<AgentStateMachine> {
+    #[must_use]
+    pub const fn state_machine(&self) -> &Arc<AgentStateMachine> {
         &self.state_machine
     }
 
     /// Initialize the agent and its state machine
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine initialization fails
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing BasicAgent '{}'", self.metadata.name);
         self.state_machine.initialize().await?;
@@ -88,6 +101,10 @@ impl BasicAgent {
     }
 
     /// Start the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Running state
     pub async fn start(&self) -> Result<()> {
         info!("Starting BasicAgent '{}'", self.metadata.name);
 
@@ -103,6 +120,11 @@ impl BasicAgent {
     }
 
     /// Pause the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Paused state
+    #[allow(clippy::cognitive_complexity)]
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing BasicAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -127,6 +149,10 @@ impl BasicAgent {
     }
 
     /// Resume the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition from Paused to Running state
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming BasicAgent '{}'", self.metadata.name);
 
@@ -142,6 +168,11 @@ impl BasicAgent {
     }
 
     /// Stop the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Stopped state
+    #[allow(clippy::cognitive_complexity)]
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping BasicAgent '{}'", self.metadata.name);
 
@@ -166,6 +197,10 @@ impl BasicAgent {
     }
 
     /// Terminate the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Terminated state
     pub async fn terminate(&self) -> Result<()> {
         info!("Terminating BasicAgent '{}'", self.metadata.name);
         self.state_machine.terminate().await?;
@@ -185,7 +220,7 @@ impl BaseAgent for BasicAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -280,7 +315,10 @@ impl BaseAgent for BasicAgent {
         }
 
         // Check resource limits
-        if input.text.len() > (self.config.resource_limits.max_memory_mb as usize * 1024) {
+        if input.text.len()
+            > (usize::try_from(self.config.resource_limits.max_memory_mb).unwrap_or(usize::MAX)
+                * 1024)
+        {
             return Err(LLMSpellError::Validation {
                 message: "Input text exceeds memory limit".to_string(),
                 field: Some("text".to_string()),
@@ -301,7 +339,7 @@ impl BaseAgent for BasicAgent {
             LLMSpellError::Component { .. } | LLMSpellError::Provider { .. } => {
                 if let Err(state_error) = self
                     .state_machine
-                    .error(format!("Agent error: {}", error))
+                    .error(format!("Agent error: {error}"))
                     .await
                 {
                     warn!(
@@ -379,7 +417,7 @@ impl StatePersistence for BasicAgent {
     }
 
     fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-        StateManagerHolder::set_state_manager(self, state_manager)
+        StateManagerHolder::set_state_manager(self, state_manager);
     }
 }
 
@@ -390,7 +428,6 @@ crate::impl_persistent_agent!(BasicAgent);
 mod tests {
     use super::*;
     use crate::builder::AgentBuilder;
-
     #[tokio::test]
     async fn test_basic_agent_creation() {
         let config = AgentBuilder::basic("test-agent")
@@ -401,7 +438,6 @@ mod tests {
         let agent = BasicAgent::new(config).unwrap();
         assert_eq!(agent.metadata().name, "test-agent");
     }
-
     #[tokio::test]
     async fn test_basic_agent_execution() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -418,7 +454,6 @@ mod tests {
             .text
             .contains("BasicAgent 'test-agent' received: Hello, agent!"));
     }
-
     #[tokio::test]
     async fn test_basic_agent_conversation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -443,7 +478,6 @@ mod tests {
         let conv = agent.get_conversation().await.unwrap();
         assert_eq!(conv.len(), 0);
     }
-
     #[tokio::test]
     async fn test_basic_agent_state_machine_integration() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -480,7 +514,6 @@ mod tests {
         agent.terminate().await.unwrap();
         assert!(!agent.is_healthy().await);
     }
-
     #[tokio::test]
     async fn test_basic_agent_execution_state_validation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -499,7 +532,6 @@ mod tests {
         let result = agent.execute(input, context).await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_basic_agent_validation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();

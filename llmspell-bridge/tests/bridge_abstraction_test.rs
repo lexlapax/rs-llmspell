@@ -1,4 +1,4 @@
-//! ABOUTME: Comprehensive tests for ScriptEngineBridge abstraction
+//! ABOUTME: Comprehensive tests for `ScriptEngineBridge` abstraction
 //! ABOUTME: Validates language-agnostic bridge pattern and engine compliance
 
 use llmspell_bridge::{
@@ -6,8 +6,9 @@ use llmspell_bridge::{
         bridge::{EngineFeatures, ExecutionContext, ScriptEngineBridge, SecurityContext},
         factory::{EngineFactory, EngineInfo, LuaConfig, StdlibLevel},
     },
-    ComponentRegistry, ProviderManager, ProviderManagerConfig,
+    ComponentRegistry, ProviderManager,
 };
+use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_core::error::LLMSpellError;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -182,8 +183,7 @@ async fn test_output_format_consistency() {
         let output = engine.execute_script(script).await.unwrap();
         assert_eq!(
             output.output, expected,
-            "Output mismatch for script: {}",
-            script
+            "Output mismatch for script: {script}"
         );
     }
 }
@@ -256,7 +256,7 @@ async fn test_security_enforcement() {
 #[tokio::test]
 async fn test_memory_limits() {
     let lua_config = LuaConfig {
-        max_memory: Some(1024 * 1024), // 1MB limit
+        max_memory_bytes: Some(1024 * 1024), // 1MB limit
         ..Default::default()
     };
 
@@ -325,7 +325,7 @@ async fn test_cross_engine_compatibility_framework() {
     let lua_config = LuaConfig::default();
     let serialized = serde_json::to_string(&lua_config).unwrap();
     let deserialized: LuaConfig = serde_json::from_str(&serialized).unwrap();
-    assert_eq!(lua_config.max_memory, deserialized.max_memory);
+    assert_eq!(lua_config.max_memory_bytes, deserialized.max_memory_bytes);
 
     // Test that errors are engine-agnostic
     let error = LLMSpellError::Script {
@@ -361,12 +361,11 @@ async fn test_streaming_execution_stub() {
         }
         Err(e) => {
             // If streaming is still not fully implemented, that's OK for now
-            eprintln!("Streaming not fully implemented yet: {:?}", e);
+            eprintln!("Streaming not fully implemented yet: {e:?}");
             // But we should document this properly
             assert!(
                 e.to_string().contains("not implemented") || e.to_string().contains("streaming"),
-                "Error should indicate streaming is not implemented: {:?}",
-                e
+                "Error should indicate streaming is not implemented: {e:?}"
             );
         }
     }

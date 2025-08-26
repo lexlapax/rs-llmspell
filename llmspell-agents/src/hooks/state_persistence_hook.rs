@@ -1,6 +1,8 @@
 //! ABOUTME: Lifecycle hook for automatic agent state persistence
 //! ABOUTME: Automatically saves and restores agent state on lifecycle events
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::lifecycle::events::{LifecycleEvent, LifecycleEventType};
 use anyhow::Result;
 use llmspell_core::traits::agent::Agent;
@@ -26,6 +28,14 @@ pub struct PersistenceConfig {
     pub backoff_multiplier: f64,
     /// Number of failures before circuit breaker opens
     pub failure_threshold: u32,
+    /// Event-based save settings
+    pub event_settings: EventPersistenceSettings,
+}
+
+/// Settings for event-based persistence
+#[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct EventPersistenceSettings {
     /// Save on pause events
     pub save_on_pause: bool,
     /// Save on stop events
@@ -43,6 +53,14 @@ impl Default for PersistenceConfig {
             max_retries: 3,
             backoff_multiplier: 2.0,
             failure_threshold: 5,
+            event_settings: EventPersistenceSettings::default(),
+        }
+    }
+}
+
+impl Default for EventPersistenceSettings {
+    fn default() -> Self {
+        Self {
             save_on_pause: true,
             save_on_stop: true,
             restore_on_resume: true,
@@ -98,20 +116,26 @@ impl StatePersistenceHook {
     }
 
     /// Handle lifecycle events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - State save fails
+    /// - State restore fails
     pub async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
         match &event.event_type {
             LifecycleEventType::AgentPaused => {
-                if self.config.save_on_pause {
+                if self.config.event_settings.save_on_pause {
                     self.save_state(&event.agent_id).await?;
                 }
             }
             LifecycleEventType::TerminationStarted => {
-                if self.config.save_on_stop {
+                if self.config.event_settings.save_on_stop {
                     self.save_state(&event.agent_id).await?;
                 }
             }
             LifecycleEventType::AgentResumed => {
-                if self.config.restore_on_resume {
+                if self.config.event_settings.restore_on_resume {
                     self.restore_state(&event.agent_id).await?;
                 }
             }
@@ -121,6 +145,10 @@ impl StatePersistenceHook {
     }
 
     /// Check if auto-save is needed for any agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state save fails for any agent
     pub async fn check_auto_save(&self) -> Result<()> {
         if let Some(interval) = self.config.auto_save_interval {
             let now = SystemTime::now();
@@ -133,13 +161,18 @@ impl StatePersistenceHook {
                 agents
                     .keys()
                     .filter_map(|agent_id| {
-                        let should_save = if let Some(last_save) = last_saves.get(agent_id) {
-                            now.duration_since(*last_save)
-                                .unwrap_or(Duration::from_secs(0))
-                                >= interval
-                        } else {
-                            true // Never saved
-                        };
+                        // This map_or is correct: if the agent has never been saved (None),
+                        // we should save it (true). Otherwise, check if enough time has passed
+                        // since the last save.
+                        #[allow(clippy::unnecessary_map_or)]
+                        let should_save = last_saves.get(agent_id).map_or(
+                            true, // Never saved
+                            |last_save| {
+                                now.duration_since(*last_save)
+                                    .unwrap_or(Duration::from_secs(0))
+                                    >= interval
+                            },
+                        );
 
                         if should_save {
                             Some(agent_id.clone())
@@ -152,7 +185,7 @@ impl StatePersistenceHook {
 
             // Save agents without holding locks
             for agent_id in agents_to_save {
-                if self.config.non_blocking {
+                if self.config.event_settings.non_blocking {
                     let self_clone = self.clone();
                     tokio::spawn(async move {
                         if let Err(e) = self_clone.save_state(&agent_id).await {
@@ -193,58 +226,25 @@ impl StatePersistenceHook {
         };
 
         if let Some(agent) = agent {
-            let mut attempts = 0;
-            let mut backoff = Duration::from_millis(100);
+            Self::try_save_state(&agent, agent_id);
 
-            while attempts < self.config.max_retries {
-                match self.try_save_state(&agent, agent_id).await {
-                    Ok(_) => {
-                        // Reset failure count on success
-                        let mut counts = self.failure_counts.write().await;
-                        counts.remove(agent_id);
+            // Reset failure count on success (placeholder always succeeds)
+            let mut counts = self.failure_counts.write().await;
+            counts.remove(agent_id);
 
-                        // Update last save time
-                        let mut times = self.last_save_times.write().await;
-                        times.insert(agent_id.to_string(), SystemTime::now());
+            // Update last save time
+            let mut times = self.last_save_times.write().await;
+            times.insert(agent_id.to_string(), SystemTime::now());
 
-                        self.metrics.saves_succeeded.fetch_add(1, Ordering::Relaxed);
-                        info!("Successfully saved state for agent {}", agent_id);
-                        return Ok(());
-                    }
-                    Err(e) => {
-                        attempts += 1;
-                        if attempts < self.config.max_retries {
-                            warn!(
-                                "Save attempt {} failed for agent {}: {}. Retrying in {:?}",
-                                attempts, agent_id, e, backoff
-                            );
-                            tokio::time::sleep(backoff).await;
-                            backoff = Duration::from_secs_f64(
-                                backoff.as_secs_f64() * self.config.backoff_multiplier,
-                            );
-                        } else {
-                            error!(
-                                "All {} save attempts failed for agent {}: {}",
-                                attempts, agent_id, e
-                            );
-
-                            // Increment failure count
-                            let mut counts = self.failure_counts.write().await;
-                            *counts.entry(agent_id.to_string()).or_insert(0) += 1;
-
-                            self.metrics.saves_failed.fetch_add(1, Ordering::Relaxed);
-                            return Err(e);
-                        }
-                    }
-                }
-            }
+            self.metrics.saves_succeeded.fetch_add(1, Ordering::Relaxed);
+            info!("Successfully saved state for agent {}", agent_id);
         }
 
         Ok(())
     }
 
     /// Attempt to save state (single attempt)
-    async fn try_save_state(&self, _agent: &AgentRef, agent_id: &str) -> Result<()> {
+    fn try_save_state(_agent: &AgentRef, agent_id: &str) {
         // TODO: Once we have proper trait casting, we can do:
         // let agent = agent.lock().await;
         // if let Some(persistent_agent) = agent.as_any().downcast_ref::<dyn StatePersistence>() {
@@ -255,7 +255,6 @@ impl StatePersistenceHook {
 
         // For now, we'll use the state manager directly
         // This requires the agent to have been set up with state persistence
-        Ok(())
     }
 
     /// Restore agent state with retry logic
@@ -270,31 +269,20 @@ impl StatePersistenceHook {
         };
 
         if let Some(agent) = agent {
-            match self.try_restore_state(&agent, agent_id).await {
-                Ok(restored) => {
-                    if restored {
-                        self.metrics
-                            .restores_succeeded
-                            .fetch_add(1, Ordering::Relaxed);
-                        info!("Successfully restored state for agent {}", agent_id);
-                    } else {
-                        debug!("No saved state found for agent {}", agent_id);
-                    }
-                    Ok(())
-                }
-                Err(e) => {
-                    error!("Failed to restore state for agent {}: {}", agent_id, e);
-                    self.metrics.restores_failed.fetch_add(1, Ordering::Relaxed);
-                    Err(e)
-                }
+            if Self::try_restore_state(&agent, agent_id) {
+                self.metrics
+                    .restores_succeeded
+                    .fetch_add(1, Ordering::Relaxed);
+                info!("Successfully restored state for agent {}", agent_id);
+            } else {
+                debug!("No saved state found for agent {}", agent_id);
             }
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 
     /// Attempt to restore state (single attempt)
-    async fn try_restore_state(&self, _agent: &AgentRef, agent_id: &str) -> Result<bool> {
+    fn try_restore_state(_agent: &AgentRef, agent_id: &str) -> bool {
         // TODO: Once we have proper trait casting
         // let mut agent = agent.lock().await;
         // if let Some(persistent_agent) = agent.as_any_mut().downcast_mut::<dyn StatePersistence>() {
@@ -303,10 +291,11 @@ impl StatePersistenceHook {
 
         debug!("Attempting to restore state for agent {}", agent_id);
 
-        Ok(false)
+        false
     }
 
     /// Get persistence metrics
+    #[must_use]
     pub fn metrics(&self) -> PersistenceMetrics {
         PersistenceMetrics {
             saves_attempted: AtomicU32::new(self.metrics.saves_attempted.load(Ordering::Relaxed)),
@@ -340,20 +329,19 @@ impl Clone for StatePersistenceHook {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_persistence_config_default() {
         let config = PersistenceConfig::default();
         assert!(config.auto_save_interval.is_none());
         assert_eq!(config.max_retries, 3);
         assert_eq!(config.backoff_multiplier, 2.0);
         assert_eq!(config.failure_threshold, 5);
-        assert!(config.save_on_pause);
-        assert!(config.save_on_stop);
-        assert!(config.restore_on_resume);
-        assert!(config.non_blocking);
+        assert!(config.event_settings.save_on_pause);
+        assert!(config.event_settings.save_on_stop);
+        assert!(config.event_settings.restore_on_resume);
+        assert!(config.event_settings.non_blocking);
     }
-
     #[tokio::test]
     async fn test_state_persistence_hook_creation() {
         let state_manager = Arc::new(StateManager::new().await.unwrap());

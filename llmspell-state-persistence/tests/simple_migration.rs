@@ -7,7 +7,6 @@ use llmspell_state_persistence::{
 };
 use serde_json::json;
 use std::time::SystemTime;
-
 #[test]
 fn test_field_copy() {
     let transformer = DataTransformer::new();
@@ -43,7 +42,6 @@ fn test_field_copy() {
     assert_eq!(state.value.get("new_name"), Some(&json!("John Doe")));
     assert!(state.value.get("old_name").is_none());
 }
-
 #[test]
 fn test_field_default() {
     let transformer = DataTransformer::new();
@@ -83,7 +81,6 @@ fn test_field_default() {
     assert_eq!(state.value.get("verified"), Some(&json!(false)));
     assert_eq!(state.value.get("name"), Some(&json!("John Doe")));
 }
-
 #[test]
 fn test_field_remove() {
     let transformer = DataTransformer::new();
@@ -123,7 +120,6 @@ fn test_field_remove() {
     assert!(state.value.get("another_deprecated").is_none());
     assert_eq!(state.value.get("name"), Some(&json!("John Doe")));
 }
-
 #[test]
 fn test_multiple_transforms() {
     let transformer = DataTransformer::new();

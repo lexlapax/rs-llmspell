@@ -1,4 +1,4 @@
-//! ABOUTME: ToolCapable trait for components that can interact with tools
+//! ABOUTME: `ToolCapable` trait for components that can interact with tools
 //! ABOUTME: Separate trait to maintain clean architecture and avoid trait cyclicity
 
 use super::base_agent::BaseAgent;
@@ -27,60 +27,82 @@ use std::collections::HashMap;
 ///     .with_max_security_level("safe");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub struct ToolQuery {
-    /// Filter by tool categories
-    pub categories: Vec<String>,
     /// Filter by required capabilities
     pub capabilities: Vec<String>,
+    /// Filter by tool categories
+    pub categories: Vec<String>,
+    /// Custom query parameters
+    pub custom_filters: HashMap<String, JsonValue>,
     /// Maximum security level allowed
     pub max_security_level: Option<String>,
     /// Minimum security level required
     pub min_security_level: Option<String>,
     /// Text search in tool names/descriptions
     pub text_search: Option<String>,
-    /// Custom query parameters
-    pub custom_filters: HashMap<String, JsonValue>,
 }
 
 impl ToolQuery {
     /// Create a new empty tool query
+    #[must_use]
+    #[inline]
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Filter by tool category
-    pub fn with_category(mut self, category: impl Into<String>) -> Self {
-        self.categories.push(category.into());
-        self
+        Self {
+            capabilities: Vec::new(),
+            categories: Vec::new(),
+            custom_filters: HashMap::new(),
+            max_security_level: None,
+            min_security_level: None,
+            text_search: None,
+        }
     }
 
     /// Filter by required capability
-    pub fn with_capability(mut self, capability: impl Into<String>) -> Self {
+    #[must_use]
+    #[inline]
+    pub fn with_capability<T: Into<String>>(mut self, capability: T) -> Self {
         self.capabilities.push(capability.into());
         self
     }
 
+    /// Filter by tool category
+    #[must_use]
+    #[inline]
+    pub fn with_category<T: Into<String>>(mut self, category: T) -> Self {
+        self.categories.push(category.into());
+        self
+    }
+
+    /// Add custom filter
+    #[must_use]
+    #[inline]
+    pub fn with_custom_filter<T: Into<String>>(mut self, key: T, value: JsonValue) -> Self {
+        self.custom_filters.insert(key.into(), value);
+        self
+    }
+
     /// Set maximum security level
-    pub fn with_max_security_level(mut self, level: impl Into<String>) -> Self {
+    #[must_use]
+    #[inline]
+    pub fn with_max_security_level<T: Into<String>>(mut self, level: T) -> Self {
         self.max_security_level = Some(level.into());
         self
     }
 
     /// Set minimum security level
-    pub fn with_min_security_level(mut self, level: impl Into<String>) -> Self {
+    #[must_use]
+    #[inline]
+    pub fn with_min_security_level<T: Into<String>>(mut self, level: T) -> Self {
         self.min_security_level = Some(level.into());
         self
     }
 
     /// Add text search filter
-    pub fn with_text_search(mut self, text: impl Into<String>) -> Self {
+    #[must_use]
+    #[inline]
+    pub fn with_text_search<T: Into<String>>(mut self, text: T) -> Self {
         self.text_search = Some(text.into());
-        self
-    }
-
-    /// Add custom filter
-    pub fn with_custom_filter(mut self, key: impl Into<String>, value: JsonValue) -> Self {
-        self.custom_filters.insert(key.into(), value);
         self
     }
 }
@@ -97,74 +119,82 @@ impl ToolQuery {
 /// use llmspell_core::traits::tool_capable::ToolInfo;
 /// use serde_json::json;
 ///
-/// let info = ToolInfo {
-///     name: "file_search".to_string(),
-///     description: "Search for files by pattern".to_string(),
-///     category: "filesystem".to_string(),
-///     security_level: "safe".to_string(),
-///     schema: json!({
-///         "type": "object",
-///         "properties": {
-///             "pattern": {"type": "string"},
-///             "recursive": {"type": "boolean"}
-///         }
-///     }),
-///     capabilities: vec!["file_operations".to_string()],
-///     requirements: json!({}),
-/// };
+/// let info = ToolInfo::new(
+///     "file_search",
+///     "Search for files by pattern",
+///     "filesystem",
+///     "safe"
+/// )
+/// .with_schema(json!({
+///     "type": "object",
+///     "properties": {
+///         "pattern": {"type": "string"},
+///         "recursive": {"type": "boolean"}
+///     }
+/// }))
+/// .with_capability("file_operations");
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct ToolInfo {
-    /// Tool name/identifier
-    pub name: String,
-    /// Tool description
-    pub description: String,
-    /// Tool category
-    pub category: String,
-    /// Security level required
-    pub security_level: String,
-    /// Parameter schema (JSON Schema format)
-    pub schema: JsonValue,
     /// Tool capabilities
     pub capabilities: Vec<String>,
+    /// Tool category
+    pub category: String,
+    /// Tool description
+    pub description: String,
+    /// Tool name/identifier
+    pub name: String,
     /// Additional requirements
     pub requirements: JsonValue,
+    /// Parameter schema (JSON Schema format)
+    pub schema: JsonValue,
+    /// Security level required
+    pub security_level: String,
 }
 
 impl ToolInfo {
-    /// Create a new ToolInfo
-    pub fn new(
-        name: impl Into<String>,
-        description: impl Into<String>,
-        category: impl Into<String>,
-        security_level: impl Into<String>,
+    /// Create a new `ToolInfo`
+    #[must_use]
+    #[inline]
+    pub fn new<N: Into<String>, D: Into<String>, C: Into<String>, S: Into<String>>(
+        name: N,
+        description: D,
+        category: C,
+        security_level: S,
     ) -> Self {
         Self {
-            name: name.into(),
-            description: description.into(),
-            category: category.into(),
-            security_level: security_level.into(),
-            schema: JsonValue::Object(serde_json::Map::new()),
             capabilities: Vec::new(),
+            category: category.into(),
+            description: description.into(),
+            name: name.into(),
             requirements: JsonValue::Object(serde_json::Map::new()),
+            schema: JsonValue::Object(serde_json::Map::new()),
+            security_level: security_level.into(),
         }
     }
 
-    /// Set the parameter schema
-    pub fn with_schema(mut self, schema: JsonValue) -> Self {
-        self.schema = schema;
-        self
-    }
-
     /// Add a capability
-    pub fn with_capability(mut self, capability: impl Into<String>) -> Self {
+    #[must_use]
+    #[inline]
+    pub fn with_capability<T: Into<String>>(mut self, capability: T) -> Self {
         self.capabilities.push(capability.into());
         self
     }
 
     /// Set requirements
+    #[must_use]
+    #[inline]
     pub fn with_requirements(mut self, requirements: JsonValue) -> Self {
         self.requirements = requirements;
+        self
+    }
+
+    /// Set the parameter schema
+    #[must_use]
+    #[inline]
+    pub fn with_schema(mut self, schema: JsonValue) -> Self {
+        self.schema = schema;
         self
     }
 }
@@ -174,24 +204,26 @@ impl ToolInfo {
 /// Defines how tools should be composed together, including data flow
 /// between tools and error handling strategies.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct ToolCompositionStep {
-    /// Tool name to invoke
-    pub tool_name: String,
-    /// Parameters for the tool (can reference outputs from previous steps)
-    pub parameters: JsonValue,
-    /// How to handle errors from this step
-    pub error_strategy: ErrorStrategy,
     /// Whether to pass the entire context or just specific values
     pub context_mode: ContextMode,
+    /// How to handle errors from this step
+    pub error_strategy: ErrorStrategy,
+    /// Parameters for the tool (can reference outputs from previous steps)
+    pub parameters: JsonValue,
+    /// Tool name to invoke
+    pub tool_name: String,
 }
 
 /// Error handling strategy for tool composition steps.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ErrorStrategy {
-    /// Stop the entire composition on error
-    Fail,
     /// Continue with the next step, using a default value
     Continue,
+    /// Stop the entire composition on error
+    Fail,
     /// Retry the step up to N times
     Retry(u32),
     /// Skip this step and continue
@@ -200,6 +232,7 @@ pub enum ErrorStrategy {
 
 /// Context passing mode for tool composition.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
 pub enum ContextMode {
     /// Pass the full execution context
     Full,
@@ -220,63 +253,60 @@ pub enum ContextMode {
 /// use llmspell_core::traits::tool_capable::{ToolComposition, ToolCompositionStep, ErrorStrategy, ContextMode};
 /// use serde_json::json;
 ///
-/// let composition = ToolComposition {
-///     name: "file_analysis".to_string(),
-///     description: "Search and analyze files".to_string(),
-///     steps: vec![
-///         ToolCompositionStep {
-///             tool_name: "file_search".to_string(),
-///             parameters: json!({"pattern": "*.txt"}),
-///             error_strategy: ErrorStrategy::Fail,
-///             context_mode: ContextMode::Full,
-///         },
-///         ToolCompositionStep {
-///             tool_name: "text_analyzer".to_string(),
-///             parameters: json!({"files": "${previous.output}"}),
-///             error_strategy: ErrorStrategy::Continue,
-///             context_mode: ContextMode::Previous,
-///         },
-///     ],
-///     parallel: false,
-/// };
+/// // ToolCompositionStep doesn't have a public constructor due to #[non_exhaustive],
+/// // so we create the composition without steps for demonstration
+/// let composition = ToolComposition::new(
+///     "file_analysis",
+///     "Search and analyze files"
+/// );
+///
+/// // In practice, steps would be added through a builder method or created internally
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[non_exhaustive]
 pub struct ToolComposition {
-    /// Composition name
-    pub name: String,
     /// Composition description
     pub description: String,
-    /// Steps to execute
-    pub steps: Vec<ToolCompositionStep>,
+    /// Composition name
+    pub name: String,
     /// Whether to execute steps in parallel (when possible)
     pub parallel: bool,
+    /// Steps to execute
+    pub steps: Vec<ToolCompositionStep>,
 }
 
 impl ToolComposition {
     /// Create a new tool composition
-    pub fn new(name: impl Into<String>, description: impl Into<String>) -> Self {
+    #[must_use]
+    #[inline]
+    pub fn new<N: Into<String>, D: Into<String>>(name: N, description: D) -> Self {
         Self {
-            name: name.into(),
             description: description.into(),
-            steps: Vec::new(),
+            name: name.into(),
             parallel: false,
+            steps: Vec::new(),
         }
     }
 
-    /// Add a composition step
-    pub fn with_step(mut self, step: ToolCompositionStep) -> Self {
-        self.steps.push(step);
+    /// Enable parallel execution
+    #[must_use]
+    #[inline]
+    pub const fn with_parallel(mut self, parallel: bool) -> Self {
+        self.parallel = parallel;
         self
     }
 
-    /// Enable parallel execution
-    pub fn with_parallel(mut self, parallel: bool) -> Self {
-        self.parallel = parallel;
+    /// Add a composition step
+    #[must_use]
+    #[inline]
+    pub fn with_step(mut self, step: ToolCompositionStep) -> Self {
+        self.steps.push(step);
         self
     }
 }
 
 impl Default for ToolComposition {
+    #[inline]
     fn default() -> Self {
         Self::new("unnamed_composition", "Tool composition")
     }
@@ -320,7 +350,7 @@ impl Default for ToolComposition {
 ///         &self.metadata
 ///     }
 ///     
-///     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+///     async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
 ///         // Can use tool capabilities here
 ///         let tools = self.list_available_tools().await?;
 ///         if tools.contains(&"file_search".to_string()) {
@@ -379,6 +409,37 @@ impl Default for ToolComposition {
 /// ```
 #[async_trait]
 pub trait ToolCapable: BaseAgent {
+    /// Compose multiple tools into a workflow.
+    ///
+    /// Executes a sequence of tool invocations where the output of one tool
+    /// can be used as input to subsequent tools. This enables complex operations
+    /// through tool composition.
+    ///
+    /// # Arguments
+    ///
+    /// * `composition` - Description of how tools should be composed
+    /// * `context` - Execution context for the composition
+    ///
+    /// # Returns
+    ///
+    /// Returns the final output after all tools have been executed, or an error
+    /// if any step in the composition fails.
+    ///
+    /// # Default Implementation
+    ///
+    /// Returns a NotImplemented error by default.
+    #[inline]
+    async fn compose_tools(
+        &self,
+        _composition: &ToolComposition,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        return Err(LLMSpellError::Component {
+            message: "Tool composition not supported by this component".to_owned(),
+            source: None,
+        });
+    }
+
     /// Discover available tools based on query criteria.
     ///
     /// Returns information about tools that match the given criteria. This allows
@@ -396,8 +457,31 @@ pub trait ToolCapable: BaseAgent {
     /// # Default Implementation
     ///
     /// Returns an empty vector by default, indicating no tool discovery capability.
+    #[inline]
     async fn discover_tools(&self, _query: &ToolQuery) -> Result<Vec<ToolInfo>> {
-        Ok(Vec::new())
+        return Ok(Vec::new());
+    }
+
+    /// Get information about a specific tool.
+    ///
+    /// Returns detailed information about a tool including its schema, capabilities,
+    /// and requirements. This enables components to understand tool interfaces
+    /// before invocation.
+    ///
+    /// # Arguments
+    ///
+    /// * `tool_name` - Name or identifier of the tool
+    ///
+    /// # Returns
+    ///
+    /// Returns tool information if found, or `None` if the tool is not available.
+    ///
+    /// # Default Implementation
+    ///
+    /// Returns `None` by default.
+    #[inline]
+    async fn get_tool_info(&self, _tool_name: &str) -> Result<Option<ToolInfo>> {
+        return Ok(None);
     }
 
     /// Invoke a tool by name with given parameters.
@@ -418,16 +502,17 @@ pub trait ToolCapable: BaseAgent {
     /// # Default Implementation
     ///
     /// Returns a NotImplemented error by default.
+    #[inline]
     async fn invoke_tool(
         &self,
         _tool_name: &str,
         _parameters: JsonValue,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
-        Err(LLMSpellError::Component {
-            message: "Tool invocation not supported by this component".to_string(),
+        return Err(LLMSpellError::Component {
+            message: "Tool invocation not supported by this component".to_owned(),
             source: None,
-        })
+        });
     }
 
     /// List all available tools that this component can access.
@@ -442,8 +527,9 @@ pub trait ToolCapable: BaseAgent {
     /// # Default Implementation
     ///
     /// Returns an empty vector by default.
+    #[inline]
     async fn list_available_tools(&self) -> Result<Vec<String>> {
-        Ok(Vec::new())
+        return Ok(Vec::new());
     }
 
     /// Check if a specific tool is available for invocation.
@@ -462,59 +548,9 @@ pub trait ToolCapable: BaseAgent {
     /// # Default Implementation
     ///
     /// Returns `false` by default.
+    #[inline]
     async fn tool_available(&self, _tool_name: &str) -> bool {
-        false
-    }
-
-    /// Get information about a specific tool.
-    ///
-    /// Returns detailed information about a tool including its schema, capabilities,
-    /// and requirements. This enables components to understand tool interfaces
-    /// before invocation.
-    ///
-    /// # Arguments
-    ///
-    /// * `tool_name` - Name or identifier of the tool
-    ///
-    /// # Returns
-    ///
-    /// Returns tool information if found, or `None` if the tool is not available.
-    ///
-    /// # Default Implementation
-    ///
-    /// Returns `None` by default.
-    async fn get_tool_info(&self, _tool_name: &str) -> Result<Option<ToolInfo>> {
-        Ok(None)
-    }
-
-    /// Compose multiple tools into a workflow.
-    ///
-    /// Executes a sequence of tool invocations where the output of one tool
-    /// can be used as input to subsequent tools. This enables complex operations
-    /// through tool composition.
-    ///
-    /// # Arguments
-    ///
-    /// * `composition` - Description of how tools should be composed
-    /// * `context` - Execution context for the composition
-    ///
-    /// # Returns
-    ///
-    /// Returns the final output after all tools have been executed, or an error
-    /// if any step in the composition fails.
-    ///
-    /// # Default Implementation
-    ///
-    /// Returns a NotImplemented error by default.
-    async fn compose_tools(
-        &self,
-        _composition: &ToolComposition,
-        _context: ExecutionContext,
-    ) -> Result<AgentOutput> {
-        Err(LLMSpellError::Component {
-            message: "Tool composition not supported by this component".to_string(),
-            source: None,
-        })
+        return false;
     }
 }
 
@@ -548,7 +584,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,
@@ -628,7 +664,6 @@ mod tests {
             )))
         }
     }
-
     #[test]
     fn test_tool_query_builder() {
         let query = ToolQuery::new()
@@ -642,7 +677,6 @@ mod tests {
         assert_eq!(query.max_security_level, Some("safe".to_string()));
         assert_eq!(query.text_search, Some("search".to_string()));
     }
-
     #[test]
     fn test_tool_info_builder() {
         let info = ToolInfo::new("test_tool", "Test description", "utility", "safe")
@@ -658,7 +692,6 @@ mod tests {
         assert_eq!(info.schema, json!({"type": "object"}));
         assert_eq!(info.requirements, json!({"mem": "10MB"}));
     }
-
     #[test]
     fn test_tool_composition_builder() {
         let composition = ToolComposition::new("test_workflow", "Test composition")
@@ -676,7 +709,6 @@ mod tests {
         assert!(composition.parallel);
         assert_eq!(composition.steps[0].tool_name, "tool1");
     }
-
     #[tokio::test]
     async fn test_tool_capable_discovery() {
         let agent = MockToolCapableAgent::new();
@@ -692,7 +724,6 @@ mod tests {
         let no_tools = agent.discover_tools(&empty_query).await.unwrap();
         assert_eq!(no_tools.len(), 0);
     }
-
     #[tokio::test]
     async fn test_tool_capable_invocation() {
         let agent = MockToolCapableAgent::new();
@@ -719,7 +750,6 @@ mod tests {
         let no_info = agent.get_tool_info("nonexistent").await.unwrap();
         assert!(no_info.is_none());
     }
-
     #[tokio::test]
     async fn test_tool_capable_composition() {
         let agent = MockToolCapableAgent::new();
@@ -743,7 +773,6 @@ mod tests {
         assert!(result.text.contains("Executed composition 'test_flow'"));
         assert!(result.text.contains("2 steps"));
     }
-
     #[tokio::test]
     async fn test_tool_capable_listing() {
         let agent = MockToolCapableAgent::new();

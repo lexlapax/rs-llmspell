@@ -310,6 +310,95 @@ pub struct CreateSessionOptions {
     pub metadata: HashMap<String, serde_json::Value>,
 }
 
+impl CreateSessionOptions {
+    /// Create a new builder for `CreateSessionOptions`
+    pub fn builder() -> CreateSessionOptionsBuilder {
+        CreateSessionOptionsBuilder::new()
+    }
+}
+
+/// Builder for `CreateSessionOptions`
+#[derive(Debug, Clone, Default)]
+pub struct CreateSessionOptionsBuilder {
+    options: CreateSessionOptions,
+}
+
+impl CreateSessionOptionsBuilder {
+    /// Create a new builder with default options
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the session name
+    #[must_use]
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.options.name = Some(name.into());
+        self
+    }
+
+    /// Set the session description
+    #[must_use]
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.options.description = Some(description.into());
+        self
+    }
+
+    /// Set the user creating the session
+    #[must_use]
+    pub fn created_by(mut self, user: impl Into<String>) -> Self {
+        self.options.created_by = Some(user.into());
+        self
+    }
+
+    /// Add a tag to the session
+    #[must_use]
+    pub fn add_tag(mut self, tag: impl Into<String>) -> Self {
+        self.options.tags.push(tag.into());
+        self
+    }
+
+    /// Set all tags at once
+    #[must_use]
+    pub fn tags(mut self, tags: Vec<String>) -> Self {
+        self.options.tags = tags;
+        self
+    }
+
+    /// Set the parent session ID
+    #[must_use]
+    pub fn parent_session_id(mut self, id: SessionId) -> Self {
+        self.options.parent_session_id = Some(id);
+        self
+    }
+
+    /// Set the custom configuration
+    #[must_use]
+    pub fn config(mut self, config: SessionConfig) -> Self {
+        self.options.config = Some(config);
+        self
+    }
+
+    /// Add a metadata entry
+    #[must_use]
+    pub fn add_metadata(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.options.metadata.insert(key.into(), value);
+        self
+    }
+
+    /// Set all metadata at once
+    #[must_use]
+    pub fn metadata(mut self, metadata: HashMap<String, serde_json::Value>) -> Self {
+        self.options.metadata = metadata;
+        self
+    }
+
+    /// Build the `CreateSessionOptions`
+    #[must_use]
+    pub fn build(self) -> CreateSessionOptions {
+        self.options
+    }
+}
+
 /// Session query filters
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct SessionQuery {
@@ -361,7 +450,6 @@ impl Default for SessionSortBy {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_session_id() {
         let id1 = SessionId::new();
@@ -376,7 +464,6 @@ mod tests {
         let parsed_id = SessionId::from_str(&id_str).unwrap();
         assert_eq!(id1, parsed_id);
     }
-
     #[test]
     fn test_session_status() {
         assert!(SessionStatus::Active.is_active());
@@ -386,7 +473,6 @@ mod tests {
         assert!(SessionStatus::Completed.is_terminal());
         assert!(!SessionStatus::Active.is_terminal());
     }
-
     #[test]
     fn test_session_metadata() {
         let id = SessionId::new();
@@ -410,7 +496,6 @@ mod tests {
         metadata.add_tag("test"); // Duplicate
         assert_eq!(metadata.tags.len(), 1);
     }
-
     #[test]
     fn test_resource_limits_default() {
         let limits = ResourceLimits::default();
@@ -419,7 +504,6 @@ mod tests {
         assert!(limits.max_operations.is_some());
         assert!(limits.max_storage_bytes.is_some());
     }
-
     #[test]
     fn test_session_config_default() {
         let config = SessionConfig::default();

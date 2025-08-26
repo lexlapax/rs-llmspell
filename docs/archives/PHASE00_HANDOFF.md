@@ -190,7 +190,7 @@ Configure per `.github/QUALITY_GATES.md`:
 ## 6. Architectural Decision Documentation ✅
 
 ### Primary Resources
-1. **Complete Architecture**: `/docs/technical/rs-llmspell-final-architecture.md`
+1. **Complete Architecture**: `/docs/technical/master-architecture-vision.md`
    - 15,034+ lines of comprehensive documentation
    - All design decisions explained
    - Implementation patterns detailed
@@ -349,7 +349,7 @@ git push -u origin feature/phase1-agent-implementation
 ```
 
 ### 5. Getting Help
-- **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md`
+- **Architecture**: `/docs/technical/master-architecture-vision.md`
 - **Phase Plan**: `/docs/in-progress/implementation-phases.md`
 - **Examples**: Test files in each crate
 - **CI/CD**: `.github/workflows/ci.yml`
@@ -461,7 +461,7 @@ All foundation components are production-ready with:
 ## Contact and Support
 
 For questions about the foundation:
-- Review: `/docs/technical/rs-llmspell-final-architecture.md`
+- Review: `/docs/technical/master-architecture-vision.md`
 - Check: `/CLAUDE.md` for development guidelines
 - Run: `./scripts/quality-check.sh` for validation
 

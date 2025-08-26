@@ -50,36 +50,42 @@ impl SecurityTestResult {
     }
 
     /// Set the attack vector
+    #[must_use]
     pub fn with_attack_vector(mut self, vector: impl Into<String>) -> Self {
         self.attack_vector = vector.into();
         self
     }
 
     /// Mark as prevented
-    pub fn mark_prevented(mut self) -> Self {
+    #[must_use]
+    pub const fn mark_prevented(mut self) -> Self {
         self.prevented = true;
         self
     }
 
     /// Add response
+    #[must_use]
     pub fn with_response(mut self, response: impl Into<String>) -> Self {
         self.response = Some(response.into());
         self
     }
 
     /// Add error
+    #[must_use]
     pub fn with_error(mut self, error: impl Into<String>) -> Self {
         self.error = Some(error.into());
         self
     }
 
     /// Set execution time
-    pub fn with_execution_time(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_execution_time(mut self, duration: Duration) -> Self {
         self.execution_time = duration;
         self
     }
 
     /// Add metadata
+    #[must_use]
     pub fn add_metadata(mut self, key: impl Into<String>, value: Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
@@ -104,7 +110,7 @@ pub struct SecurityTestCase {
 }
 
 /// Expected behavior for security tests
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExpectedBehavior {
     /// Should reject with error
     Reject,
@@ -209,6 +215,7 @@ pub struct ToolStats {
 
 impl SecurityTestRunner {
     /// Create a new test runner
+    #[must_use]
     pub fn new(config: SecurityTestConfig) -> Self {
         Self {
             results: Arc::new(Mutex::new(Vec::new())),
@@ -228,14 +235,7 @@ impl SecurityTestRunner {
             .with_attack_vector(format!("{:?}", test_case.payload));
 
         // Create input from payload
-        let input = match self.create_input(&test_case.payload) {
-            Ok(input) => input,
-            Err(e) => {
-                return result
-                    .with_error(format!("Failed to create input: {}", e))
-                    .with_execution_time(start.elapsed());
-            }
-        };
+        let input = Self::create_input(&test_case.payload);
 
         // Execute with timeout
         let execution_result = tokio::time::timeout(
@@ -247,7 +247,7 @@ impl SecurityTestRunner {
         match execution_result {
             Ok(Ok(output)) => {
                 result = result.with_response(output.text.clone());
-                result.prevented = self.check_prevention(&output, &test_case.expected_behavior);
+                result.prevented = Self::check_prevention(&output, &test_case.expected_behavior);
             }
             Ok(Err(e)) => {
                 result = result.with_error(e.to_string());
@@ -287,7 +287,7 @@ impl SecurityTestRunner {
             let result = self.run_test_case(tool, &test_case).await;
 
             if self.config.verbose {
-                self.print_result(&result);
+                Self::print_result(&result);
             }
 
             results.push(result);
@@ -297,7 +297,7 @@ impl SecurityTestRunner {
     }
 
     /// Create input from payload
-    fn create_input(&self, payload: &Value) -> Result<AgentInput> {
+    fn create_input(payload: &Value) -> AgentInput {
         let mut input = AgentInput::text("");
 
         if let Value::Object(params) = payload {
@@ -308,11 +308,11 @@ impl SecurityTestRunner {
             }
         }
 
-        Ok(input)
+        input
     }
 
     /// Check if attack was prevented
-    fn check_prevention(&self, output: &AgentOutput, expected: &ExpectedBehavior) -> bool {
+    fn check_prevention(output: &AgentOutput, expected: &ExpectedBehavior) -> bool {
         match expected {
             ExpectedBehavior::Reject => false, // If we got output, it wasn't rejected
             ExpectedBehavior::Sanitize => {
@@ -349,6 +349,7 @@ impl SecurityTestRunner {
         if !result.prevented {
             tool_stats.vulnerabilities += 1;
         }
+        drop(stats); // Explicitly drop the lock guard
     }
 
     /// Should skip test
@@ -368,7 +369,7 @@ impl SecurityTestRunner {
     }
 
     /// Print test result
-    fn print_result(&self, result: &SecurityTestResult) {
+    fn print_result(result: &SecurityTestResult) {
         let status = if result.prevented {
             "✓ PASS"
         } else {
@@ -392,7 +393,7 @@ impl SecurityTestRunner {
         );
 
         if let Some(error) = &result.error {
-            println!("  Error: {}", error);
+            println!("  Error: {error}");
         }
     }
 
@@ -406,12 +407,12 @@ impl SecurityTestRunner {
             config: self.config.clone(),
             statistics: stats,
             results: results.clone(),
-            vulnerabilities: self.extract_vulnerabilities(&results),
+            vulnerabilities: Self::extract_vulnerabilities(&results),
         }
     }
 
     /// Extract vulnerabilities from results
-    fn extract_vulnerabilities(&self, results: &[SecurityTestResult]) -> Vec<Vulnerability> {
+    fn extract_vulnerabilities(results: &[SecurityTestResult]) -> Vec<Vulnerability> {
         results
             .iter()
             .filter(|r| !r.prevented)
@@ -452,12 +453,17 @@ pub struct Vulnerability {
 }
 
 /// Helper to create test execution context
+#[must_use]
 pub fn create_test_context() -> ExecutionContext {
     ExecutionContext::new()
 }
 
 /// Helper to create parameter-based input
-pub fn create_params_input(params: Value) -> Result<AgentInput> {
+///
+/// # Errors
+///
+/// Returns an error if the parameters cannot be processed into `AgentInput`.
+pub fn create_params_input(params: &Value) -> Result<AgentInput> {
     let mut input = AgentInput::text("");
     let wrapped = json!({ "parameters": params });
     if let Value::Object(map) = wrapped {
@@ -481,7 +487,7 @@ impl Serialize for SecurityTestConfig {
             &self
                 .categories
                 .iter()
-                .map(|c| format!("{:?}", c))
+                .map(|c| format!("{c:?}"))
                 .collect::<Vec<_>>(),
         )?;
         state.serialize_field("tools", &self.tools)?;
@@ -508,14 +514,14 @@ impl Serialize for TestStatistics {
         let severity_map: HashMap<String, usize> = self
             .by_severity
             .iter()
-            .map(|(k, v)| (format!("{:?}", k), *v))
+            .map(|(k, v)| (format!("{k:?}"), *v))
             .collect();
         state.serialize_field("by_severity", &severity_map)?;
 
         let category_map: HashMap<String, usize> = self
             .by_category
             .iter()
-            .map(|(k, v)| (format!("{:?}", k), *v))
+            .map(|(k, v)| (format!("{k:?}"), *v))
             .collect();
         state.serialize_field("by_category", &category_map)?;
 
@@ -572,10 +578,10 @@ impl Serialize for Severity {
         S: serde::Serializer,
     {
         serializer.serialize_str(match self {
-            Severity::Low => "Low",
-            Severity::Medium => "Medium",
-            Severity::High => "High",
-            Severity::Critical => "Critical",
+            Self::Low => "Low",
+            Self::Medium => "Medium",
+            Self::High => "High",
+            Self::Critical => "Critical",
         })
     }
 }

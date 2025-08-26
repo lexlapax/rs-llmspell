@@ -2,6 +2,8 @@
 //!
 //! Uses criterion to measure performance of core operations
 
+// Benchmark for llmspell-core
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_core::{
     traits::{

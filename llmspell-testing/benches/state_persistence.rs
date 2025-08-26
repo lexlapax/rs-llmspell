@@ -1,6 +1,8 @@
 // ABOUTME: Performance benchmarks for state persistence operations
 // ABOUTME: Validates <5% overhead requirement for state save/load operations
 
+// Benchmark file
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_state_persistence::{
     agent_state::{

@@ -17,12 +17,13 @@ pub struct GoogleSearchProvider {
 }
 
 impl GoogleSearchProvider {
+    #[must_use]
     pub fn new(config: ProviderConfig) -> Self {
         let search_engine_id = config
             .additional_config
             .get("search_engine_id")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+            .map(std::string::ToString::to_string);
 
         Self {
             client: Client::new(),
@@ -59,7 +60,7 @@ struct SearchInformation {
 
 #[async_trait]
 impl SearchProvider for GoogleSearchProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "google"
     }
 
@@ -112,7 +113,7 @@ impl SearchProvider for GoogleSearchProvider {
             SearchType::News => {
                 // Google Custom Search doesn't have a direct news filter
                 // We can add "news" to the query as a workaround
-                news_query = format!("{} news", query);
+                news_query = format!("{query} news");
                 params[2] = ("q", news_query.as_str());
             }
             SearchType::Web => {} // Default
@@ -127,7 +128,7 @@ impl SearchProvider for GoogleSearchProvider {
             .send()
             .await
             .map_err(|e| LLMSpellError::Network {
-                message: format!("Google API request failed: {}", e),
+                message: format!("Google API request failed: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -135,14 +136,14 @@ impl SearchProvider for GoogleSearchProvider {
             let status = response.status();
             let error_body = response.text().await.unwrap_or_default();
             return Err(LLMSpellError::Network {
-                message: format!("Google API returned status {}: {}", status, error_body),
+                message: format!("Google API returned status {status}: {error_body}"),
                 source: None,
             });
         }
 
         let google_response: GoogleSearchResponse =
             response.json().await.map_err(|e| LLMSpellError::Network {
-                message: format!("Failed to parse Google response: {}", e),
+                message: format!("Failed to parse Google response: {e}"),
                 source: Some(Box::new(e)),
             })?;
 

@@ -13,6 +13,7 @@ use tracing::{info, Level};
 /// Example demonstrating how to build a library of reusable agent templates
 /// and patterns that can be customized for specific use cases.
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
@@ -243,8 +244,8 @@ async fn main() -> anyhow::Result<()> {
     // Catalog Summary
     println!("\n=== Catalog Summary ===");
     println!("Total Templates: {}", agent_catalog.len());
-    for (category, _) in agent_catalog.iter() {
-        println!("- {}", category);
+    for category in agent_catalog.keys() {
+        println!("- {category}");
     }
 
     Ok(())
@@ -253,7 +254,7 @@ async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::fixtures::create_test_context;
+    use llmspell_testing::environment_helpers::create_test_context;
 
     #[tokio::test]
     async fn test_template_catalog() {

@@ -55,35 +55,41 @@ pub struct CapabilityMatcher {
 
 impl CapabilityMatcher {
     /// Create a new capability matcher
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Match tools by category
+    #[must_use]
     pub fn with_categories(mut self, categories: Vec<ToolCategory>) -> Self {
         self.categories = Some(categories);
         self
     }
 
     /// Set maximum security level
-    pub fn with_max_security_level(mut self, level: SecurityLevel) -> Self {
+    #[must_use]
+    pub const fn with_max_security_level(mut self, level: SecurityLevel) -> Self {
         self.max_security_level = Some(level);
         self
     }
 
     /// Add capability requirement
+    #[must_use]
     pub fn with_capability(mut self, key: String, value: serde_json::Value) -> Self {
         self.capabilities.insert(key, value);
         self
     }
 
     /// Add search terms
+    #[must_use]
     pub fn with_search_terms(mut self, terms: Vec<String>) -> Self {
         self.search_terms = terms;
         self
     }
 
     /// Check if a tool matches this capability matcher
+    #[must_use]
     pub fn matches(&self, tool_info: &ToolInfo) -> bool {
         // Check category match
         if let Some(ref categories) = self.categories {
@@ -141,6 +147,7 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     /// Create a new tool registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tools: Arc::new(RwLock::new(HashMap::new())),
@@ -152,12 +159,13 @@ impl ToolRegistry {
     }
 
     /// Create a new tool registry with hook support
+    #[must_use]
     pub fn with_hooks(
         hook_executor: Option<Arc<HookExecutor>>,
         hook_registry: Option<Arc<HookRegistry>>,
         hook_config: ToolLifecycleConfig,
     ) -> Self {
-        let tool_executor = if hook_config.enable_hooks {
+        let tool_executor = if hook_config.features.hooks_enabled {
             Some(Arc::new(ToolExecutor::new(
                 hook_config.clone(),
                 hook_executor,
@@ -177,6 +185,10 @@ impl ToolRegistry {
     }
 
     /// Register a tool in the registry
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool validation fails or if a tool with the same name already exists
     pub async fn register<T>(&self, name: String, tool: T) -> Result<()>
     where
         T: Tool + 'static,
@@ -227,6 +239,7 @@ impl ToolRegistry {
     }
 
     /// Validate a tool before registration
+    #[allow(clippy::unused_async)]
     async fn validate_tool(&self, tool: &dyn Tool) -> Result<()> {
         // Check that the tool has a valid schema
         let schema = tool.schema();
@@ -314,6 +327,10 @@ impl ToolRegistry {
     }
 
     /// Unregister a tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool is not found in the registry
     pub async fn unregister_tool(&self, name: &str) -> Result<()> {
         // Get tool info before removal for category cleanup
         let tool_info = {
@@ -376,6 +393,13 @@ impl ToolRegistry {
     }
 
     /// Execute a tool with hook integration (if enabled)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool not found in registry
+    /// - Hook execution fails
+    /// - Tool execution fails
     pub async fn execute_tool_with_hooks(
         &self,
         tool_name: &str,
@@ -386,7 +410,7 @@ impl ToolRegistry {
             .get_tool(tool_name)
             .await
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Tool '{}' not found in registry", tool_name),
+                message: format!("Tool '{tool_name}' not found in registry"),
                 source: None,
             })?;
 
@@ -402,6 +426,13 @@ impl ToolRegistry {
     }
 
     /// Execute a tool by name (with or without hooks based on configuration)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool not found in registry
+    /// - Tool execution fails
+    /// - Hook execution fails (if hooks are enabled)
     pub async fn execute_tool(
         &self,
         tool_name: &str,
@@ -413,28 +444,32 @@ impl ToolRegistry {
     }
 
     /// Check if hook integration is enabled
-    pub fn has_hook_integration(&self) -> bool {
+    #[must_use]
+    pub const fn has_hook_integration(&self) -> bool {
         self.tool_executor.is_some()
     }
 
     /// Get the tool executor (if hook integration is enabled)
+    #[must_use]
     pub fn get_tool_executor(&self) -> Option<Arc<ToolExecutor>> {
         self.tool_executor.clone()
     }
 
     /// Get hook configuration
-    pub fn get_hook_config(&self) -> &ToolLifecycleConfig {
+    #[must_use]
+    pub const fn get_hook_config(&self) -> &ToolLifecycleConfig {
         &self.hook_config
     }
 
     /// Enable or disable hook integration
-    pub fn set_hook_integration_enabled(&mut self, enabled: bool) {
-        self.hook_config.enable_hooks = enabled;
+    pub const fn set_hook_integration_enabled(&mut self, enabled: bool) {
+        self.hook_config.features.hooks_enabled = enabled;
         // Note: This only changes the config - to create/destroy the ToolExecutor
         // would require recreating the registry with the new configuration
     }
 
     /// Get execution metrics from the tool executor
+    #[must_use]
     pub fn get_execution_metrics(&self) -> Option<ExecutionMetrics> {
         self.tool_executor
             .as_ref()
@@ -503,6 +538,7 @@ pub struct ResourceUsageStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lifecycle::hook_integration::HookFeatures;
     use async_trait::async_trait;
     use llmspell_core::{
         traits::{
@@ -524,7 +560,7 @@ mod tests {
     impl MockTool {
         fn new(name: String, category: ToolCategory, security_level: SecurityLevel) -> Self {
             Self {
-                metadata: ComponentMetadata::new(name.clone(), format!("Mock tool: {}", name)),
+                metadata: ComponentMetadata::new(name.clone(), format!("Mock tool: {name}")),
                 category,
                 security_level,
                 name,
@@ -538,7 +574,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
@@ -551,7 +587,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -580,7 +616,6 @@ mod tests {
             .with_returns(ParameterType::String)
         }
     }
-
     #[tokio::test]
     async fn test_tool_registration() {
         let registry = ToolRegistry::new();
@@ -608,7 +643,6 @@ mod tests {
         assert_eq!(info.category, ToolCategory::Utility);
         assert_eq!(info.security_level, SecurityLevel::Safe);
     }
-
     #[tokio::test]
     async fn test_tool_discovery() {
         let registry = ToolRegistry::new();
@@ -655,11 +689,8 @@ mod tests {
         assert!(names.contains(&"web_tool".to_string()));
         assert!(names.contains(&"util_tool".to_string()));
     }
-
     #[tokio::test]
     async fn test_tool_validation() {
-        let registry = ToolRegistry::new();
-
         // Tool with empty name should fail validation
         struct InvalidTool {
             metadata: ComponentMetadata,
@@ -668,8 +699,8 @@ mod tests {
         impl InvalidTool {
             fn new() -> Self {
                 // Create invalid metadata with empty name
-                let mut metadata = ComponentMetadata::new("".to_string(), "".to_string());
-                metadata.name = "".to_string(); // Force empty name
+                let mut metadata = ComponentMetadata::new(String::new(), String::new());
+                metadata.name = String::new(); // Force empty name
                 Self { metadata }
             }
         }
@@ -680,7 +711,7 @@ mod tests {
                 &self.metadata
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 _input: AgentInput,
                 _context: ExecutionContext,
@@ -693,7 +724,7 @@ mod tests {
             }
 
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-                Ok(AgentOutput::text(format!("Error: {}", error)))
+                Ok(AgentOutput::text(format!("Error: {error}")))
             }
         }
 
@@ -708,15 +739,15 @@ mod tests {
             }
 
             fn schema(&self) -> ToolSchema {
-                ToolSchema::new("".to_string(), "".to_string()) // Empty name and description
+                ToolSchema::new(String::new(), String::new()) // Empty name and description
             }
         }
 
+        let registry = ToolRegistry::new();
         let invalid_tool = InvalidTool::new();
         let result = registry.register("invalid".to_string(), invalid_tool).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_tool_unregistration() {
         let registry = ToolRegistry::new();
@@ -743,7 +774,6 @@ mod tests {
         assert!(registry.get_tool("temp_tool").await.is_none());
         assert!(registry.get_tool_info("temp_tool").await.is_none());
     }
-
     #[tokio::test]
     async fn test_registry_statistics() {
         let registry = ToolRegistry::new();
@@ -770,7 +800,6 @@ mod tests {
         assert_eq!(stats.security_level_counts[&SecurityLevel::Restricted], 1);
         assert_eq!(stats.security_level_counts[&SecurityLevel::Privileged], 1);
     }
-
     #[tokio::test]
     async fn test_capability_matcher() {
         let tool_info = ToolInfo {
@@ -819,7 +848,6 @@ mod tests {
         let matcher = CapabilityMatcher::new().with_search_terms(vec!["nonexistent".to_string()]);
         assert!(!matcher.matches(&tool_info));
     }
-
     #[tokio::test]
     async fn test_registry_with_hooks() {
         use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};
@@ -827,7 +855,10 @@ mod tests {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutorImpl::new());
         let hook_config = ToolLifecycleConfig {
-            enable_hooks: true,
+            features: HookFeatures {
+                hooks_enabled: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -869,7 +900,6 @@ mod tests {
             .await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_registry_without_hooks() {
         let registry = ToolRegistry::new();
@@ -898,7 +928,6 @@ mod tests {
         let output = result.unwrap();
         assert!(output.text.contains("Executed no_hook_tool"));
     }
-
     #[tokio::test]
     async fn test_tool_execution_error_handling() {
         let registry = ToolRegistry::new();
@@ -918,7 +947,6 @@ mod tests {
             panic!("Expected Component error");
         }
     }
-
     #[tokio::test]
     async fn test_resource_usage_stats_with_hooks() {
         use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};
@@ -926,7 +954,10 @@ mod tests {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutorImpl::new());
         let hook_config = ToolLifecycleConfig {
-            enable_hooks: true,
+            features: HookFeatures {
+                hooks_enabled: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -936,12 +967,12 @@ mod tests {
         // Register multiple tools
         for i in 0..3 {
             let tool = MockTool::new(
-                format!("test_tool_{}", i),
+                format!("test_tool_{i}"),
                 ToolCategory::Utility,
                 SecurityLevel::Safe,
             );
             registry
-                .register(format!("test_tool_{}", i), tool)
+                .register(format!("test_tool_{i}"), tool)
                 .await
                 .unwrap();
         }
@@ -957,7 +988,6 @@ mod tests {
         assert_eq!(stats.average_cpu_time, 0);
         assert_eq!(stats.resource_limits_hit, 0);
     }
-
     #[tokio::test]
     async fn test_resource_usage_stats_without_hooks() {
         let registry = ToolRegistry::new();
@@ -980,7 +1010,6 @@ mod tests {
         assert_eq!(stats.tools_with_hooks, 0); // No hooks enabled
         assert_eq!(stats.total_executions, 0);
     }
-
     #[tokio::test]
     async fn test_execution_metrics_from_registry() {
         use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};

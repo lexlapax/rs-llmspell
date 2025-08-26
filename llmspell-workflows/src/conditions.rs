@@ -17,7 +17,9 @@ pub enum Condition {
     Never,
     /// Compare a shared data value to a target value
     SharedDataEquals {
+        /// Key in shared data to check
         key: String,
+        /// Expected value for comparison
         expected_value: serde_json::Value,
     },
     /// Check if shared data key exists
@@ -41,6 +43,20 @@ pub enum Condition {
     Custom {
         expression: String,
         description: String,
+    },
+    /// Check if step output contains a specific string
+    StepOutputContains {
+        /// Name of the step to check
+        step_name: String,
+        /// Text to search for in the output
+        search_text: String,
+    },
+    /// Check if agent classification matches expected type
+    AgentClassification {
+        /// Name of the classification step
+        step_name: String,
+        /// Expected classification type (e.g., "blog", "social", "email")
+        expected_type: String,
     },
 }
 
@@ -98,6 +114,22 @@ impl Condition {
         Self::Custom {
             expression,
             description,
+        }
+    }
+
+    /// Create a step output contains condition
+    pub fn step_output_contains(step_name: String, search_text: String) -> Self {
+        Self::StepOutputContains {
+            step_name,
+            search_text,
+        }
+    }
+
+    /// Create an agent classification condition
+    pub fn agent_classification(step_name: String, expected_type: String) -> Self {
+        Self::AgentClassification {
+            step_name,
+            expected_type,
         }
     }
 }
@@ -303,6 +335,20 @@ impl ConditionEvaluator {
                 description,
             } => {
                 self.evaluate_custom_condition(expression, description, context)
+                    .await
+            }
+            Condition::StepOutputContains {
+                step_name,
+                search_text,
+            } => {
+                self.evaluate_step_output_contains(step_name, search_text, context)
+                    .await
+            }
+            Condition::AgentClassification {
+                step_name,
+                expected_type,
+            } => {
+                self.evaluate_agent_classification(step_name, expected_type, context)
                     .await
             }
         }
@@ -579,6 +625,72 @@ impl ConditionEvaluator {
         }
     }
 
+    /// Evaluate step output contains condition
+    async fn evaluate_step_output_contains(
+        &self,
+        step_name: &str,
+        search_text: &str,
+        context: &ConditionEvaluationContext,
+    ) -> Result<ConditionResult> {
+        let description = format!("Step '{}' output contains '{}'", step_name, search_text);
+
+        // Find step result by name
+        for (_, step_result) in context.step_results.iter() {
+            // Note: We'd need to store step names in context for proper lookup
+            // For now, check if any step output contains the text
+            if step_result.output.contains(search_text) {
+                return Ok(ConditionResult::success_true(description));
+            }
+        }
+
+        Ok(ConditionResult::success_false(format!(
+            "No step output contains '{}'",
+            search_text
+        )))
+    }
+
+    /// Evaluate agent classification condition
+    async fn evaluate_agent_classification(
+        &self,
+        step_name: &str,
+        expected_type: &str,
+        context: &ConditionEvaluationContext,
+    ) -> Result<ConditionResult> {
+        let description = format!(
+            "Agent classification from '{}' equals '{}'",
+            step_name, expected_type
+        );
+
+        // Check shared data for classification result
+        let classification_key = format!("{}_classification", step_name);
+        if let Some(classification) = context.get_shared_data(&classification_key) {
+            if let Some(class_str) = classification.as_str() {
+                if class_str
+                    .to_lowercase()
+                    .contains(&expected_type.to_lowercase())
+                {
+                    return Ok(ConditionResult::success_true(description));
+                }
+            }
+        }
+
+        // Also check step output for classification
+        for (_, step_result) in context.step_results.iter() {
+            if step_result
+                .output
+                .to_lowercase()
+                .contains(&expected_type.to_lowercase())
+            {
+                return Ok(ConditionResult::success_true(description));
+            }
+        }
+
+        Ok(ConditionResult::success_false(format!(
+            "Classification does not match '{}'",
+            expected_type
+        )))
+    }
+
     /// Evaluate simple custom expressions (basic implementation)
     async fn evaluate_simple_expression(
         &self,
@@ -641,12 +753,11 @@ impl ConditionEvaluator {
                     Some(actual_value) => {
                         if actual_value == &expected_value {
                             return Some(ConditionResult::success_true(description));
-                        } else {
-                            return Some(ConditionResult::success_false(format!(
-                                "Custom: shared_data.{} is {:?}, expected {}",
-                                key, actual_value, right
-                            )));
                         }
+                        return Some(ConditionResult::success_false(format!(
+                            "Custom: shared_data.{} is {:?}, expected {}",
+                            key, actual_value, right
+                        )));
                     }
                     None => {
                         return Some(ConditionResult::success_false(format!(
@@ -682,17 +793,15 @@ impl ConditionEvaluator {
                             let description = format!("Custom: step.{}.success", step_id_str);
                             if first_result.success {
                                 return Some(ConditionResult::success_true(description));
-                            } else {
-                                return Some(ConditionResult::success_false(description));
                             }
+                            return Some(ConditionResult::success_false(description));
                         }
                         "failed" => {
                             let description = format!("Custom: step.{}.failed", step_id_str);
                             if !first_result.success {
                                 return Some(ConditionResult::success_true(description));
-                            } else {
-                                return Some(ConditionResult::success_false(description));
                             }
+                            return Some(ConditionResult::success_false(description));
                         }
                         _ => {
                             return Some(ConditionResult::error(
@@ -713,7 +822,6 @@ impl ConditionEvaluator {
 mod tests {
     use super::*;
     use std::time::Duration;
-
     #[tokio::test]
     async fn test_always_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -724,7 +832,6 @@ mod tests {
         assert!(result.is_true);
         assert!(result.is_success());
     }
-
     #[tokio::test]
     async fn test_never_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -735,7 +842,6 @@ mod tests {
         assert!(!result.is_true);
         assert!(result.is_success());
     }
-
     #[tokio::test]
     async fn test_shared_data_equals_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -759,7 +865,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
-
     #[tokio::test]
     async fn test_and_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -775,7 +880,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
-
     #[tokio::test]
     async fn test_or_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -791,7 +895,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
-
     #[tokio::test]
     async fn test_not_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -807,7 +910,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
     }
-
     #[tokio::test]
     async fn test_custom_condition_simple() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));

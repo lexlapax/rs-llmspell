@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["ProviderCapabilities","ProviderConfig","ProviderManager","ProviderRegistry"],"trait":["ProviderInstance"],"type":["ProviderFactory","ProviderInstanceMap"]};

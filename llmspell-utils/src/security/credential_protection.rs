@@ -414,7 +414,6 @@ impl Default for CredentialAuditor {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_secure_string() {
         let secret = SecureString::from("my-secret-value");
@@ -422,14 +421,12 @@ mod tests {
         assert_eq!(format!("{secret:?}"), "SecureString[REDACTED]");
         assert_eq!(format!("{secret}"), "[REDACTED]");
     }
-
     #[test]
     fn test_secure_credential() {
         let cred = SecureCredential::new(CredentialType::ApiKey, "sk-1234567890abcdef".to_string());
         assert_eq!(cred.expose_secret(), "sk-1234567890abcdef");
         assert!(format!("{cred:?}").contains("[REDACTED]"));
     }
-
     #[test]
     fn test_credential_filter() {
         let filter = CredentialFilter::new();
@@ -454,7 +451,6 @@ mod tests {
         let filtered = filter.filter(text);
         assert!(filtered.contains("[REDACTED]"));
     }
-
     #[test]
     fn test_error_sanitizer() {
         let sanitizer = ErrorSanitizer::new();
@@ -479,7 +475,6 @@ mod tests {
         let ip_sanitized = sanitizer.sanitize(ip_error);
         assert!(ip_sanitized.contains("[IP]"));
     }
-
     #[test]
     fn test_credential_detection() {
         let filter = CredentialFilter::new();
@@ -493,7 +488,6 @@ mod tests {
         assert!(types.contains(&"API Key".to_string()));
         assert!(types.contains(&"Password".to_string()));
     }
-
     #[test]
     fn test_audit_logger() {
         let mut auditor = CredentialAuditor::new();

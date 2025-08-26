@@ -1,6 +1,10 @@
 # llmspell-bridge
 
-Script engine integration bridge providing seamless Lua and JavaScript access to rs-llmspell functionality with zero-configuration global APIs.
+**Script engine integration bridge for Lua and JavaScript**
+
+**🔗 Navigation**: [← Project Root](../) | [Documentation](../docs/) | [Lua Examples](../examples/script-users/)
+
+---
 
 ## Overview
 

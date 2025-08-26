@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for TemplateEngineTool
+//! ABOUTME: Integration tests for `TemplateEngineTool`
 //! ABOUTME: Tests template rendering with both Tera and Handlebars engines
 
 use llmspell_core::{
@@ -15,7 +15,6 @@ fn extract_result(response_text: &str) -> Value {
     assert!(output["success"].as_bool().unwrap_or(false));
     output["result"].clone()
 }
-
 #[tokio::test]
 async fn test_tera_simple_variable_substitution() {
     let tool = TemplateEngineTool::new();
@@ -39,13 +38,11 @@ async fn test_tera_simple_variable_substitution() {
     assert_eq!(output["rendered"], "Hello Alice, welcome to Wonderland!");
     assert_eq!(output["engine"], "tera");
 }
-
 #[tokio::test]
 async fn test_tera_loops_and_conditions() {
     let tool = TemplateEngineTool::new();
 
-    let params = json!({
-        "input": r#"
+    let template = r"
 {% if users %}
 Users:
 {% for user in users %}
@@ -54,13 +51,16 @@ Users:
 {% else %}
 No users found.
 {% endif %}
-"#,
-        "context": {
-            "users": [
-                {"name": "Alice", "age": 25},
-                {"name": "Bob", "age": 30}
-            ]
-        },
+";
+
+    let users = json!([
+        {"name": "Alice", "age": 25},
+        {"name": "Bob", "age": 30}
+    ]);
+
+    let params = json!({
+        "input": template,
+        "context": {"users": users},
         "engine": "tera"
     });
 
@@ -73,13 +73,11 @@ No users found.
     assert!(result.text.contains("Alice (25)"));
     assert!(result.text.contains("Bob (30)"));
 }
-
 #[tokio::test]
 async fn test_handlebars_block_helpers() {
     let tool = TemplateEngineTool::new();
 
-    let params = json!({
-        "input": r#"
+    let template = r"
 {{#if showGreeting}}
 Hello {{name}}!
 {{#each items}}
@@ -88,12 +86,17 @@ Hello {{name}}!
 {{else}}
 Goodbye!
 {{/if}}
-"#,
-        "context": {
-            "showGreeting": true,
-            "name": "World",
-            "items": ["apple", "banana", "cherry"]
-        },
+";
+
+    let context = json!({
+        "showGreeting": true,
+        "name": "World",
+        "items": ["apple", "banana", "cherry"]
+    });
+
+    let params = json!({
+        "input": template,
+        "context": context,
         "engine": "handlebars"
     });
 
@@ -108,7 +111,6 @@ Goodbye!
     assert!(result.text.contains("- banana"));
     assert!(result.text.contains("- cherry"));
 }
-
 #[tokio::test]
 async fn test_handlebars_custom_helpers() {
     let tool = TemplateEngineTool::new();
@@ -131,7 +133,6 @@ async fn test_handlebars_custom_helpers() {
     let output = extract_result(&result.text);
     assert_eq!(output["rendered"], "ALICE - wonderland");
 }
-
 #[tokio::test]
 async fn test_auto_detection() {
     let tool = TemplateEngineTool::new();
@@ -168,7 +169,6 @@ async fn test_auto_detection() {
     assert_eq!(output["rendered"], "Yes");
     assert_eq!(output["engine"], "tera");
 }
-
 #[tokio::test]
 async fn test_html_escaping() {
     let tool = TemplateEngineTool::new();
@@ -192,13 +192,11 @@ async fn test_html_escaping() {
     assert!(result.text.contains("&lt;script&gt;"));
     assert!(!result.text.contains("<script>"));
 }
-
 #[tokio::test]
 async fn test_complex_data_structures() {
     let tool = TemplateEngineTool::new();
 
-    let params = json!({
-        "input": r#"
+    let template = r"
 Company: {{ company.name }}
 Employees:
 {% for dept, employees in departments %}
@@ -207,21 +205,26 @@ Employees:
     - {{ emp.name }}: {{ emp.role }}
   {% endfor %}
 {% endfor %}
-"#,
-        "context": {
-            "company": {
-                "name": "TechCorp"
-            },
-            "departments": {
-                "Engineering": [
-                    {"name": "Alice", "role": "Senior Engineer"},
-                    {"name": "Bob", "role": "Junior Engineer"}
-                ],
-                "Sales": [
-                    {"name": "Charlie", "role": "Sales Manager"}
-                ]
-            }
-        },
+";
+
+    let company = json!({"name": "TechCorp"});
+    let engineering = json!([
+        {"name": "Alice", "role": "Senior Engineer"},
+        {"name": "Bob", "role": "Junior Engineer"}
+    ]);
+    let sales = json!([{"name": "Charlie", "role": "Sales Manager"}]);
+
+    let context = json!({
+        "company": company,
+        "departments": {
+            "Engineering": engineering,
+            "Sales": sales
+        }
+    });
+
+    let params = json!({
+        "input": template,
+        "context": context,
         "engine": "tera"
     });
 
@@ -237,7 +240,6 @@ Employees:
     assert!(result.text.contains("Sales:"));
     assert!(result.text.contains("Charlie: Sales Manager"));
 }
-
 #[tokio::test]
 async fn test_error_handling() {
     let tool = TemplateEngineTool::new();
@@ -256,7 +258,6 @@ async fn test_error_handling() {
     let err = result.unwrap_err();
     assert!(err.to_string().contains("Invalid Tera template"));
 }
-
 #[tokio::test]
 async fn test_missing_parameters() {
     let tool = TemplateEngineTool::new();
@@ -275,11 +276,9 @@ async fn test_missing_parameters() {
     // The error message should mention missing input parameter (standardized from template)
     assert!(
         error_msg.contains("input") || error_msg.contains("Input"),
-        "Expected error about missing input, got: {}",
-        error_msg
+        "Expected error about missing input, got: {error_msg}"
     );
 }
-
 #[tokio::test]
 async fn test_tool_schema() {
     let tool = TemplateEngineTool::new();
@@ -306,7 +305,6 @@ async fn test_tool_schema() {
         "tera"
     );
 }
-
 #[tokio::test]
 async fn test_metadata_in_output() {
     let tool = TemplateEngineTool::new();

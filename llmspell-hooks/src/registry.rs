@@ -11,6 +11,74 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{debug, info};
 
+/// Configuration for HookRegistry
+#[derive(Debug, Clone)]
+pub struct HookRegistryConfig {
+    /// Initial capacity for the hooks map
+    pub initial_capacity: usize,
+    /// Whether hooks are globally enabled by default
+    pub global_enabled_default: bool,
+    /// Whether to track statistics
+    pub enable_stats: bool,
+}
+
+impl Default for HookRegistryConfig {
+    fn default() -> Self {
+        Self {
+            initial_capacity: 16,
+            global_enabled_default: true,
+            enable_stats: true,
+        }
+    }
+}
+
+/// Builder for HookRegistryConfig
+#[derive(Debug, Clone)]
+pub struct HookRegistryConfigBuilder {
+    config: HookRegistryConfig,
+}
+
+impl HookRegistryConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: HookRegistryConfig::default(),
+        }
+    }
+
+    /// Set the initial capacity for the hooks map
+    #[must_use]
+    pub fn initial_capacity(mut self, capacity: usize) -> Self {
+        self.config.initial_capacity = capacity;
+        self
+    }
+
+    /// Set whether hooks are globally enabled by default
+    #[must_use]
+    pub fn global_enabled_default(mut self, enabled: bool) -> Self {
+        self.config.global_enabled_default = enabled;
+        self
+    }
+
+    /// Set whether to track statistics
+    #[must_use]
+    pub fn enable_stats(mut self, enable: bool) -> Self {
+        self.config.enable_stats = enable;
+        self
+    }
+
+    /// Build the configuration
+    pub fn build(self) -> HookRegistryConfig {
+        self.config
+    }
+}
+
+impl Default for HookRegistryConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Hook entry with metadata
 #[derive(Clone)]
 struct HookEntry {
@@ -21,6 +89,8 @@ struct HookEntry {
 
 /// Hook registry for managing hooks by point
 pub struct HookRegistry {
+    /// Registry configuration
+    config: HookRegistryConfig,
     /// Hooks organized by HookPoint
     hooks: Arc<DashMap<HookPoint, Vec<HookEntry>>>,
     /// OPTIMIZATION: Global hook state using atomic for lock-free access
@@ -39,13 +109,30 @@ pub struct RegistryStats {
 }
 
 impl HookRegistry {
-    /// Create a new hook registry
+    /// Create a new hook registry with default configuration
     pub fn new() -> Self {
+        Self::with_config(HookRegistryConfig::default())
+    }
+
+    /// Create a new hook registry with custom configuration
+    pub fn with_config(config: HookRegistryConfig) -> Self {
+        let hooks = if config.initial_capacity > 0 {
+            Arc::new(DashMap::with_capacity(config.initial_capacity))
+        } else {
+            Arc::new(DashMap::new())
+        };
+
         Self {
-            hooks: Arc::new(DashMap::new()),
-            global_enabled: Arc::new(AtomicBool::new(true)),
+            config: config.clone(),
+            hooks,
+            global_enabled: Arc::new(AtomicBool::new(config.global_enabled_default)),
             stats: Arc::new(RwLock::new(RegistryStats::default())),
         }
+    }
+
+    /// Create a new builder for HookRegistry configuration
+    pub fn builder() -> HookRegistryConfigBuilder {
+        HookRegistryConfigBuilder::new()
     }
 
     /// Register a hook for a specific point
@@ -242,6 +329,10 @@ impl HookRegistry {
 
     /// Update statistics
     fn update_stats(&self) {
+        if !self.config.enable_stats {
+            return;
+        }
+
         let mut stats = RegistryStats::default();
 
         for entry in self.hooks.iter() {
@@ -301,6 +392,7 @@ impl Default for HookRegistry {
 impl Clone for HookRegistry {
     fn clone(&self) -> Self {
         Self {
+            config: self.config.clone(),
             hooks: self.hooks.clone(),
             global_enabled: self.global_enabled.clone(),
             stats: self.stats.clone(),
@@ -330,7 +422,6 @@ mod tests {
     use crate::context::HookContext;
     use crate::result::HookResult;
     use crate::traits::FnHook;
-
     #[test]
     fn test_hook_registration() {
         let registry = HookRegistry::new();
@@ -351,7 +442,6 @@ mod tests {
             Some(&1)
         );
     }
-
     #[test]
     fn test_priority_ordering() {
         let registry = HookRegistry::new();
@@ -391,7 +481,6 @@ mod tests {
         let names = registry.get_hook_names(&HookPoint::BeforeAgentInit);
         assert_eq!(names, vec!["high", "normal", "low"]);
     }
-
     #[test]
     fn test_language_filtering() {
         let registry = HookRegistry::new();
@@ -424,7 +513,6 @@ mod tests {
             registry.get_hooks_by_language(&HookPoint::BeforeAgentInit, Language::Native);
         assert_eq!(native_hooks.len(), 1);
     }
-
     #[test]
     fn test_duplicate_registration() {
         let registry = HookRegistry::new();
@@ -439,7 +527,6 @@ mod tests {
 
         assert!(matches!(result, Err(RegistryError::DuplicateHook(_))));
     }
-
     #[test]
     fn test_unregister() {
         let registry = HookRegistry::new();
@@ -456,7 +543,6 @@ mod tests {
         assert!(!registry.has_hook(&HookPoint::BeforeAgentInit, "test_hook"));
         assert_eq!(registry.stats().total_hooks, 0);
     }
-
     #[test]
     fn test_enable_disable() {
         let registry = HookRegistry::new();
@@ -478,7 +564,6 @@ mod tests {
         let hooks = registry.get_hooks(&HookPoint::BeforeAgentInit);
         assert_eq!(hooks.len(), 1);
     }
-
     #[test]
     fn test_global_enable() {
         let registry = HookRegistry::new();
@@ -498,7 +583,6 @@ mod tests {
         let hooks = registry.get_hooks(&HookPoint::BeforeAgentInit);
         assert_eq!(hooks.len(), 1);
     }
-
     #[test]
     fn test_bulk_registration() {
         let registry = HookRegistry::new();
@@ -523,7 +607,6 @@ mod tests {
         assert_eq!(registry.stats().total_hooks, 3);
         assert_eq!(registry.get_hook_points().len(), 3);
     }
-
     #[test]
     fn test_clear_operations() {
         let registry = HookRegistry::new();
@@ -544,5 +627,27 @@ mod tests {
         // Clear all
         registry.clear_all();
         assert_eq!(registry.stats().total_hooks, 0);
+    }
+    #[test]
+    fn test_hook_registry_builder() {
+        // Test builder pattern
+        let registry = HookRegistry::builder()
+            .initial_capacity(32)
+            .global_enabled_default(false)
+            .enable_stats(false)
+            .build();
+
+        let registry = HookRegistry::with_config(registry);
+
+        // Check global enabled is false
+        assert!(!registry.is_global_enabled());
+
+        // Register a hook
+        let hook = FnHook::new("test_hook", |_| Ok(HookResult::Continue));
+        registry.register(HookPoint::BeforeAgentInit, hook).unwrap();
+
+        // Since stats are disabled, stats should remain at default
+        let stats = registry.stats();
+        assert_eq!(stats.total_hooks, 0); // Stats not updated due to enable_stats=false
     }
 }

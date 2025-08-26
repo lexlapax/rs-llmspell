@@ -12,6 +12,7 @@ use tracing::{info, warn, Level};
 /// Example demonstrating a monitoring agent that tracks system health,
 /// agent performance, and generates alerts based on thresholds.
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();
@@ -196,7 +197,7 @@ async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::fixtures::create_test_context;
+    use llmspell_testing::environment_helpers::create_test_context;
 
     #[tokio::test]
     async fn test_monitor_agent_creation() {

@@ -33,6 +33,7 @@ impl Default for UrlAnalyzerTool {
 }
 
 impl UrlAnalyzerTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -52,8 +53,7 @@ impl UrlAnalyzerTool {
         // HEAD request to get headers without body
         let response = client.head(url.to_string()).send().await.map_err(|e| {
             llmspell_utils::error_builders::llmspell::component_error(format!(
-                "Failed to fetch URL metadata: {}",
-                e
+                "Failed to fetch URL metadata: {e}"
             ))
         })?;
 
@@ -147,10 +147,14 @@ impl BaseAgent for UrlAnalyzerTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("UrlAnalyzer error: {}", error)))
+        Ok(AgentOutput::text(format!("UrlAnalyzer error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url_str = extract_required_string(params, "input")?;
         let fetch_metadata = extract_optional_bool(params, "fetch_metadata").unwrap_or(false);
@@ -168,7 +172,7 @@ impl BaseAgent for UrlAnalyzerTool {
                     ));
                 }
                 return Err(validation_error(
-                    format!("Invalid URL: {}", e),
+                    format!("Invalid URL: {e}"),
                     Some("input".to_string()),
                 ));
             }

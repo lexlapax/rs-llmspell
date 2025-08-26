@@ -1,7 +1,7 @@
 //! ABOUTME: Core types and foundational data structures
-//! ABOUTME: Provides ComponentId, Version, ComponentMetadata and streaming types
+//! ABOUTME: Provides `ComponentId`, `Version`, `ComponentMetadata` and streaming types
 
-mod agent_io;
+pub mod agent_io;
 mod media;
 mod streaming;
 
@@ -22,7 +22,7 @@ use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
-/// Unique identifier for components in the LLMSpell system.
+/// Unique identifier for components in the `LLMSpell` system.
 ///
 /// `ComponentId` uses UUID v4 for random generation and UUID v5 for deterministic
 /// generation from names. This allows both unique random IDs and reproducible IDs
@@ -47,18 +47,49 @@ use uuid::Uuid;
 pub struct ComponentId(Uuid);
 
 impl ComponentId {
-    /// Generate a new random ComponentId
+    /// Generate a new random `ComponentId`
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
 
-    /// Create ComponentId from name (deterministic)
+    /// Create `ComponentId` from an existing UUID
+    #[must_use]
+    pub fn from_uuid(uuid: Uuid) -> Self {
+        Self(uuid)
+    }
+
+    /// Create `ComponentId` from name (deterministic)
+    #[must_use]
     pub fn from_name(name: &str) -> Self {
         let namespace = Uuid::NAMESPACE_DNS;
         Self(Uuid::new_v5(&namespace, name.as_bytes()))
     }
 
+    /// Parse `ComponentId` from a UUID string or create from name
+    ///
+    /// This handles both cases:
+    /// 1. Existing UUID strings (with or without prefixes like "workflow_")
+    /// 2. Names that should be converted to UUIDs deterministically
+    pub fn parse_or_from_name(s: &str) -> Self {
+        // Try to extract UUID from common prefixed formats
+        let uuid_str = s
+            .strip_prefix("workflow_")
+            .or_else(|| s.strip_prefix("agent_"))
+            .or_else(|| s.strip_prefix("tool_"))
+            .unwrap_or(s);
+
+        // Try to parse as UUID first
+        if let Ok(uuid) = Uuid::parse_str(uuid_str) {
+            Self(uuid)
+        } else {
+            // Fall back to creating from name
+            Self::from_name(s)
+        }
+    }
+
     /// Get inner UUID
+    #[must_use]
     pub fn uuid(&self) -> Uuid {
         self.0
     }
@@ -106,6 +137,7 @@ pub struct Version {
 }
 
 impl Version {
+    #[must_use]
     pub fn new(major: u32, minor: u32, patch: u32) -> Self {
         Self {
             major,
@@ -115,11 +147,13 @@ impl Version {
     }
 
     /// Check if this version is compatible with another (same major version)
+    #[must_use]
     pub fn is_compatible_with(&self, other: &Version) -> bool {
         self.major == other.major
     }
 
     /// Check if this version is newer than another
+    #[must_use]
     pub fn is_newer_than(&self, other: &Version) -> bool {
         self > other
     }
@@ -131,7 +165,7 @@ impl fmt::Display for Version {
     }
 }
 
-/// Metadata for components in the LLMSpell system.
+/// Metadata for components in the `LLMSpell` system.
 ///
 /// Contains essential information about a component including its ID, name,
 /// version, description, and timestamps. This metadata is used throughout
@@ -164,6 +198,7 @@ pub struct ComponentMetadata {
 }
 
 impl ComponentMetadata {
+    #[must_use]
     pub fn new(name: String, description: String) -> Self {
         let now = chrono::Utc::now();
         Self {
@@ -181,9 +216,35 @@ impl ComponentMetadata {
         self.version = version;
         self.updated_at = chrono::Utc::now();
     }
+
+    /// Get the component type as a string for event emission
+    ///
+    /// Infers the component type from the name or ID pattern.
+    /// Returns "agent", "tool", "workflow", or "component" as appropriate.
+    pub fn component_type(&self) -> &str {
+        // Try to infer from name patterns
+        let name_lower = self.name.to_lowercase();
+
+        if name_lower.contains("agent") {
+            "agent"
+        } else if name_lower.contains("tool") {
+            "tool"
+        } else if name_lower.contains("workflow") {
+            "workflow"
+        } else if name_lower.ends_with("_agent") {
+            "agent"
+        } else if name_lower.ends_with("_tool") {
+            "tool"
+        } else if name_lower.ends_with("_workflow") {
+            "workflow"
+        } else {
+            // Default to generic component
+            "component"
+        }
+    }
 }
 
-/// Metadata for events in the LLMSpell system.
+/// Metadata for events in the `LLMSpell` system.
 ///
 /// Contains correlation information for tracking events across components,
 /// including trace IDs, span IDs, and custom attributes. Used for event
@@ -227,6 +288,7 @@ pub struct EventMetadata {
 
 impl EventMetadata {
     /// Create new empty event metadata
+    #[must_use]
     pub fn new() -> Self {
         Self {
             timestamp: Some(chrono::Utc::now()),
@@ -235,6 +297,7 @@ impl EventMetadata {
     }
 
     /// Create metadata with trace and span IDs
+    #[must_use]
     pub fn with_trace(trace_id: String, span_id: String) -> Self {
         Self {
             trace_id: Some(trace_id),
@@ -245,6 +308,7 @@ impl EventMetadata {
     }
 
     /// Get trace ID
+    #[must_use]
     pub fn trace_id(&self) -> Option<&str> {
         self.trace_id.as_deref()
     }
@@ -255,6 +319,7 @@ impl EventMetadata {
     }
 
     /// Get span ID
+    #[must_use]
     pub fn span_id(&self) -> Option<&str> {
         self.span_id.as_deref()
     }
@@ -265,6 +330,7 @@ impl EventMetadata {
     }
 
     /// Get parent span ID
+    #[must_use]
     pub fn parent_span_id(&self) -> Option<&str> {
         self.parent_span_id.as_deref()
     }
@@ -275,6 +341,7 @@ impl EventMetadata {
     }
 
     /// Get correlation ID
+    #[must_use]
     pub fn correlation_id(&self) -> Option<&str> {
         self.correlation_id.as_deref()
     }
@@ -285,6 +352,7 @@ impl EventMetadata {
     }
 
     /// Get source component
+    #[must_use]
     pub fn source(&self) -> Option<&ComponentId> {
         self.source.as_ref()
     }
@@ -301,15 +369,17 @@ impl EventMetadata {
 
     /// Get custom attribute
     pub fn get_attribute(&self, key: &str) -> Option<&str> {
-        self.attributes.get(key).map(|s| s.as_str())
+        self.attributes.get(key).map(String::as_str)
     }
 
     /// Get all attributes
+    #[must_use]
     pub fn attributes(&self) -> &HashMap<String, String> {
         &self.attributes
     }
 
     /// Create a child event metadata with new span ID
+    #[must_use]
     pub fn create_child(&self, span_id: String) -> Self {
         Self {
             trace_id: self.trace_id.clone(),
@@ -326,7 +396,6 @@ impl EventMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_component_id_generation() {
         let id1 = ComponentId::new();
@@ -336,7 +405,6 @@ mod tests {
         assert_ne!(id1, id2);
         assert_ne!(id1.uuid(), id2.uuid());
     }
-
     #[test]
     fn test_component_id_from_name_deterministic() {
         let name = "test-component";
@@ -347,7 +415,6 @@ mod tests {
         assert_eq!(id1, id2);
         assert_eq!(id1.uuid(), id2.uuid());
     }
-
     #[test]
     fn test_component_id_from_different_names() {
         let id1 = ComponentId::from_name("component-a");
@@ -356,7 +423,6 @@ mod tests {
         // Different names should generate different IDs
         assert_ne!(id1, id2);
     }
-
     #[test]
     fn test_component_id_display() {
         let id = ComponentId::from_name("test");
@@ -366,7 +432,6 @@ mod tests {
         assert!(display_str.len() == 36); // UUID string length
         assert!(display_str.contains('-')); // UUID format
     }
-
     #[test]
     fn test_component_id_serialization() {
         let id = ComponentId::from_name("test");
@@ -377,7 +442,6 @@ mod tests {
 
         assert_eq!(id, deserialized);
     }
-
     #[test]
     fn test_version_creation() {
         let version = Version::new(1, 2, 3);
@@ -386,7 +450,6 @@ mod tests {
         assert_eq!(version.minor, 2);
         assert_eq!(version.patch, 3);
     }
-
     #[test]
     fn test_version_comparison() {
         let v1_0_0 = Version::new(1, 0, 0);
@@ -404,7 +467,6 @@ mod tests {
         assert!(v2_0_0.is_newer_than(&v1_1_1));
         assert!(!v1_0_0.is_newer_than(&v1_1_0));
     }
-
     #[test]
     fn test_version_compatibility() {
         let v1_0_0 = Version::new(1, 0, 0);
@@ -419,13 +481,11 @@ mod tests {
         assert!(!v1_0_0.is_compatible_with(&v2_0_0));
         assert!(!v2_0_0.is_compatible_with(&v1_0_0));
     }
-
     #[test]
     fn test_version_display() {
         let version = Version::new(1, 2, 3);
         assert_eq!(format!("{}", version), "1.2.3");
     }
-
     #[test]
     fn test_version_serialization() {
         let version = Version::new(1, 2, 3);
@@ -436,7 +496,6 @@ mod tests {
 
         assert_eq!(version, deserialized);
     }
-
     #[test]
     fn test_component_metadata_creation() {
         let name = "test-component".to_string();
@@ -454,7 +513,6 @@ mod tests {
         let duration = now - metadata.created_at;
         assert!(duration.num_seconds() < 5); // Created within last 5 seconds
     }
-
     #[test]
     fn test_component_metadata_version_update() {
         let mut metadata = ComponentMetadata::new("test".to_string(), "test component".to_string());
@@ -470,7 +528,6 @@ mod tests {
         assert_eq!(metadata.version, new_version);
         assert!(metadata.updated_at > original_updated_at);
     }
-
     #[test]
     fn test_component_metadata_serialization() {
         let metadata = ComponentMetadata::new("test".to_string(), "test component".to_string());
@@ -484,7 +541,6 @@ mod tests {
         assert_eq!(metadata.version, deserialized.version);
         assert_eq!(metadata.description, deserialized.description);
     }
-
     #[test]
     fn test_event_metadata_creation() {
         let metadata = EventMetadata::new();
@@ -494,7 +550,6 @@ mod tests {
         assert!(metadata.span_id.is_none());
         assert!(metadata.attributes.is_empty());
     }
-
     #[test]
     fn test_event_metadata_with_trace() {
         let trace_id = "trace-123".to_string();
@@ -506,7 +561,6 @@ mod tests {
         assert_eq!(metadata.span_id(), Some("span-456"));
         assert!(metadata.timestamp.is_some());
     }
-
     #[test]
     fn test_event_metadata_setters_getters() {
         let mut metadata = EventMetadata::new();
@@ -523,7 +577,6 @@ mod tests {
         assert_eq!(metadata.correlation_id(), Some("corr-678"));
         assert!(metadata.source().is_some());
     }
-
     #[test]
     fn test_event_metadata_attributes() {
         let mut metadata = EventMetadata::new();
@@ -536,7 +589,6 @@ mod tests {
         assert_eq!(metadata.get_attribute("non_existent"), None);
         assert_eq!(metadata.attributes().len(), 2);
     }
-
     #[test]
     fn test_event_metadata_create_child() {
         let mut parent =
@@ -552,7 +604,6 @@ mod tests {
         assert_eq!(child.correlation_id(), Some("corr-parent"));
         assert!(child.attributes().is_empty()); // Child starts with fresh attributes
     }
-
     #[test]
     fn test_event_metadata_serialization() {
         let mut metadata =

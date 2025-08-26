@@ -1,5 +1,5 @@
 //! ABOUTME: Lua hook adapter for cross-language hook execution
-//! ABOUTME: Implements HookAdapter trait to convert between Rust and Lua types
+//! ABOUTME: Implements `HookAdapter` trait to convert between Rust and Lua types
 
 use crate::lua::conversion::{json_to_lua_value, lua_table_to_json};
 use llmspell_hooks::{HookAdapter, HookContext, HookResult};
@@ -18,11 +18,16 @@ impl Default for LuaHookAdapter {
 
 impl LuaHookAdapter {
     /// Create a new Lua hook adapter
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
-    /// Convert HookContext to Lua table
+    /// Convert `HookContext` to Lua table
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua table creation or field setting fails
     pub fn hook_context_to_lua_table<'lua>(
         &self,
         lua: &'lua Lua,
@@ -62,10 +67,13 @@ impl LuaHookAdapter {
         Ok(table)
     }
 
-    /// Convert Lua value to HookResult
+    /// Convert Lua value to `HookResult`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Lua value cannot be converted to a `HookResult`
     pub fn lua_value_to_hook_result(&self, _lua: &Lua, value: Value) -> mlua::Result<HookResult> {
         match value {
-            Value::Nil => Ok(HookResult::Continue),
             Value::String(s) => {
                 let s = s.to_str()?;
                 match s {
@@ -81,7 +89,6 @@ impl LuaHookAdapter {
                 if let Ok(Value::String(result_type)) = table.get::<_, Value>("type") {
                     let result_type = result_type.to_str()?;
                     match result_type {
-                        "continue" => Ok(HookResult::Continue),
                         "modified" => {
                             // Get the modified data
                             if let Ok(data) = table.get::<_, Table>("data") {
@@ -163,15 +170,13 @@ impl HookAdapter for LuaHookAdapter {
     }
 
     fn adapt_result(&self, result: Self::Result) -> HookResult {
-        if let Some(hook_result) = result.downcast_ref::<HookResult>() {
-            hook_result.clone()
-        } else {
-            HookResult::Continue
-        }
+        result
+            .downcast_ref::<HookResult>()
+            .map_or(HookResult::Continue, Clone::clone)
     }
 
     fn extract_error(&self, result: &Self::Result) -> Option<String> {
-        result.downcast_ref::<String>().cloned()
+        (**result).downcast_ref::<String>().cloned()
     }
 }
 
@@ -179,7 +184,6 @@ impl HookAdapter for LuaHookAdapter {
 mod tests {
     use super::*;
     use llmspell_hooks::types::{ComponentId, ComponentType, HookPoint};
-
     #[test]
     fn test_lua_hook_adapter() {
         let lua = Lua::new();

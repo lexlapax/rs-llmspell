@@ -3,9 +3,11 @@
 
 use llmspell_bridge::{
     engine::factory::{EngineFactory, LuaConfig},
-    providers::{ProviderManager, ProviderManagerConfig},
+    providers::ProviderManager,
     ComponentRegistry,
 };
+use llmspell_config::providers::ProviderManagerConfig;
+use std::fmt::Write;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -27,16 +29,16 @@ async fn test_memory_usage_simple_scripts() {
     // Execute multiple simple scripts
     let start = Instant::now();
     for i in 0..100 {
-        let script = format!("return {}", i);
+        let script = format!("return {i}");
         let _ = engine.execute_script(&script).await.unwrap();
     }
     let duration = start.elapsed();
 
-    println!("Executed 100 scripts in {:?}", duration);
+    println!("Executed 100 scripts in {duration:?}");
 
     // Verify the configured memory limit is reasonable
     assert_eq!(
-        lua_config.max_memory,
+        lua_config.max_memory_bytes,
         Some(50_000_000),
         "Default memory limit should be 50MB"
     );
@@ -44,6 +46,7 @@ async fn test_memory_usage_simple_scripts() {
 
 /// Test for memory leaks with repeated execution
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::cast_precision_loss)] // Timing measurements for performance testing
 async fn test_no_memory_leaks() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -64,27 +67,31 @@ async fn test_no_memory_leaks() {
 
     // Execute many scripts
     for i in 0..1000 {
-        let script = format!("local t = {{}}; for j=1,100 do t[j] = {} end; return #t", i);
+        let script = format!("local t = {{}}; for j=1,100 do t[j] = {i} end; return #t");
         let start = Instant::now();
         let _ = engine.execute_script(&script).await.unwrap();
         timings.push(start.elapsed());
     }
 
     // Calculate average time for first 100 vs last 100
-    let first_100_avg = timings[..100].iter().map(|d| d.as_micros()).sum::<u128>() / 100;
-    let last_100_avg = timings[900..].iter().map(|d| d.as_micros()).sum::<u128>() / 100;
+    let first_100_avg = timings[..100]
+        .iter()
+        .map(std::time::Duration::as_micros)
+        .sum::<u128>()
+        / 100;
+    let last_100_avg = timings[900..]
+        .iter()
+        .map(std::time::Duration::as_micros)
+        .sum::<u128>()
+        / 100;
 
-    println!(
-        "First 100 avg: {}μs, Last 100 avg: {}μs",
-        first_100_avg, last_100_avg
-    );
+    println!("First 100 avg: {first_100_avg}μs, Last 100 avg: {last_100_avg}μs");
 
     // Performance should not degrade significantly (indicates memory issues)
-    let degradation = last_100_avg as f64 / first_100_avg as f64;
+    let degradation = (last_100_avg as f64) / (first_100_avg as f64);
     assert!(
         degradation < 2.0,
-        "Performance degraded by {:.2}x, possible memory leak",
-        degradation
+        "Performance degraded by {degradation:.2}x, possible memory leak"
     );
 }
 
@@ -104,11 +111,10 @@ async fn test_script_startup_time() {
     let _ = engine.execute_script("return 'hello'").await.unwrap();
     let startup_time = start.elapsed();
 
-    println!("Script startup time: {:?}", startup_time);
+    println!("Script startup time: {startup_time:?}");
     assert!(
         startup_time < Duration::from_millis(100),
-        "Startup time {:?} should be < 100ms",
-        startup_time
+        "Startup time {startup_time:?} should be < 100ms"
     );
 }
 
@@ -133,16 +139,15 @@ async fn test_streaming_latency() {
 
     match result {
         Ok(_) => {
-            println!("Streaming latency: {:?}", latency);
+            println!("Streaming latency: {latency:?}");
             assert!(
                 latency < Duration::from_millis(50),
-                "Streaming latency {:?} should be < 50ms",
-                latency
+                "Streaming latency {latency:?} should be < 50ms"
             );
         }
         Err(e) => {
             // Streaming not fully implemented yet
-            println!("Streaming returned error (expected): {}", e);
+            println!("Streaming returned error (expected): {e}");
         }
     }
 }
@@ -183,16 +188,15 @@ async fn test_operation_benchmarks() {
         }
 
         let duration = start.elapsed();
-        let avg_micros = duration.as_micros() / iterations as u128;
+        let avg_micros = duration.as_micros()
+            / u128::try_from(iterations).expect("iterations should be positive");
 
-        println!("Operation '{}': avg {}μs", name, avg_micros);
+        println!("Operation '{name}': avg {avg_micros}μs");
 
         // All basic operations should be fast
         assert!(
             avg_micros < 5000,
-            "Operation '{}' too slow: {}μs",
-            name,
-            avg_micros
+            "Operation '{name}' too slow: {avg_micros}μs"
         );
     }
 }
@@ -221,14 +225,13 @@ async fn test_concurrent_execution_correctness() {
     // Use scripts that do more work to make concurrency benefits more apparent
     let create_script = |i: usize| -> String {
         format!(
-            r#"
+            r"
             local sum = 0
             for j = 1, 100 do
-                sum = sum + j * {}
+                sum = sum + j * {i}
             end
             return sum
-            "#,
-            i
+            "
         )
     };
 
@@ -258,20 +261,19 @@ async fn test_concurrent_execution_correctness() {
     }
     let conc_duration = conc_start.elapsed();
 
-    println!("Sequential execution: {:?}", seq_duration);
-    println!("Concurrent execution: {:?}", conc_duration);
+    println!("Sequential execution: {seq_duration:?}");
+    println!("Concurrent execution: {conc_duration:?}");
 
     // Calculate the overhead ratio
     let overhead_ratio = conc_duration.as_secs_f64() / seq_duration.as_secs_f64();
-    println!("Overhead ratio: {:.2}x", overhead_ratio);
+    println!("Overhead ratio: {overhead_ratio:.2}x");
 
     // Since Lua engine uses a Mutex internally, concurrent execution won't be faster.
     // We just verify that the overhead is reasonable (less than 5x slower)
     // The overhead can vary based on system load and task scheduling
     assert!(
         overhead_ratio < 5.0,
-        "Concurrent execution overhead too high: {:.2}x",
-        overhead_ratio
+        "Concurrent execution overhead too high: {overhead_ratio:.2}x"
     );
 
     // Also verify that concurrent execution produces correct results
@@ -280,6 +282,7 @@ async fn test_concurrent_execution_correctness() {
 
 /// Test memory usage with large scripts
 #[tokio::test(flavor = "multi_thread")]
+#[allow(clippy::cast_precision_loss)] // File size calculation for diagnostics
 async fn test_large_script_memory() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -294,15 +297,16 @@ async fn test_large_script_memory() {
     let mut large_script = String::new();
     large_script.push_str("local data = {\n");
     for i in 0..10000 {
-        large_script.push_str(&format!(
-            "  ['key_{}'] = 'value_{}_with_some_padding',\n",
-            i, i
-        ));
+        writeln!(
+            large_script,
+            "  ['key_{i}'] = 'value_{i}_with_some_padding',"
+        )
+        .unwrap();
     }
     large_script.push_str("}\nreturn #data");
 
     let script_size_mb = large_script.len() as f64 / (1024.0 * 1024.0);
-    println!("Large script size: {:.2} MB", script_size_mb);
+    println!("Large script size: {script_size_mb:.2} MB");
 
     // Verify script is under limit
     assert!(
@@ -316,7 +320,7 @@ async fn test_large_script_memory() {
     let duration = start.elapsed();
 
     assert!(result.is_ok(), "Large script should execute successfully");
-    println!("Large script execution time: {:?}", duration);
+    println!("Large script execution time: {duration:?}");
 
     // Large scripts should still execute reasonably fast
     assert!(
@@ -346,13 +350,12 @@ async fn test_api_injection_overhead() {
     }
 
     let avg_time = total_time / iterations;
-    println!("Average API injection time: {:?}", avg_time);
+    println!("Average API injection time: {avg_time:?}");
 
     // API injection should be fast
     assert!(
         avg_time < Duration::from_millis(10),
-        "API injection overhead {:?} should be < 10ms",
-        avg_time
+        "API injection overhead {avg_time:?} should be < 10ms"
     );
 }
 
@@ -372,7 +375,7 @@ async fn test_context_switching_overhead() {
     let mut contexts = vec![];
     for i in 0..5 {
         let mut ctx = llmspell_bridge::engine::bridge::ExecutionContext {
-            working_directory: format!("/test/dir/{}", i),
+            working_directory: format!("/test/dir/{i}"),
             ..Default::default()
         };
         ctx.environment.insert("CTX_ID".to_string(), i.to_string());
@@ -392,12 +395,11 @@ async fn test_context_switching_overhead() {
     let duration = start.elapsed();
     let avg_micros = duration.as_micros() / iterations as u128;
 
-    println!("Context switching overhead: avg {}μs", avg_micros);
+    println!("Context switching overhead: avg {avg_micros}μs");
 
     // Context switching should have minimal overhead
     assert!(
         avg_micros < 1000,
-        "Context switching overhead too high: {}μs",
-        avg_micros
+        "Context switching overhead too high: {avg_micros}μs"
     );
 }

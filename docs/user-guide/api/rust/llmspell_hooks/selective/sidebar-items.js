@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"constant":["SELECTIVE_REGISTRY_VERSION"],"struct":["HookFeatures","LazyHookEntry","SelectiveHookRegistry","SelectiveRegistryConfig","SelectiveRegistryStats"],"type":["HookFactory"]};

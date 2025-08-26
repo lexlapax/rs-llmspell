@@ -1,12 +1,15 @@
 //! Performance benchmarks for tool hook integration
 //! Measures overhead of hook system across various tools and scenarios
 
+// Benchmark file
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_core::{traits::tool::Tool, types::AgentInput, ExecutionContext};
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
 use llmspell_tools::{
     data::json_processor::JsonProcessorTool,
-    fs::file_operations::FileOperationsTool,
-    lifecycle::hook_integration::{ToolExecutor, ToolLifecycleConfig},
+    fs::file_operations::{FileOperationsConfig, FileOperationsTool},
+    lifecycle::hook_integration::{HookFeatures, ToolExecutor, ToolLifecycleConfig},
     util::calculator::CalculatorTool,
 };
 use serde_json::json;
@@ -14,8 +17,12 @@ use std::time::Duration;
 
 fn benchmark_calculator_without_hooks(c: &mut Criterion) {
     let config = ToolLifecycleConfig {
-        enable_hooks: false,
-        ..Default::default()
+        features: HookFeatures {
+            hooks_enabled: false,
+            circuit_breaker_enabled: false,
+            security_validation_enabled: false,
+        },
+        ..ToolLifecycleConfig::default()
     };
     let executor = ToolExecutor::new(config, None, None);
     let calculator = CalculatorTool::new();
@@ -54,10 +61,12 @@ fn benchmark_calculator_without_hooks(c: &mut Criterion) {
 
 fn benchmark_calculator_with_hooks(c: &mut Criterion) {
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_security_validation: true,
-        enable_audit_logging: true,
-        ..Default::default()
+        features: HookFeatures {
+            hooks_enabled: true,
+            circuit_breaker_enabled: true,
+            security_validation_enabled: true,
+        },
+        ..ToolLifecycleConfig::default()
     };
     let executor = ToolExecutor::new(config, None, None);
     let calculator = CalculatorTool::new();
@@ -96,15 +105,22 @@ fn benchmark_calculator_with_hooks(c: &mut Criterion) {
 
 fn benchmark_json_processor_hooks(c: &mut Criterion) {
     let config_no_hooks = ToolLifecycleConfig {
-        enable_hooks: false,
-        ..Default::default()
+        features: HookFeatures {
+            hooks_enabled: false,
+            circuit_breaker_enabled: false,
+            security_validation_enabled: false,
+        },
+        ..ToolLifecycleConfig::default()
     };
     let executor_no_hooks = ToolExecutor::new(config_no_hooks, None, None);
 
     let config_with_hooks = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_security_validation: true,
-        ..Default::default()
+        features: HookFeatures {
+            hooks_enabled: true,
+            circuit_breaker_enabled: true,
+            security_validation_enabled: true,
+        },
+        ..ToolLifecycleConfig::default()
     };
     let executor_with_hooks = ToolExecutor::new(config_with_hooks, None, None);
 
@@ -191,11 +207,14 @@ fn benchmark_json_processor_hooks(c: &mut Criterion) {
 
 fn benchmark_circuit_breaker(c: &mut Criterion) {
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_circuit_breaker: true,
+        features: HookFeatures {
+            hooks_enabled: true,
+            circuit_breaker_enabled: true,
+            security_validation_enabled: true,
+        },
         circuit_breaker_failure_threshold: 3,
         circuit_breaker_recovery_time: Duration::from_millis(100),
-        ..Default::default()
+        ..ToolLifecycleConfig::default()
     };
     let executor = ToolExecutor::new(config, None, None);
     let calculator = CalculatorTool::new();
@@ -222,10 +241,17 @@ fn benchmark_circuit_breaker(c: &mut Criterion) {
 }
 
 fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
+    let sandbox = create_default_test_sandbox();
     let tools: Vec<(&str, Box<dyn Tool>)> = vec![
         ("calculator", Box::new(CalculatorTool::new())),
         ("json_processor", Box::new(JsonProcessorTool::default())),
-        ("file_operations", Box::new(FileOperationsTool::default())),
+        (
+            "file_operations",
+            Box::new(FileOperationsTool::new(
+                FileOperationsConfig::default(),
+                sandbox,
+            )),
+        ),
     ];
 
     let mut group = c.benchmark_group("hook_overhead_percentage");
@@ -238,17 +264,22 @@ fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
 
             // Prepare executors
             let config_no_hooks = ToolLifecycleConfig {
-                enable_hooks: false,
-                ..Default::default()
+                features: HookFeatures {
+                    hooks_enabled: false,
+                    circuit_breaker_enabled: false,
+                    security_validation_enabled: false,
+                },
+                ..ToolLifecycleConfig::default()
             };
             let executor_no_hooks = ToolExecutor::new(config_no_hooks, None, None);
 
             let config_with_hooks = ToolLifecycleConfig {
-                enable_hooks: true,
-                enable_security_validation: true,
-                enable_audit_logging: true,
-                enable_circuit_breaker: true,
-                ..Default::default()
+                features: HookFeatures {
+                    hooks_enabled: true,
+                    circuit_breaker_enabled: true,
+                    security_validation_enabled: true,
+                },
+                ..ToolLifecycleConfig::default()
             };
             let executor_with_hooks = ToolExecutor::new(config_with_hooks, None, None);
 
@@ -301,10 +332,14 @@ fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
                     let duration_with_hooks = start_with_hooks.elapsed();
 
                     // Calculate overhead
-                    let overhead_micros = duration_with_hooks.as_micros() as f64
-                        - duration_no_hooks.as_micros() as f64;
-                    let overhead_percent =
-                        (overhead_micros / duration_no_hooks.as_micros() as f64) * 100.0;
+                    #[allow(clippy::cast_precision_loss)]
+                    let with_hooks_micros =
+                        u64::try_from(duration_with_hooks.as_micros()).unwrap_or(u64::MAX) as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let no_hooks_micros =
+                        u64::try_from(duration_no_hooks.as_micros()).unwrap_or(u64::MAX) as f64;
+                    let overhead_micros = with_hooks_micros - no_hooks_micros;
+                    let overhead_percent = (overhead_micros / no_hooks_micros) * 100.0;
 
                     black_box(overhead_percent);
                 });
@@ -317,10 +352,12 @@ fn benchmark_hook_overhead_comparison(c: &mut Criterion) {
 fn benchmark_hook_phases(c: &mut Criterion) {
     // This benchmark focuses on individual hook phase overhead
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_security_validation: true,
-        enable_audit_logging: true,
-        ..Default::default()
+        features: HookFeatures {
+            hooks_enabled: true,
+            circuit_breaker_enabled: true,
+            security_validation_enabled: true,
+        },
+        ..ToolLifecycleConfig::default()
     };
     let executor = ToolExecutor::new(config, None, None);
     let calculator = CalculatorTool::new();
@@ -366,9 +403,12 @@ fn benchmark_hook_phases(c: &mut Criterion) {
 
 fn benchmark_concurrent_hook_execution(c: &mut Criterion) {
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_security_validation: true,
-        ..Default::default()
+        features: HookFeatures {
+            hooks_enabled: true,
+            circuit_breaker_enabled: true,
+            security_validation_enabled: true,
+        },
+        ..ToolLifecycleConfig::default()
     };
     let executor = ToolExecutor::new(config, None, None);
     let calculator = CalculatorTool::new();

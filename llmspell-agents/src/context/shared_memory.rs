@@ -1,6 +1,8 @@
 //! ABOUTME: Shared memory system for inter-agent communication
 //! ABOUTME: Provides thread-safe memory regions with access control and monitoring
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::execution_context::ContextScope;
 use llmspell_core::{ComponentId, LLMSpellError, Result};
 use serde::{Deserialize, Serialize};
@@ -84,7 +86,7 @@ pub struct MemoryChange {
 }
 
 /// Type of memory change
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChangeType {
     /// Value was created
     Created,
@@ -96,6 +98,7 @@ pub enum ChangeType {
 
 impl MemoryRegion {
     /// Create a new memory region
+    #[must_use]
     pub fn new(id: String, scope: ContextScope) -> Self {
         let (change_tx, _) = broadcast::channel(100);
 
@@ -116,18 +119,31 @@ impl MemoryRegion {
     }
 
     /// Grant permission to a component
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn grant_permission(&self, component: ComponentId, permission: MemoryPermission) {
         let mut acl = self.acl.write().unwrap();
         acl.insert(component, permission);
     }
 
     /// Revoke permission from a component
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn revoke_permission(&self, component: &ComponentId) {
         let mut acl = self.acl.write().unwrap();
         acl.remove(component);
     }
 
     /// Check if component has permission
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn has_permission(&self, component: &ComponentId, required: MemoryPermission) -> bool {
         let acl = self.acl.read().unwrap();
         match acl.get(component) {
@@ -139,6 +155,14 @@ impl MemoryRegion {
     }
 
     /// Get a value with permission check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if read permission is denied
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get(&self, key: &str, accessor: &ComponentId) -> Result<Option<Value>> {
         if !self.has_permission(accessor, MemoryPermission::Read) {
             return Err(LLMSpellError::Security {
@@ -156,6 +180,14 @@ impl MemoryRegion {
     }
 
     /// Set a value with permission check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if write permission is denied
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn set(&self, key: String, value: Value, accessor: &ComponentId) -> Result<()> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -191,6 +223,14 @@ impl MemoryRegion {
     }
 
     /// Remove a value with permission check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if write permission is denied
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn remove(&self, key: &str, accessor: &ComponentId) -> Result<Option<Value>> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -222,11 +262,20 @@ impl MemoryRegion {
     }
 
     /// Subscribe to change notifications
+    #[must_use]
     pub fn subscribe(&self) -> broadcast::Receiver<MemoryChange> {
         self.change_tx.subscribe()
     }
 
     /// Get all keys in the region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if read permission is denied
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn keys(&self, accessor: &ComponentId) -> Result<Vec<String>> {
         if !self.has_permission(accessor, MemoryPermission::Read) {
             return Err(LLMSpellError::Security {
@@ -243,6 +292,14 @@ impl MemoryRegion {
     }
 
     /// Clear all data in the region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if write permission is denied
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn clear(&self, accessor: &ComponentId) -> Result<()> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -329,6 +386,7 @@ impl Default for MemoryLimits {
 
 impl SharedMemoryManager {
     /// Create a new shared memory manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             regions: Arc::new(RwLock::new(HashMap::new())),
@@ -338,6 +396,16 @@ impl SharedMemoryManager {
     }
 
     /// Create a new memory region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Maximum region limit is exceeded
+    /// - Region already exists
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn create_region(&self, id: String, scope: ContextScope, owner: ComponentId) -> Result<()> {
         let mut regions = self.regions.write().unwrap();
 
@@ -352,7 +420,7 @@ impl SharedMemoryManager {
 
         if regions.contains_key(&id) {
             return Err(LLMSpellError::Component {
-                message: format!("Memory region already exists: {}", id),
+                message: format!("Memory region already exists: {id}"),
                 source: None,
             });
         }
@@ -365,12 +433,27 @@ impl SharedMemoryManager {
     }
 
     /// Get a memory region
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn get_region(&self, id: &str) -> Option<MemoryRegion> {
         let regions = self.regions.read().unwrap();
         regions.get(id).cloned()
     }
 
     /// Delete a memory region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Delete permission is denied
+    /// - Memory region is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn delete_region(&self, id: &str, requester: &ComponentId) -> Result<()> {
         let mut regions = self.regions.write().unwrap();
 
@@ -378,14 +461,14 @@ impl SharedMemoryManager {
             // Only owner can delete (simplified check)
             if !region.has_permission(requester, MemoryPermission::ReadWrite) {
                 return Err(LLMSpellError::Security {
-                    message: format!("Permission denied: delete access to memory region {}", id),
+                    message: format!("Permission denied: delete access to memory region {id}"),
                     violation_type: Some("access_control".to_string()),
                 });
             }
         }
 
         regions.remove(id).ok_or_else(|| LLMSpellError::Component {
-            message: format!("Memory region not found: {}", id),
+            message: format!("Memory region not found: {id}"),
             source: None,
         })?;
 
@@ -393,6 +476,11 @@ impl SharedMemoryManager {
     }
 
     /// List all regions accessible by a component
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn list_regions(&self, accessor: &ComponentId) -> Vec<String> {
         let regions = self.regions.read().unwrap();
         regions
@@ -403,6 +491,11 @@ impl SharedMemoryManager {
     }
 
     /// Get memory usage statistics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn stats(&self) -> MemoryStats {
         let regions = self.regions.read().unwrap();
 
@@ -417,7 +510,11 @@ impl SharedMemoryManager {
     }
 
     /// Clean up unused regions
-    pub async fn cleanup(&self) {
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned or if duration conversion fails
+    pub fn cleanup(&self) {
         let _now = Instant::now();
         let mut regions = self.regions.write().unwrap();
 
@@ -453,7 +550,6 @@ mod tests {
     use super::*;
     use llmspell_core::ComponentId;
     use serde_json::json;
-
     #[test]
     fn test_memory_region_permissions() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
@@ -472,7 +568,6 @@ mod tests {
         assert!(!region.has_permission(&writer, MemoryPermission::Read));
         assert!(region.has_permission(&writer, MemoryPermission::Write));
     }
-
     #[test]
     fn test_memory_region_operations() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
@@ -497,7 +592,6 @@ mod tests {
         let value = region.get("key1", &accessor).unwrap();
         assert_eq!(value, None);
     }
-
     #[test]
     fn test_memory_region_permission_denied() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
@@ -510,7 +604,6 @@ mod tests {
             .is_err());
         assert!(region.remove("key", &unauthorized).is_err());
     }
-
     #[test]
     fn test_shared_memory_manager() {
         let manager = SharedMemoryManager::new();
@@ -534,7 +627,6 @@ mod tests {
         manager.delete_region("region1", &owner).unwrap();
         assert!(manager.get_region("region1").is_none());
     }
-
     #[test]
     fn test_memory_change_notifications() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);

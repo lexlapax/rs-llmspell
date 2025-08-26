@@ -1009,7 +1009,7 @@ For detailed completion history of Phases 1-11, see previous TODO-DONE.md entrie
 
 - [x] **Task 12.5** Finalize Architecture Document - **COMPLETED** 2025-06-26T16:30:00-08:00
   - [x] move all research document from `/docs/technical/*` to `/docs/archives/research/` - **COMPLETED** 2025-06-26T16:25:00-08:00
-  - [x] move `docs/rs-llmspell-complete-architecture.md` to `/docs/technical/rs-llmspell-final-architecture.md` - **COMPLETED** 2025-06-26T16:30:00-08:00
+  - [x] move `docs/rs-llmspell-complete-architecture.md` to `/docs/technical/master-architecture-vision.md` - **COMPLETED** 2025-06-26T16:30:00-08:00
 ### Phase 13: Implementation Roadmap - **COMPLETED** 2025-06-26T17:30:00-08:00
 - [x] **Task 13.1**: Define all the phases of the implementation with goals for each phase and success critera for each phase - **COMPLETED**
   - [x] Created comprehensive 16-phase implementation roadmap at `/docs/technical/implementation-phases.md`
@@ -1054,7 +1054,7 @@ For detailed completion history of Phases 1-11, see previous TODO-DONE.md entrie
 - **ComponentLifecycleManager**: 5-phase initialization strategy with dependency management
 
 ### Documentation Status:
-- **Final Architecture**: `/docs/technical/rs-llmspell-final-architecture.md` (15,034+ lines)
+- **Final Architecture**: `/docs/technical/master-architecture-vision.md` (15,034+ lines)
 - **Research Archive**: 25 documents moved to `/docs/archives/research/`
 - **Implementation Ready**: All 13 phases have sufficient architectural guidance
 - **Quality Assurance**: Comprehensive testing strategy, security model, performance optimization

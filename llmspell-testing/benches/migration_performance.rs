@@ -1,6 +1,8 @@
 // ABOUTME: Performance benchmarks for state migration operations
 // ABOUTME: Measures throughput, latency, and scalability of migration engine
 
+// Benchmark file
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use llmspell_state_persistence::{
     manager::SerializableState,
@@ -11,12 +13,16 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 fn create_test_state(id: usize) -> SerializableState {
+    #[allow(clippy::cast_precision_loss)]
+    let price = id as f64 * 10.0;
+    #[allow(clippy::cast_precision_loss)]
+    let weight = id as f64 * 0.5;
     SerializableState {
         key: format!("item_{}", id),
         value: json!({
             "id": id,
             "name": format!("Item {}", id),
-            "price": id as f64 * 10.0,
+            "price": price,
             "quantity": id % 100,
             "metadata": {
                 "created": "2024-01-01T00:00:00Z",
@@ -29,7 +35,7 @@ fn create_test_state(id: usize) -> SerializableState {
                         1 => "medium",
                         _ => "large",
                     },
-                    "weight": id as f64 * 0.5
+                    "weight": weight
                 }
             }
         }),

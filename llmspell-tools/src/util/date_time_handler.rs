@@ -65,6 +65,8 @@ impl DateTimeHandlerTool {
     }
 
     /// Process date/time operation
+    #[allow(clippy::unused_async)]
+    #[allow(clippy::too_many_lines)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let operation = extract_string_with_default(params, "operation", "parse");
 
@@ -74,7 +76,7 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -110,7 +112,7 @@ impl DateTimeHandlerTool {
                     let utc_now = now_utc();
                     let tz_time =
                         convert_timezone(&utc_now, tz).map_err(|e| LLMSpellError::Tool {
-                            message: format!("Invalid timezone: {}", e),
+                            message: format!("Invalid timezone: {e}"),
                             tool_name: Some(self.metadata.name.clone()),
                             source: None,
                         })?;
@@ -143,14 +145,14 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
 
                 let converted =
                     convert_timezone(&dt, target_tz).map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to convert timezone: {}", e),
+                        message: format!("Failed to convert timezone: {e}"),
                         tool_name: Some(self.metadata.name.clone()),
                         source: None,
                     })?;
@@ -185,7 +187,7 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -197,7 +199,7 @@ impl DateTimeHandlerTool {
                 }
                 .map_err(|e| {
                     tool_error(
-                        format!("Failed to {} duration: {}", operation, e),
+                        format!("Failed to {operation} duration: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -205,7 +207,7 @@ impl DateTimeHandlerTool {
                 let format = extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
 
                 let response = ResponseBuilder::success(operation)
-                    .with_message(format!("{} operation completed", operation))
+                    .with_message(format!("{operation} operation completed"))
                     .with_result(json!({
                         "input": input,
                         "amount": amount,
@@ -233,13 +235,13 @@ impl DateTimeHandlerTool {
                 })?;
 
                 let start_dt = parse_datetime(start).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to parse start date: {}", e),
+                    message: format!("Failed to parse start date: {e}"),
                     tool_name: Some(self.metadata.name.clone()),
                     source: None,
                 })?;
 
                 let end_dt = parse_datetime(end).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to parse end date: {}", e),
+                    message: format!("Failed to parse end date: {e}"),
                     tool_name: Some(self.metadata.name.clone()),
                     source: None,
                 })?;
@@ -267,7 +269,7 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -320,7 +322,7 @@ impl DateTimeHandlerTool {
                 Ok(response)
             }
             _ => Err(validation_error(
-                format!("Unknown operation: {}", operation),
+                format!("Unknown operation: {operation}"),
                 Some("operation".to_string()),
             )),
         }
@@ -333,7 +335,11 @@ impl BaseAgent for DateTimeHandlerTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -358,8 +364,7 @@ impl BaseAgent for DateTimeHandlerTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Date/time operation error: {}",
-            error
+            "Date/time operation error: {error}"
         )))
     }
 }
@@ -460,7 +465,6 @@ impl Tool for DateTimeHandlerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_parse_operation() {
         let tool = DateTimeHandlerTool::new();
@@ -487,7 +491,6 @@ mod tests {
         assert_eq!(output["result"]["parsed"]["minute"], 30);
         assert_eq!(output["result"]["parsed"]["weekday"], "Monday");
     }
-
     #[tokio::test]
     async fn test_now_operation() {
         let tool = DateTimeHandlerTool::new();
@@ -510,7 +513,6 @@ mod tests {
         assert_eq!(output["result"]["timezone"], "UTC");
         assert!(output["result"]["datetime"].is_string());
     }
-
     #[tokio::test]
     async fn test_timezone_conversion() {
         let tool = DateTimeHandlerTool::new();
@@ -537,7 +539,6 @@ mod tests {
             .unwrap()
             .contains("EST"));
     }
-
     #[tokio::test]
     async fn test_date_arithmetic() {
         let tool = DateTimeHandlerTool::new();
@@ -588,7 +589,6 @@ mod tests {
             .unwrap()
             .contains("2024-01-15T08:30:00"));
     }
-
     #[tokio::test]
     async fn test_date_difference() {
         let tool = DateTimeHandlerTool::new();
@@ -615,7 +615,6 @@ mod tests {
             .unwrap()
             .contains("5 days"));
     }
-
     #[tokio::test]
     async fn test_date_info() {
         let tool = DateTimeHandlerTool::new();
@@ -639,7 +638,6 @@ mod tests {
         assert_eq!(output["result"]["info"]["days_in_month"], 29);
         assert_eq!(output["result"]["info"]["weekday"], "Thursday");
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = DateTimeHandlerTool::new();

@@ -1,6 +1,7 @@
 // ABOUTME: Core StateManager implementation with persistent backend support
 // ABOUTME: Integrates Phase 4 hooks and Phase 3.3 storage for state persistence
 
+use crate::agent_state::ToolUsageStats;
 use crate::backend_adapter::{create_storage_backend, StateStorageAdapter};
 use crate::config::{PersistenceConfig, StateSchema};
 use crate::key_manager::KeyManager;
@@ -1197,7 +1198,7 @@ impl StateManager {
         // Extract agent IDs from keys
         Ok(keys
             .into_iter()
-            .filter_map(|k| k.strip_prefix(prefix).map(|s| s.to_string()))
+            .filter_map(|k| k.strip_prefix(prefix).map(str::to_string))
             .collect())
     }
 
@@ -1519,7 +1520,7 @@ impl StateManager {
         let state_data = crate::agent_state::AgentStateData {
             conversation_history: vec![],
             context_variables: HashMap::new(),
-            tool_usage_stats: Default::default(),
+            tool_usage_stats: ToolUsageStats::default(),
             execution_state: crate::agent_state::ExecutionState::Idle,
             custom_data: agent_state
                 .as_object()
@@ -1657,6 +1658,15 @@ impl StateManager {
             .get_lineage(artifact_id)
             .await
     }
+
+    /// Get all storage keys for backup/discovery purposes
+    /// This is used by the backup system to discover all scopes and data
+    pub async fn get_all_storage_keys(&self) -> StateResult<Vec<String>> {
+        self.storage_adapter
+            .list_keys("")
+            .await
+            .map_err(|e| StateError::storage(e.to_string()))
+    }
 }
 
 // ==============================================================================
@@ -1716,7 +1726,6 @@ impl TypedStatePersistence for StateManager {}
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[tokio::test]
     async fn test_state_manager_basic_operations() {
         let manager = StateManager::new().await.unwrap();
@@ -1740,7 +1749,6 @@ mod tests {
         let value = manager.get(StateScope::Global, "test_key").await.unwrap();
         assert_eq!(value, None);
     }
-
     #[tokio::test]
     async fn test_state_scoping() {
         let manager = StateManager::new().await.unwrap();
@@ -1783,7 +1791,6 @@ mod tests {
             .unwrap();
         assert_eq!(agent2, Some(json!("agent2")));
     }
-
     #[tokio::test]
     async fn test_key_validation() {
         let manager = StateManager::new().await.unwrap();
@@ -1804,7 +1811,6 @@ mod tests {
             .await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_agent_state_persistence() {
         use crate::agent_state::{MessageRole, PersistentAgentState};
@@ -1844,7 +1850,6 @@ mod tests {
         let loaded_after_delete = manager.load_agent_state("test_agent_001").await.unwrap();
         assert!(loaded_after_delete.is_none());
     }
-
     #[tokio::test]
     async fn test_agent_metadata_retrieval() {
         use crate::agent_state::PersistentAgentState;

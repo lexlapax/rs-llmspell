@@ -10,7 +10,8 @@ pub struct ReplayGlobal {
 }
 
 impl ReplayGlobal {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 }
@@ -53,7 +54,6 @@ impl GlobalObject for ReplayGlobal {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_replay_global_metadata() {
         let global = ReplayGlobal::new();

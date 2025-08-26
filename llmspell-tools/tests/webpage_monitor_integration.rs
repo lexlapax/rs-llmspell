@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WebpageMonitorTool
+//! ABOUTME: Integration tests for `WebpageMonitorTool`
 //! ABOUTME: Tests webpage monitoring and change detection functionality
 
 mod common;
@@ -7,15 +7,16 @@ use common::*;
 use llmspell_core::BaseAgent;
 use llmspell_tools::WebpageMonitorTool;
 use serde_json::json;
-
 #[tokio::test]
 async fn test_webpage_monitor_initial_check() {
     let tool = WebpageMonitorTool::new();
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "check_interval": 60
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "check_interval": 60
+        }
     }))
     .unwrap();
 
@@ -37,24 +38,25 @@ async fn test_webpage_monitor_initial_check() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
-
 #[tokio::test]
 async fn test_webpage_monitor_with_selector() {
     let tool = WebpageMonitorTool::new();
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "selector": "h1",
-        "monitor_mode": "selector"
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "selector": "h1",
+            "monitor_mode": "selector"
+        }
     }))
     .unwrap();
 
@@ -74,23 +76,24 @@ async fn test_webpage_monitor_with_selector() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
-
 #[tokio::test]
 async fn test_webpage_monitor_metadata_changes() {
     let tool = WebpageMonitorTool::new();
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "monitor_metadata": true
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "monitor_metadata": true
+        }
     }))
     .unwrap();
 
@@ -106,15 +109,14 @@ async fn test_webpage_monitor_metadata_changes() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
-
 #[tokio::test]
 async fn test_webpage_monitor_content_diff() {
     let tool = WebpageMonitorTool::new();
@@ -122,7 +124,9 @@ async fn test_webpage_monitor_content_diff() {
 
     // First check to get baseline content
     let input1 = create_agent_input(json!({
-        "input": format!("{}/html", test_endpoints::HTTPBIN_BASE)
+        "parameters": {
+            "input": format!("{}/html", test_endpoints::HTTPBIN_BASE)
+        }
     }))
     .unwrap();
 
@@ -133,16 +137,18 @@ async fn test_webpage_monitor_content_diff() {
 
             // Second check with previous content provided
             let input2 = create_agent_input(json!({
-                "input": format!("{}/html", test_endpoints::HTTPBIN_BASE),
-                "previous_content": baseline_content
+                "parameters": {
+                    "input": format!("{}/html", test_endpoints::HTTPBIN_BASE),
+                    "previous_content": baseline_content
+                }
             }))
             .unwrap();
 
             match tool.execute(input2, create_test_context()).await {
                 Ok(output2) => {
-                    let output_value: serde_json::Value =
+                    let output2_value: serde_json::Value =
                         serde_json::from_str(&output2.text).unwrap();
-                    let result = &output_value["result"];
+                    let result = &output2_value["result"];
 
                     // Should indicate if content changed or not
                     assert!(result.get("has_changes").is_some());
@@ -151,34 +157,35 @@ async fn test_webpage_monitor_content_diff() {
                 }
                 Err(e) => {
                     if e.to_string().contains("Failed to fetch URL") {
-                        eprintln!("Skipping second fetch due to network error: {}", e);
+                        eprintln!("Skipping second fetch due to network error: {e}");
                         return;
                     }
-                    panic!("Unexpected error on second fetch: {}", e);
+                    panic!("Unexpected error on second fetch: {e}");
                 }
             }
         }
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
-
 #[tokio::test]
 async fn test_webpage_monitor_alert_threshold() {
     let tool = WebpageMonitorTool::new();
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "alert_on_change": true,
-        "change_threshold": 10  // 10% change threshold
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "alert_on_change": true,
+            "change_threshold": 10  // 10% change threshold
+        }
     }))
     .unwrap();
 
@@ -194,22 +201,23 @@ async fn test_webpage_monitor_alert_threshold() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
-
 #[tokio::test]
 async fn test_webpage_monitor_invalid_url() {
     let tool = WebpageMonitorTool::new();
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "not-a-url"
+        "parameters": {
+            "input": "not-a-url"
+        }
     }))
     .unwrap();
 
@@ -218,15 +226,16 @@ async fn test_webpage_monitor_invalid_url() {
     let error = result.unwrap_err();
     assert!(error.to_string().contains("URL") || error.to_string().contains("url"));
 }
-
 #[tokio::test]
 async fn test_webpage_monitor_network_error() {
     let tool = WebpageMonitorTool::new();
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::INVALID_URL,
-        "retry_on_error": false
+        "parameters": {
+            "input": test_endpoints::INVALID_URL,
+            "retry_on_error": false
+        }
     }))
     .unwrap();
 

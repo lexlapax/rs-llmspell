@@ -15,7 +15,6 @@ use llmspell_hooks::{
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
-
 #[tokio::test]
 async fn test_tool_execution_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -68,7 +67,6 @@ async fn test_tool_execution_hooks() {
     let correlation_id = calc_context.correlation_id.to_string();
     assert_hook_persisted(&fixture.storage, &correlation_id, "MetricsHook").await;
 }
-
 #[tokio::test]
 async fn test_tool_security_validation() {
     let fixture = HookTestFixture::new().await;
@@ -147,7 +145,6 @@ async fn test_tool_security_validation() {
         "Large parameter should be blocked"
     );
 }
-
 #[tokio::test]
 async fn test_tool_retry_on_failure() {
     let fixture = HookTestFixture::new().await;
@@ -188,7 +185,6 @@ async fn test_tool_retry_on_failure() {
     assert_eq!(metrics.retry_attempts, 1);
     assert!(metrics.retry_reasons.contains_key("connection_error: timeout after 30s"));
 }
-
 #[tokio::test]
 async fn test_tool_caching_for_deterministic_operations() {
     let fixture = HookTestFixture::new().await;
@@ -250,7 +246,6 @@ async fn test_tool_caching_for_deterministic_operations() {
     assert_eq!(stats.hits, 1);
     assert!(stats.hit_rate > 0.0);
 }
-
 #[tokio::test]
 async fn test_tool_cost_tracking() {
     let fixture = HookTestFixture::new().await;
@@ -310,7 +305,6 @@ async fn test_tool_cost_tracking() {
     assert_eq!(metrics.operations_by_component.get("geocoding-api"), Some(&10));
     assert_eq!(metrics.operations_by_component.get("translation-api"), Some(&20));
 }
-
 #[tokio::test]
 async fn test_tool_debugging_traces() {
     let fixture = HookTestFixture::new().await;
@@ -369,7 +363,6 @@ async fn test_tool_debugging_traces() {
     assert!(trace.context_data.get("transformation").is_some());
     assert!(trace.stack_trace.is_some());
 }
-
 #[tokio::test]
 async fn test_tool_chain_hooks() {
     let fixture = HookTestFixture::new().await;

@@ -62,6 +62,7 @@ pub struct FileConverterTool {
 
 impl FileConverterTool {
     /// Create a new file converter tool
+    #[must_use]
     pub fn new(config: FileConverterConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -74,6 +75,13 @@ impl FileConverterTool {
     }
 
     /// Convert file encoding
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to read input file
+    /// - Text encoding conversion fails
+    /// - Failed to write output file
     async fn convert_encoding(
         &self,
         input_path: &Path,
@@ -107,6 +115,12 @@ impl FileConverterTool {
     }
 
     /// Convert line endings
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to read input file
+    /// - Failed to write output file
     async fn convert_line_endings(
         &self,
         input_path: &Path,
@@ -137,6 +151,12 @@ impl FileConverterTool {
     }
 
     /// Convert tabs to spaces or vice versa
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to read input file
+    /// - Failed to write output file
     async fn convert_indentation(
         &self,
         input_path: &Path,
@@ -173,6 +193,10 @@ impl FileConverterTool {
     }
 
     /// Create backup file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if file copy operation fails
     async fn create_backup(&self, file_path: &Path) -> Result<PathBuf> {
         let backup_path = file_path.with_extension(format!(
             "{}.backup",
@@ -187,34 +211,40 @@ impl FileConverterTool {
 
     /// Determine output path
     fn get_output_path(&self, input_path: &Path, operation: &str) -> PathBuf {
-        if let Some(output_dir) = &self.config.output_dir {
-            let stem = input_path.file_stem().unwrap_or_default();
-            let extension = input_path.extension().unwrap_or_default();
+        self.config.output_dir.as_ref().map_or_else(
+            || input_path.to_path_buf(),
+            |output_dir| {
+                let stem = input_path.file_stem().unwrap_or_default();
+                let extension = input_path.extension().unwrap_or_default();
 
-            let new_filename = format!(
-                "{}_{}{}",
-                stem.to_string_lossy(),
-                operation,
-                if extension.is_empty() {
-                    String::new()
-                } else {
-                    format!(".{}", extension.to_string_lossy())
-                }
-            );
+                let new_filename = format!(
+                    "{}_{}{}",
+                    stem.to_string_lossy(),
+                    operation,
+                    if extension.is_empty() {
+                        String::new()
+                    } else {
+                        format!(".{}", extension.to_string_lossy())
+                    }
+                );
 
-            output_dir.join(new_filename)
-        } else {
-            input_path.to_path_buf()
-        }
+                output_dir.join(new_filename)
+            },
+        )
     }
 
     /// Validate parameters for file conversion operations
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an invalid operation is specified
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
             if !matches!(operation, "encoding" | "line_endings" | "indentation") {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Invalid operation: {}", operation),
+                    message: format!("Invalid operation: {operation}"),
                     field: Some("operation".to_string()),
                 });
             }
@@ -230,7 +260,8 @@ impl BaseAgent for FileConverterTool {
         &self.metadata
     }
 
-    async fn execute(
+    #[allow(clippy::too_many_lines)]
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -251,7 +282,7 @@ impl BaseAgent for FileConverterTool {
         self.sandbox
             .validate_path(&path)
             .map_err(|e| LLMSpellError::Security {
-                message: format!("Path validation failed: {}", e),
+                message: format!("Path validation failed: {e}"),
                 violation_type: Some("path_validation".to_string()),
             })?;
 
@@ -266,7 +297,7 @@ impl BaseAgent for FileConverterTool {
         let metadata = fs::metadata(&path)
             .await
             .map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to read file metadata: {}", e),
+                message: format!("Failed to read file metadata: {e}"),
                 operation: Some("metadata".to_string()),
                 source: Some(Box::new(e)),
             })?;
@@ -283,18 +314,14 @@ impl BaseAgent for FileConverterTool {
         }
 
         // Determine output path
-        let target_path = if let Some(target_path) = extract_optional_string(params, "target_path")
-        {
-            PathBuf::from(target_path)
-        } else {
-            self.get_output_path(&path, operation)
-        };
+        let target_path = extract_optional_string(params, "target_path")
+            .map_or_else(|| self.get_output_path(&path, operation), PathBuf::from);
 
         // Validate output path
         self.sandbox
             .validate_path(&target_path)
             .map_err(|e| LLMSpellError::Security {
-                message: format!("Output path validation failed: {}", e),
+                message: format!("Output path validation failed: {e}"),
                 violation_type: Some("path_validation".to_string()),
             })?;
 
@@ -303,7 +330,7 @@ impl BaseAgent for FileConverterTool {
             self.create_backup(&path)
                 .await
                 .map_err(|e| LLMSpellError::Storage {
-                    message: format!("Failed to create backup: {}", e),
+                    message: format!("Failed to create backup: {e}"),
                     operation: Some("backup".to_string()),
                     source: None,
                 })?;
@@ -334,7 +361,7 @@ impl BaseAgent for FileConverterTool {
                         "iso88591" | "iso-8859-1" => Ok(TextEncoding::Iso88591),
                         "ascii" => Ok(TextEncoding::Ascii),
                         _ => Err(LLMSpellError::Validation {
-                            message: format!("Invalid encoding: {}", s),
+                            message: format!("Invalid encoding: {s}"),
                             field: Some("to_encoding".to_string()),
                         }),
                     }
@@ -343,7 +370,7 @@ impl BaseAgent for FileConverterTool {
                 self.convert_encoding(&path, &target_path, from_encoding, to_encoding)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Encoding conversion failed: {}", e),
+                        message: format!("Encoding conversion failed: {e}"),
                         tool_name: Some("file_converter".to_string()),
                         source: None,
                     })?;
@@ -356,7 +383,7 @@ impl BaseAgent for FileConverterTool {
                         "crlf" => Ok(LineEnding::Crlf),
                         "cr" => Ok(LineEnding::Cr),
                         _ => Err(LLMSpellError::Validation {
-                            message: format!("Invalid line ending: {}", s),
+                            message: format!("Invalid line ending: {s}"),
                             field: Some("line_ending".to_string()),
                         }),
                     }
@@ -365,7 +392,7 @@ impl BaseAgent for FileConverterTool {
                 self.convert_line_endings(&path, &target_path, line_ending)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Line ending conversion failed: {}", e),
+                        message: format!("Line ending conversion failed: {e}"),
                         tool_name: Some("file_converter".to_string()),
                         source: None,
                     })?;
@@ -375,12 +402,17 @@ impl BaseAgent for FileConverterTool {
                 let convert_to_spaces =
                     extract_optional_bool(params, "convert_to_spaces").unwrap_or(true);
 
-                let tab_size = extract_optional_u64(params, "tab_size").unwrap_or(4) as usize;
+                let tab_size =
+                    usize::try_from(extract_optional_u64(params, "tab_size").unwrap_or(4))
+                        .map_err(|_| LLMSpellError::Validation {
+                            message: "Tab size value too large for platform".to_string(),
+                            field: Some("tab_size".to_string()),
+                        })?;
 
                 self.convert_indentation(&path, &target_path, convert_to_spaces, tab_size)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Indentation conversion failed: {}", e),
+                        message: format!("Indentation conversion failed: {e}"),
                         tool_name: Some("file_converter".to_string()),
                         source: None,
                     })?;
@@ -388,7 +420,7 @@ impl BaseAgent for FileConverterTool {
 
             _ => {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Unknown operation: {}", operation),
+                    message: format!("Unknown operation: {operation}"),
                     field: Some("operation".to_string()),
                 });
             }
@@ -400,7 +432,7 @@ impl BaseAgent for FileConverterTool {
                 fs::metadata(&path)
                     .await
                     .map_err(|e| LLMSpellError::Storage {
-                        message: format!("Failed to read original metadata: {}", e),
+                        message: format!("Failed to read original metadata: {e}"),
                         operation: Some("metadata".to_string()),
                         source: None,
                     })?;
@@ -441,10 +473,7 @@ impl BaseAgent for FileConverterTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "File converter error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("File converter error: {error}")))
     }
 }
 
@@ -528,11 +557,12 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use std::collections::HashMap;
     use tempfile::TempDir;
     use tokio::fs;
 
-    fn create_test_tool() -> (FileConverterTool, TempDir) {
+    fn create_test_file_converter() -> (FileConverterTool, TempDir) {
         let temp_dir = TempDir::new().unwrap();
 
         // Create sandbox context
@@ -557,36 +587,19 @@ mod tests {
         (tool, temp_dir)
     }
 
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
-
     #[tokio::test]
     async fn test_encoding_conversion() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         // Create test file
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "Hello, World!").await.unwrap();
 
-        let input = create_test_input(
-            "Convert file encoding",
-            json!({
-                "operation": "encoding",
-                "path": test_file.to_string_lossy(),
-                "to_encoding": "utf8"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "encoding"),
+            ("path", &test_file.to_string_lossy()),
+            ("to_encoding", "utf8"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -596,10 +609,9 @@ mod tests {
             .text
             .contains("File conversion completed successfully"));
     }
-
     #[tokio::test]
     async fn test_line_ending_conversion() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         // Create test file with mixed line endings
         let test_file = temp_dir.path().join("test.txt");
@@ -607,14 +619,11 @@ mod tests {
             .await
             .unwrap();
 
-        let input = create_test_input(
-            "Convert line endings",
-            json!({
-                "operation": "line_endings",
-                "path": test_file.to_string_lossy(),
-                "line_ending": "lf"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "line_endings"),
+            ("path", &test_file.to_string_lossy()),
+            ("line_ending", "lf"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -628,10 +637,9 @@ mod tests {
         let content = fs::read_to_string(&test_file).await.unwrap();
         assert_eq!(content, "line1\nline2\nline3\n");
     }
-
     #[tokio::test]
     async fn test_indentation_conversion() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         // Create test file with tabs
         let test_file = temp_dir.path().join("test.txt");
@@ -639,15 +647,12 @@ mod tests {
             .await
             .unwrap();
 
-        let input = create_test_input(
-            "Convert tabs to spaces",
-            json!({
-                "operation": "indentation",
-                "path": test_file.to_string_lossy(),
-                "convert_to_spaces": true,
-                "tab_size": 4
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "indentation"),
+            ("path", &test_file.to_string_lossy()),
+            ("convert_to_spaces", "true"),
+            ("tab_size", "4"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -661,29 +666,24 @@ mod tests {
         let content = fs::read_to_string(&test_file).await.unwrap();
         assert_eq!(content, "line1    indented    text");
     }
-
     #[tokio::test]
     async fn test_invalid_operation() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").await.unwrap();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid",
-                "path": test_file.to_string_lossy()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "invalid"),
+            ("path", &test_file.to_string_lossy()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_missing_parameters() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_converter();
 
         let input = AgentInput {
             text: "Missing params".to_string(),
@@ -696,29 +696,24 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_nonexistent_file() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         let nonexistent_file = temp_dir.path().join("nonexistent.txt");
 
-        let input = create_test_input(
-            "Convert nonexistent file",
-            json!({
-                "operation": "encoding",
-                "path": nonexistent_file.to_string_lossy(),
-                "to_encoding": "utf8"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "encoding"),
+            ("path", &nonexistent_file.to_string_lossy()),
+            ("to_encoding", "utf8"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_converter();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "file_converter");

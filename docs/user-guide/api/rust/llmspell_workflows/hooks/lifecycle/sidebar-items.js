@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["HookPoint"],"struct":["WorkflowHooks"],"trait":["WithHooks"]};

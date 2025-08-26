@@ -121,12 +121,15 @@ impl ResourceMonitor {
                 }
 
                 if let Some(limit) = resource_limits.max_file_ops_per_sec {
-                    let ops_per_sec = current.file_operations as f64
+                    let ops_per_sec = f64::from(current.file_operations)
                         / current.timestamp.elapsed().as_secs_f64().max(1.0);
-                    if ops_per_sec > limit as f64 {
+                    #[allow(clippy::cast_precision_loss)]
+                    let limit_f64 = limit as f64;
+                    if ops_per_sec > limit_f64 {
                         viols.push(SandboxViolation::ResourceLimit {
                             resource: "file_operations".to_string(),
-                            limit: limit as u64,
+                            limit: u64::from(limit),
+                            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                             actual: ops_per_sec as u64,
                             reason: "File operations per second exceeded limit".to_string(),
                         });
@@ -174,12 +177,16 @@ impl ResourceMonitor {
         if let Some(limit) = self.context.resource_limits.max_network_bps {
             let usage = self.current_usage.read().await;
             let duration = self.start_time.elapsed().as_secs_f64().max(1.0);
+            #[allow(clippy::cast_precision_loss)]
             let bps = usage.network_bytes as f64 / duration;
 
-            if bps > limit as f64 {
+            #[allow(clippy::cast_precision_loss)]
+            let limit_f64 = limit as f64;
+            if bps > limit_f64 {
                 let violation = SandboxViolation::ResourceLimit {
                     resource: "network_bandwidth".to_string(),
                     limit,
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     actual: bps as u64,
                     reason: "Network bandwidth exceeded limit".to_string(),
                 };
@@ -206,12 +213,15 @@ impl ResourceMonitor {
         if let Some(limit) = self.context.resource_limits.max_file_ops_per_sec {
             let usage = self.current_usage.read().await;
             let duration = self.start_time.elapsed().as_secs_f64().max(1.0);
-            let ops_per_sec = usage.file_operations as f64 / duration;
+            let ops_per_sec = f64::from(usage.file_operations) / duration;
 
-            if ops_per_sec > limit as f64 {
+            #[allow(clippy::cast_precision_loss)]
+            let limit_f64 = limit as f64;
+            if ops_per_sec > limit_f64 {
                 let violation = SandboxViolation::ResourceLimit {
                     resource: "file_operations".to_string(),
-                    limit: limit as u64,
+                    limit: u64::from(limit),
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     actual: ops_per_sec as u64,
                     reason: "File operations per second exceeded limit".to_string(),
                 };
@@ -265,6 +275,7 @@ impl ResourceMonitor {
 
         ResourceUsage {
             memory_bytes: (now.elapsed().as_secs() * 1024 * 1024).min(50 * 1024 * 1024),
+            #[allow(clippy::cast_possible_truncation)]
             cpu_time_ms: now.elapsed().as_millis() as u64 / 10,
             network_bytes: 0,
             file_operations: 0,
@@ -280,7 +291,7 @@ impl ResourceMonitor {
 
     /// Get all violations
     pub async fn get_violations(&self) -> Vec<String> {
-        self.violations.iter().map(|v| v.to_string()).collect()
+        self.violations.iter().map(ToString::to_string).collect()
     }
 
     /// Get detailed resource statistics
@@ -292,6 +303,7 @@ impl ResourceMonitor {
             current_usage: usage.clone(),
             limits: self.context.resource_limits.clone(),
             uptime_seconds: elapsed.as_secs(),
+            #[allow(clippy::cast_possible_truncation)]
             violations_count: self.violations.len(),
             efficiency_metrics: EfficiencyMetrics {
                 memory_efficiency: self.calculate_memory_efficiency(&usage).await,
@@ -304,7 +316,9 @@ impl ResourceMonitor {
     /// Calculate memory efficiency (0.0 to 1.0)
     async fn calculate_memory_efficiency(&self, usage: &ResourceUsage) -> f64 {
         if let Some(limit) = self.context.resource_limits.max_memory_bytes {
-            1.0 - (usage.memory_bytes as f64 / limit as f64).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            let efficiency = 1.0 - (usage.memory_bytes as f64 / limit as f64).min(1.0);
+            efficiency
         } else {
             1.0 // No limit means perfect efficiency
         }
@@ -313,7 +327,9 @@ impl ResourceMonitor {
     /// Calculate CPU efficiency (0.0 to 1.0)
     async fn calculate_cpu_efficiency(&self, usage: &ResourceUsage) -> f64 {
         if let Some(limit) = self.context.resource_limits.max_cpu_time_ms {
-            1.0 - (usage.cpu_time_ms as f64 / limit as f64).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            let efficiency = 1.0 - (usage.cpu_time_ms as f64 / limit as f64).min(1.0);
+            efficiency
         } else {
             1.0
         }
@@ -323,8 +339,11 @@ impl ResourceMonitor {
     async fn calculate_network_efficiency(&self, usage: &ResourceUsage) -> f64 {
         if let Some(limit) = self.context.resource_limits.max_network_bps {
             let duration = self.start_time.elapsed().as_secs_f64().max(1.0);
+            #[allow(clippy::cast_precision_loss)]
             let actual_bps = usage.network_bytes as f64 / duration;
-            1.0 - (actual_bps / limit as f64).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            let efficiency = 1.0 - (actual_bps / limit as f64).min(1.0);
+            efficiency
         } else {
             1.0
         }
@@ -374,7 +393,6 @@ mod tests {
 
         ResourceMonitor::new(context).unwrap()
     }
-
     #[tokio::test]
     async fn test_monitor_lifecycle() {
         let mut monitor = create_test_monitor();
@@ -387,7 +405,6 @@ mod tests {
         assert!(monitor.stop().await.is_ok());
         assert!(!monitor.is_monitoring().await);
     }
-
     #[tokio::test]
     async fn test_usage_recording() {
         let monitor = create_test_monitor();
@@ -407,7 +424,6 @@ mod tests {
         assert_eq!(usage.file_operations, 1);
         assert_eq!(usage.custom_usage.get("api_calls"), Some(&5));
     }
-
     #[tokio::test]
     async fn test_resource_stats() {
         let monitor = create_test_monitor();
@@ -422,7 +438,6 @@ mod tests {
         assert!(stats.efficiency_metrics.memory_efficiency >= 0.0);
         assert!(stats.efficiency_metrics.memory_efficiency <= 1.0);
     }
-
     #[tokio::test]
     async fn test_counter_reset() {
         let mut monitor = create_test_monitor();
@@ -439,7 +454,6 @@ mod tests {
         assert_eq!(usage.network_bytes, 0);
         assert_eq!(usage.file_operations, 0);
     }
-
     #[tokio::test]
     async fn test_limit_enforcement() {
         let security_reqs = SecurityRequirements::safe();

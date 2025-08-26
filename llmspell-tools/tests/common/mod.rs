@@ -3,87 +3,104 @@
 
 use llmspell_core::{
     types::{AgentInput, AgentOutput},
-    ExecutionContext, LLMSpellError,
+    LLMSpellError,
 };
 use serde_json::{json, Value};
 
-/// Create a standard test execution context
-pub fn create_test_context() -> ExecutionContext {
-    ExecutionContext::new()
-}
+// Re-export consolidated test helpers
+pub use llmspell_testing::environment_helpers::create_test_context;
+pub use llmspell_testing::tool_helpers::create_test_tool_input_json;
 
-/// Create an agent input with the given parameters
+// create_test_context is now re-exported from llmspell_testing::environment_helpers
+
+/// Create an agent input with the given parameters (delegates to llmspell-testing)
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if params is not a JSON object.
 pub fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
-    // AgentInput expects parameters to be wrapped in a "parameters" object
-    let mut input = AgentInput::text("");
-    let wrapped_params = json!({ "parameters": params });
-    if let Value::Object(map) = wrapped_params {
-        // Convert serde_json::Map to HashMap
-        input.parameters = map.into_iter().collect();
+    // Convert Value to HashMap for the helper
+    if let Value::Object(map) = params {
+        let params_map: std::collections::HashMap<String, Value> = map.into_iter().collect();
+        Ok(create_test_tool_input_json("", params_map))
+    } else {
+        Err(LLMSpellError::Validation {
+            message: "Parameters must be a JSON object".to_string(),
+            field: Some("params".to_string()),
+        })
     }
-    Ok(input)
 }
 
 /// Create an agent input with a single "input" parameter
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if the JSON object creation fails.
 pub fn create_simple_input(input: &str) -> Result<AgentInput, LLMSpellError> {
     create_agent_input(json!({ "input": input }))
 }
 
 /// Validate that output is successful with expected fields
+///
+/// # Panics
+///
+/// Panics if the output text is not valid JSON or if expected fields are missing.
 #[allow(dead_code)]
 pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
     let output_value: Value = serde_json::from_str(&output.text).unwrap();
 
     assert!(
         output_value["success"].as_bool().unwrap_or(false),
-        "Expected success=true, got: {}",
-        output_value
+        "Expected success=true, got: {output_value}"
     );
 
     for field in expected_fields {
         assert!(
             output_value.get(field).is_some(),
-            "Expected field '{}' in output, got: {}",
-            field,
-            output_value
+            "Expected field '{field}' in output, got: {output_value}"
         );
     }
 }
 
 /// Validate that output is an error with expected message pattern
+///
+/// # Panics
+///
+/// Panics if the output text is not valid JSON or if the error message doesn't match the pattern.
 #[allow(dead_code)]
 pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
     let output_value: Value = serde_json::from_str(&output.text).unwrap();
 
     assert!(
         !output_value["success"].as_bool().unwrap_or(true),
-        "Expected success=false, got: {}",
-        output_value
+        "Expected success=false, got: {output_value}"
     );
 
     // Try different error message formats
-    let error_msg = if let Some(error_str) = output_value["error"].as_str() {
-        // Simple string error format
-        error_str.to_string()
-    } else if let Some(error_obj) = output_value["error"].as_object() {
-        // Complex error object format - try message field first
-        if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
-            msg.to_string()
-        } else {
-            // Fallback to serializing the entire error object
-            serde_json::to_string(error_obj).unwrap_or_else(|_| format!("{:?}", error_obj))
-        }
-    } else {
-        panic!("Expected error field in output, got: {}", output_value);
-    };
+    let error_msg = output_value["error"]
+        .as_str()
+        .map(String::from)
+        .or_else(|| {
+            output_value["error"].as_object().and_then(|error_obj| {
+                error_obj
+                    .get("message")
+                    .and_then(|m| m.as_str())
+                    .map(String::from)
+                    .or_else(|| {
+                        // Fallback to serializing the entire error object
+                        serde_json::to_string(error_obj)
+                            .ok()
+                            .or_else(|| Some(format!("{error_obj:?}")))
+                    })
+            })
+        })
+        .unwrap_or_else(|| panic!("Expected error field in output, got: {output_value}"));
 
     assert!(
         error_msg
             .to_lowercase()
             .contains(&error_pattern.to_lowercase()),
-        "Expected error to contain '{}', got: '{}'",
-        error_pattern,
-        error_msg
+        "Expected error to contain '{error_pattern}', got: '{error_msg}'"
     );
 }
 
@@ -106,6 +123,7 @@ pub mod test_endpoints {
 pub mod fixtures {
     use serde_json::json;
 
+    #[must_use]
     pub fn sample_json() -> serde_json::Value {
         json!({
             "name": "Test User",
@@ -115,7 +133,8 @@ pub mod fixtures {
         })
     }
 
-    pub fn sample_html() -> &'static str {
+    #[must_use]
+    pub const fn sample_html() -> &'static str {
         r#"<!DOCTYPE html>
         <html>
         <head><title>Test Page</title></head>
@@ -128,13 +147,15 @@ pub mod fixtures {
         </html>"#
     }
 
-    pub fn sample_api_key() -> &'static str {
+    #[must_use]
+    pub const fn sample_api_key() -> &'static str {
         "test_api_key_12345"
     }
 }
 
 /// Helper to create test configuration
 #[allow(dead_code)]
+#[must_use]
 pub fn create_test_config() -> serde_json::Map<String, serde_json::Value> {
     let mut config = serde_json::Map::new();
     config.insert("timeout".to_string(), json!(30));
@@ -143,6 +164,10 @@ pub fn create_test_config() -> serde_json::Map<String, serde_json::Value> {
 }
 
 /// Assert that a value contains expected JSON structure
+///
+/// # Panics
+///
+/// Panics if the expected keys are not found in the actual JSON or if values don't match.
 #[allow(dead_code)]
 pub fn assert_json_contains(actual: &Value, expected: &Value) {
     match (actual, expected) {
@@ -150,8 +175,7 @@ pub fn assert_json_contains(actual: &Value, expected: &Value) {
             for (key, expected_value) in expected_map {
                 assert!(
                     actual_map.contains_key(key),
-                    "Expected key '{}' not found in actual JSON",
-                    key
+                    "Expected key '{key}' not found in actual JSON"
                 );
                 assert_json_contains(&actual_map[key], expected_value);
             }
@@ -165,21 +189,18 @@ pub fn assert_json_contains(actual: &Value, expected: &Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_create_test_context() {
         let context = create_test_context();
         // Context should be created successfully
         let _ = context;
     }
-
     #[test]
     fn test_create_agent_input() {
         let input = create_agent_input(json!({"test": "value"})).unwrap();
         // AgentInput stores JSON data internally
         let _ = input;
     }
-
     #[test]
     fn test_create_simple_input() {
         let input = create_simple_input("test input").unwrap();

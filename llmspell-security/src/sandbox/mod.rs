@@ -246,7 +246,6 @@ impl std::fmt::Display for SandboxViolation {
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
-
     #[test]
     fn test_sandbox_context_creation() {
         let security_reqs = SecurityRequirements::safe()
@@ -266,7 +265,6 @@ mod tests {
             .contains(&"api.example.com".to_string()));
         assert!(context.allowed_env_vars.contains(&"HOME".to_string()));
     }
-
     #[test]
     fn test_path_permissions() {
         let security_reqs = SecurityRequirements::safe()
@@ -280,7 +278,6 @@ mod tests {
         assert!(context.is_path_allowed(Path::new("/var/log/app.log")));
         assert!(!context.is_path_allowed(Path::new("/etc/passwd")));
     }
-
     #[test]
     fn test_domain_permissions() {
         let security_reqs = SecurityRequirements::safe()
@@ -294,7 +291,6 @@ mod tests {
         assert!(context.is_domain_allowed("api.github.com"));
         assert!(!context.is_domain_allowed("malicious.com"));
     }
-
     #[test]
     fn test_env_var_permissions() {
         let security_reqs = SecurityRequirements::safe()
@@ -308,7 +304,6 @@ mod tests {
         assert!(context.is_env_var_allowed("PATH"));
         assert!(!context.is_env_var_allowed("SECRET_KEY"));
     }
-
     #[test]
     fn test_wildcard_permissions() {
         let security_reqs = SecurityRequirements::privileged();

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ParameterType","SecurityLevel","ToolCategory"],"struct":["ParameterDef","ResourceLimits","SecurityRequirements","ToolSchema"],"trait":["Tool"]};

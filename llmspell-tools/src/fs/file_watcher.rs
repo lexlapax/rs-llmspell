@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
-/// Configuration for the FileWatcherTool
+/// Configuration for the `FileWatcherTool`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileWatcherConfig {
     /// Maximum number of events to buffer
@@ -65,7 +65,8 @@ pub struct FileWatcherTool {
 }
 
 impl FileWatcherTool {
-    /// Create a new FileWatcherTool
+    /// Create a new `FileWatcherTool`
+    #[must_use]
     pub fn new(config: FileWatcherConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -78,6 +79,8 @@ impl FileWatcherTool {
     }
 
     /// Start watching files and return events
+    #[allow(clippy::unused_async)]
+    #[allow(clippy::cognitive_complexity)]
     async fn watch_files(&self, watch_config: WatchConfig) -> AnyhowResult<Vec<FileEvent>> {
         // Validate configuration
         watch_config.validate()?;
@@ -146,13 +149,10 @@ impl FileWatcherTool {
                 }
                 Ok(Err(e)) => {
                     warn!("Watch error: {}", e);
-                    continue;
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     // Check if we should continue waiting
-                    if events.is_empty() {
-                        continue;
-                    } else {
+                    if !events.is_empty() {
                         // We have some events, check if we should wait for more
                         thread::sleep(Duration::from_millis(watch_config.debounce_ms));
                         break;
@@ -171,7 +171,7 @@ impl FileWatcherTool {
         Ok(debounced_events)
     }
 
-    /// Convert notify event to our FileEvent
+    /// Convert notify event to our `FileEvent`
     fn convert_notify_event(
         &self,
         event: notify::Event,
@@ -181,7 +181,6 @@ impl FileWatcherTool {
             notify::EventKind::Create(_) => FileEventType::Create,
             notify::EventKind::Modify(_) => FileEventType::Modify,
             notify::EventKind::Remove(_) => FileEventType::Delete,
-            notify::EventKind::Other => FileEventType::Other,
             _ => FileEventType::Other,
         };
 
@@ -212,6 +211,7 @@ impl FileWatcherTool {
     }
 
     /// Validate parameters for file watching operations
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &Value) -> Result<()> {
         if !params.is_object() {
             return Err(LLMSpellError::Validation {
@@ -224,7 +224,7 @@ impl FileWatcherTool {
         if let Some(op) = operation {
             if !matches!(op, "watch" | "config") {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Invalid operation: {}", op),
+                    message: format!("Invalid operation: {op}"),
                     field: Some("operation".to_string()),
                 });
             }
@@ -261,7 +261,11 @@ impl BaseAgent for FileWatcherTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -286,19 +290,23 @@ impl BaseAgent for FileWatcherTool {
                     .collect::<Result<Vec<_>>>()?;
 
                 let recursive = extract_optional_bool(params, "recursive").unwrap_or(true);
-                let pattern = extract_optional_string(params, "pattern").map(|s| s.to_string());
+                let pattern = extract_optional_string(params, "pattern")
+                    .map(std::string::ToString::to_string);
                 let debounce_ms = extract_optional_u64(params, "debounce_ms")
                     .unwrap_or(self.config.default_debounce_ms);
                 // Support both timeout_ms and timeout_seconds for flexibility
-                let timeout_seconds = if let Some(ms) = extract_optional_u64(params, "timeout_ms") {
-                    ms.div_ceil(1000) // Round up to nearest second
-                } else {
-                    extract_optional_u64(params, "timeout_seconds")
-                        .unwrap_or(self.config.default_timeout)
-                };
-                let max_events = extract_optional_u64(params, "max_events")
-                    .unwrap_or(self.config.max_events as u64)
-                    as usize;
+                let timeout_seconds = extract_optional_u64(params, "timeout_ms").map_or_else(
+                    || {
+                        extract_optional_u64(params, "timeout_seconds")
+                            .unwrap_or(self.config.default_timeout)
+                    },
+                    |ms| ms.div_ceil(1000), // Round up to nearest second
+                );
+                let max_events = usize::try_from(
+                    extract_optional_u64(params, "max_events")
+                        .unwrap_or(self.config.max_events as u64),
+                )
+                .unwrap_or(usize::MAX);
 
                 let mut watch_config = WatchConfig::new()
                     .recursive(recursive)
@@ -318,7 +326,7 @@ impl BaseAgent for FileWatcherTool {
                     self.watch_files(watch_config)
                         .await
                         .map_err(|e| LLMSpellError::Tool {
-                            message: format!("File watching failed: {}", e),
+                            message: format!("File watching failed: {e}"),
                             tool_name: Some("file_watcher".to_string()),
                             source: None,
                         })?;
@@ -347,7 +355,7 @@ impl BaseAgent for FileWatcherTool {
                 Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown operation: {}", operation),
+                message: format!("Unknown operation: {operation}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -364,7 +372,7 @@ impl BaseAgent for FileWatcherTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("File watcher error: {}", error)))
+        Ok(AgentOutput::text(format!("File watcher error: {error}")))
     }
 }
 
@@ -448,9 +456,10 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use tempfile::TempDir;
 
-    fn create_test_tool() -> (FileWatcherTool, TempDir) {
+    fn create_test_file_watcher() -> (FileWatcherTool, TempDir) {
         let temp_dir = TempDir::new().unwrap();
         let config = FileWatcherConfig::default();
 
@@ -471,10 +480,9 @@ mod tests {
         let tool = FileWatcherTool::new(config, sandbox);
         (tool, temp_dir)
     }
-
     #[tokio::test]
     async fn test_file_watcher_tool_metadata() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "file_watcher");
         assert_eq!(
@@ -482,22 +490,19 @@ mod tests {
             "Monitors file system changes and events"
         );
     }
-
     #[tokio::test]
     async fn test_file_watcher_tool_category() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         assert_eq!(tool.category(), ToolCategory::Filesystem);
     }
-
     #[tokio::test]
     async fn test_file_watcher_tool_security_level() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
     }
-
     #[tokio::test]
     async fn test_schema() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         let schema = tool.schema();
         assert_eq!(schema.name, "file_watcher");
         assert_eq!(
@@ -506,26 +511,10 @@ mod tests {
         );
         assert!(!schema.parameters.is_empty());
     }
-
     #[tokio::test]
     async fn test_config_operation() {
-        let (tool, _temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Get file watcher configuration".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "config"
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, _temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![("operation", "config")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -538,26 +527,10 @@ mod tests {
         assert!(output["result"]["default_debounce_ms"].is_number());
         assert!(output["result"]["max_paths"].is_number());
     }
-
     #[tokio::test]
     async fn test_watch_operation_requires_paths() {
-        let (tool, _temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Watch for file changes".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "watch"
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, _temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![("operation", "watch")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -566,55 +539,43 @@ mod tests {
             .to_string()
             .contains("Missing required array parameter 'input'"));
     }
-
     #[tokio::test]
     async fn test_watch_operation_with_nonexistent_path() {
-        let (tool, _temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Watch for file changes".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "watch",
-                        "input": ["/nonexistent/path"],
-                        "timeout_seconds": 1
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, _temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![("operation", "watch"), ("timeout_seconds", "1")]);
+
+        // Need to add the array parameter separately since create_test_tool_input handles simple values
+        let mut input = input;
+        input
+            .parameters
+            .get_mut("parameters")
+            .and_then(|v| v.as_object_mut())
+            .map(|obj| obj.insert("input".to_string(), json!(["/nonexistent/path"])));
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_watch_operation_with_valid_path() {
-        let (tool, temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Watch for file changes".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "watch",
-                        "input": [temp_dir.path().to_string_lossy()],
-                        "timeout_seconds": 1,
-                        "max_events": 10
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![
+            ("operation", "watch"),
+            ("timeout_seconds", "1"),
+            ("max_events", "10"),
+        ]);
+
+        // Need to add the array parameter separately
+        let mut input = input;
+        input
+            .parameters
+            .get_mut("parameters")
+            .and_then(|v| v.as_object_mut())
+            .map(|obj| {
+                obj.insert(
+                    "input".to_string(),
+                    json!([temp_dir.path().to_string_lossy()]),
+                )
+            });
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -625,16 +586,15 @@ mod tests {
         assert!(output["result"]["events"].is_array());
         assert!(output["result"]["event_count"].is_number());
     }
-
     #[tokio::test]
     async fn test_convert_notify_event() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_watcher();
         let config = WatchConfig::new().add_path(temp_dir.path());
 
         let notify_event = notify::Event {
             kind: notify::EventKind::Create(notify::event::CreateKind::File),
             paths: vec![temp_dir.path().join("test.txt")],
-            attrs: Default::default(),
+            attrs: notify::event::EventAttributes::default(),
         };
 
         let file_event = tool.convert_notify_event(notify_event, &config);

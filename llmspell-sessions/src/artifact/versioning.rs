@@ -205,7 +205,6 @@ impl VersionManager {
 mod tests {
     use super::*;
     use llmspell_storage::MemoryBackend;
-
     #[tokio::test]
     async fn test_version_numbering() {
         let backend = Arc::new(MemoryBackend::new());
@@ -231,7 +230,6 @@ mod tests {
         assert_eq!(v2.version, 2);
         assert_eq!(v2.previous_hash, Some("hash1".to_string()));
     }
-
     #[tokio::test]
     async fn test_version_history() {
         let backend = Arc::new(MemoryBackend::new());
@@ -247,7 +245,7 @@ mod tests {
                 .record_version(
                     &session_id,
                     name,
-                    i as u32,
+                    u32::try_from(i).expect("version number should fit in u32"),
                     &artifact_id,
                     &format!("hash{}", i),
                 )

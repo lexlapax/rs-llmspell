@@ -597,7 +597,6 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::NamedTempFile;
-
     #[test]
     fn test_file_size_validation() {
         let config = FileUploadConfig {
@@ -618,7 +617,6 @@ mod tests {
             .iter()
             .any(|e| matches!(e, FileValidationError::FileTooLarge { .. })));
     }
-
     #[test]
     fn test_filename_sanitization() {
         let validator = FileUploadValidator::with_defaults();
@@ -637,7 +635,6 @@ mod tests {
             "filewithnulls.txt"
         );
     }
-
     #[test]
     fn test_magic_number_detection() {
         let validator = FileUploadValidator::with_defaults();
@@ -663,7 +660,6 @@ mod tests {
                     || w.contains("Unable to verify file type")));
         }
     }
-
     #[test]
     fn test_malicious_content_detection() {
         let validator = FileUploadValidator::with_defaults();
@@ -679,7 +675,6 @@ mod tests {
             .iter()
             .any(|e| matches!(e, FileValidationError::MaliciousContent { .. })));
     }
-
     #[test]
     fn test_sandbox_creation() {
         let sandbox = FileProcessingSandbox::new().unwrap();

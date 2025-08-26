@@ -4,8 +4,11 @@
 use llmspell_agents::testing::{framework, mocks, scenarios};
 
 use framework::{TestConfig, TestHarness};
+use llmspell_agents::factory::ResourceLimits;
 use mocks::MockAgentBuilder;
 use scenarios::{ScenarioRunner, TestScenarios};
+use serde_json::Map;
+use std::collections::HashMap;
 
 /// Test echo scenario
 #[tokio::test]
@@ -165,11 +168,13 @@ async fn test_state_transition_scenario() {
 async fn test_scenario_with_harness() {
     let config = TestConfig {
         timeout: std::time::Duration::from_secs(10),
-        debug: true,
-        record_interactions: true,
-        profile_performance: true,
-        validate_resources: true,
-        metadata: Default::default(),
+        metadata: HashMap::default(),
+        feature_flags: llmspell_agents::testing::framework::TestFeatureFlags {
+            debug: true,
+            record_interactions: true,
+            profile_performance: true,
+            validate_resources: true,
+        },
     };
 
     let harness = TestHarness::new(config);
@@ -184,12 +189,11 @@ async fn test_scenario_with_harness() {
         agent_type: "basic".to_string(),
         model: None,
         allowed_tools: vec![],
-        custom_config: Default::default(),
-        resource_limits: Default::default(),
+        custom_config: Map::default(),
+        resource_limits: ResourceLimits::default(),
     };
 
     let test_result = harness
-        .await
         .run_test(agent_config, |agent| async move {
             // Note: Agent starts in Uninitialized state but should handle this gracefully
             // The execute method will initialize automatically if needed
@@ -208,9 +212,9 @@ async fn test_scenario_with_harness() {
 
     if !test_result.passed {
         if let Some(error) = &test_result.error {
-            println!("Test failed with error: {}", error);
+            println!("Test failed with error: {error}");
         }
-        println!("Test result: {:?}", test_result);
+        println!("Test result: {test_result:?}");
     }
     assert!(test_result.passed);
     // Note: Interactions might be empty depending on harness implementation
@@ -261,6 +265,6 @@ async fn test_custom_scenario() {
 
     // All tests should pass
     for (i, test_result) in result.results.iter().enumerate() {
-        assert!(test_result.passed, "Test {} failed", i);
+        assert!(test_result.passed, "Test {i} failed");
     }
 }

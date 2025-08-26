@@ -162,6 +162,7 @@ impl UniversalEvent {
     /// Check if event has expired
     pub fn is_expired(&self) -> bool {
         if let Some(ttl) = self.metadata.ttl {
+            #[allow(clippy::cast_sign_loss)]
             let elapsed = Utc::now()
                 .signed_duration_since(self.timestamp)
                 .num_seconds() as u64;
@@ -293,7 +294,6 @@ impl UniversalEventBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_event_creation() {
         let event = UniversalEvent::new(
@@ -306,7 +306,6 @@ mod tests {
         assert_eq!(event.language, Language::Rust);
         assert!(!event.is_expired());
     }
-
     #[test]
     fn test_event_builder() {
         let event = UniversalEventBuilder::new("test.built")
@@ -324,7 +323,6 @@ mod tests {
         assert_eq!(event.metadata.priority, -1);
         assert_eq!(event.metadata.ttl, Some(300));
     }
-
     #[test]
     fn test_event_serialization() {
         let event = UniversalEvent::new(
@@ -340,7 +338,6 @@ mod tests {
         assert_eq!(deserialized.data, event.data);
         assert_eq!(deserialized.sequence, event.sequence);
     }
-
     #[test]
     fn test_pattern_matching() {
         let event = UniversalEvent::new("system.startup", Value::Null, Language::Rust);
@@ -351,7 +348,6 @@ mod tests {
         assert!(!event.matches_pattern("agent.*"));
         assert!(!event.matches_pattern("system.shutdown"));
     }
-
     #[test]
     fn test_sequence_ordering() {
         let event1 = UniversalEvent::new("event1", Value::Null, Language::Rust);
@@ -361,7 +357,6 @@ mod tests {
         assert!(event1.sequence < event2.sequence);
         assert!(event2.sequence < event3.sequence);
     }
-
     #[test]
     fn test_ttl_expiration() {
         let mut event = UniversalEvent::new("expiring", Value::Null, Language::Rust).with_ttl(0); // Expire immediately

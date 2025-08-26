@@ -203,7 +203,6 @@ fn direct_function_call(input: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_component_id_benchmark_data() {
         // Ensure benchmark data generation works
@@ -214,7 +213,6 @@ mod tests {
         let id_from_name2 = ComponentId::from_name("test");
         assert_eq!(id_from_name, id_from_name2); // Same name produces same ID
     }
-
     #[test]
     fn test_serialization_benchmark_data() {
         let metadata = ComponentMetadata::new("test".to_string(), "description".to_string());
@@ -225,7 +223,6 @@ mod tests {
         let parsed: ComponentMetadata = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.name, "test");
     }
-
     #[tokio::test]
     async fn test_async_measurement() {
         let (result, duration) = measure_async_operation(|| async {

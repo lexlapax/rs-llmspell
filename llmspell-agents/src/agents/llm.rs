@@ -34,6 +34,13 @@ pub struct LLMAgent {
 
 impl LLMAgent {
     /// Create a new LLM agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Model configuration is missing
+    /// - Provider creation fails
+    /// - Agent initialization fails
     pub async fn new(config: AgentConfig, provider_manager: Arc<ProviderManager>) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
         let agent_id_string = metadata.id.to_string();
@@ -73,14 +80,14 @@ impl LLMAgent {
             max_conversation_length: config
                 .custom_config
                 .get("max_conversation_length")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as usize)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|v| usize::try_from(v).ok())
                 .or(Some(100)),
             system_prompt: config
                 .custom_config
                 .get("system_prompt")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .or_else(|| {
                     Some(format!(
                         "You are {}, an AI assistant. {}",
@@ -93,9 +100,12 @@ impl LLMAgent {
 
         // Create state machine configuration optimized for LLM agents
         let state_config = StateMachineConfig {
-            enable_logging: true,
-            enable_hooks: true,           // Enable hooks for LLM agents
-            enable_circuit_breaker: true, // Critical for LLM reliability
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_logging: true,
+                enable_hooks: true,           // Enable hooks for LLM agents
+                enable_circuit_breaker: true, // Critical for LLM reliability
+                ..Default::default()
+            },
             max_transition_time: std::time::Duration::from_secs(30), // Longer for LLM operations
             ..StateMachineConfig::default()
         };
@@ -118,7 +128,7 @@ impl LLMAgent {
     }
 
     /// Build messages for provider including conversation history
-    fn build_messages(&self, input: &str) -> Result<Vec<ConversationMessage>, LLMSpellError> {
+    fn build_messages(&self, input: &str) -> Vec<ConversationMessage> {
         let mut messages = Vec::new();
 
         // Add system prompt if configured
@@ -144,15 +154,20 @@ impl LLMAgent {
         // Add current input
         messages.push(ConversationMessage::user(input.to_string()));
 
-        Ok(messages)
+        messages
     }
 
     /// Get state machine for lifecycle management
-    pub fn state_machine(&self) -> &Arc<AgentStateMachine> {
+    #[must_use]
+    pub const fn state_machine(&self) -> &Arc<AgentStateMachine> {
         &self.state_machine
     }
 
     /// Initialize the agent and its state machine
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine initialization fails
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing LLMAgent '{}'", self.metadata.name);
         self.state_machine.initialize().await?;
@@ -161,6 +176,10 @@ impl LLMAgent {
     }
 
     /// Start the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine start fails
     pub async fn start(&self) -> Result<()> {
         info!("Starting LLMAgent '{}'", self.metadata.name);
 
@@ -176,6 +195,11 @@ impl LLMAgent {
     }
 
     /// Pause the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine pause fails
+    #[allow(clippy::cognitive_complexity)]
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing LLMAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -200,6 +224,10 @@ impl LLMAgent {
     }
 
     /// Resume the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine resume fails
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming LLMAgent '{}'", self.metadata.name);
 
@@ -215,6 +243,11 @@ impl LLMAgent {
     }
 
     /// Stop the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine stop fails
+    #[allow(clippy::cognitive_complexity)]
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping LLMAgent '{}'", self.metadata.name);
 
@@ -239,6 +272,10 @@ impl LLMAgent {
     }
 
     /// Terminate the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine termination fails
     pub async fn terminate(&self) -> Result<()> {
         info!("Terminating LLMAgent '{}'", self.metadata.name);
         self.state_machine.terminate().await?;
@@ -258,7 +295,7 @@ impl BaseAgent for LLMAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -329,12 +366,12 @@ impl BaseAgent for LLMAgent {
         );
 
         // Build messages for the provider
-        let messages = self.build_messages(&input.text)?;
+        let messages = self.build_messages(&input.text);
 
         // Create provider input with conversation messages as JSON
         let messages_json =
             serde_json::to_string(&messages).map_err(|e| LLMSpellError::Configuration {
-                message: format!("Failed to serialize messages: {}", e),
+                message: format!("Failed to serialize messages: {e}"),
                 source: None,
             })?;
 
@@ -381,8 +418,7 @@ impl BaseAgent for LLMAgent {
             if estimated_tokens > max_tokens {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Input text too long. Estimated {} tokens, max {}",
-                        estimated_tokens, max_tokens
+                        "Input text too long. Estimated {estimated_tokens} tokens, max {max_tokens}"
                     ),
                     field: Some("text".to_string()),
                 });
@@ -403,7 +439,7 @@ impl BaseAgent for LLMAgent {
             LLMSpellError::Component { .. } | LLMSpellError::Provider { .. } => {
                 if let Err(state_error) = self
                     .state_machine
-                    .error(format!("LLM Agent error: {}", error))
+                    .error(format!("LLM Agent error: {error}"))
                     .await
                 {
                     warn!(
@@ -421,8 +457,7 @@ impl BaseAgent for LLMAgent {
         // For LLM agents, we might want to use the LLM to generate error responses
         // For now, return a formatted error
         Ok(AgentOutput::text(format!(
-            "I encountered an error while processing your request: {}",
-            error
+            "I encountered an error while processing your request: {error}"
         )))
     }
 }
@@ -483,7 +518,7 @@ impl StatePersistence for LLMAgent {
     }
 
     fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-        StateManagerHolder::set_state_manager(self, state_manager)
+        StateManagerHolder::set_state_manager(self, state_manager);
     }
 }
 
@@ -493,7 +528,6 @@ crate::impl_persistent_agent!(LLMAgent);
 #[cfg(test)]
 mod tests {
     use crate::builder::AgentBuilder;
-
     #[tokio::test]
     async fn test_llm_agent_creation() {
         // This test requires a provider manager setup

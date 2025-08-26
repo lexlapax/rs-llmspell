@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Component","Dependency","Priority","Scope","Speed","Stability"],"struct":["TestCategory","TestFilter"],"trait":["Categorizable"]};

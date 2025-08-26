@@ -285,7 +285,6 @@ mod tests {
     use super::*;
     #[cfg(feature = "rate-limiting-http")]
     use reqwest::header::{HeaderMap, HeaderValue};
-
     #[test]
     #[cfg(feature = "rate-limiting-http")]
     fn test_rate_limit_info_from_headers() {
@@ -299,7 +298,6 @@ mod tests {
         assert_eq!(info.limit, Some(100));
         assert_eq!(info.reset_at, Some(1_234_567_890));
     }
-
     #[tokio::test]
     async fn test_provider_rate_limiter() {
         let mut limiter = ProviderRateLimiter::new();

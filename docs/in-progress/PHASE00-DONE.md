@@ -6,7 +6,7 @@
 **Phase**: 0 (Foundation Infrastructure)  
 **Timeline**: Weeks 1-2 (10 working days)  
 **Priority**: CRITICAL (MVP Prerequisite)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-00-design-doc.md
 
@@ -1025,7 +1025,7 @@ Ready for Phase 1 development to begin immediately.
 **Phase 1 Resources Created**:
 1. `/docs/in-progress/PHASE01_HANDOFF_PACKAGE.md` - Complete deliverables documentation
 2. `/docs/in-progress/PHASE01_KNOWLEDGE_TRANSFER.md` - Structured knowledge transfer guide
-3. `/docs/technical/rs-llmspell-final-architecture.md` - Comprehensive architecture
+3. `/docs/technical/master-architecture-vision.md` - Comprehensive architecture
 4. `/.github/QUALITY_GATES.md` - Quality standards and branch protection
 5. `/scripts/quality-check.sh` - Local development quality validation
 

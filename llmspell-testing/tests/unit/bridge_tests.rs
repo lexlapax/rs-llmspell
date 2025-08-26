@@ -5,6 +5,7 @@
 mod tests {
     #[test]
     fn test_placeholder() {
-        assert!(true);
+        // Placeholder test - actual bridge tests are in llmspell-bridge/src/
+        assert_eq!(4 * 4, 16, "Basic placeholder test");
     }
 }

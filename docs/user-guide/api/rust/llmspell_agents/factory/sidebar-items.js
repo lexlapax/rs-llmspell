@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"struct":["AgentConfig","AgentConfigBuilder","DefaultAgentFactory","ModelConfig","ResourceLimits"],"trait":["AgentFactory","CreationHook"]};

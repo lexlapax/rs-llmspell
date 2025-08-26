@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WebSearchTool public API
+//! ABOUTME: Integration tests for `WebSearchTool` public API
 //! ABOUTME: Tests search functionality, parameter handling, and error cases
 
 use llmspell_core::{
@@ -8,7 +8,6 @@ use llmspell_core::{
 };
 use llmspell_tools::search::{WebSearchConfig, WebSearchTool};
 use serde_json::Value;
-
 #[tokio::test]
 async fn test_basic_web_search() {
     let config = WebSearchConfig::default();
@@ -25,7 +24,7 @@ async fn test_basic_web_search() {
     let result = tool.execute(input, context).await;
 
     if let Err(e) = &result {
-        eprintln!("Test failed with error: {}", e);
+        eprintln!("Test failed with error: {e}");
     }
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -34,7 +33,6 @@ async fn test_basic_web_search() {
     assert_eq!(response["success"], true);
     assert_eq!(response["operation"], "search");
 }
-
 #[tokio::test]
 async fn test_parameter_validation() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -54,7 +52,6 @@ async fn test_parameter_validation() {
     let result = tool.validate_input(&input).await;
     assert!(result.is_ok());
 }
-
 #[tokio::test]
 async fn test_search_with_options() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -71,7 +68,7 @@ async fn test_search_with_options() {
 
     let result = tool.execute(input, context.clone()).await;
     if let Err(e) = &result {
-        eprintln!("test_search_with_options (max_results) failed: {}", e);
+        eprintln!("test_search_with_options (max_results) failed: {e}");
     }
     assert!(result.is_ok());
 
@@ -86,7 +83,7 @@ async fn test_search_with_options() {
 
     let result = tool.execute(input, context.clone()).await;
     if let Err(e) = &result {
-        eprintln!("test_search_with_options (safe_search) failed: {}", e);
+        eprintln!("test_search_with_options (safe_search) failed: {e}");
     }
     assert!(result.is_ok());
 
@@ -101,11 +98,10 @@ async fn test_search_with_options() {
 
     let result = tool.execute(input, context).await;
     if let Err(e) = &result {
-        eprintln!("test_search_with_options (language) failed: {}", e);
+        eprintln!("test_search_with_options (language) failed: {e}");
     }
     assert!(result.is_ok());
 }
-
 #[tokio::test]
 async fn test_search_types() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -122,7 +118,7 @@ async fn test_search_types() {
 
     let result = tool.execute(input, context.clone()).await;
     if let Err(e) = &result {
-        eprintln!("test_search_types (web) failed: {}", e);
+        eprintln!("test_search_types (web) failed: {e}");
     }
     assert!(result.is_ok());
 
@@ -157,7 +153,6 @@ async fn test_search_types() {
     let result = tool.execute(input, context).await;
     assert!(result.is_ok());
 }
-
 #[tokio::test]
 async fn test_duckduckgo_provider() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -183,7 +178,6 @@ async fn test_duckduckgo_provider() {
         assert_eq!(result_data["provider"], "duckduckgo");
     }
 }
-
 #[tokio::test]
 async fn test_error_handling() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -202,13 +196,13 @@ async fn test_error_handling() {
     assert_eq!(response["success"], false);
     assert_eq!(response["operation"], "search");
 }
-
 #[tokio::test]
 async fn test_tool_metadata() {
+    use llmspell_core::traits::tool::ToolCategory;
+
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
 
     // Test category
-    use llmspell_core::traits::tool::ToolCategory;
     assert!(matches!(tool.category(), ToolCategory::Web));
 
     // Test security level
@@ -230,7 +224,6 @@ async fn test_tool_metadata() {
         .expect("input parameter should exist");
     assert!(input_param.required);
 }
-
 #[tokio::test]
 async fn test_response_format() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -246,7 +239,7 @@ async fn test_response_format() {
     let result = tool.execute(input, context).await;
 
     if let Err(e) = &result {
-        eprintln!("test_response_format failed with error: {}", e);
+        eprintln!("test_response_format failed with error: {e}");
     }
     assert!(result.is_ok());
 
@@ -265,7 +258,6 @@ async fn test_response_format() {
     assert!(result_data["count"].is_number());
     assert!(result_data["results"].is_array());
 }
-
 #[tokio::test]
 async fn test_provider_fallback() {
     // Test fallback behavior: if no valid provider is found, it should use the default
@@ -293,7 +285,7 @@ async fn test_provider_fallback() {
 
     // Should succeed using fallback to DuckDuckGo
     if let Err(e) = &result {
-        eprintln!("test_provider_fallback failed: {}", e);
+        eprintln!("test_provider_fallback failed: {e}");
     }
     assert!(result.is_ok());
 

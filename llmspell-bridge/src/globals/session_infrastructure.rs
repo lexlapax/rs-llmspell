@@ -2,7 +2,7 @@
 // ABOUTME: Provides get_or_create pattern for session management following state infrastructure pattern
 
 use crate::globals::GlobalContext;
-use crate::runtime::SessionConfig;
+use llmspell_config::SessionConfig;
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
@@ -12,7 +12,14 @@ use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-/// Helper function to get or create session infrastructure from GlobalContext
+/// Helper function to get or create session infrastructure from `GlobalContext`
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - State manager creation fails
+/// - Storage backend creation fails
+/// - Session manager initialization fails
 pub async fn get_or_create_session_infrastructure(
     context: &GlobalContext,
     config: &SessionConfig,
@@ -28,29 +35,28 @@ pub async fn get_or_create_session_infrastructure(
 
     // Get or create required dependencies
     let state_manager = get_or_create_state_manager(context).await?;
-    let hook_registry = get_or_create_hook_registry(context)?;
-    let hook_executor = get_or_create_hook_executor(context)?;
-    let event_bus = get_or_create_event_bus(context).await?;
+    let hook_registry = get_or_create_hook_registry(context);
+    let hook_executor = get_or_create_hook_executor(context);
+    let event_bus = get_or_create_event_bus(context);
 
     // Create storage backend based on configuration
-    let storage_backend = create_storage_backend(&config.storage_backend).await?;
+    let storage_backend = create_storage_backend(&config.storage_backend)?;
 
-    // Create SessionManagerConfig from runtime config
-    let session_config = SessionManagerConfig {
-        max_active_sessions: config.max_sessions,
-        default_session_timeout: chrono::Duration::seconds(config.session_timeout_seconds as i64),
-        storage_path: std::path::PathBuf::from("./sessions"),
-        auto_persist: true,
-        persist_interval_secs: 300,
-        track_activity: true,
-        max_storage_size_bytes: 10 * 1024 * 1024 * 1024, // 10GB
-        enable_compression: config.artifact_compression_threshold > 0,
-        compression_level: 3,
-        enable_deduplication: true,
-        cleanup_config: Default::default(),
-        hook_config: Default::default(),
-        event_config: Default::default(),
-    };
+    // Create SessionManagerConfig from runtime config using builder pattern
+    let session_config = SessionManagerConfig::builder()
+        .max_active_sessions(config.max_sessions)
+        .default_session_timeout(chrono::Duration::seconds(
+            i64::try_from(config.session_timeout_seconds).unwrap_or(i64::MAX),
+        ))
+        .storage_path(std::path::PathBuf::from("./sessions"))
+        .auto_persist(true)
+        .persist_interval_secs(300)
+        .track_activity(true)
+        .max_storage_size_bytes(10 * 1024 * 1024 * 1024) // 10GB
+        .enable_compression(config.artifact_compression_threshold > 0)
+        .compression_level(3)
+        .enable_deduplication(true)
+        .build();
 
     // Create SessionManager
     let session_manager = Arc::new(
@@ -63,7 +69,7 @@ pub async fn get_or_create_session_infrastructure(
             session_config,
         )
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create SessionManager: {}", e),
+            message: format!("Failed to create SessionManager: {e}"),
             source: None,
         })?,
     );
@@ -74,7 +80,7 @@ pub async fn get_or_create_session_infrastructure(
     Ok(SessionInfrastructure { session_manager })
 }
 
-/// Get or create StateManager
+/// Get or create `StateManager`
 async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<StateManager>> {
     if let Some(state_manager) = context.get_bridge::<StateManager>("state_manager") {
         return Ok(state_manager);
@@ -87,7 +93,7 @@ async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<Stat
             StateManager::new()
                 .await
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create StateManager: {}", e),
+                    message: format!("Failed to create StateManager: {e}"),
                     source: None,
                 })?,
         );
@@ -96,44 +102,50 @@ async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<Stat
     Ok(state_manager)
 }
 
-/// Get or create HookRegistry
-fn get_or_create_hook_registry(context: &GlobalContext) -> Result<Arc<HookRegistry>> {
+/// Get or create `HookRegistry`
+fn get_or_create_hook_registry(context: &GlobalContext) -> Arc<HookRegistry> {
     if let Some(registry) = context.get_bridge::<HookRegistry>("hook_registry") {
-        return Ok(registry);
+        return registry;
     }
 
     // Create new registry
     let registry = Arc::new(HookRegistry::new());
     context.set_bridge("hook_registry", registry.clone());
-    Ok(registry)
+    registry
 }
 
-/// Get or create HookExecutor
-fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
+/// Get or create `HookExecutor`
+fn get_or_create_hook_executor(context: &GlobalContext) -> Arc<HookExecutor> {
     if let Some(executor) = context.get_bridge::<HookExecutor>("hook_executor") {
-        return Ok(executor);
+        return executor;
     }
 
     // Create new executor
     let executor = Arc::new(HookExecutor::new());
     context.set_bridge("hook_executor", executor.clone());
-    Ok(executor)
+    executor
 }
 
-/// Get or create EventBus
-async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+/// Get or create `EventBus`
+fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
-        return Ok(event_bus);
+        return event_bus;
     }
 
     // Create new EventBus
     let event_bus = Arc::new(EventBus::new());
     context.set_bridge("event_bus", event_bus.clone());
-    Ok(event_bus)
+    event_bus
 }
 
 /// Create storage backend based on configuration
-async fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Unknown backend type is specified
+/// - Backend creation fails
+fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
     match backend_type {
         "memory" => {
             debug!("Creating in-memory storage backend for sessions");
@@ -141,10 +153,10 @@ async fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBac
         }
         "sled" => {
             debug!("Creating sled storage backend for sessions");
-            let _path = std::env::var("LLMSPELL_SESSION_PATH")
-                .unwrap_or_else(|_| "./llmspell_sessions".to_string());
+            // TODO: When SledBackend supports path configuration, use config.storage_path
+            // For now, SledBackend::new() uses its default path
             let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create sled backend: {}", e),
+                message: format!("Failed to create sled backend: {e}"),
                 source: None,
             })?;
             Ok(Arc::new(backend))
@@ -165,12 +177,16 @@ pub struct SessionInfrastructure {
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
-
+    use llmspell_config::providers::ProviderManagerConfig;
     #[tokio::test]
     async fn test_session_infrastructure_creation() {
         let context = GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         );
 
         let config = SessionConfig {

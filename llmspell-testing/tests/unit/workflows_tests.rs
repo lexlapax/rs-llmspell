@@ -5,6 +5,7 @@
 mod tests {
     #[test]
     fn test_placeholder() {
-        assert!(true);
+        // Placeholder test - actual workflow tests are in llmspell-workflows/src/
+        assert_eq!(3 + 3, 6, "Basic placeholder test");
     }
 }

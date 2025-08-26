@@ -95,7 +95,11 @@ impl CachingMetrics {
         if self.total_cache_attempts == 0 {
             0.0
         } else {
-            self.cache_hits as f64 / self.total_cache_attempts as f64
+            #[allow(clippy::cast_precision_loss)]
+            let hits = self.cache_hits as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let attempts = self.total_cache_attempts as f64;
+            hits / attempts
         }
     }
 
@@ -103,7 +107,11 @@ impl CachingMetrics {
         if self.cache_hits == 0 {
             0.0
         } else {
-            self.time_saved_ms as f64 / self.cache_hits as f64
+            #[allow(clippy::cast_precision_loss)]
+            let time_saved = self.time_saved_ms as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let hits = self.cache_hits as f64;
+            time_saved / hits
         }
     }
 }
@@ -333,15 +341,22 @@ impl CachingHook {
             Ok(()) => {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.cache_puts += 1;
-                metrics.time_saved_ms += execution_time.as_millis() as u64;
+                #[allow(clippy::cast_possible_truncation)]
+                let time_saved = execution_time.as_millis() as u64;
+                metrics.time_saved_ms += time_saved;
 
                 // Update average execution times
                 let total_ops = metrics.cache_puts + metrics.cache_hits;
                 if total_ops > 0 {
                     let current_avg = metrics.average_execution_time_ms;
+                    #[allow(clippy::cast_precision_loss)]
                     let new_time = execution_time.as_millis() as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let total_ops_minus_one = (total_ops - 1) as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let total_ops_f64 = total_ops as f64;
                     metrics.average_execution_time_ms =
-                        (current_avg * (total_ops - 1) as f64 + new_time) / total_ops as f64;
+                        (current_avg * total_ops_minus_one + new_time) / total_ops_f64;
                 }
             }
             Err(e) => {
@@ -438,308 +453,6 @@ impl MetricHook for CachingHook {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{ComponentId, ComponentType, HookPoint};
-    use serde_json::json;
-
-    fn create_test_context() -> HookContext {
-        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
-        HookContext::new(HookPoint::SystemStartup, component_id)
-    }
-
-    #[tokio::test]
-    async fn test_caching_hook_basic() {
-        let hook = CachingHook::new();
-        let mut context = create_test_context();
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-
-        // Check that cache metadata was added
-        assert_eq!(context.get_metadata("cache_hit"), Some("false"));
-        assert!(context.get_metadata("cache_checked_at").is_some());
-        assert!(context.get_metadata("caching_hook_version").is_some());
-    }
-
-    #[tokio::test]
-    async fn test_caching_hook_cache_hit() {
-        let hook = CachingHook::new();
-        let context = create_test_context();
-
-        // Simulate caching a result
-        let cache_key = CacheKey::from_context(&context);
-        hook.cache
-            .put(cache_key, HookResult::Continue, None)
-            .unwrap();
-
-        let mut context_copy = context;
-        let result = hook.execute(&mut context_copy).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-
-        // Check that it was a cache hit
-        assert_eq!(context_copy.get_metadata("cache_hit"), Some("true"));
-        assert!(context_copy.get_metadata("cached_at").is_some());
-
-        // Check metrics
-        let metrics = hook.metrics();
-        assert_eq!(metrics.cache_hits, 1);
-        assert_eq!(metrics.total_cache_attempts, 1);
-        assert_eq!(metrics.hit_ratio(), 1.0);
-    }
-
-    #[test]
-    fn test_caching_config_defaults() {
-        let config = CachingConfig::default();
-        assert_eq!(config.max_entries, 1000);
-        assert_eq!(config.default_ttl, Duration::from_secs(300));
-        assert!(matches!(config.strategy, CachingStrategy::CacheSuccessOnly));
-        assert!(config.cacheable_hook_points.is_empty());
-        assert!(config
-            .non_cacheable_hook_points
-            .contains(&HookPoint::SecurityViolation));
-        assert!(config.use_full_context);
-        assert!(!config.cache_errors);
-    }
-
-    #[test]
-    fn test_caching_strategy_success_only() {
-        let hook = CachingHook::new().with_strategy(CachingStrategy::CacheSuccessOnly);
-
-        assert!(hook.should_cache_result(&HookResult::Continue));
-        assert!(hook.should_cache_result(&HookResult::Modified(json!({"key": "value"}))));
-        assert!(!hook.should_cache_result(&HookResult::Cancel("error".to_string())));
-        assert!(!hook.should_cache_result(&HookResult::Redirect("/path".to_string())));
-    }
-
-    #[test]
-    fn test_caching_strategy_cache_all() {
-        let hook = CachingHook::new().with_strategy(CachingStrategy::CacheAll);
-
-        assert!(hook.should_cache_result(&HookResult::Continue));
-        assert!(hook.should_cache_result(&HookResult::Cancel("error".to_string())));
-        assert!(hook.should_cache_result(&HookResult::Redirect("/path".to_string())));
-    }
-
-    #[test]
-    fn test_should_cache_hook_point() {
-        let mut config = CachingConfig::default();
-        config
-            .non_cacheable_hook_points
-            .insert(HookPoint::BeforeAgentInit);
-        let hook = CachingHook::with_config(config);
-
-        assert!(hook.should_cache_hook_point(&HookPoint::SystemStartup));
-        assert!(!hook.should_cache_hook_point(&HookPoint::SecurityViolation)); // Default non-cacheable
-        assert!(!hook.should_cache_hook_point(&HookPoint::BeforeAgentInit)); // Custom non-cacheable
-    }
-
-    #[test]
-    fn test_should_cache_hook_point_with_whitelist() {
-        let mut config = CachingConfig::default();
-        config
-            .cacheable_hook_points
-            .insert(HookPoint::SystemStartup);
-        config
-            .cacheable_hook_points
-            .insert(HookPoint::BeforeAgentInit);
-        let hook = CachingHook::with_config(config);
-
-        assert!(hook.should_cache_hook_point(&HookPoint::SystemStartup));
-        assert!(hook.should_cache_hook_point(&HookPoint::BeforeAgentInit));
-        assert!(!hook.should_cache_hook_point(&HookPoint::BeforeToolExecution));
-        // Not in whitelist
-    }
-
-    #[test]
-    fn test_should_cache_by_execution_time() {
-        let hook = CachingHook::new().with_min_execution_time(Duration::from_millis(50));
-
-        assert!(!hook.should_cache_by_execution_time(Duration::from_millis(25)));
-        assert!(hook.should_cache_by_execution_time(Duration::from_millis(75)));
-        assert!(hook.should_cache_by_execution_time(Duration::from_millis(50)));
-    }
-
-    #[tokio::test]
-    async fn test_try_cache_result() {
-        let hook = CachingHook::new();
-        let context = create_test_context();
-
-        // Cache a successful result
-        hook.try_cache_result(&context, &HookResult::Continue, Duration::from_millis(100))
-            .unwrap();
-
-        // Check that it was cached
-        let cache_key = CacheKey::from_context(&context);
-        let cached = hook.cache.get(&cache_key);
-        assert!(cached.is_some());
-        assert!(matches!(cached.unwrap(), HookResult::Continue));
-
-        // Check metrics
-        let metrics = hook.metrics();
-        assert_eq!(metrics.cache_puts, 1);
-        assert_eq!(metrics.time_saved_ms, 100);
-    }
-
-    #[tokio::test]
-    async fn test_cache_error_handling() {
-        let hook = CachingHook::new().with_error_caching(false);
-        let context = create_test_context();
-
-        // Try to cache an error (should be ignored)
-        hook.try_cache_result(
-            &context,
-            &HookResult::Cancel("error".to_string()),
-            Duration::from_millis(100),
-        )
-        .unwrap();
-
-        // Check that it was not cached
-        let cache_key = CacheKey::from_context(&context);
-        let cached = hook.cache.get(&cache_key);
-        assert!(cached.is_none());
-
-        // Check metrics (should not increment cache_puts)
-        let metrics = hook.metrics();
-        assert_eq!(metrics.cache_puts, 0);
-    }
-
-    #[tokio::test]
-    async fn test_cache_error_caching_enabled() {
-        let hook = CachingHook::new()
-            .with_error_caching(true)
-            .with_strategy(CachingStrategy::CacheAll);
-        let context = create_test_context();
-
-        // Cache an error (should work with error caching enabled)
-        hook.try_cache_result(
-            &context,
-            &HookResult::Cancel("error".to_string()),
-            Duration::from_millis(100),
-        )
-        .unwrap();
-
-        // Check that it was cached
-        let cache_key = CacheKey::from_context(&context);
-        let cached = hook.cache.get(&cache_key);
-        assert!(cached.is_some());
-        if let Some(result) = cached {
-            assert!(matches!(result, HookResult::Cancel(_)));
-        }
-    }
-
-    #[test]
-    fn test_cache_key_from_context() {
-        let mut context1 = create_test_context();
-        let mut context2 = create_test_context();
-
-        // Same context should produce same key
-        let key1 = CacheKey::from_context(&context1);
-        let key2 = CacheKey::from_context(&context1);
-        assert_eq!(key1, key2);
-
-        // Different context data should produce different keys
-        context1.insert_data("key".to_string(), json!("value1"));
-        context2.insert_data("key".to_string(), json!("value2"));
-
-        let key1 = CacheKey::from_context(&context1);
-        let key2 = CacheKey::from_context(&context2);
-        assert_ne!(key1, key2);
-    }
-
-    #[test]
-    fn test_caching_metrics() {
-        let hook = CachingHook::new();
-        let context = create_test_context();
-
-        // Simulate some cache operations
-        hook.try_get_cached(&context); // Miss
-        hook.try_get_cached(&context); // Miss
-
-        let cache_key = CacheKey::from_context(&context);
-        hook.cache
-            .put(cache_key, HookResult::Continue, None)
-            .unwrap();
-
-        hook.try_get_cached(&context); // Hit
-
-        let metrics = hook.metrics();
-        assert_eq!(metrics.total_cache_attempts, 3);
-        assert_eq!(metrics.cache_hits, 1);
-        assert_eq!(metrics.cache_misses, 2);
-        assert_eq!(metrics.hit_ratio(), 1.0 / 3.0);
-    }
-
-    #[test]
-    fn test_cache_stats_integration() {
-        let hook = CachingHook::new();
-        let context = create_test_context();
-        let cache_key = CacheKey::from_context(&context);
-
-        // Put some entries
-        hook.cache
-            .put(cache_key.clone(), HookResult::Continue, None)
-            .unwrap();
-
-        // Get cache stats
-        let stats = hook.cache_stats();
-        assert_eq!(stats.current_size, 1);
-
-        // Clear cache
-        hook.clear_cache();
-        let stats = hook.cache_stats();
-        assert_eq!(stats.current_size, 0);
-    }
-
-    #[tokio::test]
-    async fn test_metric_hook_trait() {
-        let hook = CachingHook::new();
-        let context = create_test_context();
-
-        // Test MetricHook implementation
-        hook.record_pre_execution(&context).await.unwrap();
-
-        let result = HookResult::Continue;
-        hook.record_post_execution(&context, &result, Duration::from_millis(100))
-            .await
-            .unwrap();
-
-        // Check that result was cached
-        let cache_key = CacheKey::from_context(&context);
-        let cached = hook.cache.get(&cache_key);
-        assert!(cached.is_some());
-    }
-
-    #[test]
-    fn test_hook_metadata() {
-        let hook = CachingHook::new();
-        let metadata = hook.metadata();
-
-        assert_eq!(metadata.name, "CachingHook");
-        assert!(metadata.description.is_some());
-        assert_eq!(metadata.priority, Priority::HIGH);
-        assert_eq!(metadata.language, Language::Native);
-        assert!(metadata.tags.contains(&"builtin".to_string()));
-        assert!(metadata.tags.contains(&"caching".to_string()));
-        assert!(metadata.tags.contains(&"performance".to_string()));
-    }
-
-    #[test]
-    fn test_builder_methods() {
-        let hook = CachingHook::new()
-            .with_ttl(Duration::from_secs(600))
-            .with_max_entries(2000)
-            .with_error_caching(true)
-            .with_min_execution_time(Duration::from_millis(25));
-
-        assert_eq!(hook.config.default_ttl, Duration::from_secs(600));
-        assert_eq!(hook.config.max_entries, 2000);
-        assert!(hook.config.cache_errors);
-        assert_eq!(hook.config.min_execution_time, Duration::from_millis(25));
-    }
-}
-
 #[async_trait]
 impl ReplayableHook for CachingHook {
     fn is_replayable(&self) -> bool {
@@ -806,5 +519,292 @@ impl ReplayableHook for CachingHook {
 
     fn replay_id(&self) -> String {
         format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ComponentId, ComponentType, HookPoint};
+    use serde_json::json;
+
+    /// Local test helper to avoid circular dependency with llmspell-testing
+    /// (Architectural exception per 7.1.6: foundational crates may have minimal local helpers)
+    fn create_test_context() -> HookContext {
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        HookContext::new(HookPoint::BeforeAgentExecution, component_id)
+    }
+    #[tokio::test]
+    async fn test_caching_hook_basic() {
+        let hook = CachingHook::new();
+        let mut context = create_test_context();
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+
+        // Check that cache metadata was added
+        assert_eq!(context.get_metadata("cache_hit"), Some("false"));
+        assert!(context.get_metadata("cache_checked_at").is_some());
+        assert!(context.get_metadata("caching_hook_version").is_some());
+    }
+    #[tokio::test]
+    async fn test_caching_hook_cache_hit() {
+        let hook = CachingHook::new();
+        let context = create_test_context();
+
+        // Simulate caching a result
+        let cache_key = CacheKey::from_context(&context);
+        hook.cache
+            .put(cache_key, HookResult::Continue, None)
+            .unwrap();
+
+        let mut context_copy = context;
+        let result = hook.execute(&mut context_copy).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+
+        // Check that it was a cache hit
+        assert_eq!(context_copy.get_metadata("cache_hit"), Some("true"));
+        assert!(context_copy.get_metadata("cached_at").is_some());
+
+        // Check metrics
+        let metrics = hook.metrics();
+        assert_eq!(metrics.cache_hits, 1);
+        assert_eq!(metrics.total_cache_attempts, 1);
+        assert_eq!(metrics.hit_ratio(), 1.0);
+    }
+    #[test]
+    fn test_caching_config_defaults() {
+        let config = CachingConfig::default();
+        assert_eq!(config.max_entries, 1000);
+        assert_eq!(config.default_ttl, Duration::from_secs(300));
+        assert!(matches!(config.strategy, CachingStrategy::CacheSuccessOnly));
+        assert!(config.cacheable_hook_points.is_empty());
+        assert!(config
+            .non_cacheable_hook_points
+            .contains(&HookPoint::SecurityViolation));
+        assert!(config.use_full_context);
+        assert!(!config.cache_errors);
+    }
+    #[test]
+    fn test_caching_strategy_success_only() {
+        let hook = CachingHook::new().with_strategy(CachingStrategy::CacheSuccessOnly);
+
+        assert!(hook.should_cache_result(&HookResult::Continue));
+        assert!(hook.should_cache_result(&HookResult::Modified(json!({"key": "value"}))));
+        assert!(!hook.should_cache_result(&HookResult::Cancel("error".to_string())));
+        assert!(!hook.should_cache_result(&HookResult::Redirect("/path".to_string())));
+    }
+    #[test]
+    fn test_caching_strategy_cache_all() {
+        let hook = CachingHook::new().with_strategy(CachingStrategy::CacheAll);
+
+        assert!(hook.should_cache_result(&HookResult::Continue));
+        assert!(hook.should_cache_result(&HookResult::Cancel("error".to_string())));
+        assert!(hook.should_cache_result(&HookResult::Redirect("/path".to_string())));
+    }
+    #[test]
+    fn test_should_cache_hook_point() {
+        let mut config = CachingConfig::default();
+        config
+            .non_cacheable_hook_points
+            .insert(HookPoint::BeforeAgentInit);
+        let hook = CachingHook::with_config(config);
+
+        assert!(hook.should_cache_hook_point(&HookPoint::SystemStartup));
+        assert!(!hook.should_cache_hook_point(&HookPoint::SecurityViolation)); // Default non-cacheable
+        assert!(!hook.should_cache_hook_point(&HookPoint::BeforeAgentInit)); // Custom non-cacheable
+    }
+    #[test]
+    fn test_should_cache_hook_point_with_whitelist() {
+        let mut config = CachingConfig::default();
+        config
+            .cacheable_hook_points
+            .insert(HookPoint::SystemStartup);
+        config
+            .cacheable_hook_points
+            .insert(HookPoint::BeforeAgentInit);
+        let hook = CachingHook::with_config(config);
+
+        assert!(hook.should_cache_hook_point(&HookPoint::SystemStartup));
+        assert!(hook.should_cache_hook_point(&HookPoint::BeforeAgentInit));
+        assert!(!hook.should_cache_hook_point(&HookPoint::BeforeToolExecution));
+        // Not in whitelist
+    }
+    #[test]
+    fn test_should_cache_by_execution_time() {
+        let hook = CachingHook::new().with_min_execution_time(Duration::from_millis(50));
+
+        assert!(!hook.should_cache_by_execution_time(Duration::from_millis(25)));
+        assert!(hook.should_cache_by_execution_time(Duration::from_millis(75)));
+        assert!(hook.should_cache_by_execution_time(Duration::from_millis(50)));
+    }
+    #[tokio::test]
+    async fn test_try_cache_result() {
+        let hook = CachingHook::new();
+        let context = create_test_context();
+
+        // Cache a successful result
+        hook.try_cache_result(&context, &HookResult::Continue, Duration::from_millis(100))
+            .unwrap();
+
+        // Check that it was cached
+        let cache_key = CacheKey::from_context(&context);
+        let cached = hook.cache.get(&cache_key);
+        assert!(cached.is_some());
+        assert!(matches!(cached.unwrap(), HookResult::Continue));
+
+        // Check metrics
+        let metrics = hook.metrics();
+        assert_eq!(metrics.cache_puts, 1);
+        assert_eq!(metrics.time_saved_ms, 100);
+    }
+    #[tokio::test]
+    async fn test_cache_error_handling() {
+        let hook = CachingHook::new().with_error_caching(false);
+        let context = create_test_context();
+
+        // Try to cache an error (should be ignored)
+        hook.try_cache_result(
+            &context,
+            &HookResult::Cancel("error".to_string()),
+            Duration::from_millis(100),
+        )
+        .unwrap();
+
+        // Check that it was not cached
+        let cache_key = CacheKey::from_context(&context);
+        let cached = hook.cache.get(&cache_key);
+        assert!(cached.is_none());
+
+        // Check metrics (should not increment cache_puts)
+        let metrics = hook.metrics();
+        assert_eq!(metrics.cache_puts, 0);
+    }
+    #[tokio::test]
+    async fn test_cache_error_caching_enabled() {
+        let hook = CachingHook::new()
+            .with_error_caching(true)
+            .with_strategy(CachingStrategy::CacheAll);
+        let context = create_test_context();
+
+        // Cache an error (should work with error caching enabled)
+        hook.try_cache_result(
+            &context,
+            &HookResult::Cancel("error".to_string()),
+            Duration::from_millis(100),
+        )
+        .unwrap();
+
+        // Check that it was cached
+        let cache_key = CacheKey::from_context(&context);
+        let cached = hook.cache.get(&cache_key);
+        assert!(cached.is_some());
+        if let Some(result) = cached {
+            assert!(matches!(result, HookResult::Cancel(_)));
+        }
+    }
+    #[test]
+    fn test_cache_key_from_context() {
+        let mut context1 = create_test_context();
+        let mut context2 = create_test_context();
+
+        // Same context should produce same key
+        let key1 = CacheKey::from_context(&context1);
+        let key2 = CacheKey::from_context(&context1);
+        assert_eq!(key1, key2);
+
+        // Different context data should produce different keys
+        context1.insert_data("key".to_string(), json!("value1"));
+        context2.insert_data("key".to_string(), json!("value2"));
+
+        let key1 = CacheKey::from_context(&context1);
+        let key2 = CacheKey::from_context(&context2);
+        assert_ne!(key1, key2);
+    }
+    #[test]
+    fn test_caching_metrics() {
+        let hook = CachingHook::new();
+        let context = create_test_context();
+
+        // Simulate some cache operations
+        hook.try_get_cached(&context); // Miss
+        hook.try_get_cached(&context); // Miss
+
+        let cache_key = CacheKey::from_context(&context);
+        hook.cache
+            .put(cache_key, HookResult::Continue, None)
+            .unwrap();
+
+        hook.try_get_cached(&context); // Hit
+
+        let metrics = hook.metrics();
+        assert_eq!(metrics.total_cache_attempts, 3);
+        assert_eq!(metrics.cache_hits, 1);
+        assert_eq!(metrics.cache_misses, 2);
+        assert_eq!(metrics.hit_ratio(), 1.0 / 3.0);
+    }
+    #[test]
+    fn test_cache_stats_integration() {
+        let hook = CachingHook::new();
+        let context = create_test_context();
+        let cache_key = CacheKey::from_context(&context);
+
+        // Put some entries
+        hook.cache
+            .put(cache_key.clone(), HookResult::Continue, None)
+            .unwrap();
+
+        // Get cache stats
+        let stats = hook.cache_stats();
+        assert_eq!(stats.current_size, 1);
+
+        // Clear cache
+        hook.clear_cache();
+        let stats = hook.cache_stats();
+        assert_eq!(stats.current_size, 0);
+    }
+    #[tokio::test]
+    async fn test_metric_hook_trait() {
+        let hook = CachingHook::new();
+        let context = create_test_context();
+
+        // Test MetricHook implementation
+        hook.record_pre_execution(&context).await.unwrap();
+
+        let result = HookResult::Continue;
+        hook.record_post_execution(&context, &result, Duration::from_millis(100))
+            .await
+            .unwrap();
+
+        // Check that result was cached
+        let cache_key = CacheKey::from_context(&context);
+        let cached = hook.cache.get(&cache_key);
+        assert!(cached.is_some());
+    }
+    #[test]
+    fn test_hook_metadata() {
+        let hook = CachingHook::new();
+        let metadata = hook.metadata();
+
+        assert_eq!(metadata.name, "CachingHook");
+        assert!(metadata.description.is_some());
+        assert_eq!(metadata.priority, Priority::HIGH);
+        assert_eq!(metadata.language, Language::Native);
+        assert!(metadata.tags.contains(&"builtin".to_string()));
+        assert!(metadata.tags.contains(&"caching".to_string()));
+        assert!(metadata.tags.contains(&"performance".to_string()));
+    }
+    #[test]
+    fn test_builder_methods() {
+        let hook = CachingHook::new()
+            .with_ttl(Duration::from_secs(600))
+            .with_max_entries(2000)
+            .with_error_caching(true)
+            .with_min_execution_time(Duration::from_millis(25));
+
+        assert_eq!(hook.config.default_ttl, Duration::from_secs(600));
+        assert_eq!(hook.config.max_entries, 2000);
+        assert!(hook.config.cache_errors);
+        assert_eq!(hook.config.min_execution_time, Duration::from_millis(25));
     }
 }

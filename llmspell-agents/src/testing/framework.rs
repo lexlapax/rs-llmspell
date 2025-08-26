@@ -14,6 +14,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ExecutionContext, LLMSpellError,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -26,6 +27,16 @@ use tokio::sync::broadcast;
 pub struct TestConfig {
     /// Maximum test duration before timeout
     pub timeout: Duration,
+    /// Custom test metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+    /// Feature flags for testing behavior
+    pub feature_flags: TestFeatureFlags,
+}
+
+/// Feature flags for testing behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct TestFeatureFlags {
     /// Enable debug logging
     pub debug: bool,
     /// Record all interactions
@@ -34,19 +45,25 @@ pub struct TestConfig {
     pub profile_performance: bool,
     /// Validate resource usage
     pub validate_resources: bool,
-    /// Custom test metadata
-    pub metadata: HashMap<String, serde_json::Value>,
 }
 
 impl Default for TestConfig {
     fn default() -> Self {
         Self {
             timeout: Duration::from_secs(30),
+            metadata: HashMap::new(),
+            feature_flags: TestFeatureFlags::default(),
+        }
+    }
+}
+
+impl Default for TestFeatureFlags {
+    fn default() -> Self {
+        Self {
             debug: false,
             record_interactions: true,
             profile_performance: false,
             validate_resources: true,
-            metadata: HashMap::new(),
         }
     }
 }
@@ -122,7 +139,8 @@ pub struct TestHarness {
 
 impl TestHarness {
     /// Create new test harness with default factory
-    pub async fn new(config: TestConfig) -> Self {
+    #[must_use]
+    pub fn new(config: TestConfig) -> Self {
         // Create a mock provider manager for testing
         let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
         let factory = Arc::new(DefaultAgentFactory::new(provider_manager));
@@ -148,6 +166,17 @@ impl TestHarness {
     }
 
     /// Run a test with the given agent configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent creation fails
+    /// - The test function returns an error
+    /// - The test times out
+    ///
+    /// # Panics
+    ///
+    /// Panics if a Mutex is poisoned
     pub async fn run_test<F, Fut>(
         &self,
         agent_config: AgentConfig,
@@ -194,6 +223,14 @@ impl TestHarness {
     }
 
     /// Execute agent and record interaction
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent execution fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a Mutex is poisoned
     pub async fn execute_and_record(
         &self,
         agent: Arc<dyn Agent>,
@@ -208,7 +245,7 @@ impl TestHarness {
         let duration = start.elapsed();
 
         // Record interaction
-        if self.config.record_interactions {
+        if self.config.feature_flags.record_interactions {
             let output_record = match &result {
                 Ok(output) => Ok(output.clone()),
                 Err(e) => Err(LLMSpellError::Component {
@@ -245,17 +282,25 @@ impl TestHarness {
             metrics.max_response_time = metrics.max_response_time.max(duration);
             metrics.min_response_time = metrics.min_response_time.min(duration);
 
-            let total_time = metrics.avg_response_time.as_nanos()
-                * (metrics.execution_count - 1) as u128
-                + duration.as_nanos();
-            metrics.avg_response_time =
-                Duration::from_nanos((total_time / metrics.execution_count as u128) as u64);
+            #[allow(clippy::cast_possible_truncation)]
+            let count_minus_one = (metrics.execution_count - 1) as u128;
+            let total_time =
+                metrics.avg_response_time.as_nanos() * count_minus_one + duration.as_nanos();
+            #[allow(clippy::cast_possible_truncation)]
+            let execution_count_u128 = metrics.execution_count as u128;
+            #[allow(clippy::cast_possible_truncation)]
+            let avg_nanos = (total_time / execution_count_u128) as u64;
+            metrics.avg_response_time = Duration::from_nanos(avg_nanos);
         }
 
         result
     }
 
     /// Record resource usage
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn record_resource_usage(&self, memory: usize, cpu_time: Duration, tool_calls: usize) {
         let mut usage = self.resource_usage.lock().unwrap();
         usage.peak_memory = usage.peak_memory.max(memory);
@@ -269,6 +314,10 @@ pub struct AgentAssertions;
 
 impl AgentAssertions {
     /// Assert that agent output contains expected text
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output does not contain the expected text
     pub fn assert_output_contains(output: &AgentOutput, expected: &str) -> Result<()> {
         if !output.text.contains(expected) {
             return Err(anyhow::anyhow!(
@@ -280,6 +329,10 @@ impl AgentAssertions {
     }
 
     /// Assert that agent made expected tool calls
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any expected tool was not called
     pub fn assert_tool_calls(output: &AgentOutput, expected_tools: &[&str]) -> Result<()> {
         let actual_tools: Vec<String> = output
             .tool_calls
@@ -288,7 +341,7 @@ impl AgentAssertions {
             .collect();
 
         for expected_tool in expected_tools {
-            if !actual_tools.contains(&expected_tool.to_string()) {
+            if !actual_tools.contains(&(*expected_tool).to_string()) {
                 return Err(anyhow::anyhow!(
                     "Expected tool '{}' was not called",
                     expected_tool
@@ -299,6 +352,10 @@ impl AgentAssertions {
     }
 
     /// Assert execution time is within bounds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution time exceeds the maximum duration
     pub fn assert_execution_time(duration: Duration, max_duration: Duration) -> Result<()> {
         if duration > max_duration {
             return Err(anyhow::anyhow!(
@@ -311,8 +368,16 @@ impl AgentAssertions {
     }
 
     /// Assert resource usage is within limits
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Memory usage exceeds the limit
+    /// - Tool call count exceeds the limit
     pub fn assert_resource_usage(usage: &ResourceUsage, limits: &ResourceLimits) -> Result<()> {
-        if usage.peak_memory > (limits.max_memory_mb as usize * 1024 * 1024) {
+        #[allow(clippy::cast_possible_truncation)]
+        let max_memory_bytes = limits.max_memory_mb as usize * 1024 * 1024;
+        if usage.peak_memory > max_memory_bytes {
             return Err(anyhow::anyhow!(
                 "Memory usage {} bytes exceeds limit of {} MB",
                 usage.peak_memory,
@@ -320,7 +385,9 @@ impl AgentAssertions {
             ));
         }
 
-        if usage.tool_calls > limits.max_tool_calls as usize {
+        #[allow(clippy::cast_possible_truncation)]
+        let max_tool_calls_usize = limits.max_tool_calls as usize;
+        if usage.tool_calls > max_tool_calls_usize {
             return Err(anyhow::anyhow!(
                 "Tool calls {} exceeds limit of {}",
                 usage.tool_calls,
@@ -332,6 +399,10 @@ impl AgentAssertions {
     }
 
     /// Assert agent state transitions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the expected state transition is not found in the events
     pub fn assert_state_transition(
         from_state: AgentState,
         to_state: AgentState,
@@ -391,24 +462,28 @@ impl TestScenarioBuilder {
     }
 
     /// Set scenario description
+    #[must_use]
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
     }
 
     /// Set agent configuration
+    #[must_use]
     pub fn with_agent_config(mut self, config: AgentConfig) -> Self {
         self.agent_config = Some(config);
         self
     }
 
     /// Add test input
+    #[must_use]
     pub fn with_input(mut self, input: AgentInput, context: ExecutionContext) -> Self {
         self.inputs.push((input, context));
         self
     }
 
     /// Add expected output assertion
+    #[must_use]
     pub fn expect_output<F>(mut self, assertion: F) -> Self
     where
         F: Fn(&AgentOutput) -> Result<()> + Send + Sync + 'static,
@@ -418,6 +493,7 @@ impl TestScenarioBuilder {
     }
 
     /// Set setup function
+    #[must_use]
     pub fn with_setup<F>(mut self, setup: F) -> Self
     where
         F: Fn() -> Result<()> + Send + Sync + 'static,
@@ -427,6 +503,7 @@ impl TestScenarioBuilder {
     }
 
     /// Set teardown function
+    #[must_use]
     pub fn with_teardown<F>(mut self, teardown: F) -> Self
     where
         F: Fn() -> Result<()> + Send + Sync + 'static,
@@ -436,6 +513,15 @@ impl TestScenarioBuilder {
     }
 
     /// Build and run the test scenario
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent configuration is not provided
+    /// - Setup function fails
+    /// - Test execution fails
+    /// - Teardown function fails
+    /// - Output assertions fail
     pub async fn run(self, harness: &TestHarness) -> Result<TestResult> {
         // Run setup if provided
         if let Some(setup) = &self.setup {
@@ -482,6 +568,11 @@ pub struct LifecycleEventRecorder {
 
 impl LifecycleEventRecorder {
     /// Create new event recorder
+    ///
+    /// # Panics
+    ///
+    /// Panics if spawning the background task fails
+    #[must_use]
     pub fn new(receiver: broadcast::Receiver<LifecycleEvent>) -> Self {
         let events = Arc::new(Mutex::new(Vec::new()));
         let events_clone = events.clone();
@@ -503,16 +594,30 @@ impl LifecycleEventRecorder {
     }
 
     /// Get recorded events
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn get_events(&self) -> Vec<LifecycleEvent> {
         self.events.lock().unwrap().clone()
     }
 
     /// Clear recorded events
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn clear(&self) {
         self.events.lock().unwrap().clear();
     }
 
     /// Find events of specific type
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn find_events(&self, event_type: LifecycleEventType) -> Vec<LifecycleEvent> {
         self.events
             .lock()
@@ -529,28 +634,26 @@ impl LifecycleEventRecorder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use llmspell_core::types::OutputMetadata;
     #[tokio::test]
     async fn test_harness_creation() {
         let config = TestConfig::default();
-        let harness = TestHarness::new(config).await;
+        let harness = TestHarness::new(config);
         assert!(harness.interactions.lock().unwrap().is_empty());
     }
-
     #[test]
     fn test_assertions() {
         let output = AgentOutput {
             text: "Hello, world!".to_string(),
             media: vec![],
             tool_calls: vec![],
-            metadata: Default::default(),
+            metadata: OutputMetadata::default(),
             transfer_to: None,
         };
 
         assert!(AgentAssertions::assert_output_contains(&output, "Hello").is_ok());
         assert!(AgentAssertions::assert_output_contains(&output, "Goodbye").is_err());
     }
-
     #[test]
     fn test_scenario_builder() {
         let scenario = TestScenarioBuilder::new("test_scenario")

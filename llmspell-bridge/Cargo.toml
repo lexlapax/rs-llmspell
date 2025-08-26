@@ -7,8 +7,12 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-config = { path = "../llmspell-config" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-tools = { path = "../llmspell-tools" }
@@ -40,6 +44,7 @@ mlua = { workspace = true, optional = true }
 boa_engine = { workspace = true, optional = true }
 
 [dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
 criterion = { version = "0.5", features = ["html_reports"] }
 tempfile = "3.0"
 
@@ -47,6 +52,11 @@ tempfile = "3.0"
 default = ["lua"]
 lua = ["dep:mlua"]
 javascript = ["dep:boa_engine"]
+
+# Test categories (to fix cfg warnings)
+integration-tests = []
+bridge-tests = []
+workflow-tests = []
 
 [[bench]]
 name = "workflow_bridge_bench"

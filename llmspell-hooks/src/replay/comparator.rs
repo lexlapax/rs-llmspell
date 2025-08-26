@@ -551,7 +551,6 @@ impl fmt::Display for ComparisonResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_identical_results() {
         let comparator = HookResultComparator::new();
@@ -561,7 +560,6 @@ mod tests {
         assert_eq!(result.similarity_score, 1.0);
         assert!(result.differences.is_empty());
     }
-
     #[test]
     fn test_variant_mismatch() {
         let comparator = HookResultComparator::new();
@@ -578,7 +576,6 @@ mod tests {
         assert_eq!(result.differences.len(), 1);
         assert_eq!(result.differences[0].severity, DifferenceSeverity::Critical);
     }
-
     #[test]
     fn test_data_comparison() {
         let comparator = HookResultComparator::new();
@@ -609,7 +606,6 @@ mod tests {
         assert_eq!(result.differences.len(), 1);
         assert_eq!(result.differences[0].path, "field2");
     }
-
     #[test]
     fn test_ignore_fields() {
         let config = ComparatorConfig {

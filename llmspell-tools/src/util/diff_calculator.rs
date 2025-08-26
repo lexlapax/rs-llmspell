@@ -46,12 +46,12 @@ enum DiffFormat {
 impl DiffFormat {
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "unified" => Ok(DiffFormat::Unified),
-            "context" => Ok(DiffFormat::Context),
-            "inline" => Ok(DiffFormat::Inline),
-            "simple" => Ok(DiffFormat::Simple),
+            "unified" => Ok(Self::Unified),
+            "context" => Ok(Self::Context),
+            "inline" => Ok(Self::Inline),
+            "simple" => Ok(Self::Simple),
             _ => Err(validation_error(
-                format!("Invalid diff format: {}", s),
+                format!("Invalid diff format: {s}"),
                 Some("format".to_string()),
             )),
         }
@@ -84,15 +84,19 @@ impl DiffCalculatorTool {
     }
 
     /// Calculate text diff
-    fn calculate_text_diff(&self, old: &str, new: &str, format: DiffFormat) -> Result<String> {
+    #[allow(clippy::unused_self)]
+    #[allow(clippy::too_many_lines)]
+    fn calculate_text_diff(&self, old: &str, new: &str, format: &DiffFormat) -> String {
+        use std::fmt::Write;
+
         let diff = TextDiff::from_lines(old, new);
 
         match format {
-            DiffFormat::Unified => Ok(diff
+            DiffFormat::Unified => diff
                 .unified_diff()
                 .context_radius(3)
                 .header("old", "new")
-                .to_string()),
+                .to_string(),
             DiffFormat::Context => {
                 // Context format - show more surrounding lines
                 let mut output = String::new();
@@ -110,7 +114,7 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        output.push_str(&format!("  {}\n", line));
+                                        let _ = writeln!(output, "  {line}");
                                     }
                                 }
                             }
@@ -119,7 +123,7 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        output.push_str(&format!("- {}\n", line));
+                                        let _ = writeln!(output, "- {line}");
                                     }
                                 }
                             }
@@ -128,7 +132,7 @@ impl DiffCalculatorTool {
                                 let new_slices = diff.new_slices();
                                 for idx in new_range {
                                     if let Some(line) = new_slices.get(idx) {
-                                        output.push_str(&format!("+ {}\n", line));
+                                        let _ = writeln!(output, "+ {line}");
                                     }
                                 }
                             }
@@ -137,13 +141,13 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        output.push_str(&format!("- {}\n", line));
+                                        let _ = writeln!(output, "- {line}");
                                     }
                                 }
                                 let new_slices = diff.new_slices();
                                 for idx in new_range {
                                     if let Some(line) = new_slices.get(idx) {
-                                        output.push_str(&format!("+ {}\n", line));
+                                        let _ = writeln!(output, "+ {line}");
                                     }
                                 }
                             }
@@ -151,7 +155,7 @@ impl DiffCalculatorTool {
                     }
                     output.push_str("***************\n");
                 }
-                Ok(output)
+                output
             }
             DiffFormat::Inline => {
                 // For inline diff, we'll use iter_all_changes to show inline changes
@@ -162,9 +166,9 @@ impl DiffCalculatorTool {
                         ChangeTag::Insert => "+",
                         ChangeTag::Equal => " ",
                     };
-                    output.push_str(&format!("{}{}", sign, change));
+                    let _ = write!(output, "{sign}{change}");
                 }
-                Ok(output)
+                output
             }
             DiffFormat::Simple => {
                 let mut output = String::new();
@@ -174,41 +178,45 @@ impl DiffCalculatorTool {
                     match op.tag() {
                         DiffTag::Delete => {
                             changes += 1;
-                            output.push_str(&format!(
-                                "Removed at line {}: {} line(s)\n",
+                            let _ = writeln!(
+                                output,
+                                "Removed at line {}: {} line(s)",
                                 op.old_range().start + 1,
                                 op.old_range().len()
-                            ));
+                            );
                         }
                         DiffTag::Insert => {
                             changes += 1;
-                            output.push_str(&format!(
-                                "Added at line {}: {} line(s)\n",
+                            let _ = writeln!(
+                                output,
+                                "Added at line {}: {} line(s)",
                                 op.new_range().start + 1,
                                 op.new_range().len()
-                            ));
+                            );
                         }
                         DiffTag::Equal => {}
                         DiffTag::Replace => {
                             changes += 1;
-                            output.push_str(&format!(
-                                "Replaced at lines {}-{} with lines {}-{}\n",
+                            let _ = writeln!(
+                                output,
+                                "Replaced at lines {}-{} with lines {}-{}",
                                 op.old_range().start + 1,
                                 op.old_range().end,
                                 op.new_range().start + 1,
                                 op.new_range().end
-                            ));
+                            );
                         }
                     }
                 }
 
-                output.insert_str(0, &format!("Total changes: {}\n\n", changes));
-                Ok(output)
+                output.insert_str(0, &format!("Total changes: {changes}\n\n"));
+                output
             }
         }
     }
 
     /// Calculate JSON diff
+    #[allow(clippy::unused_self)]
     fn calculate_json_diff(&self, old_json: &Value, new_json: &Value) -> Result<Value> {
         let mut diff = json!({
             "added": {},
@@ -232,7 +240,7 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
                 let current_path = if path.is_empty() {
                     key.clone()
                 } else {
-                    format!("{}.{}", path, key)
+                    format!("{path}.{key}")
                 };
 
                 if !new_map.contains_key(key) {
@@ -245,20 +253,11 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
                 let current_path = if path.is_empty() {
                     key.clone()
                 } else {
-                    format!("{}.{}", path, key)
+                    format!("{path}.{key}")
                 };
 
                 if let Some(old_value) = old_map.get(key) {
-                    if old_value != new_value {
-                        if old_value.is_object() && new_value.is_object() {
-                            compare_json_values(old_value, new_value, &current_path, diff)?;
-                        } else {
-                            diff["modified"][&current_path] = json!({
-                                "old": old_value,
-                                "new": new_value
-                            });
-                        }
-                    } else {
+                    if old_value == new_value {
                         diff["unchanged"]
                             .as_array_mut()
                             .ok_or_else(|| LLMSpellError::Internal {
@@ -266,6 +265,13 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
                                 source: None,
                             })?
                             .push(json!(current_path));
+                    } else if old_value.is_object() && new_value.is_object() {
+                        compare_json_values(old_value, new_value, &current_path, diff)?;
+                    } else {
+                        diff["modified"][&current_path] = json!({
+                            "old": old_value,
+                            "new": new_value
+                        });
                     }
                 } else {
                     diff["added"][&current_path] = new_value.clone();
@@ -276,7 +282,7 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
             let current_path = if path.is_empty() {
                 "[]".to_string()
             } else {
-                format!("{}[]", path)
+                format!("{path}[]")
             };
 
             if old_arr.len() != new_arr.len() || old_arr != new_arr {
@@ -297,12 +303,7 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
             }
         }
         _ => {
-            if old != new {
-                diff["modified"][path] = json!({
-                    "old": old,
-                    "new": new
-                });
-            } else {
+            if old == new {
                 diff["unchanged"]
                     .as_array_mut()
                     .ok_or_else(|| LLMSpellError::Internal {
@@ -310,6 +311,11 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
                         source: None,
                     })?
                     .push(json!(path));
+            } else {
+                diff["modified"][path] = json!({
+                    "old": old,
+                    "new": new
+                });
             }
         }
     }
@@ -319,6 +325,8 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
 
 impl DiffCalculatorTool {
     /// Process diff operation
+    #[allow(clippy::unused_async)]
+    #[allow(clippy::too_many_lines)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let diff_type = extract_string_with_default(params, "type", "text");
 
@@ -332,13 +340,13 @@ impl DiffCalculatorTool {
                     // Read from files
                     let old = fs::read_to_string(old_file).map_err(|e| {
                         tool_error(
-                            format!("Failed to read old file: {}", e),
+                            format!("Failed to read old file: {e}"),
                             Some(self.metadata.name.clone()),
                         )
                     })?;
                     let new = fs::read_to_string(new_file).map_err(|e| {
                         tool_error(
-                            format!("Failed to read new file: {}", e),
+                            format!("Failed to read new file: {e}"),
                             Some(self.metadata.name.clone()),
                         )
                     })?;
@@ -360,7 +368,7 @@ impl DiffCalculatorTool {
                 let format = DiffFormat::from_str(format_str)?;
 
                 // Calculate diff
-                let diff_output = self.calculate_text_diff(&old_text, &new_text, format)?;
+                let diff_output = self.calculate_text_diff(&old_text, &new_text, &format);
 
                 let response = ResponseBuilder::success("text_diff")
                     .with_message("Text diff calculated successfully")
@@ -385,26 +393,26 @@ impl DiffCalculatorTool {
                     // Read from files
                     let old_content = fs::read_to_string(old_file).map_err(|e| {
                         tool_error(
-                            format!("Failed to read old file: {}", e),
+                            format!("Failed to read old file: {e}"),
                             Some(self.metadata.name.clone()),
                         )
                     })?;
                     let new_content = fs::read_to_string(new_file).map_err(|e| {
                         tool_error(
-                            format!("Failed to read new file: {}", e),
+                            format!("Failed to read new file: {e}"),
                             Some(self.metadata.name.clone()),
                         )
                     })?;
 
                     let old_json: Value = serde_json::from_str(&old_content).map_err(|e| {
                         tool_error(
-                            format!("Failed to parse old JSON: {}", e),
+                            format!("Failed to parse old JSON: {e}"),
                             Some(self.metadata.name.clone()),
                         )
                     })?;
                     let new_json: Value = serde_json::from_str(&new_content).map_err(|e| {
                         tool_error(
-                            format!("Failed to parse new JSON: {}", e),
+                            format!("Failed to parse new JSON: {e}"),
                             Some(self.metadata.name.clone()),
                         )
                     })?;
@@ -429,17 +437,17 @@ impl DiffCalculatorTool {
                         "type": "json",
                         "diff": diff,
                         "summary": {
-                            "added": diff["added"].as_object().map(|o| o.len()).unwrap_or(0),
-                            "removed": diff["removed"].as_object().map(|o| o.len()).unwrap_or(0),
-                            "modified": diff["modified"].as_object().map(|o| o.len()).unwrap_or(0),
-                            "unchanged": diff["unchanged"].as_array().map(|a| a.len()).unwrap_or(0)
+                            "added": diff["added"].as_object().map_or(0, serde_json::Map::len),
+                            "removed": diff["removed"].as_object().map_or(0, serde_json::Map::len),
+                            "modified": diff["modified"].as_object().map_or(0, serde_json::Map::len),
+                            "unchanged": diff["unchanged"].as_array().map_or(0, std::vec::Vec::len)
                         }
                     }))
                     .build();
                 Ok(response)
             }
             _ => Err(validation_error(
-                format!("Invalid diff type: {}", diff_type),
+                format!("Invalid diff type: {diff_type}"),
                 Some("type".to_string()),
             )),
         }
@@ -452,7 +460,11 @@ impl BaseAgent for DiffCalculatorTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -477,8 +489,7 @@ impl BaseAgent for DiffCalculatorTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Diff calculation error: {}",
-            error
+            "Diff calculation error: {error}"
         )))
     }
 }
@@ -572,7 +583,6 @@ impl Tool for DiffCalculatorTool {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[tokio::test]
     async fn test_text_diff_unified() {
         let tool = DiffCalculatorTool::new();
@@ -600,7 +610,6 @@ mod tests {
         assert_eq!(output["result"]["format"], "unified");
         assert!(output["result"]["diff"].as_str().unwrap().contains("@@"));
     }
-
     #[tokio::test]
     async fn test_text_diff_simple() {
         let tool = DiffCalculatorTool::new();
@@ -631,7 +640,6 @@ mod tests {
             .unwrap()
             .contains("Total changes:"));
     }
-
     #[tokio::test]
     async fn test_json_diff() {
         let tool = DiffCalculatorTool::new();
@@ -672,7 +680,6 @@ mod tests {
         assert_eq!(output["result"]["summary"]["added"], 1);
         assert_eq!(output["result"]["summary"]["modified"], 3); // age, city, hobbies[]
     }
-
     #[tokio::test]
     async fn test_missing_input() {
         let tool = DiffCalculatorTool::new();
@@ -688,7 +695,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_invalid_format() {
         let tool = DiffCalculatorTool::new();
@@ -706,7 +712,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = DiffCalculatorTool::new();

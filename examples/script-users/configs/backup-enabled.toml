@@ -1,0 +1,57 @@
+# Minimal LLMSpell Configuration with State Persistence
+# This configuration enables state persistence for backup examples
+
+# Default script engine to use
+default_engine = "lua"
+
+# Engine-specific configurations
+[engines.lua]
+stdlib_level = "full"
+sandbox_mode = false
+memory_limit = 52428800
+max_instructions = 1000000
+
+[engines.javascript]
+module_resolution = "node"
+allow_eval = false
+allow_timers = true
+allow_console = true
+memory_limit = 52428800
+max_event_loop_ticks = 10000
+typescript = false
+jsx = false
+
+# No providers configured - tools don't need LLM access
+[providers]
+# Empty section - no providers needed
+
+# Runtime settings
+[runtime]
+max_concurrent_scripts = 10
+script_timeout_seconds = 300
+enable_streaming = true
+
+[runtime.security]
+allow_file_access = true
+allow_network_access = true
+allow_process_spawn = true
+max_memory_bytes = 52428800
+max_execution_time_ms = 300000
+
+# State persistence configuration - REQUIRED for backup functionality
+[runtime.state_persistence]
+enabled = true
+backend_type = "memory"  # Use memory backend for examples
+migration_enabled = true
+backup_on_migration = true
+max_state_size_bytes = 10000000  # 10MB per key
+backup_enabled = true  # Enable backup functionality
+
+[runtime.state_persistence.backup]
+backup_dir = "./examples/backups"
+compression_enabled = true
+compression_type = "zstd"
+compression_level = 3
+incremental_enabled = true
+max_backups = 10
+max_backup_age = 3600  # 1 hour for examples

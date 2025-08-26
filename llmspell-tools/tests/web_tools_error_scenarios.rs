@@ -20,38 +20,44 @@ mod timeout_tests {
 
         // Use unreachable endpoint with 1 second timeout
         let input = create_agent_input(json!({
-            "input": "http://1.2.3.4:9999/test",
-            "timeout": 1
+            "parameters": {
+                "input": "http://1.2.3.4:9999/test",
+                "timeout": 1
+            }
         }))
         .unwrap();
 
         match tool.execute(input, context).await {
             Ok(output) => {
-                println!("{} timeout test: Got response", tool_name);
+                println!("{tool_name} timeout test: Got response");
                 // When using unreachable IPs, we might get "error sending request" instead of "timeout"
                 let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
                 assert!(!output_value["success"].as_bool().unwrap_or(true));
 
-                let error_msg = if let Some(error_str) = output_value["error"].as_str() {
-                    error_str.to_lowercase()
-                } else if let Some(error_obj) = output_value["error"].as_object() {
-                    if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
-                        msg.to_lowercase()
-                    } else {
-                        serde_json::to_string(error_obj)
-                            .unwrap_or_default()
-                            .to_lowercase()
-                    }
-                } else if let Some(result) = output_value.get("result") {
-                    // Some tools put error in result.error
-                    if let Some(err) = result.get("error").and_then(|e| e.as_str()) {
-                        err.to_lowercase()
-                    } else {
-                        "".to_string()
-                    }
-                } else {
-                    "".to_string()
-                };
+                let error_msg = output_value["error"]
+                    .as_str()
+                    .map(str::to_lowercase)
+                    .or_else(|| {
+                        output_value["error"].as_object().and_then(|error_obj| {
+                            error_obj
+                                .get("message")
+                                .and_then(|m| m.as_str())
+                                .map(str::to_lowercase)
+                                .or_else(|| {
+                                    serde_json::to_string(error_obj)
+                                        .ok()
+                                        .map(|s| s.to_lowercase())
+                                })
+                        })
+                    })
+                    .or_else(|| {
+                        output_value
+                            .get("result")
+                            .and_then(|result| result.get("error"))
+                            .and_then(|e| e.as_str())
+                            .map(str::to_lowercase)
+                    })
+                    .unwrap_or_default();
 
                 assert!(
                     error_msg.contains("timeout")
@@ -59,12 +65,11 @@ mod timeout_tests {
                         || error_msg.contains("error sending request")
                         || error_msg.contains("connection")
                         || error_msg.contains("failed to fetch"),
-                    "Expected timeout-related error, got: '{}'",
-                    error_msg
+                    "Expected timeout-related error, got: '{error_msg}'"
                 );
             }
             Err(e) => {
-                println!("{} timeout test: Got error: {}", tool_name, e);
+                println!("{tool_name} timeout test: Got error: {e}");
                 let err_str = e.to_string().to_lowercase();
                 assert!(
                     err_str.contains("timeout")
@@ -76,7 +81,6 @@ mod timeout_tests {
             }
         }
     }
-
     #[tokio::test]
     async fn test_all_tools_timeout() {
         println!("Testing ApiTester timeout...");
@@ -110,31 +114,37 @@ mod invalid_url_tests {
 
         for (url, case_name) in test_cases {
             let input = create_agent_input(json!({
-                "input": url
+                "parameters": {
+                    "input": url
+                }
             }))
             .unwrap();
 
             match tool.execute(input, context.clone()).await {
                 Ok(output) => {
-                    println!("{} {} test: Got response", tool_name, case_name);
+                    println!("{tool_name} {case_name} test: Got response");
                     // Check if it's an error response
                     let output_value: serde_json::Value =
                         serde_json::from_str(&output.text).unwrap();
-                    if !output_value["success"].as_bool().unwrap_or(true) {
+                    if output_value["success"].as_bool() == Some(false) {
                         // It's an error response - check error message
-                        let error_msg = if let Some(error_str) = output_value["error"].as_str() {
-                            error_str.to_lowercase()
-                        } else if let Some(error_obj) = output_value["error"].as_object() {
-                            if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
-                                msg.to_lowercase()
-                            } else {
-                                serde_json::to_string(error_obj)
-                                    .unwrap_or_default()
-                                    .to_lowercase()
-                            }
-                        } else {
-                            "".to_string()
-                        };
+                        let error_msg = output_value["error"]
+                            .as_str()
+                            .map(str::to_lowercase)
+                            .or_else(|| {
+                                output_value["error"].as_object().and_then(|error_obj| {
+                                    error_obj
+                                        .get("message")
+                                        .and_then(|m| m.as_str())
+                                        .map(str::to_lowercase)
+                                        .or_else(|| {
+                                            serde_json::to_string(error_obj)
+                                                .ok()
+                                                .map(|s| s.to_lowercase())
+                                        })
+                                })
+                            })
+                            .unwrap_or_default();
 
                         assert!(
                             error_msg.contains("url")
@@ -143,11 +153,11 @@ mod invalid_url_tests {
                                 || error_msg.contains("builder error")
                         );
                     } else {
-                        panic!("Expected error response, got success: {}", output_value);
+                        panic!("Expected error response, got success: {output_value}")
                     }
                 }
                 Err(e) => {
-                    println!("{} {} test: Got error: {}", tool_name, case_name, e);
+                    println!("{tool_name} {case_name} test: Got error: {e}");
                     let err_str = e.to_string().to_lowercase();
                     assert!(
                         err_str.contains("url")
@@ -159,7 +169,6 @@ mod invalid_url_tests {
             }
         }
     }
-
     #[tokio::test]
     async fn test_all_tools_invalid_urls() {
         test_tool_invalid_url(ApiTesterTool::new(), "ApiTester").await;
@@ -174,7 +183,6 @@ mod invalid_url_tests {
 /// Test network failure scenarios
 mod network_failure_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_dns_resolution_failure() {
         let tools: Vec<(&str, Box<dyn BaseAgent>)> = vec![
@@ -186,7 +194,9 @@ mod network_failure_tests {
         for (name, tool) in tools {
             let context = create_test_context();
             let input = create_agent_input(json!({
-                "input": test_endpoints::INVALID_URL
+                "parameters": {
+                    "input": test_endpoints::INVALID_URL
+                }
             }))
             .unwrap();
 
@@ -195,7 +205,7 @@ mod network_failure_tests {
                     assert_error_output(&output, "error");
                 }
                 Err(e) => {
-                    println!("{} DNS failure: {}", name, e);
+                    println!("{name} DNS failure: {e}");
                     let err_str = e.to_string().to_lowercase();
                     assert!(
                         err_str.contains("error")
@@ -209,7 +219,6 @@ mod network_failure_tests {
             }
         }
     }
-
     #[tokio::test]
     async fn test_connection_refused() {
         // Local port that's likely not in use
@@ -218,7 +227,9 @@ mod network_failure_tests {
         let tool = ApiTesterTool::new();
         let context = create_test_context();
         let input = create_agent_input(json!({
-            "input": refused_url
+            "parameters": {
+                "input": refused_url
+            }
         }))
         .unwrap();
 
@@ -241,16 +252,17 @@ mod network_failure_tests {
 /// Test HTTP error status codes
 mod http_status_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_http_error_statuses() {
-        let statuses = vec![400, 401, 403, 404, 500, 502, 503];
+        let statuses: Vec<u32> = vec![400, 401, 403, 404, 500, 502, 503];
         let tool = ApiTesterTool::new();
 
         for status in statuses {
             let context = create_test_context();
             let input = create_agent_input(json!({
-                "input": format!("{}/{}", test_endpoints::HTTPBIN_STATUS, status)
+                "parameters": {
+                    "input": format!("{}/{}", test_endpoints::HTTPBIN_STATUS, status)
+                }
             }))
             .unwrap();
 
@@ -261,12 +273,12 @@ mod http_status_tests {
                     if e.to_string().contains("error sending request")
                         || e.to_string().contains("Connection refused")
                     {
-                        eprintln!("Warning: Network error testing status {}: {}", status, e);
+                        eprintln!("Warning: Network error testing status {status}: {e}");
                         eprintln!("This indicates httpbin.org is temporarily unavailable - skipping this status code");
                         continue;
                     }
                     // If it's not a network error, still fail the test
-                    panic!("Unexpected error testing status {}: {}", status, e);
+                    panic!("Unexpected error testing status {status}: {e}");
                 }
             };
 
@@ -281,12 +293,12 @@ mod http_status_tests {
 
             // If we get 503, it means httpbin.org is down/overloaded - skip the specific assertion
             if actual_status == 503 {
-                eprintln!("Warning: httpbin.org returned 503 (Service Unavailable) instead of expected {}", status);
+                eprintln!("Warning: httpbin.org returned 503 (Service Unavailable) instead of expected {status}");
                 eprintln!("This indicates the external service is temporarily unavailable - skipping specific status assertion");
                 continue; // Skip to next status code
             }
 
-            assert_eq!(actual_status, status as u64);
+            assert_eq!(actual_status, u64::from(status));
         }
     }
 }
@@ -294,7 +306,6 @@ mod http_status_tests {
 /// Test rate limiting integration
 mod rate_limit_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_rapid_requests() {
         let _tool = ApiTesterTool::new();
@@ -305,7 +316,9 @@ mod rate_limit_tests {
         for i in 0..5 {
             let context = create_test_context();
             let input = create_agent_input(json!({
-                "input": format!("{}/get?request={}", test_endpoints::HTTPBIN_BASE, i)
+                "parameters": {
+                    "input": format!("{}/get?request={}", test_endpoints::HTTPBIN_BASE, i)
+                }
             }))
             .unwrap();
 
@@ -333,7 +346,6 @@ mod rate_limit_tests {
 /// Test input validation edge cases
 mod input_validation_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_missing_required_parameters() {
         let tool = ApiTesterTool::new();
@@ -341,14 +353,15 @@ mod input_validation_tests {
 
         // Missing "input" parameter
         let input = create_agent_input(json!({
-            "method": "GET"
+            "parameters": {
+                "method": "GET"
+            }
         }))
         .unwrap();
 
         let result = tool.execute(input, context).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_invalid_parameter_types() {
         let tool = ApiTesterTool::new();
@@ -356,15 +369,16 @@ mod input_validation_tests {
 
         // Invalid timeout type (string instead of number)
         let input = create_agent_input(json!({
-            "input": test_endpoints::HTTPBIN_GET,
-            "timeout": "not a number"
+            "parameters": {
+                "input": test_endpoints::HTTPBIN_GET,
+                "timeout": "not a number"
+            }
         }))
         .unwrap();
 
         // Should either handle gracefully or error
         let _ = tool.execute(input, context).await;
     }
-
     #[tokio::test]
     async fn test_extremely_long_urls() {
         let tool = UrlAnalyzerTool::new();
@@ -373,7 +387,9 @@ mod input_validation_tests {
         // Create a very long URL
         let long_param = "x".repeat(10000);
         let input = create_agent_input(json!({
-            "input": format!("https://example.com/?param={}", long_param)
+            "parameters": {
+                "input": format!("https://example.com/?param={}", long_param)
+            }
         }))
         .unwrap();
 

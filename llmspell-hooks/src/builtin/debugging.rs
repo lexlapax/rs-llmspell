@@ -78,7 +78,9 @@ impl TraceStorage {
 
         // Only add if it meets duration threshold
         if let Some(duration) = trace.execution_duration {
-            if duration < self.config.min_duration_ms as f64 {
+            #[allow(clippy::cast_precision_loss)]
+            let min_duration_f64 = self.config.min_duration_ms as f64;
+            if duration < min_duration_f64 {
                 return;
             }
         }
@@ -199,7 +201,9 @@ impl TraceStorage {
             let mut duration_stats = serde_json::Map::new();
 
             let sum: f64 = durations.iter().sum();
-            let mean = sum / durations.len() as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let len_f64 = durations.len() as f64;
+            let mean = sum / len_f64;
 
             let mut sorted_durations = durations.clone();
             sorted_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -442,6 +446,7 @@ impl MetricHook for DebuggingHook {
         duration: std::time::Duration,
     ) -> Result<()> {
         // Create final trace with execution duration
+        #[allow(clippy::cast_precision_loss)]
         let execution_duration = duration.as_millis() as f64;
         let mut trace = self.create_trace(context, Some(execution_duration));
 
@@ -470,218 +475,6 @@ impl MetricHook for DebuggingHook {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{ComponentId, ComponentType, HookPoint};
-    use serde_json::json;
-
-    #[tokio::test]
-    async fn test_debugging_hook_basic() {
-        let hook = DebuggingHook::new();
-        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
-        let mut context = HookContext::new(HookPoint::SystemStartup, component_id);
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-
-        // Check that debug metadata was added
-        assert!(context.get_metadata("debug_traced_at").is_some());
-        assert!(context.get_metadata("debug_hook_version").is_some());
-        assert!(context.get_metadata("debug_correlation_id").is_some());
-
-        // Check that trace was recorded
-        let traces = hook.get_traces();
-        assert_eq!(traces.len(), 1);
-        assert_eq!(traces[0].hook_point, HookPoint::SystemStartup);
-    }
-
-    #[tokio::test]
-    async fn test_debugging_hook_with_context_data() {
-        let hook = DebuggingHook::new();
-        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
-        let mut context = HookContext::new(HookPoint::BeforeAgentExecution, component_id);
-
-        // Add test data
-        context.insert_data("test_key".to_string(), json!("test_value"));
-        context.insert_metadata("test_meta".to_string(), "meta_value".to_string());
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-
-        let traces = hook.get_traces();
-        assert_eq!(traces.len(), 1);
-
-        let trace = &traces[0];
-        assert_eq!(trace.component_name, "test-agent");
-        assert!(trace.context_data.is_object());
-        assert!(trace.metadata.contains_key("test_meta"));
-    }
-
-    #[test]
-    fn test_debugging_config() {
-        let config = DebuggingConfig {
-            capture_stack_traces: false,
-            include_context_data: false,
-            min_duration_ms: 100,
-            ..Default::default()
-        };
-
-        let hook = DebuggingHook::with_config(config);
-        assert_eq!(hook.storage.config.min_duration_ms, 100);
-        assert!(!hook.storage.config.capture_stack_traces);
-        assert!(!hook.storage.config.include_context_data);
-    }
-
-    #[test]
-    fn test_trace_storage_filtering() {
-        let storage = TraceStorage::new(DebuggingConfig::default());
-
-        // Add test traces
-        let trace1 = DebugTrace {
-            timestamp: Utc::now(),
-            hook_point: HookPoint::SystemStartup,
-            component_name: "test1".to_string(),
-            component_type: "System".to_string(),
-            language: "Native".to_string(),
-            correlation_id: "test-id-1".to_string(),
-            context_data: serde_json::Value::Null,
-            metadata: HashMap::new(),
-            stack_trace: None,
-            execution_duration: Some(50.0),
-        };
-
-        let trace2 = DebugTrace {
-            timestamp: Utc::now(),
-            hook_point: HookPoint::BeforeAgentInit,
-            component_name: "test2".to_string(),
-            component_type: "Agent".to_string(),
-            language: "Native".to_string(),
-            correlation_id: "test-id-2".to_string(),
-            context_data: serde_json::Value::Null,
-            metadata: HashMap::new(),
-            stack_trace: None,
-            execution_duration: Some(150.0),
-        };
-
-        storage.add_trace(trace1);
-        storage.add_trace(trace2);
-
-        // Test filtering by hook point
-        let system_traces = storage.get_traces_for_hook_point(&HookPoint::SystemStartup);
-        assert_eq!(system_traces.len(), 1);
-        assert_eq!(system_traces[0].component_name, "test1");
-
-        // Test filtering by component
-        let test2_traces = storage.get_traces_for_component("test2");
-        assert_eq!(test2_traces.len(), 1);
-        assert_eq!(test2_traces[0].hook_point, HookPoint::BeforeAgentInit);
-    }
-
-    #[test]
-    fn test_trace_statistics() {
-        let storage = TraceStorage::new(DebuggingConfig::default());
-
-        // Add multiple traces with different characteristics
-        for i in 0..5 {
-            let trace = DebugTrace {
-                timestamp: Utc::now(),
-                hook_point: if i % 2 == 0 {
-                    HookPoint::SystemStartup
-                } else {
-                    HookPoint::BeforeAgentInit
-                },
-                component_name: format!("test{}", i),
-                component_type: if i % 2 == 0 {
-                    "System".to_string()
-                } else {
-                    "Agent".to_string()
-                },
-                language: "Native".to_string(),
-                correlation_id: format!("test-id-{}", i),
-                context_data: serde_json::Value::Null,
-                metadata: HashMap::new(),
-                stack_trace: None,
-                execution_duration: Some((i + 1) as f64 * 10.0),
-            };
-            storage.add_trace(trace);
-        }
-
-        let stats = storage.get_statistics();
-
-        assert_eq!(stats.get("total_traces").unwrap().as_u64().unwrap(), 5);
-        assert!(stats.contains_key("by_hook_point"));
-        assert!(stats.contains_key("by_component_type"));
-        assert!(stats.contains_key("duration_stats"));
-    }
-
-    #[tokio::test]
-    async fn test_metric_hook_trait() {
-        let hook = DebuggingHook::new();
-        let component_id = ComponentId::new(ComponentType::Tool, "test-tool".to_string());
-        let context = HookContext::new(HookPoint::BeforeToolExecution, component_id);
-
-        // Test MetricHook implementation
-        hook.record_pre_execution(&context).await.unwrap();
-
-        let result = HookResult::Continue;
-        hook.record_post_execution(&context, &result, std::time::Duration::from_millis(25))
-            .await
-            .unwrap();
-
-        // Verify traces were recorded
-        let traces = hook.get_traces();
-        assert!(traces.len() >= 2); // At least pre and post execution traces
-    }
-
-    #[test]
-    fn test_max_traces_limit() {
-        let config = DebuggingConfig {
-            max_traces: 3,
-            ..Default::default()
-        };
-        let storage = TraceStorage::new(config);
-
-        // Add more traces than the limit
-        for i in 0..5 {
-            let trace = DebugTrace {
-                timestamp: Utc::now(),
-                hook_point: HookPoint::SystemStartup,
-                component_name: format!("test{}", i),
-                component_type: "System".to_string(),
-                language: "Native".to_string(),
-                correlation_id: format!("test-id-{}", i),
-                context_data: serde_json::Value::Null,
-                metadata: HashMap::new(),
-                stack_trace: None,
-                execution_duration: Some(10.0),
-            };
-            storage.add_trace(trace);
-        }
-
-        let traces = storage.get_traces();
-        assert_eq!(traces.len(), 3); // Should be limited to max_traces
-
-        // Should contain the last 3 traces (test2, test3, test4)
-        assert_eq!(traces[0].component_name, "test2");
-        assert_eq!(traces[1].component_name, "test3");
-        assert_eq!(traces[2].component_name, "test4");
-    }
-
-    #[test]
-    fn test_hook_metadata() {
-        let hook = DebuggingHook::new();
-        let metadata = hook.metadata();
-
-        assert_eq!(metadata.name, "DebuggingHook");
-        assert!(metadata.description.is_some());
-        assert_eq!(metadata.priority, Priority::LOWEST);
-        assert_eq!(metadata.language, Language::Native);
-        assert!(metadata.tags.contains(&"builtin".to_string()));
-        assert!(metadata.tags.contains(&"debugging".to_string()));
-    }
-}
-
 #[async_trait]
 impl ReplayableHook for DebuggingHook {
     fn is_replayable(&self) -> bool {
@@ -706,9 +499,12 @@ impl ReplayableHook for DebuggingHook {
             "average_duration": if traces.is_empty() {
                 0.0
             } else {
-                traces.iter()
+                let durations: Vec<f64> = traces.iter()
                     .filter_map(|t| t.execution_duration)
-                    .sum::<f64>() / traces.len() as f64
+                    .collect();
+                #[allow(clippy::cast_precision_loss)]
+                let len_f64 = traces.len() as f64;
+                durations.iter().sum::<f64>() / len_f64
             },
             "component_types": traces.iter().map(|t| &t.component_type).collect::<std::collections::HashSet<_>>(),
             "languages": traces.iter().map(|t| &t.language).collect::<std::collections::HashSet<_>>(),
@@ -758,5 +554,209 @@ impl ReplayableHook for DebuggingHook {
 
     fn replay_id(&self) -> String {
         format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ComponentId, ComponentType, HookPoint};
+    use serde_json::json;
+    #[tokio::test]
+    async fn test_debugging_hook_basic() {
+        let hook = DebuggingHook::new();
+        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
+        let mut context = HookContext::new(HookPoint::SystemStartup, component_id);
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+
+        // Check that debug metadata was added
+        assert!(context.get_metadata("debug_traced_at").is_some());
+        assert!(context.get_metadata("debug_hook_version").is_some());
+        assert!(context.get_metadata("debug_correlation_id").is_some());
+
+        // Check that trace was recorded
+        let traces = hook.get_traces();
+        assert_eq!(traces.len(), 1);
+        assert_eq!(traces[0].hook_point, HookPoint::SystemStartup);
+    }
+    #[tokio::test]
+    async fn test_debugging_hook_with_context_data() {
+        let hook = DebuggingHook::new();
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        let mut context = HookContext::new(HookPoint::BeforeAgentExecution, component_id);
+
+        // Add test data
+        context.insert_data("test_key".to_string(), json!("test_value"));
+        context.insert_metadata("test_meta".to_string(), "meta_value".to_string());
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+
+        let traces = hook.get_traces();
+        assert_eq!(traces.len(), 1);
+
+        let trace = &traces[0];
+        assert_eq!(trace.component_name, "test-agent");
+        assert!(trace.context_data.is_object());
+        assert!(trace.metadata.contains_key("test_meta"));
+    }
+    #[test]
+    fn test_debugging_config() {
+        let config = DebuggingConfig {
+            capture_stack_traces: false,
+            include_context_data: false,
+            min_duration_ms: 100,
+            ..Default::default()
+        };
+
+        let hook = DebuggingHook::with_config(config);
+        assert_eq!(hook.storage.config.min_duration_ms, 100);
+        assert!(!hook.storage.config.capture_stack_traces);
+        assert!(!hook.storage.config.include_context_data);
+    }
+    #[test]
+    fn test_trace_storage_filtering() {
+        let storage = TraceStorage::new(DebuggingConfig::default());
+
+        // Add test traces
+        let trace1 = DebugTrace {
+            timestamp: Utc::now(),
+            hook_point: HookPoint::SystemStartup,
+            component_name: "test1".to_string(),
+            component_type: "System".to_string(),
+            language: "Native".to_string(),
+            correlation_id: "test-id-1".to_string(),
+            context_data: serde_json::Value::Null,
+            metadata: HashMap::new(),
+            stack_trace: None,
+            execution_duration: Some(50.0),
+        };
+
+        let trace2 = DebugTrace {
+            timestamp: Utc::now(),
+            hook_point: HookPoint::BeforeAgentInit,
+            component_name: "test2".to_string(),
+            component_type: "Agent".to_string(),
+            language: "Native".to_string(),
+            correlation_id: "test-id-2".to_string(),
+            context_data: serde_json::Value::Null,
+            metadata: HashMap::new(),
+            stack_trace: None,
+            execution_duration: Some(150.0),
+        };
+
+        storage.add_trace(trace1);
+        storage.add_trace(trace2);
+
+        // Test filtering by hook point
+        let system_traces = storage.get_traces_for_hook_point(&HookPoint::SystemStartup);
+        assert_eq!(system_traces.len(), 1);
+        assert_eq!(system_traces[0].component_name, "test1");
+
+        // Test filtering by component
+        let test2_traces = storage.get_traces_for_component("test2");
+        assert_eq!(test2_traces.len(), 1);
+        assert_eq!(test2_traces[0].hook_point, HookPoint::BeforeAgentInit);
+    }
+    #[test]
+    fn test_trace_statistics() {
+        let storage = TraceStorage::new(DebuggingConfig::default());
+
+        // Add multiple traces with different characteristics
+        for i in 0..5 {
+            let trace = DebugTrace {
+                timestamp: Utc::now(),
+                hook_point: if i % 2 == 0 {
+                    HookPoint::SystemStartup
+                } else {
+                    HookPoint::BeforeAgentInit
+                },
+                component_name: format!("test{}", i),
+                component_type: if i % 2 == 0 {
+                    "System".to_string()
+                } else {
+                    "Agent".to_string()
+                },
+                language: "Native".to_string(),
+                correlation_id: format!("test-id-{}", i),
+                context_data: serde_json::Value::Null,
+                metadata: HashMap::new(),
+                stack_trace: None,
+                execution_duration: Some((i + 1) as f64 * 10.0),
+            };
+            storage.add_trace(trace);
+        }
+
+        let stats = storage.get_statistics();
+
+        assert_eq!(stats.get("total_traces").unwrap().as_u64().unwrap(), 5);
+        assert!(stats.contains_key("by_hook_point"));
+        assert!(stats.contains_key("by_component_type"));
+        assert!(stats.contains_key("duration_stats"));
+    }
+    #[tokio::test]
+    async fn test_metric_hook_trait() {
+        let hook = DebuggingHook::new();
+        let component_id = ComponentId::new(ComponentType::Tool, "test-tool".to_string());
+        let context = HookContext::new(HookPoint::BeforeToolExecution, component_id);
+
+        // Test MetricHook implementation
+        hook.record_pre_execution(&context).await.unwrap();
+
+        let result = HookResult::Continue;
+        hook.record_post_execution(&context, &result, std::time::Duration::from_millis(25))
+            .await
+            .unwrap();
+
+        // Verify traces were recorded
+        let traces = hook.get_traces();
+        assert!(traces.len() >= 2); // At least pre and post execution traces
+    }
+    #[test]
+    fn test_max_traces_limit() {
+        let config = DebuggingConfig {
+            max_traces: 3,
+            ..Default::default()
+        };
+        let storage = TraceStorage::new(config);
+
+        // Add more traces than the limit
+        for i in 0..5 {
+            let trace = DebugTrace {
+                timestamp: Utc::now(),
+                hook_point: HookPoint::SystemStartup,
+                component_name: format!("test{}", i),
+                component_type: "System".to_string(),
+                language: "Native".to_string(),
+                correlation_id: format!("test-id-{}", i),
+                context_data: serde_json::Value::Null,
+                metadata: HashMap::new(),
+                stack_trace: None,
+                execution_duration: Some(10.0),
+            };
+            storage.add_trace(trace);
+        }
+
+        let traces = storage.get_traces();
+        assert_eq!(traces.len(), 3); // Should be limited to max_traces
+
+        // Should contain the last 3 traces (test2, test3, test4)
+        assert_eq!(traces[0].component_name, "test2");
+        assert_eq!(traces[1].component_name, "test3");
+        assert_eq!(traces[2].component_name, "test4");
+    }
+    #[test]
+    fn test_hook_metadata() {
+        let hook = DebuggingHook::new();
+        let metadata = hook.metadata();
+
+        assert_eq!(metadata.name, "DebuggingHook");
+        assert!(metadata.description.is_some());
+        assert_eq!(metadata.priority, Priority::LOWEST);
+        assert_eq!(metadata.language, Language::Native);
+        assert!(metadata.tags.contains(&"builtin".to_string()));
+        assert!(metadata.tags.contains(&"debugging".to_string()));
     }
 }

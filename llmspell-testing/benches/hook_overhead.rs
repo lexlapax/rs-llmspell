@@ -1,6 +1,8 @@
 // ABOUTME: Performance test for hook system overhead measurement
 // ABOUTME: Validates <5% overhead requirement across agent operations
 
+// Benchmark file
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_agents::testing::mocks::{MockAgent, MockAgentConfig};
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
@@ -159,7 +161,11 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
         let with_hooks = start.elapsed();
 
         let overhead_ns = with_hooks.as_nanos().saturating_sub(baseline.as_nanos());
-        let overhead_percent = (overhead_ns as f64 / baseline.as_nanos() as f64) * 100.0;
+        #[allow(clippy::cast_precision_loss)]
+        let overhead_ns_f64 = overhead_ns as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let baseline_ns_f64 = baseline.as_nanos() as f64;
+        let overhead_percent = (overhead_ns_f64 / baseline_ns_f64) * 100.0;
 
         println!("Baseline execution: {:?}", baseline);
         println!("With simulated hooks: {:?}", with_hooks);
@@ -195,8 +201,11 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
         let hook_only_overhead_ns = hook_operations
             .as_nanos()
             .saturating_sub(hook_baseline.as_nanos());
-        let hook_only_overhead_percent =
-            (hook_only_overhead_ns as f64 / hook_baseline.as_nanos() as f64) * 100.0;
+        #[allow(clippy::cast_precision_loss)]
+        let hook_overhead_ns_f64 = hook_only_overhead_ns as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let hook_baseline_ns_f64 = hook_baseline.as_nanos() as f64;
+        let hook_only_overhead_percent = (hook_overhead_ns_f64 / hook_baseline_ns_f64) * 100.0;
 
         println!("Hook baseline: {:?}", hook_baseline);
         println!("Hook operations: {:?}", hook_operations);

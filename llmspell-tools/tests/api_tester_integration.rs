@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for ApiTesterTool
+//! ABOUTME: Integration tests for `ApiTesterTool`
 //! ABOUTME: Tests REST API testing functionality with real HTTP endpoints
 
 mod common;
@@ -7,7 +7,6 @@ use common::*;
 use llmspell_core::BaseAgent;
 use llmspell_tools::ApiTesterTool;
 use serde_json::json;
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_get_request() {
@@ -38,12 +37,11 @@ async fn test_api_tester_get_request() {
             assert_eq!(headers["User-Agent"], "llmspell-test");
         }
         Err(e) => {
-            eprintln!("Warning: API GET test failed due to network issue: {}", e);
+            eprintln!("Warning: API GET test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
         }
     }
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_post_request() {
@@ -81,12 +79,11 @@ async fn test_api_tester_post_request() {
             assert_eq!(json_data["email"], "test@example.com");
         }
         Err(e) => {
-            eprintln!("Warning: API POST test failed due to network issue: {}", e);
+            eprintln!("Warning: API POST test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
         }
     }
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_status_codes() {
@@ -94,7 +91,7 @@ async fn test_api_tester_status_codes() {
 
     // Test various status codes
     let mut successful_tests = 0;
-    for status_code in [200, 201, 400, 404, 500] {
+    for status_code in [200u32, 201, 400, 404, 500] {
         let context = create_test_context();
         let input = create_agent_input(json!({
             "input": format!("{}/{}", test_endpoints::HTTPBIN_STATUS, status_code),
@@ -105,7 +102,7 @@ async fn test_api_tester_status_codes() {
         let output = match tool.execute(input, context).await {
             Ok(output) => output,
             Err(e) => {
-                eprintln!("Warning: API test failed for status {}: {}", status_code, e);
+                eprintln!("Warning: API test failed for status {status_code}: {e}");
                 eprintln!("This is likely due to httpbin.org being unavailable");
                 continue;
             }
@@ -136,10 +133,8 @@ async fn test_api_tester_status_codes() {
 
         assert_eq!(
             actual_status,
-            Some(status_code as u64),
-            "Status code mismatch for {}: got {:?}",
-            status_code,
-            actual_status
+            Some(u64::from(status_code)),
+            "Status code mismatch for {status_code}: got {actual_status:?}"
         );
         successful_tests += 1;
     }
@@ -147,11 +142,9 @@ async fn test_api_tester_status_codes() {
     // Ensure at least some tests passed (httpbin.org might be completely down)
     assert!(
         successful_tests >= 2,
-        "Too few successful tests ({}/5) - httpbin.org may be having issues",
-        successful_tests
+        "Too few successful tests ({successful_tests}/5) - httpbin.org may be having issues"
     );
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration,slow"]
 async fn test_api_tester_timeout() {
@@ -181,7 +174,6 @@ async fn test_api_tester_timeout() {
         }
     }
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_invalid_url() {
@@ -199,7 +191,6 @@ async fn test_api_tester_invalid_url() {
     let error = result.unwrap_err();
     assert!(error.to_string().contains("URL validation failed"));
 }
-
 #[tokio::test]
 #[ignore = "tool,integration"]
 async fn test_api_tester_network_error() {
@@ -224,7 +215,6 @@ async fn test_api_tester_network_error() {
         }
     }
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_all_http_methods() {
@@ -251,9 +241,7 @@ async fn test_api_tester_all_http_methods() {
                         .unwrap_or(0);
                     assert!(
                         status == 200 || status == 405,
-                        "Unexpected status {} for method {}",
-                        status,
-                        method
+                        "Unexpected status {status} for method {method}"
                     );
                 } else {
                     eprintln!(
@@ -263,16 +251,12 @@ async fn test_api_tester_all_http_methods() {
                 }
             }
             Err(e) => {
-                eprintln!(
-                    "Warning: HTTP {} test failed due to network issue: {}",
-                    method, e
-                );
+                eprintln!("Warning: HTTP {method} test failed due to network issue: {e}");
                 eprintln!("This is likely due to httpbin.org being unavailable");
             }
         }
     }
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_response_time_measurement() {
@@ -297,10 +281,7 @@ async fn test_api_tester_response_time_measurement() {
             assert!(response_time < 30000); // Less than 30 seconds (accounting for network latency)
         }
         Err(e) => {
-            eprintln!(
-                "Warning: API response time test failed due to network issue: {}",
-                e
-            );
+            eprintln!("Warning: API response time test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
         }
     }

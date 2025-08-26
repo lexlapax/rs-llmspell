@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WebScraperTool
+//! ABOUTME: Integration tests for `WebScraperTool`
 //! ABOUTME: Tests web scraping functionality with real websites
 
 mod common;
@@ -7,7 +7,6 @@ use common::*;
 use llmspell_core::BaseAgent;
 use llmspell_tools::WebScraperTool;
 use serde_json::json;
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_basic() {
@@ -26,14 +25,13 @@ async fn test_web_scraper_basic() {
     assert_success_output(&output, &["operation", "result"]);
 
     let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-    let content = &output_value["result"]["content"];
+    let basic_content = &output_value["result"]["content"];
 
     // Example.com should have these basic elements
-    assert!(content["title"].as_str().unwrap().contains("Example"));
-    assert!(!content["text"].as_str().unwrap().is_empty());
-    assert!(content["links"].is_array());
+    assert!(basic_content["title"].as_str().unwrap().contains("Example"));
+    assert!(!basic_content["text"].as_str().unwrap().is_empty());
+    assert!(basic_content["links"].is_array());
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_selectors() {
@@ -51,12 +49,11 @@ async fn test_web_scraper_selectors() {
     assert_success_output(&output, &["operation", "result"]);
 
     let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-    let content = &output_value["result"]["content"];
+    let selector_content = &output_value["result"]["content"];
 
     // Should extract h1 content
-    assert!(content["selected_content"].is_array());
+    assert!(selector_content["selected_content"].is_array());
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_metadata() {
@@ -74,12 +71,11 @@ async fn test_web_scraper_metadata() {
     assert_success_output(&output, &["operation", "result"]);
 
     let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-    let content = &output_value["result"]["content"];
+    let metadata_content = &output_value["result"]["content"];
 
     // Should have metadata
-    assert!(content["metadata"].is_object() || content["meta_tags"].is_object());
+    assert!(metadata_content["metadata"].is_object() || metadata_content["meta_tags"].is_object());
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_httpbin_html() {
@@ -97,16 +93,15 @@ async fn test_web_scraper_httpbin_html() {
     assert_success_output(&output, &["operation", "result"]);
 
     let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
-    let content = &output_value["result"]["content"];
+    let httpbin_content = &output_value["result"]["content"];
 
     // httpbin.org/html returns a sample HTML page
-    assert!(content["text"]
+    assert!(httpbin_content["text"]
         .as_str()
         .unwrap()
         .contains("Herman Melville"));
-    assert!(content["links"].is_array());
+    assert!(httpbin_content["links"].is_array());
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_invalid_url() {
@@ -123,7 +118,6 @@ async fn test_web_scraper_invalid_url() {
     let error = result.unwrap_err();
     assert!(error.to_string().contains("Invalid URL"));
 }
-
 #[tokio::test]
 #[ignore = "tool,integration"]
 async fn test_web_scraper_network_error() {
@@ -146,7 +140,6 @@ async fn test_web_scraper_network_error() {
         }
     }
 }
-
 #[tokio::test]
 #[ignore = "external,tool,integration,slow"]
 async fn test_web_scraper_timeout() {

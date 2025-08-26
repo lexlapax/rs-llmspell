@@ -3,11 +3,14 @@
 
 pub mod agent_global;
 pub mod artifact_global;
+pub mod config_global;
 pub mod core;
+pub mod debug_global;
 pub mod event_global;
 pub mod hook_global;
 pub mod injection;
 pub mod json_global;
+pub mod provider_global;
 pub mod registry;
 pub mod replay_global;
 pub mod session_global;
@@ -15,6 +18,7 @@ pub mod session_infrastructure;
 pub mod state_global;
 pub mod state_infrastructure;
 pub mod streaming_global;
+pub mod tool_api_standard;
 pub mod tool_global;
 pub mod types;
 pub mod workflow_global;
@@ -28,6 +32,12 @@ use llmspell_core::Result;
 use std::sync::Arc;
 
 /// Initialize the standard global registry with all core globals
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Global registration fails
+/// - Registry building fails
 pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalRegistry> {
     let mut builder = GlobalRegistryBuilder::new();
 
@@ -36,9 +46,12 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     builder.register(Arc::new(core::LoggerGlobal::new()));
     builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
 
+    // Register Debug global for unified debugging infrastructure
+    builder.register(Arc::new(debug_global::DebugGlobal::new()));
+
     // Create StateGlobal with migration support if configured
     let state_global = if let Some(runtime_config) =
-        context.get_bridge::<crate::runtime::RuntimeConfig>("runtime_config")
+        context.get_bridge::<llmspell_config::LLMSpellConfig>("runtime_config")
     {
         if runtime_config.runtime.state_persistence.enabled {
             // Initialize state infrastructure
@@ -93,7 +106,7 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     }
 
     // Create HookBridge for hook system integration
-    let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone()).await?);
+    let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone())?);
     builder.register(Arc::new(hook_global::HookGlobal::new(hook_bridge.clone())));
 
     // Register replay global for hook debugging
@@ -101,6 +114,11 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
 
     builder.register(Arc::new(tool_global::ToolGlobal::new(
         context.registry.clone(),
+    )));
+
+    // Register Provider global for LLM provider information
+    builder.register(Arc::new(provider_global::ProviderGlobal::new(
+        context.providers.clone(),
     )));
 
     // Create agent global with state manager if available
@@ -118,9 +136,19 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     };
     builder.register(Arc::new(agent_global));
 
-    builder.register(Arc::new(workflow_global::WorkflowGlobal::new(
-        context.registry.clone(),
-    )));
+    // Create workflow global with state manager if available
+    let workflow_global = context
+        .get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
+        .map_or_else(
+            || workflow_global::WorkflowGlobal::new(context.registry.clone()),
+            |state_manager| {
+                workflow_global::WorkflowGlobal::with_state_manager(
+                    context.registry.clone(),
+                    state_manager,
+                )
+            },
+        );
+    builder.register(Arc::new(workflow_global));
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 

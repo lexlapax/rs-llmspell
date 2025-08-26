@@ -36,6 +36,7 @@ impl Default for WebhookCallerTool {
 }
 
 impl WebhookCallerTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -117,10 +118,15 @@ impl BaseAgent for WebhookCallerTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("WebhookCaller error: {}", error)))
+        Ok(AgentOutput::text(format!("WebhookCaller error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    #[allow(clippy::too_many_lines)]
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let payload = extract_optional_object(params, "payload");
@@ -128,6 +134,7 @@ impl BaseAgent for WebhookCallerTool {
         let method = extract_optional_string(params, "method")
             .unwrap_or("POST")
             .to_uppercase();
+        #[allow(clippy::cast_possible_truncation)]
         let max_retries = extract_optional_u64(params, "max_retries").unwrap_or(3) as u32;
         let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
 
@@ -135,7 +142,7 @@ impl BaseAgent for WebhookCallerTool {
         let ssrf_protector = SsrfProtector::new();
         if let Err(e) = ssrf_protector.validate_url(url) {
             return Err(validation_error(
-                format!("URL validation failed: {}", e),
+                format!("URL validation failed: {e}"),
                 Some("input".to_string()),
             ));
         }
@@ -161,7 +168,6 @@ impl BaseAgent for WebhookCallerTool {
 
             let mut request = match method.as_str() {
                 "GET" => client.get(url),
-                "POST" => client.post(url),
                 "PUT" => client.put(url),
                 "DELETE" => client.delete(url),
                 "PATCH" => client.patch(url),
@@ -211,19 +217,20 @@ impl BaseAgent for WebhookCallerTool {
                     let body_json: Option<Value> = serde_json::from_str(&body_text).ok();
 
                     let mut headers_map = serde_json::Map::new();
-                    for (name, value) in response_headers.iter() {
+                    for (name, value) in &response_headers {
                         if let Ok(val) = value.to_str() {
                             headers_map.insert(name.to_string(), json!(val));
                         }
                     }
 
+                    let body_value = body_json.clone().unwrap_or_else(|| json!(body_text));
                     let result = json!({
                         "success": status.is_success(),
                         "webhook_url": url,
                         "status_code": status.as_u16(),
                         "status_text": status.canonical_reason().unwrap_or("Unknown"),
                         "response": {
-                            "body": body_json.as_ref().unwrap_or(&json!(body_text)),
+                            "body": body_value,
                             "json": body_json,
                             "headers": headers_map,
                             "body_is_json": body_json.is_some(),
@@ -252,8 +259,8 @@ impl BaseAgent for WebhookCallerTool {
                         break;
                     }
 
-                    if attempt < max_retries {
-                        continue;
+                    if attempt >= max_retries {
+                        break;
                     }
                 }
             }

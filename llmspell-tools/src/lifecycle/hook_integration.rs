@@ -18,13 +18,31 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
 
+/// Hook execution features configuration
+#[derive(Debug, Clone, Default)]
+pub struct HookFeatures {
+    /// Enable hook execution (can be disabled for performance)
+    pub hooks_enabled: bool,
+    /// Enable circuit breaker protection
+    pub circuit_breaker_enabled: bool,
+    /// Enable security-level validation for hooks
+    pub security_validation_enabled: bool,
+}
+
+/// Audit logging configuration
+#[derive(Debug, Clone, Default)]
+pub struct AuditConfig {
+    /// Enable comprehensive audit logging
+    pub enabled: bool,
+    /// Audit log sensitive parameters (be careful with secrets)
+    pub log_parameters: bool,
+}
+
 /// Configuration for tool lifecycle hook integration
 #[derive(Debug, Clone)]
 pub struct ToolLifecycleConfig {
-    /// Enable hook execution (can be disabled for performance)
-    pub enable_hooks: bool,
-    /// Enable circuit breaker protection
-    pub enable_circuit_breaker: bool,
+    /// Hook features configuration
+    pub features: HookFeatures,
     /// Maximum time allowed for hook execution
     pub max_hook_execution_time: Duration,
     /// Resource limits for tool execution including hooks
@@ -32,29 +50,29 @@ pub struct ToolLifecycleConfig {
     /// Circuit breaker configuration
     pub circuit_breaker_failure_threshold: u32,
     pub circuit_breaker_recovery_time: Duration,
-    /// Enable security-level validation for hooks
-    pub enable_security_validation: bool,
     /// Maximum security level allowed for hook execution
     pub max_security_level: SecurityLevel,
-    /// Enable comprehensive audit logging
-    pub enable_audit_logging: bool,
-    /// Audit log sensitive parameters (be careful with secrets)
-    pub audit_log_parameters: bool,
+    /// Audit logging configuration
+    pub audit: AuditConfig,
 }
 
 impl Default for ToolLifecycleConfig {
     fn default() -> Self {
         Self {
-            enable_hooks: true,
-            enable_circuit_breaker: true,
+            features: HookFeatures {
+                hooks_enabled: true,
+                circuit_breaker_enabled: true,
+                security_validation_enabled: true,
+            },
             max_hook_execution_time: Duration::from_millis(100), // 100ms max for hooks
             resource_limits: ResourceLimits::default(),
             circuit_breaker_failure_threshold: 5,
             circuit_breaker_recovery_time: Duration::from_secs(30),
-            enable_security_validation: true,
             max_security_level: SecurityLevel::Privileged, // Allow all security levels by default
-            enable_audit_logging: true,
-            audit_log_parameters: false, // Don't log parameters by default to avoid leaking secrets
+            audit: AuditConfig {
+                enabled: true,
+                log_parameters: false, // Don't log parameters by default to avoid leaking secrets
+            },
         }
     }
 }
@@ -95,6 +113,7 @@ pub enum ToolExecutionPhase {
 
 impl ToolHookContext {
     /// Create a new tool hook context
+    #[must_use]
     pub fn new(
         component_id: ComponentId,
         tool_metadata: ComponentMetadata,
@@ -135,31 +154,35 @@ impl ToolHookContext {
     }
 
     /// Set input parameters (for pre-execution hooks)
+    #[must_use]
     pub fn with_input_parameters(mut self, parameters: JsonValue) -> Self {
         self.input_parameters = Some(parameters);
         self
     }
 
     /// Set execution success flag (for post-execution hooks)
-    pub fn with_execution_success(mut self, success: bool) -> Self {
+    #[must_use]
+    pub const fn with_execution_success(mut self, success: bool) -> Self {
         self.execution_success = Some(success);
         self
     }
 
     /// Add resource metrics
+    #[must_use]
     pub fn with_resource_metrics(mut self, metrics: HashMap<String, JsonValue>) -> Self {
         self.resource_metrics = metrics;
         self
     }
 
-    /// Add resource metrics from ResourceTracker
+    /// Add resource metrics from `ResourceTracker`
+    #[must_use]
     pub fn with_resource_tracker_metrics(mut self, tracker: &ResourceTracker) -> Self {
         let metrics = tracker.get_metrics();
         self.resource_metrics = Self::convert_resource_metrics_to_json(&metrics);
         self
     }
 
-    /// Convert ResourceMetrics to JSON HashMap for hook context
+    /// Convert `ResourceMetrics` to JSON `HashMap` for hook context
     fn convert_resource_metrics_to_json(metrics: &ResourceMetrics) -> HashMap<String, JsonValue> {
         let mut resource_metrics = HashMap::new();
         resource_metrics.insert(
@@ -182,6 +205,7 @@ impl ToolHookContext {
     }
 
     /// Get hook point for this execution phase
+    #[must_use]
     pub fn get_hook_point(&self) -> HookPoint {
         match self.execution_phase {
             ToolExecutionPhase::PreExecution => HookPoint::BeforeToolExecution,
@@ -209,6 +233,8 @@ impl ToolHookContext {
 pub struct ToolExecutor {
     /// Hook executor for running hooks
     hook_executor: Option<Arc<HookExecutor>>,
+    /// Hook registry for retrieving hooks
+    hook_registry: Option<Arc<HookRegistry>>,
     /// Circuit breaker for performance protection
     circuit_breaker: Option<Arc<CircuitBreaker>>,
     /// Configuration
@@ -220,6 +246,7 @@ pub struct ToolExecutor {
 
 impl ToolExecutor {
     /// Create a new tool executor with hook integration
+    #[must_use]
     pub fn new(
         config: ToolLifecycleConfig,
         hook_executor: Option<Arc<HookExecutor>>,
@@ -227,8 +254,8 @@ impl ToolExecutor {
     ) -> Self {
         let component_id = ComponentId::new(ComponentType::Tool, "tool_executor".to_string());
 
-        let circuit_breaker = if config.enable_circuit_breaker {
-            hook_registry.map(|_registry| {
+        let circuit_breaker = if config.features.circuit_breaker_enabled {
+            hook_registry.as_ref().map(|_registry| {
                 Arc::new(CircuitBreaker::new(format!(
                     "tool_executor_{}",
                     component_id.name
@@ -240,6 +267,7 @@ impl ToolExecutor {
 
         Self {
             hook_executor,
+            hook_registry,
             circuit_breaker,
             config,
             component_id,
@@ -247,6 +275,16 @@ impl ToolExecutor {
     }
 
     /// Execute a tool with full hook integration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Hook execution fails and cannot be recovered
+    /// - Tool execution fails
+    /// - Resource limits are exceeded
+    /// - Circuit breaker trips due to repeated failures
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     pub async fn execute_tool_with_hooks(
         &self,
         tool: &dyn Tool,
@@ -264,7 +302,7 @@ impl ToolExecutor {
 
         // Security validation (before any execution)
         let security_level = tool.security_level();
-        self.validate_tool_security(security_level.clone())?;
+        self.validate_tool_security(&security_level)?;
 
         // Phase 1: Parameter Validation Hook
         let mut tool_context = ToolHookContext::new(
@@ -309,7 +347,7 @@ impl ToolExecutor {
                 .with_timeout(async { tool.execute(final_input.clone(), context.clone()).await })
                 .await
                 .map_err(|timeout_error| LLMSpellError::Component {
-                    message: format!("Tool execution timed out: {}", timeout_error),
+                    message: format!("Tool execution timed out: {timeout_error}"),
                     source: Some(Box::new(timeout_error)),
                 })
         } else {
@@ -318,7 +356,7 @@ impl ToolExecutor {
                 .with_timeout(async { tool.execute(final_input.clone(), context.clone()).await })
                 .await
                 .map_err(|timeout_error| LLMSpellError::Component {
-                    message: format!("Tool execution timed out: {}", timeout_error),
+                    message: format!("Tool execution timed out: {timeout_error}"),
                     source: Some(Box::new(timeout_error)),
                 })
         };
@@ -338,7 +376,9 @@ impl ToolExecutor {
                         // Log successful completion
                         audit_entry.execution_phase = ToolExecutionPhase::PostExecution;
                         audit_entry.success = Some(true);
-                        audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+                        audit_entry
+                            .resource_metrics
+                            .clone_from(&tool_context.resource_metrics);
                         self.log_audit_entry(&audit_entry);
 
                         Ok(output)
@@ -355,7 +395,9 @@ impl ToolExecutor {
                         audit_entry.execution_phase = ToolExecutionPhase::ErrorHandling;
                         audit_entry.success = Some(false);
                         audit_entry.error_message = Some(error.to_string());
-                        audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+                        audit_entry
+                            .resource_metrics
+                            .clone_from(&tool_context.resource_metrics);
                         self.log_audit_entry(&audit_entry);
 
                         // Try to handle the error through the tool's error handler
@@ -394,7 +436,9 @@ impl ToolExecutor {
 
         // Final audit log entry for cleanup phase
         audit_entry.execution_phase = ToolExecutionPhase::ResourceCleanup;
-        audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+        audit_entry
+            .resource_metrics
+            .clone_from(&tool_context.resource_metrics);
         self.log_audit_entry(&audit_entry);
 
         // Log execution metrics
@@ -409,7 +453,8 @@ impl ToolExecutor {
     }
 
     /// Get resource metrics from all tool executions
-    pub fn get_execution_metrics(&self) -> ExecutionMetrics {
+    #[must_use]
+    pub const fn get_execution_metrics(&self) -> ExecutionMetrics {
         ExecutionMetrics {
             total_executions: 0,     // TODO: Track this across executions
             hook_overhead_ms: 0,     // TODO: Track hook execution time
@@ -420,20 +465,23 @@ impl ToolExecutor {
     }
 
     /// Execute hooks for a specific phase
+    #[allow(clippy::cognitive_complexity)]
     async fn execute_hook_phase<T: Clone>(
         &self,
         tool_context: &ToolHookContext,
         input_data: Option<T>,
     ) -> Result<Option<T>, LLMSpellError> {
-        if !self.config.enable_hooks {
+        if !self.config.features.hooks_enabled {
             return Ok(input_data);
         }
 
-        let Some(ref _hook_executor) = self.hook_executor else {
+        let (Some(ref hook_executor), Some(ref hook_registry)) =
+            (&self.hook_executor, &self.hook_registry)
+        else {
             return Ok(input_data);
         };
 
-        let _hook_point = tool_context.get_hook_point();
+        let hook_point = tool_context.get_hook_point();
 
         // Track hook execution time for performance monitoring
         let hook_start = Instant::now();
@@ -450,9 +498,66 @@ impl ToolExecutor {
             }
         }
 
-        // TODO: Get hooks from registry and execute them properly
-        // For now, simulate hook execution delay
-        tokio::time::sleep(Duration::from_millis(1)).await;
+        // Get hooks from registry for this hook point
+        let hooks = hook_registry.get_hooks(&hook_point);
+
+        if !hooks.is_empty() {
+            // Convert tool context to hook context for execution
+            let mut hook_context = tool_context.base_context.clone();
+
+            // Add tool-specific metadata
+            hook_context.metadata.insert(
+                "tool_name".to_string(),
+                tool_context.tool_metadata.name.clone(),
+            );
+            hook_context.metadata.insert(
+                "tool_category".to_string(),
+                format!("{:?}", tool_context.tool_category),
+            );
+            hook_context.metadata.insert(
+                "security_level".to_string(),
+                format!("{:?}", tool_context.security_level),
+            );
+            hook_context.metadata.insert(
+                "execution_phase".to_string(),
+                format!("{:?}", tool_context.execution_phase),
+            );
+
+            // Add resource metrics to hook context
+            for (key, value) in &tool_context.resource_metrics {
+                hook_context
+                    .data
+                    .insert(format!("resource_{key}"), value.clone());
+            }
+
+            // Execute hooks
+            let results = hook_executor.execute_hooks(&hooks, &mut hook_context).await;
+
+            match results {
+                Ok(hook_results) => {
+                    // Check results for any that should block execution
+                    for result in hook_results {
+                        if let llmspell_hooks::HookResult::Cancel(reason) = result {
+                            return Err(LLMSpellError::Tool {
+                                message: format!(
+                                    "Hook cancelled tool execution for phase {:?}: {}",
+                                    tool_context.execution_phase, reason
+                                ),
+                                tool_name: Some(tool_context.tool_metadata.name.clone()),
+                                source: None,
+                            });
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Hook execution failed for phase {:?}: {}",
+                        tool_context.execution_phase, e
+                    );
+                    // Continue execution - hooks should not break tool functionality
+                }
+            }
+        }
 
         let hook_duration = hook_start.elapsed();
 
@@ -478,12 +583,12 @@ impl ToolExecutor {
     }
 
     /// Validate security level for tool execution
-    fn validate_tool_security(&self, security_level: SecurityLevel) -> Result<(), LLMSpellError> {
-        if !self.config.enable_security_validation {
+    fn validate_tool_security(&self, security_level: &SecurityLevel) -> Result<(), LLMSpellError> {
+        if !self.config.features.security_validation_enabled {
             return Ok(());
         }
 
-        if !self.config.max_security_level.allows(&security_level) {
+        if !self.config.max_security_level.allows(security_level) {
             error!(
                 "Security validation failed: Tool requires {:?} but maximum allowed is {:?}",
                 security_level, self.config.max_security_level
@@ -513,7 +618,7 @@ impl ToolExecutor {
         input: &AgentInput,
         resource_metrics: &HashMap<String, JsonValue>,
     ) -> AuditLogEntry {
-        let parameters = if self.config.audit_log_parameters {
+        let parameters = if self.config.audit.log_parameters {
             Some(input.parameters.clone())
         } else {
             Some({
@@ -541,7 +646,7 @@ impl ToolExecutor {
 
     /// Log audit entry
     fn log_audit_entry(&self, entry: &AuditLogEntry) {
-        if !self.config.enable_audit_logging {
+        if !self.config.audit.enabled {
             return;
         }
 
@@ -562,13 +667,13 @@ impl ToolExecutor {
             entry
                 .resource_metrics
                 .get("memory_bytes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0)
                 / (1024 * 1024),
             entry
                 .resource_metrics
                 .get("cpu_time_ms")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0)
         );
 
@@ -671,7 +776,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,
@@ -684,7 +789,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
-            Ok(AgentOutput::text(format!("Error handled: {}", error)))
+            Ok(AgentOutput::text(format!("Error handled: {error}")))
         }
     }
 
@@ -710,7 +815,6 @@ mod tests {
                 .with_returns(ParameterType::String)
         }
     }
-
     #[tokio::test]
     async fn test_tool_executor_creation() {
         let config = ToolLifecycleConfig::default();
@@ -719,11 +823,13 @@ mod tests {
         // Just verify it was created successfully
         assert!(!executor.component_id.name.is_empty());
     }
-
     #[tokio::test]
     async fn test_tool_execution_without_hooks() {
         let config = ToolLifecycleConfig {
-            enable_hooks: false,
+            features: HookFeatures {
+                hooks_enabled: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let executor = ToolExecutor::new(config, None, None);
@@ -740,7 +846,6 @@ mod tests {
         let output = result.unwrap();
         assert!(output.text.contains("Processed: test input"));
     }
-
     #[tokio::test]
     async fn test_tool_hook_context_creation() {
         let component_id = ComponentId::new(ComponentType::Tool, "test_tool".to_string());
@@ -758,7 +863,6 @@ mod tests {
         assert_eq!(context.security_level, SecurityLevel::Safe);
         assert_eq!(context.get_hook_point(), HookPoint::BeforeToolExecution);
     }
-
     #[tokio::test]
     async fn test_hook_point_mapping() {
         let component_id = ComponentId::new(ComponentType::Tool, "test_tool".to_string());
@@ -809,7 +913,6 @@ mod tests {
             assert_eq!(context.get_hook_point(), expected_point);
         }
     }
-
     #[tokio::test]
     async fn test_resource_metrics_integration() {
         use llmspell_utils::resource_limits::{ResourceLimits, ResourceTracker};
@@ -850,7 +953,6 @@ mod tests {
                 >= 1
         );
     }
-
     #[tokio::test]
     async fn test_execution_metrics_structure() {
         let metrics = ExecutionMetrics::default();
@@ -861,7 +963,6 @@ mod tests {
         assert_eq!(metrics.average_memory_usage, 0);
         assert_eq!(metrics.average_cpu_time, 0);
     }
-
     #[tokio::test]
     async fn test_tool_executor_with_resource_tracking() {
         let config = ToolLifecycleConfig::default();
@@ -882,7 +983,6 @@ mod tests {
         let metrics = executor.get_execution_metrics();
         assert_eq!(metrics.total_executions, 0); // TODO: This will be tracked in future
     }
-
     #[tokio::test]
     async fn test_security_validation_pass() {
         let config = ToolLifecycleConfig {
@@ -903,16 +1003,8 @@ mod tests {
             "Safe tool should pass Privileged security validation"
         );
     }
-
     #[tokio::test]
     async fn test_security_validation_fail() {
-        // Create a restricted security config
-        let config = ToolLifecycleConfig {
-            max_security_level: SecurityLevel::Safe,
-            ..Default::default()
-        };
-        let executor = ToolExecutor::new(config, None, None);
-
         // Create a mock tool with higher security level
         struct PrivilegedMockTool {
             metadata: ComponentMetadata,
@@ -935,7 +1027,7 @@ mod tests {
                 &self.metadata
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 input: AgentInput,
                 _context: ExecutionContext,
@@ -951,7 +1043,7 @@ mod tests {
                 &self,
                 error: LLMSpellError,
             ) -> Result<AgentOutput, LLMSpellError> {
-                Ok(AgentOutput::text(format!("Error handled: {}", error)))
+                Ok(AgentOutput::text(format!("Error handled: {error}")))
             }
         }
 
@@ -978,6 +1070,13 @@ mod tests {
             }
         }
 
+        // Create a restricted security config
+        let config = ToolLifecycleConfig {
+            max_security_level: SecurityLevel::Safe,
+            ..Default::default()
+        };
+        let executor = ToolExecutor::new(config, None, None);
+
         let tool = PrivilegedMockTool::new();
         let input = AgentInput::text("test security validation failure");
         let context = ExecutionContext::default();
@@ -994,12 +1093,13 @@ mod tests {
             assert!(e.to_string().contains("security level"));
         }
     }
-
     #[tokio::test]
     async fn test_audit_logging_enabled() {
         let config = ToolLifecycleConfig {
-            enable_audit_logging: true,
-            audit_log_parameters: false, // Don't log parameters for security
+            audit: AuditConfig {
+                enabled: true,
+                log_parameters: false, // Don't log parameters for security
+            },
             ..Default::default()
         };
         let executor = ToolExecutor::new(config, None, None);
@@ -1017,11 +1117,13 @@ mod tests {
         // We can't easily test the audit log output in a unit test,
         // but we can verify the execution completed without errors
     }
-
     #[tokio::test]
     async fn test_audit_logging_disabled() {
         let config = ToolLifecycleConfig {
-            enable_audit_logging: false,
+            audit: AuditConfig {
+                enabled: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let executor = ToolExecutor::new(config, None, None);
@@ -1036,16 +1138,8 @@ mod tests {
             .await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_security_validation_disabled() {
-        let config = ToolLifecycleConfig {
-            enable_security_validation: false,
-            max_security_level: SecurityLevel::Safe, // Restrictive, but disabled
-            ..Default::default()
-        };
-        let executor = ToolExecutor::new(config, None, None);
-
         // Use the privileged tool from the previous test
         struct PrivilegedMockTool {
             metadata: ComponentMetadata,
@@ -1068,7 +1162,7 @@ mod tests {
                 &self.metadata
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 input: AgentInput,
                 _context: ExecutionContext,
@@ -1084,7 +1178,7 @@ mod tests {
                 &self,
                 error: LLMSpellError,
             ) -> Result<AgentOutput, LLMSpellError> {
-                Ok(AgentOutput::text(format!("Error handled: {}", error)))
+                Ok(AgentOutput::text(format!("Error handled: {error}")))
             }
         }
 
@@ -1110,6 +1204,16 @@ mod tests {
                     .with_returns(ParameterType::String)
             }
         }
+
+        let config = ToolLifecycleConfig {
+            features: HookFeatures {
+                security_validation_enabled: false,
+                ..Default::default()
+            },
+            max_security_level: SecurityLevel::Safe, // Restrictive, but disabled
+            ..Default::default()
+        };
+        let executor = ToolExecutor::new(config, None, None);
 
         let tool = PrivilegedMockTool::new();
         let input = AgentInput::text("test security validation disabled");

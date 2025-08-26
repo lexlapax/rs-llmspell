@@ -1,5 +1,7 @@
-//! ABOUTME: Lifecycle middleware system for intercepting and augmenting agent lifecycle transitions
-//! ABOUTME: Provides composable middleware chain for logging, metrics, security, and custom lifecycle behavior
+//! ABOUTME: Lifecycle middleware system for agent transitions
+//! ABOUTME: Composable middleware chain for logging, metrics, and custom behavior
+
+#![allow(clippy::significant_drop_tightening)]
 
 use super::{
     events::{LifecycleEvent, LifecycleEventData, LifecycleEventSystem, LifecycleEventType},
@@ -33,6 +35,7 @@ pub struct MiddlewareContext {
 }
 
 impl MiddlewareContext {
+    #[must_use]
     pub fn new(agent_id: String, phase: LifecyclePhase) -> Self {
         Self {
             request_id: Uuid::new_v4().to_string(),
@@ -44,16 +47,19 @@ impl MiddlewareContext {
         }
     }
 
+    #[must_use]
     pub fn with_state_context(mut self, context: StateContext) -> Self {
         self.state_context = Some(context);
         self
     }
 
+    #[must_use]
     pub fn with_data(mut self, key: &str, value: &str) -> Self {
         self.data.insert(key.to_string(), value.to_string());
         self
     }
 
+    #[must_use]
     pub fn get_data(&self, key: &str) -> Option<&String> {
         self.data.get(key)
     }
@@ -62,6 +68,7 @@ impl MiddlewareContext {
         self.data.insert(key.to_string(), value.to_string());
     }
 
+    #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.start_time.elapsed()
     }
@@ -91,17 +98,18 @@ pub enum LifecyclePhase {
 }
 
 impl LifecyclePhase {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            LifecyclePhase::Initialization => "initialization".to_string(),
-            LifecyclePhase::StateTransition => "state_transition".to_string(),
-            LifecyclePhase::TaskExecution => "task_execution".to_string(),
-            LifecyclePhase::ResourceAllocation => "resource_allocation".to_string(),
-            LifecyclePhase::ResourceDeallocation => "resource_deallocation".to_string(),
-            LifecyclePhase::HealthCheck => "health_check".to_string(),
-            LifecyclePhase::Shutdown => "shutdown".to_string(),
-            LifecyclePhase::ErrorHandling => "error_handling".to_string(),
-            LifecyclePhase::Custom(name) => name.clone(),
+            Self::Initialization => "initialization".to_string(),
+            Self::StateTransition => "state_transition".to_string(),
+            Self::TaskExecution => "task_execution".to_string(),
+            Self::ResourceAllocation => "resource_allocation".to_string(),
+            Self::ResourceDeallocation => "resource_deallocation".to_string(),
+            Self::HealthCheck => "health_check".to_string(),
+            Self::Shutdown => "shutdown".to_string(),
+            Self::ErrorHandling => "error_handling".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -110,12 +118,27 @@ impl LifecyclePhase {
 #[async_trait]
 pub trait LifecycleMiddleware: Send + Sync {
     /// Called before the lifecycle phase executes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the pre-processing fails and should prevent the lifecycle
+    /// phase from executing (e.g., security validation failures, resource unavailability).
     async fn before(&self, context: &mut MiddlewareContext) -> Result<()>;
 
     /// Called after the lifecycle phase executes successfully
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the post-processing fails (e.g., cleanup operations,
+    /// metric recording, or notification sending failures).
     async fn after(&self, context: &mut MiddlewareContext) -> Result<()>;
 
     /// Called if the lifecycle phase encounters an error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the error handling fails (e.g., alert sending failures,
+    /// recovery operation failures).
     async fn on_error(&self, context: &mut MiddlewareContext, error: &anyhow::Error) -> Result<()>;
 
     /// Get middleware name for identification
@@ -167,16 +190,24 @@ pub struct LifecycleMiddlewareChain {
 /// Middleware configuration
 #[derive(Debug, Clone)]
 pub struct MiddlewareConfig {
-    /// Enable middleware execution
-    pub enabled: bool,
     /// Maximum execution time per middleware
     pub max_execution_time: Duration,
+    /// Maximum history size
+    pub max_history_size: usize,
+    /// Runtime behavior flags
+    pub behavior_flags: MiddlewareBehaviorFlags,
+}
+
+/// Middleware behavior flags
+#[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct MiddlewareBehaviorFlags {
+    /// Enable middleware execution
+    pub enabled: bool,
     /// Enable detailed logging
     pub enable_logging: bool,
     /// Continue chain on middleware errors
     pub continue_on_error: bool,
-    /// Maximum history size
-    pub max_history_size: usize,
     /// Emit events for middleware execution
     pub emit_events: bool,
 }
@@ -184,11 +215,19 @@ pub struct MiddlewareConfig {
 impl Default for MiddlewareConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
             max_execution_time: Duration::from_secs(5),
+            max_history_size: 1000,
+            behavior_flags: MiddlewareBehaviorFlags::default(),
+        }
+    }
+}
+
+impl Default for MiddlewareBehaviorFlags {
+    fn default() -> Self {
+        Self {
+            enabled: true,
             enable_logging: true,
             continue_on_error: false,
-            max_history_size: 1000,
             emit_events: false, // Usually too verbose
         }
     }
@@ -196,6 +235,7 @@ impl Default for MiddlewareConfig {
 
 impl LifecycleMiddlewareChain {
     /// Create new middleware chain
+    #[must_use]
     pub fn new(event_system: Arc<LifecycleEventSystem>, config: MiddlewareConfig) -> Self {
         Self {
             middleware: Arc::new(RwLock::new(Vec::new())),
@@ -206,6 +246,10 @@ impl LifecycleMiddlewareChain {
     }
 
     /// Add middleware to the chain
+    ///
+    /// # Panics
+    ///
+    /// Panics if the chain is empty after adding middleware (should never happen)
     pub async fn add_middleware(&self, middleware: Arc<dyn LifecycleMiddleware>) {
         let mut chain = self.middleware.write().await;
         chain.push(middleware);
@@ -213,7 +257,7 @@ impl LifecycleMiddlewareChain {
         // Sort by priority
         chain.sort_by_key(|m| m.priority());
 
-        if self.config.enable_logging {
+        if self.config.behavior_flags.enable_logging {
             debug!(
                 "Added middleware '{}' with priority {}",
                 chain.last().unwrap().name(),
@@ -223,8 +267,15 @@ impl LifecycleMiddlewareChain {
     }
 
     /// Execute middleware chain for a lifecycle phase
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error as middleware failures are handled internally
+    /// and stored in the context data. The Result type is provided for future
+    /// extensibility (e.g., critical system-level middleware failures).
+    #[allow(clippy::cognitive_complexity)]
     pub async fn execute(&self, mut context: MiddlewareContext) -> Result<MiddlewareContext> {
-        if !self.config.enabled {
+        if !self.config.behavior_flags.enabled {
             return Ok(context);
         }
 
@@ -238,7 +289,7 @@ impl LifecycleMiddlewareChain {
                 .collect::<Vec<_>>()
         };
 
-        if self.config.enable_logging && !middleware_list.is_empty() {
+        if self.config.behavior_flags.enable_logging && !middleware_list.is_empty() {
             debug!(
                 "Executing {} middleware for phase {:?} on agent {}",
                 middleware_list.len(),
@@ -254,7 +305,8 @@ impl LifecycleMiddlewareChain {
                 .await;
             self.record_execution(execution_result).await;
 
-            if !self.config.continue_on_error && context.get_data("_error").is_some() {
+            if !self.config.behavior_flags.continue_on_error && context.get_data("_error").is_some()
+            {
                 break;
             }
         }
@@ -267,14 +319,16 @@ impl LifecycleMiddlewareChain {
                     .await;
                 self.record_execution(execution_result).await;
 
-                if !self.config.continue_on_error && context.get_data("_error").is_some() {
+                if !self.config.behavior_flags.continue_on_error
+                    && context.get_data("_error").is_some()
+                {
                     break;
                 }
             }
         }
 
         // Emit event if configured
-        if self.config.emit_events {
+        if self.config.behavior_flags.emit_events {
             let event = LifecycleEvent::new(
                 LifecycleEventType::ExecutionCompleted,
                 context.agent_id.clone(),
@@ -309,7 +363,7 @@ impl LifecycleMiddlewareChain {
         mut context: MiddlewareContext,
         error: &anyhow::Error,
     ) -> MiddlewareContext {
-        if !self.config.enabled {
+        if !self.config.behavior_flags.enabled {
             return context;
         }
 
@@ -352,7 +406,7 @@ impl LifecycleMiddlewareChain {
                 metrics: HashMap::new(),
             },
             Ok(Err(e)) => {
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("Middleware '{}' before hook failed: {}", middleware_name, e);
                 }
                 context.set_data("_error", &e.to_string());
@@ -366,8 +420,8 @@ impl LifecycleMiddlewareChain {
                 }
             }
             Err(_) => {
-                let error_msg = format!("Middleware '{}' before hook timed out", middleware_name);
-                if self.config.enable_logging {
+                let error_msg = format!("Middleware '{middleware_name}' before hook timed out");
+                if self.config.behavior_flags.enable_logging {
                     error!("{}", error_msg);
                 }
                 context.set_data("_error", &error_msg);
@@ -403,7 +457,7 @@ impl LifecycleMiddlewareChain {
                 metrics: HashMap::new(),
             },
             Ok(Err(e)) => {
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("Middleware '{}' after hook failed: {}", middleware_name, e);
                 }
                 MiddlewareExecutionResult {
@@ -416,8 +470,8 @@ impl LifecycleMiddlewareChain {
                 }
             }
             Err(_) => {
-                let error_msg = format!("Middleware '{}' after hook timed out", middleware_name);
-                if self.config.enable_logging {
+                let error_msg = format!("Middleware '{middleware_name}' after hook timed out");
+                if self.config.behavior_flags.enable_logging {
                     error!("{}", error_msg);
                 }
                 MiddlewareExecutionResult {
@@ -457,7 +511,7 @@ impl LifecycleMiddlewareChain {
                 metrics: HashMap::new(),
             },
             Ok(Err(e)) => {
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("Middleware '{}' error hook failed: {}", middleware_name, e);
                 }
                 MiddlewareExecutionResult {
@@ -470,8 +524,8 @@ impl LifecycleMiddlewareChain {
                 }
             }
             Err(_) => {
-                let error_msg = format!("Middleware '{}' error hook timed out", middleware_name);
-                if self.config.enable_logging {
+                let error_msg = format!("Middleware '{middleware_name}' error hook timed out");
+                if self.config.behavior_flags.enable_logging {
                     error!("{}", error_msg);
                 }
                 MiddlewareExecutionResult {
@@ -528,13 +582,15 @@ impl Default for LoggingMiddleware {
 }
 
 impl LoggingMiddleware {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             log_level: tracing::Level::DEBUG,
         }
     }
 
-    pub fn with_level(mut self, level: tracing::Level) -> Self {
+    #[must_use]
+    pub const fn with_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }
@@ -612,6 +668,7 @@ impl Default for MetricsMiddleware {
 }
 
 impl MetricsMiddleware {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(RwLock::new(HashMap::new())),
@@ -638,7 +695,9 @@ impl LifecycleMiddleware for MetricsMiddleware {
         let completed_key = format!("{}_{}_completed", context.agent_id, context.phase.name());
 
         let mut metrics = self.metrics.write().await;
-        metrics.insert(duration_key, context.elapsed().as_millis() as f64);
+        #[allow(clippy::cast_precision_loss)]
+        let duration_ms = context.elapsed().as_millis() as f64;
+        metrics.insert(duration_key, duration_ms);
         *metrics.entry(completed_key).or_insert(0.0) += 1.0;
         Ok(())
     }
@@ -680,6 +739,7 @@ impl Default for SecurityMiddleware {
 }
 
 impl SecurityMiddleware {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             trusted_agents: Vec::new(),
@@ -687,11 +747,13 @@ impl SecurityMiddleware {
         }
     }
 
+    #[must_use]
     pub fn with_trusted_agents(mut self, agents: Vec<String>) -> Self {
         self.trusted_agents = agents;
         self
     }
 
+    #[must_use]
     pub fn with_policy(mut self, phase: LifecyclePhase, policies: Vec<String>) -> Self {
         self.security_policies.insert(phase, policies);
         self
@@ -758,7 +820,6 @@ impl LifecycleMiddleware for SecurityMiddleware {
 mod tests {
     use super::*;
     use crate::lifecycle::events::EventSystemConfig;
-
     #[tokio::test]
     async fn test_middleware_chain_basic() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -778,7 +839,6 @@ mod tests {
         assert_eq!(result.agent_id, "test-agent");
         assert_eq!(result.phase, LifecyclePhase::Initialization);
     }
-
     #[tokio::test]
     async fn test_middleware_priority_ordering() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -797,7 +857,6 @@ mod tests {
 
         assert_eq!(chain.get_middleware_count().await, 3);
     }
-
     #[tokio::test]
     async fn test_metrics_middleware() {
         let metrics = Arc::new(MetricsMiddleware::new());
@@ -812,7 +871,6 @@ mod tests {
         assert!(collected_metrics.contains_key("test-agent_initialization_completed"));
         assert!(collected_metrics.contains_key("test-agent_initialization_duration_ms"));
     }
-
     #[tokio::test]
     async fn test_security_middleware() {
         let security = SecurityMiddleware::new()
@@ -842,7 +900,6 @@ mod tests {
         .with_data("auth_token", "valid_token");
         assert!(security.before(&mut authed_context).await.is_ok());
     }
-
     #[tokio::test]
     async fn test_middleware_error_handling() {
         struct FailingMiddleware;
@@ -876,8 +933,11 @@ mod tests {
 
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
         let config = MiddlewareConfig {
-            continue_on_error: false,
-            ..Default::default()
+            behavior_flags: MiddlewareBehaviorFlags {
+                continue_on_error: false,
+                ..MiddlewareBehaviorFlags::default()
+            },
+            ..MiddlewareConfig::default()
         };
         let chain = LifecycleMiddlewareChain::new(event_system, config);
 
@@ -890,14 +950,12 @@ mod tests {
         // Should have error data
         assert!(result.get_data("_error").is_some());
     }
-
     #[tokio::test]
     async fn test_lifecycle_phase_names() {
         assert_eq!(LifecyclePhase::Initialization.name(), "initialization");
         assert_eq!(LifecyclePhase::StateTransition.name(), "state_transition");
         assert_eq!(LifecyclePhase::Custom("test".to_string()).name(), "test");
     }
-
     #[tokio::test]
     async fn test_middleware_context() {
         let mut context =

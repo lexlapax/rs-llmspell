@@ -701,29 +701,27 @@ impl SessionReplayControls {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_speed_control() {
         let mut speed = SessionReplaySpeed::default();
-        assert_eq!(speed.multiplier(), 1.0);
+        assert!((speed.multiplier() - 1.0).abs() < f64::EPSILON);
 
         speed.increase();
-        assert_eq!(speed.multiplier(), 1.5);
+        assert!((speed.multiplier() - 1.5).abs() < f64::EPSILON);
 
         speed.decrease();
-        assert_eq!(speed.multiplier(), 1.0);
+        assert!((speed.multiplier() - 1.0).abs() < f64::EPSILON);
 
         speed.set_speed(5.0);
-        assert_eq!(speed.multiplier(), 5.0);
+        assert!((speed.multiplier() - 5.0).abs() < f64::EPSILON);
 
         speed.set_speed(20.0); // Should clamp to max
-        assert_eq!(speed.multiplier(), 10.0);
+        assert!((speed.multiplier() - 10.0).abs() < f64::EPSILON);
 
         let duration = Duration::from_secs(10);
         let adjusted = speed.apply_to_duration(duration);
         assert_eq!(adjusted, Duration::from_secs(1)); // 10s / 10x = 1s
     }
-
     #[test]
     fn test_breakpoint_conditions() {
         let breakpoint = SessionBreakpoint {
@@ -738,7 +736,6 @@ mod tests {
         assert!(breakpoint.enabled);
         assert!(!breakpoint.one_shot);
     }
-
     #[test]
     fn test_replay_progress() {
         let progress = SessionReplayProgress {
@@ -754,7 +751,7 @@ mod tests {
             progress_percentage: 25.0,
         };
 
-        assert_eq!(progress.progress_percentage, 25.0);
+        assert!((progress.progress_percentage - 25.0).abs() < f64::EPSILON);
         assert_eq!(progress.hooks_completed, 25);
         assert_eq!(progress.total_hooks, 100);
     }

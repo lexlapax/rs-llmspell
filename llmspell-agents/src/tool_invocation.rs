@@ -1,11 +1,14 @@
 //! ABOUTME: Tool invocation wrapper with validation and error handling
 //! ABOUTME: Provides safe, validated tool execution with comprehensive error handling
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::{
     traits::tool::Tool,
     types::{AgentInput, AgentOutput},
     ExecutionContext, LLMSpellError, Result,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -14,7 +17,7 @@ use tokio::time::timeout;
 /// Tool invocation wrapper that provides validation, error handling,
 /// and execution tracking for tool calls.
 ///
-/// This wrapper sits between ToolCapable components and the actual tools,
+/// This wrapper sits between `ToolCapable` components and the actual tools,
 /// providing additional safety, monitoring, and debugging capabilities.
 ///
 /// # Examples
@@ -45,73 +48,96 @@ pub struct ToolInvoker {
 pub struct InvocationConfig {
     /// Maximum execution time per tool call
     pub max_execution_time: Duration,
+    /// Maximum memory usage per tool call (in bytes)
+    pub max_memory_bytes: Option<u64>,
+    /// Custom validation rules
+    pub custom_validators: Vec<String>,
+    /// Feature flags for tool invocation behavior
+    pub feature_flags: InvocationFeatureFlags,
+}
+
+/// Feature flags for tool invocation behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct InvocationFeatureFlags {
     /// Whether to validate parameters before invocation
     pub validate_parameters: bool,
     /// Whether to track execution metrics
     pub track_metrics: bool,
     /// Whether to enable debug logging
     pub debug_logging: bool,
-    /// Maximum memory usage per tool call (in bytes)
-    pub max_memory_bytes: Option<u64>,
     /// Whether to sandbox tool execution
     pub enable_sandboxing: bool,
-    /// Custom validation rules
-    pub custom_validators: Vec<String>,
 }
 
 impl Default for InvocationConfig {
     fn default() -> Self {
         Self {
             max_execution_time: Duration::from_secs(30),
+            max_memory_bytes: Some(100 * 1024 * 1024), // 100MB
+            custom_validators: Vec::new(),
+            feature_flags: InvocationFeatureFlags::default(),
+        }
+    }
+}
+
+impl Default for InvocationFeatureFlags {
+    fn default() -> Self {
+        Self {
             validate_parameters: true,
             track_metrics: true,
             debug_logging: false,
-            max_memory_bytes: Some(100 * 1024 * 1024), // 100MB
             enable_sandboxing: true,
-            custom_validators: Vec::new(),
         }
     }
 }
 
 impl InvocationConfig {
     /// Create a new configuration with default values
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set maximum execution time
-    pub fn with_max_execution_time(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_max_execution_time(mut self, duration: Duration) -> Self {
         self.max_execution_time = duration;
         self
     }
 
     /// Enable or disable parameter validation
-    pub fn with_parameter_validation(mut self, enabled: bool) -> Self {
-        self.validate_parameters = enabled;
+    #[must_use]
+    pub const fn with_parameter_validation(mut self, enabled: bool) -> Self {
+        self.feature_flags.validate_parameters = enabled;
         self
     }
 
     /// Enable or disable metrics tracking
-    pub fn with_metrics_tracking(mut self, enabled: bool) -> Self {
-        self.track_metrics = enabled;
+    #[must_use]
+    pub const fn with_metrics_tracking(mut self, enabled: bool) -> Self {
+        self.feature_flags.track_metrics = enabled;
         self
     }
 
     /// Enable or disable debug logging
-    pub fn with_debug_logging(mut self, enabled: bool) -> Self {
-        self.debug_logging = enabled;
+    #[must_use]
+    pub const fn with_debug_logging(mut self, enabled: bool) -> Self {
+        self.feature_flags.debug_logging = enabled;
         self
     }
 
     /// Set maximum memory usage
-    pub fn with_max_memory(mut self, bytes: u64) -> Self {
+    #[must_use]
+    pub const fn with_max_memory(mut self, bytes: u64) -> Self {
         self.max_memory_bytes = Some(bytes);
         self
     }
 
     /// Enable or disable sandboxing
-    pub fn with_sandboxing(mut self, enabled: bool) -> Self {
-        self.enable_sandboxing = enabled;
+    #[must_use]
+    pub const fn with_sandboxing(mut self, enabled: bool) -> Self {
+        self.feature_flags.enable_sandboxing = enabled;
         self
     }
 }
@@ -184,12 +210,14 @@ impl ValidationError {
     }
 
     /// Add expected value information
+    #[must_use]
     pub fn with_expected(mut self, expected: impl Into<String>) -> Self {
         self.expected = Some(expected.into());
         self
     }
 
     /// Add actual value information
+    #[must_use]
     pub fn with_actual(mut self, actual: JsonValue) -> Self {
         self.actual = Some(actual);
         self
@@ -198,11 +226,20 @@ impl ValidationError {
 
 impl ToolInvoker {
     /// Create a new tool invoker with the given configuration
-    pub fn new(config: InvocationConfig) -> Self {
+    #[must_use]
+    pub const fn new(config: InvocationConfig) -> Self {
         Self { config }
     }
 
     /// Invoke a tool with full validation and error handling
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Parameter validation fails
+    /// - Security checks fail
+    /// - Tool execution fails
+    /// - Resource limits are exceeded
     pub async fn invoke(
         &self,
         tool: Arc<dyn Tool>,
@@ -222,12 +259,9 @@ impl ToolInvoker {
         .to_string();
 
         // Validate parameters if enabled
-        if self.config.validate_parameters {
+        if self.config.feature_flags.validate_parameters {
             let validation_start = Instant::now();
-            match self
-                .validate_tool_parameters(tool.as_ref(), &parameters)
-                .await
-            {
+            match Self::validate_tool_parameters(tool.as_ref(), &parameters) {
                 Ok(validation_warnings) => {
                     warnings.extend(validation_warnings);
                 }
@@ -235,7 +269,7 @@ impl ToolInvoker {
                     metrics.validation_errors += 1;
                     metrics.execution_time = start_time.elapsed();
                     return Ok(InvocationResult {
-                        output: AgentOutput::text(format!("Validation failed: {}", e)),
+                        output: AgentOutput::text(format!("Validation failed: {e}")),
                         metrics,
                         warnings,
                         success: false,
@@ -258,7 +292,7 @@ impl ToolInvoker {
             Ok(Err(e)) => {
                 metrics.execution_time = start_time.elapsed();
                 return Ok(InvocationResult {
-                    output: AgentOutput::text(format!("Tool execution failed: {}", e)),
+                    output: AgentOutput::text(format!("Tool execution failed: {e}")),
                     metrics,
                     warnings,
                     success: false,
@@ -280,7 +314,7 @@ impl ToolInvoker {
         metrics.execution_time = start_time.elapsed();
 
         // Log execution if debug logging is enabled
-        if self.config.debug_logging {
+        if self.config.feature_flags.debug_logging {
             tracing::debug!(
                 "Tool {} executed in {:?}",
                 tool.metadata().name,
@@ -297,6 +331,12 @@ impl ToolInvoker {
     }
 
     /// Invoke a tool with basic error handling (convenience method)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool invocation fails
+    /// - Tool returns an error result
     pub async fn invoke_simple(
         &self,
         tool: Arc<dyn Tool>,
@@ -315,11 +355,7 @@ impl ToolInvoker {
     }
 
     /// Validate tool parameters against the tool's schema
-    async fn validate_tool_parameters(
-        &self,
-        tool: &dyn Tool,
-        parameters: &JsonValue,
-    ) -> Result<Vec<String>> {
+    fn validate_tool_parameters(tool: &dyn Tool, parameters: &JsonValue) -> Result<Vec<String>> {
         let mut warnings = Vec::new();
 
         // Get tool schema
@@ -337,7 +373,7 @@ impl ToolInvoker {
         for required in schema.required_parameters() {
             if !params_map.contains_key(&required) {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Missing required parameter: {}", required),
+                    message: format!("Missing required parameter: {required}"),
                     field: Some(required),
                 });
             }
@@ -399,7 +435,7 @@ impl ToolInvoker {
         // Check for unexpected parameters
         for key in params_map.keys() {
             if !schema.parameters.iter().any(|p| &p.name == key) {
-                warnings.push(format!("Unexpected parameter '{}' will be ignored", key));
+                warnings.push(format!("Unexpected parameter '{key}' will be ignored"));
             }
         }
 
@@ -407,7 +443,8 @@ impl ToolInvoker {
     }
 
     /// Get configuration
-    pub fn config(&self) -> &InvocationConfig {
+    #[must_use]
+    pub const fn config(&self) -> &InvocationConfig {
         &self.config
     }
 
@@ -454,7 +491,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,
@@ -473,7 +510,7 @@ mod tests {
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");
 
-            Ok(AgentOutput::text(format!("Processed: {}", text)))
+            Ok(AgentOutput::text(format!("Processed: {text}")))
         }
 
         async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
@@ -481,7 +518,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -507,16 +544,14 @@ mod tests {
             )
         }
     }
-
     #[tokio::test]
     async fn test_tool_invoker_creation() {
         let config = InvocationConfig::default();
         let invoker = ToolInvoker::new(config);
 
         assert_eq!(invoker.config().max_execution_time, Duration::from_secs(30));
-        assert!(invoker.config().validate_parameters);
+        assert!(invoker.config().feature_flags.validate_parameters);
     }
-
     #[tokio::test]
     async fn test_invocation_config_builder() {
         let config = InvocationConfig::new()
@@ -525,10 +560,9 @@ mod tests {
             .with_debug_logging(true);
 
         assert_eq!(config.max_execution_time, Duration::from_secs(10));
-        assert!(!config.validate_parameters);
-        assert!(config.debug_logging);
+        assert!(!config.feature_flags.validate_parameters);
+        assert!(config.feature_flags.debug_logging);
     }
-
     #[tokio::test]
     async fn test_successful_tool_invocation() {
         let config = InvocationConfig::default();
@@ -544,7 +578,6 @@ mod tests {
         assert!(result.output.text.contains("Processed: hello world"));
         assert!(result.metrics.execution_time > Duration::from_millis(0));
     }
-
     #[tokio::test]
     async fn test_parameter_validation_failure() {
         let config = InvocationConfig::default();
@@ -560,7 +593,6 @@ mod tests {
         assert!(result.output.text.contains("Validation failed"));
         assert_eq!(result.metrics.validation_errors, 1);
     }
-
     #[tokio::test]
     async fn test_simple_invocation() {
         let config = InvocationConfig::default();
@@ -573,7 +605,6 @@ mod tests {
         let output = invoker.invoke_simple(tool, params, context).await.unwrap();
         assert!(output.text.contains("Processed: simple test"));
     }
-
     #[tokio::test]
     async fn test_validation_error_creation() {
         let error = ValidationError::new("field1", "Invalid value")

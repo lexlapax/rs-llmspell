@@ -1,6 +1,8 @@
 //! ABOUTME: Factory registry for managing multiple agent factories
 //! ABOUTME: Allows registration and discovery of different factory implementations
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::factory::{AgentConfig, AgentFactory};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -16,6 +18,7 @@ pub struct FactoryRegistry {
 
 impl FactoryRegistry {
     /// Create a new factory registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             factories: Arc::new(RwLock::new(HashMap::new())),
@@ -24,6 +27,10 @@ impl FactoryRegistry {
     }
 
     /// Register a factory with a given name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a factory with the same name is already registered
     pub async fn register_factory(
         &self,
         name: String,
@@ -61,6 +68,10 @@ impl FactoryRegistry {
     }
 
     /// Set the default factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the factory is not registered
     pub async fn set_default_factory(&self, name: String) -> Result<()> {
         let factories = self.factories.read().await;
         if !factories.contains_key(&name) {
@@ -79,6 +90,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent using a specific factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Factory is not found
+    /// - Agent creation fails
     pub async fn create_agent_with(
         &self,
         factory_name: &str,
@@ -93,6 +110,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent using the default factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No default factory is set
+    /// - Agent creation fails
     pub async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>> {
         let factory = self
             .get_default_factory()
@@ -103,6 +126,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent from a template using a specific factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Factory is not found
+    /// - Template creation fails
     pub async fn create_from_template_with(
         &self,
         factory_name: &str,
@@ -117,6 +146,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent from a template using the default factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No default factory is set
+    /// - Template creation fails
     pub async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>> {
         let factory = self
             .get_default_factory()
@@ -134,10 +169,11 @@ impl Default for FactoryRegistry {
 }
 
 /// Global factory registry instance
-static GLOBAL_REGISTRY: once_cell::sync::Lazy<FactoryRegistry> =
-    once_cell::sync::Lazy::new(FactoryRegistry::new);
+static GLOBAL_REGISTRY: std::sync::LazyLock<FactoryRegistry> =
+    std::sync::LazyLock::new(FactoryRegistry::new);
 
 /// Get the global factory registry
+#[must_use]
 pub fn global_registry() -> &'static FactoryRegistry {
     &GLOBAL_REGISTRY
 }
@@ -161,6 +197,7 @@ impl CustomAgentFactory {
     }
 
     /// Add a customizer function
+    #[must_use]
     pub fn with_customizer<F>(mut self, f: F) -> Self
     where
         F: Fn(&mut AgentConfig) + Send + Sync + 'static,
@@ -202,15 +239,12 @@ mod tests {
     use super::*;
     use crate::factory::DefaultAgentFactory;
     use crate::ResourceLimits;
-
-    fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
-        Arc::new(llmspell_providers::ProviderManager::new())
-    }
+    use llmspell_providers::ProviderManager;
 
     #[tokio::test]
     async fn test_factory_registry() {
         let registry = FactoryRegistry::new();
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let factory1 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
         let factory2 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
 
@@ -247,17 +281,15 @@ mod tests {
             .await;
         assert!(result.is_err());
     }
-
     #[test]
     fn test_global_registry() {
         let registry = global_registry();
         // Should be able to access global registry
         let _ = registry;
     }
-
     #[test]
     fn test_custom_factory() {
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let base = Arc::new(DefaultAgentFactory::new(provider_manager));
         let custom = CustomAgentFactory::new(base)
             .with_customizer(|config| {
@@ -271,10 +303,9 @@ mod tests {
         let templates = custom.list_templates();
         assert!(!templates.is_empty());
     }
-
     #[tokio::test]
     async fn test_custom_factory_customization() {
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let base = Arc::new(DefaultAgentFactory::new(provider_manager));
         let custom = Arc::new(CustomAgentFactory::new(base).with_customizer(|config| {
             config.resource_limits.max_execution_time_secs = 1000;
@@ -287,7 +318,6 @@ mod tests {
         // but we can verify agent was created
         assert_eq!(agent.metadata().name, "basic-agent");
     }
-
     #[tokio::test]
     async fn test_registry_default_factory() {
         let registry = FactoryRegistry::new();
@@ -307,7 +337,7 @@ mod tests {
         assert!(result.is_err());
 
         // Register and set default
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let factory = Arc::new(DefaultAgentFactory::new(provider_manager));
         registry
             .register_factory("default".to_string(), factory)
@@ -322,12 +352,11 @@ mod tests {
         let agent = registry.create_agent(config).await.unwrap();
         assert_eq!(agent.metadata().name, "test");
     }
-
     #[tokio::test]
     async fn test_registry_specific_factory() {
         let registry = FactoryRegistry::new();
 
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let factory1 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
         let factory2 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
 

@@ -43,36 +43,28 @@ pub enum ScriptEngineError {
 impl From<ScriptEngineError> for llmspell_core::error::LLMSpellError {
     fn from(err: ScriptEngineError) -> Self {
         match err {
-            ScriptEngineError::ExecutionError { engine, details } => {
-                llmspell_core::error::LLMSpellError::Component {
-                    message: format!("{} engine execution error: {}", engine, details),
-                    source: None,
-                }
-            }
+            ScriptEngineError::ExecutionError { engine, details } => Self::Component {
+                message: format!("{engine} engine execution error: {details}"),
+                source: None,
+            },
             ScriptEngineError::SyntaxError {
                 engine,
                 message,
                 line,
                 ..
-            } => {
-                let detail = if let Some(l) = line {
-                    format!("{} at line {}", message, l)
-                } else {
-                    message
-                };
-                llmspell_core::error::LLMSpellError::Validation {
-                    field: Some("script".to_string()),
-                    message: format!("{} syntax error: {}", engine, detail),
-                }
-            }
-            ScriptEngineError::UnsupportedFeature { engine, feature } => {
-                llmspell_core::error::LLMSpellError::Component {
-                    message: format!("Feature '{}' not supported by {} engine", feature, engine),
-                    source: None,
-                }
-            }
-            _ => llmspell_core::error::LLMSpellError::Component {
-                message: format!("Script engine error: {:?}", err),
+            } => Self::Validation {
+                field: Some("script".to_string()),
+                message: format!(
+                    "{engine} syntax error: {}",
+                    line.map_or_else(|| message.clone(), |l| format!("{message} at line {l}"))
+                ),
+            },
+            ScriptEngineError::UnsupportedFeature { engine, feature } => Self::Component {
+                message: format!("Feature '{feature}' not supported by {engine} engine"),
+                source: None,
+            },
+            _ => Self::Component {
+                message: format!("Script engine error: {err:?}"),
                 source: None,
             },
         }
@@ -84,7 +76,6 @@ mod tests {
     use super::*;
 
     // API surface tests removed - functionality moved to globals
-
     #[test]
     fn test_script_engine_error_conversion() {
         let err = ScriptEngineError::ExecutionError {

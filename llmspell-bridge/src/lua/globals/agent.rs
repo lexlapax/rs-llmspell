@@ -1,12 +1,16 @@
 //! ABOUTME: Lua-specific Agent global implementation
 //! ABOUTME: Provides Lua bindings for Agent functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::agent_bridge::AgentBridge;
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{
     agent_output_to_lua_table, json_to_lua_value, lua_table_to_agent_input, lua_table_to_json,
 };
 use crate::lua::sync_utils::block_on_async;
+use llmspell_core::execution_context::{ContextScope, ExecutionContextBuilder};
+use llmspell_core::types::ComponentId;
 use mlua::{Lua, Table, UserData, UserDataMethods, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -15,20 +19,35 @@ use std::sync::Arc;
 struct LuaAgentInstance {
     agent_instance_name: String,
     bridge: Arc<AgentBridge>,
+    global_context: Arc<GlobalContext>,
 }
 
 impl UserData for LuaAgentInstance {
+    #[allow(clippy::too_many_lines)]
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // invoke method (same as execute in API) - synchronous wrapper
         methods.add_method("invoke", |lua, this, input: Table| {
-            let agent_input = lua_table_to_agent_input(lua, input)?;
+            let agent_input = lua_table_to_agent_input(lua, &input)?;
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
+            let global_context = this.global_context.clone();
+
+            // Create ExecutionContext with state if available
+            let context = global_context.state_access.as_ref().map(|state_access| {
+                ExecutionContextBuilder::new()
+                    .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                    .state(state_access.clone())
+                    .build()
+            });
 
             // Use shared sync utility to execute async code
             let result = block_on_async(
                 "agent_invoke",
-                async move { bridge.execute_agent(&agent_name, agent_input, None).await },
+                async move {
+                    bridge
+                        .execute_agent(&agent_name, agent_input, context)
+                        .await
+                },
                 None,
             )?;
 
@@ -37,14 +56,27 @@ impl UserData for LuaAgentInstance {
 
         // execute method (alias for invoke) - synchronous wrapper
         methods.add_method("execute", |lua, this, input: Table| {
-            let agent_input = lua_table_to_agent_input(lua, input)?;
+            let agent_input = lua_table_to_agent_input(lua, &input)?;
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
+            let global_context = this.global_context.clone();
+
+            // Create ExecutionContext with state if available
+            let context = global_context.state_access.as_ref().map(|state_access| {
+                ExecutionContextBuilder::new()
+                    .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                    .state(state_access.clone())
+                    .build()
+            });
 
             // Use shared sync utility to execute async code
             let result = block_on_async(
                 "agent_execute",
-                async move { bridge.execute_agent(&agent_name, agent_input, None).await },
+                async move {
+                    bridge
+                        .execute_agent(&agent_name, agent_input, context)
+                        .await
+                },
                 None,
             )?;
 
@@ -55,16 +87,25 @@ impl UserData for LuaAgentInstance {
         methods.add_method(
             "invokeStream",
             |lua, this, (input, callback): (Table, mlua::Function)| {
-                let agent_input = lua_table_to_agent_input(lua, input)?;
+                let agent_input = lua_table_to_agent_input(lua, &input)?;
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();
+                let global_context = this.global_context.clone();
+
+                // Create ExecutionContext with state if available
+                let context = global_context.state_access.as_ref().map(|state_access| {
+                    ExecutionContextBuilder::new()
+                        .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                        .state(state_access.clone())
+                        .build()
+                });
 
                 // Use block_on to handle the streaming operation
                 tokio::task::block_in_place(|| {
                     tokio::runtime::Handle::current().block_on(async move {
                         // Get streaming receiver
                         let mut rx = bridge
-                            .execute_agent_streaming(&agent_name, agent_input, None)
+                            .execute_agent_streaming(&agent_name, agent_input, context)
                             .await
                             .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
@@ -86,8 +127,8 @@ impl UserData for LuaAgentInstance {
             },
         );
 
-        // getState method - synchronous wrapper
-        methods.add_method("getState", |_, this, ()| {
+        // get_state method - synchronous wrapper
+        methods.add_method("get_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -96,25 +137,25 @@ impl UserData for LuaAgentInstance {
                 async move { bridge.get_agent_state(&agent_name).await },
                 None,
             )?;
-            Ok(format!("{:?}", state))
+            Ok(format!("{state:?}"))
         });
 
         // getConfig method
-        methods.add_method("getConfig", |lua, _this, ()| {
+        methods.add_method("get_config", |lua, _this, ()| {
             // TODO: Get agent configuration from bridge when API is available
             // For now, return empty config table
             let config_table = lua.create_table()?;
             Ok(config_table)
         });
 
-        // setState method
-        methods.add_method("setState", |_lua, _this, _state: Table| {
+        // set_state method
+        methods.add_method("set_state", |_lua, _this, _state: Table| {
             // TODO: Implement state setting when bridge supports it
             Ok(())
         });
 
-        // saveState method - synchronous wrapper
-        methods.add_method("saveState", |_, this, ()| {
+        // save_state method - synchronous wrapper
+        methods.add_method("save_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -126,8 +167,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // loadState method - synchronous wrapper
-        methods.add_method("loadState", |_, this, ()| {
+        // load_state method - synchronous wrapper
+        methods.add_method("load_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -139,8 +180,8 @@ impl UserData for LuaAgentInstance {
             Ok(loaded)
         });
 
-        // deleteState method - synchronous wrapper
-        methods.add_method("deleteState", |_, this, ()| {
+        // delete_state method - synchronous wrapper
+        methods.add_method("delete_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -154,28 +195,33 @@ impl UserData for LuaAgentInstance {
 
         // Tool Integration Methods
 
-        // discoverTools method
-        methods.add_method("discoverTools", |lua, this, ()| {
+        // discover_tools method
+        methods.add_method("discover_tools", |lua, this, ()| {
             let tools = this.bridge.list_tools();
             let tools_table = lua.create_table()?;
             for (i, tool_name) in tools.iter().enumerate() {
-                tools_table.set(i + 1, tool_name.clone())?;
+                #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                let lua_index = (i + 1) as i32;
+                tools_table.set(lua_index, tool_name.clone())?;
             }
             Ok(tools_table)
         });
 
-        // getToolMetadata method
-        methods.add_method("getToolMetadata", |lua, this, tool_name: String| {
+        // get_tool_metadata method
+        methods.add_method("get_tool_metadata", |lua, this, tool_name: String| {
             if let Some(metadata) = this.bridge.get_tool_metadata(&tool_name) {
                 // Convert JSON to Lua table
                 let metadata_table = lua.create_table()?;
-                if let Some(name) = metadata.get("name").and_then(|v| v.as_str()) {
+                if let Some(name) = metadata.get("name").and_then(serde_json::Value::as_str) {
                     metadata_table.set("name", name)?;
                 }
-                if let Some(desc) = metadata.get("description").and_then(|v| v.as_str()) {
+                if let Some(desc) = metadata
+                    .get("description")
+                    .and_then(serde_json::Value::as_str)
+                {
                     metadata_table.set("description", desc)?;
                 }
-                if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
+                if let Some(version) = metadata.get("version").and_then(serde_json::Value::as_str) {
                     metadata_table.set("version", version)?;
                 }
                 Ok(Some(metadata_table))
@@ -195,23 +241,34 @@ impl UserData for LuaAgentInstance {
                 let mut wrapped_params = std::collections::HashMap::new();
                 wrapped_params.insert("parameters".to_string(), tool_input_json);
 
-                let agent_input = llmspell_core::types::AgentInput {
-                    text: format!("Invoking tool: {}", tool_name),
-                    media: vec![],
-                    context: None,
-                    parameters: wrapped_params,
-                    output_modalities: vec![],
-                };
+                let mut builder = llmspell_core::types::AgentInput::builder()
+                    .text(format!("Invoking tool: {tool_name}"));
+
+                // Add parameters
+                for (key, value) in wrapped_params {
+                    builder = builder.parameter(key, value);
+                }
+
+                let agent_input = builder.build();
 
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();
+                let global_context = this.global_context.clone();
+
+                // Create ExecutionContext with state if available
+                let context = global_context.state_access.as_ref().map(|state_access| {
+                    ExecutionContextBuilder::new()
+                        .scope(ContextScope::Agent(ComponentId::from_name(&agent_name)))
+                        .state(state_access.clone())
+                        .build()
+                });
 
                 // Invoke the tool through the bridge
                 let result = block_on_async(
                     "agent_invokeTool",
                     async move {
                         bridge
-                            .invoke_tool_for_agent(&agent_name, &tool_name, agent_input, None)
+                            .invoke_tool_for_agent(&agent_name, &tool_name, agent_input, context)
                             .await
                     },
                     None,
@@ -222,25 +279,28 @@ impl UserData for LuaAgentInstance {
             },
         );
 
-        // hasTool method
-        methods.add_method("hasTool", |_lua, this, tool_name: String| {
+        // has_tool method
+        methods.add_method("has_tool", |_lua, this, tool_name: String| {
             Ok(this.bridge.has_tool(&tool_name))
         });
 
-        // getAllToolMetadata method
-        methods.add_method("getAllToolMetadata", |lua, this, ()| {
+        // get_all_tool_metadata method
+        methods.add_method("get_all_tool_metadata", |lua, this, ()| {
             let all_metadata = this.bridge.get_all_tool_metadata();
             let metadata_table = lua.create_table()?;
 
             for (tool_name, metadata) in all_metadata {
                 let tool_metadata_table = lua.create_table()?;
-                if let Some(name) = metadata.get("name").and_then(|v| v.as_str()) {
+                if let Some(name) = metadata.get("name").and_then(serde_json::Value::as_str) {
                     tool_metadata_table.set("name", name)?;
                 }
-                if let Some(desc) = metadata.get("description").and_then(|v| v.as_str()) {
+                if let Some(desc) = metadata
+                    .get("description")
+                    .and_then(serde_json::Value::as_str)
+                {
                     tool_metadata_table.set("description", desc)?;
                 }
-                if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
+                if let Some(version) = metadata.get("version").and_then(serde_json::Value::as_str) {
                     tool_metadata_table.set("version", version)?;
                 }
                 metadata_table.set(tool_name, tool_metadata_table)?;
@@ -251,8 +311,8 @@ impl UserData for LuaAgentInstance {
 
         // Monitoring & Lifecycle Methods
 
-        // getMetrics method - synchronous wrapper
-        methods.add_method("getMetrics", |lua, this, ()| {
+        // get_metrics method - synchronous wrapper
+        methods.add_method("get_metrics", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -266,10 +326,16 @@ impl UserData for LuaAgentInstance {
                 Ok(metrics) => {
                     let metrics_table = lua.create_table()?;
                     metrics_table.set("agent_id", metrics.agent_id.clone())?;
-                    metrics_table.set("requests_total", metrics.requests_total.get() as f64)?;
-                    metrics_table.set("requests_failed", metrics.requests_failed.get() as f64)?;
+                    #[allow(clippy::cast_precision_loss)]
+                    let requests_total = metrics.requests_total.get() as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let requests_failed = metrics.requests_failed.get() as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let tool_invocations = metrics.tool_invocations.get() as f64;
+                    metrics_table.set("requests_total", requests_total)?;
+                    metrics_table.set("requests_failed", requests_failed)?;
                     metrics_table.set("requests_active", metrics.requests_active.get())?;
-                    metrics_table.set("tool_invocations", metrics.tool_invocations.get() as f64)?;
+                    metrics_table.set("tool_invocations", tool_invocations)?;
                     metrics_table.set("memory_bytes", metrics.memory_bytes.get())?;
                     metrics_table.set("cpu_percent", metrics.cpu_percent.get())?;
                     Ok(Some(metrics_table))
@@ -278,8 +344,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getHealth method - synchronous wrapper
-        methods.add_method("getHealth", |lua, this, ()| {
+        // get_health method - synchronous wrapper
+        methods.add_method("get_health", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -293,13 +359,22 @@ impl UserData for LuaAgentInstance {
                 Ok(health_json) => {
                     // Convert JSON to Lua table
                     let health_table = lua.create_table()?;
-                    if let Some(status) = health_json.get("status").and_then(|v| v.as_str()) {
+                    if let Some(status) = health_json
+                        .get("status")
+                        .and_then(serde_json::Value::as_str)
+                    {
                         health_table.set("status", status)?;
                     }
-                    if let Some(message) = health_json.get("message").and_then(|v| v.as_str()) {
+                    if let Some(message) = health_json
+                        .get("message")
+                        .and_then(serde_json::Value::as_str)
+                    {
                         health_table.set("message", message)?;
                     }
-                    if let Some(timestamp) = health_json.get("timestamp").and_then(|v| v.as_str()) {
+                    if let Some(timestamp) = health_json
+                        .get("timestamp")
+                        .and_then(serde_json::Value::as_str)
+                    {
                         health_table.set("timestamp", timestamp)?;
                     }
                     Ok(Some(health_table))
@@ -308,8 +383,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getPerformance method - synchronous wrapper
-        methods.add_method("getPerformance", |lua, this, ()| {
+        // get_performance method - synchronous wrapper
+        methods.add_method("get_performance", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -322,23 +397,30 @@ impl UserData for LuaAgentInstance {
             match perf_result {
                 Ok(perf_json) => {
                     let perf_table = lua.create_table()?;
-                    if let Some(total_executions) =
-                        perf_json.get("total_executions").and_then(|v| v.as_u64())
+                    if let Some(total_executions) = perf_json
+                        .get("total_executions")
+                        .and_then(serde_json::Value::as_u64)
                     {
-                        perf_table.set("total_executions", total_executions as f64)?;
+                        #[allow(clippy::cast_precision_loss)]
+                        let total_exec_f64 = total_executions as f64;
+                        perf_table.set("total_executions", total_exec_f64)?;
                     }
                     if let Some(avg_time) = perf_json
                         .get("avg_execution_time_ms")
-                        .and_then(|v| v.as_f64())
+                        .and_then(serde_json::Value::as_f64)
                     {
                         perf_table.set("avg_execution_time_ms", avg_time)?;
                     }
-                    if let Some(success_rate) =
-                        perf_json.get("success_rate").and_then(|v| v.as_f64())
+                    if let Some(success_rate) = perf_json
+                        .get("success_rate")
+                        .and_then(serde_json::Value::as_f64)
                     {
                         perf_table.set("success_rate", success_rate)?;
                     }
-                    if let Some(error_rate) = perf_json.get("error_rate").and_then(|v| v.as_f64()) {
+                    if let Some(error_rate) = perf_json
+                        .get("error_rate")
+                        .and_then(serde_json::Value::as_f64)
+                    {
                         perf_table.set("error_rate", error_rate)?;
                     }
                     Ok(Some(perf_table))
@@ -367,8 +449,8 @@ impl UserData for LuaAgentInstance {
             },
         );
 
-        // configureAlerts method - synchronous wrapper
-        methods.add_method("configureAlerts", |_lua, this, config_table: Table| {
+        // configure_alerts method - synchronous wrapper
+        methods.add_method("configure_alerts", |_lua, this, config_table: Table| {
             // Convert Lua table to JSON for alert configuration
             let config_json = lua_table_to_json(config_table)?;
             let bridge = this.bridge.clone();
@@ -386,8 +468,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // getAlerts method - synchronous wrapper
-        methods.add_method("getAlerts", |lua, this, ()| {
+        // get_alerts method - synchronous wrapper
+        methods.add_method("get_alerts", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -401,17 +483,25 @@ impl UserData for LuaAgentInstance {
                 Ok(alerts) => {
                     let alerts_table = lua.create_table()?;
                     for (i, alert) in alerts.iter().enumerate() {
-                        let alert_table = lua.create_table()?;
-                        if let Some(severity) = alert.get("severity").and_then(|v| v.as_str()) {
-                            alert_table.set("severity", severity)?;
+                        let alert_item = lua.create_table()?;
+                        if let Some(severity) =
+                            alert.get("severity").and_then(serde_json::Value::as_str)
+                        {
+                            alert_item.set("severity", severity)?;
                         }
-                        if let Some(message) = alert.get("message").and_then(|v| v.as_str()) {
-                            alert_table.set("message", message)?;
+                        if let Some(message) =
+                            alert.get("message").and_then(serde_json::Value::as_str)
+                        {
+                            alert_item.set("message", message)?;
                         }
-                        if let Some(timestamp) = alert.get("timestamp").and_then(|v| v.as_str()) {
-                            alert_table.set("timestamp", timestamp)?;
+                        if let Some(timestamp) =
+                            alert.get("timestamp").and_then(serde_json::Value::as_str)
+                        {
+                            alert_item.set("timestamp", timestamp)?;
                         }
-                        alerts_table.set(i + 1, alert_table)?;
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                        let lua_index = (i + 1) as i32;
+                        alerts_table.set(lua_index, alert_item)?;
                     }
                     Ok(alerts_table)
                 }
@@ -419,8 +509,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getBridgeMetrics method (static bridge-wide metrics)
-        methods.add_method("getBridgeMetrics", |lua, this, ()| {
+        // get_bridge_metrics method (static bridge-wide metrics)
+        methods.add_method("get_bridge_metrics", |lua, this, ()| {
             let bridge_metrics = this.bridge.get_bridge_metrics();
             let metrics_table = lua.create_table()?;
 
@@ -454,8 +544,8 @@ impl UserData for LuaAgentInstance {
 
         // State Machine Methods
 
-        // getAgentState method - Get current agent state with full details - synchronous wrapper
-        methods.add_method("getAgentState", |_, this, ()| {
+        // get_agent_state method - Get current agent state with full details - synchronous wrapper
+        methods.add_method("get_agent_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -464,7 +554,7 @@ impl UserData for LuaAgentInstance {
                 async move { bridge.get_agent_state(&agent_name).await },
                 None,
             )?;
-            Ok(format!("{:?}", state))
+            Ok(format!("{state:?}"))
         });
 
         // initialize method - synchronous wrapper
@@ -545,8 +635,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // setError method - synchronous wrapper
-        methods.add_method("setError", |_, this, error_message: String| {
+        // set_error method - synchronous wrapper
+        methods.add_method("set_error", |_, this, error_message: String| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -571,8 +661,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // getStateHistory method - synchronous wrapper
-        methods.add_method("getStateHistory", |lua, this, ()| {
+        // get_state_history method - synchronous wrapper
+        methods.add_method("get_state_history", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -587,24 +677,34 @@ impl UserData for LuaAgentInstance {
                     let history_table = lua.create_table()?;
                     for (i, transition) in history.iter().enumerate() {
                         let transition_table = lua.create_table()?;
-                        if let Some(from) = transition.get("from").and_then(|v| v.as_str()) {
+                        if let Some(from) =
+                            transition.get("from").and_then(serde_json::Value::as_str)
+                        {
                             transition_table.set("from", from)?;
                         }
-                        if let Some(to) = transition.get("to").and_then(|v| v.as_str()) {
+                        if let Some(to) = transition.get("to").and_then(serde_json::Value::as_str) {
                             transition_table.set("to", to)?;
                         }
-                        if let Some(timestamp) =
-                            transition.get("timestamp").and_then(|v| v.as_str())
+                        if let Some(timestamp) = transition
+                            .get("timestamp")
+                            .and_then(serde_json::Value::as_str)
                         {
                             transition_table.set("timestamp", timestamp)?;
                         }
-                        if let Some(elapsed) = transition.get("elapsed").and_then(|v| v.as_f64()) {
+                        if let Some(elapsed) = transition
+                            .get("elapsed")
+                            .and_then(serde_json::Value::as_f64)
+                        {
                             transition_table.set("elapsed", elapsed)?;
                         }
-                        if let Some(reason) = transition.get("reason").and_then(|v| v.as_str()) {
+                        if let Some(reason) =
+                            transition.get("reason").and_then(serde_json::Value::as_str)
+                        {
                             transition_table.set("reason", reason)?;
                         }
-                        history_table.set(i + 1, transition_table)?;
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                        let lua_index = (i + 1) as i32;
+                        history_table.set(lua_index, transition_table)?;
                     }
                     Ok(history_table)
                 }
@@ -612,8 +712,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getLastError method - synchronous wrapper
-        methods.add_method("getLastError", |_, this, ()| {
+        // get_last_error method - synchronous wrapper
+        methods.add_method("get_last_error", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -629,8 +729,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getRecoveryAttempts method - synchronous wrapper
-        methods.add_method("getRecoveryAttempts", |_, this, ()| {
+        // get_recovery_attempts method - synchronous wrapper
+        methods.add_method("get_recovery_attempts", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -646,8 +746,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // isHealthy method - synchronous wrapper
-        methods.add_method("isHealthy", |_, this, ()| {
+        // is_healthy method - synchronous wrapper
+        methods.add_method("is_healthy", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -663,8 +763,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getStateMetrics method - synchronous wrapper
-        methods.add_method("getStateMetrics", |lua, this, ()| {
+        // get_state_metrics method - synchronous wrapper
+        methods.add_method("get_state_metrics", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -677,36 +777,51 @@ impl UserData for LuaAgentInstance {
             match metrics_result {
                 Ok(metrics_json) => {
                     let metrics_table = lua.create_table()?;
-                    if let Some(state) = metrics_json.get("current_state").and_then(|v| v.as_str())
+                    if let Some(state) = metrics_json
+                        .get("current_state")
+                        .and_then(serde_json::Value::as_str)
                     {
                         metrics_table.set("current_state", state)?;
                     }
                     if let Some(transitions) = metrics_json
                         .get("total_transitions")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                     {
-                        metrics_table.set("total_transitions", transitions as f64)?;
+                        #[allow(clippy::cast_precision_loss)]
+                        let transitions_f64 = transitions as f64;
+                        metrics_table.set("total_transitions", transitions_f64)?;
                     }
-                    if let Some(errors) = metrics_json.get("error_count").and_then(|v| v.as_u64()) {
-                        metrics_table.set("error_count", errors as f64)?;
+                    if let Some(errors) = metrics_json
+                        .get("error_count")
+                        .and_then(serde_json::Value::as_u64)
+                    {
+                        #[allow(clippy::cast_precision_loss)]
+                        let errors_f64 = errors as f64;
+                        metrics_table.set("error_count", errors_f64)?;
                     }
                     if let Some(attempts) = metrics_json
                         .get("recovery_attempts")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                     {
-                        metrics_table.set("recovery_attempts", attempts as f64)?;
+                        #[allow(clippy::cast_precision_loss)]
+                        let attempts_f64 = attempts as f64;
+                        metrics_table.set("recovery_attempts", attempts_f64)?;
                     }
-                    if let Some(uptime) = metrics_json.get("uptime").and_then(|v| v.as_f64()) {
+                    if let Some(uptime) = metrics_json
+                        .get("uptime")
+                        .and_then(serde_json::Value::as_f64)
+                    {
                         metrics_table.set("uptime", uptime)?;
                     }
-                    if let Some(last_transition) =
-                        metrics_json.get("last_transition").and_then(|v| v.as_str())
+                    if let Some(last_transition) = metrics_json
+                        .get("last_transition")
+                        .and_then(serde_json::Value::as_str)
                     {
                         metrics_table.set("last_transition", last_transition)?;
                     }
                     if let Some(state_dist) = metrics_json
                         .get("state_time_distribution")
-                        .and_then(|v| v.as_object())
+                        .and_then(serde_json::Value::as_object)
                     {
                         let dist_table = lua.create_table()?;
                         for (state, time) in state_dist {
@@ -724,17 +839,17 @@ impl UserData for LuaAgentInstance {
 
         // Context & Communication Methods
 
-        // executeWithContext method - synchronous wrapper
+        // execute_with_context method - synchronous wrapper
         methods.add_method(
-            "executeWithContext",
+            "execute_with_context",
             |lua, this, (input, context_id): (Table, String)| {
-                let agent_input = lua_table_to_agent_input(lua, input)?;
+                let agent_input = lua_table_to_agent_input(lua, &input)?;
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();
 
                 // Use shared sync utility to execute async code
                 let result = block_on_async(
-                    "agent_executeWithContext",
+                    "agent_execute_with_context",
                     async move {
                         bridge
                             .execute_agent_with_context(&agent_name, agent_input, &context_id)
@@ -761,7 +876,312 @@ impl UserData for LuaAgentInstance {
     }
 }
 
+/// Lua userdata representing an agent builder
+#[derive(Clone)]
+struct AgentBuilder {
+    bridge: Arc<AgentBridge>,
+    global_context: Arc<GlobalContext>,
+    name: Option<String>,
+    description: Option<String>,
+    model: Option<String>,
+    provider: Option<String>,
+    system_prompt: Option<String>,
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
+    max_conversation_length: Option<usize>,
+    base_url: Option<String>,
+    api_key: Option<String>,
+    allowed_tools: Vec<String>,
+    max_execution_time_secs: Option<u64>,
+    max_memory_mb: Option<u32>,
+    max_tool_calls: Option<u32>,
+    max_recursion_depth: Option<u32>,
+}
+
+impl AgentBuilder {
+    const fn new(bridge: Arc<AgentBridge>, global_context: Arc<GlobalContext>) -> Self {
+        Self {
+            bridge,
+            global_context,
+            name: None,
+            description: None,
+            model: None,
+            provider: None,
+            system_prompt: None,
+            temperature: None,
+            max_tokens: None,
+            max_conversation_length: None,
+            base_url: None,
+            api_key: None,
+            allowed_tools: Vec::new(),
+            max_execution_time_secs: None,
+            max_memory_mb: None,
+            max_tool_calls: None,
+            max_recursion_depth: None,
+        }
+    }
+}
+
+#[allow(clippy::too_many_lines)]
+impl UserData for AgentBuilder {
+    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        // name method
+        methods.add_method_mut("name", |_, this, name: String| {
+            this.name = Some(name);
+            Ok(this.clone())
+        });
+
+        // description method
+        methods.add_method_mut("description", |_, this, description: String| {
+            this.description = Some(description);
+            Ok(this.clone())
+        });
+
+        // model method - supports "provider/model" syntax
+        methods.add_method_mut("model", |_, this, model: String| {
+            if model.contains('/') {
+                let parts: Vec<&str> = model.splitn(2, '/').collect();
+                this.provider = Some(parts[0].to_string());
+                this.model = Some(parts[1].to_string());
+            } else {
+                this.model = Some(model);
+                if this.provider.is_none() {
+                    this.provider = Some("openai".to_string());
+                }
+            }
+            Ok(this.clone())
+        });
+
+        // provider method
+        methods.add_method_mut("provider", |_, this, provider: String| {
+            this.provider = Some(provider);
+            Ok(this.clone())
+        });
+
+        // system_prompt method
+        methods.add_method_mut("system_prompt", |_, this, prompt: String| {
+            this.system_prompt = Some(prompt);
+            Ok(this.clone())
+        });
+
+        // temperature method
+        methods.add_method_mut("temperature", |_, this, temp: f32| {
+            this.temperature = Some(temp);
+            Ok(this.clone())
+        });
+
+        // max_tokens method
+        methods.add_method_mut("max_tokens", |_, this, tokens: u32| {
+            this.max_tokens = Some(tokens);
+            Ok(this.clone())
+        });
+
+        // max_conversation_length method
+        methods.add_method_mut("max_conversation_length", |_, this, length: usize| {
+            this.max_conversation_length = Some(length);
+            Ok(this.clone())
+        });
+
+        // base_url method
+        methods.add_method_mut("base_url", |_, this, url: String| {
+            this.base_url = Some(url);
+            Ok(this.clone())
+        });
+
+        // api_key method
+        methods.add_method_mut("api_key", |_, this, key: String| {
+            this.api_key = Some(key);
+            Ok(this.clone())
+        });
+
+        // allowed_tools method - can be called multiple times
+        methods.add_method_mut("allow_tool", |_, this, tool: String| {
+            this.allowed_tools.push(tool);
+            Ok(this.clone())
+        });
+
+        // allowed_tools method - set all at once
+        methods.add_method_mut("allowed_tools", |_, this, tools: Vec<String>| {
+            this.allowed_tools = tools;
+            Ok(this.clone())
+        });
+
+        // Resource limit methods
+        methods.add_method_mut("max_execution_time", |_, this, secs: u64| {
+            this.max_execution_time_secs = Some(secs);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_memory_mb", |_, this, mb: u32| {
+            this.max_memory_mb = Some(mb);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_tool_calls", |_, this, calls: u32| {
+            this.max_tool_calls = Some(calls);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_recursion_depth", |_, this, depth: u32| {
+            this.max_recursion_depth = Some(depth);
+            Ok(this.clone())
+        });
+
+        // type method - for compatibility (always returns "llm" for now)
+        methods.add_method_mut("type", |_, this, _agent_type: String| {
+            // Currently only LLM agents are supported, so we ignore the input
+            // This method exists for API compatibility
+            Ok(this.clone())
+        });
+
+        // custom_config method - convenience method for setting multiple configs
+        methods.add_method_mut("custom_config", |_, this, config: Table| {
+            // Extract system_prompt if present
+            if let Ok(prompt) = config.get::<_, String>("system_prompt") {
+                this.system_prompt = Some(prompt);
+            }
+
+            // Extract max_conversation_length if present
+            if let Ok(len) = config.get::<_, usize>("max_conversation_length") {
+                this.max_conversation_length = Some(len);
+            }
+
+            Ok(this.clone())
+        });
+
+        // resource_limits method - convenience method for setting all resource limits
+        methods.add_method_mut("resource_limits", |_, this, limits: Table| {
+            if let Ok(secs) = limits.get::<_, u64>("max_execution_time_secs") {
+                this.max_execution_time_secs = Some(secs);
+            }
+
+            if let Ok(mb) = limits.get::<_, u32>("max_memory_mb") {
+                this.max_memory_mb = Some(mb);
+            }
+
+            if let Ok(calls) = limits.get::<_, u32>("max_tool_calls") {
+                this.max_tool_calls = Some(calls);
+            }
+
+            if let Ok(depth) = limits.get::<_, u32>("max_recursion_depth") {
+                this.max_recursion_depth = Some(depth);
+            }
+
+            Ok(this.clone())
+        });
+
+        // build method - creates the agent
+        methods.add_method("build", |_lua, this, ()| {
+            // Validate required fields
+            let model = this
+                .model
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("Model is required".to_string()))?;
+
+            let provider = this
+                .provider
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("Provider is required".to_string()))?;
+
+            // Generate name if not provided
+            let name = this.name.clone().unwrap_or_else(|| {
+                format!(
+                    "agent_{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .chars()
+                        .take(8)
+                        .collect::<String>()
+                )
+            });
+
+            // Create model configuration
+            let model_config = serde_json::json!({
+                "provider": provider,
+                "model_id": model,
+                "temperature": this.temperature,
+                "max_tokens": this.max_tokens,
+                "settings": {
+                    "base_url": this.base_url,
+                    "api_key": this.api_key
+                }
+            });
+
+            // Create custom config
+            let mut custom_config = serde_json::Map::new();
+            if let Some(prompt) = &this.system_prompt {
+                custom_config.insert("system_prompt".to_string(), serde_json::json!(prompt));
+            }
+            if let Some(len) = this.max_conversation_length {
+                custom_config.insert(
+                    "max_conversation_length".to_string(),
+                    serde_json::json!(len),
+                );
+            }
+
+            // Create full agent configuration
+            let agent_config = serde_json::json!({
+                "name": &name,
+                "description": this.description.as_deref().unwrap_or("LLM-powered agent"),
+                "agent_type": "llm",
+                "model": model_config,
+                "allowed_tools": this.allowed_tools,
+                "custom_config": custom_config,
+                "resource_limits": {
+                    "max_execution_time_secs": this.max_execution_time_secs.unwrap_or(300),
+                    "max_memory_mb": this.max_memory_mb.unwrap_or(512),
+                    "max_tool_calls": this.max_tool_calls.unwrap_or(100),
+                    "max_recursion_depth": this.max_recursion_depth.unwrap_or(10)
+                }
+            });
+
+            // Convert JSON value to HashMap for bridge
+            let config_map: HashMap<String, serde_json::Value> = match agent_config {
+                serde_json::Value::Object(map) => map.into_iter().collect(),
+                _ => {
+                    return Err(mlua::Error::RuntimeError(
+                        "Invalid agent configuration format".to_string(),
+                    ))
+                }
+            };
+
+            // Create agent using bridge
+            let bridge = this.bridge.clone();
+            let agent_name_clone = name.clone();
+            let agent_name_for_create = name;
+
+            block_on_async(
+                "agent_builder_create",
+                async move {
+                    bridge
+                        .create_agent(
+                            &agent_name_for_create,
+                            "llm", // agent_type from the config
+                            config_map,
+                        )
+                        .await
+                },
+                None,
+            )?;
+
+            // Return agent instance
+            Ok(LuaAgentInstance {
+                agent_instance_name: agent_name_clone,
+                bridge: this.bridge.clone(),
+                global_context: this.global_context.clone(),
+            })
+        });
+    }
+}
+
 /// Inject Agent global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_agent_global(
     lua: &Lua,
     context: &GlobalContext,
@@ -771,129 +1191,6 @@ pub fn inject_agent_global(
 
     // Store bridge reference in context for cross-global access
     context.set_bridge("agent", bridge.clone());
-
-    // Create Agent.create() function (synchronous wrapper)
-    let bridge_clone = bridge.clone();
-    let create_fn = lua.create_function(move |_lua, args: Table| {
-        let bridge = bridge_clone.clone();
-
-        // Extract configuration from Lua table
-        let name: String = args.get("name").unwrap_or_else(|_| {
-            format!(
-                "agent_{}",
-                uuid::Uuid::new_v4()
-                    .to_string()
-                    .chars()
-                    .take(8)
-                    .collect::<String>()
-            )
-        });
-        let description: String = args
-            .get("description")
-            .unwrap_or_else(|_| "LLM-powered agent".to_string());
-        let system_prompt: Option<String> = args.get("system_prompt").ok();
-        let temperature: Option<f32> = args.get("temperature").ok();
-        let max_tokens: Option<u32> = args.get("max_tokens").ok().map(|v: usize| v as u32);
-        let max_conversation_length: Option<usize> = args.get("max_conversation_length").ok();
-        let base_url: Option<String> = args.get("base_url").ok();
-        let api_key: Option<String> = args.get("api_key").ok();
-
-        // Get model specification - support both "model" and "provider_model" fields
-        let model_str = args
-            .get::<_, Option<String>>("model")
-            .ok()
-            .flatten()
-            .or_else(|| {
-                args.get::<_, Option<String>>("provider_model")
-                    .ok()
-                    .flatten()
-            })
-            .ok_or_else(|| {
-                mlua::Error::RuntimeError(
-                    "Model specification required (use 'model' field)".to_string(),
-                )
-            })?;
-
-        // Parse provider/model syntax (e.g., "openai/gpt-4")
-        let (provider, model_id) = if model_str.contains('/') {
-            let parts: Vec<&str> = model_str.splitn(2, '/').collect();
-            (parts[0].to_string(), parts[1].to_string())
-        } else {
-            // Default to openai if no provider specified
-            ("openai".to_string(), model_str)
-        };
-
-        // Create model configuration
-        let model_config = serde_json::json!({
-            "provider": provider,
-            "model_id": model_id,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "settings": {
-                "base_url": base_url,
-                "api_key": api_key
-            }
-        });
-
-        // Create custom config for agent
-        let mut custom_config = serde_json::Map::new();
-        if let Some(prompt) = system_prompt {
-            custom_config.insert("system_prompt".to_string(), serde_json::json!(prompt));
-        }
-        if let Some(len) = max_conversation_length {
-            custom_config.insert(
-                "max_conversation_length".to_string(),
-                serde_json::json!(len),
-            );
-        }
-
-        // Create full agent configuration
-        let agent_config = serde_json::json!({
-            "name": name.clone(),
-            "description": description,
-            "agent_type": "llm",  // Default to LLM agent type
-            "model": model_config,
-            "allowed_tools": [],  // Can be extended later
-            "custom_config": custom_config,
-            "resource_limits": {
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }
-        });
-
-        // Convert JSON value to HashMap for bridge
-        let config_map: HashMap<String, serde_json::Value> = match agent_config {
-            serde_json::Value::Object(map) => map.into_iter().collect(),
-            _ => {
-                return Err(mlua::Error::RuntimeError(
-                    "Invalid agent configuration format".to_string(),
-                ))
-            }
-        };
-
-        // Use block_on to execute async code synchronously
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                // Create the agent through discovery
-                bridge
-                    .create_agent(&name, "llm", config_map)
-                    .await
-                    .map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to create agent: {}", e))
-                    })?;
-
-                // Create Lua agent instance
-                let agent_instance = LuaAgentInstance {
-                    agent_instance_name: name,
-                    bridge: bridge.clone(),
-                };
-
-                Ok(agent_instance)
-            })
-        })
-    })?;
 
     // Create Agent.list() function
     let bridge_clone = bridge.clone();
@@ -913,9 +1210,7 @@ pub fn inject_agent_global(
     // Create Agent.discover() function
     let bridge_clone = bridge.clone();
     let discover_fn = lua.create_function(move |lua, ()| {
-        let agent_types = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(bridge_clone.list_agent_types())
-        });
+        let agent_types = bridge_clone.list_agent_types();
         let discover_table = lua.create_table()?;
         for (i, agent_type) in agent_types.into_iter().enumerate() {
             let agent_table = lua.create_table()?;
@@ -925,7 +1220,7 @@ pub fn inject_agent_global(
         Ok(discover_table)
     })?;
 
-    // Create Agent.wrapAsTool() function
+    // Create Agent.wrap_as_tool() function
     let bridge_clone = bridge.clone();
     let wrap_as_tool_fn = lua.create_function(move |_lua, args: (String, Table)| {
         let (agent_name, config) = args;
@@ -933,7 +1228,7 @@ pub fn inject_agent_global(
 
         // Convert Lua table to JSON
         let config_value = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         // Use sync wrapper to call async method
         let tool_name = block_on_async(
@@ -941,23 +1236,24 @@ pub fn inject_agent_global(
             bridge.wrap_agent_as_tool(&agent_name, config_value),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to wrap agent as tool: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to wrap agent as tool: {e}")))?;
 
         Ok(tool_name)
     })?;
 
-    // Create Agent.getInfo() function
+    // Create Agent.get_info() function
     let bridge_clone = bridge.clone();
     let get_info_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
 
         // Use sync wrapper to call async method
-        let agent_info = block_on_async("agent_getInfo", bridge.get_agent_info(&agent_name), None)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent info: {}", e)))?;
+        let agent_info = bridge
+            .get_agent_info(&agent_name)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent info: {e}")))?;
 
         // Convert AgentInfo to JSON, then to Lua table
         let info_json = serde_json::to_value(&agent_info).map_err(|e| {
-            mlua::Error::RuntimeError(format!("Failed to serialize agent info: {}", e))
+            mlua::Error::RuntimeError(format!("Failed to serialize agent info: {e}"))
         })?;
         let info_table = json_to_lua_value(lua, &info_json)?;
         match info_table {
@@ -968,7 +1264,7 @@ pub fn inject_agent_global(
         }
     })?;
 
-    // Create Agent.listCapabilities() function
+    // Create Agent.list_capabilities() function
     let bridge_clone = bridge.clone();
     let list_capabilities_fn = lua.create_function(move |lua, ()| {
         let bridge = bridge_clone.clone();
@@ -979,7 +1275,7 @@ pub fn inject_agent_global(
             bridge.list_agent_capabilities(),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to list capabilities: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to list capabilities: {e}")))?;
 
         // Convert JSON to Lua table
         let capabilities_table = json_to_lua_value(lua, &capabilities_json)?;
@@ -991,35 +1287,35 @@ pub fn inject_agent_global(
         }
     })?;
 
-    // Create Agent.createComposite() function
+    // Create Agent.create_composite() function
     let bridge_clone = bridge.clone();
     let create_composite_fn = lua.create_function(move |_lua, args: (String, Table, Table)| {
-        let (name, agents_table, config) = args;
+        let (name, agent_list, config) = args;
         let bridge = bridge_clone.clone();
 
         // Convert agents table to Vec<String>
         let mut agents = Vec::new();
-        for pair in agents_table.pairs::<mlua::Integer, String>() {
+        for pair in agent_list.pairs::<mlua::Integer, String>() {
             let (_, agent_name) = pair?;
             agents.push(agent_name);
         }
 
         // Convert config to JSON
         let config_json = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         // Use sync wrapper to call async method
         block_on_async(
-            "agent_createComposite",
+            "agent_create_composite",
             bridge.create_composite_agent(name, agents, config_json),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create composite: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create composite: {e}")))?;
 
         Ok(())
     })?;
 
-    // Create Agent.discoverByCapability() function
+    // Create Agent.discover_by_capability() function
     let bridge_clone = bridge.clone();
     let discover_by_capability_fn = lua.create_function(move |lua, capability: String| {
         let bridge = bridge_clone.clone();
@@ -1030,14 +1326,14 @@ pub fn inject_agent_global(
             bridge.discover_agents_by_capability(&capability),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to discover agents: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to discover agents: {e}")))?;
 
         // Convert to Lua table
-        let agents_table = lua.create_table()?;
+        let agent_results = lua.create_table()?;
         for (i, agent_name) in agents.into_iter().enumerate() {
-            agents_table.set(i + 1, agent_name)?;
+            agent_results.set(i + 1, agent_name)?;
         }
-        Ok(agents_table)
+        Ok(agent_results)
     })?;
 
     // Create Agent.register() function - alias for create
@@ -1062,7 +1358,7 @@ pub fn inject_agent_global(
 
         // Convert entire args table to JSON for config
         let mut config_json = lua_table_to_json(args)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         // Fix empty objects that should be arrays
         if let serde_json::Value::Object(ref mut map) = config_json {
@@ -1093,7 +1389,7 @@ pub fn inject_agent_global(
             bridge.create_agent(&name, &agent_type, config_map),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {e}")))?;
 
         // Return the agent name
         Ok(name)
@@ -1101,9 +1397,11 @@ pub fn inject_agent_global(
 
     // Create Agent.get() function
     let bridge_clone = bridge.clone();
+    let context_clone = Arc::new(context.clone());
     let get_fn = lua.create_function(move |_lua, agent_name: String| {
         let bridge = bridge_clone.clone();
         let name = agent_name.clone();
+        let global_context = context_clone.clone();
 
         // Use sync wrapper to call async method
         let agent_exists = tokio::task::block_in_place(|| {
@@ -1115,7 +1413,8 @@ pub fn inject_agent_global(
             // Create Lua agent instance
             let agent_instance = LuaAgentInstance {
                 agent_instance_name: agent_name,
-                bridge: bridge.clone(),
+                bridge,
+                global_context,
             };
             Ok(Some(agent_instance))
         } else {
@@ -1123,12 +1422,10 @@ pub fn inject_agent_global(
         }
     })?;
 
-    // Create Agent.listTemplates() function
+    // Create Agent.list_templates() function
     let bridge_clone = bridge.clone();
     let list_templates_fn = lua.create_function(move |lua, ()| {
-        let templates = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(bridge_clone.list_templates())
-        });
+        let templates = bridge_clone.list_templates();
         let list_table = lua.create_table()?;
         for (i, template) in templates.into_iter().enumerate() {
             list_table.set(i + 1, template)?;
@@ -1136,12 +1433,14 @@ pub fn inject_agent_global(
         Ok(list_table)
     })?;
 
-    // Create Agent.createFromTemplate() function
+    // Create Agent.create_from_template() function
     let bridge_clone = bridge.clone();
+    let context_clone2 = Arc::new(context.clone());
     let create_from_template_fn =
         lua.create_function(move |_lua, args: (String, String, Table)| {
             let (instance_name, template_name, params) = args;
             let bridge = bridge_clone.clone();
+            let global_context = context_clone2.clone();
 
             // Convert Lua table to HashMap
             let mut parameters = HashMap::new();
@@ -1159,18 +1458,19 @@ pub fn inject_agent_global(
                 None,
             )
             .map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to create from template: {}", e))
+                mlua::Error::RuntimeError(format!("Failed to create from template: {e}"))
             })?;
 
             // Return the created agent instance
             let agent_instance = LuaAgentInstance {
-                agent_instance_name: instance_name.clone(),
-                bridge: bridge.clone(),
+                agent_instance_name: instance_name,
+                bridge,
+                global_context,
             };
             Ok(agent_instance)
         })?;
 
-    // Create Agent.listInstances() function (alias for list)
+    // Create Agent.list_instances() function (alias for list)
     let bridge_clone = bridge.clone();
     let list_instances_fn = lua.create_function(move |lua, ()| {
         let instances = tokio::task::block_in_place(|| {
@@ -1185,32 +1485,31 @@ pub fn inject_agent_global(
 
     // Context Management Functions
 
-    // Create Agent.createContext() function
+    // Create Agent.create_context() function
     let bridge_clone = bridge.clone();
     let create_context_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
         let config_json = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         let context_id = block_on_async(
             "agent_createContext",
             bridge.create_context(config_json),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create context: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create context: {e}")))?;
 
         Ok(context_id)
     })?;
 
-    // Create Agent.createChildContext() function
+    // Create Agent.create_child_context() function
     let bridge_clone = bridge.clone();
     let create_child_context_fn =
         lua.create_function(move |_lua, args: (String, Table, String)| {
             let (parent_id, scope, inheritance) = args;
             let bridge = bridge_clone.clone();
-            let scope_json = lua_table_to_json(scope).map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to convert scope: {}", e))
-            })?;
+            let scope_json = lua_table_to_json(scope)
+                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
             let child_id = block_on_async(
                 "agent_createChildContext",
@@ -1218,31 +1517,31 @@ pub fn inject_agent_global(
                 None,
             )
             .map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to create child context: {}", e))
+                mlua::Error::RuntimeError(format!("Failed to create child context: {e}"))
             })?;
 
             Ok(child_id)
         })?;
 
-    // Create Agent.updateContext() function
+    // Create Agent.update_context() function
     let bridge_clone = bridge.clone();
     let update_context_fn = lua.create_function(move |_lua, args: (String, String, Value)| {
         let (context_id, key, value) = args;
         let bridge = bridge_clone.clone();
         let value_json = crate::lua::conversion::lua_value_to_json(value)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
         block_on_async(
             "agent_updateContext",
             bridge.update_context(&context_id, key, value_json),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to update context: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to update context: {e}")))?;
 
         Ok(())
     })?;
 
-    // Create Agent.getContextData() function
+    // Create Agent.get_context_data() function
     let bridge_clone = bridge.clone();
     let get_context_data_fn = lua.create_function(move |lua, args: (String, String)| {
         let (context_id, key) = args;
@@ -1253,15 +1552,12 @@ pub fn inject_agent_global(
             bridge.get_context_data(&context_id, &key),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get context data: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get context data: {e}")))?;
 
-        match result {
-            Some(value) => json_to_lua_value(lua, &value),
-            None => Ok(Value::Nil),
-        }
+        result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;
 
-    // Create Agent.removeContext() function
+    // Create Agent.remove_context() function
     let bridge_clone = bridge.clone();
     let remove_context_fn = lua.create_function(move |_lua, context_id: String| {
         let bridge = bridge_clone.clone();
@@ -1271,55 +1567,46 @@ pub fn inject_agent_global(
             bridge.remove_context(&context_id),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to remove context: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to remove context: {e}")))?;
 
         Ok(())
     })?;
 
     // Shared Memory Functions
 
-    // Create Agent.setSharedMemory() function
+    // Create Agent.set_shared_memory() function
     let bridge_clone = bridge.clone();
     let set_shared_memory_fn = lua.create_function(move |_lua, args: (Table, String, Value)| {
         let (scope, key, value) = args;
         let bridge = bridge_clone.clone();
         let scope_json = lua_table_to_json(scope)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
         let value_json = crate::lua::conversion::lua_value_to_json(value)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
-        block_on_async(
-            "agent_setSharedMemory",
-            bridge.set_shared_memory(scope_json, key, value_json),
-            None,
-        )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {}", e)))?;
+        bridge
+            .set_shared_memory(&scope_json, key, value_json)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {e}")))?;
 
         Ok(())
     })?;
 
-    // Create Agent.getSharedMemory() function
+    // Create Agent.get_shared_memory() function
     let bridge_clone = bridge.clone();
     let get_shared_memory_fn = lua.create_function(move |lua, args: (Table, String)| {
         let (scope, key) = args;
         let bridge = bridge_clone.clone();
         let scope_json = lua_table_to_json(scope)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
-        let result = block_on_async(
-            "agent_getSharedMemory",
-            bridge.get_shared_memory(scope_json, &key),
-            None,
-        )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {}", e)))?;
+        let result = bridge
+            .get_shared_memory(&scope_json, &key)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
 
-        match result {
-            Some(value) => json_to_lua_value(lua, &value),
-            None => Ok(Value::Nil),
-        }
+        result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;
 
-    // Create Agent.getHierarchy() function
+    // Create Agent.get_hierarchy() function
     let bridge_clone = bridge.clone();
     let get_hierarchy_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
@@ -1329,12 +1616,12 @@ pub fn inject_agent_global(
             bridge.get_composition_hierarchy(&agent_name),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get hierarchy: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get hierarchy: {e}")))?;
 
         json_to_lua_value(lua, &hierarchy)
     })?;
 
-    // Create Agent.getDetails() function (alias for getInfo with different return format)
+    // Create Agent.get_details() function (alias for get_info with different return format)
     let bridge_clone = bridge.clone();
     let get_details_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
@@ -1344,34 +1631,58 @@ pub fn inject_agent_global(
             bridge.get_agent_details(&agent_name),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent details: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent details: {e}")))?;
 
         json_to_lua_value(lua, &details)
     })?;
 
+    // Add builder() method
+    let bridge_for_builder = bridge;
+    let context_for_builder = Arc::new(context.clone());
+    let builder_fn = lua.create_function(move |_lua, ()| {
+        Ok(AgentBuilder::new(
+            bridge_for_builder.clone(),
+            context_for_builder.clone(),
+        ))
+    })?;
+    agent_table.set("builder", builder_fn)?;
+
+    // Replace create() with deprecation notice
+    let create_deprecated_fn = lua.create_function(|_, _: Value| {
+        Err::<Value, _>(mlua::Error::RuntimeError(
+            "Agent.create() is deprecated. Use Agent.builder() instead:\n\
+             local agent = Agent.builder()\n\
+                 :name('my_agent')\n\
+                 :model('openai/gpt-4')\n\
+                 :temperature(0.7)\n\
+                 :build()"
+                .to_string(),
+        ))
+    })?;
+
     // Set functions on Agent table
-    agent_table.set("create", create_fn)?;
+    agent_table.set("create", create_deprecated_fn)?;
     agent_table.set("list", list_fn)?;
     agent_table.set("discover", discover_fn)?;
-    agent_table.set("wrapAsTool", wrap_as_tool_fn)?;
-    agent_table.set("getInfo", get_info_fn)?;
-    agent_table.set("listCapabilities", list_capabilities_fn)?;
-    agent_table.set("createComposite", create_composite_fn)?;
-    agent_table.set("discoverByCapability", discover_by_capability_fn)?;
+    agent_table.set("wrap_as_tool", wrap_as_tool_fn)?;
+    agent_table.set("get_info", get_info_fn)?;
+    agent_table.set("list_capabilities", list_capabilities_fn)?;
+    agent_table.set("create_composite", create_composite_fn)?;
+    agent_table.set("discover_by_capability", discover_by_capability_fn)?;
     agent_table.set("register", register_fn)?;
     agent_table.set("get", get_fn)?;
-    agent_table.set("listTemplates", list_templates_fn)?;
-    agent_table.set("createFromTemplate", create_from_template_fn)?;
-    agent_table.set("listInstances", list_instances_fn)?;
-    agent_table.set("createContext", create_context_fn)?;
-    agent_table.set("createChildContext", create_child_context_fn)?;
-    agent_table.set("updateContext", update_context_fn)?;
-    agent_table.set("getContextData", get_context_data_fn)?;
-    agent_table.set("removeContext", remove_context_fn)?;
-    agent_table.set("setSharedMemory", set_shared_memory_fn)?;
-    agent_table.set("getSharedMemory", get_shared_memory_fn)?;
-    agent_table.set("getHierarchy", get_hierarchy_fn)?;
-    agent_table.set("getDetails", get_details_fn)?;
+    agent_table.set("list_templates", list_templates_fn)?;
+    agent_table.set("create_from_template", create_from_template_fn)?;
+    agent_table.set("list_instances", list_instances_fn)?;
+    agent_table.set("create_context", create_context_fn)?;
+    agent_table.set("create_child_context", create_child_context_fn)?;
+    agent_table.set("update_context", update_context_fn)?;
+    agent_table.set("get_context_data", get_context_data_fn)?;
+    agent_table.set("remove_context", remove_context_fn)?;
+    agent_table.set("set_shared_memory", set_shared_memory_fn)?;
+    agent_table.set("get_shared_memory", get_shared_memory_fn)?;
+    agent_table.set("get_hierarchy", get_hierarchy_fn)?;
+    agent_table.set("get_details", get_details_fn)?;
 
     // Set Agent as global
     lua.globals().set("Agent", agent_table)?;

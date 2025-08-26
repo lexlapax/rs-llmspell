@@ -1,6 +1,8 @@
 //! ABOUTME: Tool execution state machine for tracking tool lifecycle states
 //! ABOUTME: Provides state transitions and validation for tool execution phases
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -31,23 +33,21 @@ pub enum ToolExecutionState {
 
 impl ToolExecutionState {
     /// Check if tool can start execution
-    pub fn can_execute(&self) -> bool {
-        matches!(self, ToolExecutionState::Ready)
+    #[must_use]
+    pub const fn can_execute(&self) -> bool {
+        matches!(self, Self::Ready)
     }
 
     /// Check if tool is in a final state
-    pub fn is_terminal(&self) -> bool {
-        matches!(self, ToolExecutionState::Terminated)
+    #[must_use]
+    pub const fn is_terminal(&self) -> bool {
+        matches!(self, Self::Terminated)
     }
 
     /// Check if tool is healthy
-    pub fn is_healthy(&self) -> bool {
-        matches!(
-            self,
-            ToolExecutionState::Ready
-                | ToolExecutionState::Executing
-                | ToolExecutionState::Completed
-        )
+    #[must_use]
+    pub const fn is_healthy(&self) -> bool {
+        matches!(self, Self::Ready | Self::Executing | Self::Completed)
     }
 }
 
@@ -74,6 +74,7 @@ pub struct StateTransition {
 
 impl ToolStateMachine {
     /// Create a new tool state machine
+    #[must_use]
     pub fn new(tool_name: String) -> Self {
         Self {
             state: Arc::new(RwLock::new(ToolExecutionState::Uninitialized)),
@@ -94,12 +95,17 @@ impl ToolStateMachine {
     }
 
     /// Transition to a new state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the requested state transition is invalid
+    /// according to the state machine rules
     pub async fn transition_to(&self, new_state: ToolExecutionState) -> Result<()> {
         let mut state_guard = self.state.write().await;
         let current_state = *state_guard;
 
         // Validate transition
-        if !self.is_valid_transition(current_state, new_state) {
+        if !Self::is_valid_transition(current_state, new_state) {
             return Err(anyhow::anyhow!(
                 "Invalid state transition for tool '{}': {:?} -> {:?}",
                 self.tool_name,
@@ -134,6 +140,10 @@ impl ToolStateMachine {
     }
 
     /// Initialize the tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn initialize(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Initializing).await?;
         // Simulate initialization time
@@ -142,26 +152,47 @@ impl ToolStateMachine {
     }
 
     /// Start execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn start_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Executing).await
     }
 
     /// Complete execution successfully
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn complete_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Completed).await
     }
 
     /// Fail execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn fail_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Failed).await
     }
 
     /// Start cleanup
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn start_cleanup(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::CleaningUp).await
     }
 
     /// Terminate the tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition to Terminated is invalid
+    /// from the current state
     pub async fn terminate(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Terminated).await
     }
@@ -177,11 +208,10 @@ impl ToolStateMachine {
         let current_state = *self.state.read().await;
 
         let total_transitions = history.len();
-        let execution_time = if let Some(last_transition) = history.last() {
-            last_transition.duration_since_last
-        } else {
-            Instant::now().duration_since(self.created_at)
-        };
+        let execution_time = history.last().map_or_else(
+            || Instant::now().duration_since(self.created_at),
+            |last_transition| last_transition.duration_since_last,
+        );
 
         // Count state durations
         let mut state_durations = std::collections::HashMap::new();
@@ -212,43 +242,22 @@ impl ToolStateMachine {
     }
 
     /// Validate if a state transition is allowed
-    fn is_valid_transition(&self, from: ToolExecutionState, to: ToolExecutionState) -> bool {
-        use ToolExecutionState::*;
+    const fn is_valid_transition(from: ToolExecutionState, to: ToolExecutionState) -> bool {
+        use ToolExecutionState::{
+            CleaningUp, Completed, Executing, Failed, Initializing, Ready, Terminated,
+            Uninitialized,
+        };
 
         match (from, to) {
-            // From Uninitialized
-            (Uninitialized, Initializing) => true,
-            (Uninitialized, Terminated) => true, // Direct termination
-
-            // From Initializing
-            (Initializing, Ready) => true,
-            (Initializing, Failed) => true,
-            (Initializing, Terminated) => true,
-
-            // From Ready
-            (Ready, Executing) => true,
-            (Ready, CleaningUp) => true,
-            (Ready, Terminated) => true,
-
-            // From Executing
-            (Executing, Completed) => true,
-            (Executing, Failed) => true,
-
-            // From Completed
-            (Completed, CleaningUp) => true,
-            (Completed, Terminated) => true,
-
-            // From Failed
-            (Failed, CleaningUp) => true,
-            (Failed, Terminated) => true,
-
-            // From CleaningUp
-            (CleaningUp, Terminated) => true,
+            // All valid transitions
+            (Uninitialized, Initializing | Terminated)
+            | (Initializing, Ready | Failed | Terminated)
+            | (Ready, Executing | CleaningUp | Terminated)
+            | (Executing, Completed | Failed)
+            | (Completed | Failed, CleaningUp | Terminated)
+            | (CleaningUp, Terminated) => true,
 
             // Terminal states cannot transition
-            (Terminated, _) => false,
-
-            // Any other transition is invalid
             _ => false,
         }
     }
@@ -267,6 +276,7 @@ pub struct ExecutionStats {
 
 impl ExecutionStats {
     /// Get time spent in a specific state
+    #[must_use]
     pub fn time_in_state(&self, state: ToolExecutionState) -> Duration {
         self.state_durations
             .get(&state)
@@ -275,6 +285,7 @@ impl ExecutionStats {
     }
 
     /// Get percentage of time spent in a specific state
+    #[must_use]
     pub fn state_percentage(&self, state: ToolExecutionState) -> f64 {
         if self.execution_time.is_zero() {
             return 0.0;
@@ -288,7 +299,6 @@ impl ExecutionStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_tool_state_machine_creation() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -302,7 +312,6 @@ mod tests {
                 .await
         );
     }
-
     #[tokio::test]
     async fn test_valid_state_transitions() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -338,7 +347,6 @@ mod tests {
             ToolExecutionState::Terminated
         );
     }
-
     #[tokio::test]
     async fn test_failure_flow() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -354,7 +362,6 @@ mod tests {
         assert!(state_machine.start_cleanup().await.is_ok());
         assert!(state_machine.terminate().await.is_ok());
     }
-
     #[tokio::test]
     async fn test_invalid_transitions() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -368,7 +375,6 @@ mod tests {
         let result = state_machine.complete_execution().await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_execution_stats() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -388,7 +394,6 @@ mod tests {
         assert!(stats.is_healthy);
         assert!(!stats.is_terminal); // Completed is not terminal until cleanup
     }
-
     #[tokio::test]
     async fn test_transition_history() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -412,7 +417,6 @@ mod tests {
         assert_eq!(history[3].from, ToolExecutionState::Executing);
         assert_eq!(history[3].to, ToolExecutionState::Completed);
     }
-
     #[tokio::test]
     async fn test_state_checks() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());

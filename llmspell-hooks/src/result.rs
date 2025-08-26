@@ -172,27 +172,23 @@ impl ForkBuilder {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_hook_result_continuation() {
         assert!(HookResult::Continue.should_continue());
         assert!(HookResult::Modified(json!({})).should_continue());
         assert!(!HookResult::Cancel("test".to_string()).should_continue());
     }
-
     #[test]
     fn test_hook_result_cancellation() {
         assert!(HookResult::Cancel("reason".to_string()).is_cancelled());
         assert!(!HookResult::Continue.is_cancelled());
     }
-
     #[test]
     fn test_hook_result_special_handling() {
         assert!(!HookResult::Continue.requires_special_handling());
         assert!(HookResult::Modified(json!({})).requires_special_handling());
         assert!(HookResult::Cancel("test".to_string()).requires_special_handling());
     }
-
     #[test]
     fn test_retry_builder() {
         let result = RetryBuilder::new()
@@ -211,7 +207,6 @@ mod tests {
             _ => panic!("Expected Retry result"),
         }
     }
-
     #[test]
     fn test_fork_builder() {
         let result = ForkBuilder::new()
@@ -238,7 +233,6 @@ mod tests {
             _ => panic!("Expected Fork result"),
         }
     }
-
     #[test]
     fn test_hook_result_serialization() {
         let results = vec![

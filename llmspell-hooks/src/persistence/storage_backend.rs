@@ -152,8 +152,11 @@ impl StorageBackend for InMemoryStorageBackend {
             stats.total_executions += 1;
             stats.total_size_bytes += original_size;
             stats.compressed_size_bytes += compressed_size;
-            stats.compression_ratio =
-                stats.compressed_size_bytes as f64 / stats.total_size_bytes as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let compressed_f64 = stats.compressed_size_bytes as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = stats.total_size_bytes as f64;
+            stats.compression_ratio = compressed_f64 / total_f64;
 
             // Update timestamps
             if stats.oldest_execution.is_none()
@@ -244,8 +247,11 @@ impl StorageBackend for InMemoryStorageBackend {
                     .saturating_sub(compressed.len() as u64);
 
                 if stats.total_size_bytes > 0 {
-                    stats.compression_ratio =
-                        stats.compressed_size_bytes as f64 / stats.total_size_bytes as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let compressed_f64 = stats.compressed_size_bytes as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let total_f64 = stats.total_size_bytes as f64;
+                    stats.compression_ratio = compressed_f64 / total_f64;
                 }
 
                 if let Some(count) = stats.executions_by_hook.get_mut(&execution.hook_id) {
@@ -604,7 +610,6 @@ mod tests {
 
         (execution, metadata)
     }
-
     #[tokio::test]
     async fn test_in_memory_storage() {
         let backend = InMemoryStorageBackend::new();
@@ -648,7 +653,6 @@ mod tests {
             .unwrap();
         assert!(loaded.is_none());
     }
-
     #[tokio::test]
     async fn test_compression() {
         // Use larger, repetitive data that compresses well
@@ -675,7 +679,6 @@ mod tests {
             compression_ratio
         );
     }
-
     #[tokio::test]
     async fn test_cleanup_by_age() {
         let backend = InMemoryStorageBackend::new();

@@ -1,13 +1,13 @@
 //! ABOUTME: Workflow trait for orchestration components
-//! ABOUTME: Extends BaseAgent with step management and execution planning
+//! ABOUTME: Extends `BaseAgent` with step management and execution planning
 
 use super::base_agent::BaseAgent;
 use crate::types::AgentOutput;
 use crate::{ComponentId, Result};
 use async_trait::async_trait;
+use core::time::Duration;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
-use std::time::Duration;
 
 /// Workflow step definition.
 ///
@@ -35,42 +35,80 @@ use std::time::Duration;
 /// assert_eq!(step.dependencies.len(), 2);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct WorkflowStep {
-    pub id: ComponentId,
-    pub name: String,
     pub component_id: ComponentId,
     pub dependencies: Vec<ComponentId>,
+    pub id: ComponentId,
+    pub name: String,
     pub retry_policy: Option<RetryPolicy>,
     pub timeout: Option<Duration>,
 }
 
 impl WorkflowStep {
     /// Create a new workflow step
+    #[must_use]
+    #[inline]
     pub fn new(name: String, component_id: ComponentId) -> Self {
         Self {
-            id: ComponentId::new(),
-            name,
             component_id,
             dependencies: Vec::new(),
+            id: ComponentId::new(),
+            name,
             retry_policy: None,
             timeout: None,
         }
     }
 
+    /// Create a workflow step with all fields
+    #[must_use]
+    #[inline]
+    pub const fn with_all_fields(
+        id: ComponentId,
+        name: String,
+        component_id: ComponentId,
+        dependencies: Vec<ComponentId>,
+        retry_policy: Option<RetryPolicy>,
+        timeout: Option<Duration>,
+    ) -> Self {
+        Self {
+            component_id,
+            dependencies,
+            id,
+            name,
+            retry_policy,
+            timeout,
+        }
+    }
+
+    /// Set dependencies
+    #[must_use]
+    #[inline]
+    pub fn with_dependencies(mut self, dependencies: Vec<ComponentId>) -> Self {
+        self.dependencies = dependencies;
+        self
+    }
+
     /// Add a dependency
+    #[must_use]
+    #[inline]
     pub fn with_dependency(mut self, dep: ComponentId) -> Self {
         self.dependencies.push(dep);
         self
     }
 
     /// Set retry policy
-    pub fn with_retry(mut self, policy: RetryPolicy) -> Self {
+    #[must_use]
+    #[inline]
+    pub const fn with_retry(mut self, policy: RetryPolicy) -> Self {
         self.retry_policy = Some(policy);
         self
     }
 
     /// Set timeout
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    #[inline]
+    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
@@ -86,11 +124,11 @@ impl WorkflowStep {
 /// ```
 /// use llmspell_core::traits::workflow::RetryPolicy;
 ///
-/// let policy = RetryPolicy {
-///     max_attempts: 5,
-///     backoff_seconds: 2,
-///     exponential_backoff: true,
-/// };
+/// // RetryPolicy is #[non_exhaustive], so we use Default and modify fields
+/// let mut policy = RetryPolicy::default();
+/// policy.max_attempts = 5;
+/// policy.backoff_seconds = 2;
+/// policy.exponential_backoff = true;
 ///
 /// // Default policy
 /// let default = RetryPolicy::default();
@@ -98,47 +136,101 @@ impl WorkflowStep {
 /// assert!(default.exponential_backoff);
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct RetryPolicy {
-    pub max_attempts: u32,
     pub backoff_seconds: u32,
     pub exponential_backoff: bool,
+    pub max_attempts: u32,
 }
 
 impl Default for RetryPolicy {
+    #[inline]
     fn default() -> Self {
         Self {
-            max_attempts: 3,
             backoff_seconds: 1,
             exponential_backoff: true,
+            max_attempts: 3,
         }
+    }
+}
+
+impl RetryPolicy {
+    /// Create a new retry policy
+    #[must_use]
+    #[inline]
+    pub const fn new(max_attempts: u32, backoff_seconds: u32, exponential_backoff: bool) -> Self {
+        Self {
+            backoff_seconds,
+            exponential_backoff,
+            max_attempts,
+        }
+    }
+}
+
+impl Config {
+    /// Create a new workflow configuration
+    #[must_use]
+    #[inline]
+    pub const fn new() -> Self {
+        Self {
+            continue_on_error: false,
+            max_parallel: None,
+            timeout: None,
+        }
+    }
+
+    /// Set continue on error behavior
+    #[must_use]
+    #[inline]
+    pub const fn with_continue_on_error(mut self, continue_on_error: bool) -> Self {
+        self.continue_on_error = continue_on_error;
+        self
+    }
+
+    /// Set maximum parallel executions
+    #[must_use]
+    #[inline]
+    pub const fn with_max_parallel(mut self, max_parallel: Option<usize>) -> Self {
+        self.max_parallel = max_parallel;
+        self
+    }
+
+    /// Set global timeout
+    #[must_use]
+    #[inline]
+    pub const fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.timeout = timeout;
+        self
     }
 }
 
 /// Step execution result
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[non_exhaustive]
 pub struct StepResult {
-    pub step_id: ComponentId,
-    pub output: AgentOutput,
     pub duration: Duration,
-    pub success: bool,
     pub error: Option<String>,
+    pub output: AgentOutput,
     pub retry_count: u32,
+    pub step_id: ComponentId,
+    pub success: bool,
+}
+
+/// Workflow execution status
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Status {
+    Cancelled,
+    Completed,
+    Failed,
+    Pending,
+    Running,
 }
 
 impl StepResult {
-    /// Create a successful result
-    pub fn success(step_id: ComponentId, output: AgentOutput, duration: Duration) -> Self {
-        Self {
-            step_id,
-            output,
-            duration,
-            success: true,
-            error: None,
-            retry_count: 0,
-        }
-    }
-
     /// Create a failed result
+    #[must_use]
+    #[inline]
     pub fn failure(
         step_id: ComponentId,
         error: String,
@@ -146,24 +238,28 @@ impl StepResult {
         retry_count: u32,
     ) -> Self {
         Self {
-            step_id,
-            output: AgentOutput::text(String::new()),
             duration,
-            success: false,
             error: Some(error),
+            output: AgentOutput::text(String::new()),
             retry_count,
+            step_id,
+            success: false,
         }
     }
-}
 
-/// Workflow execution status
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum WorkflowStatus {
-    Pending,
-    Running,
-    Completed,
-    Failed,
-    Cancelled,
+    /// Create a successful result
+    #[must_use]
+    #[inline]
+    pub const fn success(step_id: ComponentId, output: AgentOutput, duration: Duration) -> Self {
+        Self {
+            duration,
+            error: None,
+            output,
+            retry_count: 0,
+            step_id,
+            success: true,
+        }
+    }
 }
 
 /// Workflow configuration.
@@ -174,26 +270,27 @@ pub enum WorkflowStatus {
 /// # Examples
 ///
 /// ```
-/// use llmspell_core::traits::workflow::WorkflowConfig;
+/// use llmspell_core::traits::workflow::Config;
 /// use std::time::Duration;
 ///
-/// let config = WorkflowConfig {
-///     max_parallel: Some(4),
-///     continue_on_error: true,
-///     timeout: Some(Duration::from_secs(3600)),
-/// };
+/// // Config is #[non_exhaustive], so we use Default and modify fields
+/// let mut config = Config::default();
+/// config.max_parallel = Some(4);
+/// config.continue_on_error = true;
+/// config.timeout = Some(Duration::from_secs(3600));
 ///
 /// // Default configuration
-/// let default = WorkflowConfig::default();
+/// let default = Config::default();
 /// assert_eq!(default.max_parallel, None); // No limit
 /// assert!(!default.continue_on_error); // Stop on error
 /// ```
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
-pub struct WorkflowConfig {
-    /// Maximum parallel executions
-    pub max_parallel: Option<usize>,
+#[non_exhaustive]
+pub struct Config {
     /// Continue on step failure
     pub continue_on_error: bool,
+    /// Maximum parallel executions
+    pub max_parallel: Option<usize>,
     /// Global timeout for workflow
     pub timeout: Option<Duration>,
 }
@@ -227,22 +324,22 @@ pub struct WorkflowConfig {
 ///     types::{AgentInput, AgentOutput, ExecutionContext},
 ///     traits::{
 ///         base_agent::BaseAgent,
-///         workflow::{Workflow, WorkflowConfig, WorkflowStep, WorkflowStatus, StepResult}
+///         workflow::{Workflow, Config, WorkflowStep, Status, StepResult}
 ///     }
 /// };
 /// use async_trait::async_trait;
 ///
 /// struct DataPipeline {
 ///     metadata: ComponentMetadata,
-///     config: WorkflowConfig,
+///     config: Config,
 ///     steps: Vec<WorkflowStep>,
-///     status: WorkflowStatus,
+///     status: Status,
 ///     results: Vec<StepResult>,
 /// }
 ///
 /// #[async_trait]
 /// impl Workflow for DataPipeline {
-///     fn config(&self) -> &WorkflowConfig {
+///     fn config(&self) -> &Config {
 ///         &self.config
 ///     }
 ///     
@@ -286,21 +383,19 @@ pub struct WorkflowConfig {
 /// ```
 #[async_trait]
 pub trait Workflow: BaseAgent {
-    /// Get workflow configuration
-    fn config(&self) -> &WorkflowConfig;
-
     /// Add step to workflow
     async fn add_step(&self, step: WorkflowStep) -> Result<()>;
 
-    /// Remove step from workflow
-    async fn remove_step(&self, step_id: ComponentId) -> Result<()>;
-
-    /// Get all steps
-    async fn get_steps(&self) -> Result<Vec<WorkflowStep>>;
+    /// Get workflow configuration
+    fn config(&self) -> &Config;
 
     /// Get execution plan (topologically sorted)
+    #[inline]
     async fn plan_execution(&self) -> Result<Vec<WorkflowStep>> {
-        let steps = self.get_steps().await?;
+        let steps = match self.get_steps().await {
+            Ok(steps) => steps,
+            Err(err) => return Err(err),
+        };
 
         // Build dependency graph
         let mut graph: HashMap<ComponentId, HashSet<ComponentId>> = HashMap::new();
@@ -312,7 +407,11 @@ pub trait Workflow: BaseAgent {
 
             for dep in &step.dependencies {
                 graph.entry(*dep).or_default().insert(step.id);
-                *in_degree.entry(step.id).or_default() += 1;
+                if let Some(degree) = in_degree.get_mut(&step.id) {
+                    *degree = degree.saturating_add(1);
+                } else {
+                    in_degree.insert(step.id, 1);
+                }
             }
         }
 
@@ -326,16 +425,17 @@ pub trait Workflow: BaseAgent {
         let mut sorted = Vec::new();
 
         while let Some(node) = queue.pop() {
-            if let Some(step) = steps.iter().find(|s| s.id == node) {
+            if let Some(step) = steps.iter().find(|step_item| step_item.id == node) {
                 sorted.push(step.clone());
             }
 
             if let Some(neighbors) = graph.get(&node) {
-                for neighbor in neighbors {
-                    if let Some(degree) = in_degree.get_mut(neighbor) {
-                        *degree -= 1;
+                let neighbors_vec: Vec<_> = neighbors.iter().copied().collect();
+                for neighbor in neighbors_vec {
+                    if let Some(degree) = in_degree.get_mut(&neighbor) {
+                        *degree = degree.saturating_sub(1);
                         if *degree == 0 {
-                            queue.push(*neighbor);
+                            queue.push(neighbor);
                         }
                     }
                 }
@@ -345,32 +445,48 @@ pub trait Workflow: BaseAgent {
         // Check for cycles
         if sorted.len() != steps.len() {
             return Err(crate::LLMSpellError::Workflow {
-                message: "Workflow contains circular dependencies".to_string(),
+                message: "Workflow contains circular dependencies".to_owned(),
                 step: None,
                 source: None,
             });
         }
 
-        Ok(sorted)
+        return Ok(sorted);
     }
 
-    /// Get workflow status
-    async fn status(&self) -> Result<WorkflowStatus>;
+    /// Get all steps
+    async fn get_steps(&self) -> Result<Vec<WorkflowStep>>;
 
     /// Get step results
     async fn get_results(&self) -> Result<Vec<StepResult>>;
 
     /// Get result for specific step
+    #[inline]
     async fn get_step_result(&self, step_id: ComponentId) -> Result<Option<StepResult>> {
-        let results = self.get_results().await?;
-        Ok(results.into_iter().find(|r| r.step_id == step_id))
+        let results = match self.get_results().await {
+            Ok(results) => results,
+            Err(e) => return Err(e),
+        };
+        Ok(results
+            .into_iter()
+            .find(|result_item| result_item.step_id == step_id))
     }
 
+    /// Remove step from workflow
+    async fn remove_step(&self, step_id: ComponentId) -> Result<()>;
+
+    /// Get workflow status
+    async fn status(&self) -> Result<Status>;
+
     /// Check if workflow can execute (no cycles, all dependencies valid)
+    #[inline]
     async fn validate(&self) -> Result<()> {
         // Check all dependencies exist first
-        let steps = self.get_steps().await?;
-        let step_ids: HashSet<ComponentId> = steps.iter().map(|s| s.id).collect();
+        let steps = match self.get_steps().await {
+            Ok(steps) => steps,
+            Err(err) => return Err(err),
+        };
+        let step_ids: HashSet<ComponentId> = steps.iter().map(|step_item| step_item.id).collect();
 
         for step in &steps {
             for dep in &step.dependencies {
@@ -385,9 +501,12 @@ pub trait Workflow: BaseAgent {
         }
 
         // Then check for cycles - plan execution will fail if there are cycles
-        self.plan_execution().await?;
+        match self.plan_execution().await {
+            Ok(_) => {}
+            Err(e) => return Err(e),
+        }
 
-        Ok(())
+        return Ok(());
     }
 }
 
@@ -399,7 +518,6 @@ mod tests {
     use crate::ExecutionContext;
     use std::sync::Arc;
     use tokio::sync::Mutex;
-
     #[test]
     fn test_workflow_step_builder() {
         let component_id = ComponentId::new();
@@ -417,7 +535,6 @@ mod tests {
         assert!(step.retry_policy.is_some());
         assert_eq!(step.timeout, Some(Duration::from_secs(30)));
     }
-
     #[test]
     fn test_retry_policy_default() {
         let policy = RetryPolicy::default();
@@ -425,7 +542,6 @@ mod tests {
         assert_eq!(policy.backoff_seconds, 1);
         assert!(policy.exponential_backoff);
     }
-
     #[test]
     fn test_step_result_creation() {
         let step_id = ComponentId::new();
@@ -444,10 +560,9 @@ mod tests {
         assert_eq!(failure.error, Some("Error occurred".to_string()));
         assert_eq!(failure.retry_count, 2);
     }
-
     #[test]
     fn test_workflow_config_default() {
-        let config = WorkflowConfig::default();
+        let config = Config::default();
         assert_eq!(config.max_parallel, None);
         assert!(!config.continue_on_error);
         assert_eq!(config.timeout, None);
@@ -456,9 +571,9 @@ mod tests {
     // Mock workflow implementation
     struct MockWorkflow {
         metadata: ComponentMetadata,
-        config: WorkflowConfig,
+        config: Config,
         steps: Arc<Mutex<Vec<WorkflowStep>>>,
-        status: Arc<Mutex<WorkflowStatus>>,
+        status: Arc<Mutex<Status>>,
         results: Arc<Mutex<Vec<StepResult>>>,
     }
 
@@ -469,9 +584,9 @@ mod tests {
                     "mock-workflow".to_string(),
                     "A mock workflow for testing".to_string(),
                 ),
-                config: WorkflowConfig::default(),
+                config: Config::default(),
                 steps: Arc::new(Mutex::new(Vec::new())),
-                status: Arc::new(Mutex::new(WorkflowStatus::Pending)),
+                status: Arc::new(Mutex::new(Status::Pending)),
                 results: Arc::new(Mutex::new(Vec::new())),
             }
         }
@@ -483,13 +598,13 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
         ) -> Result<AgentOutput> {
             // Execute workflow
-            *self.status.lock().await = WorkflowStatus::Running;
+            *self.status.lock().await = Status::Running;
 
             // Simulate execution
             let steps = self.steps.lock().await.clone();
@@ -502,7 +617,7 @@ mod tests {
                 self.results.lock().await.push(result);
             }
 
-            *self.status.lock().await = WorkflowStatus::Completed;
+            *self.status.lock().await = Status::Completed;
             Ok(AgentOutput::text("Workflow completed"))
         }
 
@@ -517,14 +632,14 @@ mod tests {
         }
 
         async fn handle_error(&self, error: crate::LLMSpellError) -> Result<AgentOutput> {
-            *self.status.lock().await = WorkflowStatus::Failed;
+            *self.status.lock().await = Status::Failed;
             Ok(AgentOutput::text(format!("Workflow error: {}", error)))
         }
     }
 
     #[async_trait]
     impl Workflow for MockWorkflow {
-        fn config(&self) -> &WorkflowConfig {
+        fn config(&self) -> &Config {
             &self.config
         }
 
@@ -543,7 +658,7 @@ mod tests {
             Ok(self.steps.lock().await.clone())
         }
 
-        async fn status(&self) -> Result<WorkflowStatus> {
+        async fn status(&self) -> Result<Status> {
             Ok(self.status.lock().await.clone())
         }
 
@@ -551,7 +666,6 @@ mod tests {
             Ok(self.results.lock().await.clone())
         }
     }
-
     #[tokio::test]
     async fn test_workflow_step_management() {
         let workflow = MockWorkflow::new();
@@ -573,7 +687,6 @@ mod tests {
         assert_eq!(steps.len(), 1);
         assert_eq!(steps[0].id, step2.id);
     }
-
     #[tokio::test]
     async fn test_workflow_execution_planning() {
         let workflow = MockWorkflow::new();
@@ -596,7 +709,6 @@ mod tests {
         assert_eq!(plan[1].id, step2.id);
         assert_eq!(plan[2].id, step3.id);
     }
-
     #[tokio::test]
     async fn test_workflow_circular_dependency_detection() {
         let workflow = MockWorkflow::new();
@@ -618,7 +730,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("circular"));
     }
-
     #[tokio::test]
     async fn test_workflow_validation() {
         let workflow = MockWorkflow::new();
@@ -649,7 +760,6 @@ mod tests {
             error_msg
         );
     }
-
     #[tokio::test]
     async fn test_workflow_execution_and_results() {
         let workflow = MockWorkflow::new();
@@ -666,7 +776,7 @@ mod tests {
         assert_eq!(output.text, "Workflow completed");
 
         // Check status and results
-        assert_eq!(workflow.status().await.unwrap(), WorkflowStatus::Completed);
+        assert_eq!(workflow.status().await.unwrap(), Status::Completed);
 
         let results = workflow.get_results().await.unwrap();
         assert_eq!(results.len(), 1);

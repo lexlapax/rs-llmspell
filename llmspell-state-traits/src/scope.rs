@@ -80,60 +80,70 @@ pub enum StateScope {
 
 impl StateScope {
     /// Check if this scope is global
+    #[must_use]
     pub fn is_global(&self) -> bool {
         matches!(self, StateScope::Global)
     }
 
     /// Check if this scope is user-specific
+    #[must_use]
     pub fn is_user_scope(&self) -> bool {
         matches!(self, StateScope::User(_))
     }
 
     /// Check if this scope is session-specific
+    #[must_use]
     pub fn is_session_scope(&self) -> bool {
         matches!(self, StateScope::Session(_))
     }
 
     /// Check if this scope is agent-specific
+    #[must_use]
     pub fn is_agent_scope(&self) -> bool {
         matches!(self, StateScope::Agent(_))
     }
 
     /// Check if this scope is tool-specific
+    #[must_use]
     pub fn is_tool_scope(&self) -> bool {
         matches!(self, StateScope::Tool(_))
     }
 
     /// Check if this scope is workflow-specific
+    #[must_use]
     pub fn is_workflow_scope(&self) -> bool {
         matches!(self, StateScope::Workflow(_))
     }
 
     /// Check if this scope is hook-specific
+    #[must_use]
     pub fn is_hook_scope(&self) -> bool {
         matches!(self, StateScope::Hook(_))
     }
 
     /// Check if this scope is custom
+    #[must_use]
     pub fn is_custom_scope(&self) -> bool {
         matches!(self, StateScope::Custom(_))
     }
 
     /// Get the scope identifier if it has one
+    #[must_use]
     pub fn identifier(&self) -> Option<&str> {
         match self {
             StateScope::Global => None,
-            StateScope::User(id) => Some(id),
-            StateScope::Session(id) => Some(id),
-            StateScope::Agent(id) => Some(id),
-            StateScope::Tool(id) => Some(id),
-            StateScope::Workflow(id) => Some(id),
-            StateScope::Hook(id) => Some(id),
-            StateScope::Custom(id) => Some(id),
+            StateScope::User(id)
+            | StateScope::Session(id)
+            | StateScope::Agent(id)
+            | StateScope::Tool(id)
+            | StateScope::Workflow(id)
+            | StateScope::Hook(id)
+            | StateScope::Custom(id) => Some(id),
         }
     }
 
     /// Get the scope type as a string
+    #[must_use]
     pub fn scope_type(&self) -> &'static str {
         match self {
             StateScope::Global => "global",
@@ -154,6 +164,7 @@ impl StateScope {
     /// - User scopes can access their own data and global data
     /// - Session scopes can access their own data, their user's data, and global data
     /// - Component scopes (agent, tool, workflow, hook, custom) can access their own data and global data
+    #[must_use]
     pub fn can_access(&self, target_scope: &StateScope) -> bool {
         match (self, target_scope) {
             // Global can access everything
@@ -186,55 +197,64 @@ impl StateScope {
     ///
     /// This creates a storage key that includes the scope information,
     /// allowing for efficient querying and organization in storage backends.
+    #[must_use]
     pub fn storage_key(&self, key: &str) -> String {
         match self {
-            StateScope::Global => format!("global:{}", key),
-            StateScope::User(id) => format!("user:{}:{}", id, key),
-            StateScope::Session(id) => format!("session:{}:{}", id, key),
-            StateScope::Agent(id) => format!("agent:{}:{}", id, key),
-            StateScope::Tool(id) => format!("tool:{}:{}", id, key),
-            StateScope::Workflow(id) => format!("workflow:{}:{}", id, key),
-            StateScope::Hook(id) => format!("hook:{}:{}", id, key),
-            StateScope::Custom(id) => format!("custom:{}:{}", id, key),
+            StateScope::Global => format!("global:{key}"),
+            StateScope::User(id) => format!("user:{id}:{key}"),
+            StateScope::Session(id) => format!("session:{id}:{key}"),
+            StateScope::Agent(id) => format!("agent:{id}:{key}"),
+            StateScope::Tool(id) => format!("tool:{id}:{key}"),
+            StateScope::Workflow(id) => format!("workflow:{id}:{key}"),
+            StateScope::Hook(id) => format!("hook:{id}:{key}"),
+            StateScope::Custom(id) => format!("custom:{id}:{key}"),
         }
     }
 
     /// Parse a storage key back into scope and key components
+    #[must_use]
     pub fn parse_storage_key(storage_key: &str) -> Option<(StateScope, String)> {
         let parts: Vec<&str> = storage_key.splitn(3, ':').collect();
 
         match parts.as_slice() {
-            ["global", key] => Some((StateScope::Global, key.to_string())),
-            ["user", id, key] => Some((StateScope::User(id.to_string()), key.to_string())),
-            ["session", id, key] => Some((StateScope::Session(id.to_string()), key.to_string())),
-            ["agent", id, key] => Some((StateScope::Agent(id.to_string()), key.to_string())),
-            ["tool", id, key] => Some((StateScope::Tool(id.to_string()), key.to_string())),
-            ["workflow", id, key] => Some((StateScope::Workflow(id.to_string()), key.to_string())),
-            ["hook", id, key] => Some((StateScope::Hook(id.to_string()), key.to_string())),
-            ["custom", id, key] => Some((StateScope::Custom(id.to_string()), key.to_string())),
+            ["global", key] => Some((StateScope::Global, (*key).to_string())),
+            ["user", id, key] => Some((StateScope::User((*id).to_string()), (*key).to_string())),
+            ["session", id, key] => {
+                Some((StateScope::Session((*id).to_string()), (*key).to_string()))
+            }
+            ["agent", id, key] => Some((StateScope::Agent((*id).to_string()), (*key).to_string())),
+            ["tool", id, key] => Some((StateScope::Tool((*id).to_string()), (*key).to_string())),
+            ["workflow", id, key] => {
+                Some((StateScope::Workflow((*id).to_string()), (*key).to_string()))
+            }
+            ["hook", id, key] => Some((StateScope::Hook((*id).to_string()), (*key).to_string())),
+            ["custom", id, key] => {
+                Some((StateScope::Custom((*id).to_string()), (*key).to_string()))
+            }
             _ => None,
         }
     }
 
-    /// Get the prefix for this scope (used by KeyManager)
+    /// Get the prefix for this scope (used by `KeyManager`)
+    #[must_use]
     pub fn prefix(&self) -> String {
         match self {
             StateScope::Global => "global:".to_string(),
-            StateScope::User(id) => format!("user:{}:", id),
-            StateScope::Session(id) => format!("session:{}:", id),
-            StateScope::Agent(id) => format!("agent:{}:", id),
-            StateScope::Tool(id) => format!("tool:{}:", id),
-            StateScope::Workflow(id) => format!("workflow:{}:", id),
-            StateScope::Hook(id) => format!("hook:{}:", id),
-            StateScope::Custom(id) => format!("custom:{}:", id),
+            StateScope::User(id) => format!("user:{id}:"),
+            StateScope::Session(id) => format!("session:{id}:"),
+            StateScope::Agent(id) => format!("agent:{id}:"),
+            StateScope::Tool(id) => format!("tool:{id}:"),
+            StateScope::Workflow(id) => format!("workflow:{id}:"),
+            StateScope::Hook(id) => format!("hook:{id}:"),
+            StateScope::Custom(id) => format!("custom:{id}:"),
         }
     }
 
     /// Get the parent scope if this scope has one
+    #[must_use]
     pub fn parent(&self) -> Option<StateScope> {
         match self {
             StateScope::Global => None,
-            StateScope::User(_) => Some(StateScope::Global),
             StateScope::Session(session_id) => {
                 // Extract user ID from session ID if it follows the pattern "user_session_*"
                 if let Some(user_id) = session_id.split('_').next() {
@@ -243,11 +263,12 @@ impl StateScope {
                     Some(StateScope::Global)
                 }
             }
-            StateScope::Agent(_) => Some(StateScope::Global),
-            StateScope::Tool(_) => Some(StateScope::Global),
-            StateScope::Workflow(_) => Some(StateScope::Global),
-            StateScope::Hook(_) => Some(StateScope::Global),
-            StateScope::Custom(_) => Some(StateScope::Global),
+            StateScope::User(_)
+            | StateScope::Agent(_)
+            | StateScope::Tool(_)
+            | StateScope::Workflow(_)
+            | StateScope::Hook(_)
+            | StateScope::Custom(_) => Some(StateScope::Global),
         }
     }
 }
@@ -256,13 +277,13 @@ impl fmt::Display for StateScope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StateScope::Global => write!(f, "global"),
-            StateScope::User(id) => write!(f, "user:{}", id),
-            StateScope::Session(id) => write!(f, "session:{}", id),
-            StateScope::Agent(id) => write!(f, "agent:{}", id),
-            StateScope::Tool(id) => write!(f, "tool:{}", id),
-            StateScope::Workflow(id) => write!(f, "workflow:{}", id),
-            StateScope::Hook(id) => write!(f, "hook:{}", id),
-            StateScope::Custom(id) => write!(f, "custom:{}", id),
+            StateScope::User(id) => write!(f, "user:{id}"),
+            StateScope::Session(id) => write!(f, "session:{id}"),
+            StateScope::Agent(id) => write!(f, "agent:{id}"),
+            StateScope::Tool(id) => write!(f, "tool:{id}"),
+            StateScope::Workflow(id) => write!(f, "workflow:{id}"),
+            StateScope::Hook(id) => write!(f, "hook:{id}"),
+            StateScope::Custom(id) => write!(f, "custom:{id}"),
         }
     }
 }
@@ -270,14 +291,12 @@ impl fmt::Display for StateScope {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_scope_types() {
         assert!(StateScope::Global.is_global());
         assert!(StateScope::User("alice".to_string()).is_user_scope());
         assert!(StateScope::Agent("agent-1".to_string()).is_agent_scope());
     }
-
     #[test]
     fn test_scope_identifiers() {
         assert_eq!(StateScope::Global.identifier(), None);
@@ -290,7 +309,6 @@ mod tests {
             Some("agent-1")
         );
     }
-
     #[test]
     fn test_access_control() {
         let global = StateScope::Global;
@@ -316,7 +334,6 @@ mod tests {
         assert!(!agent.can_access(&user));
         assert!(!user.can_access(&agent));
     }
-
     #[test]
     fn test_storage_keys() {
         let global = StateScope::Global;
@@ -327,7 +344,6 @@ mod tests {
         assert_eq!(user.storage_key("preferences"), "user:alice:preferences");
         assert_eq!(agent.storage_key("history"), "agent:agent-1:history");
     }
-
     #[test]
     fn test_storage_key_parsing() {
         let test_cases = vec![
@@ -345,7 +361,8 @@ mod tests {
         ];
 
         for (storage_key, expected_scope, expected_key) in test_cases {
-            let (scope, key) = StateScope::parse_storage_key(storage_key).unwrap();
+            let (scope, key) = StateScope::parse_storage_key(storage_key)
+                .expect("valid storage key should parse successfully");
             assert_eq!(scope, expected_scope);
             assert_eq!(key, expected_key);
         }
@@ -354,7 +371,6 @@ mod tests {
         assert!(StateScope::parse_storage_key("invalid").is_none());
         assert!(StateScope::parse_storage_key("unknown:type:key").is_none());
     }
-
     #[test]
     fn test_display() {
         assert_eq!(StateScope::Global.to_string(), "global");

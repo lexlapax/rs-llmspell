@@ -1,13 +1,16 @@
 // ABOUTME: Tool operation performance benchmarks for Task 2.10.3
 // ABOUTME: Measures tool execution performance for common operations
 
+// Benchmark file
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::JsonProcessorTool,
+    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
     util::{
-        Base64EncoderTool, CalculatorTool, HashCalculatorTool, TextManipulatorTool,
-        UuidGeneratorTool,
+        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+        uuid_generator::UuidGeneratorConfig, Base64EncoderTool, CalculatorTool, HashCalculatorTool,
+        TextManipulatorTool, UuidGeneratorTool,
     },
 };
 use serde_json::json;
@@ -33,7 +36,7 @@ fn bench_base64_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     let encoded_data =
@@ -52,7 +55,7 @@ fn bench_base64_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -76,7 +79,7 @@ fn bench_calculator_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("complex_expression", |b| {
@@ -91,7 +94,7 @@ fn bench_calculator_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -101,7 +104,7 @@ fn bench_hash_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("hash_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = HashCalculatorTool::new(Default::default());
+    let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
 
     let small_data = "Hello, World!";
     let medium_data = "A".repeat(1000); // 1KB
@@ -121,7 +124,7 @@ fn bench_hash_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("sha256_medium", |b| {
@@ -138,7 +141,7 @@ fn bench_hash_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("sha256_large", |b| {
@@ -155,7 +158,7 @@ fn bench_hash_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -165,7 +168,7 @@ fn bench_text_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("text_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = TextManipulatorTool::new(Default::default());
+    let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
     let test_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(1000);
 
     group.bench_function("uppercase_1kb", |b| {
@@ -174,14 +177,14 @@ fn bench_text_operations(c: &mut Criterion) {
                 "parameters",
                 json!({
                     "operation": "uppercase",
-                    "text": test_text
+                    "input": test_text
                 }),
             );
             rt.block_on(async {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("replace_operation", |b| {
@@ -190,7 +193,7 @@ fn bench_text_operations(c: &mut Criterion) {
                 "parameters",
                 json!({
                     "operation": "replace",
-                    "text": test_text,
+                    "input": test_text,
                     "pattern": "Lorem",
                     "replacement": "LOREM"
                 }),
@@ -199,7 +202,7 @@ fn bench_text_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -209,7 +212,7 @@ fn bench_json_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("json_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = JsonProcessorTool::new(Default::default());
+    let tool = JsonProcessorTool::new(JsonProcessorConfig::default());
 
     // Create test JSON data
     let simple_json = json!({
@@ -245,7 +248,7 @@ fn bench_json_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("complex_query", |b| {
@@ -262,7 +265,7 @@ fn bench_json_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -272,7 +275,7 @@ fn bench_uuid_generation(c: &mut Criterion) {
     let mut group = c.benchmark_group("uuid_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = UuidGeneratorTool::new(Default::default());
+    let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
 
     group.bench_function("uuid_v4_generation", |b| {
         b.iter(|| {
@@ -287,7 +290,7 @@ fn bench_uuid_generation(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("uuid_bulk_generation", |b| {
@@ -304,7 +307,7 @@ fn bench_uuid_generation(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -316,9 +319,9 @@ fn bench_mixed_operations(c: &mut Criterion) {
 
     // Simulate a realistic workflow using multiple tools
     group.bench_function("data_processing_workflow", |b| {
-        let json_tool = JsonProcessorTool::new(Default::default());
-        let hash_tool = HashCalculatorTool::new(Default::default());
-        let text_tool = TextManipulatorTool::new(Default::default());
+        let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
+        let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
+        let text_tool = TextManipulatorTool::new(TextManipulatorConfig::default());
 
         b.iter(|| {
             rt.block_on(async {
@@ -341,7 +344,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
                     "parameters",
                     json!({
                         "operation": "uppercase",
-                        "text": "test value"
+                        "input": "test value"
                     }),
                 );
                 let text_result = text_tool
@@ -365,7 +368,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
 
                 black_box((json_result, text_result, hash_result))
             })
-        })
+        });
     });
 
     group.finish();

@@ -11,7 +11,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-
 #[tokio::test]
 async fn test_provider_rate_limiter_creation() {
     let mut configs = HashMap::new();
@@ -27,7 +26,6 @@ async fn test_provider_rate_limiter_creation() {
     assert_eq!(metrics.requests_allowed, 1);
     assert_eq!(metrics.requests_denied, 0);
 }
-
 #[tokio::test]
 #[cfg(feature = "rate-limiting-http")]
 async fn test_rate_limit_headers_parsing() {
@@ -46,7 +44,6 @@ async fn test_rate_limit_headers_parsing() {
     // Should have wait time since remaining is 0
     assert!(info.wait_time().is_some());
 }
-
 #[tokio::test]
 async fn test_provider_specific_limits() {
     let openai_config = ProviderLimits::openai();
@@ -64,7 +61,6 @@ async fn test_provider_specific_limits() {
     let config = ProviderLimits::for_provider("unknown_provider");
     assert_eq!(config.requests_per_minute, 60); // Should use generic
 }
-
 #[tokio::test]
 async fn test_retry_with_backoff() {
     let limiter = ProviderRateLimiter::new();
@@ -79,10 +75,7 @@ async fn test_retry_with_backoff() {
             Box::pin(async move {
                 let count = attempts.fetch_add(1, Ordering::SeqCst);
                 if count < 2 {
-                    Err(Box::new(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "rate limit exceeded",
-                    ))
+                    Err(Box::new(std::io::Error::other("rate limit exceeded"))
                         as Box<dyn std::error::Error + Send + Sync>)
                 } else {
                     Ok("Success".to_string())
@@ -100,7 +93,6 @@ async fn test_retry_with_backoff() {
     let elapsed = start.elapsed();
     assert!(elapsed > Duration::from_millis(100));
 }
-
 #[tokio::test]
 async fn test_metrics_collection() {
     let mut limiter = ProviderRateLimiter::new();
@@ -126,7 +118,6 @@ async fn test_metrics_collection() {
     let all_metrics = limiter.get_all_metrics().await;
     assert!(all_metrics.contains_key("test_metrics"));
 }
-
 #[tokio::test]
 async fn test_backoff_strategies() {
     // Test linear backoff
@@ -148,7 +139,6 @@ async fn test_backoff_strategies() {
         Duration::from_millis(300_000)
     );
 }
-
 #[tokio::test]
 async fn test_concurrent_rate_limiting() {
     let limiter = Arc::new(ProviderRateLimiter::new());

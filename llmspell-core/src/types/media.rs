@@ -1,5 +1,5 @@
 //! ABOUTME: Multimodal content types for text, image, audio, video, and binary data
-//! ABOUTME: Provides MediaContent enum, format types, metadata structures, and validation helpers
+//! ABOUTME: Provides `MediaContent` enum, format types, metadata structures, and validation helpers
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
@@ -120,7 +120,7 @@ pub enum AudioFormat {
 pub enum VideoFormat {
     /// MP4 format
     Mp4,
-    /// WebM format
+    /// `WebM` format
     Webm,
     /// AVI format
     Avi,
@@ -259,10 +259,10 @@ impl fmt::Display for MediaContent {
             } => {
                 write!(f, "Binary({} bytes", data.len())?;
                 if let Some(mime) = mime_type {
-                    write!(f, ", {}", mime)?;
+                    write!(f, ", {mime}")?;
                 }
                 if let Some(name) = filename {
-                    write!(f, ", {}", name)?;
+                    write!(f, ", {name}")?;
                 }
                 write!(f, ")")
             }
@@ -334,17 +334,19 @@ impl fmt::Display for MediaType {
 
 impl MediaContent {
     /// Get the size of the content in bytes
+    #[must_use]
     pub fn size_bytes(&self) -> usize {
         match self {
             MediaContent::Text(text) => text.len(),
-            MediaContent::Image { data, .. } => data.len(),
-            MediaContent::Audio { data, .. } => data.len(),
-            MediaContent::Video { data, .. } => data.len(),
-            MediaContent::Binary { data, .. } => data.len(),
+            MediaContent::Image { data, .. }
+            | MediaContent::Audio { data, .. }
+            | MediaContent::Video { data, .. }
+            | MediaContent::Binary { data, .. } => data.len(),
         }
     }
 
     /// Get the media type of this content
+    #[must_use]
     pub fn media_type(&self) -> MediaType {
         match self {
             MediaContent::Text(_) => MediaType::Text,
@@ -368,8 +370,7 @@ impl MediaContent {
 
         if size > max_size {
             Err(format!(
-                "{} size {} bytes exceeds maximum {} bytes",
-                type_name, size, max_size
+                "{type_name} size {size} bytes exceeds maximum {max_size} bytes"
             ))
         } else {
             Ok(())
@@ -379,6 +380,7 @@ impl MediaContent {
 
 impl ImageFormat {
     /// Get MIME type for the image format
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             ImageFormat::Png => "image/png",
@@ -391,6 +393,7 @@ impl ImageFormat {
     }
 
     /// Get common file extensions for the format
+    #[must_use]
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
             ImageFormat::Png => &["png"],
@@ -405,6 +408,7 @@ impl ImageFormat {
 
 impl AudioFormat {
     /// Get MIME type for the audio format
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             AudioFormat::Mp3 => "audio/mpeg",
@@ -416,6 +420,7 @@ impl AudioFormat {
     }
 
     /// Get common file extensions for the format
+    #[must_use]
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
             AudioFormat::Mp3 => &["mp3"],
@@ -429,6 +434,7 @@ impl AudioFormat {
 
 impl VideoFormat {
     /// Get MIME type for the video format
+    #[must_use]
     pub fn mime_type(&self) -> &'static str {
         match self {
             VideoFormat::Mp4 => "video/mp4",
@@ -440,6 +446,7 @@ impl VideoFormat {
     }
 
     /// Get common file extensions for the format
+    #[must_use]
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
             VideoFormat::Mp4 => &["mp4"],
@@ -464,7 +471,7 @@ impl TryFrom<&str> for ImageFormat {
             "gif" => Ok(ImageFormat::Gif),
             "svg" => Ok(ImageFormat::Svg),
             "tif" | "tiff" => Ok(ImageFormat::Tiff),
-            _ => Err(format!("Unknown image format: {}", ext)),
+            _ => Err(format!("Unknown image format: {ext}")),
         }
     }
 }
@@ -479,7 +486,7 @@ impl TryFrom<&str> for AudioFormat {
             "flac" => Ok(AudioFormat::Flac),
             "ogg" | "oga" => Ok(AudioFormat::Ogg),
             "m4a" => Ok(AudioFormat::M4a),
-            _ => Err(format!("Unknown audio format: {}", ext)),
+            _ => Err(format!("Unknown audio format: {ext}")),
         }
     }
 }
@@ -494,7 +501,7 @@ impl TryFrom<&str> for VideoFormat {
             "avi" => Ok(VideoFormat::Avi),
             "mov" => Ok(VideoFormat::Mov),
             "mkv" => Ok(VideoFormat::Mkv),
-            _ => Err(format!("Unknown video format: {}", ext)),
+            _ => Err(format!("Unknown video format: {ext}")),
         }
     }
 }
@@ -502,7 +509,6 @@ impl TryFrom<&str> for VideoFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_media_content_text() {
         let content = MediaContent::Text("Hello, world!".to_string());
@@ -511,7 +517,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Text(13 chars)");
     }
-
     #[test]
     fn test_media_content_image() {
         let content = MediaContent::Image {
@@ -531,7 +536,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Image(Jpeg, 1920x1080)");
     }
-
     #[test]
     fn test_media_content_audio() {
         let content = MediaContent::Audio {
@@ -550,7 +554,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Audio(Mp3, 180000ms)");
     }
-
     #[test]
     fn test_media_content_video() {
         let content = MediaContent::Video {
@@ -570,7 +573,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Video(Mp4, 1920x1080, 60000ms)");
     }
-
     #[test]
     fn test_media_content_binary() {
         let content = MediaContent::Binary {
@@ -587,7 +589,6 @@ mod tests {
             "Binary(512 bytes, application/pdf, document.pdf)"
         );
     }
-
     #[test]
     fn test_size_validation() {
         // Test oversized image
@@ -605,7 +606,6 @@ mod tests {
 
         assert!(oversized_image.validate_size().is_err());
     }
-
     #[test]
     fn test_image_format_conversions() {
         assert_eq!(ImageFormat::try_from("png").unwrap(), ImageFormat::Png);
@@ -616,7 +616,6 @@ mod tests {
         assert_eq!(ImageFormat::Png.mime_type(), "image/png");
         assert_eq!(ImageFormat::Jpeg.extensions(), &["jpg", "jpeg"]);
     }
-
     #[test]
     fn test_audio_format_conversions() {
         assert_eq!(AudioFormat::try_from("mp3").unwrap(), AudioFormat::Mp3);
@@ -626,7 +625,6 @@ mod tests {
         assert_eq!(AudioFormat::Mp3.mime_type(), "audio/mpeg");
         assert_eq!(AudioFormat::Ogg.extensions(), &["ogg", "oga"]);
     }
-
     #[test]
     fn test_video_format_conversions() {
         assert_eq!(VideoFormat::try_from("mp4").unwrap(), VideoFormat::Mp4);
@@ -636,7 +634,6 @@ mod tests {
         assert_eq!(VideoFormat::Mp4.mime_type(), "video/mp4");
         assert_eq!(VideoFormat::Mkv.extensions(), &["mkv"]);
     }
-
     #[test]
     fn test_display_implementations() {
         assert_eq!(format!("{}", ImageFormat::Png), "PNG");
@@ -645,7 +642,6 @@ mod tests {
         assert_eq!(format!("{}", ColorSpace::RGB), "RGB");
         assert_eq!(format!("{}", MediaType::Image), "Image");
     }
-
     #[test]
     fn test_serialization() {
         let metadata = ImageMetadata {
@@ -661,7 +657,6 @@ mod tests {
 
         assert_eq!(metadata, deserialized);
     }
-
     #[test]
     fn test_media_content_serialization() {
         let content = MediaContent::Image {

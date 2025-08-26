@@ -1,16 +1,15 @@
-//! Integration tests for HttpRequestTool
+//! Integration tests for `HttpRequestTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_tools::HttpRequestTool;
+use llmspell_tools::{api::http_request::HttpRequestConfig, HttpRequestTool};
 use serde_json::json;
-
 #[tokio::test]
 async fn test_http_request_tool_creation() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     assert_eq!(tool.metadata().name, "http-request-tool");
     assert_eq!(tool.category().to_string(), "api");
@@ -19,10 +18,9 @@ async fn test_http_request_tool_creation() {
         llmspell_core::traits::tool::SecurityLevel::Safe
     ));
 }
-
 #[tokio::test]
 async fn test_http_get_request() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     // Using httpbin.org for testing
     let input = AgentInput::text("fetch data").with_parameter(
@@ -58,15 +56,14 @@ async fn test_http_get_request() {
             assert!(result["headers"].is_object());
         }
         Err(e) => {
-            eprintln!("Warning: HTTP GET test failed due to network issue: {}", e);
+            eprintln!("Warning: HTTP GET test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
         }
     }
 }
-
 #[tokio::test]
 async fn test_http_post_request() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("post data").with_parameter(
         "parameters".to_string(),
@@ -90,10 +87,9 @@ async fn test_http_post_request() {
     assert!(output.text.contains("test"));
     assert!(output.text.contains("123"));
 }
-
 #[tokio::test]
 async fn test_http_basic_auth() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("auth request").with_parameter(
         "parameters".to_string(),
@@ -117,10 +113,9 @@ async fn test_http_basic_auth() {
     assert!(output.text.contains("200"));
     assert!(output.text.contains("authenticated"));
 }
-
 #[tokio::test]
 async fn test_http_bearer_auth() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("bearer auth").with_parameter(
         "parameters".to_string(),
@@ -143,10 +138,9 @@ async fn test_http_bearer_auth() {
     assert!(output.text.contains("200"));
     assert!(output.text.contains("authenticated"));
 }
-
 #[tokio::test]
 async fn test_http_custom_headers() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("custom headers").with_parameter(
         "parameters".to_string(),
@@ -169,19 +163,15 @@ async fn test_http_custom_headers() {
             assert!(output.text.contains("custom-value"));
         }
         Err(e) => {
-            eprintln!(
-                "Warning: HTTP custom headers test failed due to network issue: {}",
-                e
-            );
+            eprintln!("Warning: HTTP custom headers test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
             // Skip test instead of panicking
         }
     }
 }
-
 #[tokio::test]
 async fn test_http_error_handling() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     // Test 404 error
     let input = AgentInput::text("not found").with_parameter(
@@ -199,10 +189,9 @@ async fn test_http_error_handling() {
 
     assert!(output.text.contains("404"));
 }
-
 #[tokio::test]
 async fn test_http_retry_logic() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     // Test retry on 503 (service unavailable)
     let input = AgentInput::text("retry test").with_parameter(
@@ -229,19 +218,15 @@ async fn test_http_retry_logic() {
             assert!(output.text.contains("503"));
         }
         Err(e) => {
-            eprintln!(
-                "Warning: HTTP retry logic test failed due to network issue: {}",
-                e
-            );
+            eprintln!("Warning: HTTP retry logic test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
             // Skip test instead of panicking
         }
     }
 }
-
 #[tokio::test]
 async fn test_http_json_response_parsing() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("json response").with_parameter(
         "parameters".to_string(),
@@ -260,11 +245,10 @@ async fn test_http_json_response_parsing() {
     assert!(output.text.contains("slideshow"));
     assert!(output.text.contains("json"));
 }
-
 #[tokio::test]
 #[ignore = "httpbin.org delay endpoint may not respect long delays"]
 async fn test_http_timeout() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     // httpbin.org/delay delays response by N seconds
     let input = AgentInput::text("timeout test").with_parameter(
@@ -285,10 +269,9 @@ async fn test_http_timeout() {
         assert!(e.to_string().contains("request") || e.to_string().contains("timeout"));
     }
 }
-
 #[tokio::test]
 async fn test_http_put_request() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("put data").with_parameter(
         "parameters".to_string(),
@@ -313,10 +296,9 @@ async fn test_http_put_request() {
     assert_eq!(response["result"]["status_code"], 200);
     assert_eq!(response["metadata"]["method"], "PUT");
 }
-
 #[tokio::test]
 async fn test_http_delete_request() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("delete resource").with_parameter(
         "parameters".to_string(),
@@ -337,11 +319,10 @@ async fn test_http_delete_request() {
     assert_eq!(response["result"]["status_code"], 200);
     assert_eq!(response["metadata"]["method"], "DELETE");
 }
-
 #[tokio::test]
 #[ignore = "httpbin.org intermittent network issues"]
 async fn test_http_api_key_auth() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("api key auth").with_parameter(
         "parameters".to_string(),
@@ -365,10 +346,9 @@ async fn test_http_api_key_auth() {
     assert!(output.text.contains("X-Api-Key")); // httpbin normalizes header names
     assert!(output.text.contains("my-api-key-123"));
 }
-
 #[tokio::test]
 async fn test_invalid_url() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("invalid url").with_parameter(
         "parameters".to_string(),
@@ -381,10 +361,9 @@ async fn test_invalid_url() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_missing_url() {
-    let tool = HttpRequestTool::new(Default::default()).unwrap();
+    let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
 
     let input = AgentInput::text("no url").with_parameter(
         "parameters".to_string(),

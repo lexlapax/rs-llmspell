@@ -44,7 +44,7 @@
 //!
 //! // Use mock agent in tests
 //! let mut mock = MockBaseAgent::new();
-//! mock.expect_execute()
+//! mock.expect_execute_impl()
 //!     .returning(|_, _| Ok(AgentOutput::text("test")));
 //!
 //! // Generate test data with proptest
@@ -57,12 +57,20 @@
 //! ```
 
 // Test utilities modules
+pub mod agent_helpers;
 pub mod attributes;
 pub mod benchmarks;
+pub mod bridge_helpers;
+pub mod environment_helpers;
+pub mod event_helpers;
 pub mod fixtures;
 pub mod generators;
+pub mod hook_helpers;
 pub mod macros;
 pub mod mocks;
+pub mod state_helpers;
+pub mod tool_helpers;
+pub mod workflow_helpers;
 
 // Test runner support
 #[cfg(feature = "test-runner")]

@@ -2,7 +2,7 @@
 // ABOUTME: Handles field mappings, type conversions, and data validation during migrations
 
 use crate::manager::SerializableState;
-use crate::sensitive_data::SensitiveDataProtector;
+use crate::sensitive_data::{SensitiveDataConfig, SensitiveDataProtector};
 use llmspell_state_traits::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -89,10 +89,10 @@ impl FieldTransform {
             FieldTransform::Remove { field } => vec![field],
             FieldTransform::Split { from_field, .. } => vec![from_field],
             FieldTransform::Merge { from_fields, .. } => {
-                from_fields.iter().map(|s| s.as_str()).collect()
+                from_fields.iter().map(String::as_str).collect()
             }
             FieldTransform::Custom { from_fields, .. } => {
-                from_fields.iter().map(|s| s.as_str()).collect()
+                from_fields.iter().map(String::as_str).collect()
             }
         }
     }
@@ -105,11 +105,11 @@ impl FieldTransform {
             FieldTransform::Default { field, .. } => vec![field],
             FieldTransform::Remove { .. } => vec![],
             FieldTransform::Split { to_fields, .. } => {
-                to_fields.iter().map(|s| s.as_str()).collect()
+                to_fields.iter().map(String::as_str).collect()
             }
             FieldTransform::Merge { to_field, .. } => vec![to_field],
             FieldTransform::Custom { to_fields, .. } => {
-                to_fields.iter().map(|s| s.as_str()).collect()
+                to_fields.iter().map(String::as_str).collect()
             }
         }
     }
@@ -186,7 +186,88 @@ pub struct DataTransformer {
 impl DataTransformer {
     pub fn new() -> Self {
         Self {
-            sensitive_data_protector: SensitiveDataProtector::new(Default::default()),
+            sensitive_data_protector: SensitiveDataProtector::new(SensitiveDataConfig::default()),
+        }
+    }
+
+    /// Helper function to set a nested field using dot notation (e.g., "profile.age")
+    fn set_nested_field(target: &mut Value, field_path: &str, value: Value) -> bool {
+        let parts: Vec<&str> = field_path.split('.').collect();
+        if parts.len() == 1 {
+            // Simple field, no nesting
+            if let Some(obj) = target.as_object_mut() {
+                obj.insert(field_path.to_string(), value);
+                return true;
+            }
+            return false;
+        }
+
+        // Nested field path
+        let mut current = target;
+
+        // Navigate to the parent of the final field
+        for part in &parts[..parts.len() - 1] {
+            if let Some(obj) = current.as_object_mut() {
+                // Create nested object if it doesn't exist
+                if !obj.contains_key(*part) {
+                    obj.insert(part.to_string(), Value::Object(serde_json::Map::new()));
+                }
+                // Move to the nested object
+                current = obj
+                    .get_mut(*part)
+                    .expect("object key should exist after inserting");
+            } else {
+                return false;
+            }
+        }
+
+        // Set the final field
+        if let Some(obj) = current.as_object_mut() {
+            obj.insert(parts[parts.len() - 1].to_string(), value);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Helper function to get a nested field using dot notation (e.g., "profile.age")  
+    fn get_nested_field<'a>(source: &'a Value, field_path: &str) -> Option<&'a Value> {
+        let parts: Vec<&str> = field_path.split('.').collect();
+        if parts.len() == 1 {
+            return source.get(field_path);
+        }
+
+        let mut current = source;
+        for part in parts {
+            current = current.get(part)?;
+        }
+        Some(current)
+    }
+
+    /// Helper function to remove a nested field using dot notation
+    fn remove_nested_field(target: &mut Value, field_path: &str) -> bool {
+        let parts: Vec<&str> = field_path.split('.').collect();
+        if parts.len() == 1 {
+            if let Some(obj) = target.as_object_mut() {
+                return obj.remove(field_path).is_some();
+            }
+            return false;
+        }
+
+        // Navigate to the parent of the final field
+        let mut current = target;
+        for part in &parts[..parts.len() - 1] {
+            current = match current.get_mut(*part) {
+                Some(val) => val,
+                None => return false,
+            };
+        }
+
+        // Remove the final field
+        if let Some(obj) = current.as_object_mut() {
+            obj.remove(parts[parts.len() - 1]).is_some()
+        } else {
+            false
         }
     }
 
@@ -275,12 +356,11 @@ impl DataTransformer {
                 from_field,
                 to_field,
             } => {
-                if let Some(value) = source.get(from_field) {
-                    if let Some(target_obj) = target.as_object_mut() {
-                        target_obj.insert(to_field.clone(), value.clone());
+                if let Some(value) = Self::get_nested_field(source, from_field) {
+                    if Self::set_nested_field(target, to_field, value.clone()) {
                         // Remove the source field if it's different from target
                         if from_field != to_field {
-                            target_obj.remove(from_field);
+                            Self::remove_nested_field(target, from_field);
                         }
                         return Ok(true);
                     }
@@ -295,12 +375,11 @@ impl DataTransformer {
                 to_type,
                 converter,
             } => {
-                if let Some(value) = source.get(from_field) {
+                if let Some(value) = Self::get_nested_field(source, from_field) {
                     let converted = self.convert_value(value, from_type, to_type, converter)?;
-                    if let Some(target_obj) = target.as_object_mut() {
-                        target_obj.insert(to_field.clone(), converted);
+                    if Self::set_nested_field(target, to_field, converted) {
                         if from_field != to_field {
-                            target_obj.remove(from_field);
+                            Self::remove_nested_field(target, from_field);
                         }
                         return Ok(true);
                     }
@@ -309,21 +388,16 @@ impl DataTransformer {
             }
 
             FieldTransform::Default { field, value } => {
-                if let Some(target_obj) = target.as_object_mut() {
-                    if !target_obj.contains_key(field) {
-                        target_obj.insert(field.clone(), value.clone());
-                        return Ok(true);
-                    }
+                // Check if the field already exists (handling nested paths)
+                if Self::get_nested_field(target, field).is_none()
+                    && Self::set_nested_field(target, field, value.clone())
+                {
+                    return Ok(true);
                 }
                 Ok(false)
             }
 
-            FieldTransform::Remove { field } => {
-                if let Some(target_obj) = target.as_object_mut() {
-                    return Ok(target_obj.remove(field).is_some());
-                }
-                Ok(false)
-            }
+            FieldTransform::Remove { field } => Ok(Self::remove_nested_field(target, field)),
 
             FieldTransform::Split {
                 from_field,
@@ -428,11 +502,19 @@ impl DataTransformer {
             ("string", "number", "parse_float") => {
                 if let Some(s) = value.as_str() {
                     s.parse::<f64>()
-                        .map(|n| Value::Number(serde_json::Number::from_f64(n).unwrap()))
                         .map_err(|_| TransformationError::TypeConversionFailed {
                             field: "unknown".to_string(),
                             from_type: from_type.to_string(),
                             to_type: to_type.to_string(),
+                        })
+                        .and_then(|n| {
+                            serde_json::Number::from_f64(n)
+                                .map(Value::Number)
+                                .ok_or_else(|| TransformationError::TypeConversionFailed {
+                                    field: "unknown".to_string(),
+                                    from_type: from_type.to_string(),
+                                    to_type: to_type.to_string(),
+                                })
                         })
                 } else {
                     Err(TransformationError::TypeConversionFailed {
@@ -467,7 +549,7 @@ impl DataTransformer {
         match splitter {
             "comma_split" => {
                 if let Some(s) = value.as_str() {
-                    let parts: Vec<&str> = s.split(',').map(|s| s.trim()).collect();
+                    let parts: Vec<&str> = s.split(',').map(str::trim).collect();
                     let mut result = Vec::new();
                     for (i, field) in to_fields.iter().enumerate() {
                         let value = if i < parts.len() {
@@ -502,13 +584,19 @@ impl DataTransformer {
                 let strings: Vec<String> = values
                     .iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(str::to_string)
                     .collect();
                 Ok(Value::String(strings.join(" ")))
             }
             "sum_numbers" => {
                 let sum: f64 = values.iter().filter_map(|v| v.as_f64()).sum();
-                Ok(Value::Number(serde_json::Number::from_f64(sum).unwrap()))
+                serde_json::Number::from_f64(sum)
+                    .map(Value::Number)
+                    .ok_or_else(|| TransformationError::TypeConversionFailed {
+                        field: "sum_numbers".to_string(),
+                        from_type: "array".to_string(),
+                        to_type: "number".to_string(),
+                    })
             }
             "first_non_null" => {
                 for value in values {
@@ -550,7 +638,7 @@ impl DataTransformer {
 
         match &rule.rule_type {
             ValidationType::NotNull => {
-                if field_value.is_none() || field_value.unwrap().is_null() {
+                if field_value.is_none_or(|v| v.is_null()) {
                     return Err(TransformationError::ValidationFailed {
                         details: rule
                             .error_message
@@ -716,7 +804,6 @@ impl TransformationResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_field_transform_source_fields() {
         let transform = FieldTransform::Copy {
@@ -727,7 +814,6 @@ mod tests {
         assert_eq!(transform.source_fields(), vec!["old_field"]);
         assert_eq!(transform.target_fields(), vec!["new_field"]);
     }
-
     #[test]
     fn test_state_transformation_creation() {
         let mut transformation = StateTransformation::new(
@@ -748,7 +834,6 @@ mod tests {
 
         assert_eq!(transformation.field_transforms.len(), 1);
     }
-
     #[tokio::test]
     async fn test_data_transformer() {
         let transformer = DataTransformer::new();
@@ -788,7 +873,6 @@ mod tests {
         assert!(state.value.get("new_field").is_some());
         assert!(state.value.get("parsed_number").is_some());
     }
-
     #[test]
     fn test_transformation_result() {
         let mut result = TransformationResult::new("test".to_string());

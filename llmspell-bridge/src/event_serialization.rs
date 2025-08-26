@@ -9,7 +9,11 @@ use serde_json::Value as JsonValue;
 pub struct EventSerialization;
 
 impl EventSerialization {
-    /// Convert UniversalEvent to JSON representation suitable for cross-language transfer
+    /// Convert `UniversalEvent` to JSON representation suitable for cross-language transfer
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JSON serialization fails
     pub fn universal_event_to_json(event: &UniversalEvent) -> Result<JsonValue> {
         let json = serde_json::json!({
             "id": event.id,
@@ -26,7 +30,14 @@ impl EventSerialization {
         Ok(json)
     }
 
-    /// Convert JSON representation back to UniversalEvent
+    /// Convert JSON representation back to `UniversalEvent`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Required fields are missing
+    /// - JSON parsing fails
+    /// - UUID parsing fails
     pub fn json_to_universal_event(json: &JsonValue) -> Result<UniversalEvent> {
         let event_type = json["event_type"]
             .as_str()
@@ -40,8 +51,7 @@ impl EventSerialization {
             "JavaScript" | "Javascript" => Language::JavaScript,
             "Python" => Language::Python,
             "Rust" => Language::Rust,
-            "Unknown" => Language::Unknown,
-            _ => Language::Unknown, // Default fallback
+            _ => Language::Unknown,
         };
 
         let mut event = UniversalEvent::new(event_type, data, language);
@@ -87,6 +97,12 @@ impl EventSerialization {
     }
 
     /// Serialize event data for a specific language context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Event serialization fails
+    /// - Language-specific transformations fail
     pub fn serialize_for_language(
         event: &UniversalEvent,
         target_language: Language,
@@ -94,7 +110,7 @@ impl EventSerialization {
         let mut serialized = Self::universal_event_to_json(event)?;
 
         // Add language-specific hints
-        serialized["target_language"] = JsonValue::String(format!("{:?}", target_language));
+        serialized["target_language"] = JsonValue::String(format!("{target_language:?}"));
         serialized["serialization_version"] = JsonValue::String("1.0".to_string());
 
         // Language-specific data transformations
@@ -113,12 +129,8 @@ impl EventSerialization {
                 // Ensure compatibility with JavaScript JSON parsing
                 Self::ensure_js_compatibility(&mut serialized["data"])?;
             }
-            Language::Python => {
-                // Python-specific transformations if needed
-                // Currently no special handling required
-            }
-            Language::Rust | Language::Unknown => {
-                // No transformations needed for Rust/Unknown
+            Language::Python | Language::Rust | Language::Unknown => {
+                // No transformations needed for Python/Rust/Unknown
             }
         }
 
@@ -126,6 +138,12 @@ impl EventSerialization {
     }
 
     /// Deserialize event data from a specific language context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Language-specific transformations fail
+    /// - Event deserialization fails
     pub fn deserialize_from_language(
         data: &JsonValue,
         source_language: Language,
@@ -141,7 +159,7 @@ impl EventSerialization {
                         let mut array_items = Vec::new();
                         let mut indices: Vec<usize> =
                             data_obj.keys().filter_map(|k| k.parse().ok()).collect();
-                        indices.sort();
+                        indices.sort_unstable();
 
                         for index in indices {
                             if let Some(value) = data_obj.get(&index.to_string()) {
@@ -157,11 +175,8 @@ impl EventSerialization {
                 // Handle JavaScript-specific deserialization
                 Self::normalize_js_data(&mut working_data["data"])?;
             }
-            Language::Python => {
-                // Python-specific deserialization if needed
-            }
-            Language::Rust | Language::Unknown => {
-                // No transformations needed
+            Language::Python | Language::Rust | Language::Unknown => {
+                // No transformations needed for Python/Rust/Unknown
             }
         }
 
@@ -181,7 +196,7 @@ impl EventSerialization {
             return false;
         }
 
-        indices.sort();
+        indices.sort_unstable();
         indices[0] == 1 && indices == (1..=indices.len()).collect::<Vec<_>>()
     }
 
@@ -247,16 +262,23 @@ impl EventSerialization {
     }
 
     /// Validate that an event can be safely serialized/deserialized for a target language
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Serialization fails
+    /// - Deserialization fails
+    /// - Round-trip validation fails
     pub fn validate_event_compatibility(
         event: &UniversalEvent,
         target_language: Language,
     ) -> Result<()> {
         // Try round-trip serialization
         let serialized = Self::serialize_for_language(event, target_language)
-            .with_context(|| format!("Failed to serialize event for {:?}", target_language))?;
+            .with_context(|| format!("Failed to serialize event for {target_language:?}"))?;
 
         let _deserialized = Self::deserialize_from_language(&serialized, target_language)
-            .with_context(|| format!("Failed to deserialize event from {:?}", target_language))?;
+            .with_context(|| format!("Failed to deserialize event from {target_language:?}"))?;
 
         Ok(())
     }
@@ -266,7 +288,6 @@ impl EventSerialization {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_universal_event_json_roundtrip() {
         let original = UniversalEvent::new(
@@ -282,7 +303,6 @@ mod tests {
         assert_eq!(original.data, restored.data);
         assert_eq!(original.language, restored.language);
     }
-
     #[test]
     fn test_lua_array_serialization() {
         let event = UniversalEvent::new(
@@ -306,7 +326,6 @@ mod tests {
             EventSerialization::deserialize_from_language(&lua_serialized, Language::Lua).unwrap();
         assert_eq!(restored.data, json!(["item1", "item2", "item3"]));
     }
-
     #[test]
     fn test_javascript_large_number_handling() {
         let large_number = 9_007_199_254_740_992i64; // Exceeds JS safe integer
@@ -328,7 +347,6 @@ mod tests {
                 .unwrap();
         assert_eq!(restored.data["big"], large_number.to_string());
     }
-
     #[test]
     fn test_language_detection() {
         let test_cases = vec![
@@ -352,7 +370,6 @@ mod tests {
             assert_eq!(event.language, expected);
         }
     }
-
     #[test]
     fn test_event_compatibility_validation() {
         let event = UniversalEvent::new(
@@ -369,7 +386,6 @@ mod tests {
         assert!(EventSerialization::validate_event_compatibility(&event, Language::Python).is_ok());
         assert!(EventSerialization::validate_event_compatibility(&event, Language::Rust).is_ok());
     }
-
     #[test]
     fn test_lua_array_detection() {
         let lua_array = serde_json::Map::from_iter([

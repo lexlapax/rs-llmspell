@@ -594,7 +594,6 @@ mod tests {
             self
         }
     }
-
     #[test]
     fn test_feature_flags() {
         let mut features = HookFeatures::new();
@@ -608,7 +607,6 @@ mod tests {
         features.disable_feature("logging");
         assert!(!features.is_feature_enabled("logging"));
     }
-
     #[test]
     fn test_feature_dependencies() {
         let mut features = HookFeatures::new();
@@ -618,7 +616,6 @@ mod tests {
         assert!(features.is_feature_enabled("advanced"));
         assert!(features.is_feature_enabled("basic")); // Automatically enabled
     }
-
     #[tokio::test]
     async fn test_selective_registration() {
         let mut features = HookFeatures::new();
@@ -642,7 +639,6 @@ mod tests {
         let hooks = registry.get_hooks(&HookPoint::BeforeAgentExecution);
         assert_eq!(hooks.len(), 1);
     }
-
     #[tokio::test]
     async fn test_feature_filtering() {
         let features = HookFeatures::new(); // No features enabled
@@ -672,7 +668,6 @@ mod tests {
         let hooks = registry.get_hooks(&HookPoint::BeforeToolExecution);
         assert_eq!(hooks.len(), 1);
     }
-
     #[test]
     fn test_lazy_instantiation() {
         let features = HookFeatures::with_features(vec!["core"]);
@@ -707,7 +702,6 @@ mod tests {
         let _hooks = registry.get_hooks(&HookPoint::BeforeToolExecution);
         assert_eq!(*counter.read(), 2); // Still 2
     }
-
     #[test]
     fn test_memory_management() {
         let features = HookFeatures::with_features(vec!["test"]);
@@ -741,7 +735,6 @@ mod tests {
         let stats = registry.stats();
         assert!(stats.instantiated_hooks <= 5); // May be less due to LRU
     }
-
     #[test]
     fn test_statistics() {
         let features = HookFeatures::with_features(vec!["stats"]);
@@ -777,7 +770,6 @@ mod tests {
         assert_eq!(stats.feature_usage.get("stats"), Some(&2));
         assert_eq!(stats.feature_usage.get("logging"), Some(&1));
     }
-
     #[test]
     fn test_instantiation_tracking() {
         let features = HookFeatures::with_features(vec!["test"]);
@@ -809,7 +801,6 @@ mod tests {
         // Now it should be instantiated
         assert!(hook_entry.is_instantiated());
     }
-
     #[test]
     fn test_clear_instances() {
         let features = HookFeatures::with_features(vec!["clear"]);

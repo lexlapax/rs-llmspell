@@ -267,7 +267,6 @@ mod tests {
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use tokio::time::sleep;
-
     #[tokio::test]
     async fn test_parallel_execution() {
         let counter = Arc::new(AtomicUsize::new(0));
@@ -298,7 +297,6 @@ mod tests {
         // All hooks should have executed
         assert_eq!(counter.load(Ordering::SeqCst), 111);
     }
-
     #[tokio::test]
     async fn test_parallel_timeout() {
         let hook = ParallelHook::builder("test_timeout")
@@ -316,7 +314,6 @@ mod tests {
         let result = hook.execute(&mut context).await;
         assert!(result.is_err());
     }
-
     #[test]
     fn test_result_aggregator() {
         let mut aggregator = ParallelResultAggregator::new();

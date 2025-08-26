@@ -632,7 +632,6 @@ impl Hook for VotingMiddleware {
 mod tests {
     use super::*;
     use llmspell_hooks::types::{ComponentId, ComponentType};
-
     #[tokio::test]
     async fn test_middleware_creation() {
         let hook_registry = Arc::new(HookRegistry::new());
@@ -644,7 +643,6 @@ mod tests {
         assert!(middleware.initialize().is_ok());
         assert_eq!(middleware.middleware_chains.len(), 5);
     }
-
     #[tokio::test]
     async fn test_middleware_execution() {
         let hook_registry = Arc::new(HookRegistry::new());
@@ -676,7 +674,6 @@ mod tests {
 
         assert!(result.should_continue());
     }
-
     #[tokio::test]
     async fn test_parallel_middleware() {
         let hook_registry = Arc::new(HookRegistry::new());

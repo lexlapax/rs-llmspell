@@ -7,7 +7,6 @@ mod session_tests {
     use llmspell_state_traits::StateScope;
     use serde_json::json;
     use tempfile::TempDir;
-
     #[tokio::test]
     async fn test_session_scope_basic_operations() {
         let temp_dir = TempDir::new().unwrap();
@@ -83,7 +82,6 @@ mod session_tests {
             .unwrap();
         assert_eq!(prefs_after, Some(json!({"theme": "dark"})));
     }
-
     #[tokio::test]
     async fn test_session_scope_isolation_from_global() {
         let temp_dir = TempDir::new().unwrap();
@@ -124,7 +122,6 @@ mod session_tests {
             .unwrap();
         assert_eq!(session_config, Some(json!("session-config")));
     }
-
     #[tokio::test]
     async fn test_clear_session_scope() {
         let temp_dir = TempDir::new().unwrap();

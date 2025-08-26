@@ -299,6 +299,7 @@ impl StreamUtils {
         }
 
         let elapsed = start_time.elapsed();
+        #[allow(clippy::cast_precision_loss)]
         let events_per_second = event_count as f64 / elapsed.as_secs_f64();
 
         ThroughputMeasurement {
@@ -322,14 +323,14 @@ pub struct ThroughputMeasurement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::universal_event::Language;
+    use crate::universal_event::{Language, UniversalEvent};
     use serde_json::Value;
-    use tokio_stream::StreamExt;
 
+    // Local test helper to avoid circular dependency with llmspell-testing
     fn create_test_event(event_type: &str) -> UniversalEvent {
         UniversalEvent::new(event_type, Value::Null, Language::Rust)
     }
-
+    use tokio_stream::StreamExt;
     #[tokio::test]
     async fn test_batched_stream() {
         let events = vec![
@@ -351,7 +352,6 @@ mod tests {
         let batch2 = batched.next().await.unwrap().unwrap();
         assert_eq!(batch2.len(), 1);
     }
-
     #[tokio::test]
     async fn test_filtered_stream() {
         let events = vec![
@@ -375,7 +375,6 @@ mod tests {
 
         assert!(filtered.next().await.is_none());
     }
-
     #[tokio::test]
     async fn test_high_frequency_stream() {
         let stream = StreamUtils::high_frequency_test_stream(100, 1000);
@@ -386,7 +385,6 @@ mod tests {
         assert!(measurement.event_count > 0);
         assert!(measurement.events_per_second > 0.0);
     }
-
     #[tokio::test]
     async fn test_high_throughput_processor() {
         let processor = HighThroughputProcessor::new(1000, 4);

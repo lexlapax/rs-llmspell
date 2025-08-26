@@ -82,16 +82,25 @@ impl CapabilityScorer for DefaultCapabilityScorer {
             return 0.5; // Neutral score for unused capabilities
         }
 
-        let success_rate = stats.successes as f64 / stats.invocations as f64;
-        let recency_score = if let Some(last) = stats.last_invocation {
-            let hours_ago = (chrono::Utc::now() - last).num_hours();
-            (1.0 / (1.0 + hours_ago as f64 / 24.0)).min(1.0)
-        } else {
-            0.0
-        };
+        #[allow(clippy::cast_precision_loss)]
+        let successes_f64 = stats.successes as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let invocations_f64 = stats.invocations as f64;
+        let success_rate = successes_f64 / invocations_f64;
+        let recency_score = stats.last_invocation.map_or_else(
+            || 0.0,
+            |last| {
+                let hours_ago = (chrono::Utc::now() - last).num_hours();
+                #[allow(clippy::cast_precision_loss)]
+                let hours_ago_f64 = hours_ago as f64;
+                (1.0 / (1.0 + hours_ago_f64 / 24.0)).min(1.0)
+            },
+        );
 
         // Weighted average of success rate and recency
-        (success_rate * 0.7 + recency_score * 0.3).clamp(0.0, 1.0)
+        success_rate
+            .mul_add(0.7, recency_score * 0.3)
+            .clamp(0.0, 1.0)
     }
 }
 
@@ -110,6 +119,7 @@ pub struct CapabilityMatch {
 
 impl CapabilityAggregator {
     /// Create a new capability aggregator
+    #[must_use]
     pub fn new() -> Self {
         Self::with_scorer(Arc::new(DefaultCapabilityScorer))
     }
@@ -125,6 +135,14 @@ impl CapabilityAggregator {
     }
 
     /// Register a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability registration fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn register_capability(
         &self,
         capability: Capability,
@@ -149,52 +167,85 @@ impl CapabilityAggregator {
         // Add to main registry
         let mut capabilities = self.capabilities.write().unwrap();
         capabilities.insert(capability_id.clone(), entry);
+        drop(capabilities);
 
         // Update category index
         let mut index = self.category_index.write().unwrap();
         index
-            .entry(capability.category.clone())
+            .entry(capability.category)
             .or_default()
             .insert(capability_id);
+        drop(index);
 
         Ok(())
     }
 
     /// Unregister a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn unregister_capability(&self, provider_id: &str, capability_name: &str) -> Result<()> {
-        let capability_id = format!("{}::{}", provider_id, capability_name);
+        let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
-        if let Some(entry) = capabilities.remove(&capability_id) {
+        let entry_opt = capabilities.remove(&capability_id);
+        drop(capabilities);
+
+        if let Some(entry) = entry_opt {
             // Remove from category index
             let mut index = self.category_index.write().unwrap();
             if let Some(set) = index.get_mut(&entry.capability.category) {
                 set.remove(&capability_id);
             }
+            drop(index);
         }
 
         Ok(())
     }
 
     /// Add a capability requirement
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn add_requirement(&self, requirement: CapabilityRequirement) {
         let mut requirements = self.requirements.write().unwrap();
         requirements.push(requirement);
     }
 
     /// Clear all requirements
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn clear_requirements(&self) {
         let mut requirements = self.requirements.write().unwrap();
         requirements.clear();
+        drop(requirements);
     }
 
     /// Find capabilities matching requirements
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn find_matches(&self) -> Vec<CapabilityMatch> {
         let capabilities = self.capabilities.read().unwrap();
+        let capabilities_vec: Vec<_> = capabilities.values().cloned().collect();
+        drop(capabilities);
+
         let requirements = self.requirements.read().unwrap();
+        let requirements_vec: Vec<_> = requirements.clone();
+        drop(requirements);
+
         let mut matches = Vec::new();
 
-        for (_cap_id, entry) in capabilities.iter() {
+        for entry in &capabilities_vec {
             if !entry.available {
                 continue;
             }
@@ -203,9 +254,9 @@ impl CapabilityAggregator {
             let mut total_score = 0.0;
             let mut requirement_count = 0;
 
-            for (idx, req) in requirements.iter().enumerate() {
+            for (idx, req) in requirements_vec.iter().enumerate() {
                 if self.matches_requirement(&entry.capability, req) {
-                    satisfied.push(format!("req-{}", idx));
+                    satisfied.push(format!("req-{idx}"));
                     total_score += entry.score;
                     requirement_count += 1;
                 }
@@ -213,7 +264,7 @@ impl CapabilityAggregator {
 
             if !satisfied.is_empty() {
                 let avg_score = if requirement_count > 0 {
-                    total_score / requirement_count as f64
+                    total_score / f64::from(requirement_count)
                 } else {
                     entry.score
                 };
@@ -233,30 +284,40 @@ impl CapabilityAggregator {
     }
 
     /// Check if a capability matches a requirement
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     fn matches_requirement(
         &self,
         capability: &Capability,
         requirement: &CapabilityRequirement,
     ) -> bool {
         // Check name pattern
-        if !self.matches_pattern(&capability.name, &requirement.name_pattern) {
+        if !Self::matches_pattern(&capability.name, &requirement.name_pattern) {
             return false;
         }
 
         // Check category
-        if let Some(ref req_category) = requirement.category {
-            if &capability.category != req_category {
-                return false;
-            }
+        if requirement
+            .category
+            .as_ref()
+            .is_some_and(|req_category| &capability.category != req_category)
+        {
+            return false;
         }
 
         // Check version (simplified)
         if let Some(ref min_version) = requirement.min_version {
-            if let Some(ref cap_version) = capability.version {
-                if cap_version < min_version {
-                    return false;
-                }
-            } else {
+            // This map_or is correct: if capability has no version (None), we consider it
+            // as not meeting the requirement (true = fails check). If it has a version,
+            // we check if it's less than the minimum required version.
+            #[allow(clippy::unnecessary_map_or)]
+            if capability
+                .version
+                .as_ref()
+                .map_or(true, |cap_version| cap_version < min_version)
+            {
                 return false;
             }
         }
@@ -271,10 +332,14 @@ impl CapabilityAggregator {
         // Check score
         if let Some(min_score) = requirement.min_score {
             let cap_id = format!("{}::{}", "unknown", capability.name);
-            if let Some(entry) = self.capabilities.read().unwrap().get(&cap_id) {
-                if entry.score < min_score {
-                    return false;
-                }
+            if self
+                .capabilities
+                .read()
+                .unwrap()
+                .get(&cap_id)
+                .is_some_and(|entry| entry.score < min_score)
+            {
+                return false;
             }
         }
 
@@ -282,7 +347,7 @@ impl CapabilityAggregator {
     }
 
     /// Simple pattern matching (supports * wildcard)
-    fn matches_pattern(&self, text: &str, pattern: &str) -> bool {
+    fn matches_pattern(text: &str, pattern: &str) -> bool {
         if pattern == "*" {
             return true;
         }
@@ -308,10 +373,11 @@ impl CapabilityAggregator {
                     return false;
                 }
 
-                if let Some(pos) = text[text_pos..].find(part) {
-                    text_pos += pos + part.len();
-                } else {
-                    return false;
+                match text[text_pos..].find(part) {
+                    Some(pos) => {
+                        text_pos += pos + part.len();
+                    }
+                    None => return false,
                 }
             }
             true
@@ -321,6 +387,14 @@ impl CapabilityAggregator {
     }
 
     /// Update usage statistics for a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn update_usage(
         &self,
         provider_id: &str,
@@ -328,39 +402,46 @@ impl CapabilityAggregator {
         success: bool,
         duration: std::time::Duration,
     ) -> Result<()> {
-        let capability_id = format!("{}::{}", provider_id, capability_name);
+        let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
-        if let Some(entry) = capabilities.get_mut(&capability_id) {
-            let stats = &mut entry.usage_stats;
-            stats.invocations += 1;
-            if success {
-                stats.successes += 1;
-            } else {
-                stats.failures += 1;
-            }
+        capabilities.get_mut(&capability_id).map_or_else(
+            || {
+                Err(LLMSpellError::Component {
+                    message: format!("Capability not found: {capability_id}"),
+                    source: None,
+                })
+            },
+            |entry| {
+                let stats = &mut entry.usage_stats;
+                stats.invocations += 1;
+                if success {
+                    stats.successes += 1;
+                } else {
+                    stats.failures += 1;
+                }
 
-            // Update average execution time
-            let total_time =
-                stats.avg_execution_time.as_secs() * stats.invocations + duration.as_secs();
-            stats.avg_execution_time =
-                std::time::Duration::from_secs(total_time / (stats.invocations + 1));
+                // Update average execution time
+                let total_time =
+                    stats.avg_execution_time.as_secs() * stats.invocations + duration.as_secs();
+                stats.avg_execution_time =
+                    std::time::Duration::from_secs(total_time / (stats.invocations + 1));
 
-            stats.last_invocation = Some(chrono::Utc::now());
+                stats.last_invocation = Some(chrono::Utc::now());
 
-            // Recalculate score
-            entry.score = self.scorer.score(&entry.capability, stats);
+                // Recalculate score
+                entry.score = self.scorer.score(&entry.capability, stats);
 
-            Ok(())
-        } else {
-            Err(LLMSpellError::Component {
-                message: format!("Capability not found: {}", capability_id),
-                source: None,
-            })
-        }
+                Ok(())
+            },
+        )
     }
 
     /// Get all capabilities for a provider
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_provider_capabilities(&self, provider_id: &str) -> Vec<Capability> {
         let capabilities = self.capabilities.read().unwrap();
         capabilities
@@ -371,43 +452,60 @@ impl CapabilityAggregator {
     }
 
     /// Get capabilities by category
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_by_category(&self, category: &CapabilityCategory) -> Vec<Capability> {
         let index = self.category_index.read().unwrap();
         let capabilities = self.capabilities.read().unwrap();
 
-        if let Some(cap_ids) = index.get(category) {
+        index.get(category).map_or_else(Vec::new, |cap_ids| {
             cap_ids
                 .iter()
                 .filter_map(|id| capabilities.get(id))
                 .map(|entry| entry.capability.clone())
                 .collect()
-        } else {
-            Vec::new()
-        }
+        })
     }
 
     /// Set availability for a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn set_availability(
         &self,
         provider_id: &str,
         capability_name: &str,
         available: bool,
     ) -> Result<()> {
-        let capability_id = format!("{}::{}", provider_id, capability_name);
+        let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
-        if let Some(entry) = capabilities.get_mut(&capability_id) {
-            entry.available = available;
-            Ok(())
-        } else {
-            Err(LLMSpellError::Component {
-                message: format!("Capability not found: {}", capability_id),
-                source: None,
-            })
-        }
+        capabilities.get_mut(&capability_id).map_or_else(
+            || {
+                Err(LLMSpellError::Component {
+                    message: format!("Capability not found: {capability_id}"),
+                    source: None,
+                })
+            },
+            |entry| {
+                entry.available = available;
+                Ok(())
+            },
+        )
     }
 
     /// Get statistics for all capabilities
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_statistics(&self) -> CapabilityStatistics {
         let capabilities = self.capabilities.read().unwrap();
         let total = capabilities.len();
@@ -421,7 +519,9 @@ impl CapabilityAggregator {
         }
 
         let avg_score = if total > 0 {
-            capabilities.values().map(|e| e.score).sum::<f64>() / total as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = total as f64;
+            capabilities.values().map(|e| e.score).sum::<f64>() / total_f64
         } else {
             0.0
         };
@@ -475,18 +575,21 @@ impl CapabilityRequirementBuilder {
     }
 
     /// Set the category requirement
+    #[must_use]
     pub fn category(mut self, category: CapabilityCategory) -> Self {
         self.requirement.category = Some(category);
         self
     }
 
     /// Set minimum version
+    #[must_use]
     pub fn min_version(mut self, version: impl Into<String>) -> Self {
         self.requirement.min_version = Some(version.into());
         self
     }
 
     /// Add required metadata
+    #[must_use]
     pub fn metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.requirement
             .required_metadata
@@ -495,18 +598,21 @@ impl CapabilityRequirementBuilder {
     }
 
     /// Set as mandatory
-    pub fn mandatory(mut self) -> Self {
+    #[must_use]
+    pub const fn mandatory(mut self) -> Self {
         self.requirement.mandatory = true;
         self
     }
 
     /// Set minimum score
-    pub fn min_score(mut self, score: f64) -> Self {
+    #[must_use]
+    pub const fn min_score(mut self, score: f64) -> Self {
         self.requirement.min_score = Some(score);
         self
     }
 
     /// Build the requirement
+    #[must_use]
     pub fn build(self) -> CapabilityRequirement {
         self.requirement
     }
@@ -515,7 +621,6 @@ impl CapabilityRequirementBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_capability_aggregator() {
         let aggregator = CapabilityAggregator::new();
@@ -528,27 +633,38 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        aggregator
-            .register_capability(cap.clone(), "agent-1")
-            .unwrap();
+        aggregator.register_capability(cap, "agent-1").unwrap();
 
         // Check it was registered
         let provider_caps = aggregator.get_provider_capabilities("agent-1");
         assert_eq!(provider_caps.len(), 1);
         assert_eq!(provider_caps[0].name, "text-processing");
     }
-
     #[test]
     fn test_pattern_matching() {
-        let aggregator = CapabilityAggregator::new();
+        let _aggregator = CapabilityAggregator::new();
 
-        assert!(aggregator.matches_pattern("text-processing", "text-processing"));
-        assert!(aggregator.matches_pattern("text-processing", "text-*"));
-        assert!(aggregator.matches_pattern("text-processing", "*-processing"));
-        assert!(aggregator.matches_pattern("text-processing", "*"));
-        assert!(!aggregator.matches_pattern("text-processing", "image-*"));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "text-processing"
+        ));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "text-*"
+        ));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "*-processing"
+        ));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "*"
+        ));
+        assert!(!CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "image-*"
+        ));
     }
-
     #[test]
     fn test_capability_matching() {
         let aggregator = CapabilityAggregator::new();
@@ -584,7 +700,6 @@ mod tests {
         assert_eq!(matches.len(), 1);
         assert_eq!(matches[0].capability.name, "text-analysis");
     }
-
     #[test]
     fn test_usage_statistics() {
         let aggregator = CapabilityAggregator::new();

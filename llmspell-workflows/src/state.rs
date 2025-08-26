@@ -346,7 +346,9 @@ impl StateManager {
             .fold(Duration::ZERO, |acc, d| acc + d);
 
         let average_duration = if total_steps > 0 {
-            total_duration / total_steps as u32
+            #[allow(clippy::cast_possible_truncation)]
+            let total_steps_u32 = total_steps as u32;
+            total_duration / total_steps_u32
         } else {
             Duration::ZERO
         };
@@ -501,7 +503,11 @@ impl ExecutionStats {
         if self.total_steps == 0 {
             0.0
         } else {
-            (self.successful_steps as f64 / self.total_steps as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let successful_f64 = self.successful_steps as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = self.total_steps as f64;
+            (successful_f64 / total_f64) * 100.0
         }
     }
 
@@ -539,7 +545,6 @@ impl ExecutionStats {
 mod tests {
     use super::*;
     use std::time::Duration;
-
     #[tokio::test]
     async fn test_state_manager_lifecycle() {
         let config = WorkflowConfig::default();
@@ -560,7 +565,6 @@ mod tests {
             WorkflowStatus::Completed
         );
     }
-
     #[tokio::test]
     async fn test_shared_data_management() {
         let config = WorkflowConfig::default();
@@ -586,7 +590,6 @@ mod tests {
         assert_eq!(all_data.len(), 1);
         assert!(all_data.contains_key("test_key"));
     }
-
     #[tokio::test]
     async fn test_step_execution_tracking() {
         let config = WorkflowConfig::default();
@@ -613,7 +616,6 @@ mod tests {
         assert_eq!(history[0].step_id, step_id);
         assert!(history[0].success);
     }
-
     #[tokio::test]
     async fn test_execution_statistics() {
         let config = WorkflowConfig::default();
@@ -647,7 +649,6 @@ mod tests {
         assert_eq!(stats.total_retries, 1);
         assert_eq!(stats.total_duration, Duration::from_secs(3));
     }
-
     #[tokio::test]
     async fn test_state_reset() {
         let config = WorkflowConfig::default();

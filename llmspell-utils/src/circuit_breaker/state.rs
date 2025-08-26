@@ -68,21 +68,18 @@ impl StateTransition {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_state_allows_requests() {
         assert!(CircuitState::Closed.allows_requests());
         assert!(!CircuitState::Open.allows_requests());
         assert!(CircuitState::HalfOpen.allows_requests());
     }
-
     #[test]
     fn test_state_is_protecting() {
         assert!(!CircuitState::Closed.is_protecting());
         assert!(CircuitState::Open.is_protecting());
         assert!(!CircuitState::HalfOpen.is_protecting());
     }
-
     #[test]
     fn test_state_display() {
         assert_eq!(CircuitState::Closed.to_string(), "Closed");

@@ -1,6 +1,8 @@
 //! ABOUTME: Agent state machine implementation for comprehensive lifecycle management
 //! ABOUTME: Provides deterministic state transitions for agent initialization, execution, pausing, and termination
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -44,31 +46,33 @@ pub enum AgentState {
 
 impl AgentState {
     /// Check if state allows execution
-    pub fn can_execute(&self) -> bool {
-        matches!(self, AgentState::Ready | AgentState::Running)
+    #[must_use]
+    pub const fn can_execute(&self) -> bool {
+        matches!(self, Self::Ready | Self::Running)
     }
 
     /// Check if state allows pausing
-    pub fn can_pause(&self) -> bool {
-        matches!(self, AgentState::Running)
+    #[must_use]
+    pub const fn can_pause(&self) -> bool {
+        matches!(self, Self::Running)
     }
 
     /// Check if state allows termination
-    pub fn can_terminate(&self) -> bool {
-        !matches!(self, AgentState::Terminated | AgentState::Terminating)
+    #[must_use]
+    pub const fn can_terminate(&self) -> bool {
+        !matches!(self, Self::Terminated | Self::Terminating)
     }
 
     /// Check if state indicates healthy operation
-    pub fn is_healthy(&self) -> bool {
-        matches!(
-            self,
-            AgentState::Ready | AgentState::Running | AgentState::Paused
-        )
+    #[must_use]
+    pub const fn is_healthy(&self) -> bool {
+        matches!(self, Self::Ready | Self::Running | Self::Paused)
     }
 
     /// Check if state indicates error condition
-    pub fn is_error(&self) -> bool {
-        matches!(self, AgentState::Error | AgentState::Recovering)
+    #[must_use]
+    pub const fn is_error(&self) -> bool {
+        matches!(self, Self::Error | Self::Recovering)
     }
 }
 
@@ -109,61 +113,85 @@ pub struct StateTransition {
 pub struct StateMachineConfig {
     /// Maximum time allowed for state transitions
     pub max_transition_time: Duration,
-    /// Enable automatic recovery from error states
-    pub auto_recovery: bool,
     /// Maximum number of recovery attempts
     pub max_recovery_attempts: usize,
     /// Timeout for initialization process
     pub initialization_timeout: Duration,
     /// Timeout for graceful termination
     pub termination_timeout: Duration,
+    /// Hook executor configuration (if hooks enabled)
+    pub hook_executor_config: Option<HookExecutorConfig>,
+    /// Circuit breaker configuration
+    pub circuit_breaker_config: BreakerConfig,
+    /// Feature flags for state machine behavior
+    pub feature_flags: StateMachineFeatureFlags,
+}
+
+/// Feature flags for state machine behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct StateMachineFeatureFlags {
+    /// Enable automatic recovery from error states
+    pub auto_recovery: bool,
     /// Enable state transition logging
     pub enable_logging: bool,
     /// Enable state persistence
     pub enable_persistence: bool,
     /// Enable hook execution during state transitions
     pub enable_hooks: bool,
-    /// Hook executor configuration (if hooks enabled)
-    pub hook_executor_config: Option<HookExecutorConfig>,
     /// Enable circuit breaker protection for state transitions
     pub enable_circuit_breaker: bool,
-    /// Circuit breaker configuration
-    pub circuit_breaker_config: BreakerConfig,
 }
 
 impl Default for StateMachineConfig {
     fn default() -> Self {
         Self {
             max_transition_time: Duration::from_millis(5000), // 5 seconds
-            auto_recovery: true,
             max_recovery_attempts: 3,
             initialization_timeout: Duration::from_secs(30),
             termination_timeout: Duration::from_secs(10),
+            hook_executor_config: None,
+            circuit_breaker_config: BreakerConfig::default(),
+            feature_flags: StateMachineFeatureFlags::default(),
+        }
+    }
+}
+
+impl Default for StateMachineFeatureFlags {
+    fn default() -> Self {
+        Self {
+            auto_recovery: true,
             enable_logging: true,
             enable_persistence: false,
             enable_hooks: false, // Disabled by default for backward compatibility
-            hook_executor_config: None,
             enable_circuit_breaker: true, // Enabled by default for protection
-            circuit_breaker_config: BreakerConfig::default(),
         }
     }
 }
 
 impl StateMachineConfig {
     /// Create config with hooks enabled
+    #[must_use]
     pub fn with_hooks(_hook_registry: Arc<HookRegistry>) -> Self {
         Self {
-            enable_hooks: true,
             hook_executor_config: Some(HookExecutorConfig::default()),
+            feature_flags: StateMachineFeatureFlags {
+                enable_hooks: true,
+                ..StateMachineFeatureFlags::default()
+            },
             ..Default::default()
         }
     }
 
     /// Create config with custom hook executor configuration
+    #[must_use]
     pub fn with_hook_config(hook_config: HookExecutorConfig) -> Self {
         Self {
-            enable_hooks: true,
             hook_executor_config: Some(hook_config),
+            feature_flags: StateMachineFeatureFlags {
+                enable_hooks: true,
+                ..StateMachineFeatureFlags::default()
+            },
             ..Default::default()
         }
     }
@@ -180,6 +208,7 @@ pub struct StateContext {
 }
 
 impl StateContext {
+    #[must_use]
     pub fn new(agent_id: String, current: AgentState, target: AgentState) -> Self {
         Self {
             agent_id,
@@ -190,11 +219,13 @@ impl StateContext {
         }
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.metadata.insert(key.to_string(), value.to_string());
         self
     }
 
+    #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.transition_start.elapsed().unwrap_or_default()
     }
@@ -227,7 +258,8 @@ pub struct DefaultStateHandler {
 }
 
 impl DefaultStateHandler {
-    pub fn new(state: AgentState) -> Self {
+    #[must_use]
+    pub const fn new(state: AgentState) -> Self {
         Self { state }
     }
 }
@@ -250,54 +282,24 @@ impl StateHandler for DefaultStateHandler {
     }
 
     async fn can_transition_to(&self, target: AgentState) -> bool {
-        use AgentState::*;
+        use AgentState::{
+            Error, Initializing, Paused, Ready, Recovering, Running, Terminated, Terminating,
+            Uninitialized,
+        };
 
+        #[allow(clippy::unnested_or_patterns)]
         match (self.state, target) {
-            // From Uninitialized
-            (Uninitialized, Initializing) => true,
-            (Uninitialized, Error) => true,
+            // Valid transitions
+            (Uninitialized, Initializing | Error)
+            | (Initializing, Ready | Error | Terminating)
+            | (Ready, Running | Paused | Terminating | Error)
+            | (Running, Ready | Paused | Terminating | Error)
+            | (Paused, Ready | Running | Terminating | Error)
+            | (Error, Recovering | Terminating | Terminated)
+            | (Recovering, Ready | Error | Terminating)
+            | (Terminating, Terminated | Error) => true,
 
-            // From Initializing
-            (Initializing, Ready) => true,
-            (Initializing, Error) => true,
-            (Initializing, Terminating) => true,
-
-            // From Ready
-            (Ready, Running) => true,
-            (Ready, Paused) => true,
-            (Ready, Terminating) => true,
-            (Ready, Error) => true,
-
-            // From Running
-            (Running, Ready) => true,
-            (Running, Paused) => true,
-            (Running, Terminating) => true,
-            (Running, Error) => true,
-
-            // From Paused
-            (Paused, Ready) => true,
-            (Paused, Running) => true,
-            (Paused, Terminating) => true,
-            (Paused, Error) => true,
-
-            // From Error
-            (Error, Recovering) => true,
-            (Error, Terminating) => true,
-            (Error, Terminated) => true,
-
-            // From Recovering
-            (Recovering, Ready) => true,
-            (Recovering, Error) => true,
-            (Recovering, Terminating) => true,
-
-            // From Terminating
-            (Terminating, Terminated) => true,
-            (Terminating, Error) => true,
-
-            // From Terminated (final state)
-            (Terminated, _) => false,
-
-            // All others not allowed
+            // All other transitions not allowed (including from Terminated state)
             _ => false,
         }
     }
@@ -322,10 +324,11 @@ pub struct AgentStateMachine {
 
 impl AgentStateMachine {
     /// Create new state machine for agent
+    #[must_use]
     pub fn new(agent_id: String, config: StateMachineConfig) -> Self {
-        let transition_circuit_breaker = if config.enable_circuit_breaker {
+        let transition_circuit_breaker = if config.feature_flags.enable_circuit_breaker {
             Some(Arc::new(CircuitBreaker::with_config(
-                format!("{}-state-transitions", agent_id),
+                format!("{agent_id}-state-transitions"),
                 config.circuit_breaker_config.clone(),
             )))
         } else {
@@ -352,21 +355,22 @@ impl AgentStateMachine {
     }
 
     /// Create new state machine with hook support
+    #[must_use]
     pub fn with_hooks(
         agent_id: String,
         config: StateMachineConfig,
         hook_registry: Arc<HookRegistry>,
     ) -> Self {
-        let hook_executor = if config.enable_hooks {
+        let hook_executor = if config.feature_flags.enable_hooks {
             let executor_config = config.hook_executor_config.clone().unwrap_or_default();
             Some(Arc::new(HookExecutor::with_config(executor_config)))
         } else {
             None
         };
 
-        let transition_circuit_breaker = if config.enable_circuit_breaker {
+        let transition_circuit_breaker = if config.feature_flags.enable_circuit_breaker {
             Some(Arc::new(CircuitBreaker::with_config(
-                format!("{}-state-transitions", agent_id),
+                format!("{agent_id}-state-transitions"),
                 config.circuit_breaker_config.clone(),
             )))
         } else {
@@ -393,6 +397,7 @@ impl AgentStateMachine {
     }
 
     /// Create state machine with default configuration
+    #[must_use]
     pub fn default(agent_id: String) -> Self {
         Self::new(agent_id, StateMachineConfig::default())
     }
@@ -431,6 +436,7 @@ impl AgentStateMachine {
     }
 
     /// Execute hooks for a state transition phase
+    #[allow(clippy::cognitive_complexity)]
     async fn execute_transition_hooks(
         &self,
         state: AgentState,
@@ -438,13 +444,14 @@ impl AgentStateMachine {
         context: &StateContext,
     ) -> Result<()> {
         // Only execute hooks if enabled and components are available
-        if !self.config.enable_hooks {
+        if !self.config.feature_flags.enable_hooks {
             return Ok(());
         }
 
-        let (hook_executor, hook_registry) = match (&self.hook_executor, &self.hook_registry) {
-            (Some(executor), Some(registry)) => (executor, registry),
-            _ => return Ok(()), // No hooks configured
+        let Some((hook_executor, hook_registry)) =
+            self.hook_executor.as_ref().zip(self.hook_registry.as_ref())
+        else {
+            return Ok(()); // No hooks configured
         };
 
         let hook_point = state_to_hook_point(state, is_entering);
@@ -492,7 +499,7 @@ impl AgentStateMachine {
                 // Check results for any that should block the transition
                 for result in hook_results {
                     match result {
-                        HookResult::Continue | HookResult::Skipped(_) => continue,
+                        HookResult::Continue | HookResult::Skipped(_) => {}
                         HookResult::Retry {
                             delay: _,
                             max_attempts: _,
@@ -556,20 +563,31 @@ impl AgentStateMachine {
         let transition_id = format!("{}-{:?}-{:?}", self.agent_id, from_state, to_state);
 
         let tokens = self.active_cancellation_tokens.lock().await;
-        if let Some(token) = tokens.get(&transition_id) {
+        tokens.get(&transition_id).is_some_and(|token| {
             token.cancel();
             true
-        } else {
-            false
-        }
+        })
     }
 
     /// Transition to new state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state transition fails
     pub async fn transition_to(&self, target_state: AgentState) -> Result<()> {
         self.transition_to_with_reason(target_state, None).await
     }
 
     /// Transition to new state with reason
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Circuit breaker is open (transitions blocked)
+    /// - The transition is invalid
+    /// - Hook execution prevents the transition
+    /// - Validation fails
+    /// - Timeout occurs
     pub async fn transition_to_with_reason(
         &self,
         target_state: AgentState,
@@ -631,7 +649,7 @@ impl AgentStateMachine {
             let duration = start_time_cb.elapsed();
 
             match &result {
-                Ok(_) => circuit_breaker.record_success(duration),
+                Ok(()) => circuit_breaker.record_success(duration),
                 Err(e) => circuit_breaker.record_failure(e),
             }
 
@@ -652,6 +670,7 @@ impl AgentStateMachine {
     }
 
     /// Internal method to execute the actual state transition
+    #[allow(clippy::too_many_lines)]
     async fn execute_state_transition(
         &self,
         current: AgentState,
@@ -687,7 +706,7 @@ impl AgentStateMachine {
                 context = context.with_metadata("transition_reason", r);
             }
 
-            if self.config.enable_logging {
+            if self.config.feature_flags.enable_logging {
                 info!(
                     "Agent {} transitioning from {:?} to {:?}{}",
                     self.agent_id,
@@ -695,7 +714,7 @@ impl AgentStateMachine {
                     target_state,
                     reason
                         .as_ref()
-                        .map(|r| format!(" ({})", r))
+                        .map(|r| format!(" ({r})"))
                         .unwrap_or_default()
                 );
             }
@@ -795,7 +814,7 @@ impl AgentStateMachine {
                 *attempts = 0;
             }
 
-            if self.config.enable_logging {
+            if self.config.feature_flags.enable_logging {
                 debug!(
                     "Agent {} successfully transitioned to {:?} in {:?}",
                     self.agent_id,
@@ -815,16 +834,21 @@ impl AgentStateMachine {
         }
 
         // Handle timeout
-        match timeout_result {
-            Ok(result) => result,
-            Err(_) => Err(anyhow!(
+        timeout_result.map_err(|_| {
+            anyhow!(
                 "State transition timed out after {:?}",
                 self.config.max_transition_time
-            )),
-        }
+            )
+        })?
     }
 
     /// Initialize agent (transition from Uninitialized to Ready)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Uninitialized state
+    /// - State transition fails
     pub async fn initialize(&self) -> Result<()> {
         if !self.is_state(AgentState::Uninitialized).await {
             return Err(anyhow!(
@@ -853,6 +877,12 @@ impl AgentStateMachine {
     }
 
     /// Start execution (transition to Running)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Ready or Paused state
+    /// - State transition fails
     pub async fn start(&self) -> Result<()> {
         let current = self.current_state().await;
         if !matches!(current, AgentState::Ready | AgentState::Paused) {
@@ -867,6 +897,12 @@ impl AgentStateMachine {
     }
 
     /// Pause execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Running state
+    /// - State transition fails
     pub async fn pause(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be paused from Running state"));
@@ -877,6 +913,12 @@ impl AgentStateMachine {
     }
 
     /// Resume execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Paused state
+    /// - State transition fails
     pub async fn resume(&self) -> Result<()> {
         if !self.is_state(AgentState::Paused).await {
             return Err(anyhow!("Agent can only be resumed from Paused state"));
@@ -887,6 +929,12 @@ impl AgentStateMachine {
     }
 
     /// Stop execution (transition to Ready)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Running state
+    /// - State transition fails
     pub async fn stop(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be stopped from Running state"));
@@ -897,6 +945,10 @@ impl AgentStateMachine {
     }
 
     /// Terminate agent (graceful shutdown)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent cannot be terminated from current state
     pub async fn terminate(&self) -> Result<()> {
         let current = self.current_state().await;
         if !current.can_terminate() {
@@ -927,6 +979,10 @@ impl AgentStateMachine {
     }
 
     /// Trigger error state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent is already terminated
     pub async fn error(&self, error_message: String) -> Result<()> {
         let current = self.current_state().await;
         if current == AgentState::Terminated {
@@ -941,12 +997,19 @@ impl AgentStateMachine {
 
         self.transition_to_with_reason(
             AgentState::Error,
-            Some(format!("Error occurred: {}", error_message)),
+            Some(format!("Error occurred: {error_message}")),
         )
         .await
     }
 
     /// Attempt recovery from error state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in error state
+    /// - Maximum recovery attempts exceeded
+    /// - State transition fails
     pub async fn recover(&self) -> Result<()> {
         if !self.is_state(AgentState::Error).await {
             return Err(anyhow!("Agent can only recover from Error state"));
@@ -967,7 +1030,7 @@ impl AgentStateMachine {
         // Start recovery
         self.transition_to_with_reason(
             AgentState::Recovering,
-            Some(format!("Recovery attempt {}", attempt_count)),
+            Some(format!("Recovery attempt {attempt_count}")),
         )
         .await?;
 
@@ -1014,16 +1077,17 @@ impl AgentStateMachine {
     }
 
     /// Get hook executor metrics (if hooks are enabled)
-    pub async fn get_hook_metrics(
-        &self,
-        hook_name: &str,
-    ) -> Option<llmspell_hooks::PerformanceMetrics> {
+    #[must_use]
+    pub fn get_hook_metrics(&self, hook_name: &str) -> Option<llmspell_hooks::PerformanceMetrics> {
         self.hook_executor.as_ref()?.get_metrics(hook_name)
     }
 
     /// Check if hooks are enabled
-    pub fn has_hooks(&self) -> bool {
-        self.config.enable_hooks && self.hook_executor.is_some() && self.hook_registry.is_some()
+    #[must_use]
+    pub const fn has_hooks(&self) -> bool {
+        self.config.feature_flags.enable_hooks
+            && self.hook_executor.is_some()
+            && self.hook_registry.is_some()
     }
 
     /// Get state machine metrics
@@ -1063,7 +1127,6 @@ pub struct StateMachineMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_state_machine_basic_transitions() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1095,7 +1158,6 @@ mod tests {
         machine.terminate().await.unwrap();
         assert_eq!(machine.current_state().await, AgentState::Terminated);
     }
-
     #[tokio::test]
     async fn test_state_machine_error_handling() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1122,7 +1184,6 @@ mod tests {
         let error_msg = machine.get_last_error().await;
         assert_eq!(error_msg, None);
     }
-
     #[tokio::test]
     async fn test_state_machine_invalid_transitions() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1140,7 +1201,6 @@ mod tests {
         let result = machine.resume().await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_state_machine_history() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1162,7 +1222,6 @@ mod tests {
         assert_eq!(history[3].from, AgentState::Running);
         assert_eq!(history[3].to, AgentState::Paused);
     }
-
     #[tokio::test]
     async fn test_state_machine_metrics() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1178,7 +1237,6 @@ mod tests {
         assert!(metrics.is_healthy);
         assert!(metrics.uptime > Duration::from_millis(0));
     }
-
     #[tokio::test]
     async fn test_state_checks() {
         assert!(AgentState::Ready.can_execute());

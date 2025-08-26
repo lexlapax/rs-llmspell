@@ -1,0 +1,39 @@
+# Minimal LLMSpell Configuration for Tool Testing
+# This configuration doesn't require any API keys
+
+# Default script engine to use
+default_engine = "lua"
+
+# Engine-specific configurations
+[engines.lua]
+stdlib_level = "full"
+sandbox_mode = false
+memory_limit = 52428800
+max_instructions = 1000000
+
+[engines.javascript]
+module_resolution = "node"
+allow_eval = false
+allow_timers = true
+allow_console = true
+memory_limit = 52428800
+max_event_loop_ticks = 10000
+typescript = false
+jsx = false
+
+# No providers configured - tools don't need LLM access
+[providers]
+# Empty section - no providers needed
+
+# Runtime settings
+[runtime]
+max_concurrent_scripts = 10
+script_timeout_seconds = 300
+enable_streaming = true
+
+[runtime.security]
+allow_file_access = true
+allow_network_access = true
+allow_process_spawn = true
+max_memory_bytes = 52428800
+max_execution_time_ms = 300000

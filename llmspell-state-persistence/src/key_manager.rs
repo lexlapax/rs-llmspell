@@ -167,7 +167,6 @@ impl StateAccessControl {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_key_validation() {
         // Valid keys
@@ -185,7 +184,6 @@ mod tests {
         assert!(KeyManager::validate_key("__reserved_prefix").is_err());
         assert!(KeyManager::validate_key(&"x".repeat(257)).is_err());
     }
-
     #[test]
     fn test_scoped_key_creation() {
         let scope = StateScope::Agent("agent123".to_string());
@@ -200,7 +198,6 @@ mod tests {
         assert!(KeyManager::belongs_to_scope(&key, &scope));
         assert!(!KeyManager::belongs_to_scope(&key, &StateScope::Global));
     }
-
     #[test]
     fn test_access_control() {
         let mut acl = StateAccessControl::new();
@@ -220,7 +217,6 @@ mod tests {
         let child_scope = StateScope::Custom("workflow456:step1".to_string());
         assert!(!acl.has_permission(agent_id, &child_scope, &StatePermission::Read));
     }
-
     #[test]
     fn test_key_sanitization() {
         let dirty_key = "key with spaces!@#$%^&*()";

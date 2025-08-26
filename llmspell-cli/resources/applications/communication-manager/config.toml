@@ -1,0 +1,109 @@
+# Business Layer Configuration - Communication Manager
+# Enterprise configuration with state persistence and session management
+
+[runtime]
+name = "communication-manager"
+description = "Business communication automation with state persistence"
+debug = false
+
+# Multiple providers with redundancy
+[providers.openai]
+name = "openai"
+api_key_env = "OPENAI_API_KEY"
+api_base = "https://api.openai.com/v1"
+default_model = "gpt-4o"
+timeout_seconds = 60
+retry_attempts = 3
+
+[providers.anthropic]
+name = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+api_base = "https://api.anthropic.com/v1"
+default_model = "claude-3-5-sonnet-20241022"
+timeout_seconds = 60
+retry_attempts = 3
+
+# Business-grade tools
+[tools]
+file_operations = { enabled = true }
+email_sender = { enabled = true }
+webhook_caller = { enabled = true }
+database_connector = { enabled = true }
+http_request = { enabled = true }
+json_processor = { enabled = true }
+text_manipulator = { enabled = true }
+template_engine = { enabled = true }
+
+# Enterprise workflow configuration
+[workflows]
+enabled = true
+max_concurrent = 10
+timeout_seconds = 300
+retry_attempts = 3
+error_handling = "graceful"
+
+# Persistent state for business continuity
+[state]
+enabled = true
+persistence_enabled = true
+storage_backend = "sqlite"
+database_path = "./data/communication-state.db"
+cache_size_mb = 50
+backup_enabled = true
+backup_interval_minutes = 30
+
+# Session management for client relationships
+[sessions]
+enabled = true
+max_sessions = 100
+session_timeout_minutes = 480  # 8 hours
+artifact_storage = true
+artifact_path = "./data/session-artifacts"
+thread_tracking = true
+
+# Business event tracking
+[events]
+enabled = true
+buffer_size = 1000
+export_method = "webhook"
+export_endpoint = "https://api.company.com/events"
+export_interval_seconds = 60
+
+# Business-specific settings
+[business_settings]
+client_tracking = true
+sentiment_analysis = true
+escalation_thresholds = { negative = 0.3, urgent = 0.8 }
+response_time_sla_minutes = 30
+follow_up_reminder_hours = 24
+relationship_scoring = true
+communication_threading = true
+
+# Client management
+[clients]
+database_enabled = true
+max_threads_per_client = 50
+history_retention_days = 365
+satisfaction_tracking = true
+
+# Communication templates
+[templates]
+inquiry_response = "/templates/inquiry.md"
+escalation_response = "/templates/escalation.md"
+follow_up = "/templates/follow_up.md"
+meeting_request = "/templates/meeting.md"
+
+# Basic hooks for business logic
+[hooks]
+enabled = true
+max_hooks = 10
+
+[[hooks.pre_response]]
+name = "sentiment_check"
+script = "/hooks/check_sentiment.lua"
+enabled = true
+
+[[hooks.post_response]]
+name = "client_update"
+script = "/hooks/update_client.lua"
+enabled = true

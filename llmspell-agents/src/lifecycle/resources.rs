@@ -1,6 +1,8 @@
 //! ABOUTME: Resource management for agent lifecycle with allocation and deallocation hooks
 //! ABOUTME: Provides resource tracking, limits enforcement, and cleanup during agent state transitions
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::events::{LifecycleEvent, LifecycleEventData, LifecycleEventSystem, LifecycleEventType};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
@@ -37,17 +39,18 @@ pub enum ResourceType {
 
 impl ResourceType {
     /// Get resource type name
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            ResourceType::Memory => "memory".to_string(),
-            ResourceType::Cpu => "cpu".to_string(),
-            ResourceType::Disk => "disk".to_string(),
-            ResourceType::Network => "network".to_string(),
-            ResourceType::ToolAccess => "tool_access".to_string(),
-            ResourceType::LlmConnection => "llm_connection".to_string(),
-            ResourceType::FileHandles => "file_handles".to_string(),
-            ResourceType::ThreadPool => "thread_pool".to_string(),
-            ResourceType::Custom(name) => name.clone(),
+            Self::Memory => "memory".to_string(),
+            Self::Cpu => "cpu".to_string(),
+            Self::Disk => "disk".to_string(),
+            Self::Network => "network".to_string(),
+            Self::ToolAccess => "tool_access".to_string(),
+            Self::LlmConnection => "llm_connection".to_string(),
+            Self::FileHandles => "file_handles".to_string(),
+            Self::ThreadPool => "thread_pool".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -72,6 +75,7 @@ pub struct ResourceRequest {
 }
 
 impl ResourceRequest {
+    #[must_use]
     pub fn new(agent_id: String, resource_type: ResourceType, amount: u64) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -84,16 +88,19 @@ impl ResourceRequest {
         }
     }
 
+    #[must_use]
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority.min(10);
         self
     }
 
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.metadata.insert(key.to_string(), value.to_string());
         self
@@ -118,6 +125,7 @@ pub struct ResourceAllocation {
 }
 
 impl ResourceAllocation {
+    #[must_use]
     pub fn new(agent_id: String, resource_type: ResourceType, amount: u64) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -129,6 +137,7 @@ impl ResourceAllocation {
         }
     }
 
+    #[must_use]
     pub fn age(&self) -> Duration {
         self.allocated_at.elapsed().unwrap_or_default()
     }
@@ -175,7 +184,8 @@ impl Default for ResourceLimits {
 
 impl ResourceLimits {
     /// Get limit for specific resource type per agent
-    pub fn get_per_agent_limit(&self, resource_type: &ResourceType) -> Option<u64> {
+    #[must_use]
+    pub const fn get_per_agent_limit(&self, resource_type: &ResourceType) -> Option<u64> {
         match resource_type {
             ResourceType::Memory => Some(self.max_memory_per_agent),
             ResourceType::Cpu => Some(self.max_cpu_per_agent),
@@ -190,6 +200,7 @@ impl ResourceLimits {
     }
 
     /// Get global limit for resource type
+    #[must_use]
     pub fn get_global_limit(&self, resource_type: &ResourceType) -> Option<u64> {
         self.global_limits.get(resource_type).copied()
     }
@@ -239,6 +250,7 @@ pub struct ResourceUsageStats {
 
 impl ResourceManager {
     /// Create new resource manager
+    #[must_use]
     pub fn new(limits: ResourceLimits, event_system: Arc<LifecycleEventSystem>) -> Self {
         Self {
             allocations: Arc::new(RwLock::new(HashMap::new())),
@@ -255,6 +267,15 @@ impl ResourceManager {
     }
 
     /// Allocate resources for agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Validation fails
+    /// - Resource allocation fails
+    /// - Insufficient resources available
+    /// - Quota exceeded
+    #[allow(clippy::cognitive_complexity)]
     pub async fn allocate(&self, request: ResourceRequest) -> Result<ResourceAllocation> {
         debug!(
             "Allocating {} {} for agent {}",
@@ -345,6 +366,13 @@ impl ResourceManager {
     }
 
     /// Deallocate specific resource
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Allocation not found
+    /// - Deallocation hooks fail
+    #[allow(clippy::cognitive_complexity)]
     pub async fn deallocate(&self, allocation_id: &str) -> Result<()> {
         let allocation = self.find_allocation(allocation_id).await?;
 
@@ -416,6 +444,10 @@ impl ResourceManager {
     }
 
     /// Deallocate all resources for agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any deallocation fails
     pub async fn deallocate_all(&self, agent_id: &str) -> Result<()> {
         debug!("Deallocating all resources for agent {}", agent_id);
 
@@ -474,15 +506,13 @@ impl ResourceManager {
     /// Get current resource usage for agent
     async fn get_agent_usage(&self, agent_id: &str, resource_type: &ResourceType) -> u64 {
         let allocations = self.allocations.read().await;
-        if let Some(agent_allocations) = allocations.get(agent_id) {
+        allocations.get(agent_id).map_or(0, |agent_allocations| {
             agent_allocations
                 .iter()
                 .filter(|a| a.resource_type == *resource_type)
                 .map(|a| a.amount)
                 .sum()
-        } else {
-            0
-        }
+        })
     }
 
     /// Get global resource usage
@@ -521,7 +551,7 @@ impl ResourceManager {
     /// Get total number of allocations
     pub async fn get_allocation_count(&self) -> usize {
         let allocations = self.allocations.read().await;
-        allocations.values().map(|v| v.len()).sum()
+        allocations.values().map(std::vec::Vec::len).sum()
     }
 }
 
@@ -587,13 +617,15 @@ impl Default for SecurityResourceHook {
 }
 
 impl SecurityResourceHook {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             max_memory_per_untrusted_agent: 512 * 1024 * 1024, // 512MB
             trusted_agents: Vec::new(),
         }
     }
 
+    #[must_use]
     pub fn with_trusted_agents(mut self, agents: Vec<String>) -> Self {
         self.trusted_agents = agents;
         self
@@ -635,7 +667,6 @@ impl ResourceAllocationHook for SecurityResourceHook {
 mod tests {
     use super::*;
     use crate::lifecycle::events::EventSystemConfig;
-
     #[tokio::test]
     async fn test_resource_allocation_basic() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -664,7 +695,6 @@ mod tests {
         let allocations = manager.get_agent_allocations("test-agent").await;
         assert_eq!(allocations.len(), 0);
     }
-
     #[tokio::test]
     async fn test_resource_limits() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -699,7 +729,6 @@ mod tests {
         let result = manager.allocate(request3).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_deallocate_all() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -726,7 +755,6 @@ mod tests {
         let allocations = manager.get_agent_allocations("test-agent").await;
         assert_eq!(allocations.len(), 0);
     }
-
     #[tokio::test]
     async fn test_usage_statistics() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -758,7 +786,6 @@ mod tests {
             Some(&0)
         );
     }
-
     #[tokio::test]
     async fn test_security_hook() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -786,14 +813,12 @@ mod tests {
         let result = manager.allocate(untrusted_request).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_resource_types() {
         assert_eq!(ResourceType::Memory.name(), "memory");
         assert_eq!(ResourceType::Cpu.name(), "cpu");
         assert_eq!(ResourceType::Custom("test".to_string()).name(), "test");
     }
-
     #[tokio::test]
     async fn test_resource_request_builder() {
         let request = ResourceRequest::new("test-agent".to_string(), ResourceType::Memory, 1024)

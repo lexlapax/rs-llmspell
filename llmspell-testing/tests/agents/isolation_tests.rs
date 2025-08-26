@@ -2,18 +2,16 @@
 // ABOUTME: Validates isolation boundaries and permission enforcement
 
 use llmspell_agents::state::{
-    IsolationBoundary, SharedScopeConfig, SharingPattern, StateIsolationManager, StateMessage,
-    StateOperation, StatePermission, StateScope, StateSharingManager,
+    IsolationBoundary, SharedScopeConfig, SharingPattern, StateIsolationManager, StateOperation,
+    StatePermission, StateScope, StateSharingManager,
 };
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tokio::time::timeout;
 
 // Mock state manager for testing
 struct MockStateManager;
-
 #[tokio::test]
 async fn test_strict_isolation_prevents_cross_agent_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -60,7 +58,6 @@ async fn test_strict_isolation_prevents_cross_agent_access() {
         .check_access("agent2", &StateScope::Global, StateOperation::Write)
         .unwrap());
 }
-
 #[tokio::test]
 async fn test_shared_scope_controlled_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -96,7 +93,7 @@ async fn test_shared_scope_controlled_access() {
     };
 
     isolation_manager
-        .create_shared_scope("shared_data", Some("admin".to_string()), shared_config)
+        .create_shared_scope("shared_data", Some("admin"), &shared_config)
         .unwrap();
 
     // Set agent boundaries
@@ -139,7 +136,6 @@ async fn test_shared_scope_controlled_access() {
         .check_access("admin", &shared_scope, StateOperation::Delete)
         .unwrap());
 }
-
 #[tokio::test]
 async fn test_audit_logging_tracks_access_attempts() {
     let state_manager = Arc::new(MockStateManager);
@@ -171,7 +167,6 @@ async fn test_audit_logging_tracks_access_attempts() {
     let allowed_entries: Vec<_> = audit_log.iter().filter(|e| e.allowed).collect();
     assert!(!allowed_entries.is_empty());
 }
-
 #[tokio::test]
 async fn test_state_leakage_prevention() {
     let state_manager = Arc::new(MockStateManager);
@@ -224,7 +219,6 @@ async fn test_state_leakage_prevention() {
     //     );
     // }
 }
-
 #[tokio::test]
 async fn test_performance_isolation_overhead() {
     let state_manager = Arc::new(MockStateManager);
@@ -251,7 +245,6 @@ async fn test_performance_isolation_overhead() {
         per_check
     );
 }
-
 #[tokio::test]
 async fn test_permission_revocation() {
     let state_manager = Arc::new(MockStateManager);
@@ -260,7 +253,7 @@ async fn test_permission_revocation() {
     let scope = StateScope::Custom("temp_project".to_string());
 
     // Grant permission
-    isolation_manager.grant_permission("contractor", scope.clone(), StatePermission::Write);
+    isolation_manager.grant_permission("contractor", &scope, StatePermission::Write);
 
     // Verify access
     assert!(isolation_manager
@@ -268,14 +261,13 @@ async fn test_permission_revocation() {
         .unwrap());
 
     // Revoke permission
-    isolation_manager.revoke_permissions("contractor", scope.clone());
+    isolation_manager.revoke_permissions("contractor", &scope);
 
     // Verify access is revoked
     assert!(!isolation_manager
         .check_access("contractor", &scope, StateOperation::Write)
         .unwrap());
 }
-
 #[tokio::test]
 async fn test_broadcast_channel_isolation() {
     let state_manager = Arc::new(MockStateManager);
@@ -323,7 +315,6 @@ async fn test_broadcast_channel_isolation() {
         .await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_pipeline_ordered_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -336,7 +327,7 @@ async fn test_pipeline_ordered_access() {
         "outputter".to_string(),
     ];
     sharing_manager
-        .create_pipeline("data_pipeline", stages.clone())
+        .create_pipeline("data_pipeline", &stages)
         .unwrap();
 
     // Process through pipeline in order
@@ -358,7 +349,6 @@ async fn test_pipeline_ordered_access() {
         .unwrap();
     assert_eq!(next, None);
 }
-
 #[tokio::test]
 async fn test_concurrent_access_safety() {
     let state_manager = Arc::new(MockStateManager);
@@ -380,7 +370,7 @@ async fn test_concurrent_access_safety() {
     };
 
     isolation_manager
-        .create_shared_scope("concurrent_test", None, config)
+        .create_shared_scope("concurrent_test", None, &config)
         .unwrap();
 
     let scope = StateScope::Custom("shared:concurrent_test".to_string());
@@ -391,7 +381,7 @@ async fn test_concurrent_access_safety() {
     for i in 0..10 {
         let agent_id = if i % 2 == 0 { "agent1" } else { "agent2" };
         let isolation_mgr = isolation_manager.clone();
-        let state_mgr = state_manager.clone();
+        let _state_mgr = state_manager.clone();
         let scope_clone = scope.clone();
 
         let handle = tokio::spawn(async move {
@@ -403,7 +393,7 @@ async fn test_concurrent_access_safety() {
 
             // Perform write
             // TODO: When StateManager is properly integrated, uncomment this:
-            // state_mgr
+            // _state_mgr
             //     .set_scoped(scope_clone, &format!("key_{}", i), json!(i))
             //     .await
             //     .unwrap();
@@ -427,7 +417,6 @@ async fn test_concurrent_access_safety() {
     //     assert_eq!(value, Some(json!(i)));
     // }
 }
-
 #[tokio::test]
 async fn test_custom_isolation_policy() {
     let state_manager = Arc::new(MockStateManager);
@@ -459,7 +448,7 @@ async fn test_custom_isolation_policy() {
         expires_at: None,
     };
     isolation_manager
-        .create_shared_scope("writable", None, config)
+        .create_shared_scope("writable", None, &config)
         .unwrap();
 
     // Test write-shared policy

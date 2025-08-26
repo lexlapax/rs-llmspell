@@ -83,11 +83,7 @@ prop_compose! {
         backoff_seconds in 1u32..60,
         exponential_backoff in any::<bool>()
     ) -> RetryPolicy {
-        RetryPolicy {
-            max_attempts,
-            backoff_seconds,
-            exponential_backoff,
-        }
+        RetryPolicy::new(max_attempts, backoff_seconds, exponential_backoff)
     }
 }
 
@@ -99,7 +95,6 @@ proptest! {
         let id2 = ComponentId::from_name(&name);
         prop_assert_eq!(id1, id2);
     }
-
     #[test]
     fn test_component_id_different_names(
         name1 in arb_component_name(),
@@ -111,7 +106,6 @@ proptest! {
         let id2 = ComponentId::from_name(&name2);
         prop_assert_ne!(id1, id2);
     }
-
     #[test]
     fn test_component_id_serialization_roundtrip(name in arb_component_name()) {
         // Property: ComponentId survives serialization/deserialization
@@ -120,7 +114,6 @@ proptest! {
         let deserialized: ComponentId = serde_json::from_str(&json).unwrap();
         prop_assert_eq!(id, deserialized);
     }
-
     #[test]
     fn test_version_ordering_properties(v1 in arb_version(), v2 in arb_version()) {
         // Property: Version ordering is transitive
@@ -132,7 +125,6 @@ proptest! {
             prop_assert!(v2.is_compatible_with(&v1));
         }
     }
-
     #[test]
     fn test_version_compatibility_properties(v in arb_version()) {
         // Property: A version is always compatible with itself
@@ -146,7 +138,6 @@ proptest! {
         let v3 = Version::new(v.major + 1, v.minor, v.patch);
         prop_assert!(!v.is_compatible_with(&v3));
     }
-
     #[test]
     fn test_version_serialization_roundtrip(v in arb_version()) {
         // Property: Version survives serialization/deserialization
@@ -157,7 +148,6 @@ proptest! {
         prop_assert_eq!(v.patch, deserialized.patch);
         prop_assert_eq!(v.to_string(), deserialized.to_string());
     }
-
     #[test]
     fn test_agent_input_context_preservation(input in arb_agent_input()) {
         // Property: Parameter values are preserved
@@ -168,7 +158,6 @@ proptest! {
         // Property: Non-existent keys return None
         prop_assert_eq!(input.parameters.get("non_existent_key_xyz"), None);
     }
-
     #[test]
     fn test_agent_input_serialization_roundtrip(input in arb_agent_input()) {
         // Property: AgentInput survives serialization/deserialization
@@ -177,7 +166,6 @@ proptest! {
         prop_assert_eq!(input.text, deserialized.text);
         prop_assert_eq!(input.parameters, deserialized.parameters);
     }
-
     #[test]
     fn test_agent_output_metadata_preservation(
         content in prop::string::string_regex("[a-zA-Z0-9 ]{1,100}").unwrap(),
@@ -202,7 +190,6 @@ proptest! {
             prop_assert_eq!(output.metadata.extra.get(&key), Some(&value));
         }
     }
-
     #[test]
     fn test_conversation_message_properties(msg in arb_conversation_message()) {
         // Property: Message fields are preserved
@@ -216,7 +203,6 @@ proptest! {
         prop_assert!(diff.num_seconds() >= 0);
         prop_assert!(diff.num_seconds() < 60); // Should be created within last minute
     }
-
     #[test]
     fn test_execution_context_environment_properties(
         session_id in prop::string::string_regex("[a-zA-Z0-9-]{1,50}").unwrap(),
@@ -246,7 +232,6 @@ proptest! {
         prop_assert_eq!(context.conversation_id, Some(session_id));
         prop_assert_eq!(context.user_id, user_id);
     }
-
     #[test]
     fn test_retry_policy_properties(policy in arb_retry_policy()) {
         // Property: All fields are preserved
@@ -260,7 +245,6 @@ proptest! {
         let deserialized: RetryPolicy = serde_json::from_str(&json).unwrap();
         prop_assert_eq!(policy.max_attempts, deserialized.max_attempts);
     }
-
     #[test]
     fn test_component_metadata_timestamp_ordering(
         name in arb_component_name(),
@@ -276,7 +260,6 @@ proptest! {
         metadata_mut.update_version(Version::new(1, 0, 0));
         prop_assert!(metadata_mut.updated_at > metadata.updated_at);
     }
-
     #[test]
     fn test_agent_config_optional_fields(
         max_conversation_length in prop::option::of(1usize..1000),
@@ -328,7 +311,6 @@ proptest! {
             prop_assert!(step.dependencies.contains(&dep));
         }
     }
-
     #[test]
     fn test_error_severity_ordering_transitivity(
         errors in prop::collection::vec(
@@ -359,7 +341,6 @@ proptest! {
 #[cfg(test)]
 mod regression_tests {
     use super::*;
-
     #[test]
     fn test_empty_string_component_id() {
         // Regression test: empty strings should produce valid IDs
@@ -367,7 +348,6 @@ mod regression_tests {
         let id2 = ComponentId::from_name("");
         assert_eq!(id1, id2);
     }
-
     #[test]
     fn test_unicode_component_names() {
         // Regression test: unicode should work in component names
@@ -385,7 +365,6 @@ mod regression_tests {
             assert_eq!(id1, id2);
         }
     }
-
     #[test]
     fn test_very_large_version_numbers() {
         // Regression test: large version numbers

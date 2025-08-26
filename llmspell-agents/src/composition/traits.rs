@@ -213,30 +213,41 @@ impl CompositeAgentBuilder {
     }
 
     /// Set the description
+    #[must_use]
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
     }
 
     /// Add a component
+    #[must_use]
     pub fn add_component(mut self, component: Arc<dyn BaseAgent>) -> Self {
         self.components.push(component);
         self
     }
 
     /// Set the execution pattern
+    #[must_use]
     pub fn execution_pattern(mut self, pattern: ExecutionPattern) -> Self {
         self.execution_pattern = pattern;
         self
     }
 
     /// Add metadata
+    #[must_use]
     pub fn metadata(mut self, key: impl Into<String>, value: Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
     }
 
     /// Build the composite agent (to be implemented by concrete types)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The build method is called on the base builder (must be implemented by concrete types)
+    /// - Component validation fails
+    /// - Agent construction fails due to configuration issues
     pub fn build<T: CompositeAgent>(self) -> Result<T> {
         // This will be implemented by concrete composite agent types
         Err(LLMSpellError::Component {
@@ -279,7 +290,7 @@ pub enum CompositionError {
 
 impl From<CompositionError> for LLMSpellError {
     fn from(err: CompositionError) -> Self {
-        LLMSpellError::Component {
+        Self::Component {
             message: err.to_string(),
             source: Some(Box::new(err)),
         }
@@ -289,7 +300,6 @@ impl From<CompositionError> for LLMSpellError {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_capability_creation() {
         let cap = Capability {
@@ -302,7 +312,6 @@ mod tests {
         assert_eq!(cap.name, "text-processing");
         assert_eq!(cap.category, CapabilityCategory::DataProcessing);
     }
-
     #[test]
     fn test_composition_metadata() {
         let mut metadata = CompositionMetadata {
@@ -320,7 +329,6 @@ mod tests {
         assert_eq!(metadata.composition_type, CompositionType::Hierarchical);
         assert_eq!(metadata.max_components, Some(10));
     }
-
     #[test]
     fn test_execution_pattern() {
         let condition = ExecutionCondition {
@@ -340,7 +348,6 @@ mod tests {
             _ => panic!("Expected conditional pattern"),
         }
     }
-
     #[test]
     fn test_composite_agent_builder() {
         let builder = CompositeAgentBuilder::new("test-composite")

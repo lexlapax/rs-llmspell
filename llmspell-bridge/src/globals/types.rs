@@ -1,8 +1,8 @@
 //! ABOUTME: Core types and traits for the global object injection system
-//! ABOUTME: Defines GlobalObject trait and supporting types
+//! ABOUTME: Defines `GlobalObject` trait and supporting types
 
 use crate::{ComponentRegistry, ProviderManager};
-use llmspell_core::Result;
+use llmspell_core::{traits::state::StateAccess, Result};
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -35,16 +35,35 @@ pub struct GlobalContext {
     pub registry: Arc<ComponentRegistry>,
     /// Provider manager for LLM access
     pub providers: Arc<ProviderManager>,
+    /// State access for persistent storage (optional)
+    pub state_access: Option<Arc<dyn StateAccess>>,
     /// Bridge references for cross-global communication
     pub bridge_refs: Arc<parking_lot::RwLock<HashMap<String, Arc<dyn Any + Send + Sync>>>>,
 }
 
 impl GlobalContext {
     /// Create a new global context
+    #[must_use]
     pub fn new(registry: Arc<ComponentRegistry>, providers: Arc<ProviderManager>) -> Self {
         Self {
             registry,
             providers,
+            state_access: None,
+            bridge_refs: Arc::new(parking_lot::RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Create a new global context with state access
+    #[must_use]
+    pub fn with_state(
+        registry: Arc<ComponentRegistry>,
+        providers: Arc<ProviderManager>,
+        state_access: Arc<dyn StateAccess>,
+    ) -> Self {
+        Self {
+            registry,
+            providers,
+            state_access: Some(state_access),
             bridge_refs: Arc::new(parking_lot::RwLock::new(HashMap::new())),
         }
     }
@@ -56,6 +75,7 @@ impl GlobalContext {
     }
 
     /// Get a bridge reference
+    #[must_use]
     pub fn get_bridge<T: Any + Send + Sync + 'static>(&self, name: &str) -> Option<Arc<T>> {
         let refs = self.bridge_refs.read();
         refs.get(name)
@@ -69,19 +89,35 @@ pub trait GlobalObject: Send + Sync {
     fn metadata(&self) -> GlobalMetadata;
 
     /// Initialize any resources needed by this global
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if resource initialization fails
     fn initialize(&self, _context: &GlobalContext) -> Result<()> {
         Ok(())
     }
 
     /// Inject this global into a Lua environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua injection fails
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &Lua, context: &GlobalContext) -> Result<()>;
 
     /// Inject this global into a JavaScript environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JavaScript injection fails
     #[cfg(feature = "javascript")]
     fn inject_javascript(&self, ctx: &mut Context, context: &GlobalContext) -> Result<()>;
 
     /// Clean up any resources when the global is removed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cleanup fails
     fn cleanup(&self) -> Result<()> {
         Ok(())
     }
@@ -102,12 +138,14 @@ pub struct InjectionMetrics {
 
 impl InjectionMetrics {
     /// Check if injection meets performance requirements (<5ms)
-    pub fn is_within_bounds(&self) -> bool {
+    #[must_use]
+    pub const fn is_within_bounds(&self) -> bool {
         self.total_injection_time_us < 5000 // 5ms in microseconds
     }
 
     /// Get average injection time per global
-    pub fn average_time_us(&self) -> u64 {
+    #[must_use]
+    pub const fn average_time_us(&self) -> u64 {
         if self.globals_injected == 0 {
             0
         } else {

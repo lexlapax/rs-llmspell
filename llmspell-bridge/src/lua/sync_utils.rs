@@ -12,16 +12,16 @@ use tracing::{debug, error, trace};
 ///
 /// This function provides a consistent way to execute async Rust code from synchronous
 /// Lua contexts. It handles:
-/// - Proper tokio runtime integration using block_in_place
-/// - Panic safety with catch_unwind
-/// - Error transformation from any error type to mlua::Error
+/// - Proper tokio runtime integration using `block_in_place`
+/// - Panic safety with `catch_unwind`
+/// - Error transformation from any error type to `mlua::Error`
 /// - Optional timeout support
 /// - Tracing/logging for debugging
 ///
 /// # Type Parameters
 /// - `F`: The future type to execute
 /// - `T`: The success value type (must be convertible to Lua)
-/// - `E`: The error type (must implement std::error::Error)
+/// - `E`: The error type (must implement `std::error::Error`)
 ///
 /// # Arguments
 /// - `operation_name`: Name of the operation for logging/debugging
@@ -31,6 +31,14 @@ use tracing::{debug, error, trace};
 /// # Returns
 /// - `Ok(T)` on success
 /// - `Err(mlua::Error)` on failure (including panics, timeouts, and operation errors)
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The async operation fails
+/// - The operation times out
+/// - A panic occurs during execution
+/// - The tokio runtime is not available
 ///
 /// # Example
 /// ```rust,no_run
@@ -66,6 +74,7 @@ where
     // Use catch_unwind to protect against panics in async code
     let result = catch_unwind(AssertUnwindSafe(|| {
         // block_in_place tells tokio this thread will block
+        #[allow(clippy::cognitive_complexity)] // Complex async-to-sync bridge
         tokio::task::block_in_place(|| {
             // Get current runtime handle
             let handle = match tokio::runtime::Handle::try_current() {
@@ -73,8 +82,7 @@ where
                 Err(e) => {
                     error!("No tokio runtime available for {}: {}", op_name, e);
                     return Err(mlua::Error::RuntimeError(format!(
-                        "No async runtime available for {}: {}",
-                        op_name, e
+                        "No async runtime available for {op_name}: {e}"
                     )));
                 }
             };
@@ -104,8 +112,7 @@ where
                 Err(_timeout_err) => {
                     error!("{} timed out after {:?}", op_name, timeout);
                     Err(mlua::Error::RuntimeError(format!(
-                        "{} timed out after {:?}",
-                        op_name, timeout
+                        "{op_name} timed out after {timeout:?}"
                     )))
                 }
             }
@@ -119,8 +126,7 @@ where
         Err(panic_err) => {
             error!("{} panicked: {:?}", operation_name, panic_err);
             Err(mlua::Error::RuntimeError(format!(
-                "Runtime panic in {}: operation failed unexpectedly",
-                operation_name
+                "Runtime panic in {operation_name}: operation failed unexpectedly"
             )))
         }
     }
@@ -130,6 +136,14 @@ where
 ///
 /// This is a convenience wrapper for operations that already return `LuaResult<LuaValue>`
 /// and don't need additional error transformation.
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - The async operation fails
+/// - The operation times out
+/// - A panic occurs during execution
+/// - The tokio runtime is not available
 ///
 /// # Example
 /// ```rust,no_run
@@ -164,26 +178,26 @@ where
     let op_name = operation_name.to_string();
 
     let result = catch_unwind(AssertUnwindSafe(|| {
+        #[allow(clippy::cognitive_complexity)] // Complex async-to-sync bridge with retries
         tokio::task::block_in_place(|| {
             let handle = match tokio::runtime::Handle::try_current() {
                 Ok(handle) => handle,
                 Err(e) => {
                     error!("No tokio runtime available for {}: {}", op_name, e);
                     return Err(mlua::Error::RuntimeError(format!(
-                        "No async runtime available for {}: {}",
-                        op_name, e
+                        "No async runtime available for {op_name}: {e}"
                     )));
                 }
             };
 
+            #[allow(clippy::option_if_let_else)] // Complex timeout logic is clearer with if let
             let result = if let Some(duration) = timeout {
                 debug!("Executing {} with timeout of {:?}", op_name, duration);
                 handle.block_on(async {
                     match tokio::time::timeout(duration, future).await {
                         Ok(result) => result,
                         Err(_) => Err(mlua::Error::RuntimeError(format!(
-                            "{} timed out after {:?}",
-                            op_name, duration
+                            "{op_name} timed out after {duration:?}"
                         ))),
                     }
                 })
@@ -210,8 +224,7 @@ where
         Err(panic_err) => {
             error!("{} panicked: {:?}", operation_name, panic_err);
             Err(mlua::Error::RuntimeError(format!(
-                "Runtime panic in {}: operation failed unexpectedly",
-                operation_name
+                "Runtime panic in {operation_name}: operation failed unexpectedly"
             )))
         }
     }
@@ -221,7 +234,6 @@ where
 mod tests {
     use super::*;
     use tokio::runtime::Runtime;
-
     #[test]
     fn test_block_on_async_success() {
         let rt = Runtime::new().unwrap();
@@ -236,7 +248,6 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
     }
-
     #[test]
     fn test_block_on_async_error() {
         let rt = Runtime::new().unwrap();
@@ -244,12 +255,7 @@ mod tests {
 
         let result: Result<i32, mlua::Error> = block_on_async(
             "test_error",
-            async {
-                Err::<i32, std::io::Error>(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    "test error",
-                ))
-            },
+            async { Err::<i32, std::io::Error>(std::io::Error::other("test error")) },
             None,
         );
 
@@ -257,7 +263,6 @@ mod tests {
         let err = result.unwrap_err();
         assert!(matches!(err, mlua::Error::ExternalError(_)));
     }
-
     #[test]
     fn test_block_on_async_timeout() {
         let rt = Runtime::new().unwrap();
@@ -279,7 +284,6 @@ mod tests {
             assert!(msg.contains("timed out"));
         }
     }
-
     #[test]
     fn test_block_on_async_panic_safety() {
         let rt = Runtime::new().unwrap();
@@ -302,7 +306,6 @@ mod tests {
             assert!(msg.contains("Runtime panic"));
         }
     }
-
     #[test]
     fn test_block_on_async_lua_success() {
         let rt = Runtime::new().unwrap();

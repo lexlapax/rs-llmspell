@@ -1,66 +1,58 @@
-# Rs-LLMSpell Examples
+# LLMSpell Examples
 
-**Current Version**: Phase 5 Complete (v0.5.0)  
-**Available Tools**: 34 production tools  
-**Features**: Agents, Workflows, Tools, Persistent State Management, Hooks, Events
+**Learn by example - comprehensive demonstrations of LLMSpell capabilities**
 
-**🔗 Navigation**: [← Project Home](../README.md) | [Documentation Hub](../docs/README.md) | [User Guide](../docs/user-guide/README.md)
+**🔗 Navigation**: [← Project Home](../) | [Docs Hub](../docs/) | [User Guide](../docs/user-guide/) | [Developer Guide](../docs/developer-guide/)
 
 ---
 
 ## Overview
 
-This directory contains working examples demonstrating rs-llmspell capabilities. All examples are tested and work with the current v0.5.0 release (Phase 5), including persistent state management, comprehensive hook and event system integration.
+Welcome to the LLMSpell examples! This directory contains comprehensive examples organized by audience and learning path. All examples are tested and work with the current release, including persistent state management, comprehensive hook and event system integration, and session management.
 
 ## 📁 Directory Structure
 
 ```
 examples/
-├── hello.lua                    # Basic hello world script
-├── llmspell-demo.lua           # Comprehensive demo
-├── provider-info.lua           # Provider configuration info
-├── streaming-demo.lua          # Streaming responses
-├── multimodal-stub.lua         # Multimodal capabilities
-├── configs/                    # Configuration examples
-│   ├── llmspell.toml          # Full configuration
-│   ├── minimal.toml           # Minimal configuration
-│   ├── state-enabled.toml     # State persistence config
-│   ├── backup-enabled.toml    # Backup configuration
-│   └── migration-enabled.toml # Migration configuration
-├── state_persistence/          # State persistence examples (Phase 5)
-│   ├── basic_operations.lua   # Lua state operations
-│   ├── basic_operations.rs    # Rust state operations
-│   └── configs/               # State configs
-├── lua/
-│   ├── agents/                 # Agent examples (10 files)
-│   ├── tools/                  # Tool examples (13 files)
-│   ├── workflows/              # Workflow examples (9 files)
-│   ├── hooks/                  # Hook system examples (14 files)
-│   ├── events/                 # Event system examples (10 files)
-│   ├── state/                  # State management examples (8 files)
-│   ├── backup/                 # Backup examples (3 files)
-│   ├── migration/              # Migration examples (3 files)
-│   ├── operational_recovery/   # Recovery procedures (3 files)
-│   ├── integration/            # Real-world integration examples (5 files)
-│   ├── run-all-examples.lua    # Master runner for all examples
-│   ├── run-integration-demos.lua  # Integration demo runner
-│   └── run-performance-benchmarks.lua  # Performance testing runner
-└── *.sh                        # Legacy runner scripts
+├── script-users/               # Lua scripting examples
+│   ├── getting-started/       # 5 progressive learning scripts (00-04)
+│   ├── features/              # 5 core feature demonstrations
+│   ├── cookbook/              # 8 common patterns and recipes
+│   ├── advanced-patterns/     # 4 complex use cases
+│   ├── applications/          # 7 production-ready applications
+│   └── configs/               # Configuration examples
+└── rust-developers/           # Rust integration examples
+    ├── custom-tool-example/   # Tool creation fundamentals
+    ├── custom-agent-example/  # Agent implementation patterns
+    ├── async-patterns-example/ # Concurrent programming patterns
+    ├── extension-pattern-example/ # Plugin architecture
+    ├── builder-pattern-example/ # Configuration patterns
+    └── integration-test-example/ # Testing strategies
 ```
 
 ## 🚀 Quick Start
 
-### Basic Examples
+### Script Users (Lua)
 
 ```bash
-# Run hello world
-llmspell run examples/hello.lua
+# Start with basics
+llmspell run examples/script-users/getting-started/00-hello-world.lua
 
-# Run comprehensive demo
-llmspell run examples/llmspell-demo.lua
+# Try tools and agents
+llmspell run examples/script-users/getting-started/01-first-tool.lua
+llmspell run examples/script-users/getting-started/02-first-agent.lua
 
-# Check provider configuration
-llmspell run examples/provider-info.lua
+# Explore features
+llmspell run examples/script-users/features/tool-basics.lua
+llmspell run examples/script-users/features/agent-basics.lua
+```
+
+### Rust Developers
+
+```bash
+cd examples/rust-developers/custom-tool-example && cargo run
+cd examples/rust-developers/custom-agent-example && cargo run
+cd examples/rust-developers/async-patterns-example && cargo run
 ```
 
 ### Agent Examples (Requires API Keys)
@@ -522,6 +514,31 @@ System performance targets (measured in benchmarks):
 **DevOps Automation**: CI/CD pipeline coordination and monitoring
 **Security**: Event-driven security monitoring and response
 **Performance**: Real-time performance monitoring and optimization
+
+---
+
+## 🆕 New Organized Structure (Phase 7 Complete)
+
+Phase 7 examples have been completely reorganized for better learning paths:
+
+### For Script Users (Lua)
+**Location**: [`script-users/`](script-users/)
+- **getting-started/** - Progressive learning path (5 Lua scripts: 00-04)
+- **features/** - Core feature demonstrations (5 focused examples)
+- **cookbook/** - Common patterns and recipes (8 practical patterns)
+- **advanced-patterns/** - Complex use cases (4 advanced scenarios) 
+- **applications/** - Production-ready applications (7 complete apps)
+
+### For Rust Developers
+**Location**: [`rust-developers/`](rust-developers/)
+- **custom-tool-example/** - BaseAgent + Tool trait fundamentals
+- **custom-agent-example/** - Agent personalities and specializations  
+- **async-patterns-example/** - Concurrent execution, streaming, pipelines
+- **extension-pattern-example/** - Plugin/extension architecture
+- **builder-pattern-example/** - Fluent APIs and configuration
+- **integration-test-example/** - Comprehensive testing strategies
+
+**All examples are working and tested** - Phase 7 consolidation complete!
 
 ---
 

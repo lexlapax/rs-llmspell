@@ -46,6 +46,7 @@ pub struct RegistrationBuilder {
 
 impl RegistrationBuilder {
     /// Create new registration builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             options: RegistrationOptions::default(),
@@ -53,42 +54,49 @@ impl RegistrationBuilder {
     }
 
     /// Set custom agent ID
+    #[must_use]
     pub fn with_id(mut self, id: String) -> Self {
         self.options.agent_id = Some(id);
         self
     }
 
     /// Add categories
+    #[must_use]
     pub fn with_categories(mut self, categories: Vec<String>) -> Self {
         self.options.categories = categories;
         self
     }
 
     /// Add a single category
+    #[must_use]
     pub fn add_category(mut self, category: String) -> Self {
         self.options.categories.push(category);
         self
     }
 
     /// Add custom metadata
+    #[must_use]
     pub fn with_metadata(mut self, key: String, value: serde_json::Value) -> Self {
         self.options.custom_metadata.insert(key, value);
         self
     }
 
     /// Set auto-start behavior
-    pub fn auto_start(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn auto_start(mut self, enabled: bool) -> Self {
         self.options.auto_start = enabled;
         self
     }
 
     /// Set heartbeat monitoring
-    pub fn enable_heartbeat(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn enable_heartbeat(mut self, enabled: bool) -> Self {
         self.options.enable_heartbeat = enabled;
         self
     }
 
     /// Build registration options
+    #[must_use]
     pub fn build(self) -> RegistrationOptions {
         self.options
     }
@@ -107,11 +115,15 @@ pub struct AgentRegistrar<R: AgentRegistry> {
 
 impl<R: AgentRegistry> AgentRegistrar<R> {
     /// Create new registrar
-    pub fn new(registry: Arc<R>) -> Self {
+    pub const fn new(registry: Arc<R>) -> Self {
         Self { registry }
     }
 
     /// Register agent with default options
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent registration fails
     pub async fn register_agent(
         &self,
         agent: Arc<dyn Agent>,
@@ -123,6 +135,14 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Register agent with custom options
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent validation fails
+    /// - Metadata serialization fails
+    /// - Registry registration fails
+    /// - Heartbeat fails (if enabled)
     pub async fn register_agent_with_options(
         &self,
         agent: Arc<dyn Agent>,
@@ -183,6 +203,13 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Validate agent before registration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent validation fails
+    /// - Agent is not responsive
+    /// - Configuration is invalid
     async fn validate_agent(&self, agent: &Arc<dyn Agent>, config: &AgentConfig) -> Result<()> {
         // Check agent is responsive
         let test_input = llmspell_core::types::AgentInput::text("__registry_validation__");
@@ -206,6 +233,13 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Unregister agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent not found
+    /// - Status update fails
+    /// - Removal from registry fails
     pub async fn unregister_agent(&self, id: &str) -> Result<()> {
         // Update status to stopped first
         self.registry
@@ -217,6 +251,10 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Batch register multiple agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any agent registration fails
     pub async fn register_agents(
         &self,
         agents: Vec<(Arc<dyn Agent>, AgentConfig)>,
@@ -236,9 +274,17 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
 #[async_trait::async_trait]
 pub trait RegistrationHook: Send + Sync {
     /// Called before registration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if pre-registration validation fails
     async fn before_register(&self, config: &AgentConfig) -> Result<()>;
 
     /// Called after successful registration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if post-registration processing fails
     async fn after_register(&self, id: &str, metadata: &AgentMetadata) -> Result<()>;
 
     /// Called on registration failure
@@ -252,11 +298,13 @@ pub struct CompositeRegistrationHook {
 
 impl CompositeRegistrationHook {
     /// Create new composite hook
+    #[must_use]
     pub fn new() -> Self {
         Self { hooks: Vec::new() }
     }
 
     /// Add a hook
+    #[must_use]
     pub fn add_hook(mut self, hook: Arc<dyn RegistrationHook>) -> Self {
         self.hooks.push(hook);
         self
@@ -296,7 +344,6 @@ impl RegistrationHook for CompositeRegistrationHook {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_registration_builder() {
         let options = RegistrationBuilder::new()

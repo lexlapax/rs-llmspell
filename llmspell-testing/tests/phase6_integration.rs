@@ -11,7 +11,6 @@ use llmspell_state_persistence::StateManager;
 use llmspell_storage::backends::memory::MemoryBackend;
 use std::sync::Arc;
 use std::time::Duration;
-
 #[tokio::test]
 async fn test_phase6_complete_session_lifecycle() -> Result<()> {
     // Initialize all Phase 6 components
@@ -92,7 +91,6 @@ async fn test_phase6_complete_session_lifecycle() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_phase6_performance_validation() -> Result<()> {
     let storage_backend = Arc::new(MemoryBackend::new());
@@ -203,7 +201,6 @@ pub async fn run_phase6_validation() -> Result<()> {
 #[cfg(test)]
 mod validation {
     use super::*;
-
     #[tokio::test]
     async fn validate_phase6_complete() -> Result<()> {
         run_phase6_validation().await

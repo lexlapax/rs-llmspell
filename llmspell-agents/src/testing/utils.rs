@@ -13,6 +13,7 @@ pub struct TestDataGenerator;
 
 impl TestDataGenerator {
     /// Generate random agent input
+    #[must_use]
     pub fn random_input() -> AgentInput {
         let texts = [
             "Hello, how are you?",
@@ -27,6 +28,7 @@ impl TestDataGenerator {
     }
 
     /// Generate agent input with media
+    #[must_use]
     pub fn input_with_media() -> AgentInput {
         AgentInput::builder()
             .text("Analyze this image")
@@ -45,6 +47,7 @@ impl TestDataGenerator {
     }
 
     /// Generate complex input
+    #[must_use]
     pub fn complex_input() -> AgentInput {
         AgentInput::builder()
             .text("Multi-modal request")
@@ -55,6 +58,7 @@ impl TestDataGenerator {
     }
 
     /// Generate execution context with metadata
+    #[must_use]
     pub fn context_with_metadata() -> ExecutionContext {
         let mut context = ExecutionContext::new();
         context.conversation_id = Some(uuid::Uuid::new_v4().to_string());
@@ -69,6 +73,7 @@ pub struct TestConfigs;
 
 impl TestConfigs {
     /// Basic agent configuration
+    #[must_use]
     pub fn basic_agent() -> AgentConfig {
         AgentConfig {
             name: "test_agent".to_string(),
@@ -82,6 +87,7 @@ impl TestConfigs {
     }
 
     /// Tool-enabled agent configuration
+    #[must_use]
     pub fn tool_agent() -> AgentConfig {
         AgentConfig {
             name: "tool_agent".to_string(),
@@ -99,6 +105,7 @@ impl TestConfigs {
     }
 
     /// Resource-limited agent configuration
+    #[must_use]
     pub fn limited_agent() -> AgentConfig {
         AgentConfig {
             name: "limited_agent".to_string(),
@@ -122,30 +129,34 @@ pub struct TestAssertions;
 
 impl TestAssertions {
     /// Assert duration is within range
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the duration is outside the specified range
     pub fn assert_duration_range(
         actual: Duration,
         min: Duration,
         max: Duration,
     ) -> Result<(), String> {
         if actual < min {
-            return Err(format!(
-                "Duration {:?} is less than minimum {:?}",
-                actual, min
-            ));
+            return Err(format!("Duration {actual:?} is less than minimum {min:?}"));
         }
         if actual > max {
-            return Err(format!("Duration {:?} exceeds maximum {:?}", actual, max));
+            return Err(format!("Duration {actual:?} exceeds maximum {max:?}"));
         }
         Ok(())
     }
 
     /// Assert approximately equal with tolerance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the difference exceeds the tolerance
     pub fn assert_approx_eq(actual: f64, expected: f64, tolerance: f64) -> Result<(), String> {
         let diff = (actual - expected).abs();
         if diff > tolerance {
             return Err(format!(
-                "Value {} differs from expected {} by {} (tolerance: {})",
-                actual, expected, diff, tolerance
+                "Value {actual} differs from expected {expected} by {diff} (tolerance: {tolerance})"
             ));
         }
         Ok(())
@@ -157,25 +168,28 @@ pub struct TestEnvironment;
 
 impl TestEnvironment {
     /// Set up test environment
-    pub fn setup() {
+    pub const fn setup() {
         // Initialize logging for tests
         // Note: logging initialization handled by test framework
     }
 
     /// Clean up test environment
-    pub fn cleanup() {
+    pub const fn cleanup() {
         // Clean up any test artifacts
     }
 
     /// Run with timeout
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the future times out
     pub async fn with_timeout<F, T>(duration: Duration, future: F) -> Result<T, String>
     where
         F: std::future::Future<Output = T>,
     {
-        match tokio::time::timeout(duration, future).await {
-            Ok(result) => Ok(result),
-            Err(_) => Err(format!("Operation timed out after {:?}", duration)),
-        }
+        tokio::time::timeout(duration, future)
+            .await
+            .map_err(|_| format!("Operation timed out after {duration:?}"))
     }
 }
 
@@ -220,6 +234,7 @@ struct TestReportEntry {
 
 impl TestReport {
     /// Create new report
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -241,6 +256,7 @@ impl TestReport {
     }
 
     /// Generate summary
+    #[must_use]
     pub fn summary(&self) -> String {
         let total = self.results.len();
         let passed = self.results.iter().filter(|r| r.passed).count();
@@ -248,17 +264,19 @@ impl TestReport {
         let total_duration: Duration = self.results.iter().map(|r| r.duration).sum();
 
         format!(
-            "Test Summary: {} total, {} passed, {} failed, {:?} total time",
-            total, passed, failed, total_duration
+            "Test Summary: {total} total, {passed} passed, {failed} failed, {total_duration:?} total time"
         )
     }
 
     /// Get pass rate
+    #[must_use]
     pub fn pass_rate(&self) -> f64 {
         if self.results.is_empty() {
             return 0.0;
         }
+        #[allow(clippy::cast_precision_loss)]
         let passed = self.results.iter().filter(|r| r.passed).count() as f64;
+        #[allow(clippy::cast_precision_loss)]
         let total = self.results.len() as f64;
         passed / total * 100.0
     }

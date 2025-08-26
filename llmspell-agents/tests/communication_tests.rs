@@ -1,5 +1,7 @@
-//! ABOUTME: Integration tests for agent communication patterns and message passing
-//! ABOUTME: Tests agent-to-agent communication, tool invocation, and coordination protocols
+//! Tests agent messaging functionality
+
+#![allow(clippy::significant_drop_tightening)]
+#![allow(clippy::literal_string_with_formatting_args)]
 
 use llmspell_agents::testing::mocks;
 
@@ -94,7 +96,7 @@ async fn test_broadcast_communication() {
     // Create multiple receiver agents
     for i in 0..3 {
         let mut rx = tx.subscribe();
-        let agent_name = format!("receiver_{}", i);
+        let agent_name = format!("receiver_{i}");
 
         receivers.push(tokio::spawn(async move {
             let mut messages = Vec::new();
@@ -131,7 +133,7 @@ async fn test_request_response_pattern() {
     // Spawn responder
     let responder = tokio::spawn(async move {
         while let Some((request, response_tx)) = rx.recv().await {
-            let response = format!("Response to: {}", request);
+            let response = format!("Response to: {request}");
             response_tx.send(response).await.unwrap();
         }
     });
@@ -140,7 +142,7 @@ async fn test_request_response_pattern() {
     let mut responses = Vec::new();
     for i in 0..5 {
         let (response_tx, mut response_rx) = mpsc::channel(1);
-        let request = format!("Request {}", i);
+        let request = format!("Request {i}");
 
         tx.send((request.clone(), response_tx)).await.unwrap();
 
@@ -151,7 +153,7 @@ async fn test_request_response_pattern() {
 
     assert_eq!(responses.len(), 5);
     for (i, response) in responses.iter().enumerate() {
-        assert!(response.contains(&format!("Request {}", i)));
+        assert!(response.contains(&format!("Request {i}")));
     }
 
     drop(tx);
@@ -163,7 +165,7 @@ async fn test_request_response_pattern() {
 async fn test_pipeline_communication() {
     // Create pipeline stages
     let stage1 = MockAgentBuilder::new("preprocessor")
-        .with_response(None, "Preprocessed: {input}")
+        .with_response(None, "Preprocessed: {{input}}")
         .build();
 
     let stage2 = MockAgentBuilder::new("analyzer")
@@ -241,7 +243,7 @@ async fn test_concurrent_communication() {
     for i in 0..10 {
         let agent_clone = agent.clone();
         let handle = tokio::spawn(async move {
-            let input = AgentInput::text(format!("Task {}", i));
+            let input = AgentInput::text(format!("Task {i}"));
             agent_clone
                 .execute(input, ExecutionContext::default())
                 .await
@@ -358,7 +360,7 @@ async fn test_shared_state_communication() {
     let writer = tokio::spawn(async move {
         for i in 0..5 {
             let mut state = state_clone.write().await;
-            state.insert(format!("key{}", i), format!("value{}", i));
+            state.insert(format!("key{i}"), format!("value{i}"));
             tokio::time::sleep(Duration::from_millis(10)).await;
         }
     });
@@ -391,7 +393,7 @@ async fn test_communication_resilience() {
         // Small delay to ensure state is set
         tokio::time::sleep(Duration::from_millis(10)).await;
 
-        let input = AgentInput::text(format!("attempt {}", i));
+        let input = AgentInput::text(format!("attempt {i}"));
         let result = agent.execute(input, ExecutionContext::default()).await;
 
         if result.is_ok() {
@@ -402,8 +404,7 @@ async fn test_communication_resilience() {
     // Should have roughly 50% success rate
     assert!(
         success_count == 5,
-        "Expected 50% success rate (5 successes), got {} successes out of 10",
-        success_count
+        "Expected 50% success rate (5 successes), got {success_count} successes out of 10"
     );
 }
 

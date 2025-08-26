@@ -12,7 +12,6 @@ use serde_json::json;
 use std::time::Duration;
 use chrono::{DateTime, Utc};
 use uuid::Uuid;
-
 #[tokio::test]
 async fn test_replay_single_correlation_id() {
     let fixture = HookTestFixture::new().await;
@@ -52,7 +51,6 @@ async fn test_replay_single_correlation_id() {
         );
     }
 }
-
 #[tokio::test]
 async fn test_replay_with_time_range() {
     let fixture = HookTestFixture::new().await;
@@ -123,7 +121,6 @@ async fn test_replay_with_time_range() {
     
     assert_eq!(replayed_count, 2, "Should only replay 2 contexts from time range");
 }
-
 #[tokio::test]
 async fn test_replay_with_filtering() {
     let fixture = HookTestFixture::new().await;
@@ -182,7 +179,6 @@ async fn test_replay_with_filtering() {
     assert_eq!(agent_replays, 2, "Should replay 2 agent execution contexts");
     assert_eq!(tool_replays, 0, "Should not replay tool execution contexts");
 }
-
 #[tokio::test]
 async fn test_replay_preserves_hook_order() {
     let fixture = HookTestFixture::new().await;
@@ -239,7 +235,6 @@ async fn test_replay_preserves_hook_order() {
         );
     }
 }
-
 #[tokio::test]
 async fn test_replay_handles_errors_gracefully() {
     let fixture = HookTestFixture::new().await;
@@ -270,7 +265,6 @@ async fn test_replay_handles_errors_gracefully() {
         );
     }
 }
-
 #[tokio::test]
 async fn test_replay_with_modified_context() {
     let fixture = HookTestFixture::new().await;
@@ -311,7 +305,6 @@ async fn test_replay_with_modified_context() {
         }
     }
 }
-
 #[tokio::test]
 async fn test_replay_performance_with_many_hooks() {
     let fixture = HookTestFixture::new().await;

@@ -398,7 +398,7 @@ Phase 1.2: ScriptEngineBridge foundation â†’ Phase 5: Simple JSEngine addition â
 ## **Architectural Consistency Validation**
 
 This represents the same **architectural consistency correction** we applied to:
-- `rs-llmspell-final-architecture.md` (fixed code examples and design patterns)
+- `master-architecture-vision.md` (fixed code examples and design patterns)
 - Now `implementation-phases.md` (fixed implementation guidance and phase planning)
 
 Both documents now consistently show:

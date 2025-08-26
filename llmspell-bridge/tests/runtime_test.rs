@@ -1,14 +1,12 @@
-//! ABOUTME: Integration tests for ScriptRuntime with multiple engines
+//! ABOUTME: Integration tests for `ScriptRuntime` with multiple engines
 //! ABOUTME: Validates language-agnostic runtime and engine switching
 
-use llmspell_bridge::{
-    engine::factory::EngineFactory,
-    runtime::{RuntimeConfig, ScriptRuntime},
-};
+use llmspell_bridge::{engine::factory::EngineFactory, runtime::ScriptRuntime};
+use llmspell_config::LLMSpellConfig;
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_with_lua_engine() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     assert_eq!(config.default_engine, "lua");
 
     let runtime = ScriptRuntime::new_with_lua(config).await;
@@ -22,7 +20,7 @@ async fn test_runtime_with_lua_engine() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_with_engine_name() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
 
     // Test creating with Lua by name
     let runtime = ScriptRuntime::new_with_engine_name("lua", config.clone()).await;
@@ -37,7 +35,7 @@ async fn test_runtime_with_engine_name() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_execute_script() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
 
     // Execute a simple script
@@ -47,13 +45,13 @@ async fn test_runtime_execute_script() {
         Ok(output) => {
             assert_eq!(output.output.as_i64(), Some(2));
         }
-        Err(e) => panic!("Script execution failed: {:?}", e),
+        Err(e) => panic!("Script execution failed: {e:?}"),
     }
 }
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_capability_detection() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
 
     // Test capability detection
@@ -70,7 +68,7 @@ async fn test_runtime_capability_detection() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_configuration() {
-    let mut config = RuntimeConfig::default();
+    let mut config = LLMSpellConfig::default();
 
     // Test that configuration supports multiple engines
     assert!(config.supports_engine("lua"));
@@ -78,7 +76,7 @@ async fn test_runtime_configuration() {
     assert!(!config.supports_engine("python")); // Not configured
 
     // Test engine-specific configuration
-    config.engines.lua.debug = true;
+    config.engines.lua.enable_debug = true;
     config.engines.javascript.strict_mode = false;
 
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -87,7 +85,7 @@ async fn test_runtime_configuration() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_execution_context() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
 
     // Get initial context
@@ -95,10 +93,10 @@ async fn test_runtime_execution_context() {
     assert!(!context.working_directory.is_empty());
 
     // Update context
-    let mut new_context = context.clone();
+    let mut new_context = context;
     new_context.state = serde_json::json!({ "test": "value" });
 
-    runtime.set_execution_context(new_context.clone()).unwrap();
+    runtime.set_execution_context(new_context).unwrap();
 
     // Verify update
     let updated = runtime.get_execution_context();
@@ -110,7 +108,7 @@ async fn test_runtime_engine_switching_placeholder() {
     // This test demonstrates the architecture supports engine switching
     // even though JavaScript engine is not yet implemented
 
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
 
     // Create with Lua
     let lua_runtime = ScriptRuntime::new_with_lua(config.clone()).await.unwrap();
@@ -133,15 +131,14 @@ async fn test_runtime_engine_switching_placeholder() {
         // When JavaScript feature is not enabled, it should fail
         assert!(js_runtime.is_err());
         if let Err(e) = js_runtime {
-            let error_msg = format!("{:?}", e);
+            let error_msg = format!("{e:?}");
             assert!(error_msg.contains("JavaScript") || error_msg.contains("not enabled"));
         }
     }
 }
-
 #[tokio::test]
 async fn test_runtime_with_custom_engine_name() {
-    let config = RuntimeConfig::default();
+    let config = LLMSpellConfig::default();
 
     // Test unknown engine
     let result = ScriptRuntime::new_with_engine_name("unknown", config).await;
@@ -156,7 +153,6 @@ async fn test_runtime_with_custom_engine_name() {
         }
     }
 }
-
 #[tokio::test]
 async fn test_available_engines() {
     let engines = EngineFactory::list_available_engines();

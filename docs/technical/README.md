@@ -1,153 +1,141 @@
-# Technical Architecture Documentation
+# Technical Documentation
 
-**Version**: Phase 5 Complete (v0.5.0)  
-**Last Updated**: July 29, 2025  
-**Audience**: System architects, core contributors, and technical integrators
+**Deep technical reference for LLMSpell architecture and implementation**
 
-> **🏗️ Technical Deep Dive**: This directory contains comprehensive technical documentation for rs-llmspell's architecture, implementation patterns, and system design decisions. All documents reflect the current Phase 5 implementation (v0.5.0) unless explicitly marked as future work.
-
-**🔗 Navigation**: [← Documentation Hub](../README.md) | [Project Home](../../README.md) | [User Guide](../user-guide/) | [Developer Guide](../developer-guide/)
+**🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [User Guide](../user-guide/) | [Developer Guide](../developer-guide/)
 
 ---
 
-## Core Architecture Documents
+## Overview
 
-### Master Reference
-- **[rs-llmspell-final-architecture.md](rs-llmspell-final-architecture.md)** - Complete standalone architecture document containing ALL architectural, implementation, and operational details. No external references required.
+> **📊 Technical Reference**: Consolidated technical documentation for LLMSpell's architecture. All content validated against actual implementation with 35→7 files consolidation achieved.
 
-### Implementation Deep Dives
-- **[global-injection-architecture.md](global-injection-architecture.md)** - ✅ **Current** - Detailed technical architecture of the global injection system with performance optimizations, dependency resolution, and multi-language support
-- **[tool-bridge-architecture.md](tool-bridge-architecture.md)** - ✅ **Current** - Tool integration patterns, async execution handling, and bridge layer architecture connecting scripts to native tools
+**Version**: v0.6.0 (Phase 7 Complete) | **Status**: Production Architecture | **Last Updated**: August 2025
 
 ---
 
-## Security & State Management
+## Core Documentation (7 Essential Files)
 
-### Security Architecture
-- **[security-architecture.md](security-architecture.md)** - ✅ **Current** - Comprehensive defense-in-depth security model with STRIDE threat analysis, security hardening details, and tool-specific security controls
+### 📊 What We Built
+- **[current-architecture.md](current-architecture.md)** - **SINGLE SOURCE OF TRUTH** - The actual implementation architecture (17 crates, 71K LOC, Phase 0-7 evolution)
 
-### State Management
-- **[state-architecture.md](state-architecture.md)** - ✅ **Updated for Phase 5** - Complete persistent state management with multi-backend support, migrations, backups, and enterprise features
+### 🎯 Why We Built It
+- **[architecture-decisions.md](architecture-decisions.md)** - All architectural decisions (28 ADRs) showing evolution and reversals across phases
 
----
+### 🛡️ How It's Secured
+- **[security-model.md](security-model.md)** - Complete security architecture (3-level model, STRIDE analysis, actual implementation)
 
-## Architecture Components
+### ⚡ How It Performs
+- **[performance-benchmarks.md](performance-benchmarks.md)** - Actual measured performance (all targets met/exceeded, validated metrics)
 
-### Hook and Event System
-- **[hook-event-architecture.md](hook-event-architecture.md)** - ✅ **Phase 4 Complete** - Comprehensive hook and event system architecture with 40+ hook points, CircuitBreaker protection, and cross-language support
-- **[hook-implementation.md](hook-implementation.md)** - 📋 **Phase 4 Design Reference** - Original hook system design document (see hook-event-architecture.md for current implementation)
+### 📐 How to Build It
+- **[api-style-guide.md](api-style-guide.md)** - Official API standards (Phase 7 - naming, patterns, documentation requirements)
 
----
+### 🔮 Historical Reference
+- **[master-architecture-vision.md](master-architecture-vision.md)** - Original aspirational architecture (historical reference only, NOT current state)
 
-## Quick Reference Guide
+## Component Architecture References
 
-### For System Architects
-1. Start with [rs-llmspell-final-architecture.md](rs-llmspell-final-architecture.md) for complete system overview
-2. Review [security-architecture.md](security-architecture.md) for threat model and defense layers
-3. Study [global-injection-architecture.md](global-injection-architecture.md) for runtime architecture
-
-### For Core Contributors  
-1. Read [tool-bridge-architecture.md](tool-bridge-architecture.md) for integration patterns
-2. Understand [state-architecture.md](state-architecture.md) for workflow coordination
-3. Plan future work using [hook-implementation.md](hook-implementation.md)
-
-### For Technical Integrators
-1. Focus on [global-injection-architecture.md](global-injection-architecture.md) for API surface
-2. Reference [security-architecture.md](security-architecture.md) for compliance requirements
-3. Use [tool-bridge-architecture.md](tool-bridge-architecture.md) for custom tool development
+### 🐛 Debug Infrastructure
+- **[debug-infrastructure-architecture.md](debug-infrastructure-architecture.md)** - Complete debug system architecture (global manager, thread safety, performance optimization)
 
 ---
 
-## Implementation Status
+## Quick Navigation Guide
 
-### ✅ **Phase 5 Complete** (v0.5.0 - July 2025)
-- **Persistent State Management**: Multi-backend support (Memory, Sled, RocksDB)
-- **State Scoping**: 6 levels (Global, Agent, Workflow, Step, Session, Custom)
-- **Enterprise Features**: Schema migrations (2.07μs/item), atomic backups, retention policies
-- **Hook Integration**: All state changes trigger hooks with <2% overhead
-- **Security Enhancements**: Circular reference detection, sensitive data protection
-- **Testing Infrastructure**: 7 test categories with quality check scripts
-- **Performance Achievements**: <5ms state operations, 483K items/sec migrations
-
-### ✅ **Previous Phases Complete**
-
-#### Phase 4 (July 2025)
-- **Hook System**: 40+ hook points with CircuitBreaker protection (<5% overhead)
-- **Event Architecture**: High-throughput pub/sub system (90K+ events/sec)
-- **Cross-Language Support**: Hooks and events work across Lua/JS/Rust
-- **Built-in Hooks**: 18+ production-ready hooks for common patterns
-
-#### Phase 3 (July 2025)
-- **Global Injection System**: 2-4ms injection time, >90% cache hit rate
-- **Tool Bridge Architecture**: 34 production tools, async execution, security hardening
-- **Security Architecture**: Defense-in-depth with STRIDE analysis, comprehensive hardening
-- **State Management**: Thread-safe workflow state with scoping and isolation
-
-### 🚀 **Phase 6+ Future**
-- **Session Management**: Session lifecycle and persistence
-- **Agent Upgrades**: Enhanced agent capabilities with session awareness
-- **GUI Interface**: Visual workflow design and monitoring (Phase 7)
-- **Python Support**: Full Python scripting support (Phase 9)
+### Understanding the System
+1. **Start**: [current-architecture.md](current-architecture.md) - What exists
+2. **Learn**: [architecture-decisions.md](architecture-decisions.md) - Why it exists
+3. **Secure**: [security-model.md](security-model.md) - How it's protected
+4. **Measure**: [performance-benchmarks.md](performance-benchmarks.md) - How fast it runs
+5. **Build**: [api-style-guide.md](api-style-guide.md) - How to extend it
 
 ---
 
-## Performance Characteristics
+## Key Architecture Facts
 
-Current system performance (Phase 5 - v0.5.0):
+### System Scale (Validated)
+- **17 crates** in Cargo workspace
+- **71,000+ lines** of production Rust
+- **37+ tools** (evolved from 26→33→37)
+- **15 Lua globals** with zero-import pattern
+- **40+ hook points** with circuit breakers
+- **4 workflow types** (Sequential/Parallel/Conditional/Loop)
 
-| Component | Metric | Requirement | Actual | Status |
-|-----------|--------|-------------|---------|---------|
-| Global Injection | Initialization | <5ms | 2-4ms | ✅ |
-| Tool Execution | Average latency | <10ms | 0.5-2.1ms | ✅ |
-| State Operations | Read/Write | <5ms | <5ms | ✅ |
-| Security Validation | Input processing | <5ms | <2ms | ✅ |
-| Memory Usage | Per context | <5MB | 1.8MB | ✅ |
-| Hook Overhead | Performance impact | <5% | <2% | ✅ |
-| Event Throughput | Events/sec | >50K | >90K | ✅ |
-| State Persistence | Write latency | <5ms | <5ms | ✅ |
-| Migration Speed | Items/sec | 10K | 483K | ✅ |
-| Backup Operations | Atomic guarantee | Required | SHA256 | ✅ |
+### Performance Achievements
+| Metric | Target | Actual | Status |
+|--------|--------|--------|--------|
+| Tool Init | <10ms | <10ms | ✅ |
+| Agent Creation | <50ms | ~10ms | ✅ 5x better |
+| Hook Overhead | <5% | <2% | ✅ |
+| Event Throughput | 50K/sec | 90K/sec | ✅ 1.8x |
+| State Migration | - | 2.07μs/item | ✅ |
+
+### Architecture Highlights
+- **BaseAgent Foundation**: Universal trait for all components
+- **Sync Bridge Pattern**: block_on() for Lua/JS integration  
+- **Global Injection**: 2-4ms for all 15 globals
+- **3-Level Security**: Safe/Restricted/Privileged
+- **Multi-Backend State**: Memory/Sled/RocksDB
+- **Builder Pattern**: Universal object creation
 
 ---
 
-## Architecture Principles
+## Phase 7 Documentation Achievements
 
-### Core Design Philosophy
-1. **Bridge-First Design**: Scripts as first-class interfaces, not add-ons
-2. **Composition Over Inheritance**: BaseAgent → Agent → Tool → Workflow hierarchy
-3. **Security by Design**: Defense-in-depth with multiple validation layers
-4. **Performance First**: <10ms tool initialization, async-everywhere architecture
-5. **Language Agnostic**: Consistent API across Lua, JavaScript, and future languages
+### Consolidation Complete ✅
+- **Before**: 35 scattered technical files
+- **After**: 7 organized essential files
+- **Reduction**: 80% file count reduction
+- **Archives**: 18 files archived (13 technical + 5 API planning)
 
-### Technical Patterns
-- **Global Injection**: Zero-configuration access to all functionality
-- **Async Everywhere**: Non-blocking I/O with efficient resource utilization  
-- **State-First Communication**: Shared state for agent/workflow coordination
-- **Type-Safe Bridging**: Bidirectional conversion with validation
-- **Resource Isolation**: Sandboxing and limits for safe execution
+### What Was Done
+1. ✅ Created `current-architecture.md` - validated against all phase docs
+2. ✅ Created `architecture-decisions.md` - 28 ADRs from 7 phases
+3. ✅ Created `security-model.md` - merged 2 security docs
+4. ✅ Created `performance-benchmarks.md` - actual measured metrics
+5. ✅ Kept `api-style-guide.md` - Phase 7 official standards
+6. ✅ Archived 18 redundant/outdated files
+7. ✅ Updated all cross-references
+
+### Content Validation
+- All architecture validated against phase design docs
+- All performance metrics from actual measurements
+- All security features verified in implementation
+- All API patterns confirmed in codebase
 
 ---
 
 ## Related Documentation
 
-### User Documentation
-- [User Guide](../user-guide/) - End-user scripting guide and API reference
-- [Getting Started](../user-guide/getting-started.md) - Quick start for new users
+### For Users
+- **[User Guide](../user-guide/)** - How to use LLMSpell
+- **[Getting Started](../user-guide/getting-started.md)** - 5-minute quickstart
+- **[API Reference](../user-guide/api/)** - Lua and Rust APIs
 
-### Developer Documentation  
-- [Developer Guide](../developer-guide/) - Tool development and contribution guide
-- [Tool Development](../developer-guide/tool-development-guide.md) - Creating custom tools
+### For Developers
+- **[Developer Guide](../developer-guide/)** - Contributing guide
+- **[Tool Development](../developer-guide/tool-development-guide.md)** - Create tools
+- **[Test Organization](../developer-guide/test-organization.md)** - Testing strategy
 
-### Project Documentation
-- [Implementation Phases](../in-progress/implementation-phases.md) - Project roadmap and phase planning
-- [Phase Completion Status](../in-progress/) - Current progress and handoff documents
+### Archives
+- **[Technical Archives](../archives/technical/)** - 18 historical documents
+- **[User Guide Archives](../archives/user-guide/)** - 32 consolidated files
 
 ---
 
-**📞 Questions or Issues?**
-- Technical architecture questions: Review master architecture document first
-- Implementation details: Check component-specific deep dive documents  
-- Security concerns: Consult security architecture and threat model
-- Performance questions: Reference benchmarks and optimization guides
+## Document Status Table
 
-*This documentation reflects the rs-llmspell system as of Phase 5 completion (v0.5.0 - July 29, 2025).*
+| File | Lines | Purpose | Validation |
+|------|-------|---------|------------|
+| current-architecture.md | 362 | Actual implementation | ✅ Code + Phases |
+| architecture-decisions.md | 484 | Design rationale (28 ADRs) | ✅ Phase docs |
+| security-model.md | 334 | Security implementation | ✅ Security crates |
+| performance-benchmarks.md | 257 | Measured performance | ✅ Test outputs |
+| api-style-guide.md | 529 | API standards | ✅ Phase 7 work |
+| master-architecture-vision.md | 20K+ | Original vision | 📚 Historical |
+| **README.md** | This file | Navigation hub | ✅ Current |
+
+---
+
+*Documentation reflects LLMSpell v0.6.0 after Phase 7 completion. Reduced from 35→7 files with full validation.*

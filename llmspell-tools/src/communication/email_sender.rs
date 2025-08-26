@@ -1,4 +1,4 @@
-//! ABOUTME: Email sending tool with support for SMTP, SendGrid, and AWS SES
+//! ABOUTME: Email sending tool with support for SMTP, `SendGrid`, and AWS SES
 //! ABOUTME: Provides secure email delivery with multiple provider options and configuration
 
 use async_trait::async_trait;
@@ -66,6 +66,7 @@ impl Default for EmailSenderConfig {
 
 impl EmailSenderConfig {
     /// Create configuration from environment variables
+    #[must_use]
     pub fn from_env() -> Self {
         let mut config = Self::default();
         let mut providers = HashMap::new();
@@ -168,6 +169,10 @@ impl RequiresApiKey for EmailSenderTool {
 
 impl EmailSenderTool {
     /// Create a new email sender tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid
     pub fn new(config: EmailSenderConfig) -> Result<Self> {
         let is_production = !cfg!(debug_assertions);
 
@@ -207,6 +212,13 @@ impl EmailSenderTool {
     }
 
     /// Send email using the specified provider
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified provider is not configured
+    /// - The provider type is unsupported
+    /// - Email sending fails
     async fn send_email(
         &self,
         provider: &str,
@@ -223,7 +235,7 @@ impl EmailSenderTool {
 
         let provider_config = self.config.providers.get(provider).ok_or_else(|| {
             tool_error(
-                format!("Email provider '{}' not configured", provider),
+                format!("Email provider '{provider}' not configured"),
                 Some("provider".to_string()),
             )
         })?;
@@ -252,6 +264,16 @@ impl EmailSenderTool {
     }
 
     /// Send email via SMTP
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - SMTP host is not configured
+    /// - Failed to parse email addresses
+    /// - Failed to build email message
+    /// - Failed to create SMTP transport
+    /// - Failed to send email
+    #[allow(clippy::unused_async)]
     async fn send_via_smtp(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,
@@ -282,12 +304,12 @@ impl EmailSenderTool {
             let mut builder = Message::builder()
                 .from(from.parse().map_err(|e| {
                     tool_error(
-                        format!("Invalid from address: {}", e),
+                        format!("Invalid from address: {e}"),
                         Some("from".to_string()),
                     )
                 })?)
                 .to(to.parse().map_err(|e| {
-                    tool_error(format!("Invalid to address: {}", e), Some("to".to_string()))
+                    tool_error(format!("Invalid to address: {e}"), Some("to".to_string()))
                 })?)
                 .subject(subject);
 
@@ -299,10 +321,10 @@ impl EmailSenderTool {
 
             let email = builder
                 .body(body.to_string())
-                .map_err(|e| tool_error(format!("Failed to build email: {}", e), None))?;
+                .map_err(|e| tool_error(format!("Failed to build email: {e}"), None))?;
 
             let mut mailer_builder = AsyncSmtpTransport::<Tokio1Executor>::relay(host)
-                .map_err(|e| tool_error(format!("Failed to create SMTP transport: {}", e), None))?
+                .map_err(|e| tool_error(format!("Failed to create SMTP transport: {e}"), None))?
                 .port(port);
 
             if let (Some(username), Some(password)) = (
@@ -327,7 +349,7 @@ impl EmailSenderTool {
                     }))
                 }
                 Err(e) => {
-                    let error_msg = format!("Failed to send email via SMTP: {}", e);
+                    let error_msg = format!("Failed to send email via SMTP: {e}");
                     self.log_credential_access(
                         "smtp_send",
                         "smtp_credentials",
@@ -352,7 +374,12 @@ impl EmailSenderTool {
         }
     }
 
-    /// Send email via SendGrid
+    /// Send email via `SendGrid`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `SendGrid` API call fails (currently returns mock success)
+    #[allow(clippy::unused_async)]
     async fn send_via_sendgrid(
         &self,
         _config: &EmailProviderConfig,
@@ -375,6 +402,13 @@ impl EmailSenderTool {
     }
 
     /// Send email via AWS SES
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to build email content
+    /// - AWS SES API call fails
+    #[allow(clippy::unused_async)]
     async fn send_via_ses(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,
@@ -395,8 +429,7 @@ impl EmailSenderTool {
             let region = config
                 .credentials
                 .get("region")
-                .map(|r| Region::new(r.clone()))
-                .unwrap_or_else(|| Region::new("us-east-1"));
+                .map_or_else(|| Region::new("us-east-1"), |r| Region::new(r.clone()));
 
             let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
                 .region(region)
@@ -411,18 +444,14 @@ impl EmailSenderTool {
                     .data(body)
                     .charset("UTF-8")
                     .build()
-                    .map_err(|e| {
-                        tool_error(format!("Failed to build HTML content: {}", e), None)
-                    })?;
+                    .map_err(|e| tool_error(format!("Failed to build HTML content: {e}"), None))?;
                 body_builder = body_builder.html(html_content);
             } else {
                 let text_content = Content::builder()
                     .data(body)
                     .charset("UTF-8")
                     .build()
-                    .map_err(|e| {
-                        tool_error(format!("Failed to build text content: {}", e), None)
-                    })?;
+                    .map_err(|e| tool_error(format!("Failed to build text content: {e}"), None))?;
                 body_builder = body_builder.text(text_content);
             }
 
@@ -430,7 +459,7 @@ impl EmailSenderTool {
                 .data(subject)
                 .charset("UTF-8")
                 .build()
-                .map_err(|e| tool_error(format!("Failed to build subject: {}", e), None))?;
+                .map_err(|e| tool_error(format!("Failed to build subject: {e}"), None))?;
 
             let message = Message::builder()
                 .subject(subject_content)
@@ -457,7 +486,7 @@ impl EmailSenderTool {
                     }))
                 }
                 Err(e) => {
-                    let error_msg = format!("Failed to send email via AWS SES: {}", e);
+                    let error_msg = format!("Failed to send email via AWS SES: {e}");
                     self.log_credential_access(
                         "ses_send",
                         "aws_credentials",
@@ -489,7 +518,11 @@ impl BaseAgent for EmailSenderTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
 
         // Extract required parameters
@@ -503,7 +536,7 @@ impl BaseAgent for EmailSenderTool {
             extract_optional_string(params, "provider").unwrap_or(&self.config.default_provider);
         let html = params
             .get("html")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
         // Use default sender if no from address provided and default is set
@@ -527,7 +560,7 @@ impl BaseAgent for EmailSenderTool {
                 info!("Email sent successfully via {}", provider);
 
                 let response = ResponseBuilder::success("send_email")
-                    .with_message(format!("Email sent successfully via {}", provider))
+                    .with_message(format!("Email sent successfully via {provider}"))
                     .with_result(email_result)
                     .build();
 
@@ -537,7 +570,7 @@ impl BaseAgent for EmailSenderTool {
                 error!("Failed to send email: {}", e);
 
                 let response =
-                    ResponseBuilder::error("send_email", format!("Failed to send email: {}", e))
+                    ResponseBuilder::error("send_email", format!("Failed to send email: {e}"))
                         .build();
 
                 Ok(AgentOutput::text(serde_json::to_string(&response)?))
@@ -566,7 +599,7 @@ impl BaseAgent for EmailSenderTool {
         if let Some(provider) = extract_optional_string(params, "provider") {
             if !self.config.providers.contains_key(provider) {
                 return Err(validation_error(
-                    format!("Email provider '{}' is not configured", provider),
+                    format!("Email provider '{provider}' is not configured"),
                     Some("provider".to_string()),
                 ));
             }
@@ -585,7 +618,7 @@ impl BaseAgent for EmailSenderTool {
 
         Ok(AgentOutput::text(
             serde_json::to_string_pretty(&safe_response)
-                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+                .unwrap_or_else(|_| format!("{safe_response:?}")),
         ))
     }
 }
@@ -665,14 +698,12 @@ impl Tool for EmailSenderTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_email_sender_tool_creation() {
         let config = EmailSenderConfig::default();
         let tool = EmailSenderTool::new(config).unwrap();
         assert_eq!(tool.metadata().name, "email_sender");
     }
-
     #[test]
     fn test_tool_metadata() {
         let config = EmailSenderConfig::default();
@@ -685,7 +716,6 @@ mod tests {
         assert_eq!(schema.name, "email_sender");
         assert!(!schema.parameters.is_empty());
     }
-
     #[test]
     fn test_config_from_env() {
         // Set up test environment variables
@@ -705,7 +735,6 @@ mod tests {
         std::env::remove_var("EMAIL_SMTP_PORT");
         std::env::remove_var("EMAIL_DEFAULT_SENDER");
     }
-
     #[tokio::test]
     async fn test_parameter_validation() {
         let config = EmailSenderConfig::default();

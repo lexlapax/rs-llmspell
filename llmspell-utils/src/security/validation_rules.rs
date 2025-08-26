@@ -515,28 +515,24 @@ pub mod param_validators {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_length_rule() {
         let rule = LengthRule::new(10);
         assert!(rule.validate("short").is_ok());
         assert!(rule.validate("this is too long").is_err());
     }
-
     #[test]
     fn test_html_sanitization_rule() {
         let rule = HtmlSanitizationRule::new();
         let result = rule.validate("<script>alert(1)</script>").unwrap();
         assert!(!result.contains("<script"));
     }
-
     #[test]
     fn test_sql_sanitization_rule() {
         let rule = SqlSanitizationRule::new();
         let result = rule.validate("'; DROP TABLE users; --").unwrap();
         assert!(!result.contains("DROP"));
     }
-
     #[test]
     fn test_url_validation_rule() {
         let rule = UrlValidationRule::new();
@@ -544,7 +540,6 @@ mod tests {
         assert!(rule.validate("javascript:alert(1)").is_err());
         assert!(rule.validate("not a url").is_err());
     }
-
     #[test]
     fn test_alphanumeric_rule() {
         let rule = AlphanumericRule::with_allowed(".-_");
@@ -552,7 +547,6 @@ mod tests {
         assert!(rule.validate("test-file.txt").is_ok());
         assert!(rule.validate("test@file").is_err());
     }
-
     #[test]
     fn test_validation_rule_set() {
         let rules = ValidationRuleSet::new()
@@ -565,7 +559,6 @@ mod tests {
         assert!(!result.contains("<script"));
         assert!(!result.contains('\0'));
     }
-
     #[test]
     fn test_web_standard_rules() {
         let rules = ValidationRuleSet::web_standard();
@@ -573,14 +566,12 @@ mod tests {
         let result = rules.validate(input).unwrap();
         assert!(!result.contains("onerror"));
     }
-
     #[test]
     fn test_command_standard_rules() {
         let rules = ValidationRuleSet::command_standard();
         assert!(rules.validate("ls -la").is_ok());
         assert!(rules.validate("rm -rf / && echo pwned").is_err());
     }
-
     #[test]
     fn test_path_standard_rules() {
         let rules = ValidationRuleSet::path_standard();

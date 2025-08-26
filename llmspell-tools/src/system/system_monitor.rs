@@ -10,7 +10,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_string, extract_parameters,
     response::ResponseBuilder,
@@ -63,17 +63,52 @@ pub struct DiskStats {
     pub filesystem: Option<String>,
 }
 
+/// Statistics types that can be collected
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StatType {
+    /// CPU usage statistics
+    Cpu,
+    /// Memory statistics
+    Memory,
+    /// Disk usage statistics
+    Disk,
+    /// Process information
+    Process,
+}
+
+/// Statistics collection configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StatsCollection {
+    /// Set of statistics types to collect
+    pub enabled_stats: Vec<StatType>,
+}
+
+impl StatsCollection {
+    /// Check if a specific stat type is enabled
+    #[must_use]
+    pub fn is_enabled(&self, stat_type: StatType) -> bool {
+        self.enabled_stats.contains(&stat_type)
+    }
+
+    /// Enable all statistics
+    #[must_use]
+    pub fn all() -> Self {
+        Self {
+            enabled_stats: vec![
+                StatType::Cpu,
+                StatType::Memory,
+                StatType::Disk,
+                StatType::Process,
+            ],
+        }
+    }
+}
+
 /// System monitor configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemMonitorConfig {
-    /// Whether to collect CPU usage statistics
-    pub collect_cpu_stats: bool,
-    /// Whether to collect memory statistics
-    pub collect_memory_stats: bool,
-    /// Whether to collect disk usage statistics
-    pub collect_disk_stats: bool,
-    /// Whether to collect process information
-    pub collect_process_stats: bool,
+    /// Statistics collection settings
+    pub collect: StatsCollection,
     /// Maximum number of disk mounts to report
     pub max_disk_mounts: usize,
     /// CPU sampling duration in milliseconds
@@ -85,10 +120,7 @@ pub struct SystemMonitorConfig {
 impl Default for SystemMonitorConfig {
     fn default() -> Self {
         Self {
-            collect_cpu_stats: true,
-            collect_memory_stats: true,
-            collect_disk_stats: true,
-            collect_process_stats: true,
+            collect: StatsCollection::all(),
             max_disk_mounts: 20,
             cpu_sample_duration_ms: 1000,
             include_disk_details: true,
@@ -101,39 +133,32 @@ impl Default for SystemMonitorConfig {
 pub struct SystemMonitorTool {
     metadata: ComponentMetadata,
     config: SystemMonitorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl SystemMonitorTool {
     /// Create a new system monitor tool
-    pub fn new(config: SystemMonitorConfig) -> Self {
+    #[must_use]
+    pub fn new(config: SystemMonitorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "system_monitor".to_string(),
                 "System resource monitoring for CPU, memory, and disk usage tracking".to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new system monitor tool with sandbox context
-    pub fn with_sandbox(config: SystemMonitorConfig, sandbox_context: Arc<SandboxContext>) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "system_monitor".to_string(),
-                "System resource monitoring for CPU, memory, and disk usage tracking".to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
     /// Get basic system information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if system information cannot be retrieved
+    #[allow(clippy::unused_async)]
     async fn get_basic_system_info(&self) -> LLMResult<SystemStats> {
         let system_info = get_system_info().map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to get system information: {}", e),
+            message: format!("Failed to get system information: {e}"),
             tool_name: Some("system_monitor".to_string()),
             source: None,
         })?;
@@ -143,7 +168,9 @@ impl SystemMonitorTool {
         let available_memory = system_info.available_memory.unwrap_or(0);
         let used_memory = total_memory.saturating_sub(available_memory);
         let memory_usage_percent = if total_memory > 0 {
-            (used_memory as f64 / total_memory as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let usage_percent = (used_memory as f64 / total_memory as f64) * 100.0;
+            usage_percent
         } else {
             0.0
         };
@@ -170,8 +197,9 @@ impl SystemMonitorTool {
     }
 
     /// Get CPU usage (simplified version without external dependencies)
+    #[allow(clippy::unused_async)]
     async fn get_cpu_usage(&self) -> f64 {
-        if !self.config.collect_cpu_stats {
+        if !self.config.collect.is_enabled(StatType::Cpu) {
             return 0.0;
         }
 
@@ -182,7 +210,8 @@ impl SystemMonitorTool {
         // Simple CPU load approximation based on system load
         #[cfg(unix)]
         {
-            if let Ok(load_avg) = self.get_load_average() {
+            if let Ok(load_avg) = self.get_load_average(&self.sandbox) {
+                #[allow(clippy::cast_precision_loss)]
                 let cpu_count = get_cpu_count() as f64;
                 // Convert load average to approximate CPU percentage
                 let cpu_percent = (load_avg[0] / cpu_count * 100.0).min(100.0);
@@ -197,17 +226,21 @@ impl SystemMonitorTool {
 
     /// Get system load average (Unix only)
     #[cfg(unix)]
-    fn get_load_average(&self) -> Result<[f64; 3], std::io::Error> {
+    #[allow(clippy::unused_self)]
+    fn get_load_average(&self, sandbox: &FileSandbox) -> Result<[f64; 3], std::io::Error> {
         use std::fs;
 
-        let loadavg_content = fs::read_to_string("/proc/loadavg")?;
+        let loadavg_path = sandbox
+            .validate_path("/proc/loadavg".as_ref())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::PermissionDenied, e))?;
+        let loadavg_content = fs::read_to_string(&loadavg_path)?;
         let parts: Vec<&str> = loadavg_content.split_whitespace().collect();
 
         if parts.len() >= 3 {
-            let load1 = parts[0].parse::<f64>().unwrap_or(0.0);
-            let load5 = parts[1].parse::<f64>().unwrap_or(0.0);
-            let load15 = parts[2].parse::<f64>().unwrap_or(0.0);
-            Ok([load1, load5, load15])
+            let one_minute = parts[0].parse::<f64>().unwrap_or(0.0);
+            let five_minutes = parts[1].parse::<f64>().unwrap_or(0.0);
+            let fifteen_minutes = parts[2].parse::<f64>().unwrap_or(0.0);
+            Ok([one_minute, five_minutes, fifteen_minutes])
         } else {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -217,8 +250,9 @@ impl SystemMonitorTool {
     }
 
     /// Get disk usage statistics
+    #[allow(clippy::unused_async)]
     async fn get_disk_usage(&self) -> HashMap<String, DiskStats> {
-        if !self.config.collect_disk_stats {
+        if !self.config.collect.is_enabled(StatType::Disk) {
             return HashMap::new();
         }
 
@@ -227,7 +261,7 @@ impl SystemMonitorTool {
         // Cross-platform disk usage implementation
         #[cfg(unix)]
         {
-            if let Ok(mounts) = self.get_unix_mounts() {
+            if let Ok(mounts) = self.get_unix_mounts(&self.sandbox) {
                 let mut count = 0;
                 for (mount_point, fs_type) in mounts {
                     if count >= self.config.max_disk_mounts {
@@ -279,10 +313,17 @@ impl SystemMonitorTool {
 
     /// Get Unix mount points
     #[cfg(unix)]
-    fn get_unix_mounts(&self) -> Result<Vec<(String, String)>, std::io::Error> {
+    #[allow(clippy::unused_self)]
+    fn get_unix_mounts(
+        &self,
+        sandbox: &FileSandbox,
+    ) -> Result<Vec<(String, String)>, std::io::Error> {
         use std::fs;
 
-        let mounts_content = fs::read_to_string("/proc/mounts")?;
+        let mounts_path = sandbox
+            .validate_path("/proc/mounts".as_ref())
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::PermissionDenied, e))?;
+        let mounts_content = fs::read_to_string(&mounts_path)?;
         let mut mounts = Vec::new();
 
         for line in mounts_content.lines() {
@@ -309,6 +350,7 @@ impl SystemMonitorTool {
     }
 
     /// Get disk statistics for a specific path
+    #[allow(clippy::unused_self)]
     fn get_disk_stats_for_path(&self, path: &str) -> Result<DiskStats, std::io::Error> {
         #[cfg(unix)]
         {
@@ -316,20 +358,26 @@ impl SystemMonitorTool {
             use std::mem;
 
             let path_c = CString::new(path)?;
+            // SAFETY: Creating a zeroed libc::statvfs struct is safe as all fields are scalar types
+            #[allow(unsafe_code)]
             let mut statvfs: libc::statvfs = unsafe { mem::zeroed() };
 
-            let result = unsafe { libc::statvfs(path_c.as_ptr(), &mut statvfs) };
+            // SAFETY: path_c is a valid C string and statvfs is a valid mutable reference
+            #[allow(unsafe_code)]
+            let result = unsafe { libc::statvfs(path_c.as_ptr(), &raw mut statvfs) };
 
             if result == 0 {
                 let block_size = statvfs.f_bsize;
-                let total_blocks = statvfs.f_blocks as u64;
-                let available_blocks = statvfs.f_bavail as u64;
+                let total_blocks = u64::from(statvfs.f_blocks);
+                let available_blocks = u64::from(statvfs.f_bavail);
 
                 let total_bytes = total_blocks * block_size;
                 let available_bytes = available_blocks * block_size;
                 let used_bytes = total_bytes.saturating_sub(available_bytes);
                 let usage_percent = if total_bytes > 0 {
-                    (used_bytes as f64 / total_bytes as f64) * 100.0
+                    #[allow(clippy::cast_precision_loss)]
+                    let percent = (used_bytes as f64 / total_bytes as f64) * 100.0;
+                    percent
                 } else {
                     0.0
                 };
@@ -372,7 +420,9 @@ impl SystemMonitorTool {
             if result != 0 {
                 let used_bytes = total_bytes.saturating_sub(free_bytes);
                 let usage_percent = if total_bytes > 0 {
-                    (used_bytes as f64 / total_bytes as f64) * 100.0
+                    #[allow(clippy::cast_precision_loss)]
+                    let percent = (used_bytes as f64 / total_bytes as f64) * 100.0;
+                    percent
                 } else {
                     0.0
                 };
@@ -400,16 +450,18 @@ impl SystemMonitorTool {
     }
 
     /// Get process count (simplified implementation)
-    async fn get_process_count(&self) -> Option<u32> {
-        if !self.config.collect_process_stats {
+    #[allow(clippy::unused_async)]
+    async fn get_process_count(&self, sandbox: &FileSandbox) -> Option<u32> {
+        if !self.config.collect.is_enabled(StatType::Process) {
             return None;
         }
 
         #[cfg(unix)]
         {
-            if let Ok(entries) = std::fs::read_dir("/proc") {
+            let proc_path = sandbox.validate_path("/proc".as_ref()).ok()?;
+            if let Ok(entries) = std::fs::read_dir(&proc_path) {
                 let count = entries
-                    .filter_map(|entry| entry.ok())
+                    .filter_map(std::result::Result::ok)
                     .filter(|entry| {
                         entry
                             .file_name()
@@ -417,7 +469,9 @@ impl SystemMonitorTool {
                             .chars()
                             .all(|c| c.is_ascii_digit())
                     })
-                    .count() as u32;
+                    .count();
+                #[allow(clippy::cast_possible_truncation)]
+                let count = count as u32;
                 debug!("Process count: {}", count);
                 return Some(count);
             }
@@ -433,14 +487,18 @@ impl SystemMonitorTool {
     }
 
     /// Get system uptime (simplified implementation)
-    async fn get_uptime(&self) -> Option<u64> {
+    #[allow(clippy::unused_async)]
+    async fn get_uptime(&self, sandbox: &FileSandbox) -> Option<u64> {
         #[cfg(unix)]
         {
-            if let Ok(uptime_content) = std::fs::read_to_string("/proc/uptime") {
+            let uptime_path = sandbox.validate_path("/proc/uptime".as_ref()).ok()?;
+            if let Ok(uptime_content) = std::fs::read_to_string(&uptime_path) {
                 if let Some(uptime_str) = uptime_content.split_whitespace().next() {
                     if let Ok(uptime_seconds) = uptime_str.parse::<f64>() {
-                        debug!("System uptime: {} seconds", uptime_seconds as u64);
-                        return Some(uptime_seconds as u64);
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        let uptime_u64 = uptime_seconds as u64;
+                        debug!("System uptime: {} seconds", uptime_u64);
+                        return Some(uptime_u64);
                     }
                 }
             }
@@ -450,6 +508,10 @@ impl SystemMonitorTool {
     }
 
     /// Collect comprehensive system statistics
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if system information cannot be retrieved
     async fn collect_system_stats(&self) -> LLMResult<SystemStats> {
         let start_time = Instant::now();
 
@@ -457,27 +519,27 @@ impl SystemMonitorTool {
         let mut stats = self.get_basic_system_info().await?;
 
         // Collect CPU usage
-        if self.config.collect_cpu_stats {
+        if self.config.collect.is_enabled(StatType::Cpu) {
             stats.cpu_usage_percent = self.get_cpu_usage().await;
         }
 
         // Collect disk usage
-        if self.config.collect_disk_stats {
+        if self.config.collect.is_enabled(StatType::Disk) {
             stats.disk_usage = self.get_disk_usage().await;
         }
 
         // Collect process count
-        if self.config.collect_process_stats {
-            stats.process_count = self.get_process_count().await;
+        if self.config.collect.is_enabled(StatType::Process) {
+            stats.process_count = self.get_process_count(&self.sandbox).await;
         }
 
         // Get uptime
-        stats.uptime_seconds = self.get_uptime().await;
+        stats.uptime_seconds = self.get_uptime(&self.sandbox).await;
 
         // Get load average (Unix only)
         #[cfg(unix)]
         {
-            if let Ok(load_avg) = self.get_load_average() {
+            if let Ok(load_avg) = self.get_load_average(&self.sandbox) {
                 stats.load_average = Some(load_avg);
             }
         }
@@ -485,7 +547,11 @@ impl SystemMonitorTool {
         let collection_time = start_time.elapsed();
         info!(
             "System statistics collected in {}ms - CPU: {:.1}%, Memory: {:.1}%, Disks: {}",
-            collection_time.as_millis(),
+            {
+                #[allow(clippy::cast_possible_truncation)]
+                let millis = collection_time.as_millis() as u64;
+                millis
+            },
             stats.cpu_usage_percent,
             stats.memory_usage_percent,
             stats.disk_usage.len()
@@ -495,6 +561,12 @@ impl SystemMonitorTool {
     }
 
     /// Validate monitoring parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - An invalid operation is specified
+    #[allow(clippy::unused_async)]
     async fn validate_monitoring_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation if provided
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -503,8 +575,7 @@ impl SystemMonitorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: stats, cpu, memory, disk, all",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: stats, cpu, memory, disk, all"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -522,7 +593,7 @@ impl BaseAgent for SystemMonitorTool {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -634,10 +705,7 @@ impl BaseAgent for SystemMonitorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "System monitor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("System monitor error: {error}")))
     }
 }
 
@@ -669,46 +737,59 @@ impl Tool for SystemMonitorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
 
-    fn create_test_tool() -> SystemMonitorTool {
+    fn create_test_system_monitor() -> SystemMonitorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/proc")
+            .with_file_access("/tmp");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_system_monitor".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = SystemMonitorConfig::default();
-        SystemMonitorTool::new(config)
+        SystemMonitorTool::new(config, sandbox)
     }
 
     fn create_test_tool_with_custom_config() -> SystemMonitorTool {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/proc")
+            .with_file_access("/tmp");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_system_monitor_custom".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = SystemMonitorConfig {
             max_disk_mounts: 5,
             cpu_sample_duration_ms: 500,
             include_disk_details: false,
             ..Default::default()
         };
-        SystemMonitorTool::new(config)
+        SystemMonitorTool::new(config, sandbox)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
-
     #[tokio::test]
     async fn test_collect_all_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get system statistics",
-            json!({
-                "operation": "all"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "all")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -718,17 +799,11 @@ mod tests {
         assert!(result.text.contains("CPU"));
         assert!(result.text.contains("Memory"));
     }
-
     #[tokio::test]
     async fn test_collect_cpu_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get CPU statistics",
-            json!({
-                "operation": "cpu"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "cpu")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -737,36 +812,24 @@ mod tests {
         assert!(result.text.contains("CPU usage"));
         assert!(result.text.contains("cores"));
     }
-
     #[tokio::test]
     async fn test_collect_memory_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get memory statistics",
-            json!({
-                "operation": "memory"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "memory")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
             .await
             .unwrap();
         assert!(result.text.contains("Memory usage"));
-        assert!(result.text.contains("%"));
+        assert!(result.text.contains('%'));
     }
-
     #[tokio::test]
     async fn test_collect_disk_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get disk statistics",
-            json!({
-                "operation": "disk"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "disk")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -775,17 +838,11 @@ mod tests {
         assert!(result.text.contains("Disk usage"));
         assert!(result.text.contains("mount"));
     }
-
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -794,13 +851,12 @@ mod tests {
             .to_string()
             .contains("Invalid operation"));
     }
-
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         // No operation parameter should default to "all"
-        let input = create_test_input("Get default statistics", json!({}));
+        let input = create_test_tool_input(vec![]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -808,29 +864,26 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("System stats"));
     }
-
     #[tokio::test]
     async fn test_basic_system_info() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let stats = tool.get_basic_system_info().await.unwrap();
         assert!(stats.cpu_count > 0);
         assert!(stats.memory_usage_percent >= 0.0);
         assert!(stats.memory_usage_percent <= 100.0);
     }
-
     #[tokio::test]
     async fn test_cpu_usage_measurement() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let cpu_usage = tool.get_cpu_usage().await;
         assert!(cpu_usage >= 0.0);
         assert!(cpu_usage <= 100.0);
     }
-
     #[tokio::test]
     async fn test_disk_usage_collection() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let disk_usage = tool.get_disk_usage().await;
         // Disk usage collection might return empty on some test environments
@@ -842,21 +895,19 @@ mod tests {
             assert!(stats.total_bytes >= stats.used_bytes);
         }
     }
-
     #[tokio::test]
     async fn test_process_count() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let process_count = tool.get_process_count().await;
+        let process_count = tool.get_process_count(&tool.sandbox).await;
         // Process count might be None on some platforms
         if let Some(count) = process_count {
             assert!(count > 0);
         }
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "system_monitor");
@@ -874,7 +925,6 @@ mod tests {
         let required_params = schema.required_parameters();
         assert_eq!(required_params.len(), 0); // All parameters are optional
     }
-
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -884,21 +934,36 @@ mod tests {
         assert_eq!(tool.config.cpu_sample_duration_ms, 500);
         assert!(!tool.config.include_disk_details);
     }
-
     #[tokio::test]
     async fn test_selective_collection() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let security_requirements = SecurityRequirements::default()
+            .with_file_access("/proc")
+            .with_file_access("/tmp");
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_system_monitor_selective".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = SystemMonitorConfig {
-            collect_cpu_stats: false,
-            collect_disk_stats: false,
-            collect_process_stats: false,
+            collect: StatsCollection {
+                enabled_stats: vec![StatType::Memory],
+            },
             ..Default::default()
         };
-        let tool = SystemMonitorTool::new(config);
+        let tool = SystemMonitorTool::new(config, sandbox);
 
         let stats = tool.collect_system_stats().await.unwrap();
 
         // CPU usage should be 0 when collection is disabled
-        assert_eq!(stats.cpu_usage_percent, 0.0);
+        assert!((stats.cpu_usage_percent - 0.0).abs() < f64::EPSILON);
 
         // Disk usage should be empty when collection is disabled
         assert!(stats.disk_usage.is_empty());
@@ -913,21 +978,20 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_load_average() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         // Load average might not be available in all test environments
-        if let Ok(load_avg) = tool.get_load_average() {
+        if let Ok(load_avg) = tool.get_load_average(&tool.sandbox) {
             assert!(load_avg[0] >= 0.0);
             assert!(load_avg[1] >= 0.0);
             assert!(load_avg[2] >= 0.0);
         }
     }
-
     #[tokio::test]
     async fn test_uptime() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let uptime = tool.get_uptime().await;
+        let uptime = tool.get_uptime(&tool.sandbox).await;
         // Uptime might not be available in all test environments
         if let Some(uptime_secs) = uptime {
             assert!(uptime_secs > 0);

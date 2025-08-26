@@ -222,7 +222,9 @@ impl CostTrackingMetrics {
         if self.total_requests == 0 {
             0.0
         } else {
-            self.total_cost / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let requests_f64 = self.total_requests as f64;
+            self.total_cost / requests_f64
         }
     }
 
@@ -230,7 +232,11 @@ impl CostTrackingMetrics {
         if self.total_requests == 0 {
             0.0
         } else {
-            (self.total_input_tokens + self.total_output_tokens) as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_tokens = (self.total_input_tokens + self.total_output_tokens) as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let requests_f64 = self.total_requests as f64;
+            total_tokens / requests_f64
         }
     }
 }
@@ -423,8 +429,12 @@ impl CostTrackingHook {
                 )
             })?;
 
-        let input_cost = (usage.input_tokens as f64 / 1000.0) * model_pricing.input_cost_per_1k;
-        let output_cost = (usage.output_tokens as f64 / 1000.0) * model_pricing.output_cost_per_1k;
+        #[allow(clippy::cast_precision_loss)]
+        let input_tokens_f64 = usage.input_tokens as f64;
+        let input_cost = (input_tokens_f64 / 1000.0) * model_pricing.input_cost_per_1k;
+        #[allow(clippy::cast_precision_loss)]
+        let output_tokens_f64 = usage.output_tokens as f64;
+        let output_cost = (output_tokens_f64 / 1000.0) * model_pricing.output_cost_per_1k;
         let mut total_cost = input_cost + output_cost;
 
         // Apply minimum charge if applicable
@@ -661,237 +671,6 @@ impl MetricHook for CostTrackingHook {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{ComponentId, ComponentType, HookPoint};
-
-    fn create_test_context_with_usage(
-        provider: &str,
-        model: &str,
-        input: u64,
-        output: u64,
-    ) -> HookContext {
-        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
-        let mut context = HookContext::new(HookPoint::AfterAgentExecution, component_id);
-
-        let usage = TokenUsage {
-            input_tokens: input,
-            output_tokens: output,
-            total_tokens: input + output,
-            model: model.to_string(),
-            provider: provider.to_string(),
-        };
-
-        context.data.insert(
-            "token_usage".to_string(),
-            serde_json::to_value(usage).unwrap(),
-        );
-        context
-    }
-
-    #[tokio::test]
-    async fn test_cost_tracking_hook_basic() {
-        let hook = CostTrackingHook::new();
-        let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 1000, 500);
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-
-        // Check cost metadata
-        assert!(context.get_metadata("cost_total").is_some());
-        assert!(context.get_metadata("cost_input").is_some());
-        assert!(context.get_metadata("cost_output").is_some());
-        assert_eq!(context.get_metadata("cost_currency").unwrap(), "USD");
-    }
-
-    #[tokio::test]
-    async fn test_cost_calculation() {
-        let hook = CostTrackingHook::new();
-
-        // Test GPT-3.5-turbo pricing
-        let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 1000, 500);
-        let _ = hook.execute(&mut context).await.unwrap();
-
-        let total_cost = context
-            .get_metadata("cost_total")
-            .unwrap()
-            .parse::<f64>()
-            .unwrap();
-        // 1000 input tokens * $0.0005/1K + 500 output tokens * $0.0015/1K
-        let expected = 0.0005 + 0.00075;
-        assert!((total_cost - expected).abs() < 0.000001);
-    }
-
-    #[tokio::test]
-    async fn test_budget_alerts() {
-        let hook = CostTrackingHook::new()
-            .with_budget_alert(BudgetAlert {
-                threshold: 0.001,
-                level: AlertLevel::Warning,
-                block_on_exceed: false,
-                message: Some("Test warning".to_string()),
-            })
-            .with_budget_alert(BudgetAlert {
-                threshold: 0.01,
-                level: AlertLevel::Critical,
-                block_on_exceed: true,
-                message: Some("Test block".to_string()),
-            });
-
-        // First request should trigger warning but not block
-        let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 2000, 1000);
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-        assert_eq!(context.get_metadata("cost_alert_level").unwrap(), "Warning");
-
-        // Accumulate more cost to trigger blocking
-        for _ in 0..10 {
-            let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 2000, 1000);
-            let result = hook.execute(&mut context).await.unwrap();
-            if matches!(result, HookResult::Cancel(_)) {
-                assert_eq!(
-                    context.get_metadata("cost_alert_level").unwrap(),
-                    "Critical"
-                );
-                break;
-            }
-        }
-    }
-
-    #[tokio::test]
-    async fn test_cost_aggregation() {
-        let hook = CostTrackingHook::new();
-
-        // Multiple requests
-        for i in 0..5 {
-            let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 1000, 500);
-            if i % 2 == 0 {
-                context.insert_metadata("user_id".to_string(), "user1".to_string());
-            } else {
-                context.insert_metadata("user_id".to_string(), "user2".to_string());
-            }
-            let _ = hook.execute(&mut context).await.unwrap();
-        }
-
-        let metrics = hook.metrics();
-        assert_eq!(metrics.total_requests, 5);
-        assert_eq!(metrics.total_input_tokens, 5000);
-        assert_eq!(metrics.total_output_tokens, 2500);
-        assert!(metrics.total_cost > 0.0);
-        assert_eq!(metrics.costs_by_user.len(), 2);
-    }
-
-    #[tokio::test]
-    async fn test_unknown_provider() {
-        let hook = CostTrackingHook::new();
-        let mut context =
-            create_test_context_with_usage("unknown_provider", "some-model", 1000, 500);
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-
-        // Should not have cost metadata since provider is unknown
-        assert!(context.get_metadata("cost_total").is_none());
-    }
-
-    #[tokio::test]
-    async fn test_custom_provider_pricing() {
-        let custom_pricing = ProviderPricing {
-            provider: "custom".to_string(),
-            models: {
-                let mut models = HashMap::new();
-                models.insert(
-                    "custom-model".to_string(),
-                    ModelPricing {
-                        input_cost_per_1k: 0.01,
-                        output_cost_per_1k: 0.02,
-                        minimum_charge: Some(0.001),
-                        max_tokens: Some(10000),
-                    },
-                );
-                models
-            },
-            default_currency: "EUR".to_string(),
-        };
-
-        let hook =
-            CostTrackingHook::new().with_provider_pricing("custom".to_string(), custom_pricing);
-
-        let mut context = create_test_context_with_usage("custom", "custom-model", 100, 50);
-        let _ = hook.execute(&mut context).await.unwrap();
-
-        let total_cost = context
-            .get_metadata("cost_total")
-            .unwrap()
-            .parse::<f64>()
-            .unwrap();
-        // Should use minimum charge since calculated cost would be 0.001 + 0.001 = 0.002
-        assert_eq!(total_cost, 0.002);
-        assert_eq!(context.get_metadata("cost_currency").unwrap(), "EUR");
-    }
-
-    #[test]
-    fn test_hook_metadata() {
-        let hook = CostTrackingHook::new();
-        let metadata = hook.metadata();
-
-        assert_eq!(metadata.name, "CostTrackingHook");
-        assert!(metadata.description.is_some());
-        assert_eq!(metadata.priority, Priority::LOW);
-        assert_eq!(metadata.language, Language::Native);
-        assert!(metadata.tags.contains(&"builtin".to_string()));
-        assert!(metadata.tags.contains(&"cost-tracking".to_string()));
-    }
-
-    #[test]
-    fn test_cost_metrics_calculations() {
-        let metrics = CostTrackingMetrics {
-            total_requests: 100,
-            total_cost: 50.0,
-            total_input_tokens: 50000,
-            total_output_tokens: 25000,
-            ..Default::default()
-        };
-
-        assert_eq!(metrics.average_cost_per_request(), 0.5);
-        assert_eq!(metrics.average_tokens_per_request(), 750.0);
-    }
-
-    #[test]
-    fn test_alert_sorting() {
-        let mut config = CostTrackingConfig::default();
-        config.budget_alerts.clear();
-
-        // Add alerts out of order
-        config.budget_alerts.push(BudgetAlert {
-            threshold: 50.0,
-            level: AlertLevel::Warning,
-            block_on_exceed: false,
-            message: None,
-        });
-        config.budget_alerts.push(BudgetAlert {
-            threshold: 10.0,
-            level: AlertLevel::Info,
-            block_on_exceed: false,
-            message: None,
-        });
-        config.budget_alerts.push(BudgetAlert {
-            threshold: 100.0,
-            level: AlertLevel::Critical,
-            block_on_exceed: true,
-            message: None,
-        });
-
-        let hook = CostTrackingHook::with_config(config);
-
-        // Alerts should be sorted by threshold
-        assert_eq!(hook.config.budget_alerts[0].threshold, 10.0);
-        assert_eq!(hook.config.budget_alerts[1].threshold, 50.0);
-        assert_eq!(hook.config.budget_alerts[2].threshold, 100.0);
-    }
-}
-
 #[async_trait]
 impl ReplayableHook for CostTrackingHook {
     fn is_replayable(&self) -> bool {
@@ -969,5 +748,227 @@ impl ReplayableHook for CostTrackingHook {
 
     fn replay_id(&self) -> String {
         format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ComponentId, ComponentType, HookPoint};
+
+    fn create_test_context_with_usage(
+        provider: &str,
+        model: &str,
+        input: u64,
+        output: u64,
+    ) -> HookContext {
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        let mut context = HookContext::new(HookPoint::AfterAgentExecution, component_id);
+
+        let usage = TokenUsage {
+            input_tokens: input,
+            output_tokens: output,
+            total_tokens: input + output,
+            model: model.to_string(),
+            provider: provider.to_string(),
+        };
+
+        context.data.insert(
+            "token_usage".to_string(),
+            serde_json::to_value(usage).unwrap(),
+        );
+        context
+    }
+    #[tokio::test]
+    async fn test_cost_tracking_hook_basic() {
+        let hook = CostTrackingHook::new();
+        let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 1000, 500);
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+
+        // Check cost metadata
+        assert!(context.get_metadata("cost_total").is_some());
+        assert!(context.get_metadata("cost_input").is_some());
+        assert!(context.get_metadata("cost_output").is_some());
+        assert_eq!(context.get_metadata("cost_currency").unwrap(), "USD");
+    }
+    #[tokio::test]
+    async fn test_cost_calculation() {
+        let hook = CostTrackingHook::new();
+
+        // Test GPT-3.5-turbo pricing
+        let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 1000, 500);
+        let _ = hook.execute(&mut context).await.unwrap();
+
+        let total_cost = context
+            .get_metadata("cost_total")
+            .unwrap()
+            .parse::<f64>()
+            .unwrap();
+        // 1000 input tokens * $0.0005/1K + 500 output tokens * $0.0015/1K
+        let expected = 0.0005 + 0.00075;
+        assert!((total_cost - expected).abs() < 0.000001);
+    }
+    #[tokio::test]
+    async fn test_budget_alerts() {
+        let hook = CostTrackingHook::new()
+            .with_budget_alert(BudgetAlert {
+                threshold: 0.001,
+                level: AlertLevel::Warning,
+                block_on_exceed: false,
+                message: Some("Test warning".to_string()),
+            })
+            .with_budget_alert(BudgetAlert {
+                threshold: 0.01,
+                level: AlertLevel::Critical,
+                block_on_exceed: true,
+                message: Some("Test block".to_string()),
+            });
+
+        // First request should trigger warning but not block
+        let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 2000, 1000);
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+        assert_eq!(context.get_metadata("cost_alert_level").unwrap(), "Warning");
+
+        // Accumulate more cost to trigger blocking
+        for _ in 0..10 {
+            let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 2000, 1000);
+            let result = hook.execute(&mut context).await.unwrap();
+            if matches!(result, HookResult::Cancel(_)) {
+                assert_eq!(
+                    context.get_metadata("cost_alert_level").unwrap(),
+                    "Critical"
+                );
+                break;
+            }
+        }
+    }
+    #[tokio::test]
+    async fn test_cost_aggregation() {
+        let hook = CostTrackingHook::new();
+
+        // Multiple requests
+        for i in 0..5 {
+            let mut context = create_test_context_with_usage("openai", "gpt-3.5-turbo", 1000, 500);
+            if i % 2 == 0 {
+                context.insert_metadata("user_id".to_string(), "user1".to_string());
+            } else {
+                context.insert_metadata("user_id".to_string(), "user2".to_string());
+            }
+            let _ = hook.execute(&mut context).await.unwrap();
+        }
+
+        let metrics = hook.metrics();
+        assert_eq!(metrics.total_requests, 5);
+        assert_eq!(metrics.total_input_tokens, 5000);
+        assert_eq!(metrics.total_output_tokens, 2500);
+        assert!(metrics.total_cost > 0.0);
+        assert_eq!(metrics.costs_by_user.len(), 2);
+    }
+    #[tokio::test]
+    async fn test_unknown_provider() {
+        let hook = CostTrackingHook::new();
+        let mut context =
+            create_test_context_with_usage("unknown_provider", "some-model", 1000, 500);
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+
+        // Should not have cost metadata since provider is unknown
+        assert!(context.get_metadata("cost_total").is_none());
+    }
+    #[tokio::test]
+    async fn test_custom_provider_pricing() {
+        let custom_pricing = ProviderPricing {
+            provider: "custom".to_string(),
+            models: {
+                let mut models = HashMap::new();
+                models.insert(
+                    "custom-model".to_string(),
+                    ModelPricing {
+                        input_cost_per_1k: 0.01,
+                        output_cost_per_1k: 0.02,
+                        minimum_charge: Some(0.001),
+                        max_tokens: Some(10000),
+                    },
+                );
+                models
+            },
+            default_currency: "EUR".to_string(),
+        };
+
+        let hook =
+            CostTrackingHook::new().with_provider_pricing("custom".to_string(), custom_pricing);
+
+        let mut context = create_test_context_with_usage("custom", "custom-model", 100, 50);
+        let _ = hook.execute(&mut context).await.unwrap();
+
+        let total_cost = context
+            .get_metadata("cost_total")
+            .unwrap()
+            .parse::<f64>()
+            .unwrap();
+        // Should use minimum charge since calculated cost would be 0.001 + 0.001 = 0.002
+        assert_eq!(total_cost, 0.002);
+        assert_eq!(context.get_metadata("cost_currency").unwrap(), "EUR");
+    }
+    #[test]
+    fn test_hook_metadata() {
+        let hook = CostTrackingHook::new();
+        let metadata = hook.metadata();
+
+        assert_eq!(metadata.name, "CostTrackingHook");
+        assert!(metadata.description.is_some());
+        assert_eq!(metadata.priority, Priority::LOW);
+        assert_eq!(metadata.language, Language::Native);
+        assert!(metadata.tags.contains(&"builtin".to_string()));
+        assert!(metadata.tags.contains(&"cost-tracking".to_string()));
+    }
+    #[test]
+    fn test_cost_metrics_calculations() {
+        let metrics = CostTrackingMetrics {
+            total_requests: 100,
+            total_cost: 50.0,
+            total_input_tokens: 50000,
+            total_output_tokens: 25000,
+            ..Default::default()
+        };
+
+        assert_eq!(metrics.average_cost_per_request(), 0.5);
+        assert_eq!(metrics.average_tokens_per_request(), 750.0);
+    }
+    #[test]
+    fn test_alert_sorting() {
+        let mut config = CostTrackingConfig::default();
+        config.budget_alerts.clear();
+
+        // Add alerts out of order
+        config.budget_alerts.push(BudgetAlert {
+            threshold: 50.0,
+            level: AlertLevel::Warning,
+            block_on_exceed: false,
+            message: None,
+        });
+        config.budget_alerts.push(BudgetAlert {
+            threshold: 10.0,
+            level: AlertLevel::Info,
+            block_on_exceed: false,
+            message: None,
+        });
+        config.budget_alerts.push(BudgetAlert {
+            threshold: 100.0,
+            level: AlertLevel::Critical,
+            block_on_exceed: true,
+            message: None,
+        });
+
+        let hook = CostTrackingHook::with_config(config);
+
+        // Alerts should be sorted by threshold
+        assert_eq!(hook.config.budget_alerts[0].threshold, 10.0);
+        assert_eq!(hook.config.budget_alerts[1].threshold, 50.0);
+        assert_eq!(hook.config.budget_alerts[2].threshold, 100.0);
     }
 }

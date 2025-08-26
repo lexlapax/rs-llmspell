@@ -365,7 +365,6 @@ impl Default for ExecutionChain {
 mod tests {
     use super::*;
     use crate::{ComponentType, HookPoint};
-
     #[tokio::test]
     async fn test_coordinator_creation() {
         let coordinator = CrossComponentCoordinator::new();
@@ -373,7 +372,6 @@ mod tests {
         // Coordinator should be created successfully
         assert_eq!(coordinator.chains.read().await.len(), 0);
     }
-
     #[tokio::test]
     async fn test_chain_registration() {
         let coordinator = CrossComponentCoordinator::new();
@@ -394,7 +392,6 @@ mod tests {
         assert!(!chain_id.is_nil());
         assert_eq!(coordinator.chains.read().await.len(), 1);
     }
-
     #[tokio::test]
     async fn test_chain_execution_start() {
         let coordinator = CrossComponentCoordinator::new();
@@ -424,7 +421,6 @@ mod tests {
 
         matches!(state, ChainState::Executing { .. });
     }
-
     #[test]
     fn test_execution_chain_builder() {
         let agent_id = ComponentId::new(ComponentType::Agent, "agent".to_string());
@@ -443,7 +439,6 @@ mod tests {
         assert_eq!(chain.metadata.get("purpose"), Some(&"testing".to_string()));
         assert_eq!(chain.state, ChainState::Pending);
     }
-
     #[test]
     fn test_chain_navigation() {
         let agent_id = ComponentId::new(ComponentType::Agent, "agent".to_string());

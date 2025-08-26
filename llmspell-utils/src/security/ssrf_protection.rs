@@ -550,7 +550,6 @@ impl std::error::Error for SsrfError {}
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_block_private_ips() {
         let protector = SsrfProtector::new();
@@ -564,7 +563,6 @@ mod tests {
         assert!(protector.validate_url("http://8.8.8.8").is_ok());
         assert!(protector.validate_url("https://example.com").is_ok());
     }
-
     #[test]
     fn test_block_localhost() {
         let protector = SsrfProtector::new();
@@ -574,7 +572,6 @@ mod tests {
         assert!(protector.validate_url("http://127.0.0.1").is_err());
         assert!(protector.validate_url("http://[::1]").is_err());
     }
-
     #[test]
     fn test_blocked_schemes() {
         let protector = SsrfProtector::new();
@@ -588,7 +585,6 @@ mod tests {
         assert!(protector.validate_url("http://example.com").is_ok());
         assert!(protector.validate_url("https://example.com").is_ok());
     }
-
     #[test]
     fn test_blocked_ports() {
         let protector = SsrfProtector::new();
@@ -603,7 +599,6 @@ mod tests {
         assert!(protector.validate_url("https://example.com:443").is_ok());
         assert!(protector.validate_url("http://example.com:8080").is_ok());
     }
-
     #[test]
     fn test_suspicious_patterns() {
         let protector = SsrfProtector::new();
@@ -615,7 +610,6 @@ mod tests {
             .validate_url("http://example.com%00.evil.com")
             .is_err()); // Null byte
     }
-
     #[test]
     fn test_ipv6_blocking() {
         let protector = SsrfProtector::new();
@@ -630,7 +624,6 @@ mod tests {
         assert!(protector.validate_url("http://[fc00::1]").is_err());
         assert!(protector.validate_url("http://[fd00::1]").is_err());
     }
-
     #[test]
     fn test_custom_config() {
         let config = SsrfProtectionConfig {
@@ -650,7 +643,6 @@ mod tests {
         assert!(protector.validate_url("https://trusted.com:443").is_ok());
         assert!(protector.validate_url("http://trusted.com:8080").is_err());
     }
-
     #[test]
     fn test_redirect_validation() {
         let protector = SsrfProtector::new();

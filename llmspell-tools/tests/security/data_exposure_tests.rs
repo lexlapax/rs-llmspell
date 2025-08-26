@@ -5,6 +5,7 @@ use super::test_framework::*;
 use serde_json::json;
 
 /// Sensitive file exposure tests
+#[must_use]
 pub fn sensitive_file_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -79,6 +80,7 @@ pub fn sensitive_file_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Database information disclosure tests
+#[must_use]
 pub fn database_disclosure_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -127,6 +129,7 @@ pub fn database_disclosure_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Application error disclosure tests
+#[must_use]
 pub fn error_disclosure_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -170,6 +173,7 @@ pub fn error_disclosure_tests() -> Vec<SecurityTestCase> {
 }
 
 /// User enumeration tests
+#[must_use]
 pub fn user_enumeration_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -214,6 +218,7 @@ pub fn user_enumeration_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Directory listing and file enumeration tests
+#[must_use]
 pub fn directory_listing_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -254,6 +259,7 @@ pub fn directory_listing_tests() -> Vec<SecurityTestCase> {
 }
 
 /// API information disclosure tests
+#[must_use]
 pub fn api_disclosure_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -305,6 +311,7 @@ pub fn api_disclosure_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Metadata and comment disclosure tests
+#[must_use]
 pub fn metadata_disclosure_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -349,6 +356,7 @@ pub fn metadata_disclosure_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Social engineering data exposure tests
+#[must_use]
 pub fn social_engineering_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -378,6 +386,7 @@ pub fn social_engineering_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Create all data exposure test cases
+#[must_use]
 pub fn all_data_exposure_tests() -> Vec<SecurityTestCase> {
     let mut tests = Vec::new();
     tests.extend(sensitive_file_tests());
@@ -394,7 +403,6 @@ pub fn all_data_exposure_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_data_exposure_test_creation() {
         let tests = all_data_exposure_tests();
@@ -406,7 +414,7 @@ mod tests {
             .map(|t| t.name.split('_').next().unwrap_or(""))
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         assert!(categories.contains(&"EXPOSE".to_string()));
@@ -418,7 +426,6 @@ mod tests {
         assert!(categories.contains(&"META".to_string()));
         assert!(categories.contains(&"SOCIAL".to_string()));
     }
-
     #[test]
     fn test_critical_exposure_tests() {
         let tests = all_data_exposure_tests();
@@ -435,16 +442,15 @@ mod tests {
             .iter()
             .any(|t| t.name == "EXPOSE_CONFIG_FILES"));
     }
-
     #[test]
     fn test_information_disclosure_coverage() {
         let tests = all_data_exposure_tests();
-        let disclosure_tests: Vec<_> = tests
+        let disclosure_tests_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::InformationDisclosure))
-            .collect();
+            .count();
 
         // All data exposure tests should be information disclosure
-        assert_eq!(disclosure_tests.len(), tests.len());
+        assert_eq!(disclosure_tests_count, tests.len());
     }
 }

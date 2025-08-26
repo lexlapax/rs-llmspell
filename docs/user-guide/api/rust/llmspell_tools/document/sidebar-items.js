@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"mod":["pdf_processor"]};

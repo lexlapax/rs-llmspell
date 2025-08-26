@@ -27,3 +27,4 @@ Thumbs.db
 tarpaulin-report.json
 build_rs_cov.profraw
 examples/backups/*
+

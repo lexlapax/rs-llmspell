@@ -233,8 +233,12 @@ impl Default for OverflowConfig {
 impl OverflowConfig {
     /// Create a new overflow configuration
     pub fn new(strategy: OverflowStrategy, max_buffer_size: usize) -> Self {
-        let high_water_mark = (max_buffer_size as f64 * 0.8) as usize;
-        let low_water_mark = (max_buffer_size as f64 * 0.2) as usize;
+        #[allow(clippy::cast_precision_loss)]
+        let max_size_f64 = max_buffer_size as f64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let high_water_mark = (max_size_f64 * 0.8) as usize;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let low_water_mark = (max_size_f64 * 0.2) as usize;
 
         Self {
             strategy,
@@ -269,7 +273,6 @@ mod tests {
     fn create_test_event() -> UniversalEvent {
         UniversalEvent::new("test.event", Value::Null, Language::Rust)
     }
-
     #[tokio::test]
     async fn test_drop_oldest_handler() {
         let handler = DropOldestHandler;
@@ -279,7 +282,6 @@ mod tests {
         assert_eq!(result, OverflowResult::Accepted);
         assert_eq!(handler.strategy_name(), "drop_oldest");
     }
-
     #[tokio::test]
     async fn test_drop_newest_handler() {
         let handler = DropNewestHandler;
@@ -289,7 +291,6 @@ mod tests {
         assert!(matches!(result, OverflowResult::Dropped { .. }));
         assert_eq!(handler.strategy_name(), "drop_newest");
     }
-
     #[tokio::test]
     async fn test_reject_handler() {
         let handler = RejectHandler;
@@ -299,7 +300,6 @@ mod tests {
         assert!(matches!(result, OverflowResult::Rejected { .. }));
         assert_eq!(handler.strategy_name(), "reject");
     }
-
     #[test]
     fn test_overflow_config() {
         let config = OverflowConfig::new(OverflowStrategy::Block, 1000);
@@ -315,7 +315,6 @@ mod tests {
         assert!(config.is_full(1000));
         assert!(!config.is_full(999));
     }
-
     #[test]
     fn test_overflow_result() {
         assert!(OverflowResult::Accepted.is_success());
@@ -327,7 +326,6 @@ mod tests {
         assert!(OverflowResult::Blocked.should_retry());
         assert!(!OverflowResult::Accepted.should_retry());
     }
-
     #[test]
     fn test_overflow_handler_factory() {
         let handler = OverflowHandlerFactory::create(OverflowStrategy::DropOldest);

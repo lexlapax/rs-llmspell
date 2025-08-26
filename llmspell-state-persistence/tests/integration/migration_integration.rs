@@ -2,7 +2,7 @@
 // ABOUTME: Tests end-to-end migration scenarios with hook system integration
 
 use llmspell_state_persistence::{
-    config::FieldSchema, manager::SerializableState, migration::*, schema::*, StateManager,
+    config::{FieldSchema, SledConfig, StorageBackendType, PersistenceConfig}, manager::SerializableState, migration::*, schema::*, StateManager,
     StateResult, StateScope,
 };
 use llmspell_storage::{MemoryBackend, SledBackend};
@@ -14,7 +14,6 @@ use tempfile::TempDir;
 async fn create_test_state_manager_with_backend(
     backend_type: &str,
 ) -> StateResult<(StateManager, Option<TempDir>)> {
-    use llmspell_state_persistence::config::{StorageBackendType, PersistenceConfig};
     
     match backend_type {
         "memory" => {
@@ -28,10 +27,13 @@ async fn create_test_state_manager_with_backend(
             let temp_dir = TempDir::new().unwrap();
             let mut config = PersistenceConfig::default();
             config.enabled = true;
-            config.data_dir = Some(temp_dir.path().to_path_buf());
             
             let manager = StateManager::with_backend(
-                StorageBackendType::Sled,
+                StorageBackendType::Sled(SledConfig {
+                    path: temp_dir.path().to_path_buf(),
+                    cache_capacity: 64 * 1024 * 1024, // 64MB
+                    use_compression: true,
+                }),
                 config,
             ).await?;
             Ok((manager, Some(temp_dir)))
@@ -201,7 +203,6 @@ fn create_user_schema_v2() -> EnhancedStateSchema {
 #[cfg(test)]
 mod backend_integration_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_migration_with_memory_backend() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -228,7 +229,6 @@ mod backend_integration_tests {
 
         assert_eq!(retrieved, Some(test_data));
     }
-
     #[tokio::test]
     async fn test_migration_with_sled_backend() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("sled")
@@ -262,7 +262,6 @@ mod backend_integration_tests {
 #[cfg(test)]
 mod schema_evolution_integration_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_simple_schema_evolution() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -350,7 +349,6 @@ mod schema_evolution_integration_tests {
             }
         }
     }
-
     #[tokio::test]
     async fn test_complex_schema_evolution() {
         let mut planner = MigrationPlanner::new();
@@ -391,7 +389,6 @@ mod schema_evolution_integration_tests {
 mod agent_integration_tests {
     use super::*;
     use llmspell_state_persistence::agent_state::*;
-
     #[tokio::test]
     async fn test_agent_state_with_migration() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -479,7 +476,6 @@ mod agent_integration_tests {
             assert!(retrieved_state.tool_usage_stats.contains_key("test_tool"));
         }
     }
-
     #[tokio::test]
     async fn test_agent_conversation_evolution() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -561,7 +557,6 @@ mod agent_integration_tests {
 #[cfg(test)]
 mod hook_integration_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_migration_with_hooks() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -614,7 +609,6 @@ mod hook_integration_tests {
             _ => panic!("Expected MigrationError"),
         }
     }
-
     #[tokio::test] 
     async fn test_event_correlation_tracking() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")

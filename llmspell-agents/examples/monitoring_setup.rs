@@ -4,9 +4,11 @@
 use llmspell_agents::agents::basic::BasicAgent;
 use llmspell_agents::factory::{AgentConfig, ResourceLimits};
 use llmspell_agents::{
-    AlertCondition, AlertConfig, AlertManager, AlertRule, AlertSeverity, ConsoleLogExporter,
-    ConsoleNotificationChannel, ConsoleTraceExporter, EventLogger, HealthMonitor, LogLevel,
-    MetricRegistry, PerformanceMonitor, ThresholdOperator, TraceCollector, TraceSpan,
+    AlertCondition, AlertConfig, AlertContext, AlertManager, AlertRule, AlertSeverity,
+    ComponentFilter, ConsoleLogExporter, ConsoleNotificationChannel, ConsoleTraceExporter,
+    ErrorDetails, EventLogger, HealthMonitor, LogLevel, MetricRegistry,
+    MonitoringHealthStatus as HealthStatus, PerformanceMonitor, RateLimitFilter, ThresholdOperator,
+    TraceAnalyzer, TraceCollector, TraceSpan,
 };
 use llmspell_core::BaseAgent;
 use std::sync::Arc;
@@ -51,7 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Event Logging
     println!("\n5️⃣ Setting up Event Logging");
     println!("===========================");
-    setup_logging(&agent).await?;
+    setup_logging(&agent)?;
 
     // 6. Alerting
     println!("\n6️⃣ Setting up Alerting Framework");
@@ -86,13 +88,13 @@ async fn setup_metrics(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     // Collect and display metrics
     let collected = registry.collect();
     println!("📊 Collected Metrics:");
-    for (name, value) in collected.iter() {
+    for (name, value) in &collected {
         match value {
             llmspell_agents::MetricValue::Counter(v) => {
-                println!("   {} = {} (counter)", name, v);
+                println!("   {name} = {v} (counter)");
             }
             llmspell_agents::MetricValue::Gauge(v) => {
-                println!("   {} = {:.2} (gauge)", name, v);
+                println!("   {name} = {v:.2} (gauge)");
             }
             _ => {}
         }
@@ -160,17 +162,20 @@ async fn setup_performance_tracking(
         // Simulate varying load
         metrics.requests_total.inc_by(20 + i * 5);
         metrics.requests_failed.inc_by(i);
-        metrics.update_resources(
-            (100.0 + (i as f64 * 10.0)) * 1024.0 * 1024.0, // Memory
-            20.0 + (i as f64 * 5.0),                       // CPU
-        );
+        #[allow(clippy::cast_precision_loss)]
+        let memory = (i as f64).mul_add(10.0, 100.0) * 1024.0 * 1024.0;
+        #[allow(clippy::cast_precision_loss)]
+        let cpu = (i as f64).mul_add(5.0, 20.0);
+        metrics.update_resources(memory, cpu);
 
         let snapshot = monitor.take_snapshot();
+        #[allow(clippy::cast_precision_loss)]
+        let memory_mb = snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0);
         println!(
             "📸 Snapshot {}: CPU={:.1}%, Memory={:.1}MB, Rate={:.1} req/s",
             i + 1,
             snapshot.resources.cpu_percent,
-            snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0),
+            memory_mb,
             snapshot.request_rate
         );
 
@@ -224,7 +229,6 @@ async fn setup_tracing(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     println!("🔗 Trace Analysis:");
     let trace = collector.get_trace(&trace_id);
 
-    use llmspell_agents::TraceAnalyzer;
     let critical_path = TraceAnalyzer::critical_path(&trace);
     println!("   Critical Path: {} spans", critical_path.len());
 
@@ -236,13 +240,12 @@ async fn setup_tracing(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-async fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error::Error>> {
+fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error::Error>> {
     let mut logger = EventLogger::new(agent.metadata().id.to_string(), 1000);
     logger.set_level(LogLevel::Debug);
     logger.add_exporter(Box::new(ConsoleLogExporter));
 
     // Add filters
-    use llmspell_agents::{ComponentFilter, RateLimitFilter};
     logger.add_filter(Box::new(ComponentFilter::new(vec![
         "auth".to_string(),
         "processing".to_string(),
@@ -255,7 +258,6 @@ async fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     logger.info("auth", "User authenticated successfully")?;
     logger.warn("processing", "High memory usage detected")?;
 
-    use llmspell_agents::ErrorDetails;
     let error = ErrorDetails {
         error_type: "ValidationError".to_string(),
         message: "Invalid input format".to_string(),
@@ -273,7 +275,7 @@ async fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     println!("   Buffer Utilization: {:.1}%", stats.buffer_utilization);
     println!("   Events by Level:");
     for (level, count) in &stats.level_counts {
-        println!("      {:?}: {}", level, count);
+        println!("      {level:?}: {count}");
     }
 
     Ok(())
@@ -326,7 +328,6 @@ async fn setup_alerting(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::erro
     agent_metrics.requests_failed.inc_by(7); // 7% error rate
 
     // Evaluate rules
-    use llmspell_agents::{AlertContext, MonitoringHealthStatus as HealthStatus};
     let metrics = registry.collect();
     let context = AlertContext {
         metrics: &metrics,
@@ -371,11 +372,11 @@ async fn integrated_example(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::
     // Simulate agent activity with full monitoring
     for i in 0..3 {
         // Start trace
-        let span = TraceSpan::new_root(format!("request-{}", i), agent.metadata().id.to_string());
+        let span = TraceSpan::new_root(format!("request-{i}"), agent.metadata().id.to_string());
         let span_handle = collector.start_span(span);
 
         // Log start
-        logger.info("request", &format!("Processing request {}", i))?;
+        logger.info("request", &format!("Processing request {i}"))?;
 
         // Update metrics
         let timer = metrics.start_request();
@@ -389,10 +390,10 @@ async fn integrated_example(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::
 
         if success {
             span_handle.complete_ok();
-            logger.info("request", &format!("Request {} completed successfully", i))?;
+            logger.info("request", &format!("Request {i} completed successfully"))?;
         } else {
             span_handle.complete_error();
-            logger.error("request", &format!("Request {} failed", i), None)?;
+            logger.error("request", &format!("Request {i} failed"), None)?;
         }
     }
 

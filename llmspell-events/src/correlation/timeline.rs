@@ -173,7 +173,9 @@ impl CausalityChain {
             self.end_time = timestamp;
             self.duration = self.end_time.signed_duration_since(self.start_time);
         }
-        self.depth = self.events.len() as u32 - 1;
+        #[allow(clippy::cast_possible_truncation)]
+        let event_count = self.events.len() as u32;
+        self.depth = event_count.saturating_sub(1);
     }
 
     /// Get the root event (first in chain)
@@ -320,8 +322,11 @@ impl EventTimeline {
             .unwrap_or(0);
 
         if self.duration.num_seconds() > 0 {
-            self.stats.events_per_second =
-                self.stats.total_events as f64 / self.duration.num_seconds() as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_events_f64 = self.stats.total_events as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let duration_seconds = self.duration.num_seconds() as f64;
+            self.stats.events_per_second = total_events_f64 / duration_seconds;
         }
 
         self.stats.root_causes = self.entries.iter().filter(|e| e.is_root_cause()).count();
@@ -616,12 +621,11 @@ mod tests {
     use crate::universal_event::{Language, UniversalEvent};
     use serde_json::Value;
 
+    // Local test helper to avoid circular dependency with llmspell-testing
     fn create_test_event(event_type: &str, correlation_id: Uuid) -> UniversalEvent {
-        let mut event = UniversalEvent::new(event_type, Value::Null, Language::Rust);
-        event.metadata.correlation_id = correlation_id;
-        event
+        UniversalEvent::new(event_type, Value::Null, Language::Rust)
+            .with_correlation_id(correlation_id)
     }
-
     #[test]
     fn test_timeline_entry_creation() {
         let event = create_test_event("test.event", Uuid::new_v4());
@@ -633,7 +637,6 @@ mod tests {
         assert!(entry.is_root_cause());
         assert!(entry.is_leaf_effect());
     }
-
     #[test]
     fn test_timeline_building() {
         let tracker = EventCorrelationTracker::default();
@@ -655,7 +658,6 @@ mod tests {
         assert_eq!(timeline.stats.total_events, 3);
         assert!(timeline.duration >= chrono::Duration::zero());
     }
-
     #[test]
     fn test_causality_chain_creation() {
         let root_id = Uuid::new_v4();
@@ -672,7 +674,6 @@ mod tests {
         assert_eq!(chain.depth, 1);
         assert_eq!(chain.duration, chrono::Duration::seconds(1));
     }
-
     #[test]
     fn test_timeline_queries() {
         let mut timeline = EventTimeline::new();

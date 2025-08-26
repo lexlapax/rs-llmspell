@@ -286,28 +286,24 @@ mod tests {
             output_modalities: vec![],
         }
     }
-
     #[test]
     fn test_extract_parameters() {
         let input = create_test_input(&json!({ "key": "value" }));
         let params = extract_parameters(&input).unwrap();
         assert_eq!(params, &json!({ "key": "value" }));
     }
-
     #[test]
     fn test_extract_required_string() {
         let params = json!({ "name": "test" });
         assert_eq!(extract_required_string(&params, "name").unwrap(), "test");
         assert!(extract_required_string(&params, "missing").is_err());
     }
-
     #[test]
     fn test_extract_optional_string() {
         let params = json!({ "name": "test" });
         assert_eq!(extract_optional_string(&params, "name"), Some("test"));
         assert_eq!(extract_optional_string(&params, "missing"), None);
     }
-
     #[test]
     fn test_extract_string_with_default() {
         let params = json!({ "name": "test" });
@@ -320,14 +316,12 @@ mod tests {
             "default"
         );
     }
-
     #[test]
     fn test_extract_required_bool() {
         let params = json!({ "enabled": true });
         assert!(extract_required_bool(&params, "enabled").unwrap());
         assert!(extract_required_bool(&params, "missing").is_err());
     }
-
     #[test]
     fn test_extract_numbers() {
         let params = json!({
@@ -343,21 +337,18 @@ mod tests {
                 < 0.00001
         );
     }
-
     #[test]
     fn test_extract_arrays() {
         let params = json!({ "list": [1, 2, 3] });
         let array = extract_required_array(&params, "list").unwrap();
         assert_eq!(array.len(), 3);
     }
-
     #[test]
     fn test_extract_objects() {
         let params = json!({ "config": { "key": "value" } });
         let obj = extract_required_object(&params, "config").unwrap();
         assert_eq!(obj.get("key").and_then(|v| v.as_str()), Some("value"));
     }
-
     #[test]
     fn test_require_one_of() {
         let params = json!({ "a": 1, "c": 3 });
@@ -365,7 +356,6 @@ mod tests {
         assert!(require_one_of(&params, &["b", "c"]).is_ok());
         assert!(require_one_of(&params, &["x", "y"]).is_err());
     }
-
     #[test]
     fn test_require_all_of() {
         let params = json!({ "a": 1, "b": 2, "c": 3 });
@@ -373,7 +363,6 @@ mod tests {
         assert!(require_all_of(&params, &["a", "b", "c"]).is_ok());
         assert!(require_all_of(&params, &["a", "x"]).is_err());
     }
-
     #[test]
     fn test_extract_direct_parameters() {
         let mut parameters = HashMap::new();

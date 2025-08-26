@@ -238,7 +238,6 @@ impl ArtifactMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_artifact_id_creation() {
         let session_id = SessionId::new();
@@ -249,7 +248,6 @@ mod tests {
         assert_eq!(artifact_id.session_id, session_id);
         assert_eq!(artifact_id.sequence, 1);
     }
-
     #[test]
     fn test_artifact_id_keys() {
         let session_id = SessionId::new();
@@ -263,7 +261,6 @@ mod tests {
         let content_key = artifact_id.content_key();
         assert_eq!(content_key, "content:hash123");
     }
-
     #[test]
     fn test_artifact_type_display() {
         assert_eq!(ArtifactType::AgentOutput.as_str(), "agent_output");
@@ -275,7 +272,6 @@ mod tests {
             "my_type"
         );
     }
-
     #[test]
     fn test_metadata_validation() {
         let mut metadata =
@@ -307,7 +303,6 @@ mod tests {
         metadata.mime_type = "invalid".to_string();
         assert!(metadata.validate().is_err());
     }
-
     #[test]
     fn test_metadata_tags() {
         let mut metadata =
@@ -326,7 +321,6 @@ mod tests {
         assert!(metadata.add_tag(long_tag).is_err());
         assert_eq!(metadata.tags.len(), 1);
     }
-
     #[test]
     fn test_custom_metadata() {
         let mut metadata =

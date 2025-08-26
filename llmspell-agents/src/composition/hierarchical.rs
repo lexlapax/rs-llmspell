@@ -1,6 +1,8 @@
 //! ABOUTME: Hierarchical agent composition for parent-child agent relationships
 //! ABOUTME: Enables building tree structures of agents with command and control patterns
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::traits::{
     Capability, CapabilityCategory, Composable, CompositeAgent, CompositionError,
     CompositionMetadata, CompositionType, ExecutionPattern, HierarchicalAgent, HierarchyEvent,
@@ -96,7 +98,7 @@ impl HierarchicalCompositeAgent {
     /// Create a new hierarchical composite agent
     pub fn new(name: impl Into<String>, config: HierarchicalConfig) -> Self {
         let name = name.into();
-        let description = format!("Hierarchical composite agent: {}", name);
+        let description = format!("Hierarchical composite agent: {name}");
         Self {
             metadata: ComponentMetadata::new(name, description),
             parent: RwLock::new(None),
@@ -111,29 +113,32 @@ impl HierarchicalCompositeAgent {
     }
 
     /// Set the parent of this agent
+    ///
+    /// # Errors
+    ///
+    /// Currently never returns an error, but the Result type is provided for future
+    /// extensibility (e.g., validation of parent-child relationships, cycle detection).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn set_parent(&self, parent: Weak<dyn HierarchicalAgent>) -> Result<()> {
         let mut parent_guard = self.parent.write().unwrap();
         *parent_guard = Some(parent);
+        drop(parent_guard);
         Ok(())
     }
 
     /// Get the current depth by traversing up the hierarchy
     fn calculate_depth(&self) -> usize {
         let parent_guard = self.parent.read().unwrap();
-        match &*parent_guard {
-            Some(weak_parent) => {
-                if let Some(parent) = weak_parent.upgrade() {
-                    parent.depth() + 1
-                } else {
-                    0
-                }
-            }
-            None => 0,
-        }
+        parent_guard.as_ref().map_or(0, |weak_parent| {
+            weak_parent.upgrade().map_or(0, |parent| parent.depth() + 1)
+        })
     }
 
     /// Check if adding a child would create a cycle
-    async fn would_create_cycle(&self, child: &Arc<dyn HierarchicalAgent>) -> bool {
+    fn would_create_cycle(&self, child: &Arc<dyn HierarchicalAgent>) -> bool {
         // Check if child is an ancestor of self
         let mut current = self.parent.read().unwrap().clone();
         while let Some(weak_parent) = current {
@@ -193,7 +198,11 @@ impl BaseAgent for HierarchicalCompositeAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let pattern = self.execution_pattern.read().unwrap().clone();
         let value = serde_json::to_value(&input)?;
         let result = self.execute_pattern(pattern, value, &context).await?;
@@ -213,8 +222,7 @@ impl BaseAgent for HierarchicalCompositeAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Hierarchical agent error: {}",
-            error
+            "Hierarchical agent error: {error}"
         )))
     }
 }
@@ -227,10 +235,12 @@ impl ToolCapable for HierarchicalCompositeAgent {
 
         for (name, tool) in tools.iter() {
             // Simple filtering based on text search
-            if let Some(ref text) = query.text_search {
-                if !name.contains(text) {
-                    continue;
-                }
+            if query
+                .text_search
+                .as_ref()
+                .is_some_and(|text| !name.contains(text))
+            {
+                continue;
             }
 
             let info = ToolInfo::new(
@@ -252,14 +262,15 @@ impl ToolCapable for HierarchicalCompositeAgent {
         context: ExecutionContext,
     ) -> Result<AgentOutput> {
         let tools = self.tools.read().await;
-        if let Some(tool) = tools.get(tool_name) {
-            let input = AgentInput::text(parameters.to_string());
-            tool.execute(input, context).await
-        } else {
-            Err(LLMSpellError::Component {
-                message: format!("Tool not found: {}", tool_name),
+        match tools.get(tool_name) {
+            Some(tool) => {
+                let input = AgentInput::text(parameters.to_string());
+                tool.execute(input, context).await
+            }
+            None => Err(LLMSpellError::Component {
+                message: format!("Tool not found: {tool_name}"),
                 source: None,
-            })
+            }),
         }
     }
 
@@ -315,7 +326,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
         components
             .remove(component_id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Component not found: {}", component_id),
+                message: format!("Component not found: {component_id}"),
                 source: None,
             })?;
         Ok(())
@@ -410,7 +421,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
                 let mut results = Vec::new();
                 for handle in handles {
                     results.push(handle.await.map_err(|e| LLMSpellError::Component {
-                        message: format!("Parallel execution failed: {}", e),
+                        message: format!("Parallel execution failed: {e}"),
                         source: None,
                     })??);
                 }
@@ -429,7 +440,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
 impl HierarchicalAgent for HierarchicalCompositeAgent {
     fn parent(&self) -> Option<Arc<dyn HierarchicalAgent>> {
         let parent_guard = self.parent.read().unwrap();
-        parent_guard.as_ref().and_then(|weak| weak.upgrade())
+        parent_guard.as_ref().and_then(std::sync::Weak::upgrade)
     }
 
     fn children(&self) -> Vec<Arc<dyn HierarchicalAgent>> {
@@ -443,14 +454,14 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
             let children = self.children.read().await;
             if children.len() >= max {
                 return Err(LLMSpellError::Component {
-                    message: format!("Maximum children limit ({}) reached", max),
+                    message: format!("Maximum children limit ({max}) reached"),
                     source: None,
                 });
             }
         }
 
         // Check for cycles
-        if self.would_create_cycle(&child).await {
+        if self.would_create_cycle(&child) {
             return Err(CompositionError::CycleDetected.into());
         }
 
@@ -507,10 +518,10 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
             metrics.events_propagated_up += 1;
         }
 
-        if let Some(parent) = self.parent() {
-            parent.propagate_up(event).await?;
+        match self.parent() {
+            Some(parent) => parent.propagate_up(event).await,
+            None => Ok(()),
         }
-        Ok(())
     }
 }
 
@@ -536,30 +547,39 @@ impl HierarchicalAgentBuilder {
     }
 
     /// Set the description
+    #[must_use]
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = Some(desc.into());
         self
     }
 
     /// Set the configuration
-    pub fn config(mut self, config: HierarchicalConfig) -> Self {
+    #[must_use]
+    pub const fn config(mut self, config: HierarchicalConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Add a capability
+    #[must_use]
     pub fn add_capability(mut self, capability: Capability) -> Self {
         self.capabilities.push(capability);
         self
     }
 
     /// Set the initial execution pattern
+    #[must_use]
     pub fn execution_pattern(mut self, pattern: ExecutionPattern) -> Self {
         self.initial_pattern = pattern;
         self
     }
 
     /// Build the hierarchical agent
+    ///
+    /// # Panics
+    ///
+    /// Panics if creating `Arc<RwLock<_>>` fails
+    #[must_use]
     pub fn build(self) -> HierarchicalCompositeAgent {
         let name = self.name.clone();
         let mut agent = HierarchicalCompositeAgent::new(self.name, self.config);
@@ -580,7 +600,6 @@ mod tests {
     use super::*;
     use llmspell_core::types::{AgentInput, AgentOutput};
     use llmspell_core::{ComponentMetadata, LLMSpellError};
-
     #[tokio::test]
     async fn test_hierarchical_agent_creation() {
         let agent = HierarchicalAgentBuilder::new("test-hierarchical")
@@ -590,8 +609,8 @@ mod tests {
         assert_eq!(agent.metadata().name, "test-hierarchical");
         assert_eq!(agent.depth(), 0);
     }
-
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_component_management() {
         let mut agent = HierarchicalCompositeAgent::new("parent", HierarchicalConfig::default());
 
@@ -606,7 +625,7 @@ mod tests {
                 &self.metadata
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 input: AgentInput,
                 _context: ExecutionContext,
@@ -619,7 +638,7 @@ mod tests {
             }
 
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-                Ok(AgentOutput::text(format!("Error: {}", error)))
+                Ok(AgentOutput::text(format!("Error: {error}")))
             }
         }
 
@@ -636,7 +655,6 @@ mod tests {
         let components = agent.components.read().await;
         assert_eq!(components.len(), 1);
     }
-
     #[tokio::test]
     async fn test_capability_aggregation() {
         let agent = HierarchicalAgentBuilder::new("capable-agent")

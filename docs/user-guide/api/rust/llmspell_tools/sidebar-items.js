@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"macro":["impl_tool_state_persistence"],"mod":["academic","api","api_key_integration","communication","data","document","fs","lifecycle","media","registry","resource_limited","search","state","system","util","web"]};

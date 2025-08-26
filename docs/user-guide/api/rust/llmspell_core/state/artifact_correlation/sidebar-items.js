@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ArtifactRelationship","StateOperation"],"struct":["ArtifactCorrelation","ArtifactCorrelationManager","ArtifactId","ArtifactMetadata"]};

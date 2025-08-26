@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["CachingStrategy"],"struct":["CachingConfig","CachingHook","CachingMetrics"]};

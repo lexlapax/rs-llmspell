@@ -41,13 +41,36 @@ show_help() {
     echo "Usage: $0 [category] [options]"
     echo ""
     echo "Categories:"
-    echo "  all         - Run all test categories (default)"
-    echo "  unit        - Run unit tests"
-    echo "  integration - Run integration tests"
-    echo "  agent       - Run agent tests"
-    echo "  scenario    - Run scenario tests"
-    echo "  lua         - Run Lua bridge tests"
-    echo "  performance - Run performance benchmarks"
+    echo "  all           - Run all test categories (default)"
+    echo "  fast          - Run fast test suite (unit + integration)"
+    echo "  comprehensive - Run comprehensive test suite (excludes external/benchmark)"
+    echo ""
+    echo "Primary Types:"
+    echo "  unit          - Run unit tests"
+    echo "  integration   - Run integration tests"
+    echo "  external      - Run external dependency tests"
+    echo "  benchmark     - Run benchmark tests"
+    echo ""
+    echo "Component Categories:"
+    echo "  tool          - Run tool tests"
+    echo "  agent         - Run agent tests"
+    echo "  workflow      - Run workflow tests"
+    echo "  bridge        - Run bridge tests"
+    echo "  hook          - Run hook tests"
+    echo "  event         - Run event tests"
+    echo "  session       - Run session tests"
+    echo "  state         - Run state tests"
+    echo "  util          - Run utility tests"
+    echo "  core          - Run core tests"
+    echo "  testing       - Run testing utility tests"
+    echo ""
+    echo "Specialty Categories:"
+    echo "  security      - Run security tests"
+    echo "  performance   - Run performance tests"
+    echo ""
+    echo "Legacy (deprecated):"
+    echo "  scenario      - Run scenario tests (use 'comprehensive' instead)"
+    echo "  lua           - Run Lua bridge tests (use 'bridge' instead)"
     echo ""
     echo "Options:"
     echo "  --quiet     - Suppress detailed output"
@@ -57,21 +80,30 @@ show_help() {
     echo "  --help      - Show this help message"
     echo ""
     echo "Examples:"
-    echo "  $0                    # Run all tests"
-    echo "  $0 unit               # Run only unit tests"
-    echo "  $0 integration --verbose  # Run integration tests with verbose output"
-    echo "  $0 performance --release  # Run performance tests in release mode"
+    echo "  $0                         # Run all tests"
+    echo "  $0 fast                    # Run fast test suite (unit + integration)"
+    echo "  $0 comprehensive           # Run comprehensive test suite"
+    echo "  $0 unit --verbose          # Run unit tests with verbose output"
+    echo "  $0 external --release      # Run external tests in release mode"
+    echo "  $0 tool,agent,workflow     # Run multiple component categories"
 }
 
 # Parse command line arguments
-CATEGORY="${1:-all}"
-shift || true
-
-# Parse options
+CATEGORY=""
 CARGO_OPTS=""
 QUIET=false
 VERBOSE=false
 
+# Check for help first
+if [[ "$1" == "--help" ]]; then
+    show_help
+    exit 0
+fi
+
+CATEGORY="${1:-all}"
+shift || true
+
+# Parse options
 while [[ $# -gt 0 ]]; do
     case $1 in
         --quiet)
@@ -178,48 +210,140 @@ print_info "Category: $CATEGORY"
 # Track overall success
 OVERALL_SUCCESS=0
 
-case $CATEGORY in
-    "all")
-        print_info "Running all test categories..."
-        
-        run_tests "unit" "unit-tests" "Unit tests" || OVERALL_SUCCESS=1
-        run_tests "integration" "integration-tests" "Integration tests" || OVERALL_SUCCESS=1
-        run_tests "agent" "agent-tests" "Agent tests" || OVERALL_SUCCESS=1
-        run_tests "scenario" "scenario-tests" "Scenario tests" || OVERALL_SUCCESS=1
-        run_tests "lua" "lua-tests" "Lua bridge tests" || OVERALL_SUCCESS=1
-        ;;
-        
-    "unit")
-        run_tests "unit" "unit-tests" "Unit tests" || OVERALL_SUCCESS=1
-        ;;
-        
-    "integration")
-        run_tests "integration" "integration-tests" "Integration tests" || OVERALL_SUCCESS=1
-        ;;
-        
-    "agent")
-        run_tests "agent" "agent-tests" "Agent tests" || OVERALL_SUCCESS=1
-        ;;
-        
-    "scenario")
-        run_tests "scenario" "scenario-tests" "Scenario tests" || OVERALL_SUCCESS=1
-        ;;
-        
-    "lua")
-        run_tests "lua" "lua-tests" "Lua bridge tests" || OVERALL_SUCCESS=1
-        ;;
-        
-    "performance")
-        run_benchmarks || OVERALL_SUCCESS=1
-        ;;
-        
-    *)
-        print_error "Unknown category: $CATEGORY"
-        echo ""
-        show_help
-        exit 1
-        ;;
-esac
+# Handle comma-separated categories
+if [[ "$CATEGORY" == *","* ]]; then
+    print_info "Running multiple categories: $CATEGORY"
+    IFS=',' read -ra CATEGORIES <<< "$CATEGORY"
+    for cat in "${CATEGORIES[@]}"; do
+        cat=$(echo "$cat" | xargs)  # trim whitespace
+        case $cat in
+            "unit") run_tests "unit" "unit-tests" "Unit tests" || OVERALL_SUCCESS=1 ;;
+            "integration") run_tests "integration" "integration-tests" "Integration tests" || OVERALL_SUCCESS=1 ;;
+            "external") run_tests "external" "external-tests" "External dependency tests" || OVERALL_SUCCESS=1 ;;
+            "benchmark") run_tests "benchmark" "benchmark-tests" "Benchmark tests" || OVERALL_SUCCESS=1 ;;
+            "tool") run_tests "tool" "tool-tests" "Tool tests" || OVERALL_SUCCESS=1 ;;
+            "agent") run_tests "agent" "agent-tests" "Agent tests" || OVERALL_SUCCESS=1 ;;
+            "workflow") run_tests "workflow" "workflow-tests" "Workflow tests" || OVERALL_SUCCESS=1 ;;
+            "bridge") run_tests "bridge" "bridge-tests" "Bridge tests" || OVERALL_SUCCESS=1 ;;
+            "hook") run_tests "hook" "hook-tests" "Hook tests" || OVERALL_SUCCESS=1 ;;
+            "event") run_tests "event" "event-tests" "Event tests" || OVERALL_SUCCESS=1 ;;
+            "session") run_tests "session" "session-tests" "Session tests" || OVERALL_SUCCESS=1 ;;
+            "state") run_tests "state" "state-tests" "State tests" || OVERALL_SUCCESS=1 ;;
+            "util") run_tests "util" "util-tests" "Utility tests" || OVERALL_SUCCESS=1 ;;
+            "core") run_tests "core" "core-tests" "Core tests" || OVERALL_SUCCESS=1 ;;
+            "testing") run_tests "testing" "testing-tests" "Testing utility tests" || OVERALL_SUCCESS=1 ;;
+            "security") run_tests "security" "security-tests" "Security tests" || OVERALL_SUCCESS=1 ;;
+            "performance") run_tests "performance" "performance-tests" "Performance tests" || OVERALL_SUCCESS=1 ;;
+            *) print_error "Unknown category: $cat"; OVERALL_SUCCESS=1 ;;
+        esac
+    done
+else
+    case $CATEGORY in
+        "all")
+            print_info "Running all test categories..."
+            run_tests "all" "all-tests" "All tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "fast")
+            print_info "Running fast test suite..."
+            run_tests "fast" "fast-tests" "Fast test suite (unit + integration)" || OVERALL_SUCCESS=1
+            ;;
+            
+        "comprehensive")
+            print_info "Running comprehensive test suite..."
+            run_tests "comprehensive" "comprehensive-tests" "Comprehensive test suite" || OVERALL_SUCCESS=1
+            ;;
+            
+        # Primary categories
+        "unit")
+            run_tests "unit" "unit-tests" "Unit tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "integration")
+            run_tests "integration" "integration-tests" "Integration tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "external")
+            run_tests "external" "external-tests" "External dependency tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "benchmark")
+            run_tests "benchmark" "benchmark-tests" "Benchmark tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        # Component categories
+        "tool")
+            run_tests "tool" "tool-tests" "Tool tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "agent")
+            run_tests "agent" "agent-tests" "Agent tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "workflow")
+            run_tests "workflow" "workflow-tests" "Workflow tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "bridge")
+            run_tests "bridge" "bridge-tests" "Bridge tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "hook")
+            run_tests "hook" "hook-tests" "Hook tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "event")
+            run_tests "event" "event-tests" "Event tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "session")
+            run_tests "session" "session-tests" "Session tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "state")
+            run_tests "state" "state-tests" "State tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "util")
+            run_tests "util" "util-tests" "Utility tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "core")
+            run_tests "core" "core-tests" "Core tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "testing")
+            run_tests "testing" "testing-tests" "Testing utility tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        # Specialty categories
+        "security")
+            run_tests "security" "security-tests" "Security tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        "performance")
+            run_tests "performance" "performance-tests" "Performance tests" || OVERALL_SUCCESS=1
+            ;;
+            
+        # Legacy categories (deprecated)
+        "scenario")
+            print_warning "'scenario' category is deprecated, use 'comprehensive' instead"
+            run_tests "scenario" "scenario-tests" "Scenario tests (deprecated)" || OVERALL_SUCCESS=1
+            ;;
+            
+        "lua")
+            print_warning "'lua' category is deprecated, use 'bridge' instead"
+            run_tests "lua" "lua-tests" "Lua bridge tests (deprecated)" || OVERALL_SUCCESS=1
+            ;;
+            
+        *)
+            print_error "Unknown category: $CATEGORY"
+            echo ""
+            show_help
+            exit 1
+            ;;
+    esac
+fi
 
 # Summary
 echo ""
@@ -231,6 +355,12 @@ if [ $OVERALL_SUCCESS -eq 0 ]; then
         echo ""
         print_info "For detailed coverage report, run:"
         echo "  ./scripts/test-coverage.sh"
+        echo ""
+        print_info "Available test categories:"
+        echo "  Primary: unit, integration, external, benchmark"
+        echo "  Components: tool, agent, workflow, bridge, hook, event, session, state, util, core, testing"
+        echo "  Specialty: security, performance"
+        echo "  Suites: fast, comprehensive, all"
     fi
 else
     print_error "Some tests failed! 💥"

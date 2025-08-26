@@ -1,5 +1,5 @@
-//! ABOUTME: Real integration tests for WebSearchTool with actual API calls
-//! ABOUTME: Tests DuckDuckGo and other providers with network connectivity
+//! ABOUTME: Real integration tests for `WebSearchTool` with actual API calls
+//! ABOUTME: Tests `DuckDuckGo` and other providers with network connectivity
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
@@ -9,7 +9,7 @@ use llmspell_core::{
 use llmspell_tools::search::{web_search::WebSearchConfig, WebSearchTool};
 use serde_json::Value;
 
-/// Test basic DuckDuckGo search functionality with real API call
+/// Test basic `DuckDuckGo` search functionality with real API call
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_duckduckgo_real_search() {
@@ -39,10 +39,10 @@ async fn test_duckduckgo_real_search() {
             println!("Search succeeded!");
             println!("Output: {}", output.text);
             let response: Value = serde_json::from_str(&output.text).unwrap();
-            println!("Parsed response: {:#?}", response);
+            println!("Parsed response: {response:#?}");
         }
         Err(e) => {
-            println!("Search failed with error: {}", e);
+            println!("Search failed with error: {e}");
             panic!("DuckDuckGo search should work without API key");
         }
     }
@@ -84,7 +84,7 @@ async fn test_provider_fallback() {
 
     // Debug output for failing case
     if let Err(e) = &result {
-        eprintln!("Fallback test failed with error: {}", e);
+        eprintln!("Fallback test failed with error: {e}");
     }
 
     // Should succeed using fallback
@@ -125,7 +125,7 @@ async fn test_search_with_parameters() {
     let result = tool.execute(input, context).await;
 
     if let Err(e) = &result {
-        eprintln!("Search error: {}", e);
+        eprintln!("Search error: {e}");
     }
 
     assert!(result.is_ok());
@@ -177,7 +177,7 @@ async fn test_error_handling() {
     }
 }
 
-/// Test that validates the WebSearchTool meets Phase 3.0 standards
+/// Test that validates the `WebSearchTool` meets Phase 3.0 standards
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_phase_30_compliance() {
@@ -216,7 +216,7 @@ async fn test_phase_30_compliance() {
     }
 }
 
-/// Debug test to see raw DuckDuckGo API response
+/// Debug test to see raw `DuckDuckGo` API response
 #[tokio::test]
 #[ignore = "external,debug"] // Run with --ignored to see debug output
 async fn debug_duckduckgo_api() {
@@ -250,8 +250,8 @@ async fn debug_duckduckgo_api() {
             println!("{}", serde_json::to_string_pretty(&json).unwrap());
         }
         Err(e) => {
-            println!("Failed to parse JSON: {}", e);
-            println!("Raw response: {}", text);
+            println!("Failed to parse JSON: {e}");
+            println!("Raw response: {text}");
         }
     }
 }
@@ -273,7 +273,7 @@ async fn test_with_api_keys() {
     let providers = vec!["google", "brave", "serpapi", "serperdev"];
 
     for provider in providers {
-        println!("Testing provider: {}", provider);
+        println!("Testing provider: {provider}");
 
         let input = AgentInput::text("search test").with_parameter(
             "parameters",
@@ -290,13 +290,13 @@ async fn test_with_api_keys() {
             Ok(output) => {
                 let response: Value = serde_json::from_str(&output.text).unwrap();
                 if response["success"] == true {
-                    println!("✓ {} provider working", provider);
+                    println!("✓ {provider} provider working");
                 } else {
-                    println!("✗ {} provider returned success=false", provider);
+                    println!("✗ {provider} provider returned success=false");
                 }
             }
             Err(e) => {
-                println!("✗ {} provider failed: {}", provider, e);
+                println!("✗ {provider} provider failed: {e}");
             }
         }
     }

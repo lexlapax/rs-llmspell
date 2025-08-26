@@ -16,6 +16,7 @@ pub struct ProductionLoggingHook {
 }
 
 impl ProductionLoggingHook {
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             log_count: Arc::new(Mutex::new(0)),
@@ -23,6 +24,12 @@ impl ProductionLoggingHook {
         }
     }
 
+    /// Get the current log count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn get_log_count(&self) -> u64 {
         *self.log_count.lock().unwrap()
     }
@@ -66,6 +73,7 @@ pub struct ProductionMetricsHook {
 }
 
 impl ProductionMetricsHook {
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             metrics: Arc::new(Mutex::new(Vec::new())),
@@ -73,6 +81,12 @@ impl ProductionMetricsHook {
         }
     }
 
+    /// Get the metrics count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn get_metrics_count(&self) -> usize {
         self.metrics.lock().unwrap().len()
     }
@@ -145,10 +159,12 @@ pub struct BenchmarkResults {
 }
 
 impl BenchmarkResults {
+    #[must_use]
     pub fn meets_target(&self) -> bool {
         self.overhead_percentage < 1.0
     }
 
+    #[must_use]
     pub fn summary(&self) -> String {
         format!(
             "Performance Results:\n\
@@ -181,7 +197,8 @@ pub struct PerformanceBenchmark {
 }
 
 impl PerformanceBenchmark {
-    pub fn new(config: BenchmarkConfig) -> Self {
+    #[must_use]
+    pub const fn new(config: BenchmarkConfig) -> Self {
         Self { config }
     }
 
@@ -201,11 +218,15 @@ impl PerformanceBenchmark {
                     let mut local_transitions = 0;
 
                     let state_machine = AgentStateMachine::new(
-                        format!("baseline-{}-{}", iteration, agent_id),
+                        format!("baseline-{iteration}-{agent_id}"),
                         StateMachineConfig {
-                            enable_hooks: false,
-                            enable_circuit_breaker: false,
-                            enable_logging: false,
+                            feature_flags:
+                                crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                                    enable_hooks: false,
+                                    enable_circuit_breaker: false,
+                                    enable_logging: false,
+                                    ..Default::default()
+                                },
                             ..StateMachineConfig::default()
                         },
                     );
@@ -253,8 +274,8 @@ impl PerformanceBenchmark {
 
         // Register multiple hooks per point (realistic production scenario)
         for i in 0..self.config.hooks_per_point {
-            let logging_hook = Arc::new(ProductionLoggingHook::new(format!("logging_hook_{}", i)));
-            let metrics_hook = Arc::new(ProductionMetricsHook::new(format!("metrics_hook_{}", i)));
+            let logging_hook = Arc::new(ProductionLoggingHook::new(format!("logging_hook_{i}")));
+            let metrics_hook = Arc::new(ProductionMetricsHook::new(format!("metrics_hook_{i}")));
 
             hook_instances.push((logging_hook.clone(), metrics_hook.clone()));
 
@@ -280,11 +301,15 @@ impl PerformanceBenchmark {
                     let mut local_transitions = 0;
 
                     let state_machine = AgentStateMachine::with_hooks(
-                        format!("with-hooks-{}-{}", iteration, agent_id),
+                        format!("with-hooks-{iteration}-{agent_id}"),
                         StateMachineConfig {
-                            enable_hooks: true,
-                            enable_circuit_breaker: true,
-                            enable_logging: false, // Disable debug logging for clean measurement
+                            feature_flags:
+                                crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                                    enable_hooks: true,
+                                    enable_circuit_breaker: true,
+                                    enable_logging: false, // Disable debug logging for clean measurement
+                                    ..Default::default()
+                                },
                             ..StateMachineConfig::default()
                         },
                         registry,
@@ -327,13 +352,20 @@ impl PerformanceBenchmark {
         let mut total_hook_executions = 0;
         for (logging_hook, metrics_hook) in hook_instances {
             total_hook_executions += logging_hook.get_log_count();
-            total_hook_executions += metrics_hook.get_metrics_count() as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let metrics_count_u64 = metrics_hook.get_metrics_count() as u64;
+            total_hook_executions += metrics_count_u64;
         }
 
         Ok((duration, total_transitions, total_hook_executions))
     }
 
     /// Run complete benchmark suite
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the benchmark execution fails due to resource constraints,
+    /// hook execution failures, or system-level issues that prevent performance measurement.
     pub async fn run(&self) -> Result<BenchmarkResults> {
         println!("🚀 Starting production performance benchmark...");
         println!(
@@ -349,7 +381,7 @@ impl PerformanceBenchmark {
         let mut warm_config = self.config.clone();
         warm_config.iterations = 1;
         warm_config.concurrent_agents = 5;
-        let warmup_bench = PerformanceBenchmark::new(warm_config);
+        let warmup_bench = Self::new(warm_config);
         warmup_bench.run_baseline().await?;
         warmup_bench.run_with_hooks().await?;
 
@@ -364,8 +396,12 @@ impl PerformanceBenchmark {
         let overhead_ratio = with_hooks_duration.as_secs_f64() / baseline_duration.as_secs_f64();
         let overhead_percentage = (overhead_ratio - 1.0) * 100.0;
 
-        let throughput_baseline = baseline_transitions as f64 / baseline_duration.as_secs_f64();
-        let throughput_with_hooks = hooks_transitions as f64 / with_hooks_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let baseline_transitions_f64 = baseline_transitions as f64;
+        let throughput_baseline = baseline_transitions_f64 / baseline_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let hooks_transitions_f64 = hooks_transitions as f64;
+        let throughput_with_hooks = hooks_transitions_f64 / with_hooks_duration.as_secs_f64();
 
         Ok(BenchmarkResults {
             baseline_duration,
@@ -393,9 +429,8 @@ impl Clone for BenchmarkConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
-    #[ignore] // Expensive test - run manually with --include-ignored
+    #[ignore = "Expensive test - run manually with --include-ignored"]
     async fn test_production_performance_benchmark() {
         let config = BenchmarkConfig {
             iterations: 5,
@@ -419,7 +454,6 @@ mod tests {
         // For now, we just verify the benchmark infrastructure works
         println!("Benchmark infrastructure working correctly");
     }
-
     #[tokio::test]
     async fn test_production_hooks() {
         let logging_hook = ProductionLoggingHook::new("test_logging".to_string());

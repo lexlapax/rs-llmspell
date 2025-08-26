@@ -6,7 +6,7 @@ use crate::types::WorkflowState;
 use llmspell_core::{ComponentMetadata, ExecutionContext, Result};
 use llmspell_hooks::{
     CircuitBreaker, ComponentId as HookComponentId, ComponentType, HookContext, HookExecutor,
-    HookPoint, HookRegistry,
+    HookPoint, HookRegistry, HookResult,
 };
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -176,6 +176,8 @@ impl WorkflowHookContext {
 pub struct WorkflowExecutor {
     /// Hook executor for running hooks
     hook_executor: Option<Arc<HookExecutor>>,
+    /// Hook registry for retrieving hooks
+    hook_registry: Option<Arc<HookRegistry>>,
     /// Circuit breaker for performance protection
     circuit_breaker: Option<Arc<CircuitBreaker>>,
     /// Configuration
@@ -202,7 +204,7 @@ impl WorkflowExecutor {
         };
 
         // If we have a hook registry but no executor, create one
-        let hook_executor = match (hook_executor, hook_registry) {
+        let hook_executor = match (hook_executor, hook_registry.as_ref()) {
             (Some(exec), _) => Some(exec),
             (None, Some(_registry)) => {
                 let exec = Arc::new(HookExecutor::new());
@@ -215,6 +217,7 @@ impl WorkflowExecutor {
 
         Self {
             hook_executor,
+            hook_registry,
             circuit_breaker,
             config,
             component_id,
@@ -246,8 +249,10 @@ impl WorkflowExecutor {
 
         let start_time = Instant::now();
 
-        // Execute hooks if we have an executor
-        if let Some(_hook_executor) = &self.hook_executor {
+        // Execute hooks if we have both executor and registry
+        if let (Some(hook_executor), Some(hook_registry)) =
+            (&self.hook_executor, &self.hook_registry)
+        {
             // Convert workflow context to hook context
             let mut hook_context = workflow_context.base_context.clone();
 
@@ -285,18 +290,46 @@ impl WorkflowExecutor {
                     .insert(format!("pattern_{}", key), value.clone());
             }
 
-            // For now, we don't execute hooks directly through HookExecutor
-            // This is a placeholder that maintains the structure without actual hook execution
-            // TODO: Integrate with HookRegistry when API is stabilized
+            // Get hooks from registry for this hook point
+            let hooks = hook_registry.get_hooks(&hook_point);
 
-            let _hook_point = hook_point; // Avoid unused warning
-            let _hook_context = hook_context; // Avoid unused warning
+            if !hooks.is_empty() {
+                // Execute hooks
+                let results = hook_executor.execute_hooks(&hooks, &mut hook_context).await;
 
-            // Simulate successful hook execution
+                match results {
+                    Ok(hook_results) => {
+                        // Check results for any that should block execution
+                        for result in hook_results {
+                            if let HookResult::Cancel(reason) = result {
+                                return Err(llmspell_core::LLMSpellError::Workflow {
+                                    message: format!(
+                                        "Hook cancelled workflow execution for phase {:?}: {}",
+                                        workflow_context.execution_phase, reason
+                                    ),
+                                    step: workflow_context
+                                        .step_context
+                                        .as_ref()
+                                        .map(|s| s.name.clone()),
+                                    source: None,
+                                });
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        warn!(
+                            "Hook execution failed for phase {:?}: {}",
+                            workflow_context.execution_phase, e
+                        );
+                        // Continue execution - hooks should not break workflow functionality
+                    }
+                }
+            }
+
             let duration = start_time.elapsed();
             debug!(
-                "Workflow hooks would execute for phase: {:?}",
-                workflow_context.execution_phase
+                "Workflow hooks executed for phase: {:?} in {:?}",
+                workflow_context.execution_phase, duration
             );
 
             // Record success with circuit breaker

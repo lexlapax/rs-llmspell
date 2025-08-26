@@ -4,7 +4,6 @@
 use llmspell_utils::security::path::{PathSecurityConfig, PathSecurityValidator};
 use std::path::Path;
 use tempfile::TempDir;
-
 #[test]
 fn test_path_traversal_attack_vectors() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -36,7 +35,6 @@ fn test_path_traversal_attack_vectors() {
         );
     }
 }
-
 #[test]
 fn test_unicode_path_traversal_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -62,7 +60,6 @@ fn test_unicode_path_traversal_attacks() {
         );
     }
 }
-
 #[test]
 fn test_null_byte_injection_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -87,7 +84,6 @@ fn test_null_byte_injection_attacks() {
         );
     }
 }
-
 #[test]
 fn test_case_sensitivity_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -111,7 +107,6 @@ fn test_case_sensitivity_attacks() {
         );
     }
 }
-
 #[test]
 fn test_double_encoding_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -132,7 +127,6 @@ fn test_double_encoding_attacks() {
         );
     }
 }
-
 #[test]
 fn test_overlong_utf8_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -155,7 +149,6 @@ fn test_overlong_utf8_attacks() {
         );
     }
 }
-
 #[test]
 fn test_windows_reserved_device_names() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -177,7 +170,6 @@ fn test_windows_reserved_device_names() {
         );
     }
 }
-
 #[test]
 fn test_path_length_dos_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -200,7 +192,6 @@ fn test_path_length_dos_attacks() {
         );
     }
 }
-
 #[test]
 fn test_symlink_manipulation_attacks() {
     let temp_dir = TempDir::new().unwrap();
@@ -239,7 +230,6 @@ fn test_symlink_manipulation_attacks() {
     // This might fail if jail_path has symlinks in its own path structure, which is expected
     // The test is primarily about the symlink attack detection logic
 }
-
 #[test]
 fn test_permission_escalation_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -264,7 +254,6 @@ fn test_permission_escalation_attacks() {
         );
     }
 }
-
 #[test]
 fn test_jail_escape_attacks() {
     let temp_dir = TempDir::new().unwrap();
@@ -300,7 +289,6 @@ fn test_jail_escape_attacks() {
     // Note: This might fail if the temp directory path itself contains symlinks
     // which is acceptable behavior for the security validator
 }
-
 #[test]
 fn test_chroot_jail_bypass_attacks() {
     let temp_dir = TempDir::new().unwrap();
@@ -336,7 +324,6 @@ fn test_chroot_jail_bypass_attacks() {
     let result = validator.validate(&safe_path);
     assert!(result.is_ok(), "Safe path within chroot should be allowed");
 }
-
 #[test]
 fn test_complex_attack_combinations() {
     let temp_dir = TempDir::new().unwrap();
@@ -363,7 +350,6 @@ fn test_complex_attack_combinations() {
         );
     }
 }
-
 #[test]
 fn test_edge_case_paths() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -406,7 +392,6 @@ fn test_edge_case_paths() {
         );
     }
 }
-
 #[test]
 fn test_performance_under_attack() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());

@@ -9,16 +9,14 @@ use llmspell_agents::{
     AgentBuilder, AgentConfig, AgentFactory, DIContainer, DefaultAgentFactory, ResourceLimits,
 };
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
+use llmspell_providers::ProviderManager;
 use std::{sync::Arc, time::Duration};
-
-fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
-    Arc::new(llmspell_providers::ProviderManager::new())
-}
 
 /// Test agent factory creation
 #[tokio::test]
 async fn test_agent_factory_creation() {
-    let factory = DefaultAgentFactory::new(create_test_provider_manager());
+    let provider_manager = Arc::new(ProviderManager::new());
+    let factory = DefaultAgentFactory::new(provider_manager);
 
     let config = AgentConfig {
         name: "test_agent".to_string(),
@@ -44,7 +42,8 @@ async fn test_agent_builder() {
         .build()
         .unwrap();
 
-    let factory = DefaultAgentFactory::new(create_test_provider_manager());
+    let provider_manager = Arc::new(ProviderManager::new());
+    let factory = DefaultAgentFactory::new(provider_manager);
     let agent = factory.create_agent(config).await.unwrap();
 
     let metadata = agent.metadata();
@@ -55,7 +54,10 @@ async fn test_agent_builder() {
 /// Test agent lifecycle transitions
 #[tokio::test]
 async fn test_agent_lifecycle() {
-    let state_machine = AgentStateMachine::new("lifecycle_test".to_string(), Default::default());
+    let state_machine = AgentStateMachine::new(
+        "lifecycle_test".to_string(),
+        llmspell_agents::lifecycle::state_machine::StateMachineConfig::default(),
+    );
 
     // Initial state should be Uninitialized
     assert_eq!(
@@ -90,6 +92,7 @@ async fn test_agent_lifecycle() {
 
 /// Test agent template instantiation
 #[tokio::test]
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn test_agent_templates() {
     let template = OrchestratorAgentTemplate::default();
     let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
@@ -108,8 +111,8 @@ async fn test_agent_templates() {
         parameters,
         resource_manager: None,
         event_system: None,
-        config_overrides: Default::default(),
-        environment: Default::default(),
+        config_overrides: std::collections::HashMap::default(),
+        environment: std::collections::HashMap::default(),
     };
 
     let result = template.instantiate(params).await.unwrap();
@@ -147,6 +150,7 @@ async fn test_resource_limits() {
 
 /// Test agent with tool integration
 #[tokio::test]
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn test_agent_with_tools() {
     use mocks::TestDoubles;
 
@@ -181,7 +185,7 @@ async fn test_concurrent_agent_execution() {
     for i in 0..10 {
         let agent_clone = agent.clone();
         let handle = tokio::spawn(async move {
-            let input = AgentInput::text(format!("Request {}", i));
+            let input = AgentInput::text(format!("Request {i}"));
             agent_clone
                 .execute(input, ExecutionContext::default())
                 .await
@@ -220,6 +224,7 @@ async fn test_agent_error_handling() {
 
 /// Test agent state persistence across operations
 #[tokio::test]
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn test_agent_state_persistence() {
     use mocks::MockAgentBuilder;
 

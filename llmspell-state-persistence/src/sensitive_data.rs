@@ -364,7 +364,6 @@ pub fn safe_serialize_with_redaction<T: Serialize + Clone>(
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_sensitive_field_detection() {
         let protector = SensitiveDataProtector::with_default();
@@ -376,7 +375,6 @@ mod tests {
         assert!(protector.is_sensitive_field("user_password"));
         assert!(!protector.is_sensitive_field("username"));
     }
-
     #[test]
     fn test_api_key_pattern_detection() {
         let protector = SensitiveDataProtector::with_default();
@@ -394,7 +392,6 @@ mod tests {
         // Not sensitive
         assert!(!protector.contains_sensitive_data("just a normal string"));
     }
-
     #[test]
     fn test_value_redaction() {
         let mut value = json!({
@@ -424,7 +421,6 @@ mod tests {
         // Check array redaction - entire "tokens" field is redacted because field name contains "token"
         assert!(value["tokens"].as_str().unwrap().starts_with("[REDACTED]"));
     }
-
     #[test]
     fn test_restore_redacted_values() {
         let original = json!({

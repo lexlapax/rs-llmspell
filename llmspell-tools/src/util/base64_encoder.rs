@@ -60,6 +60,8 @@ impl Base64EncoderTool {
     }
 
     /// Process Base64 operation
+    #[allow(clippy::unused_async)]
+    #[allow(clippy::too_many_lines)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         // Extract parameters using utilities
         let operation = extract_required_string(params, "operation")?;
@@ -77,7 +79,7 @@ impl Base64EncoderTool {
             // Read from file
             fs::read(file_path).map_err(|e| {
                 storage_error(
-                    format!("Failed to read input file: {}", e),
+                    format!("Failed to read input file: {e}"),
                     Some("read_file".to_string()),
                 )
             })?
@@ -86,7 +88,7 @@ impl Base64EncoderTool {
                 // Parse hex string as binary
                 hex::decode(input).map_err(|e| {
                     validation_error(
-                        format!("Failed to parse hex input: {}", e),
+                        format!("Failed to parse hex input: {e}"),
                         Some("input".to_string()),
                     )
                 })?
@@ -117,10 +119,7 @@ impl Base64EncoderTool {
                     // Convert file data to string for decoding
                     String::from_utf8(input_data).map_err(|e| {
                         validation_error(
-                            format!(
-                                "Input file contains invalid UTF-8 for Base64 decoding: {}",
-                                e
-                            ),
+                            format!("Input file contains invalid UTF-8 for Base64 decoding: {e}"),
                             Some("input_file".to_string()),
                         )
                     })?
@@ -133,7 +132,7 @@ impl Base64EncoderTool {
 
                 decoded.map_err(|e| {
                     validation_error(
-                        format!("Base64 decode error: {}", e),
+                        format!("Base64 decode error: {e}"),
                         Some("input".to_string()),
                     )
                 })?
@@ -148,7 +147,7 @@ impl Base64EncoderTool {
             // Write to file
             fs::write(path, &result_data).map_err(|e| {
                 storage_error(
-                    format!("Failed to write output file: {}", e),
+                    format!("Failed to write output file: {e}"),
                     Some("write_file".to_string()),
                 )
             })?;
@@ -161,7 +160,7 @@ impl Base64EncoderTool {
             );
 
             Ok(ResponseBuilder::success(operation)
-                .with_message(format!("Base64 {} completed successfully", operation))
+                .with_message(format!("Base64 {operation} completed successfully"))
                 .with_metadata("variant", json!(variant))
                 .with_file_info(path, Some(result_data.len() as u64))
                 .build())
@@ -171,16 +170,14 @@ impl Base64EncoderTool {
                 "encode" => String::from_utf8_lossy(&result_data).to_string(),
                 "decode" => {
                     // Try to convert to string, otherwise return hex
-                    match String::from_utf8(result_data.clone()) {
-                        Ok(s) => s,
-                        Err(_) => hex::encode(&result_data),
-                    }
+                    String::from_utf8(result_data.clone())
+                        .unwrap_or_else(|_| hex::encode(&result_data))
                 }
                 _ => unreachable!(),
             };
 
             Ok(ResponseBuilder::success(operation)
-                .with_message(format!("Base64 {} completed", operation))
+                .with_message(format!("Base64 {operation} completed"))
                 .with_result(json!({
                     "output": output,
                     "variant": variant,
@@ -197,7 +194,11 @@ impl BaseAgent for Base64EncoderTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Extract parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -219,10 +220,7 @@ impl BaseAgent for Base64EncoderTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Base64 encoding error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Base64 encoding error: {error}")))
     }
 }
 
@@ -302,7 +300,6 @@ impl Tool for Base64EncoderTool {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[tokio::test]
     async fn test_encode_decode_text() {
         let tool = Base64EncoderTool::new();
@@ -344,7 +341,6 @@ mod tests {
         let decoded = output["result"]["output"].as_str().unwrap();
         assert_eq!(decoded, test_text);
     }
-
     #[tokio::test]
     async fn test_url_safe_variant() {
         let tool = Base64EncoderTool::new();
@@ -389,7 +385,6 @@ mod tests {
         let decoded = output["result"]["output"].as_str().unwrap();
         assert_eq!(decoded, test_data);
     }
-
     #[tokio::test]
     async fn test_binary_input() {
         let tool = Base64EncoderTool::new();
@@ -414,7 +409,6 @@ mod tests {
         let encoded = output["result"]["output"].as_str().unwrap();
         assert_eq!(encoded, "3q2+7w==");
     }
-
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = Base64EncoderTool::new();
@@ -430,7 +424,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_missing_input() {
         let tool = Base64EncoderTool::new();
@@ -445,7 +438,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = Base64EncoderTool::new();

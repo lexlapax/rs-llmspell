@@ -37,6 +37,7 @@ impl Default for ApiTesterTool {
 }
 
 impl ApiTesterTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -111,10 +112,14 @@ impl BaseAgent for ApiTesterTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("ApiTester error: {}", error)))
+        Ok(AgentOutput::text(format!("ApiTester error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let method_str = extract_optional_string(params, "method").unwrap_or("GET");
@@ -126,7 +131,7 @@ impl BaseAgent for ApiTesterTool {
         let ssrf_protector = SsrfProtector::new();
         if let Err(e) = ssrf_protector.validate_url(url) {
             return Err(validation_error(
-                format!("URL validation failed: {}", e),
+                format!("URL validation failed: {e}"),
                 Some("input".to_string()),
             ));
         }
@@ -142,7 +147,7 @@ impl BaseAgent for ApiTesterTool {
             "OPTIONS" => Method::OPTIONS,
             _ => {
                 return Err(validation_error(
-                    format!("Invalid HTTP method: {}", method_str),
+                    format!("Invalid HTTP method: {method_str}"),
                     Some("method".to_string()),
                 ));
             }
@@ -179,7 +184,7 @@ impl BaseAgent for ApiTesterTool {
         let response = request
             .send()
             .await
-            .map_err(|e| component_error(format!("Request failed: {}", e)))?;
+            .map_err(|e| component_error(format!("Request failed: {e}")))?;
         let duration = start.elapsed();
 
         // Extract response data
@@ -187,7 +192,7 @@ impl BaseAgent for ApiTesterTool {
         let headers = response.headers().clone();
 
         let mut response_headers = HashMap::new();
-        for (name, value) in headers.iter() {
+        for (name, value) in &headers {
             if let Ok(val) = value.to_str() {
                 response_headers.insert(name.to_string(), val.to_string());
             }
@@ -197,6 +202,7 @@ impl BaseAgent for ApiTesterTool {
         let body_text = response.text().await.unwrap_or_default();
         let body_json: Option<Value> = serde_json::from_str(&body_text).ok();
 
+        let body_value = body_json.clone().unwrap_or_else(|| json!(body_text));
         let result = json!({
             "request": {
                 "method": method_str,
@@ -208,7 +214,7 @@ impl BaseAgent for ApiTesterTool {
                 "status_text": status.canonical_reason().unwrap_or("Unknown"),
                 "is_success": status.is_success(),
                 "headers": response_headers,
-                "body": body_json.as_ref().unwrap_or(&json!(body_text)),
+                "body": body_value,
                 "body_is_json": body_json.is_some(),
             },
             "timing": {

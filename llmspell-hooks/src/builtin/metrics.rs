@@ -116,7 +116,9 @@ impl Histogram {
         if self.count == 0 {
             0.0
         } else {
-            self.sum / self.count as f64
+            #[allow(clippy::cast_precision_loss)]
+            let count_f64 = self.count as f64;
+            self.sum / count_f64
         }
     }
 
@@ -125,7 +127,10 @@ impl Histogram {
             return 0.0;
         }
 
-        let target_count = (self.count as f64 * p / 100.0).ceil() as u64;
+        #[allow(clippy::cast_precision_loss)]
+        let count_f64 = self.count as f64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let target_count = (count_f64 * p / 100.0).ceil() as u64;
 
         for bucket in &self.buckets {
             if bucket.count >= target_count {
@@ -241,7 +246,11 @@ impl MetricsStorage {
         if total == 0 {
             0.0
         } else {
-            success_count as f64 / total as f64
+            #[allow(clippy::cast_precision_loss)]
+            let success_f64 = success_count as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = total as f64;
+            success_f64 / total_f64
         }
     }
 
@@ -550,7 +559,6 @@ impl ReplayableHook for MetricsHook {
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
-
     #[test]
     fn test_histogram_basic() {
         let mut histogram = Histogram::new();
@@ -563,7 +571,6 @@ mod tests {
         assert!((histogram.sum - 0.35).abs() < 1e-10);
         assert!((histogram.mean() - 0.11666666666666667).abs() < 1e-10);
     }
-
     #[test]
     fn test_histogram_percentiles() {
         let mut histogram = Histogram::new();
@@ -589,7 +596,6 @@ mod tests {
         assert!(p95 <= 0.25); // Should be within our bucket range
         assert!(p99 <= 0.25); // Should be within our bucket range
     }
-
     #[tokio::test]
     async fn test_metrics_hook_basic() {
         let hook = MetricsHook::new();
@@ -607,7 +613,6 @@ mod tests {
         let success_rate = hook.storage.get_success_rate(&HookPoint::SystemStartup);
         assert_eq!(success_rate, 1.0);
     }
-
     #[tokio::test]
     async fn test_metrics_hook_multiple_executions() {
         let storage = Arc::new(MetricsStorage::new());
@@ -630,7 +635,6 @@ mod tests {
         assert!(histogram.is_some());
         assert_eq!(histogram.unwrap().count, 5);
     }
-
     #[test]
     fn test_metrics_storage_custom_metrics() {
         let storage = MetricsStorage::new();
@@ -645,7 +649,6 @@ mod tests {
         assert_eq!(metric_points.len(), 1);
         assert_eq!(metric_points[0].value, 42.0);
     }
-
     #[test]
     fn test_metrics_summary() {
         let storage = MetricsStorage::new();
@@ -665,7 +668,6 @@ mod tests {
         assert!(summary.contains_key("success_rates"));
         assert!(summary.contains_key("duration_stats"));
     }
-
     #[tokio::test]
     async fn test_metric_hook_trait() {
         let hook = MetricsHook::new();
@@ -686,7 +688,6 @@ mod tests {
             .get_execution_count(&HookPoint::BeforeToolExecution);
         assert_eq!(count, 1);
     }
-
     #[test]
     fn test_hook_metadata() {
         let hook = MetricsHook::new();
@@ -699,7 +700,6 @@ mod tests {
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"metrics".to_string()));
     }
-
     #[tokio::test]
     async fn test_replayable_hook_implementation() {
         let hook = MetricsHook::new().with_custom_metrics(true);
@@ -726,8 +726,8 @@ mod tests {
         );
 
         // Ensure metrics-specific data was removed
-        assert!(deserialized.data.get("_metrics_config").is_none());
-        assert!(deserialized.data.get("_metrics_snapshot").is_none());
+        assert!(!deserialized.data.contains_key("_metrics_config"));
+        assert!(!deserialized.data.contains_key("_metrics_snapshot"));
 
         // Test replay ID
         assert_eq!(hook.replay_id(), "MetricsHook:1.0.0");

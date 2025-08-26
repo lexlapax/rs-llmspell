@@ -201,7 +201,6 @@ mod tests {
             self
         }
     }
-
     #[tokio::test]
     async fn test_basic_hook() {
         let hook = TestHook {
@@ -215,7 +214,6 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
         assert_eq!(hook.metadata().name, "test_hook");
     }
-
     #[tokio::test]
     async fn test_fn_hook() {
         let hook = FnHook::new("function_hook", |ctx: &mut HookContext| {
@@ -249,7 +247,6 @@ mod tests {
             }
         }
     }
-
     #[test]
     fn test_hook_adapter() {
         let adapter = TestAdapter;
@@ -285,7 +282,6 @@ mod tests {
             "test_replayable:1.0.0".to_string()
         }
     }
-
     #[tokio::test]
     async fn test_replayable_hook() {
         let hook = TestReplayableHook;
@@ -300,7 +296,6 @@ mod tests {
         assert_eq!(hook.replay_id(), "test_replayable:1.0.0");
         assert!(hook.is_replayable());
     }
-
     #[test]
     fn test_hook_extensions() {
         let hook = TestHook {

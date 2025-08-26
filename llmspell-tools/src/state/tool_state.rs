@@ -85,6 +85,7 @@ pub struct CachedResult {
 
 impl ToolState {
     /// Create new tool state
+    #[must_use]
     pub fn new(tool_id: String, metadata: ComponentMetadata) -> Self {
         Self {
             tool_id,
@@ -99,7 +100,7 @@ impl ToolState {
     /// Update execution statistics
     pub fn record_execution(&mut self, success: bool, duration: Duration) {
         self.execution_stats.total_executions += 1;
-        let duration_ms = duration.as_millis() as u64;
+        let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
         self.execution_stats.total_execution_time_ms += duration_ms;
 
         if success {
@@ -109,9 +110,11 @@ impl ToolState {
         }
 
         // Update average execution time
-        self.execution_stats.average_execution_time_ms =
-            self.execution_stats.total_execution_time_ms as f64
-                / self.execution_stats.total_executions as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let total_time = self.execution_stats.total_execution_time_ms as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let total_execs = self.execution_stats.total_executions as f64;
+        self.execution_stats.average_execution_time_ms = total_time / total_execs;
 
         self.execution_stats.last_execution = Some(SystemTime::now());
         self.last_updated = SystemTime::now();
@@ -129,7 +132,7 @@ impl ToolState {
         let cached_result = CachedResult {
             input_hash: input_hash.clone(),
             result,
-            execution_time_ms: execution_time.as_millis() as u64,
+            execution_time_ms: u64::try_from(execution_time.as_millis()).unwrap_or(u64::MAX),
             cached_at: SystemTime::now(),
             ttl_seconds,
             contains_sensitive_data,
@@ -140,6 +143,7 @@ impl ToolState {
     }
 
     /// Get cached result if valid
+    #[must_use]
     pub fn get_cached_result(&self, input_hash: &str) -> Option<&CachedResult> {
         if let Some(cached) = self.result_cache.get(input_hash) {
             // Check if cache entry is still valid
@@ -170,6 +174,7 @@ impl ToolState {
 
     /// Calculate cache hit ratio
     pub fn update_cache_hit_ratio(&mut self, was_cache_hit: bool) {
+        #[allow(clippy::cast_precision_loss)]
         let total_requests = self.execution_stats.total_executions as f64;
         if total_requests > 0.0 {
             let current_hits =
@@ -190,6 +195,7 @@ impl ToolState {
     }
 
     /// Get custom state value
+    #[must_use]
     pub fn get_custom_state(&self, key: &str) -> Option<&Value> {
         self.custom_state.get(key)
     }
@@ -226,7 +232,7 @@ pub trait ToolStatePersistence: Tool {
     async fn load_state(&self) -> Result<bool> {
         if let Some(state_manager) = self.state_manager() {
             let tool_id = self.metadata().id.to_string();
-            let state_scope = StateScope::Custom(format!("tool_{}", tool_id));
+            let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
 
             match state_manager.get(state_scope, "state").await {
                 Ok(Some(state_value)) => {
@@ -308,16 +314,28 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Restore execution statistics (optional override)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if restoration fails
     fn restore_execution_statistics(&self, _stats: ToolExecutionStats) -> Result<()> {
         Ok(())
     }
 
     /// Restore result cache (optional override)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if restoration fails
     fn restore_result_cache(&self, _cache: HashMap<String, CachedResult>) -> Result<()> {
         Ok(())
     }
 
     /// Restore custom state (optional override)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if restoration fails
     fn restore_custom_state(&self, _state: HashMap<String, Value>) -> Result<()> {
         Ok(())
     }
@@ -345,6 +363,9 @@ impl ToolStateRegistry {
     }
 
     /// Register a tool for state management
+    /// # Errors
+    ///
+    /// Returns an error if tool registration fails
     pub async fn register_tool<T: ToolStatePersistence>(&mut self, tool: T) -> Result<T> {
         tool.set_state_manager(self.state_manager.clone());
 
@@ -363,20 +384,29 @@ impl ToolStateRegistry {
     }
 
     /// Save state for all registered tools
+    /// # Errors
+    ///
+    /// Returns an error if saving any tool state fails
     pub async fn save_all_states(&self) -> Result<()> {
         for (tool_id, tool_state) in &self.tool_states {
-            let state_scope = StateScope::Custom(format!("tool_{}", tool_id));
+            let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
             self.state_manager
                 .set(state_scope, "state", serde_json::to_value(tool_state)?)
                 .await
-                .context(format!("Failed to save state for tool {}", tool_id))?;
+                .context(format!("Failed to save state for tool {tool_id}"))?;
         }
         Ok(())
     }
 
     /// Load state for a specific tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - State loading fails
+    /// - State deserialization fails
     pub async fn load_tool_state(&self, tool_id: &str) -> Result<Option<ToolState>> {
-        let state_scope = StateScope::Custom(format!("tool_{}", tool_id));
+        let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
 
         match self.state_manager.get(state_scope, "state").await {
             Ok(Some(state_value)) => {
@@ -390,6 +420,7 @@ impl ToolStateRegistry {
     }
 
     /// Get registry statistics
+    #[allow(clippy::unused_async)]
     pub async fn get_registry_stats(&self) -> RegistryStatistics {
         let total_tools = self.tool_states.len();
         let total_cached_results: usize = self
@@ -404,14 +435,17 @@ impl ToolStateRegistry {
             .map(|state| state.execution_stats.total_executions)
             .sum();
 
-        let average_cache_hit_ratio: f64 = if !self.tool_states.is_empty() {
-            self.tool_states
+        let average_cache_hit_ratio: f64 = if self.tool_states.is_empty() {
+            0.0
+        } else {
+            let sum: f64 = self
+                .tool_states
                 .values()
                 .map(|state| state.execution_stats.cache_hit_ratio)
-                .sum::<f64>()
-                / self.tool_states.len() as f64
-        } else {
-            0.0
+                .sum();
+            #[allow(clippy::cast_precision_loss)]
+            let count = self.tool_states.len() as f64;
+            sum / count
         };
 
         RegistryStatistics {
@@ -432,7 +466,7 @@ pub struct RegistryStatistics {
     pub average_cache_hit_ratio: f64,
 }
 
-/// Macro to implement ToolStatePersistence trait for types that implement Tool + ToolStateManagerHolder
+/// Macro to implement `ToolStatePersistence` trait for types that implement Tool + `ToolStateManagerHolder`
 #[macro_export]
 macro_rules! impl_tool_state_persistence {
     ($tool_type:ty) => {
@@ -478,7 +512,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
@@ -491,7 +525,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -531,7 +565,7 @@ mod tests {
         }
 
         fn set_state_manager(&self, state_manager: Arc<dyn StateManager>) {
-            ToolStateManagerHolder::set_state_manager(self, state_manager)
+            ToolStateManagerHolder::set_state_manager(self, state_manager);
         }
 
         fn execution_statistics(&self) -> Option<ToolExecutionStats> {
@@ -583,7 +617,6 @@ mod tests {
             .unwrap(),
         )
     }
-
     #[tokio::test]
     async fn test_tool_state_creation() {
         let metadata = ComponentMetadata::new("test-tool".to_string(), "Test tool".to_string());
@@ -594,7 +627,6 @@ mod tests {
         assert_eq!(tool_state.execution_stats.total_executions, 0);
         assert!(tool_state.result_cache.is_empty());
     }
-
     #[tokio::test]
     async fn test_tool_state_persistence() {
         let state_manager = create_test_state_manager().await;
@@ -615,7 +647,6 @@ mod tests {
         let loaded = tool.load_state().await.unwrap();
         assert!(loaded);
     }
-
     #[tokio::test]
     async fn test_tool_state_registry() {
         let state_manager = create_test_state_manager().await;

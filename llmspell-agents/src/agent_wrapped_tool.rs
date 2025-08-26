@@ -1,5 +1,5 @@
 //! ABOUTME: Agent-as-tool wrapper for enabling agents to be used as tools
-//! ABOUTME: Provides seamless integration allowing any BaseAgent to be invoked as a Tool
+//! ABOUTME: Provides seamless integration allowing any `BaseAgent` to be invoked as a `Tool`
 
 use async_trait::async_trait;
 use llmspell_core::{
@@ -13,7 +13,7 @@ use llmspell_core::{
 use serde_json::{Map, Value as JsonValue};
 use std::sync::Arc;
 
-/// Wrapper that allows any BaseAgent to be used as a Tool.
+/// Wrapper that allows any `BaseAgent` to be used as a `Tool`.
 ///
 /// This enables agent-as-tool composition patterns where agents can be
 /// discovered, invoked, and composed like tools through the tool system.
@@ -118,17 +118,20 @@ impl Default for ParameterMappingConfig {
 
 impl ParameterMappingConfig {
     /// Create new parameter mapping configuration
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Don't bundle parameters, pass them individually
-    pub fn with_unbundled_parameters(mut self) -> Self {
+    #[must_use]
+    pub const fn with_unbundled_parameters(mut self) -> Self {
         self.bundle_parameters = false;
         self
     }
 
     /// Add a parameter transformation
+    #[must_use]
     pub fn with_parameter_transform(
         mut self,
         source_name: impl Into<String>,
@@ -140,12 +143,14 @@ impl ParameterMappingConfig {
     }
 
     /// Don't include tool context in agent execution
-    pub fn without_tool_context(mut self) -> Self {
+    #[must_use]
+    pub const fn without_tool_context(mut self) -> Self {
         self.include_tool_context = false;
         self
     }
 
     /// Set custom input template for agent
+    #[must_use]
     pub fn with_input_template(mut self, template: impl Into<String>) -> Self {
         self.input_template = Some(template.into());
         self
@@ -184,12 +189,14 @@ impl ParameterTransform {
     }
 
     /// Mark transform as required
-    pub fn required(mut self) -> Self {
+    #[must_use]
+    pub const fn required(mut self) -> Self {
         self.required = true;
         self
     }
 
     /// Set default value
+    #[must_use]
     pub fn with_default(mut self, default: JsonValue) -> Self {
         self.default_value = Some(default);
         self
@@ -262,17 +269,20 @@ impl AgentWrappedTool {
     }
 
     /// Get the wrapped agent
+    #[must_use]
     pub fn agent(&self) -> &Arc<dyn BaseAgent> {
         &self.agent
     }
 
     /// Get tool metadata override
-    pub fn tool_metadata(&self) -> Option<&ToolMetadata> {
+    #[must_use]
+    pub const fn tool_metadata(&self) -> Option<&ToolMetadata> {
         self.tool_metadata.as_ref()
     }
 
     /// Get parameter mapping configuration
-    pub fn parameter_config(&self) -> &ParameterMappingConfig {
+    #[must_use]
+    pub const fn parameter_config(&self) -> &ParameterMappingConfig {
         &self.parameter_config
     }
 
@@ -281,11 +291,10 @@ impl AgentWrappedTool {
         let agent_metadata = self.agent.metadata();
 
         // Start with base input text
-        let input_text = if let Some(template) = &self.parameter_config.input_template {
-            template.clone()
-        } else {
-            format!("Tool invocation of agent: {}", agent_metadata.name)
-        };
+        let input_text = self.parameter_config.input_template.as_ref().map_or_else(
+            || format!("Tool invocation of agent: {}", agent_metadata.name),
+            String::clone,
+        );
 
         let mut agent_input = AgentInput::text(input_text);
 
@@ -299,7 +308,7 @@ impl AgentWrappedTool {
                 let (target_name, transformed_value) = if let Some(transform) =
                     self.parameter_config.parameter_transforms.get(param_name)
                 {
-                    let transformed = self.apply_transform(param_value, transform)?;
+                    let transformed = Self::apply_transform(param_value, transform)?;
                     (transform.target_name.clone(), transformed)
                 } else {
                     (param_name.clone(), param_value.clone())
@@ -311,15 +320,20 @@ impl AgentWrappedTool {
             // Apply default values for missing required transforms
             for (source_name, transform) in &self.parameter_config.parameter_transforms {
                 if transform.required && !tool_parameters.contains_key(source_name) {
-                    if let Some(default_value) = &transform.default_value {
-                        agent_input = agent_input
-                            .with_parameter(transform.target_name.clone(), default_value.clone());
-                    } else {
-                        return Err(LLMSpellError::Validation {
-                            message: format!("Required parameter '{}' not provided", source_name),
-                            field: Some(source_name.clone()),
-                        });
-                    }
+                    agent_input = transform.default_value.as_ref().map_or_else(
+                        || {
+                            Err(LLMSpellError::Validation {
+                                message: format!("Required parameter '{source_name}' not provided"),
+                                field: Some(source_name.clone()),
+                            })
+                        },
+                        |default_value| {
+                            Ok(agent_input.with_parameter(
+                                transform.target_name.clone(),
+                                default_value.clone(),
+                            ))
+                        },
+                    )?;
                 }
             }
         }
@@ -353,11 +367,7 @@ impl AgentWrappedTool {
     }
 
     /// Apply a single parameter transformation
-    fn apply_transform(
-        &self,
-        value: &JsonValue,
-        transform: &ParameterTransform,
-    ) -> Result<JsonValue> {
+    fn apply_transform(value: &JsonValue, transform: &ParameterTransform) -> Result<JsonValue> {
         match &transform.transform_type {
             TransformType::Identity => Ok(value.clone()),
             TransformType::ToString => {
@@ -367,7 +377,7 @@ impl AgentWrappedTool {
                     JsonValue::Bool(b) => b.to_string(),
                     JsonValue::Null => "null".to_string(),
                     _ => serde_json::to_string(value).map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to convert value to string: {}", e),
+                        message: format!("Failed to convert value to string: {e}"),
                         source: Some(Box::new(e)),
                     })?,
                 };
@@ -379,8 +389,7 @@ impl AgentWrappedTool {
                 } else {
                     Err(LLMSpellError::Validation {
                         message: format!(
-                            "Cannot extract field '{}' from non-object value",
-                            field_name
+                            "Cannot extract field '{field_name}' from non-object value"
                         ),
                         field: Some(field_name.clone()),
                     })
@@ -388,22 +397,25 @@ impl AgentWrappedTool {
             }
             TransformType::JsonPath(path) => {
                 // Simple JSON path implementation for basic cases
-                if let Some(field_path) = path.strip_prefix("$.") {
-                    let mut current = value;
-                    for field in field_path.split('.') {
-                        if let JsonValue::Object(obj) = current {
-                            current = obj.get(field).unwrap_or(&JsonValue::Null);
-                        } else {
-                            return Ok(JsonValue::Null);
+                path.strip_prefix("$.").map_or_else(
+                    || {
+                        Err(LLMSpellError::Validation {
+                            message: format!("Unsupported JSON path: {path}"),
+                            field: Some("json_path".to_string()),
+                        })
+                    },
+                    |field_path| {
+                        let mut current = value;
+                        for field in field_path.split('.') {
+                            if let JsonValue::Object(obj) = current {
+                                current = obj.get(field).unwrap_or(&JsonValue::Null);
+                            } else {
+                                return Ok(JsonValue::Null);
+                            }
                         }
-                    }
-                    Ok(current.clone())
-                } else {
-                    Err(LLMSpellError::Validation {
-                        message: format!("Unsupported JSON path: {}", path),
-                        field: Some("json_path".to_string()),
-                    })
-                }
+                        Ok(current.clone())
+                    },
+                )
             }
             TransformType::Custom(function_name) => {
                 // For now, just log that custom transforms are not implemented
@@ -418,26 +430,30 @@ impl AgentWrappedTool {
 
     /// Get the effective tool name
     fn tool_name(&self) -> String {
-        if let Some(metadata) = &self.tool_metadata {
-            if let Some(name) = &metadata.name {
-                return name.clone();
-            }
-        }
-        format!("agent-{}", self.agent.metadata().name)
+        self.tool_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.name.as_ref())
+            .map_or_else(
+                || format!("agent-{}", self.agent.metadata().name),
+                String::clone,
+            )
     }
 
     /// Get the effective tool description
     fn tool_description(&self) -> String {
-        if let Some(metadata) = &self.tool_metadata {
-            if let Some(description) = &metadata.description {
-                return description.clone();
-            }
-        }
-        format!(
-            "Agent '{}' wrapped as tool: {}",
-            self.agent.metadata().name,
-            self.agent.metadata().description
-        )
+        self.tool_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.description.as_ref())
+            .map_or_else(
+                || {
+                    format!(
+                        "Agent '{}' wrapped as tool: {}",
+                        self.agent.metadata().name,
+                        self.agent.metadata().description
+                    )
+                },
+                String::clone,
+            )
     }
 }
 
@@ -449,7 +465,11 @@ impl BaseAgent for AgentWrappedTool {
         self.agent.metadata()
     }
 
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Check if this is a tool invocation (has "parameters" field) or direct agent execution
         if input.parameters.contains_key("parameters") {
             // This is a tool invocation - transform parameters
@@ -517,7 +537,7 @@ impl Tool for AgentWrappedTool {
                 schema = schema.with_parameter(ParameterDef {
                     name: source_name.clone(),
                     param_type: ParameterType::Object, // Accept any type for flexibility
-                    description: format!("Parameter '{}' for agent", source_name),
+                    description: format!("Parameter '{source_name}' for agent"),
                     required: transform.required,
                     default: transform.default_value.clone(),
                 });
@@ -564,7 +584,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,
@@ -573,12 +593,11 @@ mod tests {
             let params = input
                 .parameters
                 .get("parameters")
-                .map(|v| format!(" with params: {}", v))
+                .map(|v| format!(" with params: {v}"))
                 .unwrap_or_default();
 
             Ok(AgentOutput::text(format!(
-                "MockAgent executed: {}{}",
-                text, params
+                "MockAgent executed: {text}{params}"
             )))
         }
 
@@ -587,10 +606,9 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error handled: {}", error)))
+            Ok(AgentOutput::text(format!("Error handled: {error}")))
         }
     }
-
     #[tokio::test]
     async fn test_agent_wrapped_tool_creation() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -600,7 +618,6 @@ mod tests {
         assert_eq!(wrapped.security_level(), SecurityLevel::Safe);
         assert_eq!(wrapped.agent().metadata().name, "test-agent");
     }
-
     #[tokio::test]
     async fn test_tool_schema_generation() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -611,7 +628,6 @@ mod tests {
         assert!(schema.description.contains("test agent"));
         assert!(!schema.parameters.is_empty());
     }
-
     #[tokio::test]
     async fn test_parameter_bundling() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -631,7 +647,6 @@ mod tests {
         assert!(result.text.contains("MockAgent executed"));
         assert!(result.text.contains("with params"));
     }
-
     #[tokio::test]
     async fn test_parameter_transforms() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -660,7 +675,6 @@ mod tests {
 
         assert!(result.text.contains("MockAgent executed"));
     }
-
     #[tokio::test]
     async fn test_custom_metadata() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -683,29 +697,29 @@ mod tests {
         assert_eq!(schema.name, "custom-tool-name");
         assert_eq!(schema.description, "Custom tool description");
     }
-
     #[tokio::test]
     async fn test_parameter_transform_types() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
-        let wrapped = AgentWrappedTool::new(agent, ToolCategory::Utility, SecurityLevel::Safe);
+        let _wrapped = AgentWrappedTool::new(agent, ToolCategory::Utility, SecurityLevel::Safe);
 
         // Test ToString transform
         let transform = ParameterTransform::to_string("target");
-        let result = wrapped.apply_transform(&json!(123), &transform).unwrap();
+        let result = AgentWrappedTool::apply_transform(&json!(123), &transform).unwrap();
         assert_eq!(result, json!("123"));
 
         // Test ExtractField transform
         let transform = ParameterTransform::extract_field("target", "field1");
-        let result = wrapped
-            .apply_transform(&json!({"field1": "value1", "field2": "value2"}), &transform)
-            .unwrap();
+        let result = AgentWrappedTool::apply_transform(
+            &json!({"field1": "value1", "field2": "value2"}),
+            &transform,
+        )
+        .unwrap();
         assert_eq!(result, json!("value1"));
 
         // Test Identity transform
         let transform = ParameterTransform::identity("target");
-        let result = wrapped
-            .apply_transform(&json!({"complex": "object"}), &transform)
-            .unwrap();
+        let result =
+            AgentWrappedTool::apply_transform(&json!({"complex": "object"}), &transform).unwrap();
         assert_eq!(result, json!({"complex": "object"}));
     }
 }

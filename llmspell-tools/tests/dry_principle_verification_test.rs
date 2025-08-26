@@ -3,19 +3,23 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::JsonProcessorTool,
-    util::{Base64EncoderTool, DateTimeHandlerTool, HashCalculatorTool, UuidGeneratorTool},
+    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
+    util::{
+        Base64EncoderTool, DateTimeHandlerTool, HashCalculatorConfig, HashCalculatorTool,
+        UuidGeneratorConfig, UuidGeneratorTool,
+    },
 };
 use serde_json::{json, Value};
 
 #[cfg(test)]
 mod dry_principle_tests {
     use super::*;
-
     #[tokio::test]
     async fn test_hash_consistency_across_tools() {
+        use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
+
         // Test that hash operations produce consistent results
-        let hash_tool = HashCalculatorTool::new(Default::default());
+        let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
         let test_data = "Hello, DRY Principle!";
 
         // Test SHA256
@@ -36,7 +40,6 @@ mod dry_principle_tests {
         let sha256_hash = output["result"]["hash"].as_str().unwrap();
 
         // Verify the hash is consistent with the utility function
-        use llmspell_utils::encoding::{hash_string, to_hex_string, HashAlgorithm};
         let expected_hash_bytes = hash_string(test_data, HashAlgorithm::Sha256);
         let expected_hash = to_hex_string(&expected_hash_bytes);
         assert_eq!(
@@ -44,9 +47,10 @@ mod dry_principle_tests {
             "Hash tool should produce same result as utility"
         );
     }
-
     #[tokio::test]
     async fn test_base64_consistency() {
+        use llmspell_utils::encoding::base64_encode;
+
         // Test that base64 operations are consistent
         let base64_tool = Base64EncoderTool::new();
         let test_data = "Test Base64 Consistency";
@@ -68,18 +72,16 @@ mod dry_principle_tests {
         let encoded = output["result"]["output"].as_str().unwrap();
 
         // Verify with utility
-        use llmspell_utils::encoding::base64_encode;
         let expected = base64_encode(test_data.as_bytes());
         assert_eq!(
             encoded, expected,
             "Base64 tool should produce same result as utility"
         );
     }
-
     #[tokio::test]
     async fn test_uuid_format_consistency() {
         // Test that UUID generation follows consistent patterns
-        let uuid_tool = UuidGeneratorTool::new(Default::default());
+        let uuid_tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
 
         // Generate UUID v4
         let input = AgentInput::text("generate").with_parameter(
@@ -112,11 +114,10 @@ mod dry_principle_tests {
             "Should be UUID v4"
         );
     }
-
     #[tokio::test]
     async fn test_json_processing_consistency() {
         // Test that JSON operations are consistent
-        let json_tool = JsonProcessorTool::new(Default::default());
+        let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
         let test_json = json!({
             "name": "test",
             "value": 42,
@@ -146,7 +147,6 @@ mod dry_principle_tests {
             "Query should return the original object"
         );
     }
-
     #[tokio::test]
     async fn test_date_time_consistency() {
         // Test that date/time operations are consistent
@@ -175,11 +175,10 @@ mod dry_principle_tests {
         assert_eq!(output["result"]["parsed"]["hour"].as_i64().unwrap(), 10);
         assert_eq!(output["result"]["parsed"]["minute"].as_i64().unwrap(), 30);
     }
-
     #[tokio::test]
     async fn test_error_handling_consistency() {
         // Test that error handling is consistent across tools
-        let hash_tool = HashCalculatorTool::new(Default::default());
+        let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
         let base64_tool = Base64EncoderTool::new();
 
         // Test missing required parameter in hash tool
@@ -215,20 +214,18 @@ mod dry_principle_tests {
             err.to_string().contains("ither")
                 || err.to_string().contains("missing")
                 || err.to_string().contains("required"),
-            "Error was: {}",
-            err
+            "Error was: {err}"
         );
 
         // Both should handle missing parameters consistently
     }
-
     #[tokio::test]
     async fn test_parameter_extraction_consistency() {
         // Test that all tools use consistent parameter extraction
         let tools: Vec<Box<dyn BaseAgent>> = vec![
-            Box::new(HashCalculatorTool::new(Default::default())),
+            Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
             Box::new(Base64EncoderTool::new()),
-            Box::new(UuidGeneratorTool::new(Default::default())),
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())),
         ];
 
         // Test with no parameters wrapper
@@ -250,7 +247,6 @@ mod dry_principle_tests {
         }
     }
 }
-
 #[test]
 fn test_shared_utility_usage() {
     // Verify tools are importing from llmspell_utils

@@ -1,6 +1,8 @@
 //! ABOUTME: Lifecycle management for composite agents
 //! ABOUTME: Handles initialization, state transitions, and cleanup of composed agents
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::traits::{CompositeAgent, HierarchicalAgent, HierarchyEvent};
 use async_trait::async_trait;
 use llmspell_core::{BaseAgent, LLMSpellError, Result};
@@ -58,6 +60,7 @@ impl std::fmt::Debug for ComponentLifecycle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ComponentLifecycle")
             .field("id", &self.id)
+            .field("component", &"<dyn BaseAgent>")
             .field("state", &self.state)
             .field("initialized_at", &self.initialized_at)
             .field("last_active", &self.last_active)
@@ -105,31 +108,45 @@ pub trait LifecycleEventHandler: Send + Sync {
 pub enum LifecycleEvent {
     /// State transition event
     StateTransition {
+        /// ID of the component undergoing transition
         component_id: String,
+        /// Previous lifecycle state
         from: LifecycleState,
+        /// New lifecycle state
         to: LifecycleState,
+        /// Timestamp of the transition
         timestamp: chrono::DateTime<chrono::Utc>,
     },
     /// Component added
     ComponentAdded {
+        /// ID of the added component
         component_id: String,
+        /// ID of the parent component, if any
         parent_id: Option<String>,
     },
     /// Component removed
     ComponentRemoved {
+        /// ID of the removed component
         component_id: String,
+        /// Reason for removal
         reason: String,
     },
     /// Error occurred
     Error {
+        /// ID of the component that encountered the error
         component_id: String,
+        /// Error description
         error: String,
+        /// Severity level of the error
         severity: ErrorSeverity,
     },
     /// Health check result
     HealthCheck {
+        /// ID of the component being checked
         component_id: String,
+        /// Whether the component is healthy
         healthy: bool,
+        /// Additional health check details
         details: HashMap<String, String>,
     },
 }
@@ -149,6 +166,7 @@ pub enum ErrorSeverity {
 
 impl CompositeLifecycleManager {
     /// Create a new lifecycle manager
+    #[must_use]
     pub fn new(config: LifecycleConfig) -> Self {
         Self {
             state: RwLock::new(LifecycleState::Initializing),
@@ -159,6 +177,13 @@ impl CompositeLifecycleManager {
     }
 
     /// Initialize a composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Component initialization fails
+    /// - Initialization timeout is exceeded
+    /// - Event emission fails
     pub async fn initialize_composite(&self, agent: &dyn CompositeAgent) -> Result<()> {
         // Set state to initializing
         *self.state.write().await = LifecycleState::Initializing;
@@ -233,16 +258,30 @@ impl CompositeLifecycleManager {
     }
 
     /// Activate the composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state transition fails
     pub async fn activate(&self) -> Result<()> {
         self.transition_state(LifecycleState::Active).await
     }
 
     /// Pause the composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state transition fails
     pub async fn pause(&self) -> Result<()> {
         self.transition_state(LifecycleState::Paused).await
     }
 
     /// Resume from pause
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The agent is not currently paused
+    /// - State transition fails
     pub async fn resume(&self) -> Result<()> {
         let current = self.state.read().await.clone();
         if current != LifecycleState::Paused {
@@ -255,6 +294,12 @@ impl CompositeLifecycleManager {
     }
 
     /// Shutdown the composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Component shutdown fails
+    /// - Shutdown timeout is exceeded (results in forced termination)
     pub async fn shutdown(&self) -> Result<()> {
         *self.state.write().await = LifecycleState::ShuttingDown;
 
@@ -301,9 +346,9 @@ impl CompositeLifecycleManager {
         let current = self.state.read().await.clone();
 
         // Validate transition
-        if !self.is_valid_transition(&current, &new_state) {
+        if !Self::is_valid_transition(&current, &new_state) {
             return Err(LLMSpellError::Component {
-                message: format!("Invalid state transition: {:?} -> {:?}", current, new_state),
+                message: format!("Invalid state transition: {current:?} -> {new_state:?}"),
                 source: None,
             });
         }
@@ -331,21 +376,27 @@ impl CompositeLifecycleManager {
     }
 
     /// Check if a state transition is valid
-    fn is_valid_transition(&self, from: &LifecycleState, to: &LifecycleState) -> bool {
+    const fn is_valid_transition(from: &LifecycleState, to: &LifecycleState) -> bool {
         matches!(
             (from, to),
             (LifecycleState::Initializing, LifecycleState::Ready)
-                | (LifecycleState::Ready, LifecycleState::Active)
-                | (LifecycleState::Active, LifecycleState::Paused)
-                | (LifecycleState::Paused, LifecycleState::Active)
-                | (LifecycleState::Active, LifecycleState::ShuttingDown)
-                | (LifecycleState::Ready, LifecycleState::ShuttingDown)
-                | (LifecycleState::Paused, LifecycleState::ShuttingDown)
+                | (
+                    LifecycleState::Ready | LifecycleState::Paused,
+                    LifecycleState::Active | LifecycleState::ShuttingDown
+                )
+                | (
+                    LifecycleState::Active,
+                    LifecycleState::Paused | LifecycleState::ShuttingDown
+                )
                 | (LifecycleState::ShuttingDown, LifecycleState::Terminated)
         )
     }
 
     /// Add a component dynamically
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn add_component(&self, component: Arc<dyn BaseAgent>) -> Result<()> {
         let component_id = component.metadata().id.to_string();
 
@@ -371,6 +422,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Remove a component
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn remove_component(&self, component_id: &str, reason: &str) -> Result<()> {
         self.components.write().await.remove(component_id);
 
@@ -411,6 +466,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Perform health check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn health_check(&self) -> Result<HealthCheckResult> {
         let state = self.state.read().await.clone();
         let components = self.components.read().await;
@@ -455,6 +514,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Update component activity
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if component is not found
     pub async fn update_activity(&self, component_id: &str) -> Result<()> {
         if let Some(lifecycle) = self.components.write().await.get_mut(component_id) {
             lifecycle.last_active = Some(chrono::Utc::now());
@@ -463,6 +526,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Record component error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn record_error(
         &self,
         component_id: &str,
@@ -518,6 +585,7 @@ pub struct HierarchicalLifecycleManager {
 
 impl HierarchicalLifecycleManager {
     /// Create a new hierarchical lifecycle manager
+    #[must_use]
     pub fn new(config: LifecycleConfig) -> Self {
         Self {
             base: CompositeLifecycleManager::new(config),
@@ -526,6 +594,12 @@ impl HierarchicalLifecycleManager {
     }
 
     /// Initialize a hierarchical agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Base initialization fails
+    /// - Hierarchy building fails
     pub async fn initialize_hierarchical(&self, agent: &dyn HierarchicalAgent) -> Result<()> {
         // Initialize base
         self.base.initialize_composite(agent).await?;
@@ -546,6 +620,12 @@ impl HierarchicalLifecycleManager {
     }
 
     /// Cascade an event through the hierarchy
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Event processing fails
+    /// - Recursive cascading fails
     pub async fn cascade_event(
         &self,
         from_id: &str,
@@ -596,8 +676,8 @@ impl HierarchicalLifecycleManager {
                 self.base
                     .emit_event(LifecycleEvent::StateTransition {
                         component_id: component_id.to_string(),
-                        from: self.parse_lifecycle_state(old_state),
-                        to: self.parse_lifecycle_state(new_state),
+                        from: Self::parse_lifecycle_state(old_state),
+                        to: Self::parse_lifecycle_state(new_state),
                         timestamp: chrono::Utc::now(),
                     })
                     .await?;
@@ -615,14 +695,14 @@ impl HierarchicalLifecycleManager {
     }
 
     /// Parse lifecycle state from string
-    fn parse_lifecycle_state(&self, state: &str) -> LifecycleState {
+    fn parse_lifecycle_state(state: &str) -> LifecycleState {
         match state {
             "initializing" => LifecycleState::Initializing,
-            "ready" => LifecycleState::Ready,
             "active" => LifecycleState::Active,
             "paused" => LifecycleState::Paused,
             "shutting_down" => LifecycleState::ShuttingDown,
             "terminated" => LifecycleState::Terminated,
+            // "ready" and any other unrecognized state defaults to Ready
             _ => LifecycleState::Ready,
         }
     }
@@ -656,7 +736,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
@@ -669,7 +749,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -729,7 +809,6 @@ mod tests {
             Ok(AgentOutput::text("Mock tool invocation"))
         }
     }
-
     #[tokio::test]
     async fn test_lifecycle_state_transitions() {
         let manager = CompositeLifecycleManager::new(LifecycleConfig::default());
@@ -763,7 +842,6 @@ mod tests {
         manager.shutdown().await.unwrap();
         assert_eq!(manager.state().await, LifecycleState::Terminated);
     }
-
     #[tokio::test]
     async fn test_invalid_state_transitions() {
         let manager = CompositeLifecycleManager::new(LifecycleConfig::default());
@@ -774,7 +852,6 @@ mod tests {
         // Try to resume when not paused
         assert!(manager.resume().await.is_err());
     }
-
     #[tokio::test]
     async fn test_health_check() {
         let manager = CompositeLifecycleManager::new(LifecycleConfig::default());

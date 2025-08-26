@@ -1,4 +1,4 @@
-//! ABOUTME: JSEngine implementation of ScriptEngineBridge trait
+//! ABOUTME: `JSEngine` implementation of `ScriptEngineBridge` trait
 //! ABOUTME: Provides JavaScript (ES2020) execution with async generator streaming
 
 use crate::engine::{
@@ -7,6 +7,7 @@ use crate::engine::{
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// JavaScript script engine implementation
@@ -16,6 +17,10 @@ pub struct JSEngine {
 
 impl JSEngine {
     /// Create a new JavaScript engine with the given configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if engine initialization fails
     pub fn new(config: &JSConfig) -> Result<Self, LLMSpellError> {
         Ok(Self {
             _config: config.clone(),
@@ -23,7 +28,8 @@ impl JSEngine {
     }
 
     /// Get the supported features for JavaScript
-    pub fn engine_features() -> EngineFeatures {
+    #[must_use]
+    pub const fn engine_features() -> EngineFeatures {
         EngineFeatures {
             async_execution: true, // Native async/await
             streaming: true,       // Via async generators
@@ -107,6 +113,20 @@ impl ScriptEngineBridge for JSEngine {
 
     fn set_execution_context(&mut self, _context: ExecutionContext) -> Result<(), LLMSpellError> {
         // TODO: Implement context setting
+        Ok(())
+    }
+
+    async fn set_script_args(
+        &mut self,
+        _args: HashMap<String, String>,
+    ) -> Result<(), LLMSpellError> {
+        // TODO (Phase 5): Implement JavaScript args injection
+        // When implemented, this should:
+        // 1. Create a global 'args' object with the provided arguments
+        // 2. Support both named access (args.input) and array-like access (args[0])
+        // 3. Provide process.argv equivalent for Node.js compatibility
+        // Example future implementation:
+        // self.js_context.set_global("args", convert_to_js_object(args))?;
         Ok(())
     }
 }

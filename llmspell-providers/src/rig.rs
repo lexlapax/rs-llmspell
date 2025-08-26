@@ -9,6 +9,7 @@ use llmspell_core::{
 };
 use rig::{completion::CompletionModel, providers};
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Enum to hold different provider models
 enum RigModel {
@@ -107,14 +108,14 @@ impl RigProvider {
             }),
             max_output_tokens: Some(4096),
             available_models: vec![config.model.clone()],
-            custom_features: Default::default(),
+            custom_features: HashMap::default(),
         };
 
         // Extract max_tokens from custom_config, with defaults based on provider
         let max_tokens = config
             .custom_config
             .get("max_tokens")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(match config.provider_type.as_str() {
                 "anthropic" => 4096, // Anthropic requires max_tokens
                 _ => 2048,           // Default for others
@@ -284,7 +285,6 @@ pub fn create_rig_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_rig_provider_capabilities() {
         let config = ProviderConfig::new("openai", "gpt-4");
@@ -297,7 +297,6 @@ mod tests {
             _ => panic!("Expected configuration error"),
         }
     }
-
     #[test]
     fn test_unsupported_provider() {
         let config = ProviderConfig::new("unsupported", "model");
@@ -309,7 +308,6 @@ mod tests {
             _ => panic!("Expected configuration error"),
         }
     }
-
     #[test]
     fn test_provider_capabilities_settings() {
         let mut config = ProviderConfig::new("openai", "gpt-4");
@@ -325,7 +323,6 @@ mod tests {
             assert_eq!(caps.available_models, vec!["gpt-4"]);
         }
     }
-
     #[test]
     fn test_anthropic_capabilities() {
         let mut config = ProviderConfig::new("anthropic", "claude-3-opus");
@@ -337,7 +334,6 @@ mod tests {
             assert_eq!(caps.max_context_tokens, Some(200000)); // Claude 3 Opus context size
         }
     }
-
     #[test]
     fn test_cohere_capabilities() {
         let mut config = ProviderConfig::new("cohere", "command");

@@ -253,7 +253,6 @@ enum TimeoutStatus {
 mod tests {
     use super::*;
     use llmspell_hooks::{types::ComponentId, HookPoint};
-
     #[tokio::test]
     async fn test_timeout_policy_creation() {
         let config = TimeoutConfig::default();
@@ -265,7 +264,6 @@ mod tests {
             ComponentId::new(llmspell_hooks::ComponentType::Agent, "test".to_string())
         )));
     }
-
     #[tokio::test]
     async fn test_activity_time_update() {
         let config = TimeoutConfig::default();
@@ -280,7 +278,6 @@ mod tests {
         assert!(result.should_continue());
         assert!(context.data.contains_key("last_activity_time"));
     }
-
     #[tokio::test]
     async fn test_max_duration_check() {
         let config = TimeoutConfig {
@@ -305,7 +302,6 @@ mod tests {
         assert!(!result.should_continue());
         assert!(context.data.contains_key("timeout_reason"));
     }
-
     #[tokio::test]
     async fn test_idle_timeout_check() {
         let config = TimeoutConfig {

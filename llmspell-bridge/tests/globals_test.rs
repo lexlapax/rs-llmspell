@@ -3,11 +3,15 @@
 
 #[cfg(feature = "lua")]
 mod lua_globals {
+    use async_trait::async_trait;
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
-    use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
-    use llmspell_core::Result;
+    use llmspell_bridge::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
+    use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
+    use llmspell_core::{BaseAgent, ComponentMetadata, ExecutionContext, Result, Tool};
     use mlua::Lua;
     use std::sync::Arc;
+    use std::time::Instant;
 
     async fn setup_test_context() -> Arc<GlobalContext> {
         let registry = Arc::new(ComponentRegistry::new());
@@ -17,6 +21,14 @@ mod lua_globals {
         Arc::new(GlobalContext::new(registry, providers))
     }
 
+    async fn setup_lua_with_globals() -> Result<(Lua, Arc<GlobalContext>)> {
+        let lua = Lua::new();
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
+        let injector = GlobalInjector::new(Arc::new(registry));
+        injector.inject_lua(&lua, &context)?;
+        Ok((lua, context))
+    }
     #[tokio::test]
     async fn test_global_registry_creation() -> Result<()> {
         let context = setup_test_context().await;
@@ -60,7 +72,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Lua test failed: {}", e),
+            message: format!("Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -93,7 +105,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Agent Lua test failed: {}", e),
+            message: format!("Agent Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -102,15 +114,7 @@ mod lua_globals {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tool_global_lua() -> Result<()> {
-        let lua = Lua::new();
-        let context = setup_test_context().await;
-
-        // Register a test tool
-        use async_trait::async_trait;
-        use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
-        use llmspell_core::{BaseAgent, Tool};
-        use llmspell_core::{ComponentMetadata, ExecutionContext};
-
+        // Define test tool struct and implementation before any statements
         #[derive(Clone)]
         struct TestTool;
 
@@ -125,7 +129,7 @@ mod lua_globals {
                 })
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 _input: llmspell_core::types::AgentInput,
                 _context: ExecutionContext,
@@ -163,6 +167,9 @@ mod lua_globals {
                 ToolSchema::new("test_tool".to_string(), "A test tool".to_string())
             }
         }
+
+        let lua = Lua::new();
+        let context = setup_test_context().await;
 
         context
             .registry
@@ -208,7 +215,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Tool Lua test failed: {}", e),
+            message: format!("Tool Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -216,18 +223,11 @@ mod lua_globals {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    async fn test_workflow_global_lua() -> Result<()> {
-        let lua = Lua::new();
-        let context = setup_test_context().await;
-        let registry = create_standard_registry(context.clone()).await?;
-        let injector = GlobalInjector::new(Arc::new(registry));
+    async fn test_workflow_sequential_lua() -> Result<()> {
+        let (lua, _context) = setup_lua_with_globals().await?;
 
-        injector.inject_lua(&lua, &context)?;
-
-        // Test Workflow global functions
         lua.load(
             r#"
-            -- Test Workflow.sequential()
             local seq = Workflow.sequential({
                 name = "test_seq",
                 description = "A test sequential workflow",
@@ -241,11 +241,26 @@ mod lua_globals {
                 }
             })
             assert(seq ~= nil, "Sequential workflow creation failed")
-            local info = seq:getInfo()
+            local info = seq:get_info()
             assert(info.name == "test_seq", "Sequential workflow name mismatch")
             assert(info.type == "sequential", "Sequential workflow type mismatch")
-            
-            -- Test Workflow.conditional()
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("Sequential workflow Lua test failed: {e}"),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_conditional_lua() -> Result<()> {
+        let (lua, _context) = setup_lua_with_globals().await?;
+
+        lua.load(
+            r#"
             local cond = Workflow.conditional({
                 name = "test_cond",
                 description = "A test conditional workflow",
@@ -265,10 +280,25 @@ mod lua_globals {
                 }
             })
             assert(cond ~= nil, "Conditional workflow creation failed")
-            info = cond:getInfo()
+            local info = cond:get_info()
             assert(info.type == "conditional", "Conditional workflow type mismatch")
-            
-            -- Test Workflow.loop()
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("Conditional workflow Lua test failed: {e}"),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_loop_lua() -> Result<()> {
+        let (lua, _context) = setup_lua_with_globals().await?;
+
+        lua.load(
+            r#"
             local loop_wf = Workflow.loop({
                 name = "test_loop",
                 description = "A test loop workflow",
@@ -289,10 +319,25 @@ mod lua_globals {
                 }
             })
             assert(loop_wf ~= nil, "Loop workflow creation failed")
-            info = loop_wf:getInfo()
+            local info = loop_wf:get_info()
             assert(info.type == "loop", "Loop workflow type mismatch")
-            
-            -- Test Workflow.parallel()
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("Loop workflow Lua test failed: {e}"),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_parallel_lua() -> Result<()> {
+        let (lua, _context) = setup_lua_with_globals().await?;
+
+        lua.load(
+            r#"
             local par = Workflow.parallel({
                 name = "test_parallel",
                 description = "A test parallel workflow",
@@ -311,17 +356,32 @@ mod lua_globals {
                 }
             })
             assert(par ~= nil, "Parallel workflow creation failed")
-            info = par:getInfo()
+            local info = par:get_info()
             assert(info.type == "parallel", "Parallel workflow type mismatch")
-            
-            -- Test Workflow types listing
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("Parallel workflow Lua test failed: {e}"),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_workflow_types_lua() -> Result<()> {
+        let (lua, _context) = setup_lua_with_globals().await?;
+
+        lua.load(
+            r#"
             local types = Workflow.types()
             assert(#types >= 4, "Should have at least 4 workflow types")
         "#,
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Workflow Lua test failed: {}", e),
+            message: format!("Workflow types Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -330,8 +390,6 @@ mod lua_globals {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_global_injection_performance() -> Result<()> {
-        use std::time::Instant;
-
         let lua = Lua::new();
         let context = setup_test_context().await;
         let registry = create_standard_registry(context.clone()).await?;
@@ -395,7 +453,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("JSON Lua test failed: {}", e),
+            message: format!("JSON Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -429,7 +487,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Hook Lua test failed: {}", e),
+            message: format!("Hook Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -475,7 +533,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Event Lua test failed: {}", e),
+            message: format!("Event Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -492,51 +550,53 @@ mod lua_globals {
         injector.inject_lua(&lua, &context)?;
 
         // Test State global functions (in-memory implementation)
+        // Note: State API uses save/load with scope parameter, not set/get
         lua.load(
             r#"
-            -- Test State.set() and State.get()
-            State.set("test_key", "test_value")
-            local value = State.get("test_key")
-            assert(value == "test_value", "State.get() should return stored value")
+            -- Test State.save() and State.load() with scope
+            State.save("global", "test_key", "test_value")
+            local value = State.load("global", "test_key")
+            assert(value == "test_value", "State.load() should return stored value")
             
             -- Test complex data
-            State.set("complex", {
+            State.save("global", "complex", {
                 name = "test",
                 count = 42,
                 nested = {
                     flag = true
                 }
             })
-            local complex = State.get("complex")
+            local complex = State.load("global", "complex")
             assert(complex.name == "test", "Complex state name incorrect")
             assert(complex.count == 42, "Complex state count incorrect")
             assert(complex.nested.flag == true, "Complex state nested flag incorrect")
             
-            -- Test State.list()
-            local keys = State.list()
-            assert(type(keys) == "table", "State.list() should return a table")
+            -- Test State.list_keys()
+            local keys = State.list_keys("global")
+            assert(type(keys) == "table", "State.list_keys() should return a table")
             local found_test_key = false
             local found_complex = false
             for _, key in ipairs(keys) do
-                if key == "test_key" then found_test_key = true end
-                if key == "complex" then found_complex = true end
+                -- Keys may include scope prefix
+                if key:find("test_key") then found_test_key = true end
+                if key:find("complex") then found_complex = true end
             end
-            assert(found_test_key, "State.list() should include test_key")
-            assert(found_complex, "State.list() should include complex")
+            assert(found_test_key, "State.list_keys() should include test_key")
+            assert(found_complex, "State.list_keys() should include complex")
             
             -- Test State.delete()
-            State.delete("test_key")
-            value = State.get("test_key")
-            assert(value == nil, "State.get() should return nil after delete")
+            State.delete("global", "test_key")
+            value = State.load("global", "test_key")
+            assert(value == nil, "State.load() should return nil after delete")
             
             -- Test non-existent key
-            value = State.get("non_existent")
-            assert(value == nil, "State.get() should return nil for non-existent key")
+            value = State.load("global", "non_existent")
+            assert(value == nil, "State.load() should return nil for non-existent key")
         "#,
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("State Lua test failed: {}", e),
+            message: format!("State Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -602,7 +662,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Streaming Lua test failed: {}", e),
+            message: format!("Streaming Lua test failed: {e}"),
             source: None,
         })?;
 

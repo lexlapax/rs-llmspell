@@ -1,4 +1,4 @@
-//! ABOUTME: Comprehensive security testing framework for LLMSpell tools
+//! ABOUTME: Comprehensive security testing framework for `LLMSpell` tools
 //! ABOUTME: Provides structured security testing with categorized test suites
 
 pub mod auth_tests;
@@ -18,6 +18,7 @@ pub use path_security_tests::all_path_security_tests;
 pub use rate_limit_tests::all_rate_limit_tests;
 
 /// Collect all security tests into a single comprehensive suite
+#[must_use]
 pub fn all_security_tests() -> Vec<SecurityTestCase> {
     let mut tests = Vec::new();
     tests.extend(all_path_security_tests());
@@ -29,6 +30,7 @@ pub fn all_security_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Get security tests by category
+#[must_use]
 pub fn get_tests_by_category(category: TestCategory) -> Vec<SecurityTestCase> {
     all_security_tests()
         .into_iter()
@@ -37,6 +39,7 @@ pub fn get_tests_by_category(category: TestCategory) -> Vec<SecurityTestCase> {
 }
 
 /// Get security tests by severity
+#[must_use]
 pub fn get_tests_by_severity(severity: Severity) -> Vec<SecurityTestCase> {
     all_security_tests()
         .into_iter()
@@ -45,11 +48,13 @@ pub fn get_tests_by_severity(severity: Severity) -> Vec<SecurityTestCase> {
 }
 
 /// Get critical security tests only
+#[must_use]
 pub fn get_critical_tests() -> Vec<SecurityTestCase> {
     get_tests_by_severity(Severity::Critical)
 }
 
 /// Security test statistics
+#[must_use]
 pub fn get_test_statistics() -> SecurityTestStats {
     let tests = all_security_tests();
     let total = tests.len();

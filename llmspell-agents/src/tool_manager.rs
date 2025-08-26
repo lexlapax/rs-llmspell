@@ -1,5 +1,7 @@
-//! ABOUTME: ToolManager for managing tool discovery, invocation, and composition
-//! ABOUTME: Core implementation that enables ToolCapable components to interact with tools
+//! ABOUTME: `ToolManager` for managing tool discovery, invocation, and composition
+//! ABOUTME: Core implementation that enables `ToolCapable` components to interact with tools
+
+#![allow(clippy::significant_drop_tightening)]
 
 use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
 use llmspell_core::{
@@ -17,7 +19,7 @@ use tokio::sync::RwLock;
 
 /// Tool manager that provides concrete implementation of tool integration capabilities.
 ///
-/// This component bridges the gap between ToolCapable components and the actual tool
+/// This component bridges the gap between `ToolCapable` components and the actual tool
 /// ecosystem. It handles tool discovery, invocation, validation, and composition.
 ///
 /// # Architecture
@@ -65,7 +67,7 @@ pub struct ToolManager {
     config: ToolManagerConfig,
 }
 
-/// Configuration for ToolManager behavior
+/// Configuration for `ToolManager` behavior
 #[derive(Debug, Clone)]
 pub struct ToolManagerConfig {
     /// Maximum execution time for tool invocation (milliseconds)
@@ -93,7 +95,8 @@ impl Default for ToolManagerConfig {
 }
 
 impl ToolManager {
-    /// Create a new ToolManager with the given registry
+    /// Create a new `ToolManager` with the given registry
+    #[must_use]
     pub fn new(registry: Arc<ToolRegistry>) -> Self {
         Self {
             registry,
@@ -103,7 +106,8 @@ impl ToolManager {
         }
     }
 
-    /// Create a new ToolManager with custom configuration
+    /// Create a new `ToolManager` with custom configuration
+    #[must_use]
     pub fn with_config(registry: Arc<ToolRegistry>, config: ToolManagerConfig) -> Self {
         Self {
             registry,
@@ -114,6 +118,10 @@ impl ToolManager {
     }
 
     /// Discover tools based on query criteria
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>> {
         // Convert ToolQuery to CapabilityMatcher
         let mut matcher = CapabilityMatcher::new();
@@ -123,7 +131,7 @@ impl ToolManager {
             let categories: Vec<ToolCategory> = query
                 .categories
                 .iter()
-                .filter_map(|cat| self.string_to_tool_category(cat))
+                .map(|cat| Self::string_to_tool_category(cat))
                 .collect();
             if !categories.is_empty() {
                 matcher = matcher.with_categories(categories);
@@ -137,7 +145,7 @@ impl ToolManager {
 
         // Add security level filters
         if let Some(max_level) = &query.max_security_level {
-            if let Some(security_level) = self.string_to_security_level(max_level) {
+            if let Some(security_level) = Self::string_to_security_level(max_level) {
                 matcher = matcher.with_max_security_level(security_level);
             }
         }
@@ -165,7 +173,7 @@ impl ToolManager {
 
             // Apply min_security_level filter manually
             if let Some(min_level) = &query.min_security_level {
-                if let Some(min_security) = self.string_to_security_level(min_level) {
+                if let Some(min_security) = Self::string_to_security_level(min_level) {
                     if registry_info.security_level < min_security {
                         continue;
                     }
@@ -173,7 +181,7 @@ impl ToolManager {
             }
 
             // Convert registry ToolInfo to our ToolInfo
-            let tool_info = self.registry_info_to_tool_info(&registry_info);
+            let tool_info = Self::registry_info_to_tool_info(&registry_info);
             tools.push(tool_info);
         }
 
@@ -181,6 +189,13 @@ impl ToolManager {
     }
 
     /// Invoke a tool by name with given parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool is not found or not available
+    /// - Tool execution times out
+    /// - Tool execution fails
     pub async fn invoke_tool(
         &self,
         tool_name: &str,
@@ -190,7 +205,7 @@ impl ToolManager {
         // Check if tool is available
         if !self.tool_available(tool_name).await {
             return Err(LLMSpellError::Component {
-                message: format!("Tool '{}' not found or not available", tool_name),
+                message: format!("Tool '{tool_name}' not found or not available"),
                 source: None,
             });
         }
@@ -201,7 +216,7 @@ impl ToolManager {
                 .get_tool(tool_name)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Tool '{}' not found in registry", tool_name),
+                    message: format!("Tool '{tool_name}' not found in registry"),
                     source: None,
                 })?;
 
@@ -222,7 +237,7 @@ impl ToolManager {
         )
         .await
         .map_err(|_| LLMSpellError::Component {
-            message: format!("Tool '{}' execution timed out", tool_name),
+            message: format!("Tool '{tool_name}' execution timed out"),
             source: None,
         })??;
 
@@ -230,6 +245,10 @@ impl ToolManager {
     }
 
     /// List all available tools
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool listing fails
     pub async fn list_available_tools(&self) -> Result<Vec<String>> {
         let all_tools = self.registry.list_tools().await;
         Ok(all_tools)
@@ -258,6 +277,10 @@ impl ToolManager {
     }
 
     /// Get information about a specific tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool information retrieval fails
     pub async fn get_tool_info(&self, tool_name: &str) -> Result<Option<ToolInfo>> {
         // Check cache first if enabled
         if self.config.enable_metadata_cache {
@@ -268,13 +291,12 @@ impl ToolManager {
         }
 
         // Get tool info from registry
-        let registry_info = match self.registry.get_tool_info(tool_name).await {
-            Some(info) => info,
-            None => return Ok(None),
+        let Some(registry_info) = self.registry.get_tool_info(tool_name).await else {
+            return Ok(None);
         };
 
         // Convert to our ToolInfo format
-        let tool_info = self.registry_info_to_tool_info(&registry_info);
+        let tool_info = Self::registry_info_to_tool_info(&registry_info);
 
         // Update cache if enabled
         if self.config.enable_metadata_cache {
@@ -286,17 +308,24 @@ impl ToolManager {
     }
 
     /// Compose multiple tools into a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool composition execution fails
+    /// - Any step fails with `ErrorStrategy::Fail`
+    /// - Retry attempts are exhausted
     pub async fn compose_tools(
         &self,
         composition: &ToolComposition,
-        mut context: ExecutionContext,
+        context: ExecutionContext,
     ) -> Result<AgentOutput> {
         let mut previous_output: Option<AgentOutput> = None;
         let mut results = Vec::new();
 
         for (step_index, step) in composition.steps.iter().enumerate() {
             let step_result = self
-                .execute_composition_step(step, step_index, &mut context, previous_output.as_ref())
+                .execute_composition_step(step, step_index, &context, previous_output.as_ref())
                 .await;
 
             match step_result {
@@ -310,22 +339,25 @@ impl ToolManager {
                         ErrorStrategy::Continue => {
                             // Use a default output and continue
                             let default_output =
-                                AgentOutput::text(format!("Step {} failed: {}", step_index, error));
+                                AgentOutput::text(format!("Step {step_index} failed: {error}"));
                             previous_output = Some(default_output.clone());
                             results.push(default_output);
                         }
                         ErrorStrategy::Retry(max_attempts) => {
                             // Implement retry logic
-                            let mut attempts = 0;
-                            let mut _last_error = error;
+                            if max_attempts <= 1 {
+                                return Err(error);
+                            }
+
+                            let mut last_error;
+                            let mut attempts = 1; // Already tried once
 
                             while attempts < max_attempts {
-                                attempts += 1;
                                 match self
                                     .execute_composition_step(
                                         step,
                                         step_index,
-                                        &mut context,
+                                        &context,
                                         previous_output.as_ref(),
                                     )
                                     .await
@@ -336,9 +368,10 @@ impl ToolManager {
                                         break;
                                     }
                                     Err(e) => {
-                                        _last_error = e;
+                                        last_error = e;
+                                        attempts += 1;
                                         if attempts >= max_attempts {
-                                            return Err(_last_error);
+                                            return Err(last_error);
                                         }
                                     }
                                 }
@@ -346,7 +379,10 @@ impl ToolManager {
                         }
                         ErrorStrategy::Skip => {
                             // Skip this step and continue with previous output
-                            continue;
+                        }
+                        _ => {
+                            // For any future error strategies, default to fail
+                            return Err(error);
                         }
                     }
                 }
@@ -354,13 +390,10 @@ impl ToolManager {
         }
 
         // Return the final result
-        if let Some(final_output) = results.last() {
-            Ok(final_output.clone())
-        } else {
-            Ok(AgentOutput::text(
-                "Composition completed with no output".to_string(),
-            ))
-        }
+        Ok(results.last().map_or_else(
+            || AgentOutput::text("Composition completed with no output".to_string()),
+            Clone::clone,
+        ))
     }
 
     /// Execute a single composition step
@@ -368,16 +401,16 @@ impl ToolManager {
         &self,
         step: &ToolCompositionStep,
         _step_index: usize,
-        context: &mut ExecutionContext,
+        context: &ExecutionContext,
         previous_output: Option<&AgentOutput>,
     ) -> Result<AgentOutput> {
         // Prepare parameters for this step
-        let parameters = self.prepare_step_parameters(
+        let parameters = Self::prepare_step_parameters(
             &step.parameters,
             &step.context_mode,
             context,
             previous_output,
-        )?;
+        );
 
         // Invoke the tool
         self.invoke_tool(&step.tool_name, parameters, context.clone())
@@ -386,41 +419,34 @@ impl ToolManager {
 
     /// Prepare parameters for a composition step
     fn prepare_step_parameters(
-        &self,
         base_parameters: &JsonValue,
         context_mode: &ContextMode,
         _context: &ExecutionContext,
         previous_output: Option<&AgentOutput>,
-    ) -> Result<JsonValue> {
+    ) -> JsonValue {
         let mut parameters = base_parameters.clone();
 
         // Handle parameter substitution based on context mode
-        match context_mode {
-            ContextMode::Full => {
-                // Parameters can reference full context - this would need template resolution
-                // For now, just use the base parameters
-            }
-            ContextMode::Previous => {
-                // Replace ${previous.output} with actual previous output
-                if let Some(prev_output) = previous_output {
-                    parameters = self.substitute_previous_output(parameters, prev_output)?;
-                }
-            }
-            ContextMode::Selective(_fields) => {
-                // Replace specific fields - implementation would depend on context structure
-                // For now, treat as Full mode
+        if matches!(context_mode, ContextMode::Previous) {
+            // Replace ${previous.output} with actual previous output
+            if let Some(prev_output) = previous_output {
+                parameters = Self::substitute_previous_output(parameters, prev_output);
             }
         }
+        // For other modes (Full, Selective, or future modes):
+        // - Full: Parameters can reference full context - template resolution needed
+        // - Selective: Replace specific fields - implementation would depend on context
+        // - Default: For any future context modes, use base parameters
+        // For now, just use the base parameters without modification
 
-        Ok(parameters)
+        parameters
     }
 
     /// Substitute ${previous.output} references with actual output
     fn substitute_previous_output(
-        &self,
         mut parameters: JsonValue,
         previous_output: &AgentOutput,
-    ) -> Result<JsonValue> {
+    ) -> JsonValue {
         // Simple substitution - replace "${previous.output}" with the output text
         if let JsonValue::Object(ref mut map) = parameters {
             for (_, value) in map.iter_mut() {
@@ -431,11 +457,11 @@ impl ToolManager {
                 }
             }
         }
-        Ok(parameters)
+        parameters
     }
 
-    /// Convert registry ToolInfo to our ToolInfo format
-    fn registry_info_to_tool_info(&self, registry_info: &RegistryToolInfo) -> ToolInfo {
+    /// Convert registry `ToolInfo` to our `ToolInfo` format
+    fn registry_info_to_tool_info(registry_info: &RegistryToolInfo) -> ToolInfo {
         // Convert SecurityLevel to string
         let security_level_str = match registry_info.security_level {
             SecurityLevel::Safe => "safe",
@@ -444,34 +470,33 @@ impl ToolManager {
         }
         .to_string();
 
-        ToolInfo {
-            name: registry_info.name.clone(),
-            description: registry_info.description.clone(),
-            category: registry_info.category.to_string(),
-            security_level: security_level_str,
-            schema: JsonValue::Object(Map::new()), // Schema would need to be generated from the tool itself
-            capabilities: Vec::new(), // Registry ToolInfo doesn't have capabilities field
-            requirements: JsonValue::Object(Map::new()), // Could be expanded with security requirements
-        }
+        ToolInfo::new(
+            registry_info.name.clone(),
+            registry_info.description.clone(),
+            registry_info.category.to_string(),
+            security_level_str,
+        )
+        .with_schema(JsonValue::Object(Map::new())) // Schema would need to be generated from the tool itself
+        .with_requirements(JsonValue::Object(Map::new())) // Could be expanded with security requirements
     }
 
-    /// Convert string to ToolCategory
-    fn string_to_tool_category(&self, category_str: &str) -> Option<ToolCategory> {
+    /// Convert string to `ToolCategory`
+    fn string_to_tool_category(category_str: &str) -> ToolCategory {
         match category_str.to_lowercase().as_str() {
-            "filesystem" => Some(ToolCategory::Filesystem),
-            "web" => Some(ToolCategory::Web),
-            "api" => Some(ToolCategory::Api),
-            "analysis" => Some(ToolCategory::Analysis),
-            "data" => Some(ToolCategory::Data),
-            "system" => Some(ToolCategory::System),
-            "media" => Some(ToolCategory::Media),
-            "utility" => Some(ToolCategory::Utility),
-            _ => Some(ToolCategory::Custom(category_str.to_string())),
+            "filesystem" => ToolCategory::Filesystem,
+            "web" => ToolCategory::Web,
+            "api" => ToolCategory::Api,
+            "analysis" => ToolCategory::Analysis,
+            "data" => ToolCategory::Data,
+            "system" => ToolCategory::System,
+            "media" => ToolCategory::Media,
+            "utility" => ToolCategory::Utility,
+            _ => ToolCategory::Custom(category_str.to_string()),
         }
     }
 
-    /// Convert string to SecurityLevel
-    fn string_to_security_level(&self, level_str: &str) -> Option<SecurityLevel> {
+    /// Convert string to `SecurityLevel`
+    fn string_to_security_level(level_str: &str) -> Option<SecurityLevel> {
         match level_str.to_lowercase().as_str() {
             "safe" => Some(SecurityLevel::Safe),
             "restricted" => Some(SecurityLevel::Restricted),
@@ -491,12 +516,13 @@ impl ToolManager {
     }
 
     /// Get configuration
-    pub fn config(&self) -> &ToolManagerConfig {
+    #[must_use]
+    pub const fn config(&self) -> &ToolManagerConfig {
         &self.config
     }
 
     /// Update configuration
-    pub fn update_config(&mut self, config: ToolManagerConfig) {
+    pub const fn update_config(&mut self, config: ToolManagerConfig) {
         self.config = config;
     }
 }
@@ -507,7 +533,6 @@ mod tests {
     use llmspell_core::traits::tool_capable::{ToolComposition, ToolQuery};
     use llmspell_tools::registry::ToolRegistry;
     use serde_json::json;
-
     #[tokio::test]
     async fn test_tool_manager_creation() {
         let registry = Arc::new(ToolRegistry::new());
@@ -517,7 +542,6 @@ mod tests {
         assert!(manager.config.enable_metadata_cache);
         assert!(manager.config.enable_availability_cache);
     }
-
     #[tokio::test]
     async fn test_tool_manager_with_config() {
         let registry = Arc::new(ToolRegistry::new());
@@ -536,7 +560,6 @@ mod tests {
         assert_eq!(manager.config.max_parallel_executions, 2);
         assert!(!manager.config.validate_parameters);
     }
-
     #[tokio::test]
     async fn test_tool_discovery() {
         let registry = Arc::new(ToolRegistry::new());
@@ -547,7 +570,6 @@ mod tests {
         let tools = manager.discover_tools(&query).await.unwrap();
         assert_eq!(tools.len(), 0);
     }
-
     #[tokio::test]
     async fn test_tool_availability_checks() {
         let registry = Arc::new(ToolRegistry::new());
@@ -559,7 +581,6 @@ mod tests {
         // Test that result is cached (second call should use cache)
         assert!(!manager.tool_available("nonexistent_tool").await);
     }
-
     #[tokio::test]
     async fn test_tool_listing() {
         let registry = Arc::new(ToolRegistry::new());
@@ -569,7 +590,6 @@ mod tests {
         // Should be empty for a new registry
         assert_eq!(tools.len(), 0);
     }
-
     #[tokio::test]
     async fn test_tool_info_retrieval() {
         let registry = Arc::new(ToolRegistry::new());
@@ -579,7 +599,6 @@ mod tests {
         let info = manager.get_tool_info("nonexistent").await.unwrap();
         assert!(info.is_none());
     }
-
     #[tokio::test]
     async fn test_tool_composition_empty() {
         let registry = Arc::new(ToolRegistry::new());
@@ -591,11 +610,10 @@ mod tests {
         let result = manager.compose_tools(&composition, context).await.unwrap();
         assert!(result.text.contains("no output"));
     }
-
     #[tokio::test]
     async fn test_parameter_substitution() {
         let registry = Arc::new(ToolRegistry::new());
-        let manager = ToolManager::new(registry);
+        let _manager = ToolManager::new(registry);
 
         let parameters = json!({
             "input": "${previous.output}",
@@ -603,9 +621,7 @@ mod tests {
         });
 
         let previous_output = AgentOutput::text("test_output".to_string());
-        let result = manager
-            .substitute_previous_output(parameters, &previous_output)
-            .unwrap();
+        let result = ToolManager::substitute_previous_output(parameters, &previous_output);
 
         assert_eq!(
             result["input"],
@@ -613,7 +629,6 @@ mod tests {
         );
         assert_eq!(result["other"], JsonValue::String("value".to_string()));
     }
-
     #[tokio::test]
     async fn test_cache_clearing() {
         let registry = Arc::new(ToolRegistry::new());

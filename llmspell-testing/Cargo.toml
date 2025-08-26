@@ -7,21 +7,47 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
-[lints.rust]
-unexpected_cfgs = { level = "warn", check-cfg = ['cfg(test_category, values("unit", "integration", "tool", "agent", "workflow", "external", "security", "phase6"))'] }
+# Note: cfg_attr with test_category doesn't work as expected
+# Using feature flags instead for test execution
 
 [features]
 default = []
-# Test categories for selective execution
+
+# Language features
+lua = []
+javascript = []
+
+# Primary test categories (aligned with test_category attributes)
 unit-tests = []
 integration-tests = []
+external-tests = []
+benchmark-tests = []
+
+# Component-specific categories
+tool-tests = []
 agent-tests = []
+workflow-tests = []
+bridge-tests = []
+hook-tests = []
+event-tests = []
+session-tests = []
+state-tests = []
+util-tests = []
+core-tests = []
+testing-tests = []
+
+# Specialty categories
+security-tests = []
+performance-tests = []
+
+# Test suites (as defined in documentation)
+fast-tests = ["unit-tests", "integration-tests"]
+comprehensive-tests = ["unit-tests", "integration-tests", "tool-tests", "agent-tests", "workflow-tests", "bridge-tests", "security-tests", "performance-tests"]
+all-tests = ["fast-tests", "external-tests", "benchmark-tests"]
+
+# Legacy support (deprecated, use primary categories)
 scenario-tests = []
 lua-tests = []
-performance-tests = []
-all-tests = ["unit-tests", "integration-tests", "agent-tests", "scenario-tests", "lua-tests", "performance-tests"]
-
-# Fine-grained test features
 network-tests = []
 llm-tests = []
 database-tests = []
@@ -29,20 +55,10 @@ slow-tests = []
 flaky-tests = []
 experimental-tests = []
 
-# Component-specific test features
-core-tests = []
-tools-tests = []
-workflows-tests = []
-bridge-tests = []
-state-tests = []
-events-tests = []
-hooks-tests = []
-security-tests = []
-utils-tests = []
-
 # Optional features
 test-runner = ["clap", "colored"]
 test-utilities = []
+mocks = []
 
 # Binary for test runner
 [[bin]]

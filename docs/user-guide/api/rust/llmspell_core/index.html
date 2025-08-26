@@ -1,0 +1,99 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="ABOUTME: Core traits, types, and infrastructure for rs-llmspell ABOUTME: Foundation layer providing `BaseAgent`, `Agent`, `Tool`, and `Workflow` traits"><title>llmspell_core - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="llmspell_core" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31) (Homebrew)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../static.files/storage-3a5871a4.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../llmspell_core/index.html">llmspell_<wbr>core</a><span class="version">0.6.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#overview" title="Overview">Overview</a></li><li><a href="#architecture" title="Architecture">Architecture</a></li><li><a href="#getting-started" title="Getting Started">Getting Started</a><ul><li><a href="#creating-a-simple-agent" title="Creating a Simple Agent">Creating a Simple Agent</a></li><li><a href="#error-handling" title="Error Handling">Error Handling</a></li><li><a href="#logging" title="Logging">Logging</a></li></ul></li></ul><h3><a href="#reexports">Crate Items</a></h3><ul class="block"><li><a href="#reexports" title="Re-exports">Re-exports</a></li><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#macros" title="Macros">Macros</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>llmspell_core</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/llmspell_core/lib.rs.html#1-145">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><p>ABOUTME: Core traits, types, and infrastructure for rs-llmspell
+ABOUTME: Foundation layer providing <code>BaseAgent</code>, <code>Agent</code>, <code>Tool</code>, and <code>Workflow</code> traits</p>
+<h2 id="overview"><a class="doc-anchor" href="#overview">§</a>Overview</h2>
+<p><code>llmspell-core</code> is the foundational crate of the <code>LLMSpell</code> system, providing:</p>
+<ul>
+<li><strong>Core Traits</strong>: <code>BaseAgent</code>, <code>Agent</code>, <code>Tool</code>, and <code>Workflow</code> for component abstraction</li>
+<li><strong>Type System</strong>: <code>ComponentId</code>, <code>Version</code>, and <code>ComponentMetadata</code> for identification</li>
+<li><strong>Error Handling</strong>: Comprehensive error types with severity and retry logic</li>
+<li><strong>Logging</strong>: Structured logging with JSON and human-readable formats</li>
+</ul>
+<h2 id="architecture"><a class="doc-anchor" href="#architecture">§</a>Architecture</h2>
+<p>The crate follows a trait-based architecture where all components implement
+<code>BaseAgent</code> as the foundation:</p>
+<div class="example-wrap"><pre class="language-text"><code>BaseAgent (foundation trait)
+    ├── Agent (LLM-powered components)
+    ├── Tool (functional components)  
+    └── Workflow (orchestration)</code></pre></div><h2 id="getting-started"><a class="doc-anchor" href="#getting-started">§</a>Getting Started</h2><h3 id="creating-a-simple-agent"><a class="doc-anchor" href="#creating-a-simple-agent">§</a>Creating a Simple Agent</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>llmspell_core::{
+    ComponentMetadata, <span class="prelude-ty">Result</span>, ExecutionContext,
+    traits::{
+        base_agent::BaseAgent,
+        agent::{Agent, AgentConfig, ConversationMessage}
+    },
+    types::{AgentInput, AgentOutput}
+};
+<span class="kw">use </span>async_trait::async_trait;
+
+<span class="kw">struct </span>MyAgent {
+    metadata: ComponentMetadata,
+    config: AgentConfig,
+}
+
+<span class="kw">impl </span>MyAgent {
+    <span class="kw">fn </span>new(name: String) -&gt; <span class="self">Self </span>{
+        <span class="self">Self </span>{
+            metadata: ComponentMetadata::new(name, <span class="string">"My custom agent"</span>.to_string()),
+            config: AgentConfig::default(),
+        }
+    }
+}
+
+<span class="attr">#[async_trait]
+</span><span class="kw">impl </span>BaseAgent <span class="kw">for </span>MyAgent {
+    <span class="kw">fn </span>metadata(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span>ComponentMetadata {
+        <span class="kw-2">&amp;</span><span class="self">self</span>.metadata
+    }
+     
+    <span class="kw">async fn </span>execute(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;AgentOutput&gt; {
+        <span class="comment">// Your agent logic here
+        </span><span class="prelude-val">Ok</span>(AgentOutput::text(<span class="macro">format!</span>(<span class="string">"Processed: {}"</span>, input.text)))
+    }
+     
+    <span class="kw">async fn </span>validate_input(<span class="kw-2">&amp;</span><span class="self">self</span>, input: <span class="kw-2">&amp;</span>AgentInput) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+        <span class="prelude-val">Ok</span>(())
+    }
+     
+    <span class="kw">async fn </span>handle_error(<span class="kw-2">&amp;</span><span class="self">self</span>, error: llmspell_core::LLMSpellError) -&gt; <span class="prelude-ty">Result</span>&lt;AgentOutput&gt; {
+        <span class="prelude-val">Ok</span>(AgentOutput::text(<span class="macro">format!</span>(<span class="string">"Error: {}"</span>, error)))
+    }
+}</code></pre></div>
+<h3 id="error-handling"><a class="doc-anchor" href="#error-handling">§</a>Error Handling</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>llmspell_core::{LLMSpellError, <span class="prelude-ty">Result</span>, component_error};
+
+<span class="kw">fn </span>process_data(data: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;String&gt; {
+    <span class="kw">if </span>data.is_empty() {
+        <span class="kw">return </span><span class="prelude-val">Err</span>(LLMSpellError::Validation {
+            message: <span class="string">"Data cannot be empty"</span>.to_string(),
+            field: <span class="prelude-val">Some</span>(<span class="string">"data"</span>.to_string()),
+        });
+    }
+     
+    <span class="comment">// Or use convenience macros
+    </span><span class="kw">if </span>data.len() &gt; <span class="number">1000 </span>{
+        <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="macro">component_error!</span>(<span class="string">"Data too large"</span>));
+    }
+     
+    <span class="prelude-val">Ok</span>(data.to_uppercase())
+}</code></pre></div>
+<h3 id="logging"><a class="doc-anchor" href="#logging">§</a>Logging</h3>
+<div class="example-wrap"><pre class="rust rust-example-rendered"><code><span class="kw">use </span>llmspell_core::logging::{init_from_env, info, debug};
+
+<span class="comment">// Initialize logging
+</span>init_from_env().expect(<span class="string">"Failed to init logging"</span>);
+
+<span class="comment">// Use standard tracing macros
+</span><span class="macro">info!</span>(<span class="string">"Application started"</span>);
+<span class="macro">debug!</span>(user = <span class="string">"alice"</span>, <span class="string">"Processing request"</span>);</code></pre></div>
+</div></details><h2 id="reexports" class="section-header">Re-exports<a href="#reexports" class="anchor">§</a></h2><dl class="item-table reexports"><dt id="reexport.LLMSpellError"><code>pub use error::<a class="enum" href="error/enum.LLMSpellError.html" title="enum llmspell_core::error::LLMSpellError">LLMSpellError</a>;</code></dt><dt id="reexport.Result"><code>pub use error::<a class="type" href="error/type.Result.html" title="type llmspell_core::error::Result">Result</a>;</code></dt><dt id="reexport.ContextScope"><code>pub use execution_context::<a class="enum" href="execution_context/enum.ContextScope.html" title="enum llmspell_core::execution_context::ContextScope">ContextScope</a>;</code></dt><dt id="reexport.ExecutionContext"><code>pub use execution_context::<a class="struct" href="execution_context/struct.ExecutionContext.html" title="struct llmspell_core::execution_context::ExecutionContext">ExecutionContext</a>;</code></dt><dt id="reexport.InheritancePolicy"><code>pub use execution_context::<a class="enum" href="execution_context/enum.InheritancePolicy.html" title="enum llmspell_core::execution_context::InheritancePolicy">InheritancePolicy</a>;</code></dt><dt id="reexport.Agent"><code>pub use traits::agent::<a class="trait" href="traits/agent/trait.Agent.html" title="trait llmspell_core::traits::agent::Agent">Agent</a>;</code></dt><dt id="reexport.BaseAgent"><code>pub use traits::base_agent::<a class="trait" href="traits/base_agent/trait.BaseAgent.html" title="trait llmspell_core::traits::base_agent::BaseAgent">BaseAgent</a>;</code></dt><dt id="reexport.ComponentLookup"><code>pub use traits::component_lookup::<a class="trait" href="traits/component_lookup/trait.ComponentLookup.html" title="trait llmspell_core::traits::component_lookup::ComponentLookup">ComponentLookup</a>;</code></dt><dt id="reexport.EventConfig"><code>pub use traits::event::<a class="struct" href="traits/event/struct.EventConfig.html" title="struct llmspell_core::traits::event::EventConfig">EventConfig</a>;</code></dt><dt id="reexport.EventData"><code>pub use traits::event::<a class="struct" href="traits/event/struct.EventData.html" title="struct llmspell_core::traits::event::EventData">EventData</a>;</code></dt><dt id="reexport.EventEmitter"><code>pub use traits::event::<a class="trait" href="traits/event/trait.EventEmitter.html" title="trait llmspell_core::traits::event::EventEmitter">EventEmitter</a>;</code></dt><dt id="reexport.StateAccess"><code>pub use traits::state::<a class="trait" href="traits/state/trait.StateAccess.html" title="trait llmspell_core::traits::state::StateAccess">StateAccess</a>;</code></dt><dt id="reexport.Tool"><code>pub use traits::tool::<a class="trait" href="traits/tool/trait.Tool.html" title="trait llmspell_core::traits::tool::Tool">Tool</a>;</code></dt><dt id="reexport.ToolCapable"><code>pub use traits::tool_capable::<a class="trait" href="traits/tool_capable/trait.ToolCapable.html" title="trait llmspell_core::traits::tool_capable::ToolCapable">ToolCapable</a>;</code></dt><dt id="reexport.Workflow"><code>pub use traits::workflow::<a class="trait" href="traits/workflow/trait.Workflow.html" title="trait llmspell_core::traits::workflow::Workflow">Workflow</a>;</code></dt><dt id="reexport.ComponentId"><code>pub use types::<a class="struct" href="types/struct.ComponentId.html" title="struct llmspell_core::types::ComponentId">ComponentId</a>;</code></dt><dt id="reexport.ComponentMetadata"><code>pub use types::<a class="struct" href="types/struct.ComponentMetadata.html" title="struct llmspell_core::types::ComponentMetadata">ComponentMetadata</a>;</code></dt><dt id="reexport.EventMetadata"><code>pub use types::<a class="struct" href="types/struct.EventMetadata.html" title="struct llmspell_core::types::EventMetadata">EventMetadata</a>;</code></dt><dt id="reexport.Version"><code>pub use types::<a class="struct" href="types/struct.Version.html" title="struct llmspell_core::types::Version">Version</a>;</code></dt></dl><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><dl class="item-table"><dt><a class="mod" href="error/index.html" title="mod llmspell_core::error">error</a></dt><dd>ABOUTME: Error types and handling for rs-llmspell
+ABOUTME: Provides <code>LLMSpellError</code> enum and <code>Result</code> type alias</dd><dt><a class="mod" href="events/index.html" title="mod llmspell_core::events">events</a></dt><dd>ABOUTME: Event types and structures for llmspell-core
+ABOUTME: Provides artifact lifecycle events and event metadata</dd><dt><a class="mod" href="execution_context/index.html" title="mod llmspell_core::execution_context">execution_<wbr>context</a></dt><dd>ABOUTME: Enhanced <code>ExecutionContext</code> with hierarchical support and service bundle architecture
+ABOUTME: Provides comprehensive runtime services for agents, tools, and workflows</dd><dt><a class="mod" href="logging/index.html" title="mod llmspell_core::logging">logging</a></dt><dd>ABOUTME: Structured logging infrastructure for rs-llmspell
+ABOUTME: Provides tracing setup with JSON formatting and runtime configuration</dd><dt><a class="mod" href="state/index.html" title="mod llmspell_core::state">state</a></dt><dd>ABOUTME: State management types and structures for llmspell-core
+ABOUTME: Provides artifact correlation and state-related core types</dd><dt><a class="mod" href="traits/index.html" title="mod llmspell_core::traits">traits</a></dt><dt><a class="mod" href="types/index.html" title="mod llmspell_core::types">types</a></dt><dd>ABOUTME: Core types and foundational data structures
+ABOUTME: Provides <code>ComponentId</code>, <code>Version</code>, <code>ComponentMetadata</code> and streaming types</dd></dl><h2 id="macros" class="section-header">Macros<a href="#macros" class="anchor">§</a></h2><dl class="item-table"><dt><a class="macro" href="macro.component_error.html" title="macro llmspell_core::component_error">component_<wbr>error</a></dt><dt><a class="macro" href="macro.log_component_event.html" title="macro llmspell_core::log_component_event">log_<wbr>component_<wbr>event</a></dt><dd>These macros provide structured logging for component lifecycle events.
+They automatically capture component metadata and format it consistently.</dd><dt><a class="macro" href="macro.log_error.html" title="macro llmspell_core::log_error">log_<wbr>error</a></dt><dt><a class="macro" href="macro.log_execution_end.html" title="macro llmspell_core::log_execution_end">log_<wbr>execution_<wbr>end</a></dt><dt><a class="macro" href="macro.log_execution_start.html" title="macro llmspell_core::log_execution_start">log_<wbr>execution_<wbr>start</a></dt><dt><a class="macro" href="macro.tool_error.html" title="macro llmspell_core::tool_error">tool_<wbr>error</a></dt><dt><a class="macro" href="macro.validation_error.html" title="macro llmspell_core::validation_error">validation_<wbr>error</a></dt></dl></section></div></main></body></html>

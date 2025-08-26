@@ -155,7 +155,7 @@ impl HookTestContext {
             return Ok(None);
         }
 
-        let config = AgentBuilder::new(&format!("{}-anthropic", &self.agent_id), "llm")
+        let config = AgentBuilder::new(format!("{}-anthropic", &self.agent_id), "llm")
             .description("Test agent for Anthropic hook integration")
             .with_model("anthropic", "claude-3-5-sonnet-latest")
             .temperature(0.7)
@@ -413,22 +413,21 @@ pub mod test_data {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_context_creation() {
         let context = HookTestContext::new().await.unwrap();
         assert!(!context.agent_id.is_empty());
         assert!(context.temp_dir.path().exists());
     }
-
     #[test]
     fn test_api_key_checking() {
         // This will return false unless API keys are actually set
         let has_openai = check_api_key("openai");
         let has_anthropic = check_api_key("anthropic");
 
-        // Just verify the function doesn't panic
-        assert!(has_openai || !has_openai);
-        assert!(has_anthropic || !has_anthropic);
+        // Just verify the function doesn't panic and returns boolean values
+        // The actual values depend on environment variables being set
+        let _ = has_openai;
+        let _ = has_anthropic;
     }
 }

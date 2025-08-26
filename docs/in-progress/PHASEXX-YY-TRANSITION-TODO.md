@@ -15,7 +15,7 @@ now I'm going to ask you a series of questions about the architecture documented
 
 ### Section 2: Changes to architecture document and implementation plan
 **Instructions** Read Section 1 questions, answers and todos and propose a detailed change to the the documents in the task sections outlined below: for each question below, first answer the first task `Changes to document`, then pause and ask if you should do the second part `Applied changes to document`, one at a time.
-- [ ] **Task/question 2.1** changes to overall architecture in `/docs/technical/rs-llmspell-final-architecture.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE*-DONE.md`. Ensure the entire document makes holistic architecture sense, do not just add new sections, the updates may need to be interspersed across sections.
+- [ ] **Task/question 2.1** changes to overall architecture in `/docs/technical/master-architecture-vision.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE*-DONE.md`. Ensure the entire document makes holistic architecture sense, do not just add new sections, the updates may need to be interspersed across sections.
     - [ ] **Task 2.1.1** Changes to document
         - 
         - 
@@ -29,7 +29,7 @@ now I'm going to ask you a series of questions about the architecture documented
 
 ### Section 3: Transition to next phase
 **Instructions** Read Section 1 and section 2 above and complete the following tasks/questions: 
-- [x] **Task/question 3.1** Based on the `/docs/technical/rs-llmspell-final-architecture.md`, and the `/docs/in-progress/implemenation-phases.md`, and the `/docs/in-progress/KNOWN_ISSUES.md` are you ready to create a detailed design doc for phase 02 `/docs/in-progress/phase-03-design-doc.md` in the style of `/docs/in-progress/phase-00-design-doc.md` and a todo list `/docs/in-progress/PHASE03-TODO.md` in the style of `/docs/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/docs/in-progress/PHASE*-DONE.md`, `/docs/in-progress/PHASE*HANDOFF.md`  to inform your answers and todos.
+- [x] **Task/question 3.1** Based on the `/docs/technical/master-architecture-vision.md`, and the `/docs/in-progress/implemenation-phases.md`, and the `/docs/in-progress/KNOWN_ISSUES.md` are you ready to create a detailed design doc for phase 02 `/docs/in-progress/phase-03-design-doc.md` in the style of `/docs/in-progress/phase-00-design-doc.md` and a todo list `/docs/in-progress/PHASE03-TODO.md` in the style of `/docs/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/docs/in-progress/PHASE*-DONE.md`, `/docs/in-progress/PHASE*HANDOFF.md`  to inform your answers and todos.
     - [ ] Answer: 
         - 
         - 

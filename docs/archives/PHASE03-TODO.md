@@ -6,7 +6,7 @@
 **Phase**: 3 (Tool Enhancement & Workflow Orchestration)  
 **Timeline**: Weeks 9-16 (40 working days)  
 **Priority**: HIGH (MVP Completion)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-03-design-doc.md
 

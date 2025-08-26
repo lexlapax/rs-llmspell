@@ -51,7 +51,7 @@ async fn main() -> Result<()> {
         .max_memory_mb(512)
         .build()?;
 
-    println!("Built agent config: {:?}", agent_config);
+    println!("Built agent config: {agent_config:?}");
 
     // Try to create agent
     match factory.create_agent(agent_config).await {
@@ -65,17 +65,17 @@ async fn main() -> Result<()> {
 
             match agent.execute(input, context).await {
                 Ok(output) => println!("Agent response: {}", output.text),
-                Err(e) => println!("Execution error: {}", e),
+                Err(e) => println!("Execution error: {e}"),
             }
         }
-        Err(e) => println!("Creation error: {}", e),
+        Err(e) => println!("Creation error: {e}"),
     }
 
     // Example 2: Create from template
     println!("\n=== Example 2: Agent Templates ===");
 
     let templates = factory.list_templates();
-    println!("Available templates: {:?}", templates);
+    println!("Available templates: {templates:?}");
 
     // Try to create from template
     match factory.create_from_template("basic").await {
@@ -88,10 +88,10 @@ async fn main() -> Result<()> {
 
             match agent.execute(input, context).await {
                 Ok(output) => println!("Template agent response: {}", output.text),
-                Err(e) => println!("Execution error: {}", e),
+                Err(e) => println!("Execution error: {e}"),
             }
         }
-        Err(e) => println!("Template creation error: {}", e),
+        Err(e) => println!("Template creation error: {e}"),
     }
 
     // Example 3: Using convenience builders
@@ -100,18 +100,18 @@ async fn main() -> Result<()> {
     let research_agent = AgentBuilder::basic("simple-agent")
         .max_tool_calls(10)
         .build()?;
-    println!("Basic agent config: {:#?}", research_agent);
+    println!("Basic agent config: {research_agent:#?}");
 
     let orchestrator = AgentBuilder::tool_orchestrator("orchestrator")
         .max_execution_time_secs(600)
         .build()?;
-    println!("Orchestrator config: {:#?}", orchestrator);
+    println!("Orchestrator config: {orchestrator:#?}");
 
     let llm_agent = AgentBuilder::llm("gpt-agent", "openai", "gpt-4")
         .temperature(0.8)
         .max_tokens(2000)
         .build()?;
-    println!("LLM agent config: {:#?}", llm_agent);
+    println!("LLM agent config: {llm_agent:#?}");
 
     // Example 4: Using factory registry
     println!("\n=== Example 4: Factory Registry ===");
@@ -140,10 +140,10 @@ async fn main() -> Result<()> {
 
             match agent.execute(input, context).await {
                 Ok(output) => println!("Registry agent response: {}", output.text),
-                Err(e) => println!("Execution error: {}", e),
+                Err(e) => println!("Execution error: {e}"),
             }
         }
-        Err(e) => println!("Registry creation error: {}", e),
+        Err(e) => println!("Registry creation error: {e}"),
     }
 
     // Example 5: Default templates

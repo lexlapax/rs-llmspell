@@ -1,6 +1,8 @@
 //! ABOUTME: Performance monitoring and profiling for agents
 //! ABOUTME: Tracks resource usage, response times, throughput, and generates performance reports
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::monitoring::metrics::AgentMetrics;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
@@ -27,7 +29,8 @@ pub struct ResourceUsage {
 
 impl ResourceUsage {
     /// Create a resource usage snapshot
-    pub fn snapshot() -> Self {
+    #[must_use]
+    pub const fn snapshot() -> Self {
         // In a real implementation, this would use system APIs
         // For now, we'll return mock data
         Self {
@@ -93,6 +96,11 @@ pub struct PerformanceReport {
 
 impl PerformanceReport {
     /// Generate a report from snapshots
+    ///
+    /// # Panics
+    ///
+    /// Panics if snapshots is empty (though this is guarded against).
+    #[must_use]
     pub fn from_snapshots(snapshots: &[PerformanceSnapshot]) -> Self {
         if snapshots.is_empty() {
             return Self::empty();
@@ -121,35 +129,60 @@ impl PerformanceReport {
             response_times.push(snapshot.avg_response_time);
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let count = snapshots.len() as f64;
         let avg_cpu_percent = total_cpu / count;
-        let avg_memory_bytes = (total_memory as f64 / count) as u64;
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
+        let avg_memory_bytes = (total_memory as f64 / count).round() as u64;
         let avg_response_time = total_response_time / count;
 
         // Calculate percentiles
         response_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let p95_index =
-            ((response_times.len() as f64 * 0.95) as usize).min(response_times.len() - 1);
-        let p99_index =
-            ((response_times.len() as f64 * 0.99) as usize).min(response_times.len() - 1);
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
+        let p95_index = usize::try_from((response_times.len() as f64 * 0.95).round() as u64)
+            .unwrap_or(0)
+            .min(response_times.len() - 1);
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
+        let p99_index = usize::try_from((response_times.len() as f64 * 0.99).round() as u64)
+            .unwrap_or(0)
+            .min(response_times.len() - 1);
         let p95_response_time = response_times[p95_index];
         let p99_response_time = response_times[p99_index];
 
         // Calculate totals from first and last snapshots
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let total_requests = snapshots.iter().map(|s| s.request_rate).sum::<f64>() as u64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let failed_requests = snapshots
             .iter()
             .map(|s| (s.error_rate * s.request_rate / 100.0) as u64)
             .sum();
 
         let throughput = if duration.as_secs() > 0 {
-            total_requests as f64 / duration.as_secs_f64()
+            #[allow(clippy::cast_precision_loss)]
+            let throughput_val = total_requests as f64 / duration.as_secs_f64();
+            throughput_val
         } else {
             0.0
         };
 
         let availability = if total_requests > 0 {
-            ((total_requests - failed_requests) as f64 / total_requests as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let avail_val =
+                ((total_requests - failed_requests) as f64 / total_requests as f64) * 100.0;
+            avail_val
         } else {
             100.0
         };
@@ -192,6 +225,7 @@ impl PerformanceReport {
     }
 
     /// Generate a summary string
+    #[must_use]
     pub fn summary(&self) -> String {
         let duration = (self.end_time - self.start_time)
             .to_std()
@@ -207,11 +241,25 @@ impl PerformanceReport {
             duration.as_secs_f64(),
             self.avg_cpu_percent,
             self.peak_cpu_percent,
-            self.avg_memory_bytes as f64 / (1024.0 * 1024.0),
-            self.peak_memory_bytes as f64 / (1024.0 * 1024.0),
+            {
+                #[allow(clippy::cast_precision_loss)]
+                let avg_mb = self.avg_memory_bytes as f64 / (1024.0 * 1024.0);
+                avg_mb
+            },
+            {
+                #[allow(clippy::cast_precision_loss)]
+                let peak_mb = self.peak_memory_bytes as f64 / (1024.0 * 1024.0);
+                peak_mb
+            },
             self.total_requests,
             self.failed_requests,
-            100.0 - (self.failed_requests as f64 / self.total_requests.max(1) as f64 * 100.0),
+            {
+                #[allow(clippy::cast_precision_loss)]
+                let success_rate = (self.failed_requests as f64
+                    / self.total_requests.max(1) as f64)
+                    .mul_add(-100.0, 100.0);
+                success_rate
+            },
             self.avg_response_time,
             self.p95_response_time,
             self.p99_response_time,
@@ -266,6 +314,7 @@ impl Default for PerformanceThresholds {
 
 impl PerformanceMonitor {
     /// Create a new performance monitor
+    #[must_use]
     pub fn new(
         agent_id: String,
         metrics: Arc<AgentMetrics>,
@@ -283,23 +332,29 @@ impl PerformanceMonitor {
     }
 
     /// Set custom thresholds
-    pub fn with_thresholds(mut self, thresholds: PerformanceThresholds) -> Self {
+    #[must_use]
+    pub const fn with_thresholds(mut self, thresholds: PerformanceThresholds) -> Self {
         self.thresholds = thresholds;
         self
     }
 
     /// Take a performance snapshot
+    #[must_use]
     pub fn take_snapshot(&self) -> PerformanceSnapshot {
         let resources = ResourceUsage::snapshot();
 
         // Calculate rates from metrics
         let total_requests = self.metrics.requests_total.get();
         let failed_requests = self.metrics.requests_failed.get();
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let active_requests = self.metrics.requests_active.get() as usize;
 
+        #[allow(clippy::cast_precision_loss)]
         let request_rate = total_requests as f64 / self.snapshot_interval.as_secs_f64();
         let error_rate = if total_requests > 0 {
-            (failed_requests as f64 / total_requests as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let rate = (failed_requests as f64 / total_requests as f64) * 100.0;
+            rate
         } else {
             0.0
         };
@@ -308,7 +363,9 @@ impl PerformanceMonitor {
         let avg_response_time = match self.metrics.request_duration.get() {
             crate::monitoring::metrics::MetricValue::Histogram { sum, count, .. } => {
                 if count > 0 {
-                    (sum / count as f64) * 1000.0 // Convert to milliseconds
+                    #[allow(clippy::cast_precision_loss)]
+                    let avg_time = (sum / count as f64) * 1000.0; // Convert to milliseconds
+                    avg_time
                 } else {
                     0.0
                 }
@@ -328,6 +385,10 @@ impl PerformanceMonitor {
     }
 
     /// Store a snapshot
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     fn store_snapshot(&self, snapshot: PerformanceSnapshot) {
         let mut snapshots = self.snapshots.write().unwrap();
 
@@ -340,6 +401,11 @@ impl PerformanceMonitor {
     }
 
     /// Generate a performance report
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn generate_report(&self) -> PerformanceReport {
         let snapshots = self.snapshots.read().unwrap();
         let snapshots_vec: Vec<_> = snapshots.iter().cloned().collect();
@@ -347,6 +413,7 @@ impl PerformanceMonitor {
     }
 
     /// Check if performance is within thresholds
+    #[must_use]
     pub fn check_thresholds(&self, snapshot: &PerformanceSnapshot) -> Vec<PerformanceViolation> {
         let mut violations = Vec::new();
 
@@ -362,17 +429,21 @@ impl PerformanceMonitor {
         if snapshot.resources.memory_bytes > self.thresholds.max_memory_bytes {
             violations.push(PerformanceViolation {
                 metric: "memory_bytes".to_string(),
+                #[allow(clippy::cast_precision_loss)]
                 current_value: snapshot.resources.memory_bytes as f64,
+                #[allow(clippy::cast_precision_loss)]
                 threshold_value: self.thresholds.max_memory_bytes as f64,
                 severity: ViolationSeverity::Critical,
             });
         }
 
-        if snapshot.avg_response_time > self.thresholds.max_response_time_ms as f64 {
+        #[allow(clippy::cast_precision_loss)]
+        let max_response_time = self.thresholds.max_response_time_ms as f64;
+        if snapshot.avg_response_time > max_response_time {
             violations.push(PerformanceViolation {
                 metric: "response_time_ms".to_string(),
                 current_value: snapshot.avg_response_time,
-                threshold_value: self.thresholds.max_response_time_ms as f64,
+                threshold_value: max_response_time,
                 severity: ViolationSeverity::Warning,
             });
         }
@@ -390,8 +461,8 @@ impl PerformanceMonitor {
     }
 
     /// Start performance monitoring
-    pub async fn start_monitoring(self: Arc<Self>) {
-        let monitor = self.clone();
+    pub fn start_monitoring(self: Arc<Self>) {
+        let monitor = self;
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(monitor.snapshot_interval);
 
@@ -402,10 +473,11 @@ impl PerformanceMonitor {
                 let snapshot = monitor.take_snapshot();
 
                 // Update metrics
-                monitor.metrics.update_resources(
-                    snapshot.resources.memory_bytes as f64,
-                    snapshot.resources.cpu_percent,
-                );
+                #[allow(clippy::cast_precision_loss)]
+                let memory_f64 = snapshot.resources.memory_bytes as f64;
+                monitor
+                    .metrics
+                    .update_resources(memory_f64, snapshot.resources.cpu_percent);
 
                 // Check thresholds
                 let violations = monitor.check_thresholds(&snapshot);
@@ -453,7 +525,6 @@ pub enum ViolationSeverity {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_resource_usage_snapshot() {
         let usage = ResourceUsage::snapshot();
@@ -461,24 +532,26 @@ mod tests {
         assert!(usage.memory_bytes > 0);
         assert!(usage.thread_count > 0);
     }
-
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_performance_report_from_snapshots() {
         let mut snapshots = Vec::new();
 
         for i in 0..5 {
             let snapshot = PerformanceSnapshot {
-                timestamp: Utc::now() + chrono::Duration::seconds(i as i64),
+                #[allow(clippy::cast_possible_wrap)]
+                timestamp: Utc::now() + chrono::Duration::seconds(i64::from(i)),
                 resources: ResourceUsage {
-                    cpu_percent: 20.0 + (i as f64 * 5.0),
-                    memory_bytes: 100 * 1024 * 1024 + (i as u64 * 10 * 1024 * 1024),
+                    cpu_percent: f64::from(i).mul_add(5.0, 20.0),
+                    memory_bytes: 100 * 1024 * 1024
+                        + (u64::try_from(i).unwrap_or(0) * 10 * 1024 * 1024),
                     thread_count: 8,
                     fd_count: Some(42),
                     network_sent_bytes: 0,
                     network_recv_bytes: 0,
                 },
                 request_rate: 100.0,
-                avg_response_time: 50.0 + (i as f64 * 10.0),
+                avg_response_time: f64::from(i).mul_add(10.0, 50.0),
                 error_rate: 1.0,
                 active_requests: 10,
                 queue_depth: 5,
@@ -498,7 +571,6 @@ mod tests {
         let summary = report.summary();
         assert!(summary.contains("CPU: avg 30.0%, peak 40.0%"));
     }
-
     #[test]
     fn test_performance_threshold_violations() {
         let metrics = Arc::new(AgentMetrics::new("test-agent".to_string()));
@@ -535,8 +607,8 @@ mod tests {
         assert!(violations.iter().any(|v| v.metric == "response_time_ms"));
         assert!(violations.iter().any(|v| v.metric == "throughput"));
     }
-
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertions on float values
     fn test_snapshot_storage() {
         let metrics = Arc::new(AgentMetrics::new("test-agent".to_string()));
         let monitor = PerformanceMonitor::new(
@@ -551,7 +623,7 @@ mod tests {
             let snapshot = PerformanceSnapshot {
                 timestamp: Utc::now(),
                 resources: ResourceUsage::snapshot(),
-                request_rate: i as f64,
+                request_rate: f64::from(i),
                 avg_response_time: 50.0,
                 error_rate: 0.0,
                 active_requests: 0,

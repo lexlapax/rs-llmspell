@@ -9,7 +9,7 @@ use tracing_subscriber::{
     EnvFilter, Layer,
 };
 
-/// Logging configuration for the LLMSpell system.
+/// Logging configuration for the `LLMSpell` system.
 ///
 /// Controls various aspects of log output including format, level,
 /// and metadata inclusion. Supports both human-readable and JSON formats.
@@ -74,6 +74,7 @@ impl Default for LoggingConfig {
 
 impl LoggingConfig {
     /// Create a development configuration with human-readable output
+    #[must_use]
     pub fn development() -> Self {
         Self {
             default_level: Level::DEBUG,
@@ -87,6 +88,7 @@ impl LoggingConfig {
     }
 
     /// Create a production configuration with JSON output
+    #[must_use]
     pub fn production() -> Self {
         Self::default()
     }
@@ -236,7 +238,6 @@ macro_rules! log_execution_end {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_logging_config_default() {
         let config = LoggingConfig::default();
@@ -245,7 +246,6 @@ mod tests {
         assert!(config.with_timestamps);
         assert!(!config.with_thread_names);
     }
-
     #[test]
     fn test_logging_config_development() {
         let config = LoggingConfig::development();
@@ -255,7 +255,6 @@ mod tests {
         assert!(config.with_thread_names);
         assert!(config.with_span_events);
     }
-
     #[test]
     fn test_logging_config_production() {
         let config = LoggingConfig::production();
@@ -264,7 +263,6 @@ mod tests {
         assert!(config.with_timestamps);
         assert!(config.with_file_lines);
     }
-
     #[test]
     fn test_logging_initialization() {
         // We can't actually initialize logging in tests (it's global state)

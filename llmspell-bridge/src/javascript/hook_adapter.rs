@@ -62,7 +62,6 @@ impl HookAdapter for JavaScriptHookAdapter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_javascript_hook_adapter_stub() {
         let adapter = JavaScriptHookAdapter::new();

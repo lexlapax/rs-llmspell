@@ -892,7 +892,6 @@ mod tests {
     use super::*;
     use std::env;
     use std::fs;
-
     #[test]
     fn test_normalize_path() {
         // Test basic normalization
@@ -907,7 +906,6 @@ mod tests {
         let path = normalize_path(Path::new("/home/user/"));
         assert_eq!(path, Path::new("/home/user"));
     }
-
     #[test]
     fn test_is_absolute_path() {
         assert!(is_absolute_path(Path::new("/home/user")));
@@ -915,7 +913,6 @@ mod tests {
         assert!(!is_absolute_path(Path::new("./relative")));
         assert!(!is_absolute_path(Path::new("../parent")));
     }
-
     #[test]
     fn test_join_paths() {
         // Basic join
@@ -930,7 +927,6 @@ mod tests {
         let joined = join_paths(&[Path::new("/home"), Path::new(""), Path::new("user")]);
         assert_eq!(joined, Path::new("/home/user"));
     }
-
     #[test]
     fn test_parent_dir() {
         assert_eq!(
@@ -946,7 +942,6 @@ mod tests {
         // Root has no parent
         assert_eq!(parent_dir(Path::new("/")), None);
     }
-
     #[test]
     fn test_expand_path_tilde() {
         // Set HOME for consistent testing
@@ -967,7 +962,6 @@ mod tests {
             env::remove_var("HOME");
         }
     }
-
     #[test]
     fn test_expand_path_env_vars() {
         // Set test environment variable
@@ -991,7 +985,6 @@ mod tests {
         // Cleanup
         env::remove_var("TEST_VAR");
     }
-
     #[test]
     fn test_ensure_dir() {
         let temp_dir = std::env::temp_dir();
@@ -1013,7 +1006,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(&test_dir);
     }
-
     #[test]
     fn test_ensure_dir_file_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1030,7 +1022,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
     #[test]
     fn test_read_write_file() {
         let temp_dir = std::env::temp_dir();
@@ -1049,7 +1040,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
     #[test]
     fn test_write_file_creates_parent_dirs() {
         let temp_dir = std::env::temp_dir();
@@ -1074,7 +1064,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
     }
-
     #[test]
     fn test_atomic_write() {
         let temp_dir = std::env::temp_dir();
@@ -1103,7 +1092,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
     #[test]
     fn test_copy_file() {
         let temp_dir = std::env::temp_dir();
@@ -1127,7 +1115,6 @@ mod tests {
         let _ = fs::remove_file(&source);
         let _ = fs::remove_file(&dest);
     }
-
     #[test]
     fn test_remove_file_if_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1145,7 +1132,6 @@ mod tests {
         // Remove again (should still succeed)
         assert!(remove_file_if_exists(&test_file).is_ok());
     }
-
     #[test]
     fn test_remove_dir_all_if_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1166,7 +1152,6 @@ mod tests {
         // Remove again (should still succeed)
         assert!(remove_dir_all_if_exists(&test_dir).is_ok());
     }
-
     #[test]
     fn test_append_file() {
         let temp_dir = std::env::temp_dir();
@@ -1187,7 +1172,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
     #[test]
     fn test_append_file_creates_parent_dirs() {
         let temp_dir = std::env::temp_dir();
@@ -1207,7 +1191,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
     }
-
     #[test]
     fn test_move_file() {
         let temp_dir = std::env::temp_dir();
@@ -1231,7 +1214,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&dest);
     }
-
     #[test]
     fn test_move_file_creates_parent_dirs() {
         let temp_dir = std::env::temp_dir();
@@ -1255,7 +1237,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(dest.parent().unwrap().parent().unwrap());
     }
-
     #[test]
     fn test_get_metadata() {
         let temp_dir = std::env::temp_dir();
@@ -1283,7 +1264,6 @@ mod tests {
         let _ = fs::remove_file(&test_file);
         let _ = fs::remove_dir(&test_dir);
     }
-
     #[test]
     fn test_file_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1300,7 +1280,6 @@ mod tests {
         fs::remove_file(&test_file).unwrap();
         assert!(!file_exists(&test_file));
     }
-
     #[test]
     fn test_list_dir() {
         let temp_dir = std::env::temp_dir();
@@ -1340,7 +1319,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(&test_dir);
     }
-
     #[test]
     fn test_list_empty_dir() {
         let temp_dir = std::env::temp_dir();
@@ -1353,7 +1331,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir(&test_dir);
     }
-
     #[test]
     fn test_list_dir_error() {
         let temp_dir = std::env::temp_dir();
@@ -1411,7 +1388,6 @@ mod property_tests {
             let normalized_again = normalize_path(&normalized);
             assert_eq!(normalized, normalized_again);
         }
-
         #[test]
         fn test_join_paths_associative(
             a in "[a-zA-Z0-9]+",
@@ -1426,7 +1402,6 @@ mod property_tests {
             let result2 = join_paths(&[path_a, &join_paths(&[path_b, path_c])]);
             assert_eq!(result1, result2);
         }
-
         #[test]
         fn test_write_read_roundtrip(data: Vec<u8>) {
             let temp_dir = std::env::temp_dir();
@@ -1444,69 +1419,5 @@ mod property_tests {
             // Cleanup
             let _ = fs::remove_file(&test_file);
         }
-    }
-}
-
-#[cfg(all(test, not(debug_assertions)))]
-mod benchmarks {
-    use super::*;
-    use criterion::{black_box, Criterion};
-
-    pub fn bench_normalize_path(c: &mut Criterion) {
-        c.bench_function("normalize_path", |b| {
-            b.iter(|| normalize_path(black_box(Path::new("/home/user/../user/./docs/./file.txt"))));
-        });
-    }
-
-    pub fn bench_expand_path(c: &mut Criterion) {
-        env::set_var("BENCH_VAR", "/test/path");
-
-        c.bench_function("expand_path", |b| {
-            b.iter(|| expand_path(black_box("$BENCH_VAR/subdir/file.txt")).unwrap());
-        });
-
-        env::remove_var("BENCH_VAR");
-    }
-
-    pub fn bench_write_file(c: &mut Criterion) {
-        let temp_dir = std::env::temp_dir();
-        let test_file = temp_dir.join("llmspell_bench_write");
-        let data = vec![b'x'; 1024]; // 1KB of data
-
-        c.bench_function("write_file_1kb", |b| {
-            b.iter(|| write_file(black_box(&test_file), black_box(&data)).unwrap());
-        });
-
-        // Cleanup
-        let _ = fs::remove_file(&test_file);
-    }
-
-    pub fn bench_write_file_atomic(c: &mut Criterion) {
-        let temp_dir = std::env::temp_dir();
-        let test_file = temp_dir.join("llmspell_bench_atomic");
-        let data = vec![b'x'; 1024]; // 1KB of data
-
-        c.bench_function("write_file_atomic_1kb", |b| {
-            b.iter(|| write_file_atomic(black_box(&test_file), black_box(&data)).unwrap());
-        });
-
-        // Cleanup
-        let _ = fs::remove_file(&test_file);
-    }
-
-    pub fn bench_read_file(c: &mut Criterion) {
-        let temp_dir = std::env::temp_dir();
-        let test_file = temp_dir.join("llmspell_bench_read");
-        let data = vec![b'x'; 1024]; // 1KB of data
-
-        // Create file
-        write_file(&test_file, &data).unwrap();
-
-        c.bench_function("read_file_1kb", |b| {
-            b.iter(|| read_file(black_box(&test_file)).unwrap());
-        });
-
-        // Cleanup
-        let _ = fs::remove_file(&test_file);
     }
 }

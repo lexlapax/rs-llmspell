@@ -41,7 +41,7 @@ impl BaseAgent for TestAgent {
         Ok(())
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         _input: AgentInput,
         _context: ExecutionContext,
@@ -129,16 +129,13 @@ async fn test_registry_query() {
 
     // Register multiple agents
     for i in 1..=3 {
-        let agent = Arc::new(TestAgent::new(
-            &format!("agent-{}", i),
-            &format!("Agent {}", i),
-        ));
+        let agent = Arc::new(TestAgent::new(&format!("agent-{i}"), &format!("Agent {i}")));
 
         let metadata = AgentMetadata {
-            id: format!("agent-{}", i),
-            name: format!("Agent {}", i),
+            id: format!("agent-{i}"),
+            name: format!("Agent {i}"),
             agent_type: if i % 2 == 0 { "even" } else { "odd" }.to_string(),
-            description: format!("Test agent {}", i),
+            description: format!("Test agent {i}"),
             categories: vec![format!("group-{}", if i <= 2 { "a" } else { "b" })],
             custom_metadata: HashMap::new(),
             created_at: chrono::Utc::now(),
@@ -152,7 +149,7 @@ async fn test_registry_query() {
         };
 
         registry
-            .register_agent(format!("agent-{}", i), agent, metadata)
+            .register_agent(format!("agent-{i}"), agent, metadata)
             .await
             .unwrap();
     }
@@ -266,8 +263,8 @@ async fn test_metrics_update() {
     // Verify metrics updated
     let updated = registry.get_metadata("metrics-1").await.unwrap().unwrap();
     assert_eq!(updated.metrics.execution_count, 100);
-    assert_eq!(updated.metrics.success_rate, 0.95);
-    assert_eq!(updated.metrics.avg_execution_time_ms, 50.0);
+    assert!((updated.metrics.success_rate - 0.95).abs() < f64::EPSILON);
+    assert!((updated.metrics.avg_execution_time_ms - 50.0).abs() < f64::EPSILON);
 }
 
 #[tokio::test]

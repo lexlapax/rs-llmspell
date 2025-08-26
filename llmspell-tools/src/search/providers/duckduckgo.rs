@@ -1,5 +1,5 @@
-//! ABOUTME: DuckDuckGo search provider implementation
-//! ABOUTME: Uses DuckDuckGo Instant Answer API (no API key required)
+//! ABOUTME: `DuckDuckGo` search provider implementation
+//! ABOUTME: Uses `DuckDuckGo` Instant Answer API (no API key required)
 
 use super::{SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
@@ -8,12 +8,13 @@ use reqwest::Client;
 use serde_json::Value;
 use tracing::{debug, info, warn};
 
-/// DuckDuckGo search provider
+/// `DuckDuckGo` search provider
 pub struct DuckDuckGoProvider {
     client: Client,
 }
 
 impl DuckDuckGoProvider {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             client: Client::new(),
@@ -29,7 +30,7 @@ impl Default for DuckDuckGoProvider {
 
 #[async_trait]
 impl SearchProvider for DuckDuckGoProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "duckduckgo"
     }
 
@@ -41,6 +42,7 @@ impl SearchProvider for DuckDuckGoProvider {
         None // No official rate limit, but we should be respectful
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         // DuckDuckGo Instant Answer API only supports web search
         if options.search_type != SearchType::Web {
@@ -72,7 +74,7 @@ impl SearchProvider for DuckDuckGoProvider {
             .send()
             .await
             .map_err(|e| LLMSpellError::Network {
-                message: format!("DuckDuckGo API request failed: {}", e),
+                message: format!("DuckDuckGo API request failed: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -84,7 +86,7 @@ impl SearchProvider for DuckDuckGoProvider {
         }
 
         let response_text = response.text().await.map_err(|e| LLMSpellError::Network {
-            message: format!("Failed to get DuckDuckGo response text: {}", e),
+            message: format!("Failed to get DuckDuckGo response text: {e}"),
             source: Some(Box::new(e)),
         })?;
 
@@ -99,7 +101,7 @@ impl SearchProvider for DuckDuckGoProvider {
                 response_text
             );
             LLMSpellError::Network {
-                message: format!("Failed to parse DuckDuckGo response: {}", e),
+                message: format!("Failed to parse DuckDuckGo response: {e}"),
                 source: Some(Box::new(e)),
             }
         })?;

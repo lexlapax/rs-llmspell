@@ -1,5 +1,5 @@
 //! ABOUTME: Session global object providing session management for scripts
-//! ABOUTME: Integrates with SessionManager via SessionBridge for language-specific bindings
+//! ABOUTME: Integrates with `SessionManager` via `SessionBridge` for language-specific bindings
 
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::session_bridge::SessionBridge;
@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 /// Session global object providing session management for scripts
 ///
-/// This wraps SessionBridge and provides language-specific bindings,
+/// This wraps `SessionBridge` and provides language-specific bindings,
 /// converting between async Rust operations and synchronous script calls.
 pub struct SessionGlobal {
     /// Session bridge for core operations
@@ -17,7 +17,8 @@ pub struct SessionGlobal {
 
 impl SessionGlobal {
     /// Create a new Session global
-    pub fn new(session_bridge: Arc<SessionBridge>) -> Self {
+    #[must_use]
+    pub const fn new(session_bridge: Arc<SessionBridge>) -> Self {
         Self { session_bridge }
     }
 }
@@ -41,7 +42,7 @@ impl GlobalObject for SessionGlobal {
             self.session_bridge.clone(),
         )
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to inject Session global: {}", e),
+            message: format!("Failed to inject Session global: {e}"),
             source: None,
         })
     }

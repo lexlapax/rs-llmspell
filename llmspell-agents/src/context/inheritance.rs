@@ -81,7 +81,7 @@ pub enum ConflictResolution {
 /// Trait for custom inheritance validation
 pub trait InheritanceValidator: Send + Sync {
     /// Validate whether a field should be inherited
-    fn should_inherit(&self, field: &str, value: &Value, policy: &InheritancePolicy) -> bool;
+    fn should_inherit(&self, field: &str, value: &Value, policy: InheritancePolicy) -> bool;
 
     /// Validate the inherited value
     fn validate_value(&self, field: &str, value: &Value) -> bool;
@@ -89,6 +89,7 @@ pub trait InheritanceValidator: Send + Sync {
 
 impl InheritanceRules {
     /// Create new inheritance rules with defaults
+    #[must_use]
     pub fn new() -> Self {
         Self {
             field_rules: FieldInheritance::default(),
@@ -99,48 +100,59 @@ impl InheritanceRules {
     }
 
     /// Add a field that should always be inherited
+    #[must_use]
     pub fn always_inherit(mut self, field: String) -> Self {
         self.field_rules.always_inherit.insert(field);
         self
     }
 
     /// Add a field that should never be inherited
+    #[must_use]
     pub fn never_inherit(mut self, field: String) -> Self {
         self.field_rules.never_inherit.insert(field);
         self
     }
 
     /// Add conditional inheritance for a field
+    #[must_use]
     pub fn conditional_inherit(mut self, field: String, policies: Vec<InheritancePolicy>) -> Self {
         self.field_rules.conditional_inherit.insert(field, policies);
         self
     }
 
     /// Add a field transform
+    #[must_use]
     pub fn with_transform(mut self, field: String, transform: FieldTransform) -> Self {
         self.field_rules.transforms.insert(field, transform);
         self
     }
 
     /// Set maximum inheritance depth
-    pub fn max_depth(mut self, depth: usize) -> Self {
+    #[must_use]
+    pub const fn max_depth(mut self, depth: usize) -> Self {
         self.max_depth = depth;
         self
     }
 
     /// Set conflict resolution strategy
-    pub fn conflict_resolution(mut self, resolution: ConflictResolution) -> Self {
+    #[must_use]
+    pub const fn conflict_resolution(mut self, resolution: ConflictResolution) -> Self {
         self.conflict_resolution = resolution;
         self
     }
 
     /// Add a custom validator
+    #[must_use]
     pub fn add_validator(mut self, validator: Box<dyn InheritanceValidator>) -> Self {
         self.validators.push(validator);
         self
     }
 
     /// Apply inheritance rules to create child context data
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation fails
     pub fn apply(
         &self,
         parent_ctx: &ExecutionContext,
@@ -182,7 +194,7 @@ impl InheritanceRules {
         child: &mut ExecutionContext,
     ) -> Result<(), String> {
         for (field, value) in &parent.data {
-            if self.should_inherit_field(field, value, &child.inheritance) {
+            if self.should_inherit_field(field, value, child.inheritance) {
                 let transformed_value = self.transform_value(field, value);
                 self.set_field_value(child, field.clone(), transformed_value)?;
             }
@@ -229,7 +241,7 @@ impl InheritanceRules {
         Ok(())
     }
 
-    fn should_inherit_field(&self, field: &str, value: &Value, policy: &InheritancePolicy) -> bool {
+    fn should_inherit_field(&self, field: &str, value: &Value, policy: InheritancePolicy) -> bool {
         // Check never_inherit first
         if self.field_rules.never_inherit.contains(field) {
             return false;
@@ -242,7 +254,7 @@ impl InheritanceRules {
 
         // Check conditional inheritance
         if let Some(policies) = self.field_rules.conditional_inherit.get(field) {
-            if !policies.contains(policy) {
+            if !policies.contains(&policy) {
                 return false;
             }
         }
@@ -259,26 +271,15 @@ impl InheritanceRules {
 
     fn transform_value(&self, field: &str, value: &Value) -> Value {
         match self.field_rules.transforms.get(field) {
-            Some(FieldTransform::Copy) => value.clone(),
-            Some(FieldTransform::Prefix(prefix)) => {
-                if let Some(str_val) = value.as_str() {
-                    Value::String(format!("{}{}", prefix, str_val))
-                } else {
-                    value.clone()
-                }
-            }
-            Some(FieldTransform::Suffix(suffix)) => {
-                if let Some(str_val) = value.as_str() {
-                    Value::String(format!("{}{}", str_val, suffix))
-                } else {
-                    value.clone()
-                }
-            }
-            Some(FieldTransform::Custom(_)) => {
-                // Custom transforms would be implemented by validators
-                value.clone()
-            }
-            None => value.clone(),
+            Some(FieldTransform::Prefix(prefix)) => value.as_str().map_or_else(
+                || value.clone(),
+                |str_val| Value::String(format!("{prefix}{str_val}")),
+            ),
+            Some(FieldTransform::Suffix(suffix)) => value.as_str().map_or_else(
+                || value.clone(),
+                |str_val| Value::String(format!("{str_val}{suffix}")),
+            ),
+            Some(FieldTransform::Copy | FieldTransform::Custom(_)) | None => value.clone(),
         }
     }
 
@@ -291,7 +292,7 @@ impl InheritanceRules {
         // Validate value
         for validator in &self.validators {
             if !validator.validate_value(&field, &value) {
-                return Err(format!("Validation failed for field: {}", field));
+                return Err(format!("Validation failed for field: {field}"));
             }
         }
 
@@ -306,7 +307,7 @@ impl InheritanceRules {
                     ctx.set(field, value);
                 }
                 ConflictResolution::Merge => {
-                    let merged = self.merge_values(existing, &value);
+                    let merged = Self::merge_values(existing, &value);
                     ctx.set(field, merged);
                 }
                 ConflictResolution::KeepBoth => {
@@ -321,7 +322,7 @@ impl InheritanceRules {
         Ok(())
     }
 
-    fn merge_values(&self, existing: &Value, new: &Value) -> Value {
+    fn merge_values(existing: &Value, new: &Value) -> Value {
         match (existing, new) {
             (Value::Object(existing_obj), Value::Object(new_obj)) => {
                 let mut merged = existing_obj.clone();
@@ -350,17 +351,16 @@ impl Default for InheritanceRules {
 pub struct SecurityFieldValidator;
 
 impl InheritanceValidator for SecurityFieldValidator {
-    fn should_inherit(&self, field: &str, _value: &Value, _policy: &InheritancePolicy) -> bool {
+    fn should_inherit(&self, field: &str, _value: &Value, _policy: InheritancePolicy) -> bool {
         // Security fields should generally be inherited
         field.starts_with("security_") || field == "permissions"
     }
 
     fn validate_value(&self, field: &str, value: &Value) -> bool {
         if field == "security_level" {
-            if let Some(level) = value.as_str() {
-                return ["low", "medium", "high", "critical"].contains(&level);
-            }
-            false
+            value
+                .as_str()
+                .is_some_and(|level| ["low", "medium", "high", "critical"].contains(&level))
         } else {
             true
         }
@@ -371,7 +371,6 @@ impl InheritanceValidator for SecurityFieldValidator {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_default_inheritance_rules() {
         let rules = InheritanceRules::new();
@@ -383,7 +382,6 @@ mod tests {
             .never_inherit
             .contains("agent_private_state"));
     }
-
     #[test]
     fn test_field_inheritance() {
         let rules = InheritanceRules::new()
@@ -409,7 +407,6 @@ mod tests {
         // normal_field should not be inherited with Isolate policy
         assert_eq!(child.get("normal_field"), None);
     }
-
     #[test]
     fn test_field_transforms() {
         let rules = InheritanceRules::new()
@@ -433,7 +430,6 @@ mod tests {
 
         assert_eq!(child.get("prefixed_field"), Some(json!("child_value")));
     }
-
     #[test]
     fn test_conflict_resolution() {
         // Test ChildWins
@@ -470,7 +466,6 @@ mod tests {
         assert_eq!(merged["a"], 1);
         assert_eq!(merged["b"], 2);
     }
-
     #[test]
     fn test_security_validator() {
         let mut rules = InheritanceRules::new();

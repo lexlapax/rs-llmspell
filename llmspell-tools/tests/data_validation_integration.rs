@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for DataValidationTool
+//! ABOUTME: Integration tests for `DataValidationTool`
 //! ABOUTME: Tests comprehensive validation scenarios with multiple rule types
 
 use llmspell_core::{
@@ -11,7 +11,6 @@ use llmspell_tools::{
     DataValidationTool,
 };
 use serde_json::{json, Value};
-
 #[tokio::test]
 async fn test_simple_required_validation() {
     let tool = DataValidationTool::new();
@@ -63,7 +62,6 @@ async fn test_simple_required_validation() {
     assert!(validation_result.valid);
     assert_eq!(validation_result.errors.len(), 0);
 }
-
 #[tokio::test]
 async fn test_multiple_validation_rules() {
     let tool = DataValidationTool::new();
@@ -94,7 +92,6 @@ async fn test_multiple_validation_rules() {
     assert_eq!(validation_result.errors.len(), 1); // Only length validation should fail
     assert!(validation_result.errors[0].message.contains("at least 3"));
 }
-
 #[tokio::test]
 async fn test_numeric_range_validation() {
     let tool = DataValidationTool::new();
@@ -145,7 +142,6 @@ async fn test_numeric_range_validation() {
     assert!(!validation_result.valid);
     assert!(validation_result.errors[0].message.contains("at most 65"));
 }
-
 #[tokio::test]
 async fn test_enum_validation() {
     let tool = DataValidationTool::new();
@@ -196,7 +192,6 @@ async fn test_enum_validation() {
         .message
         .contains("must be one of"));
 }
-
 #[tokio::test]
 async fn test_email_and_url_validation() {
     let tool = DataValidationTool::new();
@@ -245,7 +240,6 @@ async fn test_email_and_url_validation() {
         serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 }
-
 #[tokio::test]
 async fn test_date_validation() {
     let tool = DataValidationTool::new();
@@ -293,7 +287,6 @@ async fn test_date_validation() {
         serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
 }
-
 #[tokio::test]
 async fn test_array_validation() {
     let tool = DataValidationTool::new();
@@ -356,7 +349,6 @@ async fn test_array_validation() {
     assert!(!validation_result.valid);
     assert!(validation_result.errors[0].message.contains("unique"));
 }
-
 #[tokio::test]
 async fn test_nested_object_validation() {
     let tool = DataValidationTool::new();
@@ -450,7 +442,6 @@ async fn test_nested_object_validation() {
         serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 }
-
 #[tokio::test]
 async fn test_custom_validators() {
     let tool = DataValidationTool::new();
@@ -521,7 +512,6 @@ async fn test_custom_validators() {
         serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 }
-
 #[tokio::test]
 async fn test_fail_fast_configuration() {
     let config = DataValidationConfig {
@@ -554,7 +544,6 @@ async fn test_fail_fast_configuration() {
     assert!(!validation_result.valid);
     assert_eq!(validation_result.errors.len(), 1); // Only first error due to fail_fast
 }
-
 #[tokio::test]
 async fn test_tool_metadata() {
     let tool = DataValidationTool::new();
@@ -571,7 +560,6 @@ async fn test_tool_metadata() {
     assert_eq!(rules_param.name, "rules");
     assert!(rules_param.required);
 }
-
 #[tokio::test]
 async fn test_validation_error_details() {
     let tool = DataValidationTool::new();

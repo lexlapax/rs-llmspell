@@ -165,7 +165,11 @@ impl MigrationContext {
         if self.total_steps == 0 {
             0.0
         } else {
-            self.current_step as f64 / self.total_steps as f64
+            #[allow(clippy::cast_precision_loss)]
+            let current_step_f64 = self.current_step as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_steps_f64 = self.total_steps as f64;
+            current_step_f64 / total_steps_f64
         }
     }
 
@@ -185,7 +189,6 @@ impl MigrationContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_migration_result_lifecycle() {
         let from_version = SemanticVersion::new(1, 0, 0);
@@ -208,7 +211,6 @@ mod tests {
         assert_eq!(result.items_migrated, 50);
         assert_eq!(result.steps_completed, 3);
     }
-
     #[test]
     fn test_migration_context() {
         let config = MigrationConfig::default();
@@ -219,7 +221,6 @@ mod tests {
         assert_eq!(context.current_step, 0);
         assert_eq!(context.total_steps, 5);
     }
-
     #[test]
     fn test_migration_config_defaults() {
         let config = MigrationConfig::default();

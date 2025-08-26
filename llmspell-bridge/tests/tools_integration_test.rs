@@ -5,9 +5,10 @@
 async fn test_all_tools_integration() {
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
-        providers::{ProviderManager, ProviderManagerConfig},
+        providers::ProviderManager,
         ComponentRegistry,
     };
+    use llmspell_config::providers::ProviderManagerConfig;
     use std::sync::Arc;
 
     // Initialize components
@@ -15,8 +16,9 @@ async fn test_all_tools_integration() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    // Register all tools
-    llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+    // Register all tools with default configuration
+    let tools_config = llmspell_config::tools::ToolsConfig::default();
+    llmspell_bridge::tools::register_all_tools(&registry, &tools_config).unwrap();
 
     // Create engine
     let lua_config = LuaConfig::default();
@@ -75,19 +77,19 @@ async fn test_all_tools_integration() {
             if let Some(obj) = result.output.as_object() {
                 if let Some(passed) = obj.get("passed") {
                     let passed_count = passed.as_i64().unwrap_or(0);
-                    let failed_count = obj.get("failed").and_then(|f| f.as_i64()).unwrap_or(0);
+                    let failed_count = obj
+                        .get("failed")
+                        .and_then(serde_json::value::Value::as_i64)
+                        .unwrap_or(0);
 
-                    println!(
-                        "Test results: {} passed, {} failed",
-                        passed_count, failed_count
-                    );
+                    println!("Test results: {passed_count} passed, {failed_count} failed");
                     assert!(passed_count >= 6, "Should have at least 6 core tools");
                     assert_eq!(failed_count, 0, "Some core tools are missing");
                 }
             }
         }
         Err(e) => {
-            panic!("Integration test failed: {}", e);
+            panic!("Integration test failed: {e}");
         }
     }
 }
@@ -97,9 +99,10 @@ async fn test_all_tools_integration() {
 async fn test_tool_performance_benchmarks() {
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
-        providers::{ProviderManager, ProviderManagerConfig},
+        providers::ProviderManager,
         ComponentRegistry,
     };
+    use llmspell_config::providers::ProviderManagerConfig;
     use std::sync::Arc;
     use std::time::Instant;
 
@@ -107,7 +110,8 @@ async fn test_tool_performance_benchmarks() {
     let provider_config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
-    llmspell_bridge::tools::register_all_tools(registry.clone()).unwrap();
+    let tools_config = llmspell_config::tools::ToolsConfig::default();
+    llmspell_bridge::tools::register_all_tools(&registry, &tools_config).unwrap();
 
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -150,16 +154,15 @@ async fn test_tool_performance_benchmarks() {
         }
 
         let elapsed = start.elapsed();
-        let per_op = elapsed.as_micros() as f64 / iterations as f64 / 1000.0; // Convert to ms
+        #[allow(clippy::cast_precision_loss)] // Acceptable for timing measurements
+        let per_op = elapsed.as_micros() as f64 / f64::from(iterations) / 1000.0; // Convert to ms
 
-        println!("{:<20} {:.3}ms/op", tool_name, per_op);
+        println!("{tool_name:<20} {per_op:.3}ms/op");
 
         // Assert <10ms requirement
         assert!(
             per_op < 10.0,
-            "{} exceeds 10ms target: {:.3}ms",
-            tool_name,
-            per_op
+            "{tool_name} exceeds 10ms target: {per_op:.3}ms"
         );
     }
 }

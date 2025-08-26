@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["SortField","SortOrder"],"struct":["Discovery","RecommendationContext","SearchBuilder","SearchCriteria","SearchResult"]};

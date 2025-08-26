@@ -1,5 +1,5 @@
 //! ABOUTME: Search provider abstraction and implementations
-//! ABOUTME: Defines common interface for all search providers (Google, Bing, DuckDuckGo, SerpApi, SerperDev)
+//! ABOUTME: Defines common interface for all search providers (Google, Bing, `DuckDuckGo`, `SerpApi`, `SerperDev`)
 
 use async_trait::async_trait;
 use llmspell_core::Result;

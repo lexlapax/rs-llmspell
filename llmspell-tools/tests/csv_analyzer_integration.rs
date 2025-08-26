@@ -1,10 +1,9 @@
-//! ABOUTME: Integration tests for CsvAnalyzerTool with real-world CSV scenarios
+//! ABOUTME: Integration tests for `CsvAnalyzerTool` with real-world CSV scenarios
 //! ABOUTME: Tests complex workflows, large file handling, and error cases
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::CsvAnalyzerTool;
 use serde_json::json;
-
 #[tokio::test]
 async fn test_complex_csv_analysis_workflow() {
     let tool = CsvAnalyzerTool::default();
@@ -88,7 +87,6 @@ async fn test_complex_csv_analysis_workflow() {
     assert!(parsed.is_array());
     assert_eq!(parsed.as_array().unwrap().len(), 5);
 }
-
 #[tokio::test]
 async fn test_malformed_csv_handling() {
     let tool = CsvAnalyzerTool::default();
@@ -127,20 +125,23 @@ newline",300
         assert!(!errors.is_empty());
     }
 }
-
 #[tokio::test]
 async fn test_large_csv_streaming() {
+    use std::fmt::Write;
+
     let tool = CsvAnalyzerTool::default();
 
     // Generate a large CSV (but still within default limits)
     let mut csv_content = String::from("id,value,category\n");
     for i in 1..=1000 {
-        csv_content.push_str(&format!(
-            "{},value_{},{}\n",
+        writeln!(
+            csv_content,
+            "{},value_{},{}",
             i,
             i,
             if i % 2 == 0 { "A" } else { "B" }
-        ));
+        )
+        .unwrap();
     }
 
     let input = AgentInput::text("sample large csv").with_parameter(
@@ -164,17 +165,16 @@ async fn test_large_csv_streaming() {
     let line_count = result.text.lines().count();
     assert_eq!(line_count, 11); // 1 header + 10 samples
 }
-
 #[tokio::test]
 async fn test_csv_validation() {
     let tool = CsvAnalyzerTool::default();
 
-    let csv_content = r#"id,email,age
+    let csv_content = r"id,email,age
 1,john@example.com,25
 2,invalid-email,30
 3,mary@test.org,150
 4,bob@demo.net,-5
-"#;
+";
 
     let input = AgentInput::text("validate csv data").with_parameter(
         "parameters".to_string(),
@@ -204,16 +204,15 @@ async fn test_csv_validation() {
         assert!(!errors.is_empty()); // Should have validation errors
     }
 }
-
 #[tokio::test]
 async fn test_csv_transform_operation() {
     let tool = CsvAnalyzerTool::default();
 
-    let csv_content = r#"product,price,quantity
+    let csv_content = r"product,price,quantity
 Apple,1.50,100
 Banana,0.75,200
 Orange,2.00,150
-"#;
+";
 
     let input = AgentInput::text("transform csv").with_parameter(
         "parameters".to_string(),
@@ -243,7 +242,6 @@ Orange,2.00,150
     assert!(result.text.contains("total"));
     assert!(!result.text.contains("product,")); // Old name should be gone
 }
-
 #[tokio::test]
 async fn test_encoding_detection() {
     let tool = CsvAnalyzerTool::default();

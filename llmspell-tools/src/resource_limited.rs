@@ -1,5 +1,5 @@
 //! ABOUTME: Resource-limited tool execution wrapper
-//! ABOUTME: Provides ResourceLimitedTool trait and implementation for enforcing resource limits
+//! ABOUTME: Provides `ResourceLimitedTool` trait and implementation for enforcing resource limits
 
 use async_trait::async_trait;
 use llmspell_core::{
@@ -38,7 +38,7 @@ pub struct ResourceLimitedTool<T: Tool> {
 
 impl<T: Tool> ResourceLimitedTool<T> {
     /// Create a new resource-limited tool
-    pub fn new(tool: T, limits: ResourceLimits) -> Self {
+    pub const fn new(tool: T, limits: ResourceLimits) -> Self {
         Self {
             inner: tool,
             limits,
@@ -62,7 +62,7 @@ impl<T: Tool + Send + Sync> BaseAgent for ResourceLimitedTool<T> {
         self.inner.metadata()
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         context: ExecutionContext,
@@ -155,6 +155,13 @@ pub trait ResourceLimitExt: Tool + Sized {
 impl<T: Tool> ResourceLimitExt for T {}
 
 /// Helper to track file operations with size limits
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Operation tracking fails due to resource limits
+/// - File size exceeds configured limits
+#[allow(clippy::unused_async)]
 pub async fn check_file_operation(
     tracker: &ResourceTracker,
     path: &std::path::Path,
@@ -166,6 +173,7 @@ pub async fn check_file_operation(
 
     if operation == "read" || operation == "write" {
         if let Ok(metadata) = fs::metadata(path) {
+            #[allow(clippy::cast_possible_truncation)]
             let size = metadata.len() as usize;
             tracker.check_file_size(size)?;
         }
@@ -175,6 +183,12 @@ pub async fn check_file_operation(
 }
 
 /// Helper to track memory allocation for data processing
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Memory allocation would exceed configured limits
+/// - The operation function returns an error
 pub fn track_data_processing<T, F>(
     tracker: &ResourceTracker,
     estimated_size: usize,
@@ -224,7 +238,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
@@ -238,7 +252,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -256,7 +270,6 @@ mod tests {
             ToolSchema::new("mock_tool".to_string(), "Mock tool for testing".to_string())
         }
     }
-
     #[tokio::test]
     async fn test_resource_limited_tool() {
         let mock_tool = MockTool::new(50);
@@ -269,7 +282,6 @@ mod tests {
         assert!(result.text.contains("Success"));
         assert!(result.text.contains("Resource usage:"));
     }
-
     #[tokio::test]
     async fn test_timeout_enforcement() {
         let mock_tool = MockTool::new(200);
@@ -294,7 +306,6 @@ mod tests {
             }
         }
     }
-
     #[test]
     fn test_file_size_checking() {
         let tracker = ResourceTracker::new(ResourceLimits {
@@ -309,7 +320,6 @@ mod tests {
         let result = tracker.check_file_size(2048);
         assert!(result.is_err());
     }
-
     #[test]
     fn test_memory_tracking() {
         let tracker = ResourceTracker::new(ResourceLimits {

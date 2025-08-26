@@ -1,6 +1,8 @@
 //! ABOUTME: Hierarchical context support for parent-child relationships
 //! ABOUTME: Enables context trees with traversal and management capabilities
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::execution_context::{ContextScope, ExecutionContext, InheritancePolicy};
 use llmspell_core::{LLMSpellError, Result};
 use serde::{Deserialize, Serialize};
@@ -32,6 +34,7 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
+    #[must_use]
     pub fn new() -> Self {
         let now = chrono::Utc::now();
         Self {
@@ -45,6 +48,7 @@ impl NodeMetadata {
 
 impl ContextNode {
     /// Create a new context node
+    #[must_use]
     pub fn new(context: ExecutionContext) -> Self {
         Self {
             context,
@@ -54,14 +58,19 @@ impl ContextNode {
     }
 
     /// Add a child node
-    pub fn add_child(&mut self, child: ContextNode) -> Arc<RwLock<ContextNode>> {
+    pub fn add_child(&mut self, child: Self) -> Arc<RwLock<Self>> {
         let child_arc = Arc::new(RwLock::new(child));
         self.children.push(child_arc.clone());
         child_arc
     }
 
     /// Find a node by context ID
-    pub fn find_by_id(&self, id: &str) -> Option<Arc<RwLock<ContextNode>>> {
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
+    #[must_use]
+    pub fn find_by_id(&self, id: &str) -> Option<Arc<RwLock<Self>>> {
         // Check self
         if self.context.id == id {
             return None; // Would need to return self somehow
@@ -83,7 +92,12 @@ impl ContextNode {
     }
 
     /// Get all descendant nodes
-    pub fn descendants(&self) -> Vec<Arc<RwLock<ContextNode>>> {
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
+    #[must_use]
+    pub fn descendants(&self) -> Vec<Arc<RwLock<Self>>> {
         let mut result = Vec::new();
 
         for child in &self.children {
@@ -113,6 +127,7 @@ pub struct HierarchicalContext {
 
 impl HierarchicalContext {
     /// Create a new hierarchical context manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             roots: HashMap::new(),
@@ -121,11 +136,19 @@ impl HierarchicalContext {
     }
 
     /// Create a new root context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context creation fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
     pub fn create_root(&mut self, name: String, context: ExecutionContext) -> Result<String> {
         let node = ContextNode::new(context.clone());
         let node_arc = Arc::new(RwLock::new(node));
 
-        self.roots.insert(name.clone(), node_arc.clone());
+        self.roots.insert(name, node_arc.clone());
         self.index
             .write()
             .unwrap()
@@ -135,6 +158,16 @@ impl HierarchicalContext {
     }
 
     /// Create a child context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Parent context not found
+    /// - Child context creation fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
     pub fn create_child(
         &self,
         parent_id: &str,
@@ -147,7 +180,7 @@ impl HierarchicalContext {
             index
                 .get(parent_id)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Context not found: {}", parent_id),
+                    message: format!("Context not found: {parent_id}"),
                     source: None,
                 })?
                 .clone()
@@ -169,6 +202,11 @@ impl HierarchicalContext {
     }
 
     /// Get a context by ID
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
+    #[must_use]
     pub fn get(&self, id: &str) -> Option<ExecutionContext> {
         let index = self.index.read().unwrap();
         index.get(id).map(|node| {
@@ -179,6 +217,14 @@ impl HierarchicalContext {
     }
 
     /// Remove a context and all its descendants
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
     pub fn remove(&mut self, id: &str) -> Result<()> {
         let mut index = self.index.write().unwrap();
 
@@ -200,13 +246,18 @@ impl HierarchicalContext {
             Ok(())
         } else {
             Err(LLMSpellError::Component {
-                message: format!("Context not found: {}", id),
+                message: format!("Context not found: {id}"),
                 source: None,
             })
         }
     }
 
     /// Get all root contexts
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
+    #[must_use]
     pub fn roots(&self) -> HashMap<String, ExecutionContext> {
         self.roots
             .iter()
@@ -219,6 +270,11 @@ impl HierarchicalContext {
     }
 
     /// Get context statistics
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
+    #[must_use]
     pub fn stats(&self) -> ContextStats {
         let index = self.index.read().unwrap();
         let total_contexts = index.len();
@@ -239,7 +295,11 @@ impl HierarchicalContext {
             average_depth: if self.roots.is_empty() {
                 0.0
             } else {
-                total_depth as f64 / self.roots.len() as f64
+                #[allow(clippy::cast_precision_loss)]
+                let total_depth_f64 = total_depth as f64;
+                #[allow(clippy::cast_precision_loss)]
+                let roots_len_f64 = self.roots.len() as f64;
+                total_depth_f64 / roots_len_f64
             },
         }
     }
@@ -280,7 +340,6 @@ mod tests {
     use super::*;
     use llmspell_core::ComponentId;
     use serde_json::json;
-
     #[test]
     fn test_hierarchical_context_creation() {
         let mut hierarchy = HierarchicalContext::new();
@@ -302,7 +361,6 @@ mod tests {
         assert!(child_ctx.get("root_key").is_some());
         assert_eq!(child_ctx.depth(), 1);
     }
-
     #[test]
     fn test_context_removal() {
         let mut hierarchy = HierarchicalContext::new();
@@ -333,7 +391,6 @@ mod tests {
         assert!(hierarchy.get(&root_id).is_none());
         assert!(hierarchy.get(&child1.id).is_none());
     }
-
     #[test]
     fn test_context_stats() {
         let mut hierarchy = HierarchicalContext::new();
@@ -374,7 +431,6 @@ mod tests {
         assert_eq!(stats.root_count, 2);
         assert_eq!(stats.max_depth, 3); // root1 -> child1 -> grandchild
     }
-
     #[test]
     fn test_node_metadata() {
         let mut node = ContextNode::new(ExecutionContext::new());

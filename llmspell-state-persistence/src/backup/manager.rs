@@ -250,6 +250,7 @@ impl BackupManager {
             stats: BackupStats {
                 total_entries: entry_count,
                 total_size: data.len() as u64,
+                #[allow(clippy::cast_possible_truncation)]
                 duration_ms: duration.as_millis() as u64,
                 scopes_backed_up: vec!["global".to_string()], // TODO: Get actual scopes
             },
@@ -410,7 +411,9 @@ impl BackupManager {
         }
 
         // Basic integrity checks
-        let integrity_valid = !data.is_empty() && data.len() == metadata.stats.total_size as usize;
+        #[allow(clippy::cast_possible_truncation)]
+        let expected_size = metadata.stats.total_size as usize;
+        let integrity_valid = !data.is_empty() && data.len() == expected_size;
         if !integrity_valid {
             errors.push("Data integrity check failed".to_string());
         }
@@ -567,9 +570,12 @@ impl BackupManager {
             let reduction_percent = if compression_info.original_size > 0
                 && compression_info.compressed_size < compression_info.original_size
             {
-                ((compression_info.original_size - compression_info.compressed_size) as f64
-                    / compression_info.original_size as f64)
-                    * 100.0
+                #[allow(clippy::cast_precision_loss)]
+                let size_diff =
+                    (compression_info.original_size - compression_info.compressed_size) as f64;
+                #[allow(clippy::cast_precision_loss)]
+                let original_size = compression_info.original_size as f64;
+                (size_diff / original_size) * 100.0
             } else {
                 0.0
             };
@@ -776,7 +782,6 @@ impl BackupManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_backup_id_generation() {
         let _config = BackupConfig::default();
@@ -799,7 +804,6 @@ mod tests {
         let id = format!("backup_{}_test", timestamp);
         assert!(id.starts_with("backup_"));
     }
-
     #[test]
     fn test_backup_type_serialization() {
         let full = BackupType::Full;

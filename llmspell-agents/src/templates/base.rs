@@ -44,6 +44,7 @@ impl std::fmt::Debug for TemplateInstantiationParams {
 
 impl TemplateInstantiationParams {
     /// Create new instantiation parameters
+    #[must_use]
     pub fn new(agent_id: String) -> Self {
         Self {
             agent_id,
@@ -56,30 +57,35 @@ impl TemplateInstantiationParams {
     }
 
     /// Add parameter value
+    #[must_use]
     pub fn with_parameter(mut self, name: &str, value: serde_json::Value) -> Self {
         self.parameters.insert(name.to_string(), value);
         self
     }
 
     /// Set resource manager
+    #[must_use]
     pub fn with_resource_manager(mut self, resource_manager: Arc<ResourceManager>) -> Self {
         self.resource_manager = Some(resource_manager);
         self
     }
 
     /// Set event system
+    #[must_use]
     pub fn with_event_system(mut self, event_system: Arc<LifecycleEventSystem>) -> Self {
         self.event_system = Some(event_system);
         self
     }
 
     /// Add config override
+    #[must_use]
     pub fn with_config_override(mut self, key: &str, value: serde_json::Value) -> Self {
         self.config_overrides.insert(key.to_string(), value);
         self
     }
 
     /// Add environment variable
+    #[must_use]
     pub fn with_environment(mut self, key: &str, value: &str) -> Self {
         self.environment.insert(key.to_string(), value.to_string());
         self
@@ -105,6 +111,10 @@ pub trait AgentTemplate: Send + Sync {
     fn schema(&self) -> &TemplateSchema;
 
     /// Validate instantiation parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if parameters are invalid or required parameters are missing
     async fn validate_parameters(&self, params: &TemplateInstantiationParams) -> Result<()> {
         // Default validation implementation
         let schema = self.schema();
@@ -127,6 +137,7 @@ pub trait AgentTemplate: Send + Sync {
     }
 
     /// Validate individual parameter value
+    #[allow(clippy::too_many_lines)]
     async fn validate_parameter_value(
         &self,
         param_def: &ParameterDefinition,
@@ -213,13 +224,9 @@ pub trait AgentTemplate: Send + Sync {
                     }
                 }
                 ParameterConstraint::MinLength(min_len) => {
-                    let length = if let Some(s) = value.as_str() {
-                        s.len()
-                    } else if let Some(arr) = value.as_array() {
-                        arr.len()
-                    } else {
-                        0
-                    };
+                    let length = value
+                        .as_str()
+                        .map_or_else(|| value.as_array().map_or(0, Vec::len), str::len);
                     if length < *min_len {
                         return Err(anyhow!(
                             "Parameter '{}' must have minimum length {}",
@@ -229,13 +236,9 @@ pub trait AgentTemplate: Send + Sync {
                     }
                 }
                 ParameterConstraint::MaxLength(max_len) => {
-                    let length = if let Some(s) = value.as_str() {
-                        s.len()
-                    } else if let Some(arr) = value.as_array() {
-                        arr.len()
-                    } else {
-                        0
-                    };
+                    let length = value
+                        .as_str()
+                        .map_or_else(|| value.as_array().map_or(0, Vec::len), str::len);
                     if length > *max_len {
                         return Err(anyhow!(
                             "Parameter '{}' must have maximum length {}",
@@ -284,6 +287,10 @@ pub trait AgentTemplate: Send + Sync {
     }
 
     /// Apply default values to parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if default value application fails
     async fn apply_defaults(&self, params: &mut TemplateInstantiationParams) -> Result<()> {
         let schema = self.schema();
 
@@ -359,11 +366,16 @@ pub struct TemplateFactory {
 
 impl TemplateFactory {
     /// Create new template factory
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Register a template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if template registration fails or template already exists
     pub fn register_template(&mut self, template: Box<dyn AgentTemplate>) -> Result<()> {
         let template_id = template.schema().metadata.id.clone();
         let category = template.category().clone();
@@ -389,36 +401,43 @@ impl TemplateFactory {
     }
 
     /// Get template by ID
+    #[must_use]
     pub fn get_template(&self, template_id: &str) -> Option<&dyn AgentTemplate> {
-        self.templates.get(template_id).map(|t| t.as_ref())
+        self.templates
+            .get(template_id)
+            .map(std::convert::AsRef::as_ref)
     }
 
     /// Get all templates in category
+    #[must_use]
     pub fn get_templates_by_category(
         &self,
         category: &super::schema::TemplateCategory,
     ) -> Vec<&dyn AgentTemplate> {
-        if let Some(template_ids) = self.templates_by_category.get(category) {
-            template_ids
-                .iter()
-                .filter_map(|id| self.get_template(id))
-                .collect()
-        } else {
-            Vec::new()
-        }
+        self.templates_by_category
+            .get(category)
+            .map_or_else(Vec::new, |template_ids| {
+                template_ids
+                    .iter()
+                    .filter_map(|id| self.get_template(id))
+                    .collect()
+            })
     }
 
     /// Get all template IDs
+    #[must_use]
     pub fn list_templates(&self) -> Vec<String> {
         self.templates.keys().cloned().collect()
     }
 
     /// Get template schemas
+    #[must_use]
     pub fn get_template_schemas(&self) -> Vec<&TemplateSchema> {
         self.templates.values().map(|t| t.schema()).collect()
     }
 
     /// Find templates by keyword
+    #[must_use]
     pub fn find_templates(&self, keyword: &str) -> Vec<&dyn AgentTemplate> {
         let keyword_lower = keyword.to_lowercase();
         self.templates
@@ -437,11 +456,17 @@ impl TemplateFactory {
                         .iter()
                         .any(|k| k.to_lowercase().contains(&keyword_lower))
             })
-            .map(|t| t.as_ref())
+            .map(std::convert::AsRef::as_ref)
             .collect()
     }
 
     /// Instantiate template by ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Template not found
+    /// - Instantiation fails
     pub async fn instantiate_template(
         &self,
         template_id: &str,
@@ -455,6 +480,12 @@ impl TemplateFactory {
     }
 
     /// Validate template parameters without instantiation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Template not found
+    /// - Parameter validation fails
     pub async fn validate_template_parameters(
         &self,
         template_id: &str,
@@ -468,16 +499,22 @@ impl TemplateFactory {
     }
 
     /// Get template count
+    #[must_use]
     pub fn template_count(&self) -> usize {
         self.templates.len()
     }
 
     /// Check if template exists
+    #[must_use]
     pub fn has_template(&self, template_id: &str) -> bool {
         self.templates.contains_key(template_id)
     }
 
     /// Unregister template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if template is not found
     pub fn unregister_template(&mut self, template_id: &str) -> Result<()> {
         if let Some(template) = self.templates.remove(template_id) {
             let category = template.category().clone();
@@ -559,12 +596,11 @@ mod tests {
         }
 
         fn clone_template(&self) -> Box<dyn AgentTemplate> {
-            Box::new(MockTemplate {
+            Box::new(Self {
                 schema: self.schema.clone(),
             })
         }
     }
-
     #[tokio::test]
     async fn test_template_factory_registration() {
         let mut factory = TemplateFactory::new();
@@ -578,7 +614,6 @@ mod tests {
         assert!(factory.has_template("mock_template"));
         assert!(!factory.has_template("nonexistent"));
     }
-
     #[tokio::test]
     async fn test_template_factory_categories() {
         let mut factory = TemplateFactory::new();
@@ -592,7 +627,6 @@ mod tests {
         let monitoring_templates = factory.get_templates_by_category(&TemplateCategory::Monitoring);
         assert_eq!(monitoring_templates.len(), 0);
     }
-
     #[tokio::test]
     async fn test_template_factory_search() {
         let mut factory = TemplateFactory::new();
@@ -609,7 +643,6 @@ mod tests {
         let found = factory.find_templates("nonexistent");
         assert_eq!(found.len(), 0);
     }
-
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = MockTemplate::new();
@@ -631,7 +664,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_template_metadata() {
         let template = MockTemplate::new();
@@ -641,7 +673,6 @@ mod tests {
         assert_eq!(template.required_tools().len(), 0);
         assert_eq!(template.optional_tools().len(), 0);
     }
-
     #[tokio::test]
     async fn test_template_unregistration() {
         let mut factory = TemplateFactory::new();

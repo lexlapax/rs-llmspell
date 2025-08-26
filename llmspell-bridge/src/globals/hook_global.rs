@@ -1,6 +1,8 @@
 //! ABOUTME: Hook global object providing cross-language hook system
 //! ABOUTME: Full implementation integrating with llmspell-hooks infrastructure
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::hook_bridge::HookBridge;
 use llmspell_core::error::LLMSpellError;
@@ -13,7 +15,8 @@ pub struct HookGlobal {
 
 impl HookGlobal {
     /// Create a new Hook global with the bridge
-    pub fn new(hook_bridge: Arc<HookBridge>) -> Self {
+    #[must_use]
+    pub const fn new(hook_bridge: Arc<HookBridge>) -> Self {
         Self { hook_bridge }
     }
 }
@@ -57,14 +60,18 @@ impl GlobalObject for HookGlobal {
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
-
+    use llmspell_config::providers::ProviderManagerConfig;
     #[tokio::test]
     async fn test_hook_global_metadata() {
         let context = Arc::new(GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         ));
-        let hook_bridge = Arc::new(HookBridge::new(context).await.unwrap());
+        let hook_bridge = Arc::new(HookBridge::new(context).unwrap());
         let global = HookGlobal::new(hook_bridge);
         let metadata = global.metadata();
         assert_eq!(metadata.name, "Hook");

@@ -18,17 +18,34 @@ members = [
     "llmspell-utils",
     "llmspell-state-persistence",
     "llmspell-state-traits",
-    "llmspell-sessions"
+    "llmspell-sessions",
+    "examples/rust-developers/extension-pattern-example",
+    "examples/rust-developers/builder-pattern-example", 
+    "examples/rust-developers/custom-tool-example",
+    "examples/rust-developers/custom-agent-example",
+    "examples/rust-developers/async-patterns-example",
+    "examples/rust-developers/integration-test-example"
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.7.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
 repository = "https://github.com/lexlapax/rs-llmspell"
-license = "MIT OR Apache-2.0"
+license = "Apache-2.0"
 keywords = ["llm", "ai", "agents", "scripting", "automation"]
 categories = ["text-processing", "api-bindings", "automation"]
+
+# Test categorization managed through features in llmspell-testing crate
+
+[workspace.lints.rust]
+unsafe_code = "warn"
+unused_must_use = "warn"
+
+[workspace.lints.clippy]
+all = "warn"
+pedantic = "warn"
+nursery = "warn"
 
 [workspace.dependencies]
 # Async runtime and utilities
@@ -99,6 +116,7 @@ walkdir = "2.5"
 crossbeam = "0.8"
 parking_lot = "0.12"
 lazy_static = "1.4"
+dashmap = "6.1"
 
 # Random number generation
 rand = "0.8"

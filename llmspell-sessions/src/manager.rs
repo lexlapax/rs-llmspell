@@ -97,10 +97,9 @@ impl SessionManager {
         // Create storage directories if needed
         if config.auto_persist {
             std::fs::create_dir_all(&config.storage_path).map_err(|e| {
-                SessionError::Io(std::io::Error::new(
-                    std::io::ErrorKind::Other,
-                    format!("Failed to create storage directory: {e}"),
-                ))
+                SessionError::Io(std::io::Error::other(format!(
+                    "Failed to create storage directory: {e}"
+                )))
             })?;
         }
 
@@ -1520,10 +1519,7 @@ impl SessionManager {
     ) -> Result<ArtifactId> {
         // Read file content
         let content = tokio::fs::read(file_path).await.map_err(|e| {
-            SessionError::Io(std::io::Error::new(
-                std::io::ErrorKind::Other,
-                format!("Failed to read file: {e}"),
-            ))
+            SessionError::Io(std::io::Error::other(format!("Failed to read file: {e}")))
         })?;
 
         // Use file name as artifact name
@@ -1638,7 +1634,6 @@ mod tests {
         )
         .unwrap()
     }
-
     #[tokio::test]
     async fn test_create_session() {
         let manager = create_test_manager().await;
@@ -1651,7 +1646,6 @@ mod tests {
         let session_id = manager.create_session(options).await.unwrap();
         assert!(manager.get_session(&session_id).await.is_ok());
     }
-
     #[tokio::test]
     async fn test_session_lifecycle() {
         let manager = create_test_manager().await;
@@ -1676,7 +1670,6 @@ mod tests {
         manager.complete_session(&session_id).await.unwrap();
         assert!(manager.get_session(&session_id).await.is_err());
     }
-
     #[tokio::test]
     async fn test_save_load_session() {
         let manager = create_test_manager().await;
@@ -1696,7 +1689,6 @@ mod tests {
         let loaded = manager.load_session(&session_id).await.unwrap();
         assert_eq!(loaded.id().await, session_id);
     }
-
     #[tokio::test]
     async fn test_list_sessions() {
         let manager = create_test_manager().await;
@@ -1724,7 +1716,6 @@ mod tests {
         let sessions = manager.list_sessions(query).await.unwrap();
         assert_eq!(sessions.len(), 3);
     }
-
     #[tokio::test]
     async fn test_user_artifact_storage() {
         let manager = create_test_manager().await;
@@ -1772,7 +1763,6 @@ mod tests {
         let result = manager.get_artifact(&session_id, &artifact_id).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_artifact_with_metadata() {
         let manager = create_test_manager().await;
@@ -1819,7 +1809,6 @@ mod tests {
             &serde_json::json!("1.0.0")
         );
     }
-
     #[tokio::test]
     async fn test_store_file_artifact() {
         let manager = create_test_manager().await;
@@ -1850,7 +1839,6 @@ mod tests {
         assert_eq!(artifact.metadata.name, "test_file.json");
         assert_eq!(artifact.get_content().unwrap(), content.as_bytes());
     }
-
     #[tokio::test]
     async fn test_artifact_operations_on_inactive_session() {
         let manager = create_test_manager().await;
@@ -1892,7 +1880,6 @@ mod tests {
         let result = manager.delete_artifact(&session_id, &artifact_id).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_query_artifacts() {
         let manager = create_test_manager().await;

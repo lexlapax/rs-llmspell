@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
     example_monitor_agent().await?;
 
     // Example 4: Using Template Factory
-    example_template_factory().await?;
+    example_template_factory()?;
 
     // Example 5: Template Validation
     example_template_validation().await?;
@@ -52,8 +52,8 @@ async fn example_tool_agent() -> Result<()> {
 
     // Validate parameters
     match template.validate_parameters(&params).await {
-        Ok(_) => println!("Parameters validated successfully"),
-        Err(e) => println!("Parameter validation failed: {}", e),
+        Ok(()) => println!("Parameters validated successfully"),
+        Err(e) => println!("Parameter validation failed: {e}"),
     }
 
     // Instantiate the agent (in real usage, this would create an actual agent)
@@ -68,10 +68,7 @@ async fn example_tool_agent() -> Result<()> {
             );
         }
         Err(e) => {
-            println!(
-                "Agent instantiation would create a real agent (mock error: {})",
-                e
-            );
+            println!("Agent instantiation would create a real agent (mock error: {e})");
         }
     }
 
@@ -104,7 +101,7 @@ async fn example_orchestrator_agent() -> Result<()> {
     // Show parameter info
     println!("Instantiating with parameters:");
     for (key, value) in &params.parameters {
-        println!("  {}: {}", key, value);
+        println!("  {key}: {value}");
     }
     println!();
 
@@ -118,10 +115,7 @@ async fn example_orchestrator_agent() -> Result<()> {
             );
         }
         Err(e) => {
-            println!(
-                "Mock orchestrator creation (would create real agent): {}",
-                e
-            );
+            println!("Mock orchestrator creation (would create real agent): {e}");
         }
     }
 
@@ -144,7 +138,7 @@ async fn example_monitor_agent() -> Result<()> {
     ];
 
     for (name, template) in variants {
-        println!("--- {} ---", name);
+        println!("--- {name} ---");
         println!("Complexity: {:?}", template.complexity());
 
         let resources = &template.schema().resource_requirements;
@@ -152,7 +146,7 @@ async fn example_monitor_agent() -> Result<()> {
             println!("Memory requirement: {} MB", memory / 1024 / 1024);
         }
         if let Some(cpu) = resources.cpu {
-            println!("CPU requirement: {}%", cpu);
+            println!("CPU requirement: {cpu}%");
         }
 
         println!("Optional tools: {:?}", template.optional_tools());
@@ -175,7 +169,7 @@ async fn example_monitor_agent() -> Result<()> {
             println!("Applied config items: {}", result.applied_config.len());
         }
         Err(e) => {
-            println!("Mock monitor creation: {}", e);
+            println!("Mock monitor creation: {e}");
         }
     }
 
@@ -184,7 +178,8 @@ async fn example_monitor_agent() -> Result<()> {
 }
 
 /// Example 4: Using Template Factory
-async fn example_template_factory() -> Result<()> {
+#[allow(clippy::items_after_statements)] // Inner items for test organization
+fn example_template_factory() -> Result<()> {
     println!("=== Example 4: Template Factory ===\n");
 
     // Create factory and register templates
@@ -279,9 +274,9 @@ async fn example_template_validation() -> Result<()> {
     ];
 
     for (description, params, should_pass) in test_cases {
-        print!("{}: ", description);
+        print!("{description}: ");
         match template.validate_parameters(&params).await {
-            Ok(_) => {
+            Ok(()) => {
                 if should_pass {
                     println!("✓ Passed");
                 } else {
@@ -289,10 +284,10 @@ async fn example_template_validation() -> Result<()> {
                 }
             }
             Err(e) => {
-                if !should_pass {
-                    println!("✓ Failed as expected: {}", e);
+                if should_pass {
+                    println!("✗ Unexpected failure: {e}");
                 } else {
-                    println!("✗ Unexpected failure: {}", e);
+                    println!("✓ Failed as expected: {e}");
                 }
             }
         }
@@ -343,14 +338,14 @@ async fn example_custom_configuration() -> Result<()> {
             println!("\nCustom agent created successfully!");
             println!("Applied configuration includes:");
             for (key, _) in result.applied_config.iter().take(5) {
-                println!("  - {}", key);
+                println!("  - {key}");
             }
             if result.applied_config.len() > 5 {
                 println!("  ... and {} more", result.applied_config.len() - 5);
             }
         }
         Err(e) => {
-            println!("\nMock creation (would create real custom agent): {}", e);
+            println!("\nMock creation (would create real custom agent): {e}");
         }
     }
 

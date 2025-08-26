@@ -8,7 +8,9 @@ use llmspell_core::traits::agent::Agent;
 use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::AgentInput;
 use llmspell_core::ExecutionContext;
-use llmspell_state_persistence::{PersistenceConfig, StateManager, StorageBackendType};
+use llmspell_state_persistence::{
+    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
+};
 use std::sync::Arc;
 
 #[tokio::main]
@@ -39,7 +41,7 @@ async fn main() -> Result<()> {
                 encryption: None,
                 backup_retention: std::time::Duration::from_secs(7 * 24 * 60 * 60),
                 backup: None,
-                performance: Default::default(),
+                performance: PerformanceConfig::default(),
             },
         )
         .await?,
@@ -83,7 +85,7 @@ async fn main() -> Result<()> {
     // Load the saved state
     println!("\n--- Loading State ---");
     let loaded = agent.load_state().await?;
-    println!("State loaded: {}", loaded);
+    println!("State loaded: {loaded}");
 
     // Check restored conversation
     let restored_history = agent.get_conversation().await?;

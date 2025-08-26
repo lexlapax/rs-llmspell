@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["safe_serialize","safe_to_json"],"struct":["CircularReferenceDetector","CircularReferenceError"],"trait":["CircularReferenceCheck"]};

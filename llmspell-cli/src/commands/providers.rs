@@ -3,12 +3,12 @@
 
 use crate::cli::OutputFormat;
 use anyhow::Result;
-use llmspell_bridge::RuntimeConfig;
+use llmspell_config::LLMSpellConfig;
 use serde_json::json;
 
 /// List available providers
 pub async fn list_providers(
-    _runtime_config: RuntimeConfig,
+    _runtime_config: LLMSpellConfig,
     detailed: bool,
     output_format: OutputFormat,
 ) -> Result<()> {

@@ -8,7 +8,6 @@ use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionC
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_token_count_persistence() -> Result<()> {
@@ -33,7 +32,7 @@ async fn test_openai_token_count_persistence() -> Result<()> {
     agent.start().await?;
 
     // Have multiple conversations to accumulate token usage
-    let inputs = vec![
+    let inputs = [
         "Hello! Please write a short poem about coding.",
         "Now write a haiku about Rust programming.",
         "Can you explain what makes Rust memory-safe in 2 sentences?",
@@ -112,7 +111,6 @@ async fn test_openai_token_count_persistence() -> Result<()> {
     info!("OpenAI token count persistence test completed");
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_token_cost_tracking() -> Result<()> {
@@ -168,7 +166,9 @@ async fn test_anthropic_token_cost_tracking() -> Result<()> {
 
     // Calculate approximate cost (Claude 3.5 Sonnet pricing as example)
     // Input: $3 per million tokens, Output: $15 per million tokens
+    #[allow(clippy::cast_precision_loss)]
     let input_cost = (estimated_input_tokens as f64 / 1_000_000.0) * 3.0;
+    #[allow(clippy::cast_precision_loss)]
     let output_cost = (estimated_output_tokens as f64 / 1_000_000.0) * 15.0;
     let total_cost = input_cost + output_cost;
 
@@ -209,9 +209,9 @@ async fn test_anthropic_token_cost_tracking() -> Result<()> {
     info!("Anthropic token cost tracking test completed");
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY or ANTHROPIC_API_KEY"]
+#[allow(clippy::too_many_lines)] // Comprehensive test
 async fn test_token_usage_aggregation() -> Result<()> {
     // This test demonstrates how token usage could be aggregated across sessions
 

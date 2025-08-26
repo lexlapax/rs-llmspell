@@ -1,6 +1,8 @@
 //! ABOUTME: Agent lifecycle hooks for customizing agent creation and destruction
 //! ABOUTME: Provides hooks that run at various stages of agent lifecycle
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::factory::{AgentConfig, CreationHook};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -21,6 +23,7 @@ pub struct ValidationHook {
 }
 
 impl ValidationHook {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             min_execution_time_secs: 1,
@@ -39,12 +42,14 @@ impl ValidationHook {
         }
     }
 
-    pub fn with_execution_limits(mut self, min: u64, max: u64) -> Self {
+    #[must_use]
+    pub const fn with_execution_limits(mut self, min: u64, max: u64) -> Self {
         self.min_execution_time_secs = min;
         self.max_execution_time_secs = max;
         self
     }
 
+    #[must_use]
     pub fn with_allowed_types(mut self, types: Vec<String>) -> Self {
         self.allowed_types = types;
         self
@@ -108,13 +113,15 @@ pub struct LoggingHook {
 }
 
 impl LoggingHook {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             log_level: tracing::Level::INFO,
         }
     }
 
-    pub fn with_level(mut self, level: tracing::Level) -> Self {
+    #[must_use]
+    pub const fn with_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }
@@ -161,6 +168,7 @@ pub struct MetricsHook {
 }
 
 impl MetricsHook {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             creation_counter: Arc::new(std::sync::atomic::AtomicUsize::new(0)),
@@ -168,6 +176,7 @@ impl MetricsHook {
         }
     }
 
+    #[must_use]
     pub fn get_creation_count(&self) -> usize {
         self.creation_counter
             .load(std::sync::atomic::Ordering::Relaxed)
@@ -211,7 +220,8 @@ pub struct SecurityHook {
 }
 
 impl SecurityHook {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             require_resource_limits: true,
             max_tool_access: None,
@@ -219,11 +229,13 @@ impl SecurityHook {
         }
     }
 
-    pub fn with_max_tool_access(mut self, max: usize) -> Self {
+    #[must_use]
+    pub const fn with_max_tool_access(mut self, max: usize) -> Self {
         self.max_tool_access = Some(max);
         self
     }
 
+    #[must_use]
     pub fn with_forbidden_tools(mut self, tools: Vec<String>) -> Self {
         self.forbidden_tools = tools;
         self
@@ -284,10 +296,12 @@ pub struct CompositeHook {
 }
 
 impl CompositeHook {
+    #[must_use]
     pub fn new() -> Self {
         Self { hooks: vec![] }
     }
 
+    #[must_use]
     pub fn add_hook(mut self, hook: Arc<dyn CreationHook>) -> Self {
         self.hooks.push(hook);
         self
@@ -321,7 +335,6 @@ impl CreationHook for CompositeHook {
 mod tests {
     use super::*;
     use crate::builder::AgentBuilder;
-
     #[tokio::test]
     async fn test_validation_hook() {
         let hook = ValidationHook::new()
@@ -349,7 +362,6 @@ mod tests {
             .unwrap();
         assert!(hook.before_create(&invalid_config).await.is_err());
     }
-
     #[tokio::test]
     async fn test_security_hook() {
         let hook = SecurityHook::new()
@@ -377,7 +389,6 @@ mod tests {
             .unwrap();
         assert!(hook.before_create(&invalid_config).await.is_err());
     }
-
     #[tokio::test]
     async fn test_metrics_hook() {
         let hook = MetricsHook::new();
@@ -390,7 +401,6 @@ mod tests {
         // In real usage, after_create would be called with actual agent
         // hook.after_create(&agent).await.unwrap();
     }
-
     #[tokio::test]
     async fn test_logging_hook() {
         // Just test that it doesn't panic
@@ -402,7 +412,6 @@ mod tests {
         let agent: Arc<dyn Agent> = Arc::new(crate::agents::BasicAgent::new(config).unwrap());
         assert!(hook.after_create(&agent).await.is_ok());
     }
-
     #[tokio::test]
     async fn test_composite_hook() {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -444,7 +453,6 @@ mod tests {
         assert_eq!(count1.load(Ordering::SeqCst), 2);
         assert_eq!(count2.load(Ordering::SeqCst), 2);
     }
-
     #[tokio::test]
     async fn test_composite_hook_error_propagation() {
         struct FailingHook;

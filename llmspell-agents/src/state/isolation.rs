@@ -1,3 +1,4 @@
+#![allow(clippy::significant_drop_tightening)]
 // ABOUTME: Agent state isolation enforcement for multi-agent security
 // ABOUTME: Prevents unauthorized cross-agent state access with permission controls
 
@@ -24,33 +25,33 @@ pub enum StateScope {
 }
 
 impl StateScope {
-    pub fn parent(&self) -> Option<StateScope> {
+    #[must_use]
+    pub fn parent(&self) -> Option<Self> {
         match self {
-            StateScope::Step { workflow_id, .. } => Some(StateScope::Workflow(workflow_id.clone())),
-            StateScope::Workflow(_) | StateScope::Agent(_) | StateScope::Session(_) => {
-                Some(StateScope::Global)
-            }
-            StateScope::Global | StateScope::Custom(_) => None,
+            Self::Step { workflow_id, .. } => Some(Self::Workflow(workflow_id.clone())),
+            Self::Workflow(_) | Self::Agent(_) | Self::Session(_) => Some(Self::Global),
+            Self::Global | Self::Custom(_) => None,
         }
     }
 
+    #[must_use]
     pub fn prefix(&self) -> String {
         match self {
-            StateScope::Global => String::new(),
-            StateScope::Agent(id) => format!("agent:{}:", id),
-            StateScope::Workflow(id) => format!("workflow:{}:", id),
-            StateScope::Step {
+            Self::Global => String::new(),
+            Self::Agent(id) => format!("agent:{id}:"),
+            Self::Workflow(id) => format!("workflow:{id}:"),
+            Self::Step {
                 workflow_id,
                 step_name,
-            } => format!("workflow:{}:step:{}:", workflow_id, step_name),
-            StateScope::Session(id) => format!("session:{}:", id),
-            StateScope::Custom(prefix) => format!("{}:", prefix),
+            } => format!("workflow:{workflow_id}:step:{step_name}:"),
+            Self::Session(id) => format!("session:{id}:"),
+            Self::Custom(prefix) => format!("{prefix}:"),
         }
     }
 }
 
 /// State permission types
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum StatePermission {
     Read,
     Write,
@@ -98,6 +99,7 @@ pub struct StateAccessControl {
 }
 
 impl StateAccessControl {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -115,6 +117,7 @@ impl StateAccessControl {
         }
     }
 
+    #[must_use]
     pub fn has_permission(
         &self,
         agent_id: &str,
@@ -128,11 +131,9 @@ impl StateAccessControl {
         }
 
         // Check parent scope permissions
-        if let Some(parent) = scope.parent() {
-            self.has_permission(agent_id, &parent, permission)
-        } else {
-            false
-        }
+        scope
+            .parent()
+            .is_some_and(|parent| self.has_permission(agent_id, &parent, permission))
     }
 
     pub fn revoke_permissions(&mut self, agent_id: &str, scope: StateScope) {
@@ -190,6 +191,10 @@ impl StateIsolationManager {
     }
 
     /// Check if an agent can access a specific state scope
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access check fails
     #[instrument(skip(self))]
     pub fn check_access(
         &self,
@@ -200,7 +205,7 @@ impl StateIsolationManager {
         let start_time = std::time::Instant::now();
 
         // Check if agent owns the scope
-        if self.agent_owns_scope(agent_id, target_scope) {
+        if Self::agent_owns_scope(agent_id, target_scope) {
             self.audit_access(
                 agent_id,
                 target_scope,
@@ -227,7 +232,7 @@ impl StateIsolationManager {
                 matches!(operation, StateOperation::Read) && self.is_shared_scope(target_scope)
             }
             IsolationBoundary::SharedAccess => {
-                // Allow full access to shared scopes
+                // Allow access to shared scopes (explicit permissions checked separately)
                 self.is_shared_scope(target_scope)
             }
             IsolationBoundary::Custom(policy) => {
@@ -247,7 +252,11 @@ impl StateIsolationManager {
         let access_control = self.access_control.read();
         let has_permission = access_control.has_permission(agent_id, target_scope, &permission);
 
-        let final_allowed = allowed || has_permission;
+        // For SharedAccess boundary, require both boundary access AND explicit permission
+        let final_allowed = match boundary {
+            IsolationBoundary::SharedAccess => allowed && has_permission,
+            _ => allowed || has_permission,
+        };
 
         // Audit the access attempt
         self.audit_access(
@@ -272,12 +281,18 @@ impl StateIsolationManager {
     }
 
     /// Create a shared scope for multiple agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The shared scope already exists
+    /// - Creation fails
     #[instrument(skip(self))]
     pub fn create_shared_scope(
         &self,
         scope_id: &str,
-        owner_agent_id: Option<String>,
-        config: SharedScopeConfig,
+        owner_agent_id: Option<&str>,
+        config: &SharedScopeConfig,
     ) -> Result<()> {
         let mut shared_scopes = self.shared_scopes.write();
 
@@ -294,8 +309,8 @@ impl StateIsolationManager {
                 for permission in permissions {
                     access_control.grant_permission(
                         agent_id,
-                        StateScope::Custom(format!("shared:{}", scope_id)),
-                        permission.clone(),
+                        StateScope::Custom(format!("shared:{scope_id}")),
+                        *permission,
                     );
                 }
             }
@@ -310,31 +325,41 @@ impl StateIsolationManager {
     }
 
     /// Remove a shared scope
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shared scope is not found
     #[instrument(skip(self))]
     pub fn remove_shared_scope(&self, scope_id: &str) -> Result<()> {
         let mut shared_scopes = self.shared_scopes.write();
 
-        if let Some(config) = shared_scopes.remove(scope_id) {
-            // Revoke permissions from all agents
-            let mut access_control = self.access_control.write();
-            for agent_id in &config.allowed_agents {
-                access_control.revoke_permissions(
-                    agent_id,
-                    StateScope::Custom(format!("shared:{}", scope_id)),
-                );
-            }
-            debug!("Removed shared scope {}", scope_id);
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Shared scope {} not found", scope_id))
-        }
+        shared_scopes.remove(scope_id).map_or_else(
+            || Err(anyhow::anyhow!("Shared scope {} not found", scope_id)),
+            |config| {
+                // Revoke permissions from all agents
+                let mut access_control = self.access_control.write();
+                for agent_id in &config.allowed_agents {
+                    access_control.revoke_permissions(
+                        agent_id,
+                        StateScope::Custom(format!("shared:{scope_id}")),
+                    );
+                }
+                debug!("Removed shared scope {}", scope_id);
+                Ok(())
+            },
+        )
     }
 
     /// Grant specific permission to an agent for a scope
     #[instrument(skip(self))]
-    pub fn grant_permission(&self, agent_id: &str, scope: StateScope, permission: StatePermission) {
+    pub fn grant_permission(
+        &self,
+        agent_id: &str,
+        scope: &StateScope,
+        permission: StatePermission,
+    ) {
         let mut access_control = self.access_control.write();
-        access_control.grant_permission(agent_id, scope.clone(), permission.clone());
+        access_control.grant_permission(agent_id, scope.clone(), permission);
         debug!(
             "Granted {:?} permission to agent {} for scope {:?}",
             permission, agent_id, scope
@@ -343,7 +368,7 @@ impl StateIsolationManager {
 
     /// Revoke all permissions for an agent in a scope
     #[instrument(skip(self))]
-    pub fn revoke_permissions(&self, agent_id: &str, scope: StateScope) {
+    pub fn revoke_permissions(&self, agent_id: &str, scope: &StateScope) {
         let mut access_control = self.access_control.write();
         access_control.revoke_permissions(agent_id, scope.clone());
         debug!(
@@ -353,12 +378,13 @@ impl StateIsolationManager {
     }
 
     /// Get audit log entries
+    #[must_use]
     pub fn get_audit_log(&self, limit: Option<usize>) -> Vec<StateAccessAudit> {
         let audit_log = self.audit_log.read();
-        match limit {
-            Some(n) => audit_log.iter().rev().take(n).cloned().collect(),
-            None => audit_log.clone(),
-        }
+        limit.map_or_else(
+            || audit_log.clone(),
+            |n| audit_log.iter().rev().take(n).cloned().collect(),
+        )
     }
 
     /// Clear old audit log entries
@@ -370,10 +396,10 @@ impl StateIsolationManager {
 
     // Private helper methods
 
-    fn agent_owns_scope(&self, agent_id: &str, scope: &StateScope) -> bool {
+    fn agent_owns_scope(agent_id: &str, scope: &StateScope) -> bool {
         match scope {
             StateScope::Agent(id) => id == agent_id,
-            StateScope::Custom(s) if s.starts_with(&format!("agent:{}:", agent_id)) => true,
+            StateScope::Custom(s) if s.starts_with(&format!("agent:{agent_id}:")) => true,
             _ => false,
         }
     }
@@ -485,11 +511,15 @@ impl IsolatedStateAccessor {
     }
 
     /// Get state with isolation check
-    pub async fn get(&self, scope: StateScope, _key: &str) -> Result<Option<serde_json::Value>> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
+    pub fn get(&self, scope: &StateScope, _key: &str) -> Result<Option<serde_json::Value>> {
         // Check access permission
         if !self
             .isolation_manager
-            .check_access(&self.agent_id, &scope, StateOperation::Read)?
+            .check_access(&self.agent_id, scope, StateOperation::Read)?
         {
             return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
         }
@@ -500,16 +530,15 @@ impl IsolatedStateAccessor {
     }
 
     /// Set state with isolation check
-    pub async fn set(
-        &self,
-        scope: StateScope,
-        _key: &str,
-        _value: serde_json::Value,
-    ) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
+    pub fn set(&self, scope: &StateScope, _key: &str, _value: &serde_json::Value) -> Result<()> {
         // Check access permission
         if !self
             .isolation_manager
-            .check_access(&self.agent_id, &scope, StateOperation::Write)?
+            .check_access(&self.agent_id, scope, StateOperation::Write)?
         {
             return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
         }
@@ -519,11 +548,15 @@ impl IsolatedStateAccessor {
     }
 
     /// Delete state with isolation check
-    pub async fn delete(&self, scope: StateScope, _key: &str) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
+    pub fn delete(&self, scope: &StateScope, _key: &str) -> Result<()> {
         // Check access permission
         if !self
             .isolation_manager
-            .check_access(&self.agent_id, &scope, StateOperation::Delete)?
+            .check_access(&self.agent_id, scope, StateOperation::Delete)?
         {
             return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
         }
@@ -533,11 +566,15 @@ impl IsolatedStateAccessor {
     }
 
     /// List keys with isolation check
-    pub async fn list_keys(&self, scope: StateScope) -> Result<Vec<String>> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
+    pub fn list_keys(&self, scope: &StateScope) -> Result<Vec<String>> {
         // Check access permission
         if !self
             .isolation_manager
-            .check_access(&self.agent_id, &scope, StateOperation::List)?
+            .check_access(&self.agent_id, scope, StateOperation::List)?
         {
             return Err(anyhow::anyhow!("Access denied to scope {:?}", scope));
         }
@@ -553,7 +590,6 @@ mod tests {
 
     // Mock state manager for testing
     struct MockStateManager;
-
     #[test]
     fn test_strict_isolation() {
         let state_manager = Arc::new(MockStateManager);
@@ -585,7 +621,6 @@ mod tests {
             .check_access("agent1", &StateScope::Global, StateOperation::Read)
             .unwrap());
     }
-
     #[test]
     fn test_shared_scope_access() {
         let state_manager = Arc::new(MockStateManager);
@@ -610,7 +645,7 @@ mod tests {
         };
 
         isolation_manager
-            .create_shared_scope("team-data", Some("agent1".to_string()), config)
+            .create_shared_scope("team-data", Some("agent1"), &config)
             .unwrap();
 
         // Set boundaries
@@ -640,7 +675,6 @@ mod tests {
             .check_access("agent3", &shared_scope, StateOperation::Read)
             .unwrap());
     }
-
     #[test]
     fn test_audit_logging() {
         let state_manager = Arc::new(MockStateManager);
@@ -665,7 +699,6 @@ mod tests {
         assert!(!audit_log[0].allowed); // First access denied
         assert!(audit_log[1].allowed); // Second access allowed
     }
-
     #[test]
     fn test_permission_grant_revoke() {
         let state_manager = Arc::new(MockStateManager);
@@ -679,7 +712,7 @@ mod tests {
             .unwrap());
 
         // Grant read permission
-        isolation_manager.grant_permission("agent1", scope.clone(), StatePermission::Read);
+        isolation_manager.grant_permission("agent1", &scope, StatePermission::Read);
         assert!(isolation_manager
             .check_access("agent1", &scope, StateOperation::Read)
             .unwrap());
@@ -688,13 +721,13 @@ mod tests {
             .unwrap());
 
         // Grant write permission
-        isolation_manager.grant_permission("agent1", scope.clone(), StatePermission::Write);
+        isolation_manager.grant_permission("agent1", &scope, StatePermission::Write);
         assert!(isolation_manager
             .check_access("agent1", &scope, StateOperation::Write)
             .unwrap());
 
         // Revoke all permissions
-        isolation_manager.revoke_permissions("agent1", scope.clone());
+        isolation_manager.revoke_permissions("agent1", &scope);
         assert!(!isolation_manager
             .check_access("agent1", &scope, StateOperation::Read)
             .unwrap());

@@ -234,7 +234,6 @@ pub fn debounce_events(events: Vec<FileEvent>, debounce_ms: u64) -> Vec<FileEven
 mod tests {
     use super::*;
     use std::path::PathBuf;
-
     #[test]
     fn test_file_event_creation() {
         let event = FileEvent::new(FileEventType::Create, PathBuf::from("/test/file.txt"));
@@ -242,7 +241,6 @@ mod tests {
         assert_eq!(event.path, PathBuf::from("/test/file.txt"));
         assert!(event.old_path.is_none());
     }
-
     #[test]
     fn test_rename_event_creation() {
         let event = FileEvent::new_rename(
@@ -253,7 +251,6 @@ mod tests {
         assert_eq!(event.path, PathBuf::from("/test/new.txt"));
         assert_eq!(event.old_path, Some(PathBuf::from("/test/old.txt")));
     }
-
     #[test]
     fn test_pattern_matching() {
         let event = FileEvent::new(FileEventType::Create, PathBuf::from("/test/file.txt"));
@@ -261,7 +258,6 @@ mod tests {
         assert!(event.matches_pattern("/test/*"));
         assert!(!event.matches_pattern("*.log"));
     }
-
     #[test]
     fn test_watch_config_builder() {
         let config = WatchConfig::new()
@@ -279,14 +275,12 @@ mod tests {
         assert_eq!(config.max_events, 500);
         assert_eq!(config.timeout_seconds, Some(60));
     }
-
     #[test]
     fn test_should_watch_path() {
         let config = WatchConfig::new().pattern("*.txt");
         assert!(should_watch_path(&PathBuf::from("file.txt"), &config));
         assert!(!should_watch_path(&PathBuf::from("file.log"), &config));
     }
-
     #[test]
     fn test_debounce_events() {
         let mut events = Vec::new();

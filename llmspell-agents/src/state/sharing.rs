@@ -1,3 +1,4 @@
+#![allow(clippy::significant_drop_tightening)]
 // ABOUTME: Controlled state sharing patterns for multi-agent collaboration
 // ABOUTME: Implements secure data exchange between agents with permission controls
 
@@ -13,7 +14,7 @@ use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 
 /// State sharing patterns
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SharingPattern {
     /// Broadcast - one agent publishes, all subscribed agents receive
     Broadcast,
@@ -72,6 +73,12 @@ impl StateSharingManager {
     }
 
     /// Create a new shared state channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - A channel with the given ID already exists
+    /// - Subscribing the creator agent fails
     #[instrument(skip(self))]
     pub fn create_channel(
         &self,
@@ -117,6 +124,12 @@ impl StateSharingManager {
     }
 
     /// Subscribe an agent to a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The agent ID is invalid
     #[instrument(skip(self))]
     pub fn subscribe_agent(&self, agent_id: &str, channel_id: &str) -> Result<()> {
         // Verify channel exists
@@ -142,6 +155,12 @@ impl StateSharingManager {
     }
 
     /// Unsubscribe an agent from a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The agent is not subscribed to the channel
     #[instrument(skip(self))]
     pub fn unsubscribe_agent(&self, agent_id: &str, channel_id: &str) -> Result<()> {
         // Remove from channel participants
@@ -164,6 +183,13 @@ impl StateSharingManager {
     }
 
     /// Publish a message to a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The sender agent is not a participant in the channel
+    /// - Pattern permissions validation fails
     #[instrument(skip(self, payload))]
     pub async fn publish_message(
         &self,
@@ -188,7 +214,7 @@ impl StateSharingManager {
         }
 
         // Validate pattern permissions
-        self.validate_pattern_permissions(&channel.pattern, sender_agent_id, channel)?;
+        Self::validate_pattern_permissions(channel.pattern, sender_agent_id, channel)?;
 
         let message = StateMessage {
             message_id: Uuid::new_v4(),
@@ -229,6 +255,13 @@ impl StateSharingManager {
     }
 
     /// Reply to a message in a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The original message to reply to is not found
+    /// - Publishing the reply message fails
     #[instrument(skip(self, payload))]
     pub async fn reply_to_message(
         &self,
@@ -274,6 +307,10 @@ impl StateSharingManager {
     }
 
     /// Get messages for an agent from their subscribed channels
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent has no subscriptions
     #[instrument(skip(self))]
     pub fn get_messages_for_agent(
         &self,
@@ -295,11 +332,11 @@ impl StateSharingManager {
                     .iter()
                     .filter(|m| {
                         // Filter by time if specified
-                        if let Some(since_time) = since {
-                            m.timestamp > since_time
-                        } else {
-                            true
-                        }
+                        // This map_or is correct: if no since time is specified (None),
+                        // include all messages (true). Otherwise, only include messages
+                        // with timestamps after the specified time.
+                        #[allow(clippy::unnecessary_map_or)]
+                        since.map_or(true, |since_time| m.timestamp > since_time)
                     })
                     .filter(|m| {
                         // Don't show agent their own messages
@@ -324,6 +361,12 @@ impl StateSharingManager {
     }
 
     /// Create a collaborative workspace for multiple agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Creating the collaborative channel fails
+    /// - Subscribing any participant to the workspace fails
     #[instrument(skip(self))]
     pub async fn create_collaborative_workspace(
         &self,
@@ -367,11 +410,18 @@ impl StateSharingManager {
     }
 
     /// Create a data pipeline between agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Creating the pipeline channel fails
+    /// - The stages list is empty
+    /// - Setting pipeline metadata fails
     #[instrument(skip(self))]
     pub fn create_pipeline(
         &self,
         pipeline_id: &str,
-        stages: Vec<String>, // Agent IDs in order
+        stages: &[String], // Agent IDs in order
     ) -> Result<()> {
         if stages.is_empty() {
             return Err(anyhow::anyhow!("Pipeline must have at least one stage"));
@@ -381,17 +431,16 @@ impl StateSharingManager {
         self.create_channel(pipeline_id, SharingPattern::Pipeline, &stages[0], None)?;
 
         // Subscribe all stages
-        for agent_id in &stages {
+        for agent_id in stages {
             self.subscribe_agent(agent_id, pipeline_id)?;
         }
 
         // Store pipeline configuration
         let mut channels = self.channels.write();
         if let Some(channel) = channels.get_mut(pipeline_id) {
-            channel.metadata.insert(
-                "pipeline_stages".to_string(),
-                serde_json::to_value(&stages)?,
-            );
+            channel
+                .metadata
+                .insert("pipeline_stages".to_string(), serde_json::to_value(stages)?);
         }
 
         info!(
@@ -403,6 +452,14 @@ impl StateSharingManager {
     }
 
     /// Process next stage in a pipeline
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The pipeline is not found
+    /// - Pipeline stages metadata is missing or invalid
+    /// - The current agent is not in the pipeline
+    /// - Publishing the stage completion message fails
     #[instrument(skip(self, data))]
     pub async fn process_pipeline_stage(
         &self,
@@ -493,26 +550,18 @@ impl StateSharingManager {
     // Private helper methods
 
     fn validate_pattern_permissions(
-        &self,
-        pattern: &SharingPattern,
+        pattern: SharingPattern,
         agent_id: &str,
         channel: &SharedStateChannel,
     ) -> Result<()> {
-        match pattern {
-            SharingPattern::Broadcast => {
-                // Only creator can broadcast
-                if agent_id != channel.creator_agent_id {
-                    return Err(anyhow::anyhow!("Only channel creator can broadcast"));
-                }
-            }
-            SharingPattern::Pipeline => {
-                // Agents can only publish when it's their turn
-                // This is enforced by process_pipeline_stage
-            }
-            _ => {
-                // Other patterns allow any participant to publish
+        if pattern == SharingPattern::Broadcast {
+            // Only creator can broadcast
+            if agent_id != channel.creator_agent_id {
+                return Err(anyhow::anyhow!("Only channel creator can broadcast"));
             }
         }
+        // Pipeline: Agents can only publish when it's their turn (enforced by process_pipeline_stage)
+        // RequestResponse, Collaborative, Hierarchical: Allow any participant to publish
         Ok(())
     }
 }
@@ -525,10 +574,7 @@ pub trait SharedStateAgent: Agent {
     where
         Self: Sized,
     {
-        SharedStateAccessor::new(
-            self.metadata().id.to_string(),
-            self.sharing_manager().clone(),
-        )
+        SharedStateAccessor::new(self.metadata().id.to_string(), self.sharing_manager())
     }
 
     /// Get sharing manager (to be implemented by agent)
@@ -542,7 +588,8 @@ pub struct SharedStateAccessor {
 }
 
 impl SharedStateAccessor {
-    pub fn new(agent_id: String, sharing_manager: Arc<StateSharingManager>) -> Self {
+    #[must_use]
+    pub const fn new(agent_id: String, sharing_manager: Arc<StateSharingManager>) -> Self {
         Self {
             agent_id,
             sharing_manager,
@@ -550,18 +597,30 @@ impl SharedStateAccessor {
     }
 
     /// Subscribe to a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription fails
     pub fn subscribe(&self, channel_id: &str) -> Result<()> {
         self.sharing_manager
             .subscribe_agent(&self.agent_id, channel_id)
     }
 
     /// Unsubscribe from a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unsubscription fails
     pub fn unsubscribe(&self, channel_id: &str) -> Result<()> {
         self.sharing_manager
             .unsubscribe_agent(&self.agent_id, channel_id)
     }
 
     /// Publish a message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if publishing the message fails
     pub async fn publish(
         &self,
         channel_id: &str,
@@ -574,6 +633,10 @@ impl SharedStateAccessor {
     }
 
     /// Get new messages
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if retrieving messages fails
     pub fn get_messages(&self, since: Option<SystemTime>) -> Result<Vec<StateMessage>> {
         self.sharing_manager
             .get_messages_for_agent(&self.agent_id, since, None)
@@ -596,8 +659,8 @@ mod tests {
                 .try_init();
         });
     }
-
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_broadcast_channel() {
         init_tracing();
         // Mock state manager for testing
@@ -649,8 +712,8 @@ mod tests {
             .await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_collaborative_workspace() {
         init_tracing();
         // Mock state manager for testing
@@ -698,8 +761,8 @@ mod tests {
         assert_eq!(lead_msgs.len(), 1); // Should see dev1's message
         assert_eq!(lead_msgs[0].sender_agent_id, "dev1");
     }
-
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_pipeline_processing() {
         init_tracing();
         // Mock state manager for testing
@@ -714,7 +777,7 @@ mod tests {
             "writer".to_string(),
         ];
         sharing_manager
-            .create_pipeline("data-pipeline", stages)
+            .create_pipeline("data-pipeline", &stages)
             .unwrap();
 
         // First stage processes

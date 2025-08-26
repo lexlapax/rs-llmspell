@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for the CalculatorTool
 // ABOUTME: Tests complex mathematical expressions and edge cases
 
-//! Integration tests for CalculatorTool
+//! Integration tests for `CalculatorTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
@@ -33,13 +33,10 @@ async fn evaluate_expression(
     let output: Value = serde_json::from_str(&result.text)?;
 
     // Extract the result from the response wrapper
-    if let Some(result_obj) = output.get("result") {
-        Ok(result_obj.clone())
-    } else {
-        Ok(output)
-    }
+    Ok(output
+        .get("result")
+        .map_or_else(|| output.clone(), Clone::clone))
 }
-
 #[tokio::test]
 async fn test_complex_arithmetic() {
     // Test order of operations
@@ -58,7 +55,6 @@ async fn test_complex_arithmetic() {
     let result = evaluate_expression("2^3 + 3^2", None).await.unwrap();
     assert_eq!(result["result"], 17.0); // 8 + 9 = 17
 }
-
 #[tokio::test]
 async fn test_variable_substitution() {
     // Basic variable substitution
@@ -90,7 +86,6 @@ async fn test_variable_substitution() {
         .unwrap();
     assert!((result["result"].as_f64().unwrap() - 78.53975).abs() < 0.0001);
 }
-
 #[tokio::test]
 async fn test_comparison_operations() {
     // Test comparison operations - fasteval returns 1.0 for true, 0.0 for false
@@ -108,7 +103,6 @@ async fn test_comparison_operations() {
         .unwrap();
     assert_eq!(result["result"], 1.0); // Both comparisons are true, so 1.0 * 1.0 = 1.0
 }
-
 #[tokio::test]
 async fn test_logical_operations() {
     // Fasteval uses && and || for logical operations with numeric values
@@ -132,16 +126,15 @@ async fn test_logical_operations() {
 }
 
 // String operations are not supported by fasteval - removed test
-
 #[tokio::test]
 async fn test_edge_cases() {
     // Test very large numbers
     let result = evaluate_expression("10^10", None).await.unwrap();
-    assert_eq!(result["result"], 10000000000.0);
+    assert_eq!(result["result"], 10_000_000_000.0);
 
     // Test very small numbers
     let result = evaluate_expression("1.0 / 1000000", None).await.unwrap();
-    assert_eq!(result["result"], 0.000001);
+    assert_eq!(result["result"], 0.000_001);
 
     // Test negative numbers
     let result = evaluate_expression("-5 * -3", None).await.unwrap();
@@ -151,7 +144,6 @@ async fn test_edge_cases() {
     let result = evaluate_expression("-17 % 5", None).await.unwrap();
     assert_eq!(result["result"], -2.0); // fasteval returns floats
 }
-
 #[tokio::test]
 async fn test_validation_operation() {
     let tool = CalculatorTool::new();
@@ -190,7 +182,6 @@ async fn test_validation_operation() {
     // For validation, errors are in the result
     assert!(output["result"].get("error").is_some());
 }
-
 #[tokio::test]
 async fn test_error_handling() {
     // Division by zero returns Infinity
@@ -212,7 +203,6 @@ async fn test_error_handling() {
     // Type mismatch should also return Ok but with failure status
     assert!(result.is_ok());
 }
-
 #[tokio::test]
 async fn test_functions_list() {
     let tool = CalculatorTool::new();
@@ -248,7 +238,6 @@ async fn test_functions_list() {
     assert!(arithmetic.contains(&json!("*")));
     assert!(arithmetic.contains(&json!("^")));
 }
-
 #[tokio::test]
 async fn test_tool_characteristics() {
     let tool = CalculatorTool::new();
@@ -275,7 +264,6 @@ async fn test_tool_characteristics() {
     assert!(limits.max_memory_bytes.is_some());
     assert!(limits.max_cpu_time_ms.is_some());
 }
-
 #[tokio::test]
 async fn test_mixed_type_variables() {
     // Test with mixed numeric types

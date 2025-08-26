@@ -1,0 +1,28 @@
+# Configuration for enabling migration support
+# This enables state persistence and migration functionality
+
+default_engine = "lua"
+
+[engines.lua]
+stdlib = "full"
+
+[engines.javascript]
+strict_mode = true
+
+[providers]
+# No providers configured for migration examples
+
+[runtime]
+max_concurrent_scripts = 10
+script_timeout_seconds = 300
+enable_streaming = true
+
+[runtime.security]
+allow_file_access = true
+allow_network_access = true
+allow_process_spawn = false
+
+[runtime.state_persistence]
+enabled = true
+backend_type = "memory"
+migration_enabled = true

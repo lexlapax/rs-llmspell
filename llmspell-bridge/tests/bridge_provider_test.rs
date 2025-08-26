@@ -3,9 +3,10 @@
 
 use llmspell_bridge::{
     engine::factory::{EngineFactory, LuaConfig},
-    providers::{ProviderConfig, ProviderManager, ProviderManagerConfig},
+    providers::ProviderManager,
     ComponentRegistry,
 };
+use llmspell_config::providers::{ProviderConfig, ProviderManagerConfig};
 use std::sync::Arc;
 
 /// Test provider manager creation
@@ -78,7 +79,7 @@ async fn test_script_list_providers() {
     );
 }
 
-/// Test that scripts work but globals need inject_apis
+/// Test that scripts work but globals need `inject_apis`
 #[tokio::test]
 async fn test_script_without_api_injection() {
     let lua_config = LuaConfig::default();
@@ -86,22 +87,19 @@ async fn test_script_without_api_injection() {
 
     // Basic scripts should work
     let result = engine.execute_script("return 42").await;
-    assert!(result.is_ok(), "Basic script should work: {:?}", result);
+    assert!(result.is_ok(), "Basic script should work: {result:?}");
 
     // Globals require inject_apis to be called - check Tool is not available
     let global_check = engine.execute_script("return Tool").await;
-    match global_check {
-        Ok(output) => {
-            // Tool might be nil which is expected
-            // Check if the output is null/nil
-            assert!(
-                output.output.is_null(),
-                "Tool should be nil without inject_apis"
-            );
-        }
-        Err(_) => {
-            // Or it might error which is also fine
-        }
+    if let Ok(output) = global_check {
+        // Tool might be nil which is expected
+        // Check if the output is null/nil
+        assert!(
+            output.output.is_null(),
+            "Tool should be nil without inject_apis"
+        );
+    } else {
+        // Or it might error which is also fine
     }
 }
 
@@ -124,12 +122,19 @@ async fn test_provider_config_validation() {
     config.providers.insert(
         "test-provider".to_string(),
         ProviderConfig {
+            name: "test-provider".to_string(),
             provider_type: "openai".to_string(),
+            enabled: true,
             api_key_env: Some("OPENAI_API_KEY".to_string()),
+            api_key: None,
             base_url: None,
-            model: Some("gpt-3.5-turbo".to_string()),
+            default_model: Some("gpt-3.5-turbo".to_string()),
             max_tokens: Some(1000),
-            extra: std::collections::HashMap::new(),
+            timeout_seconds: Some(60),
+            max_retries: None,
+            rate_limit: None,
+            retry: None,
+            options: std::collections::HashMap::new(),
         },
     );
 
@@ -156,7 +161,7 @@ async fn test_concurrent_provider_access() {
     for i in 0..5 {
         let engine_clone = engine.clone();
         let handle = tokio::spawn(async move {
-            let script = format!("return 'task {}'", i);
+            let script = format!("return 'task {i}'");
             engine_clone.execute_script(&script).await
         });
         handles.push(handle);

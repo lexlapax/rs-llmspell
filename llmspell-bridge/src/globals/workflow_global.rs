@@ -1,10 +1,13 @@
 //! ABOUTME: Workflow global object implementation for script engines
 //! ABOUTME: Provides Workflow creation and orchestration functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::workflows::WorkflowBridge;
 use crate::ComponentRegistry;
 use llmspell_core::Result;
+use llmspell_state_persistence::StateManager;
 use std::sync::Arc;
 
 /// Workflow global object for script engines
@@ -14,19 +17,36 @@ pub struct WorkflowGlobal {
 }
 
 impl WorkflowGlobal {
-    /// Create a new Workflow global
+    /// Create a new Workflow global without state manager
+    #[must_use]
     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
-        let bridge = Arc::new(WorkflowBridge::new(registry.clone()));
+        let bridge = Arc::new(WorkflowBridge::new(&registry, None));
+        Self { registry, bridge }
+    }
+
+    /// Create a new Workflow global with state manager
+    #[must_use]
+    pub fn with_state_manager(
+        registry: Arc<ComponentRegistry>,
+        state_manager: Arc<StateManager>,
+    ) -> Self {
+        tracing::info!(
+            "WorkflowGlobal: Creating WorkflowBridge with StateManager at {:p}",
+            Arc::as_ptr(&state_manager)
+        );
+        let bridge = Arc::new(WorkflowBridge::new(&registry, Some(state_manager)));
         Self { registry, bridge }
     }
 
     /// Get the component registry
-    pub fn registry(&self) -> &Arc<ComponentRegistry> {
+    #[must_use]
+    pub const fn registry(&self) -> &Arc<ComponentRegistry> {
         &self.registry
     }
 
     /// Get the workflow bridge
-    pub fn bridge(&self) -> &Arc<WorkflowBridge> {
+    #[must_use]
+    pub const fn bridge(&self) -> &Arc<WorkflowBridge> {
         &self.bridge
     }
 }
@@ -46,7 +66,7 @@ impl GlobalObject for WorkflowGlobal {
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
         crate::lua::globals::workflow::inject_workflow_global(lua, context, self.bridge.clone())
             .map_err(|e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Workflow global: {}", e),
+                message: format!("Failed to inject Workflow global: {e}"),
                 source: None,
             })
     }
@@ -59,7 +79,7 @@ impl GlobalObject for WorkflowGlobal {
     ) -> Result<()> {
         crate::javascript::globals::workflow::inject_workflow_global(ctx, context).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Workflow global for JavaScript: {}", e),
+                message: format!("Failed to inject Workflow global for JavaScript: {e}"),
                 source: None,
             }
         })

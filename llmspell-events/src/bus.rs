@@ -385,10 +385,10 @@ mod tests {
     use crate::universal_event::{Language, UniversalEvent};
     use serde_json::Value;
 
+    // Local test helper to avoid circular dependency with llmspell-testing
     fn create_test_event(event_type: &str) -> UniversalEvent {
         UniversalEvent::new(event_type, Value::Null, Language::Rust)
     }
-
     #[tokio::test]
     async fn test_basic_pub_sub() {
         let bus = EventBus::new();
@@ -400,7 +400,6 @@ mod tests {
         let received = receiver.recv().await.unwrap();
         assert_eq!(received.event_type, "test.event");
     }
-
     #[tokio::test]
     async fn test_pattern_matching() {
         let bus = EventBus::new();
@@ -423,7 +422,6 @@ mod tests {
         let received = agent_receiver.recv().await.unwrap();
         assert_eq!(received.event_type, "agent.created");
     }
-
     #[tokio::test]
     async fn test_broadcast_all() {
         let bus = EventBus::new();
@@ -435,7 +433,6 @@ mod tests {
         let received = broadcast_receiver.recv().await.unwrap();
         assert_eq!(received.event_type, "any.event");
     }
-
     #[tokio::test]
     async fn test_multiple_subscribers() {
         let bus = EventBus::new();
@@ -452,7 +449,6 @@ mod tests {
         assert_eq!(received1.event_type, "multi.test");
         assert_eq!(received2.event_type, "multi.test");
     }
-
     #[tokio::test]
     async fn test_statistics() {
         let bus = EventBus::new();
@@ -463,7 +459,6 @@ mod tests {
         let stats = bus.get_stats();
         assert!(stats.events_processed > 0);
     }
-
     #[tokio::test]
     async fn test_builder() {
         let bus = EventBusBuilder::new().with_broadcast_capacity(5000).build();

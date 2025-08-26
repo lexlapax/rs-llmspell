@@ -16,7 +16,8 @@ pub use super::workflow_global::WorkflowGlobal;
 pub struct LoggerGlobal;
 
 impl LoggerGlobal {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }
@@ -44,12 +45,12 @@ impl GlobalObject for LoggerGlobal {
         let table = lua
             .create_table()
             .map_err(|e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to create Logger table: {}", e),
+                message: format!("Failed to create Logger table: {e}"),
                 source: None,
             })?;
         lua.globals().set("Logger", table).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to set Logger global: {}", e),
+                message: format!("Failed to set Logger global: {e}"),
                 source: None,
             }
         })?;
@@ -75,7 +76,8 @@ pub struct ConfigGlobal {
 }
 
 impl ConfigGlobal {
-    pub fn new(config: serde_json::Value) -> Self {
+    #[must_use]
+    pub const fn new(config: serde_json::Value) -> Self {
         Self { config }
     }
 }
@@ -97,12 +99,12 @@ impl GlobalObject for ConfigGlobal {
         let table = lua
             .create_table()
             .map_err(|e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to create Config table: {}", e),
+                message: format!("Failed to create Config table: {e}"),
                 source: None,
             })?;
         lua.globals().set("Config", table).map_err(|e| {
             llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to set Config global: {}", e),
+                message: format!("Failed to set Config global: {e}"),
                 source: None,
             }
         })?;
@@ -125,7 +127,8 @@ impl GlobalObject for ConfigGlobal {
 pub struct UtilsGlobal;
 
 impl UtilsGlobal {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }
@@ -153,13 +156,13 @@ impl GlobalObject for UtilsGlobal {
         let table = lua
             .create_table()
             .map_err(|e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to create Utils table: {}", e),
+                message: format!("Failed to create Utils table: {e}"),
                 source: None,
             })?;
         lua.globals()
             .set("Utils", table)
             .map_err(|e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to set Utils global: {}", e),
+                message: format!("Failed to set Utils global: {e}"),
                 source: None,
             })?;
         Ok(())

@@ -301,7 +301,6 @@ impl RecoveryOrchestrator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_recovery_state_serialization() {
         let state = RecoveryState::RestoringData;
@@ -309,7 +308,6 @@ mod tests {
         let deserialized: RecoveryState = serde_json::from_str(&json).unwrap();
         assert_eq!(state, deserialized);
     }
-
     #[test]
     fn test_advanced_recovery_options_defaults() {
         let options = AdvancedRecoveryOptions::default();

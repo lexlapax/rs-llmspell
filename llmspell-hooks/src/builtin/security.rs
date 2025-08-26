@@ -326,6 +326,7 @@ impl SecurityStorage {
         stats.insert("by_type".to_string(), serde_json::Value::Object(type_json));
 
         // Blocked events count
+        #[allow(clippy::cast_possible_truncation)]
         let blocked_count = events.iter().filter(|event| event.blocked).count();
         stats.insert(
             "blocked_events".to_string(),
@@ -453,9 +454,9 @@ impl SecurityHook {
                     component_type: format!("{:?}", context.component_id.component_type),
                     language: format!("{:?}", context.language),
                     correlation_id: context.correlation_id.to_string(),
-                    user_id: context.get_metadata("user_id").map(|s| s.to_string()),
-                    session_id: context.get_metadata("session_id").map(|s| s.to_string()),
-                    source_ip: context.get_metadata("source_ip").map(|s| s.to_string()),
+                    user_id: context.get_metadata("user_id").map(str::to_string),
+                    session_id: context.get_metadata("session_id").map(str::to_string),
+                    source_ip: context.get_metadata("source_ip").map(str::to_string),
                     description: format!(
                         "Parameter '{}' exceeds maximum size ({} > {})",
                         key,
@@ -495,9 +496,9 @@ impl SecurityHook {
                     component_type: format!("{:?}", context.component_id.component_type),
                     language: format!("{:?}", context.language),
                     correlation_id: context.correlation_id.to_string(),
-                    user_id: context.get_metadata("user_id").map(|s| s.to_string()),
-                    session_id: context.get_metadata("session_id").map(|s| s.to_string()),
-                    source_ip: context.get_metadata("source_ip").map(|s| s.to_string()),
+                    user_id: context.get_metadata("user_id").map(str::to_string),
+                    session_id: context.get_metadata("session_id").map(str::to_string),
+                    source_ip: context.get_metadata("source_ip").map(str::to_string),
                     description: format!("Access to sensitive parameter '{}'", key),
                     details: {
                         let mut details = HashMap::new();
@@ -530,9 +531,9 @@ impl SecurityHook {
             component_type: format!("{:?}", context.component_id.component_type),
             language: format!("{:?}", context.language),
             correlation_id: context.correlation_id.to_string(),
-            user_id: context.get_metadata("user_id").map(|s| s.to_string()),
-            session_id: context.get_metadata("session_id").map(|s| s.to_string()),
-            source_ip: context.get_metadata("source_ip").map(|s| s.to_string()),
+            user_id: context.get_metadata("user_id").map(str::to_string),
+            session_id: context.get_metadata("session_id").map(str::to_string),
+            source_ip: context.get_metadata("source_ip").map(str::to_string),
             description: format!("Hook execution at {:?}", context.point),
             details: HashMap::new(),
             blocked: false,
@@ -611,9 +612,9 @@ impl MetricHook for SecurityHook {
             component_type: format!("{:?}", context.component_id.component_type),
             language: format!("{:?}", context.language),
             correlation_id: context.correlation_id.to_string(),
-            user_id: context.get_metadata("user_id").map(|s| s.to_string()),
-            session_id: context.get_metadata("session_id").map(|s| s.to_string()),
-            source_ip: context.get_metadata("source_ip").map(|s| s.to_string()),
+            user_id: context.get_metadata("user_id").map(str::to_string),
+            session_id: context.get_metadata("session_id").map(str::to_string),
+            source_ip: context.get_metadata("source_ip").map(str::to_string),
             description: "Pre-execution security check".to_string(),
             details: HashMap::new(),
             blocked: false,
@@ -653,9 +654,9 @@ impl MetricHook for SecurityHook {
             component_type: format!("{:?}", context.component_id.component_type),
             language: format!("{:?}", context.language),
             correlation_id: context.correlation_id.to_string(),
-            user_id: context.get_metadata("user_id").map(|s| s.to_string()),
-            session_id: context.get_metadata("session_id").map(|s| s.to_string()),
-            source_ip: context.get_metadata("source_ip").map(|s| s.to_string()),
+            user_id: context.get_metadata("user_id").map(str::to_string),
+            session_id: context.get_metadata("session_id").map(str::to_string),
+            source_ip: context.get_metadata("source_ip").map(str::to_string),
             description: "Post-execution security audit".to_string(),
             details,
             blocked: false,
@@ -663,248 +664,6 @@ impl MetricHook for SecurityHook {
 
         self.storage.add_event(completion_event);
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::types::{ComponentId, ComponentType, HookPoint};
-    use serde_json::json;
-
-    #[tokio::test]
-    async fn test_security_hook_basic() {
-        let hook = SecurityHook::new();
-        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
-        let mut context = HookContext::new(HookPoint::SystemStartup, component_id);
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue));
-
-        // Check that security metadata was added
-        assert!(context.get_metadata("security_checked_at").is_some());
-        assert!(context.get_metadata("security_hook_version").is_some());
-
-        // Check that audit event was recorded
-        let events = hook.get_events();
-        assert!(!events.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_security_hook_parameter_validation() {
-        let hook = SecurityHook::new().with_blocking(true);
-        let component_id = ComponentId::new(ComponentType::Tool, "test-tool".to_string());
-        let mut context = HookContext::new(HookPoint::BeforeToolExecution, component_id);
-
-        // Add a large parameter that should trigger validation
-        let large_data = "x".repeat(20000);
-        context.insert_data("large_param".to_string(), json!(large_data));
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Cancel(_)));
-
-        // Check that security violation was recorded
-        let events = hook.get_events();
-        let violations: Vec<_> = events
-            .iter()
-            .filter(|e| e.event_type == SecurityEventType::ParameterInjection)
-            .collect();
-        assert!(!violations.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_security_hook_sensitive_parameters() {
-        let hook = SecurityHook::new();
-        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
-        let mut context = HookContext::new(HookPoint::BeforeAgentExecution, component_id);
-
-        // Add sensitive parameters
-        context.insert_data("password".to_string(), json!("secret123"));
-        context.insert_data("api_key".to_string(), json!("sk_test_123"));
-
-        let result = hook.execute(&mut context).await.unwrap();
-        assert!(matches!(result, HookResult::Continue)); // Should not block, just log
-
-        // Check that sensitive parameter access was logged
-        let events = hook.get_events();
-        let data_access_events: Vec<_> = events
-            .iter()
-            .filter(|e| e.event_type == SecurityEventType::DataAccess)
-            .collect();
-        assert_eq!(data_access_events.len(), 2); // password and api_key
-    }
-
-    #[test]
-    fn test_security_config_defaults() {
-        let config = SecurityConfig::default();
-        assert!(config.enable_audit_logging);
-        assert!(config.enable_parameter_validation);
-        assert_eq!(config.min_severity, SecuritySeverity::Info);
-        assert!(!config.block_on_violations);
-        assert!(config.sensitive_parameters.contains("password"));
-        assert!(config.sensitive_parameters.contains("api_key"));
-    }
-
-    #[test]
-    fn test_security_event_serialization() {
-        let event = SecurityEvent {
-            timestamp: Utc::now(),
-            event_type: SecurityEventType::AccessAttempt,
-            severity: SecuritySeverity::Medium,
-            hook_point: HookPoint::SystemStartup,
-            component_name: "test".to_string(),
-            component_type: "System".to_string(),
-            language: "Native".to_string(),
-            correlation_id: "test-id".to_string(),
-            user_id: Some("user123".to_string()),
-            session_id: Some("session456".to_string()),
-            source_ip: Some("192.168.1.1".to_string()),
-            description: "Test event".to_string(),
-            details: HashMap::new(),
-            blocked: false,
-        };
-
-        let serialized = serde_json::to_string(&event).unwrap();
-        let deserialized: SecurityEvent = serde_json::from_str(&serialized).unwrap();
-
-        assert_eq!(deserialized.event_type, SecurityEventType::AccessAttempt);
-        assert_eq!(deserialized.severity, SecuritySeverity::Medium);
-        assert_eq!(deserialized.user_id, Some("user123".to_string()));
-    }
-
-    #[test]
-    fn test_security_storage_filtering() {
-        let storage = SecurityStorage::new(SecurityConfig::default());
-
-        // Add test events with different severities
-        let events = vec![
-            SecurityEvent {
-                timestamp: Utc::now(),
-                event_type: SecurityEventType::AccessAttempt,
-                severity: SecuritySeverity::Info,
-                hook_point: HookPoint::SystemStartup,
-                component_name: "test1".to_string(),
-                component_type: "System".to_string(),
-                language: "Native".to_string(),
-                correlation_id: "test-id-1".to_string(),
-                user_id: None,
-                session_id: None,
-                source_ip: None,
-                description: "Info event".to_string(),
-                details: HashMap::new(),
-                blocked: false,
-            },
-            SecurityEvent {
-                timestamp: Utc::now(),
-                event_type: SecurityEventType::SecurityViolation,
-                severity: SecuritySeverity::Critical,
-                hook_point: HookPoint::SecurityViolation,
-                component_name: "test2".to_string(),
-                component_type: "System".to_string(),
-                language: "Native".to_string(),
-                correlation_id: "test-id-2".to_string(),
-                user_id: None,
-                session_id: None,
-                source_ip: None,
-                description: "Critical event".to_string(),
-                details: HashMap::new(),
-                blocked: true,
-            },
-        ];
-
-        for event in events {
-            storage.add_event(event);
-        }
-
-        // Test filtering by severity
-        let critical_events = storage.get_events_by_severity(SecuritySeverity::Critical);
-        assert_eq!(critical_events.len(), 1);
-        assert_eq!(critical_events[0].severity, SecuritySeverity::Critical);
-
-        // Test filtering by type
-        let violation_events = storage.get_events_by_type(&SecurityEventType::SecurityViolation);
-        assert_eq!(violation_events.len(), 1);
-        assert_eq!(
-            violation_events[0].event_type,
-            SecurityEventType::SecurityViolation
-        );
-    }
-
-    #[test]
-    fn test_security_statistics() {
-        let storage = SecurityStorage::new(SecurityConfig::default());
-
-        // Add multiple events
-        for i in 0..5 {
-            let event = SecurityEvent {
-                timestamp: Utc::now(),
-                event_type: if i % 2 == 0 {
-                    SecurityEventType::AccessAttempt
-                } else {
-                    SecurityEventType::AuditLog
-                },
-                severity: if i < 2 {
-                    SecuritySeverity::Info
-                } else {
-                    SecuritySeverity::High
-                },
-                hook_point: HookPoint::SystemStartup,
-                component_name: format!("test{}", i),
-                component_type: "System".to_string(),
-                language: "Native".to_string(),
-                correlation_id: format!("test-id-{}", i),
-                user_id: None,
-                session_id: None,
-                source_ip: None,
-                description: format!("Test event {}", i),
-                details: HashMap::new(),
-                blocked: i == 0, // Only first event is blocked
-            };
-            storage.add_event(event);
-        }
-
-        let stats = storage.get_statistics();
-
-        assert_eq!(stats.get("total_events").unwrap().as_u64().unwrap(), 5);
-        assert!(stats.contains_key("by_severity"));
-        assert!(stats.contains_key("by_type"));
-        assert_eq!(stats.get("blocked_events").unwrap().as_u64().unwrap(), 1);
-    }
-
-    #[tokio::test]
-    async fn test_metric_hook_trait() {
-        let hook = SecurityHook::new();
-        let component_id = ComponentId::new(ComponentType::Tool, "test-tool".to_string());
-        let context = HookContext::new(HookPoint::BeforeToolExecution, component_id);
-
-        // Test MetricHook implementation
-        hook.record_pre_execution(&context).await.unwrap();
-
-        let result = HookResult::Continue;
-        hook.record_post_execution(&context, &result, std::time::Duration::from_millis(15))
-            .await
-            .unwrap();
-
-        // Verify security events were recorded
-        let events = hook.get_events();
-        let access_attempts: Vec<_> = events
-            .iter()
-            .filter(|e| e.event_type == SecurityEventType::AccessAttempt)
-            .collect();
-        assert!(!access_attempts.is_empty());
-    }
-
-    #[test]
-    fn test_hook_metadata() {
-        let hook = SecurityHook::new();
-        let metadata = hook.metadata();
-
-        assert_eq!(metadata.name, "SecurityHook");
-        assert!(metadata.description.is_some());
-        assert_eq!(metadata.priority, Priority::HIGHEST);
-        assert_eq!(metadata.language, Language::Native);
-        assert!(metadata.tags.contains(&"builtin".to_string()));
-        assert!(metadata.tags.contains(&"security".to_string()));
     }
 }
 
@@ -973,5 +732,238 @@ impl ReplayableHook for SecurityHook {
 
     fn replay_id(&self) -> String {
         format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::{ComponentId, ComponentType, HookPoint};
+    use serde_json::json;
+    #[tokio::test]
+    async fn test_security_hook_basic() {
+        let hook = SecurityHook::new();
+        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
+        let mut context = HookContext::new(HookPoint::SystemStartup, component_id);
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue));
+
+        // Check that security metadata was added
+        assert!(context.get_metadata("security_checked_at").is_some());
+        assert!(context.get_metadata("security_hook_version").is_some());
+
+        // Check that audit event was recorded
+        let events = hook.get_events();
+        assert!(!events.is_empty());
+    }
+    #[tokio::test]
+    async fn test_security_hook_parameter_validation() {
+        let hook = SecurityHook::new().with_blocking(true);
+        let component_id = ComponentId::new(ComponentType::Tool, "test-tool".to_string());
+        let mut context = HookContext::new(HookPoint::BeforeToolExecution, component_id);
+
+        // Add a large parameter that should trigger validation
+        let large_data = "x".repeat(20000);
+        context.insert_data("large_param".to_string(), json!(large_data));
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Cancel(_)));
+
+        // Check that security violation was recorded
+        let events = hook.get_events();
+        let violations: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == SecurityEventType::ParameterInjection)
+            .collect();
+        assert!(!violations.is_empty());
+    }
+    #[tokio::test]
+    async fn test_security_hook_sensitive_parameters() {
+        let hook = SecurityHook::new();
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        let mut context = HookContext::new(HookPoint::BeforeAgentExecution, component_id);
+
+        // Add sensitive parameters
+        context.insert_data("password".to_string(), json!("secret123"));
+        context.insert_data("api_key".to_string(), json!("sk_test_123"));
+
+        let result = hook.execute(&mut context).await.unwrap();
+        assert!(matches!(result, HookResult::Continue)); // Should not block, just log
+
+        // Check that sensitive parameter access was logged
+        let events = hook.get_events();
+        let data_access_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == SecurityEventType::DataAccess)
+            .collect();
+        assert_eq!(data_access_events.len(), 2); // password and api_key
+    }
+    #[test]
+    fn test_security_config_defaults() {
+        let config = SecurityConfig::default();
+        assert!(config.enable_audit_logging);
+        assert!(config.enable_parameter_validation);
+        assert_eq!(config.min_severity, SecuritySeverity::Info);
+        assert!(!config.block_on_violations);
+        assert!(config.sensitive_parameters.contains("password"));
+        assert!(config.sensitive_parameters.contains("api_key"));
+    }
+    #[test]
+    fn test_security_event_serialization() {
+        let event = SecurityEvent {
+            timestamp: Utc::now(),
+            event_type: SecurityEventType::AccessAttempt,
+            severity: SecuritySeverity::Medium,
+            hook_point: HookPoint::SystemStartup,
+            component_name: "test".to_string(),
+            component_type: "System".to_string(),
+            language: "Native".to_string(),
+            correlation_id: "test-id".to_string(),
+            user_id: Some("user123".to_string()),
+            session_id: Some("session456".to_string()),
+            source_ip: Some("192.168.1.1".to_string()),
+            description: "Test event".to_string(),
+            details: HashMap::new(),
+            blocked: false,
+        };
+
+        let serialized = serde_json::to_string(&event).unwrap();
+        let deserialized: SecurityEvent = serde_json::from_str(&serialized).unwrap();
+
+        assert_eq!(deserialized.event_type, SecurityEventType::AccessAttempt);
+        assert_eq!(deserialized.severity, SecuritySeverity::Medium);
+        assert_eq!(deserialized.user_id, Some("user123".to_string()));
+    }
+    #[test]
+    fn test_security_storage_filtering() {
+        let storage = SecurityStorage::new(SecurityConfig::default());
+
+        // Add test events with different severities
+        let events = vec![
+            SecurityEvent {
+                timestamp: Utc::now(),
+                event_type: SecurityEventType::AccessAttempt,
+                severity: SecuritySeverity::Info,
+                hook_point: HookPoint::SystemStartup,
+                component_name: "test1".to_string(),
+                component_type: "System".to_string(),
+                language: "Native".to_string(),
+                correlation_id: "test-id-1".to_string(),
+                user_id: None,
+                session_id: None,
+                source_ip: None,
+                description: "Info event".to_string(),
+                details: HashMap::new(),
+                blocked: false,
+            },
+            SecurityEvent {
+                timestamp: Utc::now(),
+                event_type: SecurityEventType::SecurityViolation,
+                severity: SecuritySeverity::Critical,
+                hook_point: HookPoint::SecurityViolation,
+                component_name: "test2".to_string(),
+                component_type: "System".to_string(),
+                language: "Native".to_string(),
+                correlation_id: "test-id-2".to_string(),
+                user_id: None,
+                session_id: None,
+                source_ip: None,
+                description: "Critical event".to_string(),
+                details: HashMap::new(),
+                blocked: true,
+            },
+        ];
+
+        for event in events {
+            storage.add_event(event);
+        }
+
+        // Test filtering by severity
+        let critical_events = storage.get_events_by_severity(SecuritySeverity::Critical);
+        assert_eq!(critical_events.len(), 1);
+        assert_eq!(critical_events[0].severity, SecuritySeverity::Critical);
+
+        // Test filtering by type
+        let violation_events = storage.get_events_by_type(&SecurityEventType::SecurityViolation);
+        assert_eq!(violation_events.len(), 1);
+        assert_eq!(
+            violation_events[0].event_type,
+            SecurityEventType::SecurityViolation
+        );
+    }
+    #[test]
+    fn test_security_statistics() {
+        let storage = SecurityStorage::new(SecurityConfig::default());
+
+        // Add multiple events
+        for i in 0..5 {
+            let event = SecurityEvent {
+                timestamp: Utc::now(),
+                event_type: if i % 2 == 0 {
+                    SecurityEventType::AccessAttempt
+                } else {
+                    SecurityEventType::AuditLog
+                },
+                severity: if i < 2 {
+                    SecuritySeverity::Info
+                } else {
+                    SecuritySeverity::High
+                },
+                hook_point: HookPoint::SystemStartup,
+                component_name: format!("test{}", i),
+                component_type: "System".to_string(),
+                language: "Native".to_string(),
+                correlation_id: format!("test-id-{}", i),
+                user_id: None,
+                session_id: None,
+                source_ip: None,
+                description: format!("Test event {}", i),
+                details: HashMap::new(),
+                blocked: i == 0, // Only first event is blocked
+            };
+            storage.add_event(event);
+        }
+
+        let stats = storage.get_statistics();
+
+        assert_eq!(stats.get("total_events").unwrap().as_u64().unwrap(), 5);
+        assert!(stats.contains_key("by_severity"));
+        assert!(stats.contains_key("by_type"));
+        assert_eq!(stats.get("blocked_events").unwrap().as_u64().unwrap(), 1);
+    }
+    #[tokio::test]
+    async fn test_metric_hook_trait() {
+        let hook = SecurityHook::new();
+        let component_id = ComponentId::new(ComponentType::Tool, "test-tool".to_string());
+        let context = HookContext::new(HookPoint::BeforeToolExecution, component_id);
+
+        // Test MetricHook implementation
+        hook.record_pre_execution(&context).await.unwrap();
+
+        let result = HookResult::Continue;
+        hook.record_post_execution(&context, &result, std::time::Duration::from_millis(15))
+            .await
+            .unwrap();
+
+        // Verify security events were recorded
+        let events = hook.get_events();
+        let access_attempts: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == SecurityEventType::AccessAttempt)
+            .collect();
+        assert!(!access_attempts.is_empty());
+    }
+    #[test]
+    fn test_hook_metadata() {
+        let hook = SecurityHook::new();
+        let metadata = hook.metadata();
+
+        assert_eq!(metadata.name, "SecurityHook");
+        assert!(metadata.description.is_some());
+        assert_eq!(metadata.priority, Priority::HIGHEST);
+        assert_eq!(metadata.language, Language::Native);
+        assert!(metadata.tags.contains(&"builtin".to_string()));
+        assert!(metadata.tags.contains(&"security".to_string()));
     }
 }

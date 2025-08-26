@@ -11,14 +11,14 @@ use mlua::{
 use serde_json;
 use std::time::Duration;
 
-/// Lua wrapper for ReplayMode
+/// Lua wrapper for `ReplayMode`
 #[derive(Debug, Clone)]
 pub struct LuaReplayMode(pub ReplayMode);
 
 impl<'lua> FromLua<'lua> for LuaReplayMode {
     fn from_lua(value: Value<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
         match value {
-            Value::UserData(ud) => Ok(ud.borrow::<LuaReplayMode>()?.clone()),
+            Value::UserData(ud) => Ok(ud.borrow::<Self>()?.clone()),
             _ => Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
                 to: "LuaReplayMode",
@@ -39,7 +39,7 @@ impl UserData for LuaReplayMode {
     }
 }
 
-/// Lua wrapper for ParameterModification
+/// Lua wrapper for `ParameterModification`
 #[derive(Debug, Clone)]
 pub struct LuaParameterModification(pub ParameterModification);
 
@@ -61,7 +61,7 @@ impl UserData for LuaParameterModification {
     }
 }
 
-/// Lua wrapper for ReplayConfig
+/// Lua wrapper for `ReplayConfig`
 #[derive(Debug, Clone)]
 pub struct LuaReplayConfig(pub ReplayConfig);
 
@@ -106,7 +106,7 @@ impl UserData for LuaReplayConfig {
     }
 }
 
-/// Lua wrapper for ReplaySchedule
+/// Lua wrapper for `ReplaySchedule`
 #[derive(Debug, Clone)]
 pub struct LuaReplaySchedule(pub ReplaySchedule);
 
@@ -122,7 +122,8 @@ impl UserData for LuaReplaySchedule {
 }
 
 /// Convert Lua value to JSON
-fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
+#[allow(clippy::only_used_in_recursion)]
+fn lua_value_to_json(lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
     match value {
         Value::Nil => Ok(serde_json::Value::Null),
         Value::Boolean(b) => Ok(serde_json::Value::Bool(b)),
@@ -153,14 +154,14 @@ fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
                 let mut arr = Vec::new();
                 for pair in t.pairs::<i64, Value>() {
                     let (_, v) = pair?;
-                    arr.push(lua_value_to_json(_lua, v)?);
+                    arr.push(lua_value_to_json(lua, v)?);
                 }
                 Ok(serde_json::Value::Array(arr))
             } else {
                 let mut map = serde_json::Map::new();
                 for pair in t.pairs::<String, Value>() {
                     let (k, v) = pair?;
-                    map.insert(k, lua_value_to_json(_lua, v)?);
+                    map.insert(k, lua_value_to_json(lua, v)?);
                 }
                 Ok(serde_json::Value::Object(map))
             }
@@ -170,6 +171,12 @@ fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
 }
 
 /// Inject replay global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Replay API creation fails
+/// - Global injection fails
 pub fn inject_replay_global(lua: &Lua) -> Result<(), LLMSpellError> {
     let replay = create_replay_api(lua).map_err(|e| LLMSpellError::Internal {
         message: e.to_string(),
@@ -187,7 +194,13 @@ pub fn inject_replay_global(lua: &Lua) -> Result<(), LLMSpellError> {
 }
 
 /// Create the replay API table
-pub fn create_replay_api(lua: &Lua) -> LuaResult<Table> {
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - Method injection fails
+pub fn create_replay_api(lua: &Lua) -> LuaResult<Table<'_>> {
     let replay = lua.create_table()?;
 
     // ReplayMode constructors
@@ -203,7 +216,7 @@ pub fn create_replay_api(lua: &Lua) -> LuaResult<Table> {
         "create_config",
         lua.create_function(|_, mode: Option<LuaReplayMode>| {
             let config = ReplayConfig {
-                mode: mode.map(|m| m.0).unwrap_or(ReplayMode::Exact),
+                mode: mode.map_or(ReplayMode::Exact, |m| m.0),
                 ..Default::default()
             };
             Ok(LuaReplayConfig(config))
@@ -268,7 +281,7 @@ pub fn create_replay_api(lua: &Lua) -> LuaResult<Table> {
     Ok(replay)
 }
 
-/// Lua wrapper for HookResultComparator
+/// Lua wrapper for `HookResultComparator`
 #[derive(Debug)]
 pub struct LuaHookResultComparator;
 
@@ -313,14 +326,12 @@ impl UserData for LuaHookResultComparator {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_lua_replay_api_creation() {
         let lua = Lua::new();
         let result = create_replay_api(&lua);
         assert!(result.is_ok());
     }
-
     #[test]
     fn test_lua_value_to_json() {
         let lua = Lua::new();

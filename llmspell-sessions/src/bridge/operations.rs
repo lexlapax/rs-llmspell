@@ -239,10 +239,10 @@ mod tests {
             name: Some("test-session".to_string()),
             description: Some("Test session for unit tests".to_string()),
             tags: vec!["test".to_string(), "unit".to_string()],
-            created_by: None,
-            parent_session_id: None,
+            created_by: Option::default(),
+            parent_session_id: Option::default(),
             config: None,
-            metadata: Default::default(),
+            metadata: HashMap::default(),
         };
 
         let session_id = session_manager
@@ -252,7 +252,6 @@ mod tests {
 
         (session_manager, session_id)
     }
-
     #[tokio::test]
     async fn test_update_metadata() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -296,7 +295,6 @@ mod tests {
             Some(&serde_json::json!("custom value"))
         );
     }
-
     #[tokio::test]
     async fn test_tag_operations() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -343,7 +341,6 @@ mod tests {
             .await
             .expect("Failed to check tag"));
     }
-
     #[tokio::test]
     async fn test_get_session_stats() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -357,7 +354,7 @@ mod tests {
                     crate::artifact::ArtifactType::UserInput,
                     format!("test_artifact_{}.txt", i),
                     format!("Test content {}", i).as_bytes().to_vec(),
-                    Default::default(),
+                    None,
                 )
                 .await
                 .expect("Failed to store artifact");
@@ -375,7 +372,6 @@ mod tests {
         assert_eq!(stats.tag_count, 2); // "test", "unit"
         assert_eq!(stats.status, "Active");
     }
-
     #[tokio::test]
     async fn test_export_session() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -388,7 +384,7 @@ mod tests {
                 crate::artifact::ArtifactType::ToolResult,
                 "export_test.json".to_string(),
                 r#"{"test": "data"}"#.as_bytes().to_vec(),
-                Default::default(),
+                None,
             )
             .await
             .expect("Failed to store artifact");
@@ -412,7 +408,6 @@ mod tests {
         assert!(export.artifacts.is_some());
         assert_eq!(export.artifacts.as_ref().unwrap().len(), 1);
     }
-
     #[tokio::test]
     async fn test_update_metadata_edge_cases() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -438,7 +433,6 @@ mod tests {
         let tags = ops.get_tags(&session_id).await.expect("Failed to get tags");
         assert_eq!(tags, vec!["valid-tag"]); // Only string values kept
     }
-
     #[tokio::test]
     async fn test_concurrent_tag_operations() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -472,7 +466,6 @@ mod tests {
             assert!(tags.contains(&format!("concurrent-{}", i)));
         }
     }
-
     #[tokio::test]
     async fn test_nonexistent_session() {
         let (session_manager, _) = setup_test_env().await;

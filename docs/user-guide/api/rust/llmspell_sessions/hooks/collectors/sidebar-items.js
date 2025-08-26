@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["process_collected_artifact","register_artifact_collectors"],"struct":["ArtifactCollectionProcessor","CollectorConfig"]};

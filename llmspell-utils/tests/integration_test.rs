@@ -5,7 +5,6 @@
 
 use llmspell_utils::*;
 use std::path::Path;
-
 #[test]
 fn test_string_utils_exports() {
     // Test string manipulation functions
@@ -27,7 +26,6 @@ fn test_string_utils_exports() {
 
     assert_eq!(normalize_whitespace("Hello    world"), "Hello world");
 }
-
 #[test]
 fn test_system_info_exports() {
     // Test system info functions
@@ -44,7 +42,6 @@ fn test_system_info_exports() {
     assert_eq!(format_bytes(1024), "1.0 KB");
     assert_eq!(format_bytes(1_048_576), "1.0 MB");
 }
-
 #[test]
 fn test_error_builders_exports() {
     use llmspell_utils::templates;
@@ -63,7 +60,6 @@ fn test_error_builders_exports() {
     let val_err = templates::validation_error("Invalid", "test@", "missing domain").build();
     assert_eq!(val_err.get_context("error_type"), Some("validation"));
 }
-
 #[test]
 fn test_id_generator_exports() {
     // Test ID generation
@@ -85,7 +81,6 @@ fn test_id_generator_exports() {
         .build();
     assert!(builder_id.starts_with("custom_"));
 }
-
 #[test]
 fn test_serialization_exports() {
     use std::collections::HashMap;
@@ -114,7 +109,6 @@ fn test_serialization_exports() {
     assert_eq!(merged["b"], 3);
     assert_eq!(merged["c"], 4);
 }
-
 #[test]
 fn test_file_utils_exports() {
     // Test file_utils functions
@@ -136,7 +130,6 @@ fn test_file_utils_exports() {
         assert!(expanded.starts_with(&home));
     }
 }
-
 #[tokio::test]
 async fn test_async_utils_exports() {
     use std::time::Duration;

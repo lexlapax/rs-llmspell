@@ -10,8 +10,12 @@ use llmspell_core::error::LLMSpellError;
 ///
 /// NOTE: This is a stub implementation for Phase 15.
 /// Full JavaScript event bridge will be implemented when JavaScript support is added.
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_event_global(
+pub const fn inject_event_global(
     _ctx: &mut Context,
     _context: &GlobalContext,
 ) -> Result<(), LLMSpellError> {
@@ -24,15 +28,21 @@ pub fn inject_event_global(
 }
 
 /// No-op stub when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_event_global(_ctx: &mut (), _context: &GlobalContext) -> Result<(), LLMSpellError> {
+pub const fn inject_event_global(
+    _ctx: &mut (),
+    _context: &GlobalContext,
+) -> Result<(), LLMSpellError> {
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_event_global_stub_compiles() {
         // This test just ensures the stub compiles correctly
@@ -44,12 +54,14 @@ mod tests {
     #[test]
     fn test_javascript_event_injection() {
         use crate::{ComponentRegistry, ProviderManager};
+        use llmspell_config::providers::ProviderManagerConfig;
         use std::sync::Arc;
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
             let registry = Arc::new(ComponentRegistry::new());
-            let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+            let config = ProviderManagerConfig::default();
+            let providers = Arc::new(ProviderManager::new(config).await.unwrap());
             let context = GlobalContext::new(registry, providers);
 
             let mut js_context = Context::default();

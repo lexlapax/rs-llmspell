@@ -1,6 +1,8 @@
 //! ABOUTME: Distributed tracing for agent operations
 //! ABOUTME: Provides span tracking, context propagation, and trace collection
 
+#![allow(clippy::significant_drop_tightening)]
+
 use chrono::{DateTime, Utc};
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};
@@ -38,12 +40,14 @@ pub struct TraceSpan {
 
 impl TraceSpan {
     /// Create a new root span
+    #[must_use]
     pub fn new_root(operation: String, service: String) -> Self {
         let trace_id = Uuid::new_v4().to_string();
-        Self::new(trace_id.clone(), None, operation, service)
+        Self::new(trace_id, None, operation, service)
     }
 
     /// Create a new child span
+    #[must_use]
     pub fn new_child(&self, operation: String) -> Self {
         Self::new(
             self.trace_id.clone(),
@@ -86,6 +90,10 @@ impl TraceSpan {
     }
 
     /// Complete the span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `end_time` calculation results in a negative `duration`
     pub fn complete(&mut self, status: SpanStatus) {
         self.end_time = Some(Utc::now());
         self.duration = Some(
@@ -97,6 +105,7 @@ impl TraceSpan {
     }
 
     /// Get span duration in milliseconds
+    #[must_use]
     pub fn duration_ms(&self) -> Option<f64> {
         self.duration.map(|d| d.as_secs_f64() * 1000.0)
     }
@@ -128,6 +137,7 @@ pub struct TraceEvent {
 
 impl TraceEvent {
     /// Create a new trace event
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             timestamp: Utc::now(),
@@ -137,6 +147,7 @@ impl TraceEvent {
     }
 
     /// Add an attribute to the event
+    #[must_use]
     pub fn with_attribute(mut self, key: String, value: String) -> Self {
         self.attributes.insert(key, value);
         self
@@ -158,6 +169,7 @@ pub struct SpanContext {
 
 impl SpanContext {
     /// Create from a span
+    #[must_use]
     pub fn from_span(span: &TraceSpan) -> Self {
         Self {
             trace_id: span.trace_id.clone(),
@@ -173,6 +185,7 @@ impl SpanContext {
     }
 
     /// Create a child span from this context
+    #[must_use]
     pub fn child_span(&self, operation: String) -> TraceSpan {
         TraceSpan::new(
             self.trace_id.clone(),
@@ -196,6 +209,9 @@ pub struct TraceCollector {
 }
 
 impl std::fmt::Debug for TraceCollector {
+    /// # Panics
+    ///
+    /// Panics if any `RwLock` is poisoned
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TraceCollector")
             .field(
@@ -214,6 +230,7 @@ impl std::fmt::Debug for TraceCollector {
 
 impl TraceCollector {
     /// Create a new trace collector
+    #[must_use]
     pub fn new(max_completed_spans: usize) -> Self {
         Self {
             active_spans: Arc::new(RwLock::new(HashMap::new())),
@@ -229,6 +246,11 @@ impl TraceCollector {
     }
 
     /// Start a new span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn start_span(self: &Arc<Self>, span: TraceSpan) -> SpanHandle {
         let span_id = span.span_id.clone();
         self.active_spans
@@ -243,6 +265,10 @@ impl TraceCollector {
     }
 
     /// Complete a span
+    ///
+    /// # Panics
+    ///
+    /// Panics if any `RwLock` is poisoned
     fn complete_span(&self, span_id: &str, status: SpanStatus) -> Result<()> {
         let mut active = self.active_spans.write().unwrap();
 
@@ -266,11 +292,21 @@ impl TraceCollector {
     }
 
     /// Get active span count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn active_span_count(&self) -> usize {
         self.active_spans.read().unwrap().len()
     }
 
     /// Get completed spans for a trace
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn get_trace(&self, trace_id: &str) -> Vec<TraceSpan> {
         self.completed_spans
             .read()
@@ -282,6 +318,10 @@ impl TraceCollector {
     }
 
     /// Get all traces
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_all_traces(&self) -> HashMap<String, Vec<TraceSpan>> {
         let mut traces = HashMap::new();
 
@@ -296,6 +336,10 @@ impl TraceCollector {
     }
 
     /// Clear all completed spans
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn clear_completed(&self) {
         self.completed_spans.write().unwrap().clear();
     }
@@ -309,6 +353,10 @@ pub struct SpanHandle {
 
 impl SpanHandle {
     /// Add a tag to the span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn add_tag(&self, key: String, value: String) {
         if let Some(span) = self
             .collector
@@ -322,6 +370,10 @@ impl SpanHandle {
     }
 
     /// Add an event to the span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn add_event(&self, event: TraceEvent) {
         if let Some(span) = self
             .collector
@@ -357,6 +409,11 @@ impl SpanHandle {
 /// Trait for exporting traces
 pub trait TraceExporter: Send + Sync {
     /// Export a completed span
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the span cannot be exported due to network issues,
+    /// serialization failures, or backend service unavailability.
     fn export(&self, span: &TraceSpan) -> Result<()>;
 }
 
@@ -384,6 +441,7 @@ pub struct TraceAnalyzer;
 
 impl TraceAnalyzer {
     /// Calculate critical path in a trace
+    #[must_use]
     pub fn critical_path(spans: &[TraceSpan]) -> Vec<String> {
         if spans.is_empty() {
             return Vec::new();
@@ -423,6 +481,7 @@ impl TraceAnalyzer {
     }
 
     /// Calculate trace statistics
+    #[must_use]
     pub fn trace_stats(spans: &[TraceSpan]) -> TraceStatistics {
         if spans.is_empty() {
             return TraceStatistics::default();
@@ -437,11 +496,16 @@ impl TraceAnalyzer {
 
         let service_durations = Self::calculate_service_durations(spans);
 
+        #[allow(clippy::cast_precision_loss)]
+        let error_count_f64 = error_count as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let span_count_f64 = spans.len() as f64;
+
         TraceStatistics {
             span_count: spans.len(),
             total_duration,
             error_count,
-            error_rate: (error_count as f64 / spans.len() as f64) * 100.0,
+            error_rate: (error_count_f64 / span_count_f64) * 100.0,
             service_durations,
         }
     }
@@ -479,7 +543,6 @@ pub struct TraceStatistics {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_span_creation() {
         let root = TraceSpan::new_root("operation".to_string(), "service".to_string());
@@ -492,7 +555,6 @@ mod tests {
         assert_eq!(child.parent_span_id, Some(root.span_id.clone()));
         assert_eq!(child.service, root.service);
     }
-
     #[test]
     fn test_span_completion() {
         let mut span = TraceSpan::new_root("test".to_string(), "service".to_string());
@@ -510,7 +572,6 @@ mod tests {
         assert!(span.duration.unwrap() >= Duration::from_millis(10));
         assert_eq!(span.status, SpanStatus::Ok);
     }
-
     #[test]
     fn test_trace_collector() {
         let collector = Arc::new(TraceCollector::new(10));
@@ -537,7 +598,6 @@ mod tests {
         assert_eq!(trace[0].span_id, span_id);
         assert_eq!(trace[0].status, SpanStatus::Ok);
     }
-
     #[test]
     fn test_span_context() {
         let span = TraceSpan::new_root("op".to_string(), "service".to_string());
@@ -547,9 +607,8 @@ mod tests {
 
         let child = context.child_span("child-op".to_string());
         assert_eq!(child.trace_id, span.trace_id);
-        assert_eq!(child.parent_span_id, Some(span.span_id.clone()));
+        assert_eq!(child.parent_span_id, Some(span.span_id));
     }
-
     #[test]
     fn test_trace_analyzer() {
         let root = TraceSpan::new_root("root".to_string(), "service-a".to_string());

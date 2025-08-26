@@ -1,16 +1,22 @@
 //! ABOUTME: llmspell-tools implementation crate
 //! ABOUTME: Built-in tools library with registry, security sandbox, and tool implementations
 
+/// Academic and research tools
+pub mod academic;
 pub mod api;
 pub mod api_key_integration;
 pub mod communication;
+/// Data processing and transformation tools
 pub mod data;
+/// Document processing tools
+pub mod document;
 pub mod fs;
 pub mod lifecycle;
 pub mod media;
 pub mod registry;
 pub mod resource_limited;
 pub mod search;
+/// State management and persistence tools
 pub mod state;
 pub mod system;
 pub mod util;
@@ -36,9 +42,11 @@ pub use state::{
 };
 
 // Re-export tools
+pub use academic::CitationFormatterTool;
 pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use communication::{DatabaseConnectorTool, EmailSenderTool};
-pub use data::{CsvAnalyzerTool, JsonProcessorTool};
+pub use data::{CsvAnalyzerTool, GraphBuilderTool, JsonProcessorTool};
+pub use document::PdfProcessorTool;
 pub use fs::{
     ArchiveHandlerTool, FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,
 };

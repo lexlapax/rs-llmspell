@@ -1,6 +1,8 @@
 //! ABOUTME: Health monitoring system for agent lifecycle management and operational status tracking
 //! ABOUTME: Provides comprehensive health checks, metrics collection, and alerting for agent wellness
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::lifecycle::{
     events::{LifecycleEvent, LifecycleEventData, LifecycleEventSystem, LifecycleEventType},
     resources::ResourceManager,
@@ -18,9 +20,10 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Health status levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub enum HealthStatus {
     /// Everything is operating normally
+    #[default]
     Healthy,
     /// Minor issues detected, but agent is still functional
     Warning,
@@ -34,23 +37,26 @@ pub enum HealthStatus {
 
 impl HealthStatus {
     /// Check if status indicates agent is operational
-    pub fn is_operational(&self) -> bool {
-        matches!(self, HealthStatus::Healthy | HealthStatus::Warning)
+    #[must_use]
+    pub const fn is_operational(&self) -> bool {
+        matches!(self, Self::Healthy | Self::Warning)
     }
 
     /// Check if status requires immediate attention
-    pub fn needs_attention(&self) -> bool {
-        matches!(self, HealthStatus::Critical | HealthStatus::Unhealthy)
+    #[must_use]
+    pub const fn needs_attention(&self) -> bool {
+        matches!(self, Self::Critical | Self::Unhealthy)
     }
 
     /// Get numeric severity (higher is worse)
-    pub fn severity(&self) -> u8 {
+    #[must_use]
+    pub const fn severity(&self) -> u8 {
         match self {
-            HealthStatus::Healthy => 0,
-            HealthStatus::Warning => 1,
-            HealthStatus::Critical => 2,
-            HealthStatus::Unhealthy => 3,
-            HealthStatus::Unknown => 4,
+            Self::Healthy => 0,
+            Self::Warning => 1,
+            Self::Critical => 2,
+            Self::Unhealthy => 3,
+            Self::Unknown => 4,
         }
     }
 }
@@ -81,6 +87,7 @@ pub struct HealthCheckResult {
 }
 
 impl HealthCheckResult {
+    #[must_use]
     pub fn new(agent_id: String, check_type: String, status: HealthStatus) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -96,26 +103,31 @@ impl HealthCheckResult {
         }
     }
 
+    #[must_use]
     pub fn with_message(mut self, message: String) -> Self {
         self.message = message;
         self
     }
 
-    pub fn with_duration(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
         self
     }
 
+    #[must_use]
     pub fn with_metric(mut self, name: &str, value: f64) -> Self {
         self.metrics.insert(name.to_string(), value);
         self
     }
 
+    #[must_use]
     pub fn with_issue(mut self, issue: HealthIssue) -> Self {
         self.issues.push(issue);
         self
     }
 
+    #[must_use]
     pub fn with_recommendation(mut self, recommendation: String) -> Self {
         self.recommendations.push(recommendation);
         self
@@ -138,7 +150,8 @@ pub struct HealthIssue {
 }
 
 impl HealthIssue {
-    pub fn new(severity: HealthStatus, category: String, description: String) -> Self {
+    #[must_use]
+    pub const fn new(severity: HealthStatus, category: String, description: String) -> Self {
         Self {
             severity,
             category,
@@ -148,11 +161,13 @@ impl HealthIssue {
         }
     }
 
+    #[must_use]
     pub fn with_causes(mut self, causes: Vec<String>) -> Self {
         self.possible_causes = causes;
         self
     }
 
+    #[must_use]
     pub fn with_remediation(mut self, remediation: Vec<String>) -> Self {
         self.remediation = remediation;
         self
@@ -238,6 +253,7 @@ impl Default for HealthMonitorConfig {
 
 impl AgentHealthMonitor {
     /// Create new health monitor for agent
+    #[must_use]
     pub fn new(
         agent_id: String,
         state_machine: Arc<AgentStateMachine>,
@@ -272,6 +288,12 @@ impl AgentHealthMonitor {
     }
 
     /// Perform immediate health check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any health check fails to execute
+    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     pub async fn check_health(&self) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
 
@@ -327,7 +349,7 @@ impl AgentHealthMonitor {
 
         // Create overall result
         let overall_message = if check_messages.is_empty() {
-            format!("Health check completed with status: {:?}", overall_status)
+            format!("Health check completed with status: {overall_status:?}")
         } else {
             check_messages.join("; ")
         };
@@ -382,7 +404,7 @@ impl AgentHealthMonitor {
                 self.agent_id.clone(),
                 LifecycleEventData::Health {
                     is_healthy: overall_status.is_operational(),
-                    status: format!("{:?}", overall_status),
+                    status: format!("{overall_status:?}"),
                     metrics: all_metrics
                         .into_iter()
                         .map(|(k, v)| (k, v.to_string()))
@@ -420,7 +442,11 @@ impl AgentHealthMonitor {
     }
 
     /// Start continuous health monitoring
-    pub async fn start_monitoring(&self) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if monitoring task spawn fails
+    pub fn start_monitoring(&self) -> Result<()> {
         if !self.config.enable_monitoring {
             return Ok(());
         }
@@ -498,7 +524,8 @@ pub struct StateMachineHealthCheck {
 }
 
 impl StateMachineHealthCheck {
-    pub fn new(state_machine: Arc<AgentStateMachine>) -> Self {
+    #[must_use]
+    pub const fn new(state_machine: Arc<AgentStateMachine>) -> Self {
         Self { state_machine }
     }
 }
@@ -527,17 +554,27 @@ impl HealthCheck for StateMachineHealthCheck {
             ),
             _ => (
                 HealthStatus::Unknown,
-                format!("Unknown state: {:?}", current_state),
+                format!("Unknown state: {current_state:?}"),
             ),
         };
 
         let mut result =
             HealthCheckResult::new(agent_id.to_string(), "state_machine".to_string(), status)
                 .with_message(message)
-                .with_duration(start_time.elapsed())
-                .with_metric("total_transitions", metrics.total_transitions as f64)
-                .with_metric("recovery_attempts", metrics.recovery_attempts as f64)
-                .with_metric("uptime_seconds", metrics.uptime.as_secs() as f64);
+                .with_duration(start_time.elapsed());
+
+        {
+            #[allow(clippy::cast_precision_loss)]
+            let total_transitions = metrics.total_transitions as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let recovery_attempts = metrics.recovery_attempts as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let uptime_seconds = metrics.uptime.as_secs() as f64;
+            result = result
+                .with_metric("total_transitions", total_transitions)
+                .with_metric("recovery_attempts", recovery_attempts)
+                .with_metric("uptime_seconds", uptime_seconds);
+        }
 
         // Add issues for problematic states
         if metrics.recovery_attempts > 0 {
@@ -558,7 +595,7 @@ impl HealthCheck for StateMachineHealthCheck {
             result = result.with_issue(HealthIssue::new(
                 HealthStatus::Critical,
                 "error".to_string(),
-                format!("Last error: {}", error),
+                format!("Last error: {error}"),
             ));
         }
 
@@ -580,7 +617,8 @@ pub struct ResourceHealthCheck {
 }
 
 impl ResourceHealthCheck {
-    pub fn new(resource_manager: Arc<ResourceManager>) -> Self {
+    #[must_use]
+    pub const fn new(resource_manager: Arc<ResourceManager>) -> Self {
         Self { resource_manager }
     }
 }
@@ -590,7 +628,7 @@ impl HealthCheck for ResourceHealthCheck {
     async fn check(&self, agent_id: &str) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
         let allocations = self.resource_manager.get_agent_allocations(agent_id).await;
-        let stats = self.resource_manager.get_usage_stats().await;
+        let usage_stats = self.resource_manager.get_usage_stats().await;
 
         // Check for resource leaks or excessive usage
         let allocation_count = allocations.len();
@@ -599,30 +637,40 @@ impl HealthCheck for ResourceHealthCheck {
         } else if allocation_count > 50 {
             (
                 HealthStatus::Critical,
-                format!("Excessive resource allocations: {}", allocation_count),
+                format!("Excessive resource allocations: {allocation_count}"),
             )
         } else if allocation_count > 20 {
             (
                 HealthStatus::Warning,
-                format!("High resource allocation count: {}", allocation_count),
+                format!("High resource allocation count: {allocation_count}"),
             )
         } else {
             (
                 HealthStatus::Healthy,
-                format!("Resource allocations: {}", allocation_count),
+                format!("Resource allocations: {allocation_count}"),
             )
         };
 
         let mut result =
             HealthCheckResult::new(agent_id.to_string(), "resources".to_string(), status)
                 .with_message(message)
-                .with_duration(start_time.elapsed())
-                .with_metric("allocation_count", allocation_count as f64)
-                .with_metric("total_allocations", stats.total_allocations as f64);
+                .with_duration(start_time.elapsed());
+
+        {
+            #[allow(clippy::cast_precision_loss)]
+            let alloc_count = allocation_count as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_allocs = usage_stats.total_allocations as f64;
+            result = result
+                .with_metric("allocation_count", alloc_count)
+                .with_metric("total_allocations", total_allocs);
+        }
 
         // Add resource-specific metrics
-        for (resource_type, usage) in &stats.current_usage_by_type {
-            result = result.with_metric(&format!("usage_{}", resource_type.name()), *usage as f64);
+        for (resource_type, usage) in &usage_stats.current_usage_by_type {
+            #[allow(clippy::cast_precision_loss)]
+            let usage_f64 = *usage as f64;
+            result = result.with_metric(&format!("usage_{}", resource_type.name()), usage_f64);
         }
 
         // Add recommendations for high resource usage
@@ -655,22 +703,23 @@ impl HealthCheck for ResponsivenessHealthCheck {
         tokio::time::sleep(Duration::from_millis(1)).await;
 
         let response_time = start_time.elapsed();
+        #[allow(clippy::cast_precision_loss)]
         let response_ms = response_time.as_millis() as f64;
 
         let (status, message) = if response_ms > 1000.0 {
             (
                 HealthStatus::Critical,
-                format!("Very slow response: {:.1}ms", response_ms),
+                format!("Very slow response: {response_ms:.1}ms"),
             )
         } else if response_ms > 100.0 {
             (
                 HealthStatus::Warning,
-                format!("Slow response: {:.1}ms", response_ms),
+                format!("Slow response: {response_ms:.1}ms"),
             )
         } else {
             (
                 HealthStatus::Healthy,
-                format!("Good response time: {:.1}ms", response_ms),
+                format!("Good response time: {response_ms:.1}ms"),
             )
         };
 
@@ -699,7 +748,6 @@ impl HealthCheck for ResponsivenessHealthCheck {
 mod tests {
     use super::*;
     use crate::lifecycle::{events::EventSystemConfig, resources::ResourceLimits};
-
     #[tokio::test]
     async fn test_health_monitor_basic() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -733,7 +781,6 @@ mod tests {
         assert_eq!(result.check_type, "comprehensive");
         assert_eq!(result.status, HealthStatus::Healthy);
     }
-
     #[tokio::test]
     async fn test_health_status_severity() {
         assert_eq!(HealthStatus::Healthy.severity(), 0);
@@ -750,7 +797,6 @@ mod tests {
         assert!(HealthStatus::Unhealthy.needs_attention());
         assert!(!HealthStatus::Healthy.needs_attention());
     }
-
     #[tokio::test]
     async fn test_state_machine_health_check() {
         let state_machine = Arc::new(AgentStateMachine::default("test-agent".to_string()));
@@ -768,7 +814,6 @@ mod tests {
         let result = check.check("test-agent").await.unwrap();
         assert_eq!(result.status, HealthStatus::Critical);
     }
-
     #[tokio::test]
     async fn test_resource_health_check() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -784,7 +829,6 @@ mod tests {
         assert_eq!(result.status, HealthStatus::Healthy);
         assert!(result.metrics.contains_key("allocation_count"));
     }
-
     #[tokio::test]
     async fn test_responsiveness_health_check() {
         let check = ResponsivenessHealthCheck;
@@ -795,7 +839,6 @@ mod tests {
         // Should be healthy for a simple test
         assert_eq!(result.status, HealthStatus::Healthy);
     }
-
     #[tokio::test]
     async fn test_health_check_result_builder() {
         let result = HealthCheckResult::new(

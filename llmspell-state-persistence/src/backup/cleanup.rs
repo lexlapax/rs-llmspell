@@ -268,7 +268,6 @@ impl CleanupScheduler {
 mod tests {
     use super::*;
     use crate::backup::retention::{RetentionDecision, RetentionPriority};
-
     #[tokio::test]
     async fn test_cleanup_dry_run() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -297,7 +296,6 @@ mod tests {
         // Errors are expected since backups don't exist in the empty index
         // This is fine for a dry run test
     }
-
     #[tokio::test]
     async fn test_cleanup_scheduler() {
         let scheduler = CleanupScheduler::new(Duration::from_secs(60));

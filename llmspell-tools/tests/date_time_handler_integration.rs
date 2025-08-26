@@ -11,7 +11,6 @@ fn extract_result(response_text: &str) -> Value {
     assert!(output["success"].as_bool().unwrap_or(false));
     output["result"].clone()
 }
-
 #[tokio::test]
 async fn test_parse_multiple_formats() {
     let tool = DateTimeHandlerTool::new();
@@ -42,21 +41,16 @@ async fn test_parse_multiple_formats() {
         let result = tool
             .execute(input, ExecutionContext::default())
             .await
-            .unwrap_or_else(|e| panic!("Failed to parse {} ({}): {}", date_str, description, e));
+            .unwrap_or_else(|e| panic!("Failed to parse {date_str} ({description}): {e}"));
 
         let output = extract_result(&result.text);
         // Operation might not be in result anymore
         // assert_eq!(output["operation"], "parse");
-        assert_eq!(
-            output["parsed"]["year"], 2024,
-            "Failed for: {}",
-            description
-        );
-        assert_eq!(output["parsed"]["month"], 1, "Failed for: {}", description);
-        assert_eq!(output["parsed"]["day"], 15, "Failed for: {}", description);
+        assert_eq!(output["parsed"]["year"], 2024, "Failed for: {description}");
+        assert_eq!(output["parsed"]["month"], 1, "Failed for: {description}");
+        assert_eq!(output["parsed"]["day"], 15, "Failed for: {description}");
     }
 }
-
 #[tokio::test]
 async fn test_timezone_conversion_with_dst() {
     let tool = DateTimeHandlerTool::new();
@@ -101,7 +95,6 @@ async fn test_timezone_conversion_with_dst() {
     assert!(output["converted"].as_str().unwrap().contains("07:00"));
     assert!(output["converted"].as_str().unwrap().contains("EST"));
 }
-
 #[tokio::test]
 async fn test_current_time_operations() {
     let tool = DateTimeHandlerTool::new();
@@ -145,7 +138,6 @@ async fn test_current_time_operations() {
     assert_eq!(output["timezone"], "Asia/Tokyo");
     assert!(output["datetime"].as_str().unwrap().contains("JST"));
 }
-
 #[tokio::test]
 async fn test_date_arithmetic_operations() {
     let tool = DateTimeHandlerTool::new();
@@ -210,7 +202,6 @@ async fn test_date_arithmetic_operations() {
 
     assert!(output["result"].as_str().unwrap().contains("2024-12-30"));
 }
-
 #[tokio::test]
 async fn test_leap_year_handling() {
     let tool = DateTimeHandlerTool::new();
@@ -270,7 +261,6 @@ async fn test_leap_year_handling() {
     assert_eq!(output["info"]["is_leap_year"], false);
     assert_eq!(output["info"]["days_in_month"], 28);
 }
-
 #[tokio::test]
 async fn test_date_difference_calculations() {
     let tool = DateTimeHandlerTool::new();
@@ -321,7 +311,6 @@ async fn test_date_difference_calculations() {
         .unwrap()
         .contains("5 days ago"));
 }
-
 #[tokio::test]
 async fn test_date_info_details() {
     let tool = DateTimeHandlerTool::new();
@@ -354,7 +343,6 @@ async fn test_date_info_details() {
         .unwrap()
         .contains("23:59:59"));
 }
-
 #[tokio::test]
 async fn test_format_options() {
     let tool = DateTimeHandlerTool::new();
@@ -403,7 +391,6 @@ async fn test_format_options() {
     assert!(output["available_formats"].is_array());
     assert!(output["example_formats"]["ISO8601"].is_string());
 }
-
 #[tokio::test]
 async fn test_error_handling() {
     let tool = DateTimeHandlerTool::new();
@@ -456,7 +443,6 @@ async fn test_error_handling() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_edge_cases() {
     let tool = DateTimeHandlerTool::new();
@@ -518,7 +504,6 @@ async fn test_edge_cases() {
     // Should handle DST transition correctly
     assert!(output["converted"].is_string());
 }
-
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

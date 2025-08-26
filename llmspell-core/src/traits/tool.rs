@@ -1,5 +1,5 @@
 //! ABOUTME: Tool trait for functional components with schema validation
-//! ABOUTME: Extends BaseAgent with parameter validation and tool categorization
+//! ABOUTME: Extends `BaseAgent` with parameter validation and tool categorization
 
 use super::base_agent::BaseAgent;
 use crate::{
@@ -84,6 +84,7 @@ pub enum SecurityLevel {
 
 impl SecurityLevel {
     /// Check if this security level allows execution at the given level
+    #[must_use]
     pub fn allows(&self, required: &SecurityLevel) -> bool {
         self >= required
     }
@@ -118,11 +119,13 @@ impl Default for SecurityRequirements {
 
 impl SecurityRequirements {
     /// Create safe security requirements (no file/network access)
+    #[must_use]
     pub fn safe() -> Self {
         Self::default()
     }
 
     /// Create restricted security requirements with limited access
+    #[must_use]
     pub fn restricted() -> Self {
         Self {
             level: SecurityLevel::Restricted,
@@ -131,6 +134,7 @@ impl SecurityRequirements {
     }
 
     /// Create privileged security requirements with full access
+    #[must_use]
     pub fn privileged() -> Self {
         Self {
             level: SecurityLevel::Privileged,
@@ -189,6 +193,7 @@ impl Default for ResourceLimits {
 
 impl ResourceLimits {
     /// Create unlimited resource limits (for privileged tools)
+    #[must_use]
     pub fn unlimited() -> Self {
         Self {
             max_memory_bytes: None,
@@ -200,6 +205,7 @@ impl ResourceLimits {
     }
 
     /// Create strict resource limits (for safe tools)
+    #[must_use]
     pub fn strict() -> Self {
         Self {
             max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
@@ -211,18 +217,21 @@ impl ResourceLimits {
     }
 
     /// Set memory limit
+    #[must_use]
     pub fn with_memory_limit(mut self, bytes: u64) -> Self {
         self.max_memory_bytes = Some(bytes);
         self
     }
 
     /// Set CPU time limit
+    #[must_use]
     pub fn with_cpu_limit(mut self, milliseconds: u64) -> Self {
         self.max_cpu_time_ms = Some(milliseconds);
         self
     }
 
     /// Set network bandwidth limit
+    #[must_use]
     pub fn with_network_limit(mut self, bytes_per_second: u64) -> Self {
         self.max_network_bps = Some(bytes_per_second);
         self
@@ -298,6 +307,7 @@ pub struct ToolSchema {
 
 impl ToolSchema {
     /// Create a new tool schema
+    #[must_use]
     pub fn new(name: String, description: String) -> Self {
         Self {
             name,
@@ -308,18 +318,21 @@ impl ToolSchema {
     }
 
     /// Add a parameter to the schema
+    #[must_use]
     pub fn with_parameter(mut self, param: ParameterDef) -> Self {
         self.parameters.push(param);
         self
     }
 
     /// Set the return type
+    #[must_use]
     pub fn with_returns(mut self, returns: ParameterType) -> Self {
         self.returns = Some(returns);
         self
     }
 
     /// Get required parameter names
+    #[must_use]
     pub fn required_parameters(&self) -> Vec<String> {
         self.parameters
             .iter()
@@ -329,6 +342,7 @@ impl ToolSchema {
     }
 
     /// Convert to JSON schema format
+    #[must_use]
     pub fn to_json_schema(&self) -> serde_json::Value {
         let mut properties = serde_json::Map::new();
 
@@ -431,7 +445,7 @@ impl ToolSchema {
 ///         &self.metadata
 ///     }
 ///     
-///     async fn execute(
+///     async fn execute_impl(
 ///         &self,
 ///         input: AgentInput,
 ///         context: ExecutionContext,
@@ -458,7 +472,7 @@ impl ToolSchema {
 ///     }
 ///     
 ///     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-///         Ok(AgentOutput::text(format!("Tool error: {}", error)))
+///         Err(error)
 ///     }
 /// }
 /// ```
@@ -536,7 +550,7 @@ pub trait Tool: BaseAgent {
         for required in schema.required_parameters() {
             if !params_map.contains_key(&required) {
                 return Err(crate::LLMSpellError::Validation {
-                    message: format!("Missing required parameter: {}", required),
+                    message: format!("Missing required parameter: {required}"),
                     field: Some(required.clone()),
                 });
             }
@@ -576,14 +590,12 @@ mod tests {
     use crate::types::{AgentInput, AgentOutput};
     use crate::ComponentMetadata;
     use crate::ExecutionContext;
-
     #[test]
     fn test_tool_category_display() {
         assert_eq!(ToolCategory::Filesystem.to_string(), "filesystem");
         assert_eq!(ToolCategory::Web.to_string(), "web");
         assert_eq!(ToolCategory::Custom("ai".to_string()).to_string(), "ai");
     }
-
     #[test]
     fn test_security_level_ordering() {
         assert!(SecurityLevel::Safe < SecurityLevel::Restricted);
@@ -591,7 +603,6 @@ mod tests {
         assert!(SecurityLevel::Privileged.allows(&SecurityLevel::Safe));
         assert!(!SecurityLevel::Safe.allows(&SecurityLevel::Privileged));
     }
-
     #[test]
     fn test_parameter_def_creation() {
         let param = ParameterDef {
@@ -606,7 +617,6 @@ mod tests {
         assert!(param.required);
         assert_eq!(param.param_type, ParameterType::String);
     }
-
     #[test]
     fn test_tool_schema_builder() {
         let schema = ToolSchema::new("test_tool".to_string(), "A test tool".to_string())
@@ -631,7 +641,6 @@ mod tests {
         assert_eq!(schema.returns, Some(ParameterType::String));
         assert_eq!(schema.required_parameters(), vec!["text"]);
     }
-
     #[test]
     fn test_tool_schema_json_conversion() {
         let schema =
@@ -697,7 +706,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,
@@ -758,7 +767,6 @@ mod tests {
             self.schema.clone()
         }
     }
-
     #[tokio::test]
     async fn test_tool_parameter_validation() {
         let tool = MockTool::new();
@@ -799,7 +807,6 @@ mod tests {
             .to_string()
             .contains("must be an object"));
     }
-
     #[tokio::test]
     async fn test_tool_execution() {
         let tool = MockTool::new();
@@ -830,7 +837,6 @@ mod tests {
         let result = tool.execute(input, context).await.unwrap();
         assert_eq!(result.text, "HELLO WORLD");
     }
-
     #[test]
     fn test_tool_metadata() {
         let tool = MockTool::new();

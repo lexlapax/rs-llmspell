@@ -4,7 +4,6 @@
 use llmspell_utils::resource_limits::{MemoryGuard, ResourceLimits, ResourceTracker};
 use std::time::Duration;
 use tokio::time::sleep;
-
 #[test]
 fn test_memory_limit_enforcement() {
     let limits = ResourceLimits {
@@ -30,7 +29,6 @@ fn test_memory_limit_enforcement() {
     tracker.release_memory(400_000);
     assert!(tracker.track_memory(200_000).is_ok());
 }
-
 #[test]
 fn test_operation_count_limits() {
     let limits = ResourceLimits {
@@ -57,7 +55,6 @@ fn test_operation_count_limits() {
         assert!(e.to_string().contains("100"));
     }
 }
-
 #[test]
 fn test_file_size_limits() {
     let limits = ResourceLimits {
@@ -80,7 +77,6 @@ fn test_file_size_limits() {
         assert!(e.to_string().contains("5000000"));
     }
 }
-
 #[test]
 fn test_cpu_time_tracking() {
     let limits = ResourceLimits {
@@ -103,7 +99,6 @@ fn test_cpu_time_tracking() {
         assert!(e.to_string().contains("cpu_time"));
     }
 }
-
 #[test]
 fn test_concurrent_operations_limit() {
     let limits = ResourceLimits {
@@ -134,7 +129,6 @@ fn test_concurrent_operations_limit() {
     drop(guard1);
     drop(guard3);
 }
-
 #[tokio::test]
 async fn test_operation_timeout() {
     let limits = ResourceLimits {
@@ -166,7 +160,6 @@ async fn test_operation_timeout() {
         assert!(e.to_string().contains("200"));
     }
 }
-
 #[test]
 fn test_memory_guard_lifecycle() {
     let limits = ResourceLimits {
@@ -196,7 +189,6 @@ fn test_memory_guard_lifecycle() {
     // Should be able to allocate again
     let _guard = MemoryGuard::new(&tracker, 900_000).unwrap();
 }
-
 #[test]
 fn test_resource_metrics() {
     let limits = ResourceLimits::default();
@@ -218,7 +210,6 @@ fn test_resource_metrics() {
     let _guard = tracker.track_concurrent_start().unwrap();
     assert_eq!(tracker.get_metrics().concurrent_ops, 1);
 }
-
 #[test]
 fn test_limit_configurations() {
     // Test default limits
@@ -249,7 +240,6 @@ fn test_limit_configurations() {
     assert_eq!(unlimited.max_file_size_bytes, None);
     assert_eq!(unlimited.max_operations, None);
 }
-
 #[tokio::test]
 async fn test_complex_resource_scenario() {
     let limits = ResourceLimits {

@@ -1,6 +1,8 @@
 //! ABOUTME: Dependency injection container for agent dependencies
 //! ABOUTME: Manages tools, providers, and other dependencies for agents
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::Result;
 use llmspell_core::traits::tool::Tool;
 #[cfg(test)]
@@ -26,6 +28,7 @@ pub struct DIContainer {
 
 impl DIContainer {
     /// Create a new dependency injection container
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tools: Arc::new(RwLock::new(HashMap::new())),
@@ -35,6 +38,10 @@ impl DIContainer {
     }
 
     /// Register a tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a tool with the same ID is already registered
     pub async fn register_tool(&self, id: String, tool: Arc<dyn Tool>) -> Result<()> {
         let mut tools = self.tools.write().await;
         if tools.contains_key(&id) {
@@ -57,6 +64,10 @@ impl DIContainer {
     }
 
     /// Register a service by type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a service of the same type is already registered
     pub async fn register_service<T: Any + Send + Sync + 'static>(&self, service: T) -> Result<()> {
         let type_id = TypeId::of::<T>();
         let mut services = self.services.write().await;
@@ -74,12 +85,19 @@ impl DIContainer {
     pub async fn get_service<T: Any + Send + Sync + Clone + 'static>(&self) -> Option<Arc<T>> {
         let type_id = TypeId::of::<T>();
         let services = self.services.read().await;
-        services
-            .get(&type_id)
-            .and_then(|service| service.downcast_ref::<T>().map(|s| Arc::new(s.clone())))
+        services.get(&type_id).and_then(|service| {
+            service
+                .as_ref()
+                .downcast_ref::<T>()
+                .map(|s| Arc::new(s.clone()))
+        })
     }
 
     /// Register a named instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a named instance with the same name is already registered
     pub async fn register_named<T: Any + Send + Sync + 'static>(
         &self,
         name: String,
@@ -99,13 +117,17 @@ impl DIContainer {
         name: &str,
     ) -> Option<Arc<T>> {
         let instances = self.named_instances.read().await;
-        instances
-            .get(name)
-            .and_then(|instance| instance.downcast_ref::<T>().map(|i| Arc::new(i.clone())))
+        instances.get(name).and_then(|instance| {
+            instance
+                .as_ref()
+                .downcast_ref::<T>()
+                .map(|i| Arc::new(i.clone()))
+        })
     }
 
     /// Create a scoped container with additional dependencies
-    pub fn create_scope(&self) -> ScopedDIContainer {
+    #[must_use]
+    pub fn create_scope(&self) -> ScopedDIContainer<'_> {
         ScopedDIContainer {
             parent: self,
             scoped_services: Arc::new(RwLock::new(HashMap::new())),
@@ -129,6 +151,10 @@ pub struct ScopedDIContainer<'a> {
 
 impl ScopedDIContainer<'_> {
     /// Register a scoped service
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if service registration fails
     pub async fn register_scoped<T: Any + Send + Sync + 'static>(&self, service: T) -> Result<()> {
         let type_id = TypeId::of::<T>();
         let mut services = self.scoped_services.write().await;
@@ -143,7 +169,10 @@ impl ScopedDIContainer<'_> {
         // Check scoped services first
         let scoped = self.scoped_services.read().await;
         if let Some(service) = scoped.get(&type_id) {
-            return service.downcast_ref::<T>().map(|s| Arc::new(s.clone()));
+            return service
+                .as_ref()
+                .downcast_ref::<T>()
+                .map(|s| Arc::new(s.clone()));
         }
 
         // Fall back to parent
@@ -163,6 +192,7 @@ pub struct DIContainerBuilder {
 
 impl DIContainerBuilder {
     /// Create a new builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             container: DIContainer::new(),
@@ -170,6 +200,11 @@ impl DIContainerBuilder {
     }
 
     /// Add a tool to the container
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
+    #[must_use]
     pub fn with_tool(self, id: String, tool: Arc<dyn Tool>) -> Self {
         // Use blocking to register during building
         tokio::task::block_in_place(move || {
@@ -181,6 +216,7 @@ impl DIContainerBuilder {
     }
 
     /// Build the container
+    #[must_use]
     pub fn build(self) -> DIContainer {
         self.container
     }
@@ -207,7 +243,7 @@ mod tests {
 
     #[async_trait::async_trait]
     impl BaseAgent for MockTool {
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
@@ -249,7 +285,6 @@ mod tests {
             ToolSchema::new(self.id.clone(), "Mock tool for testing".to_string())
         }
     }
-
     #[tokio::test]
     async fn test_tool_registration() {
         let container = DIContainer::new();
@@ -281,7 +316,6 @@ mod tests {
         #[allow(dead_code)]
         value: String,
     }
-
     #[tokio::test]
     async fn test_service_registration() {
         let container = DIContainer::new();
@@ -300,7 +334,6 @@ mod tests {
         let result = container.register_service(service).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_scoped_container() {
         let parent = DIContainer::new();
@@ -319,7 +352,6 @@ mod tests {
         let service = scope.get_service::<TestService>().await;
         assert!(service.is_some());
     }
-
     #[tokio::test]
     async fn test_named_instances() {
         let container = DIContainer::new();
@@ -359,7 +391,6 @@ mod tests {
         let result = container.register_named("svc1".to_string(), service3).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_di_builder() {
         let tool = Arc::new(MockTool {
@@ -378,7 +409,6 @@ mod tests {
         let retrieved = container.get_tool("builder-tool").await;
         assert!(retrieved.is_some());
     }
-
     #[tokio::test]
     async fn test_scoped_tool_access() {
         let parent = DIContainer::new();

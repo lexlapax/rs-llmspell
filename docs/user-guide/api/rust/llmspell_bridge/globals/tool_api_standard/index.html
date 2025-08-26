@@ -1,0 +1,75 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Standardized Tool API"><title>llmspell_bridge::globals::tool_api_standard - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../../" data-static-root-path="../../../static.files/" data-current-crate="llmspell_bridge" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31) (Homebrew)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../../../static.files/storage-3a5871a4.js"></script><script defer src="../sidebar-items.js"></script><script defer src="../../../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../../static.files/favicon-044be391.svg"></head><body class="rustdoc mod"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../../../llmspell_bridge/index.html">llmspell_<wbr>bridge</a><span class="version">0.6.0</span></h2></div><div class="sidebar-elems"><section id="rustdoc-toc"><h2 class="location"><a href="#">Module tool_<wbr>api_<wbr>standard</a></h2><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#standardized-tool-api" title="Standardized Tool API">Standardized Tool API</a><ul><li><a href="#global-object-tool" title="Global Object: `Tool`">Global Object: <code>Tool</code></a></li><li><a href="#data-types" title="Data Types">Data Types</a></li><li><a href="#security-considerations" title="Security Considerations">Security Considerations</a></li><li><a href="#error-handling" title="Error Handling">Error Handling</a></li><li><a href="#implementation-notes" title="Implementation Notes">Implementation Notes</a></li></ul></li></ul><h3><a href="#structs">Module Items</a></h3><ul class="block"><li><a href="#structs" title="Structs">Structs</a></li><li><a href="#traits" title="Traits">Traits</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"><h2><a href="../index.html">In llmspell_<wbr>bridge::<wbr>globals</a></h2></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><div class="rustdoc-breadcrumbs"><a href="../../index.html">llmspell_bridge</a>::<wbr><a href="../index.html">globals</a></div><h1>Module <span>tool_api_standard</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../../../src/llmspell_bridge/globals/tool_api_standard.rs.html#4-223">Source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="standardized-tool-api"><a class="doc-anchor" href="#standardized-tool-api">§</a>Standardized Tool API</h2>
+<p>This module defines the standard API that all script engines (Lua, JavaScript, Python)
+must implement for tool access. This ensures consistency across different scripting
+environments.</p>
+<h3 id="global-object-tool"><a class="doc-anchor" href="#global-object-tool">§</a>Global Object: <code>Tool</code></h3>
+<p>The Tool global object provides access to all registered tools in the system.</p>
+<h4 id="core-methods"><a class="doc-anchor" href="#core-methods">§</a>Core Methods</h4><h5 id="toollist---arraytoolinfo"><a class="doc-anchor" href="#toollist---arraytoolinfo">§</a><code>Tool.list() -&gt; Array&lt;ToolInfo&gt;</code></h5>
+<p>Returns a list of all available tools with their metadata.</p>
+<div class="example-wrap"><pre class="language-js"><code>const tools = Tool.list();
+// Returns: [{ name: &quot;calculator&quot;, description: &quot;...&quot;, version: &quot;...&quot; }, ...]</code></pre></div><h5 id="toolgetname-string---toolinstance--null"><a class="doc-anchor" href="#toolgetname-string---toolinstance--null">§</a><code>Tool.get(name: string) -&gt; ToolInstance | null</code></h5>
+<p>Retrieves a specific tool by name, returning a tool instance or null if not found.</p>
+<div class="example-wrap"><pre class="language-js"><code>const calc = Tool.get(&quot;calculator&quot;);
+if (calc) {
+    const result = calc.execute({ expression: &quot;2 + 2&quot; });
+}</code></pre></div><h5 id="toolinvokename-string-params-object---object"><a class="doc-anchor" href="#toolinvokename-string-params-object---object">§</a><code>Tool.invoke(name: string, params: object) -&gt; object</code></h5>
+<p>Directly invokes a tool by name with the given parameters.</p>
+<div class="example-wrap"><pre class="language-js"><code>const result = Tool.invoke(&quot;calculator&quot;, { expression: &quot;2 + 2&quot; });</code></pre></div><h5 id="toolexistsname-string---boolean"><a class="doc-anchor" href="#toolexistsname-string---boolean">§</a><code>Tool.exists(name: string) -&gt; boolean</code></h5>
+<p>Checks if a tool with the given name exists.</p>
+<div class="example-wrap"><pre class="language-js"><code>if (Tool.exists(&quot;web_search&quot;)) {
+    // Use web search tool
+}</code></pre></div><h5 id="toolcategories---arraystring"><a class="doc-anchor" href="#toolcategories---arraystring">§</a><code>Tool.categories() -&gt; Array&lt;string&gt;</code></h5>
+<p>Returns all available tool categories.</p>
+<div class="example-wrap"><pre class="language-js"><code>const categories = Tool.categories();
+// Returns: [&quot;utility&quot;, &quot;data_processing&quot;, &quot;file_system&quot;, &quot;web&quot;, ...]</code></pre></div><h5 id="tooldiscoverfilter--category-string-tag-string----arraytoolinfo"><a class="doc-anchor" href="#tooldiscoverfilter--category-string-tag-string----arraytoolinfo">§</a><code>Tool.discover(filter?: { category?: string, tag?: string }) -&gt; Array&lt;ToolInfo&gt;</code></h5>
+<p>Discovers tools matching the optional filter criteria.</p>
+<div class="example-wrap"><pre class="language-js"><code>const webTools = Tool.discover({ category: &quot;web&quot; });
+const searchTools = Tool.discover({ tag: &quot;search&quot; });</code></pre></div><h4 id="direct-tool-access"><a class="doc-anchor" href="#direct-tool-access">§</a>Direct Tool Access</h4>
+<p>Tools can be accessed directly via the Tool object using dot notation:</p>
+<div class="example-wrap"><pre class="language-js"><code>const result = Tool.calculator.execute({ expression: &quot;2 + 2&quot; });</code></pre></div><h4 id="tool-instance-methods"><a class="doc-anchor" href="#tool-instance-methods">§</a>Tool Instance Methods</h4>
+<p>Each tool instance returned by <code>Tool.get()</code> or accessed directly has:</p>
+<h5 id="executeparams-object---object"><a class="doc-anchor" href="#executeparams-object---object">§</a><code>execute(params: object) -&gt; object</code></h5>
+<p>Executes the tool with the given parameters.</p>
+<h5 id="getschema---toolschema"><a class="doc-anchor" href="#getschema---toolschema">§</a><code>getSchema() -&gt; ToolSchema</code></h5>
+<p>Returns the tool’s parameter schema.</p>
+<h3 id="data-types"><a class="doc-anchor" href="#data-types">§</a>Data Types</h3><h4 id="toolinfo"><a class="doc-anchor" href="#toolinfo">§</a><code>ToolInfo</code></h4><div class="example-wrap"><pre class="language-typescript"><code>interface ToolInfo {
+    name: string;
+    description: string;
+    category: string;
+    version: string;
+}</code></pre></div><h4 id="toolschema"><a class="doc-anchor" href="#toolschema">§</a><code>ToolSchema</code></h4><div class="example-wrap"><pre class="language-typescript"><code>interface ToolSchema {
+    name: string;
+    description: string;
+    parameters: ParameterDef[];
+}
+
+interface ParameterDef {
+    name: string;
+    type: string;
+    description: string;
+    required: boolean;
+    default?: any;
+}</code></pre></div><h3 id="security-considerations"><a class="doc-anchor" href="#security-considerations">§</a>Security Considerations</h3>
+<ul>
+<li>All tool executions are subject to security constraints</li>
+<li>File system tools respect sandbox boundaries</li>
+<li>Network tools respect allowed domains</li>
+<li>Resource limits are enforced per tool execution</li>
+</ul>
+<h3 id="error-handling"><a class="doc-anchor" href="#error-handling">§</a>Error Handling</h3>
+<p>Tool methods throw errors on failure:</p>
+<ul>
+<li>Tool not found</li>
+<li>Invalid parameters</li>
+<li>Security violations</li>
+<li>Resource limit exceeded</li>
+<li>Tool execution failure</li>
+</ul>
+<h3 id="implementation-notes"><a class="doc-anchor" href="#implementation-notes">§</a>Implementation Notes</h3>
+<ul>
+<li>All methods are synchronous from the script’s perspective</li>
+<li>Async operations are handled internally by the bridge</li>
+<li>Tool discovery is cached for performance</li>
+<li>Direct tool access (<code>Tool.tool_name</code>) uses lazy loading</li>
+</ul>
+</div></details><h2 id="structs" class="section-header">Structs<a href="#structs" class="anchor">§</a></h2><dl class="item-table"><dt><a class="struct" href="struct.StandardParameterDef.html" title="struct llmspell_bridge::globals::tool_api_standard::StandardParameterDef">Standard<wbr>Parameter<wbr>Def</a></dt><dd>Standard parameter definition exposed to scripts</dd><dt><a class="struct" href="struct.StandardToolInfo.html" title="struct llmspell_bridge::globals::tool_api_standard::StandardToolInfo">Standard<wbr>Tool<wbr>Info</a></dt><dd>Standard tool information exposed to scripts</dd><dt><a class="struct" href="struct.StandardToolSchema.html" title="struct llmspell_bridge::globals::tool_api_standard::StandardToolSchema">Standard<wbr>Tool<wbr>Schema</a></dt><dd>Standard tool schema exposed to scripts</dd></dl><h2 id="traits" class="section-header">Traits<a href="#traits" class="anchor">§</a></h2><dl class="item-table"><dt><a class="trait" href="trait.StandardToolApi.html" title="trait llmspell_bridge::globals::tool_api_standard::StandardToolApi">Standard<wbr>Tool<wbr>Api</a></dt><dd>Standard tool API trait that all script engines must implement</dd></dl><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><dl class="item-table"><dt><a class="fn" href="fn.to_standard_schema.html" title="fn llmspell_bridge::globals::tool_api_standard::to_standard_schema">to_<wbr>standard_<wbr>schema</a></dt><dd>Convert from core <code>ToolSchema</code> to standard schema</dd></dl></section></div></main></body></html>

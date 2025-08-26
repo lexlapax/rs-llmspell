@@ -1,4 +1,4 @@
-//! Integration tests for ArchiveHandlerTool
+//! Integration tests for `ArchiveHandlerTool`
 
 use anyhow::Result;
 use llmspell_core::{
@@ -15,7 +15,6 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
 use tempfile::TempDir;
-
 #[tokio::test]
 async fn test_zip_create_and_extract() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -78,7 +77,6 @@ async fn test_zip_create_and_extract() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_tar_gz_operations() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -122,7 +120,6 @@ async fn test_tar_gz_operations() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_single_file_gz() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -168,7 +165,6 @@ async fn test_single_file_gz() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_archive_size_limits() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -196,7 +192,6 @@ async fn test_archive_size_limits() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_path_traversal_protection() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -234,7 +229,6 @@ async fn test_path_traversal_protection() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_with_file_sandbox() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -291,7 +285,6 @@ async fn test_with_file_sandbox() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_archive_formats() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -338,7 +331,6 @@ async fn test_archive_formats() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_compression_levels() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -359,7 +351,7 @@ async fn test_compression_levels() -> Result<()> {
 
         let tool = ArchiveHandlerTool::with_config(config);
 
-        let archive_path = temp_dir.path().join(format!("test_level_{}.zip", level));
+        let archive_path = temp_dir.path().join(format!("test_level_{level}.zip"));
         let create_params = json!({
             "operation": "create",
             "path": archive_path.to_str().unwrap(),
@@ -375,7 +367,7 @@ async fn test_compression_levels() -> Result<()> {
 
     // Higher compression levels should produce smaller files
     // (though for small files the difference might be minimal)
-    println!("Compression sizes: {:?}", sizes);
+    println!("Compression sizes: {sizes:?}");
 
     Ok(())
 }

@@ -222,6 +222,7 @@ impl Default for MetricsCollector {
 
 /// Alert levels for circuit breaker monitoring
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum AlertLevel {
     /// Circuit is healthy
     Healthy,
@@ -231,6 +232,7 @@ pub enum AlertLevel {
     Critical,
 }
 
+#[allow(dead_code)]
 impl From<&CircuitMetrics> for AlertLevel {
     fn from(metrics: &CircuitMetrics) -> Self {
         if metrics.is_critical() {
@@ -246,7 +248,6 @@ impl From<&CircuitMetrics> for AlertLevel {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_metrics_collection() {
         let collector = MetricsCollector::new();
@@ -268,7 +269,6 @@ mod tests {
         assert!((metrics.success_rate() - 50.0).abs() < f64::EPSILON);
         assert!((metrics.rejection_rate() - 33.333_333).abs() < 0.001);
     }
-
     #[tokio::test]
     async fn test_state_tracking() {
         let collector = MetricsCollector::new();
@@ -288,7 +288,6 @@ mod tests {
         assert_eq!(metrics.state_changes, 1);
         assert!(metrics.last_state_change.is_some());
     }
-
     #[test]
     fn test_alert_levels() {
         // Healthy state

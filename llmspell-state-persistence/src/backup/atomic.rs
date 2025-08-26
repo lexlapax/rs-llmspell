@@ -6,7 +6,7 @@ use anyhow::Result;
 use llmspell_state_traits::{StateError, StateScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
 use tokio::sync::Mutex;
@@ -150,8 +150,14 @@ impl AtomicBackup {
         let mut entries = HashMap::new();
         let mut total_size = 0u64;
 
-        // Get all scopes
-        let scopes = vec![StateScope::Global];
+        // Discover all scopes by listing keys with empty prefix to get all data
+        let scopes = self.discover_scopes().await?;
+
+        debug!(
+            "Discovered {} scopes for backup: {:?}",
+            scopes.len(),
+            scopes
+        );
 
         // Capture state for each scope
         for scope in scopes {
@@ -231,6 +237,30 @@ impl AtomicBackup {
         Ok(entries)
     }
 
+    /// Discover all scopes that contain data by examining storage keys
+    async fn discover_scopes(&self) -> Result<Vec<StateScope>, StateError> {
+        use std::collections::HashSet;
+
+        let mut unique_scopes = HashSet::new();
+
+        // Get all storage keys using StateManager's method
+        let all_keys = self.state_manager.get_all_storage_keys().await?;
+
+        debug!("Found {} total keys for scope discovery", all_keys.len());
+
+        // Use StateScope's built-in parsing to extract scope information
+        for key in all_keys {
+            if let Some((scope, _key_part)) = StateScope::parse_storage_key(&key) {
+                unique_scopes.insert(scope);
+            }
+        }
+
+        let scopes: Vec<StateScope> = unique_scopes.into_iter().collect();
+        debug!("Discovered {} unique scopes: {:?}", scopes.len(), scopes);
+
+        Ok(scopes)
+    }
+
     /// Serialize snapshot to bytes
     fn serialize_snapshot(&self, snapshot: &StateSnapshot) -> Result<Vec<u8>, StateError> {
         // Use MessagePack for efficient binary serialization
@@ -248,6 +278,26 @@ impl AtomicBackup {
 
         // Validate snapshot
         self.validate_snapshot(&snapshot)?;
+
+        // Clear existing state in the scopes we're restoring to ensure clean restore
+        // Extract unique scopes from the snapshot data
+        let scopes_to_clear: HashSet<StateScope> = snapshot
+            .entries
+            .values()
+            .map(|entry| entry.scope.clone())
+            .collect();
+
+        for scope in &scopes_to_clear {
+            match self.state_manager.clear_scope(scope.clone()).await {
+                Ok(_) => {
+                    debug!("Cleared scope: {}", scope);
+                }
+                Err(e) => {
+                    error!("Failed to clear scope {}: {}", scope, e);
+                    return Err(e);
+                }
+            }
+        }
 
         // Restore state atomically
         let mut restored_count = 0;
@@ -296,6 +346,26 @@ impl AtomicBackup {
 
         // Validate snapshot
         self.validate_snapshot(&snapshot)?;
+
+        // Clear existing state in the scopes we're restoring to ensure clean restore
+        // Extract unique scopes from the snapshot data
+        let scopes_to_clear: HashSet<StateScope> = snapshot
+            .entries
+            .values()
+            .map(|entry| entry.scope.clone())
+            .collect();
+
+        for scope in &scopes_to_clear {
+            match self.state_manager.clear_scope(scope.clone()).await {
+                Ok(_) => {
+                    debug!("Cleared scope: {}", scope);
+                }
+                Err(e) => {
+                    error!("Failed to clear scope {}: {}", scope, e);
+                    return Err(e);
+                }
+            }
+        }
 
         let total_entries = snapshot.entries.len();
         debug!("Restoring {} entries", total_entries);
@@ -392,7 +462,6 @@ impl AtomicBackupBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_atomic_backup_builder() {
         let builder = AtomicBackup::builder("test_backup".to_string())
@@ -405,7 +474,6 @@ mod tests {
         assert!(builder.include_scopes.is_some());
         assert!(builder.exclude_patterns.is_some());
     }
-
     #[tokio::test]
     async fn test_backup_operation_status() {
         let operation = BackupOperation {
@@ -421,7 +489,6 @@ mod tests {
         assert_eq!(operation.status, OperationStatus::Pending);
         assert!(operation.completed_at.is_none());
     }
-
     #[test]
     fn test_snapshot_metadata_serialization() {
         let metadata = SnapshotMetadata {

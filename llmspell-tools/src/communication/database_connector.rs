@@ -1,4 +1,4 @@
-//! ABOUTME: Database connector tool with support for PostgreSQL, MySQL, and SQLite
+//! ABOUTME: Database connector tool with support for `PostgreSQL`, `MySQL`, and `SQLite`
 //! ABOUTME: Provides secure database operations with connection pooling and query building
 
 use async_trait::async_trait;
@@ -119,6 +119,7 @@ impl Default for DatabaseConnectorConfig {
 
 impl DatabaseConnectorConfig {
     /// Create configuration from environment variables
+    #[must_use]
     pub fn from_env() -> Self {
         let mut config = Self::default();
         let mut databases = HashMap::new();
@@ -194,6 +195,10 @@ pub struct DatabaseConnectorTool {
 
 impl DatabaseConnectorTool {
     /// Create a new database connector tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid
     pub fn new(config: DatabaseConnectorConfig) -> Result<Self> {
         let is_production = !cfg!(debug_assertions);
 
@@ -212,6 +217,14 @@ impl DatabaseConnectorTool {
     }
 
     /// Execute a database query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified database is not configured
+    /// - Query validation fails
+    /// - The database type is unsupported
+    /// - Query execution fails
     async fn execute_query(
         &self,
         database: &str,
@@ -225,7 +238,7 @@ impl DatabaseConnectorTool {
 
         let db_config = self.config.databases.get(database).ok_or_else(|| {
             tool_error(
-                format!("Database '{}' not configured", database),
+                format!("Database '{database}' not configured"),
                 Some("database".to_string()),
             )
         })?;
@@ -245,6 +258,14 @@ impl DatabaseConnectorTool {
     }
 
     /// Validate query against security settings
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The operation is not allowed
+    /// - DDL operations are attempted when not allowed
+    /// - DML operations are attempted when not allowed
+    /// - Query contains potentially unsafe patterns
     fn validate_query(&self, query: &str, operation: &str) -> Result<()> {
         let operation_upper = operation.to_uppercase();
 
@@ -256,7 +277,7 @@ impl DatabaseConnectorTool {
             .contains(&operation_upper)
         {
             return Err(validation_error(
-                format!("Database operation '{}' is not allowed", operation),
+                format!("Database operation '{operation}' is not allowed"),
                 Some("operation".to_string()),
             ));
         }
@@ -289,16 +310,19 @@ impl DatabaseConnectorTool {
     }
 
     /// Check if operation is DDL
+    #[allow(clippy::unused_self)]
     fn is_ddl_operation(&self, operation: &str) -> bool {
         matches!(operation, "CREATE" | "DROP" | "ALTER" | "TRUNCATE")
     }
 
     /// Check if operation is DML
+    #[allow(clippy::unused_self)]
     fn is_dml_operation(&self, operation: &str) -> bool {
         matches!(operation, "INSERT" | "UPDATE" | "DELETE")
     }
 
     /// Check for suspicious SQL patterns
+    #[allow(clippy::unused_self)]
     fn contains_suspicious_patterns(&self, query: &str) -> bool {
         let query_lower = query.to_lowercase();
         let suspicious_patterns = [
@@ -322,7 +346,15 @@ impl DatabaseConnectorTool {
             .any(|pattern| query_lower.contains(pattern))
     }
 
-    /// Execute PostgreSQL query
+    /// Execute `PostgreSQL` query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `PostgreSQL` URL is not configured
+    /// - Failed to connect to `PostgreSQL`
+    /// - Query execution fails
+    #[allow(clippy::unused_async)]
     async fn execute_postgresql_query(
         &self,
         #[allow(unused_variables)] config: &DatabaseConfig,
@@ -343,33 +375,38 @@ impl DatabaseConnectorTool {
                 .acquire_timeout(Duration::from_secs(config.pool_settings.connect_timeout))
                 .connect(url)
                 .await
-                .map_err(|e| tool_error(format!("Failed to connect to PostgreSQL: {}", e), None))?;
+                .map_err(|e| tool_error(format!("Failed to connect to PostgreSQL: {e}"), None))?;
 
             let start = std::time::Instant::now();
 
             match sqlx::query(query).fetch_all(&pool).await {
                 Ok(rows) => {
+                    #[allow(clippy::cast_possible_truncation)]
                     let execution_time = start.elapsed().as_millis() as u64;
                     let results: Vec<serde_json::Value> = rows
                         .iter()
                         .map(|row| {
                             let mut result = serde_json::Map::new();
                             for (i, column) in row.columns().iter().enumerate() {
-                                let value: serde_json::Value =
-                                    if let Ok(v) = row.try_get::<String, _>(i) {
-                                        serde_json::Value::String(v)
-                                    } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                                        serde_json::Value::Number(v.into())
-                                    } else if let Ok(v) = row.try_get::<f64, _>(i) {
-                                        serde_json::Value::Number(
-                                            serde_json::Number::from_f64(v)
-                                                .unwrap_or(serde_json::Number::from(0)),
-                                        )
-                                    } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                                        serde_json::Value::Bool(v)
-                                    } else {
-                                        serde_json::Value::Null
-                                    };
+                                let value: serde_json::Value = row
+                                    .try_get::<String, _>(i)
+                                    .map(serde_json::Value::String)
+                                    .or_else(|_| {
+                                        row.try_get::<i64, _>(i)
+                                            .map(|v| serde_json::Value::Number(v.into()))
+                                    })
+                                    .or_else(|_| {
+                                        row.try_get::<f64, _>(i).map(|v| {
+                                            serde_json::Value::Number(
+                                                serde_json::Number::from_f64(v)
+                                                    .unwrap_or_else(|| serde_json::Number::from(0)),
+                                            )
+                                        })
+                                    })
+                                    .or_else(|_| {
+                                        row.try_get::<bool, _>(i).map(serde_json::Value::Bool)
+                                    })
+                                    .unwrap_or(serde_json::Value::Null);
                                 result.insert(column.name().to_string(), value);
                             }
                             serde_json::Value::Object(result)
@@ -386,7 +423,7 @@ impl DatabaseConnectorTool {
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     }))
                 }
-                Err(e) => Err(tool_error(format!("PostgreSQL query failed: {}", e), None)),
+                Err(e) => Err(tool_error(format!("PostgreSQL query failed: {e}"), None)),
             }
         }
 
@@ -406,7 +443,12 @@ impl DatabaseConnectorTool {
         }
     }
 
-    /// Execute MySQL query
+    /// Execute `MySQL` query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `MySQL` query execution fails (currently returns mock success)
+    #[allow(clippy::unused_async)]
     async fn execute_mysql_query(
         &self,
         _config: &DatabaseConfig,
@@ -427,7 +469,12 @@ impl DatabaseConnectorTool {
         }))
     }
 
-    /// Execute SQLite query
+    /// Execute `SQLite` query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `SQLite` query execution fails (currently returns mock success)
+    #[allow(clippy::unused_async)]
     async fn execute_sqlite_query(
         &self,
         _config: &DatabaseConfig,
@@ -449,12 +496,17 @@ impl DatabaseConnectorTool {
     }
 
     /// Get database schema information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the specified database is not configured
+    #[allow(clippy::unused_async)]
     async fn get_schema(&self, database: &str) -> Result<serde_json::Value> {
         debug!("Getting schema for database '{}'", database);
 
         let db_config = self.config.databases.get(database).ok_or_else(|| {
             tool_error(
-                format!("Database '{}' not configured", database),
+                format!("Database '{database}' not configured"),
                 Some("database".to_string()),
             )
         })?;
@@ -495,7 +547,11 @@ impl BaseAgent for DatabaseConnectorTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
 
         // Extract required parameters
@@ -534,8 +590,7 @@ impl BaseAgent for DatabaseConnectorTool {
 
                         let response = ResponseBuilder::success("query")
                             .with_message(format!(
-                                "Query executed successfully on database '{}'",
-                                database
+                                "Query executed successfully on database '{database}'"
                             ))
                             .with_result(result)
                             .build();
@@ -545,11 +600,9 @@ impl BaseAgent for DatabaseConnectorTool {
                     Err(e) => {
                         error!("Database query failed: {}", e);
 
-                        let response = ResponseBuilder::error(
-                            "query",
-                            format!("Database query failed: {}", e),
-                        )
-                        .build();
+                        let response =
+                            ResponseBuilder::error("query", format!("Database query failed: {e}"))
+                                .build();
 
                         Ok(AgentOutput::text(serde_json::to_string(&response)?))
                     }
@@ -560,7 +613,7 @@ impl BaseAgent for DatabaseConnectorTool {
                     info!("Database schema retrieved for '{}'", database);
 
                     let response = ResponseBuilder::success("schema")
-                        .with_message(format!("Schema retrieved for database '{}'", database))
+                        .with_message(format!("Schema retrieved for database '{database}'"))
                         .with_result(schema)
                         .build();
 
@@ -571,7 +624,7 @@ impl BaseAgent for DatabaseConnectorTool {
 
                     let response = ResponseBuilder::error(
                         "schema",
-                        format!("Failed to get database schema: {}", e),
+                        format!("Failed to get database schema: {e}"),
                     )
                     .build();
 
@@ -581,7 +634,7 @@ impl BaseAgent for DatabaseConnectorTool {
             _ => {
                 let response = ResponseBuilder::error(
                     "unknown_operation",
-                    format!("Unknown operation: {}", operation),
+                    format!("Unknown operation: {operation}"),
                 )
                 .build();
 
@@ -606,7 +659,7 @@ impl BaseAgent for DatabaseConnectorTool {
             }
             _ => {
                 return Err(validation_error(
-                    format!("Invalid operation: {}", operation),
+                    format!("Invalid operation: {operation}"),
                     Some("operation".to_string()),
                 ));
             }
@@ -616,7 +669,7 @@ impl BaseAgent for DatabaseConnectorTool {
         if let Some(database) = extract_optional_string(params, "database") {
             if !self.config.databases.contains_key(database) {
                 return Err(validation_error(
-                    format!("Database '{}' is not configured", database),
+                    format!("Database '{database}' is not configured"),
                     Some("database".to_string()),
                 ));
             }
@@ -635,7 +688,7 @@ impl BaseAgent for DatabaseConnectorTool {
 
         Ok(AgentOutput::text(
             serde_json::to_string_pretty(&safe_response)
-                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+                .unwrap_or_else(|_| format!("{safe_response:?}")),
         ))
     }
 }
@@ -700,14 +753,12 @@ impl Tool for DatabaseConnectorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_database_connector_tool_creation() {
         let config = DatabaseConnectorConfig::default();
         let tool = DatabaseConnectorTool::new(config).unwrap();
         assert_eq!(tool.metadata().name, "database_connector");
     }
-
     #[test]
     fn test_tool_metadata() {
         let config = DatabaseConnectorConfig::default();
@@ -720,13 +771,11 @@ mod tests {
         assert_eq!(schema.name, "database_connector");
         assert!(!schema.parameters.is_empty());
     }
-
     #[test]
     fn test_config_from_env() {
         // Test that from_env doesn't panic
         let _config = DatabaseConnectorConfig::from_env();
     }
-
     #[test]
     fn test_security_validation() {
         let config = DatabaseConnectorConfig::default();
@@ -749,7 +798,6 @@ mod tests {
         assert!(tool.contains_suspicious_patterns("DROP TABLE users"));
         assert!(!tool.contains_suspicious_patterns("SELECT * FROM users WHERE id = 1"));
     }
-
     #[tokio::test]
     async fn test_parameter_validation() {
         let config = DatabaseConnectorConfig::default();

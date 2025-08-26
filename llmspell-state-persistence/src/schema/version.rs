@@ -243,7 +243,6 @@ impl fmt::Display for SchemaVersion {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_semantic_version_creation() {
         let version = SemanticVersion::new(1, 2, 3);
@@ -253,7 +252,6 @@ mod tests {
         assert_eq!(version.pre_release, None);
         assert_eq!(version.build, None);
     }
-
     #[test]
     fn test_version_parsing() {
         let version: SemanticVersion = "1.2.3".parse().unwrap();
@@ -272,7 +270,6 @@ mod tests {
         assert_eq!(full_version.pre_release, Some("beta.2".to_string()));
         assert_eq!(full_version.build, Some("build.456".to_string()));
     }
-
     #[test]
     fn test_version_display() {
         let version = SemanticVersion::new(1, 2, 3);
@@ -284,7 +281,6 @@ mod tests {
         let version_build = SemanticVersion::new(1, 2, 3).with_build("build.123".to_string());
         assert_eq!(version_build.to_string(), "1.2.3+build.123");
     }
-
     #[test]
     fn test_version_comparison() {
         let v1_0_0 = SemanticVersion::new(1, 0, 0);
@@ -300,7 +296,6 @@ mod tests {
         let v1_0_0_alpha = SemanticVersion::new(1, 0, 0).with_pre_release("alpha".to_string());
         assert!(v1_0_0 > v1_0_0_alpha);
     }
-
     #[test]
     fn test_compatibility_checking() {
         let v1_0_0 = SemanticVersion::new(1, 0, 0);
@@ -314,7 +309,6 @@ mod tests {
         assert!(!v2_0_0.is_compatible_with(&v1_0_0)); // Major version change
         assert!(!v1_0_0.is_compatible_with(&v2_0_0)); // Major version change
     }
-
     #[test]
     fn test_breaking_change_detection() {
         let v1_0_0 = SemanticVersion::new(1, 0, 0);
@@ -325,7 +319,6 @@ mod tests {
         assert!(v2_0_0.is_breaking_change_from(&v1_0_0));
         assert!(v2_0_0.is_breaking_change_from(&v1_1_0));
     }
-
     #[test]
     fn test_version_increment() {
         let mut version = SemanticVersion::new(1, 2, 3);
@@ -339,7 +332,6 @@ mod tests {
         version.increment_major();
         assert_eq!(version, SemanticVersion::new(2, 0, 0));
     }
-
     #[test]
     fn test_schema_version() {
         let semantic_version = SemanticVersion::new(1, 0, 0);
@@ -359,7 +351,6 @@ mod tests {
         assert_eq!(schema_version.breaking_changes.len(), 1);
         assert!(schema_version.has_deprecated_fields());
     }
-
     #[test]
     fn test_invalid_version_parsing() {
         assert!("1.2".parse::<SemanticVersion>().is_err());

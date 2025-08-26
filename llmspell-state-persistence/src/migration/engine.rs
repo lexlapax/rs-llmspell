@@ -632,7 +632,6 @@ impl MigrationExecutor for MigrationEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_migration_engine_creation() {
         let storage_adapter = Arc::new(crate::backend_adapter::StateStorageAdapter::new(
@@ -654,7 +653,6 @@ mod tests {
 
         assert!(engine.get_active_migrations().is_empty());
     }
-
     #[test]
     fn test_migration_engine_error_conversion() {
         let error = MigrationEngineError::MigrationFailed {

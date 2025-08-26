@@ -1,12 +1,15 @@
 //! ABOUTME: Mock implementations for testing agent infrastructure
 //! ABOUTME: Provides configurable mock agents, tools, and providers for unit and integration testing
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::factory::{AgentConfig, ResourceLimits};
 use crate::lifecycle::{
     events::{LifecycleEvent, LifecycleEventData, LifecycleEventType},
     state_machine::{AgentState, AgentStateMachine},
 };
 use crate::state::{StateManagerHolder, StatePersistence};
+use crate::StateMachineConfig;
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::{
@@ -21,6 +24,7 @@ use llmspell_core::{
     },
     BaseAgent, ExecutionContext, LLMSpellError,
 };
+use llmspell_state_persistence::ToolUsageStats;
 use llmspell_state_persistence::{PersistentAgentState, StateManager};
 use std::{
     collections::HashMap,
@@ -40,7 +44,7 @@ pub struct MockAgentConfig {
     pub delay: Option<Duration>,
     /// Whether to simulate failures
     pub should_fail: bool,
-    /// Failure message if should_fail is true
+    /// Failure message if `should_fail` is true
     pub failure_message: String,
     /// Tool calls to simulate
     pub tool_calls: Vec<ToolCall>,
@@ -103,6 +107,7 @@ pub struct MockAgent {
 
 impl MockAgent {
     /// Create new mock agent
+    #[must_use]
     pub fn new(config: MockAgentConfig) -> Self {
         let metadata = ComponentMetadata {
             id: ComponentId::from_name(&config.agent_config.name),
@@ -113,8 +118,10 @@ impl MockAgent {
             updated_at: chrono::Utc::now(),
         };
 
-        let state_machine =
-            AgentStateMachine::new(config.agent_config.name.clone(), Default::default());
+        let state_machine = AgentStateMachine::new(
+            config.agent_config.name.clone(),
+            StateMachineConfig::default(),
+        );
 
         let core_config = CoreAgentConfig {
             max_conversation_length: Some(100),
@@ -146,26 +153,49 @@ impl MockAgent {
     }
 
     /// Get execution count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn execution_count(&self) -> usize {
         *self.execution_count.lock().unwrap()
     }
 
     /// Get last input
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn last_input(&self) -> Option<AgentInput> {
         self.last_input.lock().unwrap().clone()
     }
 
     /// Get last context
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn last_context(&self) -> Option<ExecutionContext> {
         self.last_context.lock().unwrap().clone()
     }
 
     /// Add response to mock agent
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn add_response(&self, response: MockResponse) {
         self.config.lock().unwrap().responses.push(response);
     }
 
     /// Set failure mode
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn set_failure(&self, should_fail: bool, message: &str) {
         let mut config = self.config.lock().unwrap();
         config.should_fail = should_fail;
@@ -173,6 +203,10 @@ impl MockAgent {
     }
 
     /// Add state transition
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn add_state_transition(&self, state: AgentState) {
         self.config.lock().unwrap().state_transitions.push(state);
     }
@@ -185,6 +219,10 @@ impl MockAgent {
     }
 
     /// Initialize the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine initialization fails
     pub async fn initialize(&mut self) -> Result<()> {
         self.state_machine
             .initialize()
@@ -193,6 +231,10 @@ impl MockAgent {
     }
 
     /// Start the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine start fails
     pub async fn start(&mut self) -> Result<()> {
         self.state_machine
             .start()
@@ -201,6 +243,10 @@ impl MockAgent {
     }
 
     /// Stop the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine stop fails
     pub async fn stop(&mut self) -> Result<()> {
         self.state_machine
             .stop()
@@ -209,6 +255,10 @@ impl MockAgent {
     }
 
     /// Terminate the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine termination fails
     pub async fn terminate(&mut self) -> Result<()> {
         self.state_machine
             .terminate()
@@ -223,7 +273,10 @@ impl BaseAgent for MockAgent {
         &self.metadata
     }
 
-    async fn execute(
+    /// # Panics
+    ///
+    /// Panics if any Mutex is poisoned
+    async fn execute_impl(
         &self,
         input: AgentInput,
         context: ExecutionContext,
@@ -349,7 +402,7 @@ impl BaseAgent for MockAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Mock error handling: {}", error),
+            text: format!("Mock error handling: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),
@@ -417,7 +470,7 @@ impl StatePersistence for MockAgent {
     }
 
     fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-        StateManagerHolder::set_state_manager(self, state_manager)
+        StateManagerHolder::set_state_manager(self, state_manager);
     }
 
     async fn save_state(&self) -> Result<()> {
@@ -477,7 +530,7 @@ impl StatePersistence for MockAgent {
         let state_data = llmspell_state_persistence::agent_state::AgentStateData {
             conversation_history,
             context_variables: HashMap::new(),
-            tool_usage_stats: Default::default(),
+            tool_usage_stats: ToolUsageStats::default(),
             execution_state: llmspell_state_persistence::agent_state::ExecutionState::Idle,
             custom_data: HashMap::new(),
         };
@@ -517,10 +570,8 @@ impl StatePersistence for MockAgent {
                 llmspell_state_persistence::agent_state::MessageRole::User => {
                     llmspell_core::traits::agent::MessageRole::User
                 }
-                llmspell_state_persistence::agent_state::MessageRole::Assistant => {
-                    llmspell_core::traits::agent::MessageRole::Assistant
-                }
-                llmspell_state_persistence::agent_state::MessageRole::Tool => {
+                llmspell_state_persistence::agent_state::MessageRole::Assistant
+                | llmspell_state_persistence::agent_state::MessageRole::Tool => {
                     llmspell_core::traits::agent::MessageRole::Assistant
                 } // Map Tool to Assistant
             };
@@ -550,12 +601,13 @@ pub struct MockTool {
 
 impl MockTool {
     /// Create new mock tool
+    #[must_use]
     pub fn new(name: &str) -> Self {
         let metadata = ComponentMetadata {
             id: ComponentId::from_name(name),
             name: name.to_string(),
             version: Version::new(1, 0, 0),
-            description: format!("Mock tool: {}", name),
+            description: format!("Mock tool: {name}"),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -570,6 +622,10 @@ impl MockTool {
     }
 
     /// Set response for specific input
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned.
     pub fn set_response(&self, input_key: &str, output: ToolOutput) {
         self.responses
             .lock()
@@ -578,16 +634,21 @@ impl MockTool {
     }
 
     /// Set execution delay
-    pub fn set_delay(&mut self, delay: Duration) {
+    pub const fn set_delay(&mut self, delay: Duration) {
         self.delay = Some(delay);
     }
 
     /// Set failure mode
-    pub fn set_failure(&mut self, should_fail: bool) {
+    pub const fn set_failure(&mut self, should_fail: bool) {
         self.should_fail = should_fail;
     }
 
     /// Get execution count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
+    #[must_use]
     pub fn execution_count(&self) -> usize {
         *self.execution_count.lock().unwrap()
     }
@@ -599,7 +660,10 @@ impl BaseAgent for MockTool {
         &self.metadata
     }
 
-    async fn execute(
+    /// # Panics
+    ///
+    /// Panics if any Mutex is poisoned
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -627,22 +691,23 @@ impl BaseAgent for MockTool {
         let input_str = serde_json::to_string(params).unwrap_or_default();
         let responses = self.responses.lock().unwrap();
 
-        let tool_output = if let Some(response) = responses.get(&input_str) {
-            response.clone()
-        } else {
-            // Default response
-            ToolOutput {
-                success: true,
-                data: serde_json::json!({
-                    "mock": true,
-                    "tool": self.metadata.name,
-                    "input": params,
-                    "timestamp": chrono::Utc::now().to_rfc3339(),
-                }),
-                error: None,
-                execution_time_ms: Some(10),
-            }
-        };
+        let tool_output = responses.get(&input_str).map_or_else(
+            || {
+                // Default response
+                ToolOutput {
+                    success: true,
+                    data: serde_json::json!({
+                        "mock": true,
+                        "tool": self.metadata.name,
+                        "input": params,
+                        "timestamp": chrono::Utc::now().to_rfc3339(),
+                    }),
+                    error: None,
+                    execution_time_ms: Some(10),
+                }
+            },
+            Clone::clone,
+        );
 
         // Convert tool output to agent output
         Ok(AgentOutput {
@@ -659,7 +724,7 @@ impl BaseAgent for MockTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
-        Ok(AgentOutput::text(format!("Tool error: {}", error)))
+        Ok(AgentOutput::text(format!("Tool error: {error}")))
     }
 }
 
@@ -695,6 +760,7 @@ pub struct MockAgentBuilder {
 
 impl MockAgentBuilder {
     /// Create new mock agent builder
+    #[must_use]
     pub fn new(name: &str) -> Self {
         let mut config = MockAgentConfig::default();
         config.agent_config.name = name.to_string();
@@ -703,12 +769,14 @@ impl MockAgentBuilder {
     }
 
     /// Set agent type
+    #[must_use]
     pub fn agent_type(mut self, agent_type: &str) -> Self {
         self.config.agent_config.agent_type = agent_type.to_string();
         self
     }
 
     /// Add allowed tool
+    #[must_use]
     pub fn with_tool(mut self, tool_name: &str) -> Self {
         self.config
             .agent_config
@@ -718,6 +786,7 @@ impl MockAgentBuilder {
     }
 
     /// Add response
+    #[must_use]
     pub fn with_response(mut self, pattern: Option<String>, text: &str) -> Self {
         self.config.responses.push(MockResponse {
             input_pattern: pattern,
@@ -729,6 +798,7 @@ impl MockAgentBuilder {
     }
 
     /// Add response with tool calls
+    #[must_use]
     pub fn with_tool_response(
         mut self,
         pattern: Option<String>,
@@ -745,12 +815,14 @@ impl MockAgentBuilder {
     }
 
     /// Set delay
-    pub fn with_delay(mut self, delay: Duration) -> Self {
+    #[must_use]
+    pub const fn with_delay(mut self, delay: Duration) -> Self {
         self.config.delay = Some(delay);
         self
     }
 
     /// Set failure mode
+    #[must_use]
     pub fn will_fail(mut self, message: &str) -> Self {
         self.config.should_fail = true;
         self.config.failure_message = message.to_string();
@@ -758,18 +830,21 @@ impl MockAgentBuilder {
     }
 
     /// Add state transition
+    #[must_use]
     pub fn with_state_transition(mut self, state: AgentState) -> Self {
         self.config.state_transitions.push(state);
         self
     }
 
     /// Set resource limits
-    pub fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
+    #[must_use]
+    pub const fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.config.agent_config.resource_limits = limits;
         self
     }
 
     /// Build the mock agent
+    #[must_use]
     pub fn build(self) -> MockAgent {
         MockAgent::new(self.config)
     }
@@ -780,6 +855,7 @@ pub struct TestDoubles;
 
 impl TestDoubles {
     /// Create a simple echo agent
+    #[must_use]
     pub fn echo_agent(name: &str) -> MockAgent {
         MockAgentBuilder::new(name)
             .agent_type("echo")
@@ -788,6 +864,7 @@ impl TestDoubles {
     }
 
     /// Create an agent that always fails
+    #[must_use]
     pub fn failing_agent(name: &str, error_message: &str) -> MockAgent {
         MockAgentBuilder::new(name)
             .agent_type("failing")
@@ -796,6 +873,7 @@ impl TestDoubles {
     }
 
     /// Create an agent with tool capabilities
+    #[must_use]
     pub fn tool_agent(name: &str, tools: Vec<&str>) -> MockAgent {
         let mut builder = MockAgentBuilder::new(name).agent_type("tool_capable");
 
@@ -807,6 +885,7 @@ impl TestDoubles {
     }
 
     /// Create a slow agent
+    #[must_use]
     pub fn slow_agent(name: &str, delay: Duration) -> MockAgent {
         MockAgentBuilder::new(name)
             .agent_type("slow")
@@ -816,6 +895,7 @@ impl TestDoubles {
     }
 
     /// Create a stateful agent
+    #[must_use]
     pub fn stateful_agent(name: &str, states: Vec<AgentState>) -> MockAgent {
         let mut builder = MockAgentBuilder::new(name).agent_type("stateful");
 
@@ -830,7 +910,6 @@ impl TestDoubles {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_mock_agent_basic() {
         let agent = MockAgentBuilder::new("test")
@@ -846,7 +925,6 @@ mod tests {
         assert_eq!(output.text, "Hi there!");
         assert_eq!(agent.execution_count(), 1);
     }
-
     #[tokio::test]
     async fn test_mock_agent_failure() {
         let agent = MockAgentBuilder::new("test")
@@ -858,7 +936,6 @@ mod tests {
 
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_mock_tool() {
         let tool = MockTool::new("test_tool");
@@ -875,7 +952,6 @@ mod tests {
         assert!(output.text.contains("mock"));
         assert_eq!(tool.execution_count(), 1);
     }
-
     #[tokio::test]
     async fn test_test_doubles() {
         let echo = TestDoubles::echo_agent("echo");

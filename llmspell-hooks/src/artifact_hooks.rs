@@ -108,7 +108,6 @@ mod tests {
     use llmspell_core::events::ArtifactEventBuilder;
     use llmspell_core::state::ArtifactMetadata;
     use llmspell_core::types::ComponentId;
-
     #[test]
     fn test_artifact_hook_points() {
         let point = ArtifactHookPoints::to_hook_point(ArtifactHookPoints::BEFORE_CREATE);
@@ -117,7 +116,6 @@ mod tests {
         let non_artifact_point = HookPoint::BeforeAgentInit;
         assert!(!is_artifact_hook_point(&non_artifact_point));
     }
-
     #[test]
     fn test_event_to_hook_point() {
         let component_id = ComponentId::new();
@@ -126,7 +124,7 @@ mod tests {
             artifact_id.clone(),
             "test".to_string(),
             "test.txt".to_string(),
-            component_id.clone(),
+            component_id,
         );
 
         let event = ArtifactEventBuilder::new(component_id).created(metadata, None);

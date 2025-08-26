@@ -1,5 +1,5 @@
 //! ABOUTME: Error types and handling for rs-llmspell
-//! ABOUTME: Provides LLMSpellError enum and Result type alias
+//! ABOUTME: Provides `LLMSpellError` enum and `Result` type alias
 
 use thiserror::Error;
 
@@ -68,7 +68,7 @@ pub enum ErrorCategory {
     Internal,
 }
 
-/// Comprehensive error enum for all LLMSpell operations.
+/// Comprehensive error enum for all `LLMSpell` operations.
 ///
 /// Central error type that encompasses all possible errors in the system.
 /// Each variant includes relevant context and may chain underlying errors.
@@ -224,6 +224,7 @@ pub enum LLMSpellError {
 
 impl LLMSpellError {
     /// Get the error category
+    #[must_use]
     pub fn category(&self) -> ErrorCategory {
         match self {
             Self::Configuration { .. } => ErrorCategory::Configuration,
@@ -243,46 +244,52 @@ impl LLMSpellError {
     }
 
     /// Get the error severity
+    #[must_use]
     pub fn severity(&self) -> ErrorSeverity {
         match self {
-            Self::Validation { .. } => ErrorSeverity::Warning,
+            Self::Validation { .. } | Self::Timeout { .. } => ErrorSeverity::Warning,
             Self::Configuration { .. } => ErrorSeverity::Error,
             Self::Security { .. } => ErrorSeverity::Critical,
             Self::Internal { .. } => ErrorSeverity::Fatal,
-            Self::Timeout { .. } => ErrorSeverity::Warning,
             _ => ErrorSeverity::Error,
         }
     }
 
     /// Check if the error is retryable
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
         match self {
             Self::Network { .. }
             | Self::Timeout { .. }
             | Self::Provider { .. }
-            | Self::RateLimit { .. } => true,
-            Self::Resource { .. } => true,
+            | Self::RateLimit { .. }
+            | Self::Resource { .. } => true,
             Self::Storage { operation, .. } => {
                 // Some storage operations are retryable
                 operation
                     .as_ref()
                     .is_some_and(|op| op == "read" || op == "write" || op == "lock")
             }
-            Self::Security { .. } | Self::Configuration { .. } | Self::Validation { .. } => false,
-            Self::Internal { .. } => false,
-            Self::ResourceLimit { .. } => false, // Resource limits are not retryable
-            _ => false,
+            Self::Security { .. }
+            | Self::Configuration { .. }
+            | Self::Validation { .. }
+            | Self::Internal { .. }
+            | Self::ResourceLimit { .. } // Resource limits are not retryable
+            | Self::Component { .. }
+            | Self::Tool { .. }
+            | Self::Script { .. }
+            | Self::Workflow { .. } => false,
         }
     }
 
     /// Get suggested retry delay in milliseconds
+    #[must_use]
     pub fn retry_delay_ms(&self) -> Option<u64> {
         if !self.is_retryable() {
             return None;
         }
 
         match self {
-            Self::Network { .. } => Some(1000), // 1 second
             Self::Timeout { duration_ms, .. } => {
                 // Retry with double the timeout
                 duration_ms.map(|d| d * 2).or(Some(5000))
@@ -290,7 +297,17 @@ impl LLMSpellError {
             Self::Provider { .. } => Some(2000), // 2 seconds
             Self::Resource { .. } => Some(500),  // 500ms
             Self::Storage { .. } => Some(100),   // 100ms
-            _ => Some(1000),                     // Default 1 second
+            Self::Network { .. } | Self::RateLimit { .. } => Some(1000), // 1 second
+            // These errors are not retryable so shouldn't reach here
+            Self::Security { .. }
+            | Self::Configuration { .. }
+            | Self::Validation { .. }
+            | Self::Internal { .. }
+            | Self::ResourceLimit { .. }
+            | Self::Component { .. }
+            | Self::Tool { .. }
+            | Self::Script { .. }
+            | Self::Workflow { .. } => None,
         }
     }
 
@@ -325,7 +342,7 @@ pub type Result<T> = std::result::Result<T, LLMSpellError>;
 impl From<std::io::Error> for LLMSpellError {
     fn from(err: std::io::Error) -> Self {
         LLMSpellError::Storage {
-            message: format!("IO error: {}", err),
+            message: format!("IO error: {err}"),
             operation: None,
             source: Some(Box::new(err)),
         }
@@ -335,7 +352,7 @@ impl From<std::io::Error> for LLMSpellError {
 impl From<serde_json::Error> for LLMSpellError {
     fn from(err: serde_json::Error) -> Self {
         LLMSpellError::Configuration {
-            message: format!("JSON serialization error: {}", err),
+            message: format!("JSON serialization error: {err}"),
             source: Some(Box::new(err)),
         }
     }
@@ -344,7 +361,7 @@ impl From<serde_json::Error> for LLMSpellError {
 impl From<std::fmt::Error> for LLMSpellError {
     fn from(err: std::fmt::Error) -> Self {
         LLMSpellError::Internal {
-            message: format!("Formatting error: {}", err),
+            message: format!("Formatting error: {err}"),
             source: Some(Box::new(err)),
         }
     }
@@ -432,7 +449,6 @@ macro_rules! log_error {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_error_severity_ordering() {
         assert!(ErrorSeverity::Info < ErrorSeverity::Warning);
@@ -440,7 +456,6 @@ mod tests {
         assert!(ErrorSeverity::Error < ErrorSeverity::Critical);
         assert!(ErrorSeverity::Critical < ErrorSeverity::Fatal);
     }
-
     #[test]
     fn test_error_categorization() {
         let config_err = LLMSpellError::Configuration {
@@ -461,7 +476,6 @@ mod tests {
         };
         assert_eq!(security_err.category(), ErrorCategory::Security);
     }
-
     #[test]
     fn test_error_severity_mapping() {
         let validation_err = LLMSpellError::Validation {
@@ -482,7 +496,6 @@ mod tests {
         };
         assert_eq!(internal_err.severity(), ErrorSeverity::Fatal);
     }
-
     #[test]
     fn test_error_retryability() {
         // Retryable errors
@@ -515,7 +528,6 @@ mod tests {
         assert!(!security_err.is_retryable());
         assert_eq!(security_err.retry_delay_ms(), None);
     }
-
     #[test]
     fn test_storage_error_retryability() {
         let read_err = LLMSpellError::Storage {
@@ -532,7 +544,6 @@ mod tests {
         };
         assert!(!delete_err.is_retryable());
     }
-
     #[test]
     fn test_error_chaining() {
         use std::io;
@@ -553,7 +564,6 @@ mod tests {
             _ => panic!("Expected Storage error"),
         }
     }
-
     #[test]
     fn test_error_display() {
         let provider_err = LLMSpellError::Provider {
@@ -565,7 +575,6 @@ mod tests {
         assert!(display.contains("LLM provider error"));
         assert!(display.contains("API rate limit exceeded"));
     }
-
     #[test]
     fn test_error_macros() {
         let comp_err = component_error!("Component failed");
@@ -597,7 +606,6 @@ mod tests {
             _ => panic!("Expected Tool error"),
         }
     }
-
     #[test]
     fn test_script_error_with_details() {
         let script_err = LLMSpellError::Script {
@@ -615,7 +623,6 @@ mod tests {
             _ => panic!("Expected Script error"),
         }
     }
-
     #[test]
     fn test_workflow_error_with_step() {
         let workflow_err = LLMSpellError::Workflow {
@@ -631,7 +638,6 @@ mod tests {
             _ => panic!("Expected Workflow error"),
         }
     }
-
     #[test]
     fn test_error_serialization() {
         // Test that errors can be converted to strings and back

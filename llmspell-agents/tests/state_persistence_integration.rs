@@ -8,15 +8,17 @@ use llmspell_agents::{
     state::StatePersistence,
     testing::mocks::{MockAgent, MockAgentConfig, MockResponse},
 };
+use llmspell_core::types::OutputMetadata;
 use llmspell_core::{
     traits::{agent::Agent, base_agent::BaseAgent},
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_state_persistence::{PersistenceConfig, StateManager, StorageBackendType};
+use llmspell_state_persistence::{
+    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
+};
 use std::sync::Arc;
 use tempfile::TempDir;
-
 #[tokio::test]
 async fn test_basic_agent_state_persistence() -> Result<()> {
     // Create a temporary directory for storage
@@ -48,7 +50,7 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
                 encryption: None,
                 backup_retention: std::time::Duration::from_secs(3600),
                 backup: None,
-                performance: Default::default(),
+                performance: PerformanceConfig::default(),
             },
         )
         .await?,
@@ -106,7 +108,6 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_mock_agent_state_persistence() -> Result<()> {
     // Create mock agent configuration with pre-programmed responses
@@ -120,13 +121,13 @@ async fn test_mock_agent_state_persistence() -> Result<()> {
             input_pattern: Some("Remember this number".to_string()),
             text: "I'll remember the number 42 for you.".to_string(),
             tool_calls: vec![],
-            metadata: Default::default(),
+            metadata: OutputMetadata::default(),
         },
         MockResponse {
             input_pattern: Some("What number".to_string()),
             text: "The number you asked me to remember is 42.".to_string(),
             tool_calls: vec![],
-            metadata: Default::default(),
+            metadata: OutputMetadata::default(),
         },
     ];
 
@@ -176,7 +177,6 @@ async fn test_mock_agent_state_persistence() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_state_persistence_with_multiple_agents() -> Result<()> {
     // Create state manager
@@ -250,7 +250,6 @@ async fn test_state_persistence_with_multiple_agents() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_state_persistence_error_handling() -> Result<()> {
     // Create agent without state manager

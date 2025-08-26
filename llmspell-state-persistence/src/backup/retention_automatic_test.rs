@@ -12,7 +12,6 @@ mod test {
     use std::sync::Arc;
     use std::time::Duration;
     use tempfile::TempDir;
-
     #[tokio::test]
     async fn test_automatic_cleanup_during_creation() {
         // Create state manager

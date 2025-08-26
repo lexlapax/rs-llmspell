@@ -85,7 +85,7 @@ impl Drop for LuaHookHandle {
     }
 }
 
-/// Convert HookContext to Lua table
+/// Convert `HookContext` to Lua table
 #[allow(dead_code)]
 fn hook_context_to_lua_table<'lua>(
     lua: &'lua Lua,
@@ -125,11 +125,10 @@ fn hook_context_to_lua_table<'lua>(
     Ok(table)
 }
 
-/// Convert Lua value to HookResult
+/// Convert Lua value to `HookResult`
 #[allow(dead_code)]
 fn lua_value_to_hook_result(value: Value) -> mlua::Result<HookResult> {
     match value {
-        Value::Nil => Ok(HookResult::Continue),
         Value::String(s) => {
             let s = s.to_str()?;
             match s {
@@ -143,7 +142,6 @@ fn lua_value_to_hook_result(value: Value) -> mlua::Result<HookResult> {
             if let Ok(Value::String(result_type)) = table.get::<_, Value>("type") {
                 let result_type = result_type.to_str()?;
                 match result_type {
-                    "continue" => Ok(HookResult::Continue),
                     "modified" => {
                         // Get the modified data
                         if let Ok(data) = table.get::<_, Table>("data") {
@@ -228,18 +226,16 @@ fn parse_hook_point(s: &str) -> mlua::Result<HookPoint> {
         "AfterWorkflowComplete" => Ok(HookPoint::AfterWorkflowComplete),
         "WorkflowError" => Ok(HookPoint::WorkflowError),
         _ => Err(mlua::Error::RuntimeError(format!(
-            "Unknown hook point: {}",
-            s
+            "Unknown hook point: {s}"
         ))),
     }
 }
 
 /// Parse priority from string or use default
-fn parse_priority(s: Option<String>) -> Priority {
-    match s.as_deref() {
+fn parse_priority(s: Option<&String>) -> Priority {
+    match s.map(String::as_str) {
         Some("highest") => Priority::HIGHEST,
         Some("high") => Priority::HIGH,
-        Some("normal") => Priority::NORMAL,
         Some("low") => Priority::LOW,
         Some("lowest") => Priority::LOWEST,
         _ => Priority::NORMAL,
@@ -247,6 +243,11 @@ fn parse_priority(s: Option<String>) -> Priority {
 }
 
 /// Inject the Hook global into Lua
+///
+/// # Errors
+///
+/// Returns an error if Lua global injection fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_hook_global(
     lua: &Lua,
     _context: &GlobalContext,
@@ -254,7 +255,7 @@ pub fn inject_hook_global(
 ) -> Result<()> {
     // Create the Hook table
     let hook_table = lua.create_table().map_err(|e| LLMSpellError::Component {
-        message: format!("Failed to create Hook table: {}", e),
+        message: format!("Failed to create Hook table: {e}"),
         source: None,
     })?;
 
@@ -281,7 +282,7 @@ pub fn inject_hook_global(
             None,
         )
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to register Lua adapter: {}", e),
+            message: format!("Failed to register Lua adapter: {e}"),
             source: None,
         })?;
     }
@@ -292,7 +293,7 @@ pub fn inject_hook_global(
         .create_function(
             move |lua, (hook_point, callback, priority): (String, Function, Option<String>)| {
                 let hook_point = parse_hook_point(&hook_point)?;
-                let priority = parse_priority(priority);
+                let priority = parse_priority(priority.as_ref());
                 let hook_bridge = hook_bridge_clone.clone();
 
                 // Store the callback
@@ -320,14 +321,14 @@ pub fn inject_hook_global(
             },
         )
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create Hook.register: {}", e),
+            message: format!("Failed to create Hook.register: {e}"),
             source: None,
         })?;
 
     hook_table
         .set("register", register_fn)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set Hook.register: {}", e),
+            message: format!("Failed to set Hook.register: {e}"),
             source: None,
         })?;
 
@@ -336,7 +337,7 @@ pub fn inject_hook_global(
     //   - nil: list all hooks
     //   - string: hook point name
     //   - table: {hook_point?, language?, priority?, tag?}
-    let hook_bridge_clone = hook_bridge.clone();
+    let hook_bridge_clone = hook_bridge;
     let list_fn = lua
         .create_function(move |lua, filter: Option<mlua::Value>| {
             let hook_bridge = hook_bridge_clone.clone();
@@ -425,14 +426,14 @@ pub fn inject_hook_global(
             Ok(result)
         })
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create Hook.list: {}", e),
+            message: format!("Failed to create Hook.list: {e}"),
             source: None,
         })?;
 
     hook_table
         .set("list", list_fn)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set Hook.list: {}", e),
+            message: format!("Failed to set Hook.list: {e}"),
             source: None,
         })?;
 
@@ -440,6 +441,7 @@ pub fn inject_hook_global(
     let unregister_fn = lua
         .create_function(move |_, handle: mlua::AnyUserData| {
             // Try to cast to LuaHookHandle and call unregister
+            #[allow(clippy::option_if_let_else)] // Complex pattern
             if let Ok(lua_handle) = handle.borrow::<LuaHookHandle>() {
                 block_on_async::<_, _, LLMSpellError>(
                     "hook_unregister_standalone",
@@ -459,14 +461,14 @@ pub fn inject_hook_global(
             }
         })
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create Hook.unregister: {}", e),
+            message: format!("Failed to create Hook.unregister: {e}"),
             source: None,
         })?;
 
     hook_table
         .set("unregister", unregister_fn)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set Hook.unregister: {}", e),
+            message: format!("Failed to set Hook.unregister: {e}"),
             source: None,
         })?;
 
@@ -474,7 +476,7 @@ pub fn inject_hook_global(
     lua.globals()
         .set("Hook", hook_table)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set Hook global: {}", e),
+            message: format!("Failed to set Hook global: {e}"),
             source: None,
         })?;
 
@@ -485,15 +487,20 @@ pub fn inject_hook_global(
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_lua_hook_injection() {
         let lua = Lua::new();
         let context = Arc::new(GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         ));
-        let hook_bridge = Arc::new(HookBridge::new(context.clone()).await.unwrap());
+        let hook_bridge = Arc::new(HookBridge::new(context.clone()).unwrap());
 
         inject_hook_global(&lua, &context, hook_bridge).unwrap();
 

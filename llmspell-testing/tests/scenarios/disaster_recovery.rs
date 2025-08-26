@@ -4,7 +4,7 @@
 use llmspell_state_persistence::{
     backup::{BackupConfig, BackupManager, CompressionType, RestoreOptions},
     config::{PersistenceConfig, StorageBackendType},
-    manager::{SerializableState, StateManager},
+    manager::StateManager,
     StateScope,
 };
 use serde_json::json;
@@ -43,7 +43,7 @@ mod disaster_recovery_scenarios {
                 encryption_enabled: false,
                 max_backups: Some(10),
                 incremental_enabled: true,
-                retention_days: Some(30),
+                max_backup_age: Some(Duration::from_secs(30 * 24 * 60 * 60)), // 30 days
                 ..Default::default()
             };
 
@@ -168,7 +168,29 @@ mod disaster_recovery_scenarios {
         /// Simulate complete system failure
         async fn simulate_disaster(&self) {
             // Clear all state to simulate complete system failure
-            self.state_manager.clear_all().await.unwrap();
+            // We need to clear all scopes that contain data
+
+            // Clear global scope
+            self.state_manager
+                .clear_scope(StateScope::Global)
+                .await
+                .unwrap();
+
+            // Clear agent scopes
+            for i in 1..=5 {
+                self.state_manager
+                    .clear_scope(StateScope::Custom(format!("agent_{}", i)))
+                    .await
+                    .unwrap();
+            }
+
+            // Clear user session scopes
+            for i in 1..=10 {
+                self.state_manager
+                    .clear_scope(StateScope::Custom(format!("user_session_{}", i)))
+                    .await
+                    .unwrap();
+            }
         }
 
         /// Verify system integrity after recovery
@@ -233,7 +255,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_complete_system_disaster_recovery() {
         let app = TestApplication::new().await;
 
@@ -242,7 +263,39 @@ mod disaster_recovery_scenarios {
 
         // Step 2: Create disaster recovery backup
         let disaster_backup = app.backup_manager.create_backup(false).await.unwrap();
-        assert!(disaster_backup.entry_count >= 20); // Should have all our test data
+        println!(
+            "🔍 Backup created with {} entries (expected >= 20)",
+            disaster_backup.entry_count
+        );
+
+        // Debug: Let's see what's actually in the state before backup
+        let global_keys = app
+            .state_manager
+            .list_keys(StateScope::Global)
+            .await
+            .unwrap();
+        println!("🔍 Global scope keys: {:?}", global_keys);
+
+        // Check agent scopes
+        for i in 1..=5 {
+            let agent_scope = StateScope::Custom(format!("agent_{}", i));
+            let agent_keys = app.state_manager.list_keys(agent_scope).await.unwrap();
+            println!("🔍 Agent {} scope keys: {:?}", i, agent_keys);
+        }
+
+        // Check user session scopes
+        for i in 1..=3 {
+            // Just check first 3 to avoid spam
+            let session_scope = StateScope::Custom(format!("user_session_{}", i));
+            let session_keys = app.state_manager.list_keys(session_scope).await.unwrap();
+            println!("🔍 User session {} scope keys: {:?}", i, session_keys);
+        }
+
+        assert!(
+            disaster_backup.entry_count >= 20,
+            "Should have all our test data, got {} entries",
+            disaster_backup.entry_count
+        );
 
         // Step 3: Validate backup before disaster
         let validation = app
@@ -337,7 +390,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_partial_system_failure_recovery() {
         let app = TestApplication::new().await;
 
@@ -389,7 +441,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_point_in_time_recovery() {
         let app = TestApplication::new().await;
 
@@ -501,7 +552,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_recovery_under_load() {
         let app = TestApplication::new().await;
 
@@ -600,7 +650,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_cascading_failure_recovery() {
         let app = TestApplication::new().await;
 
@@ -675,7 +724,7 @@ mod disaster_recovery_scenarios {
         let db_value = db_config.unwrap();
         assert_eq!(db_value["connection_pool_size"], 20); // Original value
         assert_eq!(db_value["timeout_seconds"], 30); // Original value
-        assert!(!db_value.get("status").is_some() || db_value["status"] != "degraded");
+        assert!(!matches!(db_value.get("status"), Some(v) if v == "degraded"));
 
         let feature_flags = app
             .state_manager
@@ -694,7 +743,7 @@ mod disaster_recovery_scenarios {
             .unwrap();
         let agent_1_value = agent_1_config.unwrap();
         assert_eq!(agent_1_value["active"], true); // Original value
-        assert!(!agent_1_value.get("error").is_some());
+        assert!(agent_1_value.get("error").is_none());
 
         // Verify system integrity
         let integrity_check = app.verify_system_integrity().await.unwrap();

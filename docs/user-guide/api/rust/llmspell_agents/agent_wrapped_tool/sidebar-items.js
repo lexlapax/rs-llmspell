@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["TransformType"],"struct":["AgentWrappedTool","ParameterMappingConfig","ParameterTransform","ToolMetadata"]};

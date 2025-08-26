@@ -1,12 +1,16 @@
-//! ABOUTME: JavaScript Streaming global implementation stub  
+//! ABOUTME: JavaScript Streaming global implementation stub\
 //! ABOUTME: Streaming API bindings for JavaScript engine (Phase 12+ implementation)
 
 use crate::globals::GlobalContext;
 use llmspell_core::error::LLMSpellError;
 
 /// Inject Streaming global into JavaScript engine
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_streaming_global(
+pub const fn inject_streaming_global(
     _ctx: &mut boa_engine::Context,
     _context: &GlobalContext,
 ) -> Result<(), LLMSpellError> {
@@ -20,8 +24,15 @@ pub fn inject_streaming_global(
 }
 
 /// Stub for when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_streaming_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
+pub const fn inject_streaming_global(
+    _ctx: &(),
+    _context: &GlobalContext,
+) -> Result<(), LLMSpellError> {
     Ok(())
 }
 

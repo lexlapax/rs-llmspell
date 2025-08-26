@@ -85,7 +85,11 @@ impl BackupCompression {
 
         let compressed_size = compressed.len();
         let ratio = if start_size > 0 && compressed_size < start_size {
-            ((start_size - compressed_size) as f64 / start_size as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let size_diff = (start_size - compressed_size) as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let start_size_f64 = start_size as f64;
+            (size_diff / start_size_f64) * 100.0
         } else {
             0.0
         };
@@ -146,7 +150,9 @@ impl BackupCompression {
 
     /// Compress with zstd
     fn compress_zstd(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
-        zstd::encode_all(data, self.compression_level.0 as i32)
+        #[allow(clippy::cast_possible_wrap)]
+        let level_i32 = self.compression_level.0 as i32;
+        zstd::encode_all(data, level_i32)
             .map_err(|e| StateError::storage(format!("Compression error: {}", e)))
     }
 
@@ -184,6 +190,7 @@ impl BackupCompression {
     fn compress_brotli(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         let mut output = Vec::new();
         let params = brotli::enc::BrotliEncoderParams {
+            #[allow(clippy::cast_possible_wrap)]
             quality: self.compression_level.0 as i32,
             ..Default::default()
         };
@@ -233,7 +240,11 @@ impl BackupCompression {
         let decompression_time = decompress_start.elapsed();
 
         let compression_ratio = if original_size > 0 && compressed_size < original_size {
-            ((original_size - compressed_size) as f64 / original_size as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let size_diff = (original_size - compressed_size) as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let original_size_f64 = original_size as f64;
+            (size_diff / original_size_f64) * 100.0
         } else {
             0.0
         };
@@ -242,7 +253,9 @@ impl BackupCompression {
             original_size,
             compressed_size,
             compression_ratio,
+            #[allow(clippy::cast_possible_truncation)]
             compression_time_ms: compression_time.as_millis() as u64,
+            #[allow(clippy::cast_possible_truncation)]
             estimated_decompression_time_ms: decompression_time.as_millis() as u64,
             algorithm: self.compression_type,
             level: self.compression_level,
@@ -314,14 +327,12 @@ pub fn find_optimal_compression(
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_compression_level_validation() {
         assert!(CompressionLevel::new(0).is_err());
         assert!(CompressionLevel::new(5).is_ok());
         assert!(CompressionLevel::new(10).is_err());
     }
-
     #[test]
     fn test_compression_type_extension() {
         assert_eq!(CompressionType::None.extension(), "");
@@ -330,7 +341,6 @@ mod tests {
         assert_eq!(CompressionType::Lz4.extension(), ".lz4");
         assert_eq!(CompressionType::Brotli.extension(), ".br");
     }
-
     #[test]
     fn test_compression_roundtrip() {
         let data = b"Hello, World! This is test data for compression.".repeat(100);
@@ -342,7 +352,6 @@ mod tests {
         let decompressed = compressor.decompress(&compressed).unwrap();
         assert_eq!(decompressed, data);
     }
-
     #[test]
     fn test_all_compression_algorithms() {
         let data = b"Test data for all compression algorithms".repeat(50);
@@ -361,7 +370,6 @@ mod tests {
             assert_eq!(decompressed, data, "Failed for {:?}", algorithm);
         }
     }
-
     #[test]
     fn test_compression_analysis() {
         let data = b"Highly compressible data ".repeat(100);
@@ -372,7 +380,6 @@ mod tests {
         assert!(analysis.compression_ratio > 50.0); // Should achieve >50% compression
         assert!(analysis.compressed_size < analysis.original_size);
     }
-
     #[test]
     fn test_compression_edge_cases() {
         // Test 1: Empty data
@@ -396,7 +403,6 @@ mod tests {
         let decompressed_random = compressor.decompress(&compressed_random).unwrap();
         assert_eq!(decompressed_random, random_data);
     }
-
     #[test]
     fn test_compression_ratio_calculation() {
         // Test that compression ratio calculation doesn't panic

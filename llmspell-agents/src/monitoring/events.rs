@@ -1,6 +1,8 @@
 //! ABOUTME: Event logging system for agent activities
 //! ABOUTME: Provides structured logging, event correlation, and log aggregation
 
+#![allow(clippy::significant_drop_tightening)]
+
 use chrono::{DateTime, Utc};
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};
@@ -26,19 +28,21 @@ pub enum LogLevel {
 
 impl LogLevel {
     /// Check if this level should be logged given a minimum level
-    pub fn should_log(&self, min_level: LogLevel) -> bool {
+    #[must_use]
+    pub fn should_log(&self, min_level: Self) -> bool {
         *self >= min_level
     }
 
     /// Convert to string representation
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            LogLevel::Trace => "TRACE",
-            LogLevel::Debug => "DEBUG",
-            LogLevel::Info => "INFO",
-            LogLevel::Warn => "WARN",
-            LogLevel::Error => "ERROR",
-            LogLevel::Fatal => "FATAL",
+            Self::Trace => "TRACE",
+            Self::Debug => "DEBUG",
+            Self::Info => "INFO",
+            Self::Warn => "WARN",
+            Self::Error => "ERROR",
+            Self::Fatal => "FATAL",
         }
     }
 }
@@ -70,6 +74,7 @@ pub struct LogEvent {
 
 impl LogEvent {
     /// Create a new log event
+    #[must_use]
     pub fn new(level: LogLevel, agent_id: String, component: String, message: String) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -86,12 +91,14 @@ impl LogEvent {
     }
 
     /// Add a field
+    #[must_use]
     pub fn with_field(mut self, key: String, value: serde_json::Value) -> Self {
         self.fields.insert(key, value);
         self
     }
 
     /// Add trace context
+    #[must_use]
     pub fn with_trace(mut self, trace_id: String, span_id: String) -> Self {
         self.trace_id = Some(trace_id);
         self.span_id = Some(span_id);
@@ -99,12 +106,14 @@ impl LogEvent {
     }
 
     /// Add error details
+    #[must_use]
     pub fn with_error(mut self, error: ErrorDetails) -> Self {
         self.error = Some(error);
         self
     }
 
     /// Format as a log line
+    #[must_use]
     pub fn format(&self) -> String {
         let mut parts = vec![
             format!("[{}]", self.level.as_str()),
@@ -117,13 +126,13 @@ impl LogEvent {
             let fields: Vec<String> = self
                 .fields
                 .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
+                .map(|(k, v)| format!("{k}={v}"))
                 .collect();
             parts.push(format!("fields={{{}}}", fields.join(", ")));
         }
 
         if let Some(trace_id) = &self.trace_id {
-            parts.push(format!("trace_id={}", trace_id));
+            parts.push(format!("trace_id={trace_id}"));
         }
 
         if let Some(error) = &self.error {
@@ -164,10 +173,14 @@ pub struct EventLogger {
 }
 
 impl std::fmt::Debug for EventLogger {
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EventLogger")
             .field("agent_id", &self.agent_id)
             .field("min_level", &*self.min_level.read().unwrap())
+            .field("buffer_size", &self.buffer.read().unwrap().len())
             .field("max_buffer_size", &self.max_buffer_size)
             .field("exporters_count", &self.exporters.len())
             .field("filters_count", &self.filters.len())
@@ -177,6 +190,7 @@ impl std::fmt::Debug for EventLogger {
 
 impl EventLogger {
     /// Create a new event logger
+    #[must_use]
     pub fn new(agent_id: String, max_buffer_size: usize) -> Self {
         Self {
             agent_id,
@@ -189,11 +203,19 @@ impl EventLogger {
     }
 
     /// Set minimum log level
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn set_level(&self, level: LogLevel) {
         *self.min_level.write().unwrap() = level;
     }
 
     /// Get current log level
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_level(&self) -> LogLevel {
         *self.min_level.read().unwrap()
     }
@@ -209,6 +231,14 @@ impl EventLogger {
     }
 
     /// Log an event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any exporter fails to export the event
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn log(&self, event: LogEvent) -> Result<()> {
         // Check minimum level
         if !event.level.should_log(self.get_level()) {
@@ -238,6 +268,10 @@ impl EventLogger {
     }
 
     /// Log a trace event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn trace(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Trace,
@@ -249,6 +283,10 @@ impl EventLogger {
     }
 
     /// Log a debug event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn debug(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Debug,
@@ -260,6 +298,10 @@ impl EventLogger {
     }
 
     /// Log an info event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn info(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Info,
@@ -271,6 +313,10 @@ impl EventLogger {
     }
 
     /// Log a warning event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn warn(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Warn,
@@ -282,6 +328,10 @@ impl EventLogger {
     }
 
     /// Log an error event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn error(&self, component: &str, message: &str, error: Option<ErrorDetails>) -> Result<()> {
         let mut event = LogEvent::new(
             LogLevel::Error,
@@ -298,6 +348,10 @@ impl EventLogger {
     }
 
     /// Log a fatal event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn fatal(&self, component: &str, message: &str, error: Option<ErrorDetails>) -> Result<()> {
         let mut event = LogEvent::new(
             LogLevel::Fatal,
@@ -314,12 +368,20 @@ impl EventLogger {
     }
 
     /// Get recent events
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_recent_events(&self, count: usize) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer.iter().rev().take(count).cloned().collect()
     }
 
     /// Get events by level
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_events_by_level(&self, level: LogLevel) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer
@@ -330,6 +392,10 @@ impl EventLogger {
     }
 
     /// Get events by trace ID
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_events_by_trace(&self, trace_id: &str) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer
@@ -340,11 +406,19 @@ impl EventLogger {
     }
 
     /// Clear the event buffer
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn clear_buffer(&self) {
         self.buffer.write().unwrap().clear();
     }
 
     /// Get event statistics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn get_statistics(&self) -> EventStatistics {
         let buffer = self.buffer.read().unwrap();
 
@@ -361,12 +435,17 @@ impl EventLogger {
             }
         }
 
+        #[allow(clippy::cast_precision_loss)]
+        let buffer_len_f64 = buffer.len() as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let max_buffer_size_f64 = self.max_buffer_size as f64;
+
         EventStatistics {
             total_events: buffer.len(),
             level_counts,
             component_counts,
             error_count,
-            buffer_utilization: (buffer.len() as f64 / self.max_buffer_size as f64) * 100.0,
+            buffer_utilization: (buffer_len_f64 / max_buffer_size_f64) * 100.0,
         }
     }
 }
@@ -389,6 +468,10 @@ pub struct EventStatistics {
 /// Trait for exporting log events
 pub trait LogExporter: Send + Sync {
     /// Export a log event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the export operation fails
     fn export(&self, event: &LogEvent) -> Result<()>;
 }
 
@@ -397,6 +480,11 @@ pub trait LogExporter: Send + Sync {
 pub struct ConsoleLogExporter;
 
 impl LogExporter for ConsoleLogExporter {
+    /// Export a log event to console
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if console output fails
     fn export(&self, event: &LogEvent) -> Result<()> {
         println!("{}", event.format());
         Ok(())
@@ -418,7 +506,8 @@ pub struct ComponentFilter {
 
 impl ComponentFilter {
     /// Create a new component filter
-    pub fn new(allowed_components: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(allowed_components: Vec<String>) -> Self {
         Self { allowed_components }
     }
 }
@@ -438,7 +527,8 @@ pub struct LevelFilter {
 
 impl LevelFilter {
     /// Create a new level filter
-    pub fn new(min_level: LogLevel) -> Self {
+    #[must_use]
+    pub const fn new(min_level: LogLevel) -> Self {
         Self { min_level }
     }
 }
@@ -460,7 +550,8 @@ pub struct RateLimitFilter {
 
 impl RateLimitFilter {
     /// Create a new rate limit filter
-    pub fn new(max_per_second: usize) -> Self {
+    #[must_use]
+    pub const fn new(max_per_second: usize) -> Self {
         Self {
             max_per_second,
             counts: RwLock::new(VecDeque::new()),
@@ -495,7 +586,6 @@ impl EventFilter for RateLimitFilter {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_log_levels() {
         assert!(LogLevel::Error > LogLevel::Warn);
@@ -503,7 +593,6 @@ mod tests {
         assert!(LogLevel::Info.should_log(LogLevel::Debug));
         assert!(!LogLevel::Debug.should_log(LogLevel::Info));
     }
-
     #[test]
     fn test_log_event_creation() {
         let mut event = LogEvent::new(
@@ -522,7 +611,6 @@ mod tests {
         assert_eq!(event.fields.get("user_id"), Some(&serde_json::json!("123")));
         assert_eq!(event.trace_id, Some("trace-123".to_string()));
     }
-
     #[test]
     fn test_event_logger() {
         let logger = EventLogger::new("test-agent".to_string(), 100);
@@ -547,7 +635,6 @@ mod tests {
         assert_eq!(stats.level_counts.get(&LogLevel::Warn), Some(&1));
         assert_eq!(stats.level_counts.get(&LogLevel::Error), Some(&1));
     }
-
     #[test]
     fn test_event_filters() {
         let mut logger = EventLogger::new("test-agent".to_string(), 100);
@@ -568,7 +655,6 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].component, "allowed-component");
     }
-
     #[test]
     fn test_rate_limit_filter() {
         let filter = RateLimitFilter::new(2);
@@ -590,7 +676,6 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(1));
         assert!(filter.should_log(&event));
     }
-
     #[test]
     fn test_log_formatting() {
         let event = LogEvent::new(

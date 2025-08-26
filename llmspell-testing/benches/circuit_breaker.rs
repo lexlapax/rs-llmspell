@@ -1,6 +1,8 @@
 // ABOUTME: Performance test for circuit breaker effectiveness
 // ABOUTME: Validates circuit breaker triggers correctly under load and protects system performance
 
+// Benchmark file
+
 use anyhow::anyhow;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_hooks::{
@@ -94,6 +96,12 @@ fn bench_circuit_breaker_recovery(c: &mut Criterion) {
 
                 // Wait for half-open state
                 sleep(Duration::from_millis(15)).await;
+
+                // Trigger transition to half-open by checking if we can execute
+                assert!(
+                    circuit_breaker.can_execute(),
+                    "Should transition to half-open"
+                );
 
                 // Record successes to recover
                 for _ in 0..2 {
@@ -210,7 +218,11 @@ fn calculate_circuit_breaker_overhead(_c: &mut Criterion) {
         let with_breaker = start.elapsed();
 
         let overhead_ns = with_breaker.as_nanos().saturating_sub(baseline.as_nanos());
-        let overhead_percent = (overhead_ns as f64 / baseline.as_nanos() as f64) * 100.0;
+        #[allow(clippy::cast_precision_loss)]
+        let overhead_ns_f64 = overhead_ns as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let baseline_ns_f64 = baseline.as_nanos() as f64;
+        let overhead_percent = (overhead_ns_f64 / baseline_ns_f64) * 100.0;
 
         println!("Baseline execution: {:?}", baseline);
         println!("With circuit breaker: {:?}", with_breaker);

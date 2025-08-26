@@ -148,7 +148,6 @@ impl ScopedMemoryTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_memory_tracking() {
         let tracker = MemoryTracker::new(1000);
@@ -169,7 +168,6 @@ mod tests {
         tracker.reset();
         assert_eq!(tracker.current_usage(), 0);
     }
-
     #[test]
     fn test_memory_guard() {
         let tracker = MemoryTracker::new(1000);
@@ -182,7 +180,6 @@ mod tests {
         // Guard should deallocate on drop
         assert_eq!(tracker.current_usage(), 0);
     }
-
     #[test]
     fn test_scoped_tracking() {
         let root = ScopedMemoryTracker::new(1000);

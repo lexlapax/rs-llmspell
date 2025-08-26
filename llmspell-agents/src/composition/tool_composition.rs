@@ -93,7 +93,9 @@ pub enum DataFlow {
     SharedContext(String),
     /// Transform data from another source
     Transform {
+        /// Source of the data to transform
         source: Box<DataFlow>,
+        /// Transformation to apply to the source data
         transform: DataTransform,
     },
 }
@@ -270,7 +272,7 @@ impl ToolComposition {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.clone(),
-            description: format!("Tool composition: {}", name),
+            description: format!("Tool composition: {name}"),
             steps: Vec::new(),
             error_strategy: CompositionErrorStrategy::FailFast,
             max_execution_time: Some(Duration::from_secs(300)), // 5 minutes default
@@ -285,30 +287,43 @@ impl ToolComposition {
     }
 
     /// Set error strategy for the composition
-    pub fn with_error_strategy(mut self, strategy: CompositionErrorStrategy) -> Self {
+    #[must_use]
+    pub const fn with_error_strategy(mut self, strategy: CompositionErrorStrategy) -> Self {
         self.error_strategy = strategy;
         self
     }
 
     /// Set maximum execution time
-    pub fn with_max_execution_time(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_max_execution_time(mut self, duration: Duration) -> Self {
         self.max_execution_time = Some(duration);
         self
     }
 
     /// Enable parallel execution where possible
-    pub fn with_parallel_execution(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn with_parallel_execution(mut self, enabled: bool) -> Self {
         self.parallel_execution = enabled;
         self
     }
 
     /// Add shared context data
+    #[must_use]
     pub fn with_shared_context(mut self, key: impl Into<String>, value: JsonValue) -> Self {
         self.shared_context.insert(key.into(), value);
         self
     }
 
     /// Execute the composition with the given tool provider
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool execution fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
+    #[allow(clippy::future_not_send)] // Tool provider may not be Send
     pub async fn execute<T>(
         &self,
         tool_provider: &T,
@@ -322,7 +337,7 @@ impl ToolComposition {
         let mut step_results = HashMap::new();
         let mut errors = Vec::new();
         let mut execution_context =
-            CompositionExecutionContext::new(initial_parameters, &self.shared_context);
+            CompositionExecutionContext::new(&initial_parameters, &self.shared_context);
 
         let mut steps_executed = 0;
         let mut steps_failed = 0;
@@ -342,91 +357,70 @@ impl ToolComposition {
             let step_start_time = Instant::now();
             let mut retry_attempts = 0;
 
-            let step_result = loop {
-                steps_executed += 1;
+            let step_result =
+                loop {
+                    steps_executed += 1;
 
-                // Prepare step input
-                let step_input = self.prepare_step_input(step, &execution_context)?;
+                    // Prepare step input
+                    let step_input = self.prepare_step_input(step, &execution_context)?;
 
-                // Execute the step
-                match self
-                    .execute_step(tool_provider, step, step_input, context.clone())
-                    .await
-                {
-                    Ok(output) => {
-                        let step_metrics = StepMetrics {
-                            execution_time: step_start_time.elapsed(),
-                            retry_attempts,
-                            memory_used: None,
-                        };
+                    // Execute the step
+                    match self
+                        .execute_step(tool_provider, step, step_input, context.clone())
+                        .await
+                    {
+                        Ok(output) => {
+                            let result = Self::handle_step_success(
+                                &step.id,
+                                output.clone(),
+                                step_start_time.elapsed(),
+                                retry_attempts,
+                            );
+                            execution_context.set_step_output(&step.id, output);
+                            break result;
+                        }
+                        Err(e) => {
+                            steps_failed += 1;
 
-                        let result = StepResult {
-                            success: true,
-                            output: output.clone(),
-                            error: None,
-                            metrics: step_metrics,
-                        };
-
-                        // Update execution context with step output
-                        execution_context.set_step_output(&step.id, output);
-
-                        break result;
-                    }
-                    Err(e) => {
-                        steps_failed += 1;
-                        let error_msg = e.to_string();
-
-                        // Check if we should retry
-                        if let Some(retry_config) = &step.retry_config {
-                            if retry_attempts < retry_config.max_attempts {
+                            // Check if we should retry
+                            if step.retry_config.as_ref().is_some_and(|retry_config| {
+                                retry_attempts < retry_config.max_attempts
+                            }) {
                                 retry_attempts += 1;
                                 total_retries += 1;
 
-                                let delay =
-                                    self.calculate_retry_delay(retry_config, retry_attempts);
+                                let delay = Self::calculate_retry_delay(
+                                    step.retry_config.as_ref().unwrap(),
+                                    retry_attempts,
+                                );
                                 tokio::time::sleep(delay).await;
                                 continue;
                             }
+
+                            let result = self.handle_step_error_result(
+                                step,
+                                &e,
+                                step_start_time.elapsed(),
+                                retry_attempts,
+                                &mut errors,
+                            );
+                            break result;
                         }
-
-                        let step_metrics = StepMetrics {
-                            execution_time: step_start_time.elapsed(),
-                            retry_attempts,
-                            memory_used: None,
-                        };
-
-                        let result = StepResult {
-                            success: false,
-                            output: JsonValue::Null,
-                            error: Some(error_msg.clone()),
-                            metrics: step_metrics,
-                        };
-
-                        // Handle step error based on strategy
-                        let fatal = self.handle_step_error(step, &e);
-                        errors.push(CompositionError {
-                            step_id: step.id.clone(),
-                            message: error_msg,
-                            fatal,
-                        });
-
-                        break result;
                     }
-                }
-            };
+                };
 
             step_results.insert(step.id.clone(), step_result);
         }
 
         // Determine final output
-        let output = if let Some(last_step) = self.steps.last() {
-            step_results
-                .get(&last_step.id)
-                .map(|r| r.output.clone())
-                .unwrap_or(JsonValue::Null)
-        } else {
-            JsonValue::Null
-        };
+        let output = self.steps.last().map_or_else(
+            || JsonValue::Null,
+            |last_step| {
+                step_results
+                    .get(&last_step.id)
+                    .map_or(JsonValue::Null, |r| r.output.clone())
+            },
+        );
 
         let metrics = CompositionMetrics {
             total_execution_time: start_time.elapsed(),
@@ -515,6 +509,7 @@ impl ToolComposition {
     }
 
     /// Resolve a data flow to a concrete value
+    #[allow(clippy::only_used_in_recursion)]
     fn resolve_data_flow(
         &self,
         data_flow: &DataFlow,
@@ -525,17 +520,17 @@ impl ToolComposition {
                 Ok(context.get_parameter(param_name).unwrap_or(JsonValue::Null))
             }
             DataFlow::StepOutput(step_id, field_name) => {
-                if let Some(step_output) = context.get_step_output(step_id) {
-                    if field_name == "*" {
-                        Ok(step_output.clone())
-                    } else if let JsonValue::Object(obj) = step_output {
-                        Ok(obj.get(field_name).cloned().unwrap_or(JsonValue::Null))
-                    } else {
-                        Ok(JsonValue::Null)
-                    }
-                } else {
-                    Ok(JsonValue::Null)
-                }
+                context
+                    .get_step_output(step_id)
+                    .map_or(Ok(JsonValue::Null), |step_output| {
+                        if field_name == "*" {
+                            Ok(step_output.clone())
+                        } else if let JsonValue::Object(obj) = step_output {
+                            Ok(obj.get(field_name).cloned().unwrap_or(JsonValue::Null))
+                        } else {
+                            Ok(JsonValue::Null)
+                        }
+                    })
             }
             DataFlow::Constant(value) => Ok(value.clone()),
             DataFlow::SharedContext(key) => {
@@ -543,17 +538,13 @@ impl ToolComposition {
             }
             DataFlow::Transform { source, transform } => {
                 let source_value = self.resolve_data_flow(source, context)?;
-                self.apply_data_transform(&source_value, transform)
+                Self::apply_data_transform(&source_value, transform)
             }
         }
     }
 
     /// Apply a data transformation
-    fn apply_data_transform(
-        &self,
-        value: &JsonValue,
-        transform: &DataTransform,
-    ) -> Result<JsonValue> {
+    fn apply_data_transform(value: &JsonValue, transform: &DataTransform) -> Result<JsonValue> {
         match transform {
             DataTransform::ExtractField(field_name) => {
                 if let JsonValue::Object(obj) = value {
@@ -574,7 +565,7 @@ impl ToolComposition {
                     JsonValue::Bool(b) => b.to_string(),
                     JsonValue::Null => "null".to_string(),
                     _ => serde_json::to_string(value).map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to convert to string: {}", e),
+                        message: format!("Failed to convert to string: {e}"),
                         source: Some(Box::new(e)),
                     })?,
                 };
@@ -582,16 +573,12 @@ impl ToolComposition {
             }
             DataTransform::ToNumber => match value {
                 JsonValue::Number(n) => Ok(JsonValue::Number(n.clone())),
-                JsonValue::String(s) => {
-                    if let Ok(n) = s.parse::<f64>() {
-                        Ok(JsonValue::Number(
-                            serde_json::Number::from_f64(n)
-                                .unwrap_or_else(|| serde_json::Number::from(0)),
-                        ))
-                    } else {
-                        Ok(JsonValue::Number(serde_json::Number::from(0)))
-                    }
-                }
+                JsonValue::String(s) => Ok(JsonValue::Number(
+                    s.parse::<f64>()
+                        .ok()
+                        .and_then(serde_json::Number::from_f64)
+                        .unwrap_or_else(|| serde_json::Number::from(0)),
+                )),
                 _ => Ok(JsonValue::Number(serde_json::Number::from(0))),
             },
             DataTransform::Custom(function_name) => {
@@ -603,6 +590,7 @@ impl ToolComposition {
     }
 
     /// Execute a single step
+    #[allow(clippy::future_not_send)]
     async fn execute_step<T>(
         &self,
         tool_provider: &T,
@@ -618,31 +606,84 @@ impl ToolComposition {
             .await
     }
 
+    /// Helper to handle successful step execution
+    #[allow(clippy::missing_const_for_fn)] // Cannot be const due to struct creation
+    fn handle_step_success(
+        _step_id: &str,
+        output: JsonValue,
+        execution_time: Duration,
+        retry_attempts: u32,
+    ) -> StepResult {
+        let step_metrics = StepMetrics {
+            execution_time,
+            retry_attempts,
+            memory_used: None,
+        };
+
+        StepResult {
+            success: true,
+            output,
+            error: None,
+            metrics: step_metrics,
+        }
+    }
+
+    /// Helper to handle step error result
+    fn handle_step_error_result(
+        &self,
+        step: &CompositionStep,
+        error: &LLMSpellError,
+        execution_time: Duration,
+        retry_attempts: u32,
+        errors: &mut Vec<CompositionError>,
+    ) -> StepResult {
+        let error_msg = error.to_string();
+        let fatal = self.handle_step_error(step, error);
+
+        errors.push(CompositionError {
+            step_id: step.id.clone(),
+            message: error_msg.clone(),
+            fatal,
+        });
+
+        let step_metrics = StepMetrics {
+            execution_time,
+            retry_attempts,
+            memory_used: None,
+        };
+
+        StepResult {
+            success: false,
+            output: JsonValue::Null,
+            error: Some(error_msg),
+            metrics: step_metrics,
+        }
+    }
+
     /// Handle step error based on strategy
-    fn handle_step_error(&self, step: &CompositionStep, _error: &LLMSpellError) -> bool {
+    const fn handle_step_error(&self, step: &CompositionStep, _error: &LLMSpellError) -> bool {
         match step.error_strategy {
             StepErrorStrategy::Inherit => {
                 matches!(self.error_strategy, CompositionErrorStrategy::FailFast)
             }
             StepErrorStrategy::Stop => true,
-            StepErrorStrategy::Continue | StepErrorStrategy::Skip => false,
-            StepErrorStrategy::Retry { .. } => false, // Retries are handled separately
+            StepErrorStrategy::Continue
+            | StepErrorStrategy::Skip
+            | StepErrorStrategy::Retry { .. } => false,
         }
     }
 
     /// Calculate retry delay
-    fn calculate_retry_delay(&self, retry_config: &RetryConfig, attempt: u32) -> Duration {
+    fn calculate_retry_delay(retry_config: &RetryConfig, attempt: u32) -> Duration {
         let base_delay = retry_config.base_delay;
 
         if retry_config.exponential_backoff {
             let multiplier = 2_u32.pow(attempt.saturating_sub(1));
             let delay = base_delay * multiplier;
 
-            if let Some(max_delay) = retry_config.max_delay {
-                delay.min(max_delay)
-            } else {
-                delay
-            }
+            retry_config
+                .max_delay
+                .map_or(delay, |max_delay| delay.min(max_delay))
         } else {
             base_delay
         }
@@ -666,6 +707,7 @@ impl CompositionStep {
     }
 
     /// Add an input mapping
+    #[must_use]
     pub fn with_input_mapping(
         mut self,
         param_name: impl Into<String>,
@@ -676,25 +718,29 @@ impl CompositionStep {
     }
 
     /// Set error strategy for this step
-    pub fn with_error_strategy(mut self, strategy: StepErrorStrategy) -> Self {
+    #[must_use]
+    pub const fn with_error_strategy(mut self, strategy: StepErrorStrategy) -> Self {
         self.error_strategy = strategy;
         self
     }
 
     /// Mark step as optional
-    pub fn optional(mut self) -> Self {
+    #[must_use]
+    pub const fn optional(mut self) -> Self {
         self.optional = true;
         self
     }
 
     /// Add execution condition
+    #[must_use]
     pub fn with_condition(mut self, condition: ExecutionCondition) -> Self {
         self.conditions.push(condition);
         self
     }
 
     /// Set retry configuration
-    pub fn with_retry(mut self, config: RetryConfig) -> Self {
+    #[must_use]
+    pub const fn with_retry(mut self, config: RetryConfig) -> Self {
         self.retry_config = Some(config);
         self
     }
@@ -711,7 +757,7 @@ struct CompositionExecutionContext {
 }
 
 impl CompositionExecutionContext {
-    fn new(parameters: JsonValue, shared_context: &HashMap<String, JsonValue>) -> Self {
+    fn new(parameters: &JsonValue, shared_context: &HashMap<String, JsonValue>) -> Self {
         let parameters = parameters.as_object().cloned().unwrap_or_default();
         Self {
             parameters,
@@ -781,15 +827,12 @@ mod tests {
         ) -> Result<JsonValue> {
             match tool_name {
                 "echo" => Ok(input),
-                "transform" => {
-                    if let Some(text) = input.get("text").and_then(|v| v.as_str()) {
-                        Ok(json!({"result": text.to_uppercase()}))
-                    } else {
-                        Ok(json!({"result": "NO_TEXT"}))
-                    }
-                }
+                "transform" => Ok(input.get("text").and_then(|v| v.as_str()).map_or_else(
+                    || json!({"result": "NO_TEXT"}),
+                    |text| json!({"result": text.to_uppercase()}),
+                )),
                 _ => Err(LLMSpellError::Component {
-                    message: format!("Tool not found: {}", tool_name),
+                    message: format!("Tool not found: {tool_name}"),
                     source: None,
                 }),
             }
@@ -799,7 +842,6 @@ mod tests {
             self.tools.contains_key(tool_name)
         }
     }
-
     #[tokio::test]
     async fn test_simple_composition() {
         let provider = MockToolProvider::new();
@@ -821,7 +863,6 @@ mod tests {
         assert!(result.success);
         assert_eq!(result.step_results.len(), 1);
     }
-
     #[tokio::test]
     async fn test_chained_composition() {
         let provider = MockToolProvider::new();
@@ -854,12 +895,11 @@ mod tests {
         let step2_result = result.step_results.get("step2").unwrap();
         assert!(step2_result.success);
     }
-
     #[tokio::test]
     async fn test_data_flow_transforms() {
         let composition = ToolComposition::new("test");
         let context = CompositionExecutionContext::new(
-            json!({"nested": {"field": "value"}}),
+            &json!({"nested": {"field": "value"}}),
             &HashMap::new(),
         );
 
@@ -877,30 +917,26 @@ mod tests {
             .unwrap();
         assert_eq!(result, json!("constant_value"));
     }
-
     #[tokio::test]
     async fn test_data_transforms() {
-        let composition = ToolComposition::new("test");
+        let _composition = ToolComposition::new("test");
 
         // Test ToString transform
-        let result = composition
-            .apply_data_transform(&json!(123), &DataTransform::ToString)
-            .unwrap();
+        let result =
+            ToolComposition::apply_data_transform(&json!(123), &DataTransform::ToString).unwrap();
         assert_eq!(result, json!("123"));
 
         // Test ExtractField transform
-        let result = composition
-            .apply_data_transform(
-                &json!({"field1": "value1", "field2": "value2"}),
-                &DataTransform::ExtractField("field1".to_string()),
-            )
-            .unwrap();
+        let result = ToolComposition::apply_data_transform(
+            &json!({"field1": "value1", "field2": "value2"}),
+            &DataTransform::ExtractField("field1".to_string()),
+        )
+        .unwrap();
         assert_eq!(result, json!("value1"));
 
         // Test ToNumber transform
-        let result = composition
-            .apply_data_transform(&json!("42"), &DataTransform::ToNumber)
-            .unwrap();
+        let result =
+            ToolComposition::apply_data_transform(&json!("42"), &DataTransform::ToNumber).unwrap();
         assert_eq!(result.as_f64(), Some(42.0));
     }
 }

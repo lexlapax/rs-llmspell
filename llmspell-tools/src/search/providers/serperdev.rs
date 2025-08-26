@@ -131,7 +131,7 @@ struct AnswerBox {
 
 #[async_trait]
 impl SearchProvider for SerperDevProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "serperdev"
     }
 
@@ -143,6 +143,7 @@ impl SearchProvider for SerperDevProvider {
         Some(2500) // 2,500 searches per month for free tier
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key
@@ -183,7 +184,7 @@ impl SearchProvider for SerperDevProvider {
             .send()
             .await
             .map_err(|e| LLMSpellError::Network {
-                message: format!("Serper.dev API request failed: {}", e),
+                message: format!("Serper.dev API request failed: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -191,14 +192,14 @@ impl SearchProvider for SerperDevProvider {
             let status = response.status();
             let error_body = response.text().await.unwrap_or_default();
             return Err(LLMSpellError::Network {
-                message: format!("Serper.dev API returned status {}: {}", status, error_body),
+                message: format!("Serper.dev API returned status {status}: {error_body}"),
                 source: None,
             });
         }
 
         let serper_response: SerperResponse =
             response.json().await.map_err(|e| LLMSpellError::Network {
-                message: format!("Failed to parse Serper.dev response: {}", e),
+                message: format!("Failed to parse Serper.dev response: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -231,7 +232,17 @@ impl SearchProvider for SerperDevProvider {
                                 .snippet
                                 .unwrap_or_else(|| "No description available".to_string()),
                             provider: self.name().to_string(),
-                            rank: result.position.unwrap_or(rank as i32) as usize,
+                            rank: {
+                                #[allow(
+                                    clippy::cast_possible_truncation,
+                                    clippy::cast_sign_loss,
+                                    clippy::cast_possible_wrap
+                                )]
+                                let rank_i32 = rank as i32;
+                                #[allow(clippy::cast_sign_loss)]
+                                let position = result.position.unwrap_or(rank_i32) as usize;
+                                position
+                            },
                         });
                         rank += 1;
                     }
@@ -244,7 +255,7 @@ impl SearchProvider for SerperDevProvider {
                             .snippet
                             .unwrap_or_else(|| "No description available".to_string());
                         if let Some(source) = &result.source {
-                            snippet = format!("{} - {}", source, snippet);
+                            snippet = format!("{source} - {snippet}");
                         }
 
                         results.push(SearchResult {
@@ -252,7 +263,17 @@ impl SearchProvider for SerperDevProvider {
                             url: result.link,
                             snippet,
                             provider: self.name().to_string(),
-                            rank: result.position.unwrap_or(rank as i32) as usize,
+                            rank: {
+                                #[allow(
+                                    clippy::cast_possible_truncation,
+                                    clippy::cast_sign_loss,
+                                    clippy::cast_possible_wrap
+                                )]
+                                let rank_i32 = rank as i32;
+                                #[allow(clippy::cast_sign_loss)]
+                                let position = result.position.unwrap_or(rank_i32) as usize;
+                                position
+                            },
                         });
                         rank += 1;
                     }
@@ -266,7 +287,17 @@ impl SearchProvider for SerperDevProvider {
                             url: result.image_url,
                             snippet: result.source.unwrap_or_else(|| result.link.clone()),
                             provider: self.name().to_string(),
-                            rank: result.position.unwrap_or(rank as i32) as usize,
+                            rank: {
+                                #[allow(
+                                    clippy::cast_possible_truncation,
+                                    clippy::cast_sign_loss,
+                                    clippy::cast_possible_wrap
+                                )]
+                                let rank_i32 = rank as i32;
+                                #[allow(clippy::cast_sign_loss)]
+                                let position = result.position.unwrap_or(rank_i32) as usize;
+                                position
+                            },
                         });
                         rank += 1;
                     }

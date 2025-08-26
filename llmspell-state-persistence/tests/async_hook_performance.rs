@@ -30,7 +30,6 @@ impl Hook for SlowTestHook {
         self
     }
 }
-
 #[tokio::test]
 async fn test_async_hooks_dont_block_state_operations() {
     // Create manager with persistence enabled so async hooks are available
@@ -118,7 +117,6 @@ async fn test_async_hooks_dont_block_state_operations() {
     // Stop async hooks
     manager.stop_async_hooks().await.unwrap();
 }
-
 #[tokio::test]
 async fn test_async_agent_save_performance() {
     // Create manager with persistence enabled so async hooks are available
@@ -227,7 +225,6 @@ async fn test_async_agent_save_performance() {
 
     manager.stop_async_hooks().await.unwrap();
 }
-
 #[tokio::test]
 async fn test_hook_batching_performance() {
     // Create manager with persistence enabled so async hooks are available
@@ -299,7 +296,6 @@ async fn test_hook_batching_performance() {
 
     manager.stop_async_hooks().await.unwrap();
 }
-
 #[tokio::test]
 async fn test_hook_failure_isolation() {
     // Create manager with persistence enabled so async hooks are available

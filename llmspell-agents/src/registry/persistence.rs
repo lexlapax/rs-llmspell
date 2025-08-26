@@ -1,6 +1,8 @@
 //! ABOUTME: Persistence integration for agent registry
 //! ABOUTME: Uses llmspell-storage for backend-agnostic persistence
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::{AgentMetadata, AgentQuery, AgentRegistry, AgentStatus};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -29,6 +31,10 @@ pub struct PersistentAgentRegistry {
 
 impl PersistentAgentRegistry {
     /// Create new persistent registry with given storage backend
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading metadata from storage fails
     pub async fn new(storage: Arc<dyn StorageBackend>) -> Result<Self> {
         // Load existing metadata from storage
         let metadata = Self::load_all_metadata(&storage).await?;
@@ -64,10 +70,17 @@ impl PersistentAgentRegistry {
 
     /// Get metadata key for agent
     fn metadata_key(agent_id: &str) -> String {
-        format!("{}{}", AGENT_METADATA_PREFIX, agent_id)
+        format!("{AGENT_METADATA_PREFIX}{agent_id}")
     }
 
     /// Persist current state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Metadata serialization fails
+    /// - Storage write operations fail
+    /// - Snapshot creation fails
     pub async fn persist(&self) -> Result<()> {
         let cache = self.metadata_cache.read().await;
 
@@ -88,6 +101,12 @@ impl PersistentAgentRegistry {
     }
 
     /// Load from snapshot (faster than loading individual entries)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Storage read fails
+    /// - Snapshot deserialization fails
     pub async fn load_from_snapshot(&mut self) -> Result<()> {
         if let Some(data) = self.storage.get(REGISTRY_SNAPSHOT_KEY).await? {
             if let Ok(metadata) = HashMap::<String, AgentMetadata>::from_storage_bytes(&data) {
@@ -295,8 +314,8 @@ impl AgentRegistry for PersistentAgentRegistry {
 mod tests {
     use super::*;
     use llmspell_storage::MemoryBackend;
-
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_persistent_registry_basic_operations() {
         let storage = Arc::new(MemoryBackend::new());
         let registry = PersistentAgentRegistry::new(storage).await.unwrap();
@@ -331,7 +350,7 @@ mod tests {
                 Ok(())
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 _input: llmspell_core::types::AgentInput,
                 _context: llmspell_core::ExecutionContext,
@@ -339,6 +358,7 @@ mod tests {
                 panic!("Not implemented for test")
             }
 
+            #[allow(clippy::items_after_statements)] // Inner items for test organization
             async fn handle_error(
                 &self,
                 _error: llmspell_core::LLMSpellError,
@@ -408,8 +428,8 @@ mod tests {
         registry.unregister_agent("test-agent").await.unwrap();
         assert!(!registry.exists("test-agent").await.unwrap());
     }
-
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_persistent_registry_persistence() {
         let storage = Arc::new(MemoryBackend::new());
 
@@ -444,7 +464,7 @@ mod tests {
                     Ok(())
                 }
 
-                async fn execute(
+                async fn execute_impl(
                     &self,
                     _input: llmspell_core::types::AgentInput,
                     _context: llmspell_core::ExecutionContext,
@@ -452,6 +472,7 @@ mod tests {
                     panic!("Not implemented for test")
                 }
 
+                #[allow(clippy::items_after_statements)] // Inner items for test organization
                 async fn handle_error(
                     &self,
                     _error: llmspell_core::LLMSpellError,

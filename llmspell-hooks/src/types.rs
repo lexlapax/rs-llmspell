@@ -173,7 +173,6 @@ impl Default for HookMetadata {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_hook_point_display() {
         assert_eq!(HookPoint::BeforeAgentInit.to_string(), "BeforeAgentInit");
@@ -182,13 +181,11 @@ mod tests {
             "custom:test"
         );
     }
-
     #[test]
     fn test_language_display() {
         assert_eq!(Language::Lua.to_string(), "lua");
         assert_eq!(Language::JavaScript.to_string(), "javascript");
     }
-
     #[test]
     fn test_priority_ordering() {
         assert!(Priority::HIGHEST < Priority::HIGH);
@@ -196,7 +193,6 @@ mod tests {
         assert!(Priority::NORMAL < Priority::LOW);
         assert!(Priority::LOW < Priority::LOWEST);
     }
-
     #[test]
     fn test_component_id_creation() {
         let id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());

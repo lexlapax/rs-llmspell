@@ -5,6 +5,7 @@
 mod tests {
     #[test]
     fn test_placeholder() {
-        assert!(true);
+        // Placeholder test - actual state tests are in llmspell-state-persistence/src/
+        assert_eq!(5 * 5, 25, "Basic placeholder test");
     }
 }

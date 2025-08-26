@@ -312,6 +312,7 @@ pub struct ValidationFailure {
 
 impl ArtifactEvent {
     /// Create a new artifact event
+    #[must_use]
     pub fn new(event_type: ArtifactEventType, source: ComponentId) -> Self {
         Self {
             metadata: EventMetadata::new(),
@@ -328,6 +329,7 @@ impl ArtifactEvent {
     }
 
     /// Get event name for routing/filtering
+    #[must_use]
     pub fn event_name(&self) -> &'static str {
         match &self.event_type {
             ArtifactEventType::Created(_) => "artifact.created",
@@ -351,6 +353,7 @@ pub struct ArtifactEventBuilder {
 
 impl ArtifactEventBuilder {
     /// Create a new event builder
+    #[must_use]
     pub fn new(source: ComponentId) -> Self {
         Self {
             source,
@@ -365,6 +368,7 @@ impl ArtifactEventBuilder {
     }
 
     /// Build a created event
+    #[must_use]
     pub fn created(
         self,
         artifact: ArtifactMetadata,
@@ -383,6 +387,7 @@ impl ArtifactEventBuilder {
     }
 
     /// Build a modified event
+    #[must_use]
     pub fn modified(
         self,
         artifact_id: ArtifactId,
@@ -403,6 +408,7 @@ impl ArtifactEventBuilder {
     }
 
     /// Build a deleted event
+    #[must_use]
     pub fn deleted(
         self,
         artifact_id: ArtifactId,
@@ -426,7 +432,6 @@ impl ArtifactEventBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_event_builder() {
         let component_id = ComponentId::new();
@@ -435,10 +440,10 @@ mod tests {
             artifact_id.clone(),
             "test".to_string(),
             "test.txt".to_string(),
-            component_id.clone(),
+            component_id,
         );
 
-        let event = ArtifactEventBuilder::new(component_id.clone())
+        let event = ArtifactEventBuilder::new(component_id)
             .with_context("user", serde_json::json!("test-user"))
             .created(
                 metadata,
@@ -449,7 +454,6 @@ mod tests {
         assert_eq!(event.source, component_id);
         assert_eq!(event.context.get("user").unwrap(), "test-user");
     }
-
     #[test]
     fn test_event_names() {
         let component_id = ComponentId::new();
@@ -460,12 +464,12 @@ mod tests {
                     ArtifactId::new("test"),
                     "test".to_string(),
                     "test.txt".to_string(),
-                    component_id.clone(),
+                    component_id,
                 ),
                 storage_location: None,
                 content_hash: None,
             }),
-            component_id.clone(),
+            component_id,
         );
         assert_eq!(created.event_name(), "artifact.created");
 

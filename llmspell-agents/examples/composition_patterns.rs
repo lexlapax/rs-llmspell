@@ -11,6 +11,7 @@ use llmspell_agents::composition::{
 use llmspell_agents::di::DIContainer;
 use llmspell_agents::factory::{AgentConfig, ResourceLimits};
 use llmspell_core::ExecutionContext;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -24,10 +25,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     delegation_pattern_example().await?;
 
     // Example 3: Capability-Based Composition
-    capability_based_example().await?;
+    capability_based_example()?;
 
     // Example 4: Tool Composition with Agents
-    tool_composition_example().await?;
+    tool_composition_example()?;
 
     // Example 5: Composite Lifecycle Management
     lifecycle_management_example().await?;
@@ -36,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Example 1: Hierarchical Agent Composition
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn hierarchical_composition_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("1️⃣ Hierarchical Agent Composition");
     println!("================================");
@@ -52,7 +54,7 @@ async fn hierarchical_composition_example() -> Result<(), Box<dyn std::error::Er
             name: "data-processing".to_string(),
             category: CapabilityCategory::DataProcessing,
             version: Some("1.0.0".to_string()),
-            metadata: Default::default(),
+            metadata: HashMap::default(),
         })
         .build();
 
@@ -62,7 +64,7 @@ async fn hierarchical_composition_example() -> Result<(), Box<dyn std::error::Er
             name: "analysis".to_string(),
             category: CapabilityCategory::Custom("analysis".to_string()),
             version: Some("1.0.0".to_string()),
-            metadata: Default::default(),
+            metadata: HashMap::default(),
         })
         .build();
 
@@ -153,7 +155,8 @@ async fn delegation_pattern_example() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 /// Example 3: Capability-Based Composition
-async fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
+#[allow(clippy::items_after_statements)] // Inner items for test organization
+fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("3️⃣ Capability-Based Composition");
     println!("===============================");
 
@@ -167,21 +170,21 @@ async fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
         name: "text-processing".to_string(),
         category: CapabilityCategory::DataProcessing,
         version: Some("2.0.0".to_string()),
-        metadata: Default::default(),
+        metadata: HashMap::default(),
     };
 
     let calc_cap = Capability {
         name: "mathematical-operations".to_string(),
         category: CapabilityCategory::DataProcessing,
         version: Some("1.5.0".to_string()),
-        metadata: Default::default(),
+        metadata: HashMap::default(),
     };
 
     let monitor_cap = Capability {
         name: "system-monitoring".to_string(),
         category: CapabilityCategory::Monitoring,
         version: Some("1.0.0".to_string()),
-        metadata: Default::default(),
+        metadata: HashMap::default(),
     };
 
     aggregator.register_capability(text_cap, "agent-1")?;
@@ -217,7 +220,7 @@ async fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Example 4: Tool Composition with Agents
-async fn tool_composition_example() -> Result<(), Box<dyn std::error::Error>> {
+fn tool_composition_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("4️⃣ Tool Composition with Agents");
     println!("===============================");
 

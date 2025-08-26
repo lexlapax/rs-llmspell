@@ -8,7 +8,10 @@ use llmspell_hooks::{
     HookContext, HookExecutor, HookPoint, HookRegistry,
 };
 use llmspell_sessions::{
-    policies::{PolicyComposition, PolicyType, SessionPolicyConfig, SessionPolicyManager},
+    policies::{
+        rate_limit::RateLimitConfig, resource_limit::ResourceConfig, timeout::TimeoutConfig,
+        PolicyComposition, PolicyType, SessionPolicyConfig, SessionPolicyManager,
+    },
     types::CreateSessionOptions,
     SessionManager, SessionManagerConfig,
 };
@@ -16,19 +19,23 @@ use llmspell_state_persistence::StateManager;
 use llmspell_storage::MemoryBackend;
 use std::sync::Arc;
 use std::time::Duration;
-
 #[tokio::test]
 async fn test_timeout_policy_enforcement() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with short timeout
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.enable_timeout = true;
-    policy_config.enable_resource_limits = false;
-    policy_config.enable_rate_limiting = false;
-    policy_config.timeout_config.max_session_duration = Duration::from_millis(100);
-    policy_config.timeout_config.idle_timeout = Duration::from_secs(3600); // Long idle timeout
+    let policy_config = SessionPolicyConfig {
+        enable_timeout: true,
+        enable_resource_limits: false,
+        enable_rate_limiting: false,
+        timeout_config: TimeoutConfig {
+            max_session_duration: Duration::from_millis(100),
+            idle_timeout: Duration::from_secs(3600), // Long idle timeout
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -56,19 +63,23 @@ async fn test_timeout_policy_enforcement() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_resource_limit_policy_enforcement() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with low resource limits
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.enable_timeout = false;
-    policy_config.enable_resource_limits = true;
-    policy_config.enable_rate_limiting = false;
-    policy_config.resource_config.max_memory_bytes = Some(1000);
-    policy_config.resource_config.max_operations = Some(5);
+    let policy_config = SessionPolicyConfig {
+        enable_timeout: false,
+        enable_resource_limits: true,
+        enable_rate_limiting: false,
+        resource_config: ResourceConfig {
+            max_memory_bytes: Some(1000),
+            max_operations: Some(5),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -93,18 +104,22 @@ async fn test_resource_limit_policy_enforcement() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_rate_limit_policy_enforcement() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with low rate limits
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.enable_timeout = false;
-    policy_config.enable_resource_limits = false;
-    policy_config.enable_rate_limiting = true;
-    policy_config.rate_limit_config.global_rpm = 1; // Very low for testing
+    let policy_config = SessionPolicyConfig {
+        enable_timeout: false,
+        enable_resource_limits: false,
+        enable_rate_limiting: true,
+        rate_limit_config: llmspell_sessions::policies::rate_limit::RateLimitConfig {
+            global_rpm: 1, // Very low for testing
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -127,15 +142,16 @@ async fn test_rate_limit_policy_enforcement() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_policy_composition_sequential() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with sequential composition
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.composition_pattern = PolicyComposition::Sequential;
+    let policy_config = SessionPolicyConfig {
+        composition_pattern: PolicyComposition::Sequential,
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -149,15 +165,16 @@ async fn test_policy_composition_sequential() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_policy_composition_parallel() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with parallel composition
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.composition_pattern = PolicyComposition::Parallel;
+    let policy_config = SessionPolicyConfig {
+        composition_pattern: PolicyComposition::Parallel,
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -177,15 +194,16 @@ async fn test_policy_composition_parallel() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_policy_composition_voting() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with voting composition
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.composition_pattern = PolicyComposition::Voting { threshold: 0.6 };
+    let policy_config = SessionPolicyConfig {
+        composition_pattern: PolicyComposition::Voting { threshold: 0.6 },
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -205,7 +223,6 @@ async fn test_policy_composition_voting() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_policy_integration_with_session_manager() -> Result<()> {
     // Create infrastructure
@@ -254,7 +271,6 @@ async fn test_policy_integration_with_session_manager() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_policy_configuration_update() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -270,9 +286,11 @@ async fn test_policy_configuration_update() -> Result<()> {
     assert!(policy_manager.is_policy_enabled(PolicyType::RateLimit));
 
     // Update configuration
-    let mut new_config = SessionPolicyConfig::default();
-    new_config.enable_timeout = false;
-    new_config.enable_resource_limits = false;
+    let new_config = SessionPolicyConfig {
+        enable_timeout: false,
+        enable_resource_limits: false,
+        ..Default::default()
+    };
 
     policy_manager.update_config(new_config);
 
@@ -283,23 +301,25 @@ async fn test_policy_configuration_update() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_operation_specific_rate_limits() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with operation-specific limits
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.enable_timeout = false;
-    policy_config.enable_resource_limits = false;
-    policy_config.enable_rate_limiting = true;
+    let mut operation_limits = std::collections::HashMap::new();
+    operation_limits.insert("llm_call".to_string(), 1);
 
-    // Set very low limit for LLM calls
-    policy_config
-        .rate_limit_config
-        .operation_limits
-        .insert("llm_call".to_string(), 1);
+    let policy_config = SessionPolicyConfig {
+        enable_timeout: false,
+        enable_resource_limits: false,
+        enable_rate_limiting: true,
+        rate_limit_config: RateLimitConfig {
+            operation_limits,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -323,16 +343,20 @@ async fn test_operation_specific_rate_limits() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_warning_thresholds() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.timeout_config.enable_warnings = true;
-    policy_config.timeout_config.warning_intervals = vec![Duration::from_secs(300)];
+    let policy_config = SessionPolicyConfig {
+        timeout_config: TimeoutConfig {
+            enable_warnings: true,
+            warning_intervals: vec![Duration::from_secs(300)],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());

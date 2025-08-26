@@ -1,8 +1,8 @@
 //! ABOUTME: Integration tests for session replay functionality
-//! ABOUTME: Tests the ReplayEngine and SessionReplayAdapter with existing infrastructure
+//! ABOUTME: Tests the `ReplayEngine` and `SessionReplayAdapter` with existing infrastructure
 
 #[cfg(test)]
-mod tests {
+mod replay_tests {
     use super::super::{
         session_adapter::{SessionReplayAdapter, SessionReplayConfig, SessionReplayStatus},
         HookReplayBridge, ReplayEngine,
@@ -15,7 +15,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
 
-    async fn create_test_replay_components() -> (
+    fn create_test_replay_components() -> (
         Arc<ReplayManager>,
         Arc<HookReplayManager>,
         Arc<dyn llmspell_storage::StorageBackend>,
@@ -69,11 +69,10 @@ mod tests {
         )
         .unwrap()
     }
-
     #[tokio::test]
     async fn test_replay_engine_creation() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let replay_engine = ReplayEngine::new(
             replay_manager,
@@ -90,11 +89,10 @@ mod tests {
             .await
             .is_ok());
     }
-
     #[tokio::test]
     async fn test_session_replay_adapter_creation() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -108,7 +106,6 @@ mod tests {
         let can_replay = adapter.can_replay_session(&session_id).await.unwrap();
         assert!(!can_replay, "Non-existent session should not be replayable");
     }
-
     #[tokio::test]
     async fn test_session_replay_config_defaults() {
         let config = SessionReplayConfig::default();
@@ -119,7 +116,6 @@ mod tests {
         assert_eq!(config.timeout, std::time::Duration::from_secs(300));
         assert!(config.target_timestamp.is_none());
     }
-
     #[tokio::test]
     async fn test_session_replay_config_conversion() {
         let session_config = SessionReplayConfig {
@@ -139,7 +135,6 @@ mod tests {
         assert!(!replay_config.stop_on_error);
         assert!(replay_config.tags.contains(&"session".to_string()));
     }
-
     #[tokio::test]
     async fn test_session_manager_replay_integration() {
         let manager = create_test_session_manager().await;
@@ -156,35 +151,28 @@ mod tests {
 
         // Test can_replay_session - expecting false or error since session format mismatch
         let can_replay_result = manager.can_replay_session(&session_id).await;
-        match can_replay_result {
-            Ok(can_replay) => {
-                // Should be false since no hooks have been executed yet
-                assert!(
-                    !can_replay,
-                    "New session should not be replayable without hook executions"
-                );
-            }
-            Err(_) => {
-                // Expected for now due to format mismatch between session storage
-                // and replay adapter expectations. This will be fixed in later tasks.
-            }
+        if let Ok(can_replay) = can_replay_result {
+            // Should be false since no hooks have been executed yet
+            assert!(
+                !can_replay,
+                "New session should not be replayable without hook executions"
+            );
+        } else {
+            // Expected for now due to format mismatch between session storage
+            // and replay adapter expectations. This will be fixed in later tasks.
         }
 
         // Test get_session_timeline - expecting empty timeline or error
         let timeline_result = manager.get_session_timeline(&session_id).await;
-        match timeline_result {
-            Ok(timeline) => {
-                assert!(
-                    timeline.is_empty(),
-                    "New session should have empty timeline"
-                );
-            }
-            Err(_) => {
-                // Expected for now due to format mismatch
-            }
+        if let Ok(timeline) = timeline_result {
+            assert!(
+                timeline.is_empty(),
+                "New session should have empty timeline"
+            );
+        } else {
+            // Expected for now due to format mismatch
         }
     }
-
     #[tokio::test]
     async fn test_replay_engine_direct_access() {
         let manager = create_test_session_manager().await;
@@ -197,11 +185,10 @@ mod tests {
         let can_replay = replay_engine.can_replay_session(&session_id).await.unwrap();
         assert!(!can_replay);
     }
-
     #[tokio::test]
     async fn test_replay_adapter_timeline_empty_session() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -230,11 +217,10 @@ mod tests {
         let result = adapter.get_session_timeline(&session_id).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_replay_adapter_with_correlation_id() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -279,11 +265,10 @@ mod tests {
         let timeline = adapter.get_session_timeline(&session_id).await.unwrap();
         assert!(timeline.is_empty());
     }
-
     #[tokio::test]
     async fn test_replay_status_tracking() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -321,11 +306,10 @@ mod tests {
         ));
         assert_eq!(status.total_hooks, 10);
     }
-
     #[tokio::test]
     async fn test_replay_stop() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -365,11 +349,10 @@ mod tests {
             llmspell_hooks::replay::ReplayState::Cancelled
         ));
     }
-
     #[tokio::test]
     async fn test_replay_progress_update() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -404,11 +387,10 @@ mod tests {
         assert_eq!(status.hooks_processed, 5);
         assert_eq!(status.current_hook, Some("hook_five".to_string()));
     }
-
     #[tokio::test]
     async fn test_clear_completed_replays() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -480,7 +462,6 @@ mod tests {
         assert!(adapter.get_replay_status(&session3).is_none());
         assert!(adapter.get_replay_status(&session4).is_none());
     }
-
     #[tokio::test]
     async fn test_session_storage_with_metadata() {
         let manager = create_test_session_manager().await;
@@ -502,11 +483,10 @@ mod tests {
         // Should be false since no hooks have been executed yet
         assert!(!can_replay);
     }
-
     #[tokio::test]
     async fn test_query_session_hooks() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -542,11 +522,10 @@ mod tests {
             .unwrap();
         assert!(results.is_empty());
     }
-
     #[tokio::test]
     async fn test_get_session_replay_metadata() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -584,11 +563,10 @@ mod tests {
         assert_eq!(replay_metadata.total_hooks, 0);
         assert!(!replay_metadata.can_replay);
     }
-
     #[tokio::test]
     async fn test_list_replayable_sessions() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -624,7 +602,6 @@ mod tests {
         let replayable = adapter.list_replayable_sessions().await.unwrap();
         assert!(replayable.is_empty());
     }
-
     #[tokio::test]
     async fn test_storage_key_patterns() {
         // Test that our key patterns are correct and compatible
@@ -671,7 +648,6 @@ mod tests {
         let metadata_key = format!("session_metadata:{}", session_id);
         assert!(storage_backend.get(&metadata_key).await.unwrap().is_some());
     }
-
     #[tokio::test]
     async fn test_storage_integration_with_existing_infrastructure() {
         // Test that we're using existing storage infrastructure correctly
@@ -702,11 +678,10 @@ mod tests {
         let keys = storage_backend.list_keys("session").await.unwrap();
         assert!(keys.iter().any(|k| k.contains(&session_id.to_string())));
     }
-
     #[tokio::test]
     async fn test_query_functionality_with_filters() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -746,7 +721,6 @@ mod tests {
             .unwrap();
         assert!(results.is_empty()); // No hooks stored yet
     }
-
     #[tokio::test]
     async fn test_no_new_storage_code_written() {
         // Verify we're only using existing storage backends and not implementing new ones
@@ -768,7 +742,6 @@ mod tests {
         let can_replay = replay_engine.can_replay_session(&session_id).await.unwrap();
         assert!(!can_replay); // No hooks yet
     }
-
     #[tokio::test]
     async fn test_session_replay_controls_creation() {
         use super::super::session_controls::{SessionReplayControlConfig, SessionReplayControls};
@@ -780,11 +753,10 @@ mod tests {
         let active_replays = controls.get_active_replays();
         assert!(active_replays.is_empty());
     }
-
     #[tokio::test]
     async fn test_session_replay_scheduling() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -819,11 +791,10 @@ mod tests {
         let result = adapter.schedule_replay(&session_id, config, schedule).await;
         assert!(result.is_err()); // No executions to replay
     }
-
     #[tokio::test]
     async fn test_replay_pause_resume() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -840,24 +811,23 @@ mod tests {
         // Cannot resume non-existent replay
         assert!(adapter.resume_replay(&session_id).await.is_err());
     }
-
     #[tokio::test]
     async fn test_replay_speed_control() {
         use super::super::session_controls::SessionReplaySpeed;
 
         // Test speed control directly
         let mut speed = SessionReplaySpeed::default();
-        assert_eq!(speed.multiplier(), 1.0);
+        assert!((speed.multiplier() - 1.0).abs() < f64::EPSILON);
 
         speed.set_speed(2.0);
-        assert_eq!(speed.multiplier(), 2.0);
+        assert!((speed.multiplier() - 2.0).abs() < f64::EPSILON);
 
         // Test extreme speeds with clamping
         speed.set_speed(0.05);
-        assert_eq!(speed.multiplier(), 0.1); // Clamped to min
+        assert!((speed.multiplier() - 0.1).abs() < f64::EPSILON); // Clamped to min
 
         speed.set_speed(20.0);
-        assert_eq!(speed.multiplier(), 10.0); // Clamped to max
+        assert!((speed.multiplier() - 10.0).abs() < f64::EPSILON); // Clamped to max
 
         // Test duration application
         let duration = Duration::from_secs(10);
@@ -865,13 +835,12 @@ mod tests {
         let adjusted = speed.apply_to_duration(duration);
         assert_eq!(adjusted, Duration::from_secs(5)); // 10s / 2x = 5s
     }
-
     #[tokio::test]
     async fn test_breakpoint_management() {
         use super::super::session_controls::{SessionBreakpoint, SessionBreakpointCondition};
 
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -902,11 +871,10 @@ mod tests {
             .await
             .is_ok());
     }
-
     #[tokio::test]
     async fn test_step_debugging() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -921,11 +889,10 @@ mod tests {
         let result = adapter.step_next(&session_id).await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_replay_progress_tracking() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -946,7 +913,6 @@ mod tests {
         // Clear controls (should not error)
         adapter.clear_session_controls(&session_id);
     }
-
     #[tokio::test]
     async fn test_session_replay_state_conversions() {
         use super::super::session_controls::SessionReplayState;
@@ -970,7 +936,6 @@ mod tests {
         assert!(SessionReplayState::Scheduled.to_replay_state().is_none());
         assert!(SessionReplayState::Paused.to_replay_state().is_none());
     }
-
     #[tokio::test]
     async fn test_controls_with_session_manager() {
         let manager = create_test_session_manager().await;

@@ -213,7 +213,6 @@ impl From<bincode::Error> for SessionError {
 mod tests {
     use super::*;
     use crate::SessionStatus;
-
     #[test]
     fn test_session_error_display() {
         // Test each error variant's display output
@@ -250,7 +249,6 @@ mod tests {
         let error = SessionError::Validation("invalid data".to_string());
         assert_eq!(error.to_string(), "Validation error: invalid data");
     }
-
     #[test]
     fn test_invalid_session_state_error() {
         let error = SessionError::InvalidSessionState {
@@ -263,7 +261,6 @@ mod tests {
             "Session session-123 is in invalid state Failed for operation save"
         );
     }
-
     #[test]
     fn test_artifact_errors() {
         let error = SessionError::ArtifactNotFound {
@@ -280,7 +277,6 @@ mod tests {
             "Artifact already exists: artifact-789 in session session-123"
         );
     }
-
     #[test]
     fn test_resource_and_access_errors() {
         let error = SessionError::AccessDenied {
@@ -307,7 +303,6 @@ mod tests {
         };
         assert_eq!(error.to_string(), "Data integrity error: checksum mismatch");
     }
-
     #[test]
     fn test_general_error_constructors() {
         let error = SessionError::general("general error");
@@ -329,7 +324,6 @@ mod tests {
             _ => panic!("Expected General error"),
         }
     }
-
     #[test]
     fn test_replay_error_constructors() {
         let error = SessionError::replay("replay failed");
@@ -342,7 +336,7 @@ mod tests {
         }
 
         let source_err: Box<dyn std::error::Error + Send + Sync> =
-            Box::new(std::io::Error::new(std::io::ErrorKind::Other, "io error"));
+            Box::new(std::io::Error::other("io error"));
         let error = SessionError::replay_with_source("replay io error", source_err);
         match error {
             SessionError::ReplayError { message, source } => {
@@ -352,7 +346,6 @@ mod tests {
             _ => panic!("Expected ReplayError"),
         }
     }
-
     #[test]
     fn test_from_serde_json_error() {
         // Test deserialization error (EOF)
@@ -369,7 +362,6 @@ mod tests {
         // Test serialization error (would need a type that can't be serialized)
         // Most serde_json errors are actually data/parsing errors
     }
-
     #[test]
     fn test_from_io_error() {
         let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
@@ -382,7 +374,6 @@ mod tests {
             _ => panic!("Expected Io error"),
         }
     }
-
     #[test]
     fn test_from_bincode_error() {
         // Create a bincode error by trying to deserialize invalid data
@@ -396,14 +387,12 @@ mod tests {
             _ => panic!("Expected Serialization error"),
         }
     }
-
     #[test]
     fn test_error_is_send_sync() {
         // Verify that SessionError implements Send + Sync
         fn assert_send_sync<T: Send + Sync>() {}
         assert_send_sync::<SessionError>();
     }
-
     #[test]
     fn test_result_type_alias() {
         // Test that Result<T> works as expected
@@ -418,7 +407,6 @@ mod tests {
         assert!(test_function().is_ok());
         assert!(test_error_function().is_err());
     }
-
     #[test]
     fn test_from_state_error() {
         use llmspell_state_traits::StateError;
@@ -439,20 +427,18 @@ mod tests {
             _ => panic!("Expected State error"),
         }
     }
-
     #[test]
     fn test_error_source_chain() {
         use std::error::Error;
 
         // Test that errors with sources properly implement Error trait
-        let io_error = std::io::Error::new(std::io::ErrorKind::Other, "root cause");
+        let io_error = std::io::Error::other("root cause");
         let source_err = anyhow::Error::new(io_error);
         let error = SessionError::general_with_source("high level error", source_err);
 
         // Verify error source chain works
         assert!(error.source().is_some());
     }
-
     #[test]
     fn test_hook_and_event_errors() {
         let error = SessionError::Hook("hook failed".to_string());
@@ -461,7 +447,6 @@ mod tests {
         let error = SessionError::Event("event dispatch failed".to_string());
         assert_eq!(error.to_string(), "Event error: event dispatch failed");
     }
-
     #[test]
     fn test_serialization_deserialization_errors() {
         let error = SessionError::Serialization("failed to serialize".to_string());

@@ -411,7 +411,6 @@ impl ApiKeyManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_api_key_manager_basic() {
         let manager = ApiKeyManager::new();
@@ -439,7 +438,6 @@ mod tests {
         let audit_log = manager.get_audit_log(None);
         assert_eq!(audit_log.len(), 2); // Create + Read
     }
-
     #[test]
     fn test_key_rotation() {
         let manager = ApiKeyManager::new();
@@ -470,7 +468,6 @@ mod tests {
             .iter()
             .any(|entry| matches!(entry.action, ApiKeyAction::Rotate)));
     }
-
     #[test]
     fn test_load_from_env() {
         // Set test environment variable

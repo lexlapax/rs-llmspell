@@ -1,1 +1,9 @@
-
+- allow security flags and configs to be set as environment variables or flags.. -e.g allow write to this directory.
+- every script /example code when it was last working should have a version stamp of rust code that it worked with in the header and the last code commit signature.
+- all lua bridges should be just wrappers to rust native bridge.. not doing json conversion etc in lua engine. we just fixed workflow bridge to be that way.
+- all tool functions should be consistent for two word functions either like-this or like_this, but not both.
+- security sandbox - add network access, add process execution access 
+- workflow output collection should be rust code.. are there other things that should be rust code based on webapp-creator?
+- agent, workflow, tool - BaseAgent, should probably have a save output, save output stream function at the rust level.
+- in phase 7 we redid state 
+- remove invoke and just use execute in agent.

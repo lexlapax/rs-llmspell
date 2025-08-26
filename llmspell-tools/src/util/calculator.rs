@@ -45,9 +45,9 @@ use std::collections::BTreeMap;
 pub struct CalculatorTool {
     /// Tool metadata
     metadata: ComponentMetadata,
-    /// Basic expression analyzer for DoS protection
+    /// Basic expression analyzer for `DoS` protection
     analyzer: ExpressionAnalyzer,
-    /// Enhanced analyzer for advanced DoS protection
+    /// Enhanced analyzer for advanced `DoS` protection
     enhanced_analyzer: EnhancedExpressionAnalyzer,
 }
 
@@ -74,8 +74,8 @@ impl CalculatorTool {
         Self::default()
     }
 
-    /// Convert fasteval error to LLMSpellError
-    fn convert_error(&self, error: FastevalError) -> LLMSpellError {
+    /// Convert fasteval error to `LLMSpellError`
+    fn convert_error(&self, error: &FastevalError) -> LLMSpellError {
         tool_error(error.to_string(), Some(self.metadata.name.clone()))
     }
 
@@ -127,7 +127,7 @@ impl CalculatorTool {
         let expr_memory = processed_expr.len() * 8 + variables.len() * 64;
         if let Err(e) = memory_tracker.allocate(expr_memory) {
             return Err(validation_error(
-                format!("Expression requires too much memory: {}", e),
+                format!("Expression requires too much memory: {e}"),
                 Some("input".to_string()),
             ));
         }
@@ -143,9 +143,9 @@ impl CalculatorTool {
         .await
         {
             Ok(Ok(result)) => Ok(result),
-            Ok(Err(e)) => Err(self.convert_error(e)),
+            Ok(Err(e)) => Err(self.convert_error(&e)),
             Err(_) => Err(validation_error(
-                format!("Expression evaluation timed out after {:?}", max_eval_time),
+                format!("Expression evaluation timed out after {max_eval_time:?}"),
                 Some("input".to_string()),
             )),
         };
@@ -157,6 +157,7 @@ impl CalculatorTool {
     }
 
     /// Preprocess expression to replace custom functions with their implementations
+    #[allow(clippy::unused_self)]
     fn preprocess_custom_functions(&self, expression: &str) -> String {
         use regex::Regex;
         use std::sync::OnceLock;
@@ -292,7 +293,11 @@ impl BaseAgent for CalculatorTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Create resource tracker for this execution
         let limits = ResourceLimits {
             max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
@@ -436,11 +441,13 @@ impl ResourceLimited for CalculatorTool {
 // This is provided by the blanket implementation in the lifecycle module
 impl CalculatorTool {
     /// Helper method to show hook integration capabilities
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         json!({
             "tool_name": self.metadata().name,
@@ -473,6 +480,12 @@ impl CalculatorTool {
 
     /// Demonstrate hook-aware execution
     /// This method showcases how the calculator works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool execution fails
+    /// - Hook integration fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
@@ -499,7 +512,6 @@ impl CalculatorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_basic_arithmetic() {
         let tool = CalculatorTool::new();
@@ -522,7 +534,6 @@ mod tests {
         assert_eq!(output["result"]["result"], 14.0);
         assert_eq!(output["result"]["result_type"], "float");
     }
-
     #[tokio::test]
     async fn test_variables() {
         let tool = CalculatorTool::new();
@@ -550,7 +561,6 @@ mod tests {
         assert_eq!(output["result"]["variables"]["x"], 3.0);
         assert_eq!(output["result"]["variables"]["y"], 4.0);
     }
-
     #[tokio::test]
     async fn test_power_operations() {
         let tool = CalculatorTool::new();
@@ -593,7 +603,6 @@ mod tests {
         assert_eq!(output["result"]["result"], 2.0);
         assert_eq!(output["result"]["result_type"], "float");
     }
-
     #[tokio::test]
     async fn test_expression_validation() {
         let tool = CalculatorTool::new();
@@ -636,7 +645,6 @@ mod tests {
         // The error message should indicate an issue with the expression
         assert!(output["result"].get("error").is_some());
     }
-
     #[tokio::test]
     async fn test_division_by_zero() {
         let tool = CalculatorTool::new();
@@ -660,7 +668,6 @@ mod tests {
         assert_eq!(output["result"]["result"], "Infinity");
         assert_eq!(output["result"]["result_type"], "special");
     }
-
     #[tokio::test]
     async fn test_functions_list() {
         let tool = CalculatorTool::new();
@@ -683,7 +690,6 @@ mod tests {
         assert!(output["result"]["logical"].is_array());
         assert!(output["result"]["examples"].is_object());
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = CalculatorTool::new();
@@ -696,7 +702,6 @@ mod tests {
         assert_eq!(tool.category(), ToolCategory::Utility);
         assert_eq!(tool.security_level(), SecurityLevel::Safe);
     }
-
     #[tokio::test]
     async fn test_mathematical_functions() {
         let tool = CalculatorTool::new();
@@ -755,7 +760,6 @@ mod tests {
         assert!(output["success"].as_bool().unwrap_or(false));
         assert!((output["result"]["result"].as_f64().unwrap() - 2.0).abs() < 0.0001);
     }
-
     #[tokio::test]
     async fn test_dos_protection_long_expression() {
         let tool = CalculatorTool::new();
@@ -783,7 +787,6 @@ mod tests {
             .unwrap()
             .contains("too long"));
     }
-
     #[tokio::test]
     async fn test_dos_protection_deep_nesting() {
         let tool = CalculatorTool::new();
@@ -811,14 +814,13 @@ mod tests {
             .unwrap()
             .contains("too deep"));
     }
-
     #[tokio::test]
     async fn test_dos_protection_too_many_operations() {
         let tool = CalculatorTool::new();
 
         // Create expression with too many operations
         let many_ops = (0..150)
-            .map(|i| format!("{}", i))
+            .map(|i| format!("{i}"))
             .collect::<Vec<_>>()
             .join(" + ");
 
@@ -842,7 +844,6 @@ mod tests {
             .unwrap()
             .contains("operations"));
     }
-
     #[tokio::test]
     async fn test_dos_protection_timeout() {
         let tool = CalculatorTool::new();
@@ -877,7 +878,6 @@ mod tests {
             assert!(error_msg.contains("timeout") || error_msg.contains("operations"));
         }
     }
-
     #[tokio::test]
     async fn test_dos_protection_large_numbers() {
         let tool = CalculatorTool::new();
@@ -905,7 +905,6 @@ mod tests {
             .unwrap()
             .contains("large number"));
     }
-
     #[tokio::test]
     async fn test_dos_protection_dangerous_patterns() {
         let tool = CalculatorTool::new();
@@ -928,22 +927,16 @@ mod tests {
                 .unwrap();
             let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-            assert_eq!(
-                output["success"], false,
-                "Expression '{}' should fail",
-                expr
-            );
+            assert_eq!(output["success"], false, "Expression '{expr}' should fail");
             let error_msg = output["error"]["message"].as_str().unwrap();
             assert!(
                 error_msg.contains("consecutive")
                     || error_msg.contains("stack overflow")
                     || error_msg.contains("complex"),
-                "Expression '{}' should have appropriate error message",
-                expr
+                "Expression '{expr}' should have appropriate error message"
             );
         }
     }
-
     #[tokio::test]
     async fn test_hook_integration_capability() {
         let tool = CalculatorTool::new();
@@ -961,16 +954,19 @@ mod tests {
         );
         assert!(metadata["hook_integration_benefits"].is_array());
     }
-
     #[tokio::test]
     async fn test_calculator_with_hook_executor() {
+        use crate::lifecycle::hook_integration::HookFeatures;
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
 
         let tool = CalculatorTool::new();
 
         // Create a ToolExecutor for testing (without actual hooks for this demo)
         let config = ToolLifecycleConfig {
-            enable_hooks: false, // Disable for testing to avoid hook dependencies
+            features: HookFeatures {
+                hooks_enabled: false, // Disable for testing to avoid hook dependencies
+                ..Default::default()
+            },
             ..Default::default()
         };
         let tool_executor = ToolExecutor::new(config, None, None);
@@ -986,7 +982,6 @@ mod tests {
         assert!(parsed["success"].as_bool().unwrap_or(false));
         assert_eq!(parsed["result"]["result"], 5.0);
     }
-
     #[tokio::test]
     async fn test_calculator_hook_integration_with_variables() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -1011,7 +1006,6 @@ mod tests {
         assert!(parsed["success"].as_bool().unwrap_or(false));
         assert_eq!(parsed["result"]["result"], 25.0);
     }
-
     #[tokio::test]
     async fn test_hookable_tool_execution_trait() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

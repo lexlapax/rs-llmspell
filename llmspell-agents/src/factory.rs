@@ -36,7 +36,7 @@ pub struct AgentConfig {
 }
 
 impl AgentConfig {
-    /// Create a new builder for AgentConfig
+    /// Create a new builder for `AgentConfig`
     pub fn builder(name: impl Into<String>) -> AgentConfigBuilder {
         AgentConfigBuilder::new(name)
     }
@@ -88,7 +88,7 @@ impl Default for ResourceLimits {
     }
 }
 
-/// Builder for AgentConfig
+/// Builder for `AgentConfig`
 #[derive(Debug, Clone)]
 pub struct AgentConfigBuilder {
     name: String,
@@ -115,72 +115,84 @@ impl AgentConfigBuilder {
     }
 
     /// Set the agent's description
+    #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the agent type
+    #[must_use]
     pub fn agent_type(mut self, agent_type: impl Into<String>) -> Self {
         self.agent_type = agent_type.into();
         self
     }
 
     /// Set the model configuration
+    #[must_use]
     pub fn model(mut self, model: ModelConfig) -> Self {
         self.model = Some(model);
         self
     }
 
     /// Add an allowed tool
+    #[must_use]
     pub fn allow_tool(mut self, tool_id: impl Into<String>) -> Self {
         self.allowed_tools.push(tool_id.into());
         self
     }
 
     /// Set allowed tools
+    #[must_use]
     pub fn allowed_tools(mut self, tools: Vec<String>) -> Self {
         self.allowed_tools = tools;
         self
     }
 
     /// Add a custom configuration parameter
+    #[must_use]
     pub fn custom_param(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.custom_config.insert(key.into(), value);
         self
     }
 
     /// Set custom configuration
+    #[must_use]
     pub fn custom_config(mut self, config: serde_json::Map<String, serde_json::Value>) -> Self {
         self.custom_config = config;
         self
     }
 
     /// Set resource limits
-    pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+    #[must_use]
+    pub const fn resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.resource_limits = limits;
         self
     }
 
     /// Set maximum execution time
-    pub fn max_execution_time_secs(mut self, secs: u64) -> Self {
+    #[must_use]
+    pub const fn max_execution_time_secs(mut self, secs: u64) -> Self {
         self.resource_limits.max_execution_time_secs = secs;
         self
     }
 
     /// Set maximum memory usage
-    pub fn max_memory_mb(mut self, mb: u64) -> Self {
+    #[must_use]
+    pub const fn max_memory_mb(mut self, mb: u64) -> Self {
         self.resource_limits.max_memory_mb = mb;
         self
     }
 
     /// Set maximum tool calls
-    pub fn max_tool_calls(mut self, calls: u32) -> Self {
+    #[must_use]
+    pub const fn max_tool_calls(mut self, calls: u32) -> Self {
         self.resource_limits.max_tool_calls = calls;
         self
     }
 
-    /// Build the final AgentConfig
+    /// Build the final `AgentConfig`
+    #[must_use]
     pub fn build(self) -> AgentConfig {
         AgentConfig {
             name: self.name,
@@ -198,19 +210,34 @@ impl AgentConfigBuilder {
 #[async_trait]
 pub trait AgentFactory: Send + Sync {
     /// Create an agent from configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent creation fails due to invalid configuration,
+    /// resource constraints, dependency resolution failures, or system-level issues.
     async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>>;
 
     /// Create an agent from a template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template is not found, template instantiation fails,
+    /// or the resulting agent configuration is invalid.
     async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>>;
 
     /// List available agent templates
     fn list_templates(&self) -> Vec<&str>;
 
     /// Validate agent configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid (e.g., missing required fields,
+    /// invalid tool references, conflicting settings, or unsupported agent types).
     fn validate_config(&self, config: &AgentConfig) -> Result<()>;
 }
 
-/// Default implementation of AgentFactory
+/// Default implementation of `AgentFactory`
 pub struct DefaultAgentFactory {
     /// Template registry
     templates: std::collections::HashMap<String, AgentConfig>,
@@ -240,6 +267,7 @@ pub trait CreationHook: Send + Sync {
 
 impl DefaultAgentFactory {
     /// Create a new agent factory with provider manager
+    #[must_use]
     pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
         let mut templates = std::collections::HashMap::new();
 
@@ -316,23 +344,29 @@ impl DefaultAgentFactory {
     }
 
     /// Set hook registry for state machine integration
+    #[must_use]
     pub fn with_hook_registry(mut self, hook_registry: Arc<HookRegistry>) -> Self {
         self.hook_registry = Some(hook_registry);
         self
     }
 
     /// Configure default state machine settings
-    pub fn with_state_config(mut self, state_config: StateMachineConfig) -> Self {
+    #[must_use]
+    pub const fn with_state_config(mut self, state_config: StateMachineConfig) -> Self {
         self.default_state_config = state_config;
         self
     }
 
     /// Enable hooks and circuit breaker by default
+    #[must_use]
     pub fn with_enhanced_lifecycle(mut self) -> Self {
         self.default_state_config = StateMachineConfig {
-            enable_logging: true,
-            enable_hooks: true,
-            enable_circuit_breaker: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_logging: true,
+                enable_hooks: true,
+                enable_circuit_breaker: true,
+                ..Default::default()
+            },
             ..StateMachineConfig::default()
         };
         self
@@ -355,7 +389,7 @@ impl DefaultAgentFactory {
     }
 
     /// Initialize agent lifecycle by calling initialize on the concrete type
-    async fn initialize_agent_lifecycle(&self, agent_type: &str, agent_name: &str) -> Result<()> {
+    fn initialize_agent_lifecycle(agent_type: &str, agent_name: &str) {
         info!(
             "Agent '{}' of type '{}' created with lifecycle management",
             agent_name, agent_type
@@ -363,7 +397,6 @@ impl DefaultAgentFactory {
         // Note: Individual agents are responsible for calling initialize() when they're ready
         // The factory creates them with state machines but doesn't auto-initialize
         // This allows for more controlled startup sequences
-        Ok(())
     }
 }
 
@@ -405,8 +438,7 @@ impl AgentFactory for DefaultAgentFactory {
         self.run_after_hooks(&agent).await?;
 
         // Initialize agent lifecycle
-        self.initialize_agent_lifecycle(&agent_type, &agent_name)
-            .await?;
+        Self::initialize_agent_lifecycle(&agent_type, &agent_name);
 
         Ok(agent)
     }
@@ -422,7 +454,10 @@ impl AgentFactory for DefaultAgentFactory {
     }
 
     fn list_templates(&self) -> Vec<&str> {
-        self.templates.keys().map(|s| s.as_str()).collect()
+        self.templates
+            .keys()
+            .map(std::string::String::as_str)
+            .collect()
     }
 
     fn validate_config(&self, config: &AgentConfig) -> Result<()> {
@@ -456,7 +491,7 @@ impl AgentFactory for DefaultAgentFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-
+    use llmspell_providers::ProviderManager;
     #[test]
     fn test_default_resource_limits() {
         let limits = ResourceLimits::default();
@@ -466,22 +501,20 @@ mod tests {
         assert_eq!(limits.max_recursion_depth, 10);
     }
 
-    async fn create_test_factory() -> DefaultAgentFactory {
-        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+    fn create_test_factory() -> DefaultAgentFactory {
+        let provider_manager = Arc::new(ProviderManager::new());
         DefaultAgentFactory::new(provider_manager)
     }
-
     #[tokio::test]
     async fn test_factory_templates() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
         let templates = factory.list_templates();
         assert!(templates.contains(&"basic"));
         assert!(templates.contains(&"llm"));
     }
-
     #[tokio::test]
     async fn test_config_validation() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         // Valid config
         let valid_config = AgentConfig {
@@ -497,7 +530,7 @@ mod tests {
 
         // Invalid config - empty name
         let invalid_config = AgentConfig {
-            name: "".to_string(),
+            name: String::new(),
             ..valid_config.clone()
         };
         assert!(factory.validate_config(&invalid_config).is_err());
@@ -525,20 +558,19 @@ mod tests {
         // Invalid model config - empty provider
         let invalid_config = AgentConfig {
             model: Some(ModelConfig {
-                provider: "".to_string(),
+                provider: String::new(),
                 model_id: "gpt-4".to_string(),
                 temperature: None,
                 max_tokens: None,
                 settings: serde_json::Map::new(),
             }),
-            ..valid_config.clone()
+            ..valid_config
         };
         assert!(factory.validate_config(&invalid_config).is_err());
     }
-
     #[tokio::test]
     async fn test_agent_creation() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         let config = AgentConfig {
             name: "test-basic".to_string(),
@@ -553,10 +585,9 @@ mod tests {
         let agent = factory.create_agent(config).await.unwrap();
         assert_eq!(agent.metadata().name, "test-basic");
     }
-
     #[tokio::test]
     async fn test_agent_creation_unknown_type() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         let config = AgentConfig {
             name: "test-unknown".to_string(),
@@ -573,10 +604,9 @@ mod tests {
         let err = result.err().unwrap();
         assert!(err.to_string().contains("Unknown agent type"));
     }
-
     #[tokio::test]
     async fn test_create_from_template() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         let agent = factory.create_from_template("basic").await.unwrap();
         assert_eq!(agent.metadata().name, "basic-agent");
@@ -585,7 +615,6 @@ mod tests {
         let result = factory.create_from_template("non-existent").await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_hooks_execution() {
         use std::sync::atomic::{AtomicBool, Ordering};
@@ -608,7 +637,7 @@ mod tests {
             }
         }
 
-        let mut factory = create_test_factory().await;
+        let mut factory = create_test_factory();
         let before_called = Arc::new(AtomicBool::new(false));
         let after_called = Arc::new(AtomicBool::new(false));
 
@@ -634,10 +663,9 @@ mod tests {
         assert!(before_called.load(Ordering::SeqCst));
         assert!(after_called.load(Ordering::SeqCst));
     }
-
     #[tokio::test]
     async fn test_add_custom_template() {
-        let mut factory = create_test_factory().await;
+        let mut factory = create_test_factory();
 
         let custom_config = AgentConfig {
             name: "custom-agent".to_string(),

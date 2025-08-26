@@ -158,7 +158,6 @@ impl ReplayableHook for StatefulTestHook {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_basic_hook_persistence_and_replay() -> Result<()> {
         // Create in-memory storage
@@ -252,7 +251,6 @@ mod tests {
 
         Ok(())
     }
-
     #[tokio::test]
     async fn test_hook_execution_with_event_bus() -> Result<()> {
         // Create event bus
@@ -320,7 +318,6 @@ mod tests {
 
         Ok(())
     }
-
     #[tokio::test]
     async fn test_hook_replay_performance() -> Result<()> {
         // Create storage
@@ -410,7 +407,11 @@ mod tests {
         );
 
         // Verify overhead is acceptable
-        let overhead_ratio = replay_time.as_millis() as f64 / recording_time.as_millis() as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let replay_millis_f64 = replay_time.as_millis() as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let recording_millis_f64 = recording_time.as_millis() as f64;
+        let overhead_ratio = replay_millis_f64 / recording_millis_f64;
         assert!(
             overhead_ratio < 5.0,
             "Replay overhead too high: {:.2}x",
@@ -419,7 +420,6 @@ mod tests {
 
         Ok(())
     }
-
     #[tokio::test]
     async fn test_builtin_hooks_with_persistence() -> Result<()> {
         // Create storage
@@ -490,7 +490,6 @@ mod tests {
 
         Ok(())
     }
-
     #[tokio::test]
     async fn test_hook_registry_integration() -> Result<()> {
         let registry = HookRegistry::new();

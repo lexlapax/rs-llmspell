@@ -1,10 +1,11 @@
-//! Integration tests for FileOperationsTool
+//! Integration tests for `FileOperationsTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
     types::AgentInput,
     ExecutionContext,
 };
+use llmspell_testing::tool_helpers::create_test_sandbox_with_temp_dir;
 use llmspell_tools::{fs::FileOperationsConfig, FileOperationsTool};
 use serde_json::json;
 use std::path::PathBuf;
@@ -26,7 +27,6 @@ fn create_test_dir() -> PathBuf {
 fn cleanup_test_dir(path: &PathBuf) {
     let _ = std::fs::remove_dir_all(path);
 }
-
 #[tokio::test]
 async fn test_file_operations_basic() {
     let test_dir = create_test_dir();
@@ -34,7 +34,9 @@ async fn test_file_operations_basic() {
     let test_content = "Hello, FileOperations!";
 
     // Create tool
-    let tool = FileOperationsTool::default();
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox);
 
     // Test write operation
     let write_input = AgentInput::text("write").with_parameter(
@@ -138,12 +140,13 @@ async fn test_file_operations_basic() {
 
     cleanup_test_dir(&test_dir);
 }
-
 #[tokio::test]
 async fn test_directory_operations() {
     let test_base = create_test_dir();
-    let test_dir = test_base.join("test_dir");
-    let tool = FileOperationsTool::default();
+    let _test_dir = test_base.join("test_dir");
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox);
     let context = create_context();
 
     // Create directory
@@ -163,7 +166,7 @@ async fn test_directory_operations() {
 
     // Create some files in the directory
     for i in 1..=3 {
-        let file_path = test_dir.join(format!("file{}.txt", i));
+        let file_path = test_dir.join(format!("file{i}.txt"));
         let write_input = AgentInput::text("write").with_parameter(
             "parameters",
             json!({
@@ -189,7 +192,6 @@ async fn test_directory_operations() {
 
     cleanup_test_dir(&test_base);
 }
-
 #[tokio::test]
 async fn test_copy_move_operations() {
     let test_dir = create_test_dir();
@@ -197,7 +199,9 @@ async fn test_copy_move_operations() {
     let copy_dest = test_dir.join("copy.txt");
     let move_dest = test_dir.join("moved.txt");
 
-    let tool = FileOperationsTool::default();
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox);
     let context = create_context();
 
     // Create source file
@@ -259,10 +263,11 @@ async fn test_copy_move_operations() {
 
     cleanup_test_dir(&test_dir);
 }
-
 #[tokio::test]
 async fn test_security_sandbox() {
-    let tool = FileOperationsTool::default();
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox);
     let context = create_context();
 
     // Attempt to access file outside sandbox (should fail)
@@ -290,10 +295,11 @@ async fn test_security_sandbox() {
     let result = tool.execute(traversal_input, context).await;
     assert!(result.is_err() || result.unwrap().text.contains("error"));
 }
-
 #[tokio::test]
 async fn test_tool_metadata() {
-    let tool = FileOperationsTool::default();
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox);
 
     // Test tool category
     assert_eq!(
@@ -320,10 +326,11 @@ async fn test_tool_metadata() {
         .expect("operation parameter should exist");
     assert!(operation_param.required);
 }
-
 #[tokio::test]
 async fn test_error_handling() {
-    let tool = FileOperationsTool::default();
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox);
     let context = create_context();
 
     // Test missing operation parameter
@@ -361,7 +368,6 @@ async fn test_error_handling() {
     let result = tool.execute(missing_content_input, context).await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_recursive_directory_creation() {
     let test_dir = create_test_dir();
@@ -371,7 +377,9 @@ async fn test_recursive_directory_creation() {
         allow_recursive: true,
         ..Default::default()
     };
-    let tool = FileOperationsTool::new(config);
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(config, sandbox);
     let context = create_context();
 
     // Create nested directory with recursive flag
@@ -390,7 +398,6 @@ async fn test_recursive_directory_creation() {
 
     cleanup_test_dir(&test_dir);
 }
-
 #[tokio::test]
 async fn test_file_size_limits() {
     let test_dir = create_test_dir();
@@ -401,7 +408,9 @@ async fn test_file_size_limits() {
         max_file_size: 100, // 100 bytes
         ..Default::default()
     };
-    let tool = FileOperationsTool::new(config);
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(config, sandbox);
     let context = create_context();
 
     // Try to write content larger than limit
@@ -415,19 +424,24 @@ async fn test_file_size_limits() {
         }),
     );
 
-    let result = tool.execute(write_input, context).await;
-    assert!(result.is_err());
+    let result = tool.execute(write_input, context).await.unwrap();
+    // The tool returns errors as successful responses with error information
+    assert!(
+        result.text.contains("validation_error")
+            || result.text.contains("exceeds maximum allowed size")
+    );
 
     cleanup_test_dir(&test_dir);
 }
-
 #[tokio::test]
 async fn test_atomic_writes() {
     let test_dir = create_test_dir();
     let test_file = test_dir.join("atomic.txt");
 
     // Create tool with atomic writes enabled (default)
-    let tool = FileOperationsTool::default();
+    let test_dir = create_test_dir();
+    let sandbox = create_test_sandbox_with_temp_dir("file_ops_test", &test_dir.to_string_lossy());
+    let tool = FileOperationsTool::new(FileOperationsConfig::default(), sandbox);
     let context = create_context();
 
     // Write initial content

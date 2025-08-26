@@ -82,6 +82,7 @@ pub struct UuidGeneratorTool {
 
 impl UuidGeneratorTool {
     /// Create a new UUID generator tool
+    #[must_use]
     pub fn new(config: UuidGeneratorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -93,37 +94,34 @@ impl UuidGeneratorTool {
     }
 
     fn generate_uuid(
-        &self,
         version: UuidVersion,
         namespace: Option<&str>,
         name: Option<&str>,
     ) -> Result<Uuid> {
         match version {
-            UuidVersion::V1 => {
+            UuidVersion::V1 | UuidVersion::V4 => {
                 // UUID v1 is timestamp-based, we'll use v4 as fallback for security
                 // v1 requires MAC address which can be a privacy concern
                 Ok(Uuid::new_v4())
             }
-            UuidVersion::V4 => Ok(Uuid::new_v4()),
             UuidVersion::V5 => {
                 let namespace_uuid = match namespace {
                     Some("agent") => *NAMESPACE_AGENT,
                     Some("tool") => *NAMESPACE_TOOL,
                     Some("workflow") => *NAMESPACE_WORKFLOW,
-                    Some("dns") => Uuid::NAMESPACE_DNS,
                     Some("url") => Uuid::NAMESPACE_URL,
                     Some("oid") => Uuid::NAMESPACE_OID,
                     Some("x500") => Uuid::NAMESPACE_X500,
+                    Some("dns") | None => Uuid::NAMESPACE_DNS, // DNS is the default namespace
                     Some(custom) => {
                         // Try to parse as UUID
                         Uuid::parse_str(custom).map_err(|_| {
                             validation_error(
-                                format!("Invalid namespace UUID: {}", custom),
+                                format!("Invalid namespace UUID: {custom}"),
                                 Some("namespace".to_string()),
                             )
                         })?
                     }
-                    None => Uuid::NAMESPACE_DNS, // Default namespace
                 };
 
                 let name = name.ok_or_else(|| {
@@ -138,7 +136,8 @@ impl UuidGeneratorTool {
         }
     }
 
-    fn format_uuid(&self, uuid: Uuid, format: &UuidFormat) -> String {
+    #[allow(clippy::unused_self)]
+    fn format_uuid(&self, uuid: Uuid, format: UuidFormat) -> String {
         match format {
             UuidFormat::Standard | UuidFormat::Hyphenated => uuid.to_string(),
             UuidFormat::Simple => uuid.simple().to_string(),
@@ -147,6 +146,7 @@ impl UuidGeneratorTool {
         }
     }
 
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> Result<()> {
         // Extract operation type for validation
         let operation = extract_string_with_default(params, "operation", "generate");
@@ -206,7 +206,12 @@ impl BaseAgent for UuidGeneratorTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    #[allow(clippy::too_many_lines)]
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters from input using shared utility
         let params = extract_parameters(&input)?;
 
@@ -219,34 +224,36 @@ impl BaseAgent for UuidGeneratorTool {
         match operation {
             "generate" => {
                 // Extract version
-                let version = extract_optional_string(params, "version")
-                    .map(|v| match v {
+                let version = extract_optional_string(params, "version").map_or(
+                    self.config.default_version,
+                    |v| match v {
                         "v1" | "1" => UuidVersion::V1,
                         "v4" | "4" => UuidVersion::V4,
                         "v5" | "5" => UuidVersion::V5,
                         _ => self.config.default_version,
-                    })
-                    .unwrap_or(self.config.default_version);
+                    },
+                );
 
                 // Extract namespace and name for v5
                 let namespace = extract_optional_string(params, "namespace");
                 let name = extract_optional_string(params, "name");
 
                 // Generate UUID
-                let uuid = self.generate_uuid(version, namespace, name)?;
+                let uuid = Self::generate_uuid(version, namespace, name)?;
 
                 // Extract format
-                let format = extract_optional_string(params, "format")
-                    .map(|f| match f {
+                let format = extract_optional_string(params, "format").map_or(
+                    self.config.default_format,
+                    |f| match f {
                         "standard" | "hyphenated" => UuidFormat::Hyphenated,
                         "simple" => UuidFormat::Simple,
                         "urn" => UuidFormat::Urn,
                         "braced" => UuidFormat::Braced,
                         _ => self.config.default_format,
-                    })
-                    .unwrap_or(self.config.default_format);
+                    },
+                );
 
-                let formatted = self.format_uuid(uuid, &format);
+                let formatted = self.format_uuid(uuid, format);
                 let response = ResponseBuilder::success("generate")
                     .with_message("UUID generated successfully")
                     .with_result(json!({
@@ -293,10 +300,9 @@ impl BaseAgent for UuidGeneratorTool {
                 let name = extract_required_string(params, "name")?;
 
                 let namespace_uuid = match namespace {
-                    "agent" => *NAMESPACE_AGENT,
                     "tool" => *NAMESPACE_TOOL,
                     "workflow" => *NAMESPACE_WORKFLOW,
-                    _ => *NAMESPACE_AGENT,
+                    _ => *NAMESPACE_AGENT, // Default to agent namespace
                 };
 
                 let id = generate_deterministic_id(&namespace_uuid, name);
@@ -347,27 +353,24 @@ impl BaseAgent for UuidGeneratorTool {
                 // Validate a UUID
                 let uuid_str = extract_required_string(params, "uuid")?;
 
-                match Uuid::parse_str(uuid_str) {
-                    Ok(uuid) => {
-                        let result = json!({
-                            "valid": true,
-                            "uuid": uuid.to_string(),
-                            "version": uuid.get_version().map(|v| format!("v{}", v as u8)),
-                            "variant": format!("{:?}", uuid.get_variant()),
-                        });
-                        Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
-                    }
-                    Err(_) => {
-                        let result = json!({
-                            "valid": false,
-                            "error": "Invalid UUID format"
-                        });
-                        Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
-                    }
+                if let Ok(uuid) = Uuid::parse_str(uuid_str) {
+                    let result = json!({
+                        "valid": true,
+                        "uuid": uuid.to_string(),
+                        "version": uuid.get_version().map(|v| format!("v{}", v as u8)),
+                        "variant": format!("{:?}", uuid.get_variant()),
+                    });
+                    Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
+                } else {
+                    let result = json!({
+                        "valid": false,
+                        "error": "Invalid UUID format"
+                    });
+                    Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
                 }
             }
             _ => Err(validation_error(
-                format!("Unknown operation: {}", operation),
+                format!("Unknown operation: {operation}"),
                 Some("operation".to_string()),
             )),
         }
@@ -384,10 +387,7 @@ impl BaseAgent for UuidGeneratorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "UUID generation error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("UUID generation error: {error}")))
     }
 }
 
@@ -496,7 +496,6 @@ impl Tool for UuidGeneratorTool {
 mod tests {
     use super::*;
     use serde_json::Value;
-
     #[tokio::test]
     async fn test_generate_v4_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -518,7 +517,6 @@ mod tests {
         let uuid_str = response["result"]["uuid"].as_str().unwrap();
         assert!(Uuid::parse_str(uuid_str).is_ok());
     }
-
     #[tokio::test]
     async fn test_generate_v5_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -543,7 +541,6 @@ mod tests {
         let uuid = Uuid::parse_str(uuid_str).unwrap();
         assert_eq!(uuid.get_version(), Some(uuid::Version::Sha1));
     }
-
     #[tokio::test]
     async fn test_generate_component_id() {
         let tool = UuidGeneratorTool::default();
@@ -566,7 +563,6 @@ mod tests {
         let id = response["result"]["id"].as_str().unwrap();
         assert!(id.starts_with("test_"));
     }
-
     #[tokio::test]
     async fn test_generate_deterministic_id() {
         let tool = UuidGeneratorTool::default();
@@ -597,7 +593,6 @@ mod tests {
 
         assert_eq!(id1, id2);
     }
-
     #[tokio::test]
     async fn test_custom_id_generation() {
         let tool = UuidGeneratorTool::default();
@@ -622,9 +617,8 @@ mod tests {
         let id = response["result"]["id"].as_str().unwrap();
         assert!(id.starts_with("custom_"));
         assert!(id.ends_with("_v1"));
-        assert!(id.contains("_")); // Contains timestamp separator
+        assert!(id.contains('_')); // Contains timestamp separator
     }
-
     #[tokio::test]
     async fn test_validate_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -646,7 +640,6 @@ mod tests {
         let parsed: Value = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed["valid"], true);
     }
-
     #[tokio::test]
     async fn test_validate_invalid_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -666,7 +659,6 @@ mod tests {
         let parsed: Value = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed["valid"], false);
     }
-
     #[tokio::test]
     async fn test_different_formats() {
         let tool = UuidGeneratorTool::default();
@@ -684,7 +676,7 @@ mod tests {
             let context = ExecutionContext::with_conversation("test".to_string());
 
             let result = tool.execute(input, context).await;
-            assert!(result.is_ok(), "Format {} failed", format);
+            assert!(result.is_ok(), "Format {format} failed");
 
             let output = result.unwrap().text;
             let response: Value = serde_json::from_str(&output).unwrap();
@@ -698,7 +690,6 @@ mod tests {
             }
         }
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = UuidGeneratorTool::default();

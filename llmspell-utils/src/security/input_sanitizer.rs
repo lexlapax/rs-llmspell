@@ -493,7 +493,6 @@ pub enum Severity {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_html_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -514,7 +513,6 @@ mod tests {
         let js_sanitized = sanitizer.sanitize_html(js_input);
         assert!(!js_sanitized.contains("javascript:"));
     }
-
     #[test]
     fn test_sql_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -535,7 +533,6 @@ mod tests {
         assert!(!union_sanitized.contains("UNION"));
         assert!(!union_sanitized.contains("SELECT"));
     }
-
     #[test]
     fn test_command_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -555,7 +552,6 @@ mod tests {
         let meta_sanitized = sanitizer.sanitize_command(meta_input);
         assert!(meta_sanitized.contains("\\;"));
     }
-
     #[test]
     fn test_format_string_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -572,7 +568,6 @@ mod tests {
         assert!(safe_fmt_sanitized.contains("%d"));
         assert!(safe_fmt_sanitized.contains("%.2f"));
     }
-
     #[test]
     fn test_xml_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -588,7 +583,6 @@ mod tests {
         let entity_sanitized = sanitizer.sanitize_xml(entity_input);
         assert!(!entity_sanitized.contains("ENTITY"));
     }
-
     #[test]
     fn test_path_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -605,7 +599,6 @@ mod tests {
         assert!(sanitizer.sanitize_path("data/file.txt").is_ok());
         assert!(sanitizer.sanitize_path("subdir/file.txt").is_ok());
     }
-
     #[test]
     fn test_validation_report() {
         let sanitizer = InputSanitizer::new();
@@ -624,7 +617,6 @@ mod tests {
             .iter()
             .any(|i| i.issue_type == IssueType::SqlInjection));
     }
-
     #[test]
     fn test_config_modes() {
         // Test strict mode
@@ -636,7 +628,6 @@ mod tests {
         let relaxed = InputSanitizer::with_config(SanitizationConfig::relaxed());
         assert!(relaxed.sanitize(&long_input).is_ok());
     }
-
     #[test]
     fn test_blocked_patterns() {
         let config = SanitizationConfig {

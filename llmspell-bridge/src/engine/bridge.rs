@@ -1,9 +1,10 @@
-//! ABOUTME: ScriptEngineBridge trait defining language-agnostic script engine interface
+//! ABOUTME: `ScriptEngineBridge` trait defining language-agnostic script engine interface
 //! ABOUTME: Foundation for multi-language script execution (Lua, JavaScript, Python, etc.)
 
 use async_trait::async_trait;
 use llmspell_core::{error::LLMSpellError, types::AgentStream};
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Core abstraction for script execution engines
@@ -25,11 +26,28 @@ pub trait ScriptEngineBridge: Send + Sync {
     /// - Tool discovery and execution APIs
     /// - Workflow orchestration APIs
     /// - Provider access APIs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if API injection fails
     fn inject_apis(
         &mut self,
         registry: &Arc<crate::ComponentRegistry>,
         providers: &Arc<crate::ProviderManager>,
     ) -> Result<(), LLMSpellError>;
+
+    /// Set script arguments to be made available in the script environment
+    ///
+    /// Arguments are passed as a `HashMap` and made available in a language-specific way:
+    /// - Lua: Global `ARGS` table
+    /// - JavaScript: Global `args` object
+    /// - Python: `sys.argv` equivalent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if arguments cannot be set in the engine
+    async fn set_script_args(&mut self, args: HashMap<String, String>)
+        -> Result<(), LLMSpellError>;
 
     /// Get the name of this script engine
     fn get_engine_name(&self) -> &'static str;
@@ -44,9 +62,17 @@ pub trait ScriptEngineBridge: Send + Sync {
     fn supported_features(&self) -> EngineFeatures;
 
     /// Get the current execution context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the execution context is invalid
     fn get_execution_context(&self) -> Result<ExecutionContext, LLMSpellError>;
 
     /// Set the execution context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the execution context cannot be set
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError>;
 }
 
@@ -84,6 +110,7 @@ pub struct ScriptMetadata {
 
 /// Features supported by a script engine
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct EngineFeatures {
     /// Supports async/await or coroutines
     pub async_execution: bool,
@@ -132,7 +159,6 @@ pub struct SecurityContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_engine_features_default() {
         let features = EngineFeatures::default();
@@ -141,7 +167,6 @@ mod tests {
         assert!(!features.multimodal);
         assert!(features.max_script_size.is_none());
     }
-
     #[test]
     fn test_security_context_default() {
         let security = SecurityContext::default();

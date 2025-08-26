@@ -49,7 +49,11 @@ impl BaseAgent for ConcurrentAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Increment execution count atomically
         let count = self.execution_count.fetch_add(1, Ordering::SeqCst) + 1;
 
@@ -107,7 +111,6 @@ impl Agent for ConcurrentAgent {
         Ok(())
     }
 }
-
 #[tokio::test]
 async fn test_concurrent_agent_execution() {
     let agent = Arc::new(ConcurrentAgent::new("concurrent-test"));
@@ -145,7 +148,6 @@ async fn test_concurrent_agent_execution() {
     let conv = agent.get_conversation().await.unwrap();
     assert_eq!(conv.len(), num_tasks * 2); // User + Assistant messages
 }
-
 #[tokio::test]
 async fn test_component_id_thread_safety() {
     let num_threads = 50;
@@ -175,7 +177,6 @@ async fn test_component_id_thread_safety() {
         assert_eq!(*id, id2, "ComponentId generation should be deterministic");
     }
 }
-
 #[tokio::test]
 async fn test_concurrent_conversation_modifications() {
     let agent = Arc::new(RwLock::new(ConcurrentAgent::new("conversation-test")));
@@ -216,7 +217,6 @@ async fn test_concurrent_conversation_modifications() {
     let conv = agent.get_conversation().await.unwrap();
     assert_eq!(conv.len(), 20);
 }
-
 #[tokio::test]
 async fn test_metadata_immutability() {
     // ComponentMetadata should be safely shareable
@@ -242,7 +242,6 @@ async fn test_metadata_immutability() {
         handle.await.unwrap();
     }
 }
-
 #[tokio::test]
 async fn test_execution_context_concurrent_access() {
     let context = Arc::new({
@@ -284,7 +283,6 @@ async fn test_execution_context_concurrent_access() {
         handle.await.unwrap();
     }
 }
-
 #[test]
 fn test_error_thread_safety() {
     use std::thread;

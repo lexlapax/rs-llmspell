@@ -583,7 +583,6 @@ pub fn format_bytes(bytes: u64) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_operating_system() {
         let os = OperatingSystem::current();
@@ -609,7 +608,6 @@ mod tests {
             assert!(OperatingSystem::is_unix());
         }
     }
-
     #[test]
     fn test_get_system_info() {
         let info = get_system_info().unwrap();
@@ -625,7 +623,6 @@ mod tests {
         // Architecture should match env::consts::ARCH
         assert_eq!(info.arch, env::consts::ARCH);
     }
-
     #[test]
     fn test_get_cpu_count() {
         let count = get_cpu_count();
@@ -636,7 +633,6 @@ mod tests {
             assert_eq!(count, parallelism.get());
         }
     }
-
     #[test]
     fn test_env_helpers() {
         // Test get_env_or
@@ -670,7 +666,6 @@ mod tests {
         env::remove_var("TRUTHY_VAR");
         assert!(!is_env_truthy("TRUTHY_VAR"));
     }
-
     #[test]
     fn test_get_env_var() {
         // Test getting an existing variable (PATH should exist on all systems)
@@ -682,7 +677,6 @@ mod tests {
         let nonexistent = get_env_var("NONEXISTENT_VAR_12345");
         assert!(nonexistent.is_none());
     }
-
     #[test]
     fn test_set_env_var_if_allowed() {
         let test_key = "TEST_ENV_VAR_12345";
@@ -702,7 +696,6 @@ mod tests {
         // Clean up
         env::remove_var(test_key);
     }
-
     #[test]
     fn test_get_all_env_vars() {
         let vars = get_all_env_vars();
@@ -711,14 +704,12 @@ mod tests {
         // Should contain PATH
         assert!(vars.iter().any(|(k, _)| k == "PATH"));
     }
-
     #[test]
     fn test_get_temp_dir() {
         let temp_dir = get_temp_dir();
         assert!(temp_dir.is_absolute());
         assert!(temp_dir.exists());
     }
-
     #[test]
     fn test_format_bytes() {
         assert_eq!(format_bytes(0), "0 B");
@@ -730,7 +721,6 @@ mod tests {
         assert_eq!(format_bytes(1_099_511_627_776), "1.0 TB");
         assert_eq!(format_bytes(1_125_899_906_842_624), "1.0 PB");
     }
-
     #[test]
     fn test_username_and_home() {
         // These might not always be set in CI environments
@@ -742,7 +732,6 @@ mod tests {
             assert!(home.is_absolute());
         }
     }
-
     #[test]
     fn test_find_executable() {
         // Common executables that should exist
@@ -761,7 +750,6 @@ mod tests {
         // Non-existent executable
         assert!(find_executable("this_executable_definitely_does_not_exist_12345").is_none());
     }
-
     #[test]
     fn test_container_and_vm_detection() {
         // These are environment-specific, so we just ensure they don't panic
@@ -787,7 +775,6 @@ mod property_tests {
                 assert_eq!(formatted1, "0 B");
             }
         }
-
         #[test]
         fn test_env_var_roundtrip(suffix in "[A-Z][A-Z0-9_]*", value in "[^\0]*") {
             // Use a unique prefix to avoid conflicts

@@ -19,7 +19,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
-use llmspell_security::sandbox::SandboxContext;
+use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_f64, extract_optional_string, extract_parameters, extract_required_string,
     response::ResponseBuilder,
@@ -31,7 +31,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 /// Video format types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum VideoFormat {
     Mp4,
@@ -46,11 +46,12 @@ pub enum VideoFormat {
 
 impl VideoFormat {
     /// Detect format from file extension
+    #[must_use]
     pub fn from_extension(path: &Path) -> Self {
         match path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .as_deref()
         {
             Some("mp4") => Self::Mp4,
@@ -74,7 +75,8 @@ pub struct VideoResolution {
 
 impl VideoResolution {
     /// Get resolution name (e.g., "1080p", "4K")
-    pub fn name(&self) -> &'static str {
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
         match (self.width, self.height) {
             (w, h) if w >= 7680 && h >= 4320 => "8K",
             (w, h) if w >= 3840 && h >= 2160 => "4K",
@@ -88,15 +90,16 @@ impl VideoResolution {
     }
 
     /// Get aspect ratio as a string
+    #[must_use]
     pub fn aspect_ratio(&self) -> String {
-        let gcd = self.gcd(self.width, self.height);
+        let gcd = Self::gcd(self.width, self.height);
         let w = self.width / gcd;
         let h = self.height / gcd;
-        format!("{}:{}", w, h)
+        format!("{w}:{h}")
     }
 
-    fn gcd(&self, _a: u32, b: u32) -> u32 {
-        let mut a = _a;
+    const fn gcd(a: u32, b: u32) -> u32 {
+        let mut a = a;
         let mut b = b;
         while b != 0 {
             let tmp = b;
@@ -170,13 +173,13 @@ impl Default for VideoProcessorConfig {
 pub struct VideoProcessorTool {
     metadata: ComponentMetadata,
     config: VideoProcessorConfig,
-    #[allow(dead_code)] // Reserved for future sandbox integration
-    sandbox_context: Option<Arc<SandboxContext>>,
+    sandbox: Arc<FileSandbox>,
 }
 
 impl VideoProcessorTool {
     /// Create a new video processor tool
-    pub fn new(config: VideoProcessorConfig) -> Self {
+    #[must_use]
+    pub fn new(config: VideoProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
                 "video_processor".to_string(),
@@ -184,27 +187,12 @@ impl VideoProcessorTool {
                     .to_string(),
             ),
             config,
-            sandbox_context: None,
-        }
-    }
-
-    /// Create a new video processor tool with sandbox context
-    pub fn with_sandbox(
-        config: VideoProcessorConfig,
-        sandbox_context: Arc<SandboxContext>,
-    ) -> Self {
-        Self {
-            metadata: ComponentMetadata::new(
-                "video_processor".to_string(),
-                "Video file processing for format detection, metadata extraction, and thumbnails"
-                    .to_string(),
-            ),
-            config,
-            sandbox_context: Some(sandbox_context),
+            sandbox,
         }
     }
 
     /// Detect video format from file
+    #[allow(clippy::unused_async)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<VideoFormat> {
         // First try extension-based detection
         let format = VideoFormat::from_extension(file_path);
@@ -221,10 +209,17 @@ impl VideoProcessorTool {
     }
 
     /// Extract metadata from video file
-    async fn extract_metadata(&self, file_path: &Path) -> LLMResult<VideoMetadata> {
+    async fn extract_metadata(
+        &self,
+        file_path: &Path,
+        sandbox: &FileSandbox,
+    ) -> LLMResult<VideoMetadata> {
+        // Validate path using sandbox
+        let safe_path = sandbox.validate_path(file_path)?;
+
         // Get file size
-        let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to read file metadata: {}", e),
+        let file_metadata = std::fs::metadata(&safe_path).map_err(|e| LLMSpellError::Tool {
+            message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("video_processor".to_string()),
             source: None,
         })?;
@@ -248,7 +243,7 @@ impl VideoProcessorTool {
 
         // Create basic metadata
         let metadata = VideoMetadata {
-            format: format.clone(),
+            format,
             duration_seconds: None,
             resolution: None,
             fps: None,
@@ -270,6 +265,7 @@ impl VideoProcessorTool {
     }
 
     /// Generate thumbnail from video
+    #[allow(clippy::unused_async)]
     async fn generate_thumbnail(
         &self,
         _video_path: &Path,
@@ -288,6 +284,7 @@ impl VideoProcessorTool {
     }
 
     /// Extract frame at specific timestamp
+    #[allow(clippy::unused_async)]
     async fn extract_frame(
         &self,
         _video_path: &Path,
@@ -300,8 +297,7 @@ impl VideoProcessorTool {
         // For now, we'll create a placeholder response
         Err(LLMSpellError::Tool {
             message: format!(
-                "Frame extraction at {}s is not implemented in this basic version. Video processing capabilities will be added in Phase 3+",
-                timestamp_seconds
+                "Frame extraction at {timestamp_seconds}s is not implemented in this basic version. Video processing capabilities will be added in Phase 3+"
             ),
             tool_name: Some("video_processor".to_string()),
             source: None,
@@ -309,6 +305,7 @@ impl VideoProcessorTool {
     }
 
     /// Validate processing parameters
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -317,8 +314,7 @@ impl VideoProcessorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: detect, metadata, thumbnail, extract_frame",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: detect, metadata, thumbnail, extract_frame"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -339,7 +335,7 @@ impl VideoProcessorTool {
         // Validate thumbnail/frame extraction parameters
         if matches!(
             extract_optional_string(params, "operation"),
-            Some("thumbnail") | Some("extract_frame")
+            Some("thumbnail" | "extract_frame")
         ) && params.get("target_path").is_none()
         {
             return Err(LLMSpellError::Validation {
@@ -359,11 +355,13 @@ impl BaseAgent for VideoProcessorTool {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        use std::fmt::Write;
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -382,7 +380,7 @@ impl BaseAgent for VideoProcessorTool {
                     && self.config.supported_formats.contains(&format);
 
                 let response = ResponseBuilder::success("detect")
-                    .with_message(format!("Detected video format: {:?}", format))
+                    .with_message(format!("Detected video format: {format:?}"))
                     .with_result(json!({
                         "file_path": file_path,
                         "format": format,
@@ -397,24 +395,25 @@ impl BaseAgent for VideoProcessorTool {
                 let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
-                let metadata = self.extract_metadata(path).await?;
+                let metadata = self.extract_metadata(path, &self.sandbox).await?;
 
                 let mut message = format!("Video file: {:?} format", metadata.format);
 
                 if let Some(resolution) = &metadata.resolution {
-                    message.push_str(&format!(
+                    let _ = write!(
+                        message,
                         ", Resolution: {}x{} ({})",
                         resolution.width,
                         resolution.height,
                         resolution.name()
-                    ));
+                    );
                 }
 
                 if let Some(duration) = metadata.duration_seconds {
-                    message.push_str(&format!(", Duration: {:.1}s", duration));
+                    let _ = write!(message, ", Duration: {duration:.1}s");
                 }
 
-                message.push_str(&format!(", Size: {} bytes", metadata.file_size));
+                let _ = write!(message, ", Size: {} bytes", metadata.file_size);
 
                 let response = ResponseBuilder::success("metadata")
                     .with_message(message)
@@ -439,8 +438,7 @@ impl BaseAgent for VideoProcessorTool {
 
                 let response = ResponseBuilder::success("thumbnail")
                     .with_message(format!(
-                        "Generated thumbnail from {} to {}",
-                        video_path, target_path
+                        "Generated thumbnail from {video_path} to {target_path}"
                     ))
                     .with_result(json!({
                         "video_path": video_path,
@@ -465,8 +463,7 @@ impl BaseAgent for VideoProcessorTool {
 
                 let response = ResponseBuilder::success("extract_frame")
                     .with_message(format!(
-                        "Extracted frame at {}s from {} to {}",
-                        timestamp, video_path, target_path
+                        "Extracted frame at {timestamp}s from {video_path} to {target_path}"
                     ))
                     .with_result(json!({
                         "video_path": video_path,
@@ -494,10 +491,7 @@ impl BaseAgent for VideoProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Video processor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Video processor error: {error}")))
     }
 }
 
@@ -552,32 +546,38 @@ impl Tool for VideoProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::collections::HashMap;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
+
     use std::fs;
     use tempfile::TempDir;
 
-    fn create_test_tool() -> VideoProcessorTool {
-        let config = VideoProcessorConfig::default();
-        VideoProcessorTool::new(config)
+    fn create_test_video_processor_with_temp_dir() -> (VideoProcessorTool, TempDir) {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_video".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
+        let tool = VideoProcessorTool::new(VideoProcessorConfig::default(), sandbox);
+        (tool, temp_dir)
     }
 
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
+    fn create_test_video_processor() -> VideoProcessorTool {
+        create_test_video_processor_with_temp_dir().0
     }
-
     #[tokio::test]
     async fn test_format_detection_by_extension() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
 
         // Test various extensions
@@ -600,7 +600,6 @@ mod tests {
             assert_eq!(format, expected_format);
         }
     }
-
     #[tokio::test]
     async fn test_resolution_naming() {
         let res_4k = VideoResolution {
@@ -630,22 +629,17 @@ mod tests {
         };
         assert_eq!(res_square.aspect_ratio(), "1:1");
     }
-
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_video_processor_with_temp_dir();
         let file_path = temp_dir.path().join("video.mp4");
 
         fs::write(&file_path, b"dummy mp4 content").unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -656,22 +650,18 @@ mod tests {
         assert!(result.text.contains("Mp4"));
         assert!(result.text.contains("Size: 17 bytes"));
     }
-
     #[tokio::test]
     async fn test_format_detection_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.mkv");
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -680,75 +670,78 @@ mod tests {
 
         assert!(result.text.contains("Detected video format: Mkv"));
     }
-
     #[tokio::test]
     async fn test_file_size_limit() {
+        use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+        use llmspell_security::sandbox::SandboxContext;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new().unwrap();
+        let security_requirements =
+            SecurityRequirements::default().with_file_access(temp_dir.path().to_str().unwrap());
+        let resource_limits = ResourceLimits::default();
+
+        let context = SandboxContext::new(
+            "test_video_size_limit".to_string(),
+            security_requirements,
+            resource_limits,
+        );
+        let sandbox = Arc::new(FileSandbox::new(context).unwrap());
+
         let config = VideoProcessorConfig {
             max_file_size: 10, // Very small limit
             ..Default::default()
         };
-        let tool = VideoProcessorTool::new(config);
+        let tool = VideoProcessorTool::new(config, sandbox);
 
-        let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("large.mp4");
 
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
     }
-
     #[tokio::test]
     async fn test_thumbnail_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let video_path = temp_dir.path().join("video.mp4");
         let target_path = temp_dir.path().join("thumb.jpg");
 
         fs::write(&video_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Generate thumbnail",
-            json!({
-                "operation": "thumbnail",
-                "file_path": video_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "thumbnail"),
+            ("file_path", video_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not implemented"));
     }
-
     #[tokio::test]
     async fn test_extract_frame_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let video_path = temp_dir.path().join("video.mp4");
         let target_path = temp_dir.path().join("frame.jpg");
 
         fs::write(&video_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Extract frame",
-            json!({
-                "operation": "extract_frame",
-                "file_path": video_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap(),
-                "timestamp_seconds": 5.0
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "extract_frame"),
+            ("file_path", video_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
+            ("timestamp_seconds", "5.0"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -756,17 +749,11 @@ mod tests {
         assert!(error_msg.contains("not implemented"));
         assert!(error_msg.contains("5s"));
     }
-
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -775,18 +762,12 @@ mod tests {
             .to_string()
             .contains("Invalid operation"));
     }
-
     #[tokio::test]
     async fn test_missing_required_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "metadata")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -796,13 +777,10 @@ mod tests {
             .contains("Missing required parameter 'file_path'"));
 
         // Missing target_path for thumbnail
-        let input = create_test_input(
-            "Generate thumbnail",
-            json!({
-                "operation": "thumbnail",
-                "file_path": "/tmp/video.mp4"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "thumbnail"),
+            ("file_path", "/tmp/video.mp4"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -811,10 +789,9 @@ mod tests {
             .to_string()
             .contains("target_path is required"));
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "video_processor");
@@ -832,22 +809,15 @@ mod tests {
         assert!(params.iter().any(|p| p.name == "target_path"));
         assert!(params.iter().any(|p| p.name == "timestamp_seconds"));
     }
-
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
-        let temp_dir = TempDir::new().unwrap();
+        let (tool, temp_dir) = create_test_video_processor_with_temp_dir();
         let file_path = temp_dir.path().join("test.mp4");
 
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_input(
-            "Process video",
-            json!({
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![("file_path", file_path.to_str().unwrap())]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -856,24 +826,16 @@ mod tests {
 
         assert!(result.text.contains("Video file"));
     }
-
     #[tokio::test]
     async fn test_empty_file_path() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": ""
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "detect"), ("file_path", "")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
-
     #[tokio::test]
     async fn test_supported_formats() {
         let config = VideoProcessorConfig::default();

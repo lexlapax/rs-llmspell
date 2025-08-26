@@ -1,17 +1,16 @@
 //! ABOUTME: Performance optimizations for workflow bridge operations
 //! ABOUTME: Ensures workflow bridge overhead stays under 10ms requirement
 
-use lazy_static::lazy_static;
+#![allow(clippy::significant_drop_tightening)]
+
 use parking_lot::RwLock;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
-lazy_static! {
-    /// Cache for workflow type information to avoid repeated discovery
-    static ref WORKFLOW_TYPE_CACHE: Arc<RwLock<HashMap<String, WorkflowTypeInfo>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
+/// Cache for workflow type information to avoid repeated discovery
+static WORKFLOW_TYPE_CACHE: LazyLock<Arc<RwLock<HashMap<String, WorkflowTypeInfo>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 /// Cached workflow type information
 #[derive(Clone, Debug)]
@@ -39,6 +38,7 @@ impl Default for OptimizedConverter {
 }
 
 impl OptimizedConverter {
+    #[must_use]
     pub fn new() -> Self {
         let mut validators = HashMap::new();
 
@@ -73,11 +73,11 @@ impl OptimizedConverter {
     }
 
     /// Fast parameter validation without full parsing
+    #[must_use]
     pub fn validate_params(&self, workflow_type: &str, params: &Value) -> bool {
         self.validators
             .get(workflow_type)
-            .map(|validator| validator(params))
-            .unwrap_or(true)
+            .is_none_or(|validator| validator(params))
     }
 }
 
@@ -95,6 +95,12 @@ struct CachedExecution {
 }
 
 impl ExecutionCache {
+    /// Create a new execution cache with the specified capacity
+    ///
+    /// # Panics
+    ///
+    /// Panics if capacity is 0
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
             cache: Arc::new(RwLock::new(lru::LruCache::new(
@@ -104,6 +110,7 @@ impl ExecutionCache {
     }
 
     /// Get cached execution if available and fresh
+    #[must_use]
     pub fn get(&self, workflow_id: &str) -> Option<Value> {
         let mut cache = self.cache.write();
         if let Some(cached) = cache.get(workflow_id) {
@@ -148,6 +155,7 @@ impl Default for PerformanceMetrics {
 }
 
 impl PerformanceMetrics {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(RwLock::new(Metrics::default())),
@@ -168,16 +176,22 @@ impl PerformanceMetrics {
     }
 
     /// Get average operation duration
+    #[must_use]
     pub fn average_duration_ms(&self) -> f64 {
         let metrics = self.metrics.read();
         if metrics.total_operations == 0 {
             0.0
         } else {
-            metrics.total_duration_ms as f64 / metrics.total_operations as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_duration = metrics.total_duration_ms as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_ops = metrics.total_operations as f64;
+            total_duration / total_ops
         }
     }
 
     /// Get p99 operation duration
+    #[must_use]
     pub fn p99_duration_ms(&self) -> u64 {
         let metrics = self.metrics.read();
         if metrics.operation_durations.is_empty() {
@@ -186,18 +200,23 @@ impl PerformanceMetrics {
 
         let mut durations = metrics.operation_durations.clone();
         durations.sort_unstable();
-        let idx = (durations.len() as f64 * 0.99) as usize;
+        #[allow(clippy::cast_precision_loss)]
+        let len_f64 = durations.len() as f64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let idx = (len_f64 * 0.99) as usize;
         durations.get(idx).copied().unwrap_or(0)
     }
 
     /// Check if performance is within acceptable bounds
+    #[must_use]
     pub fn is_within_bounds(&self) -> bool {
         self.p99_duration_ms() < 10
     }
 }
 
 /// Optimized workflow discovery with caching
-pub async fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTypeInfo> {
+#[must_use]
+pub fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTypeInfo> {
     // Check cache first
     {
         let cache = WORKFLOW_TYPE_CACHE.read();
@@ -252,7 +271,6 @@ pub async fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTyp
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_optimized_converter() {
         let converter = OptimizedConverter::new();
@@ -270,7 +288,6 @@ mod tests {
         });
         assert!(!converter.validate_params("sequential", &params));
     }
-
     #[test]
     fn test_execution_cache() {
         let cache = ExecutionCache::new(10);
@@ -289,7 +306,6 @@ mod tests {
         // Non-existent entry
         assert!(cache.get("workflow2").is_none());
     }
-
     #[test]
     fn test_performance_metrics() {
         let metrics = PerformanceMetrics::new();

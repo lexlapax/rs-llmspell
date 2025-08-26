@@ -158,9 +158,13 @@ async fn test_complete_lifecycle_workflow() {
     let health_result = health_monitor.check_health().await.unwrap();
     assert_eq!(health_result.status, HealthStatus::Unhealthy);
 }
-
 #[tokio::test]
 async fn test_event_system_integration() {
+    use llmspell_agents::lifecycle::events::{
+        LifecycleEvent, LifecycleEventData, LifecycleEventType,
+    };
+    use llmspell_agents::lifecycle::state_machine::AgentState;
+
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
 
     // Setup event listeners
@@ -186,10 +190,6 @@ async fn test_event_system_integration() {
 
     // Manually emit events to test the event system
     // (State machine doesn't currently integrate with event system)
-    use llmspell_agents::lifecycle::events::{
-        LifecycleEvent, LifecycleEventData, LifecycleEventType,
-    };
-    use llmspell_agents::lifecycle::state_machine::AgentState;
 
     // Emit state change event
     let event = LifecycleEvent::new(
@@ -235,7 +235,6 @@ async fn test_event_system_integration() {
     // Should have metrics for various event types
     assert!(metrics.keys().any(|k| k.contains("StateChanged")));
 }
-
 #[tokio::test]
 async fn test_resource_management_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -291,7 +290,6 @@ async fn test_resource_management_integration() {
     let agent_allocations = resource_manager.get_agent_allocations(agent_id).await;
     assert_eq!(agent_allocations.len(), 0);
 }
-
 #[tokio::test]
 async fn test_middleware_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -328,7 +326,6 @@ async fn test_middleware_integration() {
     let execution_history = middleware_chain.get_execution_history().await;
     assert!(!execution_history.is_empty());
 }
-
 #[tokio::test]
 async fn test_shutdown_coordinator_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -359,10 +356,10 @@ async fn test_shutdown_coordinator_integration() {
     ];
 
     for (agent_id, _priority) in &priorities {
-        let state_machine = Arc::new(AgentStateMachine::default(agent_id.to_string()));
+        let state_machine = Arc::new(AgentStateMachine::default((*agent_id).to_string()));
         state_machine.initialize().await.unwrap();
         state_machine.start().await.unwrap();
-        agents.insert(agent_id.to_string(), state_machine);
+        agents.insert((*agent_id).to_string(), state_machine);
     }
 
     // Create shutdown requests
@@ -398,7 +395,6 @@ async fn test_shutdown_coordinator_integration() {
         assert_eq!(state_machine.current_state().await, AgentState::Terminated);
     }
 }
-
 #[tokio::test]
 async fn test_health_monitoring_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -469,7 +465,6 @@ async fn test_health_monitoring_integration() {
     let latest = health_monitor.get_latest_result().await;
     assert!(latest.is_some());
 }
-
 #[tokio::test]
 async fn test_error_scenarios_and_recovery() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -538,7 +533,6 @@ async fn test_error_scenarios_and_recovery() {
     assert!(result.success);
     assert_eq!(state_machine.current_state().await, AgentState::Terminated);
 }
-
 #[tokio::test]
 async fn test_concurrent_operations() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -550,7 +544,7 @@ async fn test_concurrent_operations() {
     // Test concurrent resource allocations
     let mut handles = Vec::new();
     for i in 0..10 {
-        let agent_id = format!("concurrent-agent-{}", i);
+        let agent_id = format!("concurrent-agent-{i}");
         let resource_manager = resource_manager.clone();
 
         let handle = tokio::spawn(async move {
@@ -577,7 +571,7 @@ async fn test_concurrent_operations() {
     // Test concurrent state machine operations
     let mut state_handles = Vec::new();
     for i in 0..5 {
-        let agent_id = format!("state-agent-{}", i);
+        let agent_id = format!("state-agent-{i}");
         let state_machine = Arc::new(AgentStateMachine::default(agent_id));
 
         let handle = tokio::spawn(async move {
@@ -596,7 +590,6 @@ async fn test_concurrent_operations() {
         handle.await.unwrap().unwrap();
     }
 }
-
 #[tokio::test]
 async fn test_performance_requirements() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -612,8 +605,7 @@ async fn test_performance_requirements() {
     let initialization_time = start.elapsed();
     assert!(
         initialization_time < Duration::from_millis(10),
-        "Initialization took {:?}, expected < 10ms",
-        initialization_time
+        "Initialization took {initialization_time:?}, expected < 10ms"
     );
 
     // Test resource allocation performance
@@ -627,8 +619,7 @@ async fn test_performance_requirements() {
     let allocation_time = start.elapsed();
     assert!(
         allocation_time < Duration::from_millis(50),
-        "Resource allocation took {:?}, expected < 50ms",
-        allocation_time
+        "Resource allocation took {allocation_time:?}, expected < 50ms"
     );
 
     // Test health check performance
@@ -651,8 +642,7 @@ async fn test_performance_requirements() {
     let health_check_time = start.elapsed();
     assert!(
         health_check_time < Duration::from_millis(100),
-        "Health check took {:?}, expected < 100ms",
-        health_check_time
+        "Health check took {health_check_time:?}, expected < 100ms"
     );
 }
 
@@ -703,7 +693,6 @@ impl LifecycleMiddleware for TestMiddleware {
         true
     }
 }
-
 #[tokio::test]
 async fn test_custom_middleware() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));

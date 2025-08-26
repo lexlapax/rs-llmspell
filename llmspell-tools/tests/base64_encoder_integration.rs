@@ -6,7 +6,6 @@ use llmspell_tools::util::Base64EncoderTool;
 use serde_json::{json, Value};
 use std::fs;
 use tempfile::TempDir;
-
 #[tokio::test]
 async fn test_standard_base64_roundtrip() {
     let tool = Base64EncoderTool::new();
@@ -54,10 +53,9 @@ async fn test_standard_base64_roundtrip() {
         assert!(output["success"].as_bool().unwrap());
         let decoded = output["result"]["output"].as_str().unwrap();
 
-        assert_eq!(decoded, test_text, "Failed to roundtrip: {}", test_text);
+        assert_eq!(decoded, test_text, "Failed to roundtrip: {test_text}");
     }
 }
-
 #[tokio::test]
 async fn test_url_safe_base64() {
     let tool = Base64EncoderTool::new();
@@ -108,7 +106,6 @@ async fn test_url_safe_base64() {
     let decoded = output["result"]["output"].as_str().unwrap();
     assert_eq!(decoded, test_data);
 }
-
 #[tokio::test]
 async fn test_binary_data_handling() {
     let tool = Base64EncoderTool::new();
@@ -143,8 +140,7 @@ async fn test_binary_data_handling() {
         // Verify the encoding is correct
         assert_eq!(
             encoded, expected_base64,
-            "Encoding mismatch for {}",
-            hex_input
+            "Encoding mismatch for {hex_input}"
         );
 
         // Decode back
@@ -165,19 +161,17 @@ async fn test_binary_data_handling() {
         // The decoded hex might not have leading zeros, so we compare the actual bytes
         let original_bytes = hex::decode(hex_input).unwrap();
         let decoded_hex_padded = if decoded_hex.len() % 2 == 1 {
-            format!("0{}", decoded_hex)
+            format!("0{decoded_hex}")
         } else {
             decoded_hex.to_string()
         };
         let decoded_bytes = hex::decode(&decoded_hex_padded).unwrap();
         assert_eq!(
             decoded_bytes, original_bytes,
-            "Failed for input: {}",
-            hex_input
+            "Failed for input: {hex_input}"
         );
     }
 }
-
 #[tokio::test]
 async fn test_file_operations() {
     let tool = Base64EncoderTool::new();
@@ -233,7 +227,6 @@ async fn test_file_operations() {
     let decoded_content = fs::read_to_string(&decoded_path).unwrap();
     assert_eq!(decoded_content, test_content);
 }
-
 #[tokio::test]
 async fn test_large_file_handling() {
     let tool = Base64EncoderTool::new();
@@ -265,7 +258,6 @@ async fn test_large_file_handling() {
     // Verify success
     assert!(output["success"].as_bool().unwrap());
 }
-
 #[tokio::test]
 async fn test_error_handling() {
     let tool = Base64EncoderTool::new();
@@ -314,7 +306,6 @@ async fn test_error_handling() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_mixed_variants() {
     let tool = Base64EncoderTool::new();
@@ -388,7 +379,6 @@ async fn test_mixed_variants() {
     let decoded = output_value["result"]["output"].as_str().unwrap();
     assert_eq!(decoded, test_text);
 }
-
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

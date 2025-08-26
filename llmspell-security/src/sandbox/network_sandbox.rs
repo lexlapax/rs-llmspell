@@ -60,7 +60,9 @@ impl RateLimiter {
         self.requests.retain(|&timestamp| timestamp > window_start);
 
         // Check if we're under the limit
-        if self.requests.len() < self.config.max_requests as usize {
+        #[allow(clippy::cast_lossless)]
+        let max_requests_usize = self.config.max_requests as usize;
+        if self.requests.len() < max_requests_usize {
             self.requests.push(now);
             true
         } else {
@@ -152,7 +154,8 @@ impl NetworkSandbox {
         if !limiter.check_and_record() {
             let violation = SandboxViolation::ResourceLimit {
                 resource: "network_requests".to_string(),
-                limit: self.default_rate_limit.max_requests as u64,
+                limit: u64::from(self.default_rate_limit.max_requests),
+                #[allow(clippy::cast_possible_truncation)]
                 actual: limiter.requests.len() as u64,
                 reason: format!("Rate limit exceeded for domain: {}", domain),
             };
@@ -292,7 +295,6 @@ mod tests {
 
         NetworkSandbox::new(context).unwrap()
     }
-
     #[tokio::test]
     async fn test_domain_validation() {
         let mut sandbox = create_test_sandbox();
@@ -309,7 +311,6 @@ mod tests {
             .await
             .is_err());
     }
-
     #[test]
     fn test_domain_extraction() {
         let sandbox = create_test_sandbox();
@@ -331,7 +332,6 @@ mod tests {
             "sub.domain.com"
         );
     }
-
     #[tokio::test]
     async fn test_http_methods() {
         let mut sandbox = create_test_sandbox();
@@ -348,7 +348,6 @@ mod tests {
             .is_ok());
         assert!(sandbox.delete("https://api.example.com/data").await.is_ok());
     }
-
     #[tokio::test]
     async fn test_rate_limiting() {
         let rate_config = RateLimitConfig {
@@ -368,7 +367,6 @@ mod tests {
         // Check that violation was recorded
         assert!(!sandbox.get_violations().is_empty());
     }
-
     #[tokio::test]
     async fn test_network_stats() {
         let mut sandbox = create_test_sandbox();
@@ -382,7 +380,6 @@ mod tests {
         assert!(stats.domain_stats.contains_key("api.example.com"));
         assert!(stats.domain_stats.contains_key("github.com"));
     }
-
     #[tokio::test]
     async fn test_violation_tracking() {
         let mut sandbox = create_test_sandbox();

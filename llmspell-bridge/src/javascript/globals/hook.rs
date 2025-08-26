@@ -5,8 +5,15 @@ use crate::globals::types::GlobalContext;
 use llmspell_core::Result;
 
 /// Inject the Hook global into JavaScript (stub for Phase 15)
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalContext) -> Result<()> {
+pub const fn inject_hook_global(
+    _ctx: &mut boa_engine::Context,
+    _context: &GlobalContext,
+) -> Result<()> {
     // TODO (Phase 15): Implement JavaScript hook global
     // This will include:
     // - Hook.register(hook_point, callback, priority)
@@ -15,25 +22,27 @@ pub fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalConte
     Ok(())
 }
 
+/// Stub for when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_hook_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()> {
+pub const fn inject_hook_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()> {
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_hook_global_stub() {
         // Basic compilation test
+        use llmspell_config::providers::ProviderManagerConfig;
+        let config = ProviderManagerConfig::default();
         let context = GlobalContext::new(
             std::sync::Arc::new(crate::ComponentRegistry::new()),
-            std::sync::Arc::new(
-                crate::ProviderManager::new(Default::default())
-                    .await
-                    .unwrap(),
-            ),
+            std::sync::Arc::new(crate::ProviderManager::new(config).await.unwrap()),
         );
 
         #[cfg(feature = "javascript")]

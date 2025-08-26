@@ -69,6 +69,7 @@ struct ScrapeOptions {
 
 impl WebScraperTool {
     /// Create a new web scraper tool
+    #[must_use]
     pub fn new(config: WebScraperConfig) -> Self {
         let client = Client::builder()
             .timeout(Duration::from_secs(config.default_timeout))
@@ -86,6 +87,7 @@ impl WebScraperTool {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn scrape_page(
         &self,
         url: &str,
@@ -105,7 +107,7 @@ impl WebScraperTool {
             .get(url)
             .send()
             .await
-            .map_err(|e| component_error(format!("Failed to fetch URL: {}", e)))?;
+            .map_err(|e| component_error(format!("Failed to fetch URL: {e}")))?;
 
         if !response.status().is_success() {
             return Err(component_error(format!(
@@ -118,7 +120,7 @@ impl WebScraperTool {
         let html_content = response
             .text()
             .await
-            .map_err(|e| component_error(format!("Failed to read response: {}", e)))?;
+            .map_err(|e| component_error(format!("Failed to read response: {e}")))?;
 
         // Parse HTML
         let document = Html::parse_document(&html_content);
@@ -143,7 +145,7 @@ impl WebScraperTool {
                 }
                 Err(e) => {
                     return Err(validation_error(
-                        format!("Invalid CSS selector '{}': {:?}", selector_str, e),
+                        format!("Invalid CSS selector '{selector_str}': {e:?}"),
                         Some("selector".to_string()),
                     ));
                 }
@@ -175,7 +177,7 @@ impl WebScraperTool {
                     }
                     Err(e) => {
                         return Err(validation_error(
-                            format!("Invalid CSS selector '{}': {:?}", selector_str, e),
+                            format!("Invalid CSS selector '{selector_str}': {e:?}"),
                             Some("selectors".to_string()),
                         ));
                     }
@@ -203,7 +205,7 @@ impl WebScraperTool {
             let links: Vec<String> = document
                 .select(&link_selector)
                 .filter_map(|el| el.value().attr("href"))
-                .map(|href| href.to_string())
+                .map(std::string::ToString::to_string)
                 .collect();
             result.insert("links".to_string(), json!(links));
         }
@@ -214,7 +216,7 @@ impl WebScraperTool {
             let images: Vec<String> = document
                 .select(&img_selector)
                 .filter_map(|el| el.value().attr("src"))
-                .map(|src| src.to_string())
+                .map(std::string::ToString::to_string)
                 .collect();
             result.insert("images".to_string(), json!(images));
         }
@@ -352,10 +354,14 @@ impl BaseAgent for WebScraperTool {
         //     .with_operation("web_scraping")
         //     .with_resource(url);
         // let safe_response = handler.handle_llmspell_error(&error, context);
-        Ok(AgentOutput::text(format!("WebScraper error: {}", error)))
+        Ok(AgentOutput::text(format!("WebScraper error: {error}")))
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
 
@@ -374,7 +380,7 @@ impl BaseAgent for WebScraperTool {
             }
             Err(e) => {
                 return Err(validation_error(
-                    format!("URL validation failed: {}", e),
+                    format!("URL validation failed: {e}"),
                     Some("input".to_string()),
                 ));
             }
@@ -399,14 +405,12 @@ impl BaseAgent for WebScraperTool {
             }
         }
 
-        let selectors = if let Some(obj) = extract_optional_object(params, "selectors") {
+        let selectors = extract_optional_object(params, "selectors").and_then(|obj| {
             serde_json::from_value::<HashMap<String, String>>(serde_json::Value::Object(
                 obj.clone(),
             ))
             .ok()
-        } else {
-            None
-        };
+        });
 
         let wait_for_js = extract_optional_bool(params, "wait_for_js").unwrap_or(false);
 
@@ -428,7 +432,7 @@ impl BaseAgent for WebScraperTool {
                 url,
                 &options,
                 selectors,
-                single_selector.map(|s| s.to_string()),
+                single_selector.map(std::string::ToString::to_string),
             )
             .await?;
 
@@ -451,7 +455,6 @@ mod tests {
     use super::*;
     use serde_json::json;
     use std::collections::HashMap;
-
     #[test]
     fn test_tool_schema() {
         let tool = WebScraperTool::new(WebScraperConfig::default());
@@ -461,7 +464,6 @@ mod tests {
         assert_eq!(schema.parameters[0].name, "input");
         assert!(schema.parameters[0].required);
     }
-
     #[tokio::test]
     async fn test_url_validation() {
         let tool = WebScraperTool::new(WebScraperConfig::default());
@@ -473,7 +475,7 @@ mod tests {
             }),
         );
         let input = AgentInput {
-            text: "".to_string(),
+            text: String::new(),
             media: vec![],
             context: None,
             parameters: params,
@@ -484,7 +486,6 @@ mod tests {
         let result = tool.execute(input, context).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_js_wait_not_implemented() {
         let tool = WebScraperTool::new(WebScraperConfig::default());
@@ -497,7 +498,7 @@ mod tests {
             }),
         );
         let input = AgentInput {
-            text: "".to_string(),
+            text: String::new(),
             media: vec![],
             context: None,
             parameters: params,

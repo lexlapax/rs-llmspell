@@ -293,7 +293,6 @@ mod tests {
         types::{ComponentId, ComponentType},
         HookPoint,
     };
-
     #[tokio::test]
     async fn test_rate_limit_policy_creation() {
         let config = RateLimitConfig::default();
@@ -302,7 +301,6 @@ mod tests {
         assert_eq!(policy.metadata.name, "SessionRateLimitPolicy");
         assert!(!policy.operation_limiters.is_empty());
     }
-
     #[tokio::test]
     async fn test_operation_type_extraction() {
         let config = RateLimitConfig::default();
@@ -320,7 +318,6 @@ mod tests {
         let op_type = policy.get_operation_type(&context);
         assert_eq!(op_type, Some("llm_call".to_string()));
     }
-
     #[tokio::test]
     async fn test_rate_limit_with_session_id() {
         let config = RateLimitConfig {
@@ -346,7 +343,6 @@ mod tests {
         // Rapid subsequent calls might be rate limited
         // (Note: Actual rate limiting depends on the underlying RateLimitHook implementation)
     }
-
     #[tokio::test]
     async fn test_warning_detection() {
         let config = RateLimitConfig::default();

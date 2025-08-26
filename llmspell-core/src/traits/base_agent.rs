@@ -1,10 +1,13 @@
-//! ABOUTME: BaseAgent trait - foundation for all components
+//! ABOUTME: `BaseAgent` trait - foundation for all components
 //! ABOUTME: Provides core functionality for agents, tools, and workflows
 
 use crate::execution_context::ExecutionContext;
+use crate::traits::event::EventData;
 use crate::types::{AgentInput, AgentOutput, AgentStream, MediaType};
 use crate::{ComponentMetadata, Result};
 use async_trait::async_trait;
+use serde_json::json;
+use std::time::Instant;
 
 /// Base trait for all components in the LLMSpell system.
 ///
@@ -38,17 +41,13 @@ use async_trait::async_trait;
 ///         &self.metadata
 ///     }
 ///     
-///     async fn execute(
+///     async fn execute_impl(
 ///         &self,
 ///         input: AgentInput,
 ///         context: ExecutionContext,
 ///     ) -> Result<AgentOutput> {
-///         // Validate input first
-///         self.validate_input(&input).await?;
-///         
 ///         // Process the input
 ///         let result = format!("Processed: {}", input.text);
-///         
 ///         Ok(AgentOutput::text(result))
 ///     }
 ///     
@@ -63,7 +62,7 @@ use async_trait::async_trait;
 ///     }
 ///     
 ///     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-///         Ok(AgentOutput::text(format!("Error handled: {}", error)))
+///         Err(error)
 ///     }
 /// }
 /// ```
@@ -78,8 +77,105 @@ pub trait BaseAgent: Send + Sync {
 
     /// Execute the component with given input.
     ///
-    /// This is the main execution method for all components. It processes
-    /// the input according to the component's logic and returns the result.
+    /// This is the main execution method that handles both event emission and state management
+    /// based on what's available in the ExecutionContext. Components should NOT override this
+    /// method - instead, they should implement `execute_impl()`.
+    ///
+    /// # Behavior
+    ///
+    /// - If `context.events` is Some, emits start/complete/failed events
+    /// - If `context.state` is Some, state operations are available
+    /// - Always calls `execute_impl()` for the actual component logic
+    ///
+    /// # Arguments
+    ///
+    /// * `input` - The input containing prompt and optional context data
+    /// * `context` - Execution context with optional state and events
+    ///
+    /// # Returns
+    ///
+    /// Returns `Ok(AgentOutput)` on success, or an error if execution fails.
+    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+        let start = Instant::now();
+        let metadata = self.metadata();
+        let component_type = metadata.component_type();
+        let component_id = metadata.id;
+
+        // Emit start event if events are enabled
+        if let Some(ref events) = context.events {
+            if events.is_enabled() {
+                let event_data = EventData::new(format!("{}.started", component_type))
+                    .with_component(component_id)
+                    .with_data(json!({
+                        "component_name": metadata.name,
+                        "component_version": metadata.version,
+                        "input_text_length": input.text.len(),
+                        "has_context": input.context.is_some(),
+                        "parameter_keys": input.parameters.keys().collect::<Vec<_>>(),
+                        "session_id": context.session_id.clone(),
+                        "conversation_id": context.conversation_id.clone(),
+                    }))
+                    .with_correlation(context.metadata.correlation_id().unwrap_or("").to_string());
+
+                // Fire and forget - don't fail execution if event emission fails
+                let _ = events.emit_structured(event_data).await;
+            }
+        }
+
+        // Execute the actual component implementation
+        let result = self.execute_impl(input.clone(), context.clone()).await;
+
+        // Emit completion or error event
+        if let Some(ref events) = context.events {
+            if events.is_enabled() {
+                let elapsed_ms = start.elapsed().as_millis();
+
+                match &result {
+                    Ok(output) => {
+                        let event_data = EventData::new(format!("{}.completed", component_type))
+                            .with_component(component_id)
+                            .with_data(json!({
+                                "component_name": metadata.name,
+                                "duration_ms": elapsed_ms,
+                                "output_text_length": output.text.len(),
+                                "has_tool_calls": !output.tool_calls.is_empty(),
+                                "tool_call_count": output.tool_calls.len(),
+                                "confidence": output.metadata.confidence,
+                                "model_used": output.metadata.model.clone(),
+                            }))
+                            .with_correlation(
+                                context.metadata.correlation_id().unwrap_or("").to_string(),
+                            );
+
+                        let _ = events.emit_structured(event_data).await;
+                    }
+                    Err(e) => {
+                        let event_data = EventData::new(format!("{}.failed", component_type))
+                            .with_component(component_id)
+                            .with_data(json!({
+                                "component_name": metadata.name,
+                                "duration_ms": elapsed_ms,
+                                "error": e.to_string(),
+                                "error_type": format!("{:?}", e),
+                            }))
+                            .with_correlation(
+                                context.metadata.correlation_id().unwrap_or("").to_string(),
+                            );
+
+                        let _ = events.emit_structured(event_data).await;
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Implementation-specific execution logic.
+    ///
+    /// This is the method that components must implement to provide their
+    /// specific functionality. It's called by the public `execute()` method
+    /// after handling cross-cutting concerns like event emission.
     ///
     /// # Arguments
     ///
@@ -89,8 +185,11 @@ pub trait BaseAgent: Send + Sync {
     /// # Returns
     ///
     /// Returns `Ok(AgentOutput)` on success, or an error if execution fails.
-    /// The output contains the result content and optional metadata.
-    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput>;
 
     /// Validate input before execution.
     ///
@@ -222,7 +321,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             input: AgentInput,
             _context: ExecutionContext,
@@ -244,7 +343,6 @@ mod tests {
             Ok(AgentOutput::text(format!("Error handled: {}", error)))
         }
     }
-
     #[tokio::test]
     async fn test_base_agent_implementation() {
         let agent = MockAgent::new();
@@ -260,7 +358,6 @@ mod tests {
         let result = agent.execute(input, context).await.unwrap();
         assert_eq!(result.text, "Processed: test prompt");
     }
-
     #[tokio::test]
     async fn test_base_agent_validation() {
         let agent = MockAgent::new();
@@ -280,7 +377,6 @@ mod tests {
             panic!("Expected validation error");
         }
     }
-
     #[tokio::test]
     async fn test_base_agent_error_handling() {
         let agent = MockAgent::new();
@@ -294,7 +390,6 @@ mod tests {
         assert!(result.text.contains("Error handled"));
         assert!(result.text.contains("Test error"));
     }
-
     #[tokio::test]
     async fn test_base_agent_streaming_default() {
         let agent = MockAgent::new();

@@ -2,7 +2,8 @@
 //! ABOUTME: Tests session lifecycle, persistence, and replay functionality
 
 use llmspell_bridge::lua::engine::LuaEngine;
-use llmspell_bridge::runtime::GlobalRuntimeConfig;
+use llmspell_bridge::runtime::Global;
+use llmspell_config::LLMSpellConfig;
 use llmspell_bridge::ComponentRegistry;
 use llmspell_core::test_utils::TestLogger;
 use llmspell_sessions::config::SessionManagerConfig;
@@ -20,7 +21,7 @@ async fn test_session_creation_and_operations() {
     let storage_path = temp_dir.path().to_path_buf();
 
     // Create runtime config with sessions enabled
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
     runtime_config.runtime.sessions.max_sessions = 10;
@@ -51,8 +52,8 @@ async fn test_session_creation_and_operations() {
         assert(metadata.description == "Integration test session", "Description should match")
         
         -- Test session context
-        Session.setCurrent(session_id)
-        local current = Session.getCurrent()
+        Session.set_current(session_id)
+        local current = Session.get_current()
         assert(current == session_id, "Current session should match set session")
         
         -- Test session listing
@@ -72,7 +73,7 @@ async fn test_session_persistence() {
     TestLogger::init();
     
     // Create runtime config
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
@@ -112,7 +113,7 @@ async fn test_session_persistence() {
 async fn test_session_lifecycle() {
     TestLogger::init();
     
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
@@ -146,7 +147,7 @@ async fn test_session_lifecycle() {
 async fn test_session_replay() {
     TestLogger::init();
     
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
@@ -185,7 +186,7 @@ async fn test_session_replay() {
 async fn test_session_error_conditions() {
     TestLogger::init();
     
-    let mut runtime_config = GlobalRuntimeConfig::default();
+    let mut runtime_config = GlobalLLMSpellConfig::default();
     runtime_config.runtime.sessions.enabled = true;
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 

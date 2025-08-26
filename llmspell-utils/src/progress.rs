@@ -469,7 +469,6 @@ macro_rules! progress {
 mod tests {
     use super::*;
     use tokio::sync::Mutex;
-
     #[tokio::test]
     async fn test_progress_reporter() {
         let (reporter, mut receiver) = ProgressReporter::new("Test Operation", Some(100));
@@ -498,7 +497,6 @@ mod tests {
             _ => panic!("Expected Update event"),
         }
     }
-
     #[tokio::test]
     async fn test_progress_increment() {
         let (reporter, mut receiver) = ProgressReporter::new("Increment Test", Some(10));
@@ -513,7 +511,6 @@ mod tests {
         // Check final value
         assert_eq!(reporter.current().await, 5);
     }
-
     #[tokio::test]
     async fn test_progress_tracker() {
         let tracker = ProgressTracker::new();
@@ -545,7 +542,6 @@ mod tests {
         let events = events.lock().await;
         assert!(events.len() >= 2); // Started + Update
     }
-
     #[tokio::test]
     async fn test_progress_completion() {
         let (reporter, mut receiver) = ProgressReporter::new("Complete Test", None);
@@ -566,7 +562,6 @@ mod tests {
             _ => panic!("Expected Completed event"),
         }
     }
-
     #[tokio::test]
     async fn test_progress_builder() {
         let reporter = ProgressBuilder::new("Built Operation")

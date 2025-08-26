@@ -27,6 +27,7 @@ pub struct InjectionCache {
 
 impl InjectionCache {
     /// Create a new injection cache
+    #[must_use]
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "lua")]
@@ -37,6 +38,7 @@ impl InjectionCache {
     }
 
     /// Get cache hit rate
+    #[must_use]
     pub fn hit_rate(&self) -> f64 {
         let hits = *self.hits.read();
         let misses = *self.misses.read();
@@ -44,7 +46,9 @@ impl InjectionCache {
         if total == 0 {
             0.0
         } else {
-            hits as f64 / total as f64
+            #[allow(clippy::cast_precision_loss)]
+            let rate = hits as f64 / total as f64;
+            rate
         }
     }
 
@@ -71,6 +75,7 @@ pub struct GlobalInjector {
 
 impl GlobalInjector {
     /// Create a new global injector
+    #[must_use]
     pub fn new(registry: Arc<GlobalRegistry>) -> Self {
         Self {
             registry,
@@ -79,6 +84,12 @@ impl GlobalInjector {
     }
 
     /// Inject all globals into a Lua environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Global initialization fails
+    /// - Lua injection fails for any global
     #[cfg(feature = "lua")]
     pub fn inject_lua(&self, lua: &Lua, context: &GlobalContext) -> Result<InjectionMetrics> {
         let start = Instant::now();
@@ -103,13 +114,14 @@ impl GlobalInjector {
                     source: Some(Box::new(e)),
                 })?;
 
-            let elapsed = global_start.elapsed().as_micros() as u64;
+            let elapsed = u64::try_from(global_start.elapsed().as_micros()).unwrap_or(u64::MAX);
             metrics
                 .per_global_times
                 .insert(metadata.name.clone(), elapsed);
         }
 
-        metrics.total_injection_time_us = start.elapsed().as_micros() as u64;
+        metrics.total_injection_time_us =
+            u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
         metrics.globals_injected = globals.len();
         metrics.cache_hit_rate = self.cache.hit_rate();
 
@@ -117,6 +129,12 @@ impl GlobalInjector {
     }
 
     /// Inject all globals into a JavaScript environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Global initialization fails
+    /// - JavaScript injection fails for any global
     #[cfg(feature = "javascript")]
     pub fn inject_javascript(
         &self,
@@ -145,13 +163,14 @@ impl GlobalInjector {
                     source: Some(Box::new(e)),
                 })?;
 
-            let elapsed = global_start.elapsed().as_micros() as u64;
+            let elapsed = u64::try_from(global_start.elapsed().as_micros()).unwrap_or(u64::MAX);
             metrics
                 .per_global_times
                 .insert(metadata.name.clone(), elapsed);
         }
 
-        metrics.total_injection_time_us = start.elapsed().as_micros() as u64;
+        metrics.total_injection_time_us =
+            u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
         metrics.globals_injected = globals.len();
         metrics.cache_hit_rate = self.cache.hit_rate();
 
@@ -159,6 +178,10 @@ impl GlobalInjector {
     }
 
     /// Clean up all globals
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cleanup fails for any global
     pub fn cleanup(&self) -> Result<()> {
         let globals = self.registry.get_all_ordered();
 
@@ -172,6 +195,8 @@ impl GlobalInjector {
     }
 
     /// Get injection metrics from the last injection
+    #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Arc deref not supported in const fn
     pub fn get_metrics(&self) -> &InjectionMetrics {
         self.registry.metrics()
     }
@@ -180,26 +205,24 @@ impl GlobalInjector {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_injection_cache() {
         let cache = InjectionCache::new();
 
         // Initially, hit rate should be 0
-        assert_eq!(cache.hit_rate(), 0.0);
+        assert!((cache.hit_rate() - 0.0).abs() < f64::EPSILON);
 
         // Simulate some hits and misses
         *cache.hits.write() = 7;
         *cache.misses.write() = 3;
 
         // Hit rate should be 0.7
-        assert_eq!(cache.hit_rate(), 0.7);
+        assert!((cache.hit_rate() - 0.7).abs() < f64::EPSILON);
 
         // Clear should reset everything
         cache.clear();
-        assert_eq!(cache.hit_rate(), 0.0);
+        assert!((cache.hit_rate() - 0.0).abs() < f64::EPSILON);
     }
-
     #[test]
     fn test_injection_metrics() {
         let metrics = InjectionMetrics {
@@ -211,7 +234,6 @@ mod tests {
         assert!(metrics.is_within_bounds());
         assert_eq!(metrics.average_time_us(), 300);
     }
-
     #[test]
     fn test_injection_metrics_failure_case() {
         // Test failure case

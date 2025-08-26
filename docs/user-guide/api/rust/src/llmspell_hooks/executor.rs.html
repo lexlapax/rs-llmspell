@@ -1,0 +1,804 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `llmspell-hooks/src/executor.rs`."><title>executor.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="llmspell_hooks" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31) (Homebrew)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../../static.files/storage-3a5871a4.js"></script><script defer src="../../static.files/src-script-b8d3f215.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">llmspell_hooks/</div>executor.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-3"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="comment">// ABOUTME: HookExecutor implementation with automatic performance protection via CircuitBreaker
+<a href=#2 id=2 data-nosnippet>2</a>// ABOUTME: Manages hook execution with monitoring, error handling, and performance guarantees
+<a href=#3 id=3 data-nosnippet>3</a>
+<a href=#4 id=4 data-nosnippet>4</a></span><span class="kw">use </span><span class="kw">crate</span>::circuit_breaker::{BreakerConfig, CircuitBreaker, CircuitBreakerManager};
+<a href=#5 id=5 data-nosnippet>5</a><span class="kw">use </span><span class="kw">crate</span>::context::HookContext;
+<a href=#6 id=6 data-nosnippet>6</a><span class="kw">use </span><span class="kw">crate</span>::performance::{PerformanceConfig, PerformanceMetrics, PerformanceMonitor};
+<a href=#7 id=7 data-nosnippet>7</a><span class="kw">use </span><span class="kw">crate</span>::persistence::HookPersistenceManager;
+<a href=#8 id=8 data-nosnippet>8</a><span class="kw">use </span><span class="kw">crate</span>::result::HookResult;
+<a href=#9 id=9 data-nosnippet>9</a><span class="kw">use </span><span class="kw">crate</span>::traits::Hook;
+<a href=#10 id=10 data-nosnippet>10</a><span class="kw">use </span>anyhow::Result;
+<a href=#11 id=11 data-nosnippet>11</a><span class="kw">use </span>llmspell_events::{EventCorrelationTracker, EventLink, EventRelationship, UniversalEvent};
+<a href=#12 id=12 data-nosnippet>12</a><span class="kw">use </span>parking_lot::RwLock;
+<a href=#13 id=13 data-nosnippet>13</a><span class="kw">use </span>std::collections::HashMap;
+<a href=#14 id=14 data-nosnippet>14</a><span class="kw">use </span>std::sync::Arc;
+<a href=#15 id=15 data-nosnippet>15</a><span class="kw">use </span>std::time::{Duration, Instant};
+<a href=#16 id=16 data-nosnippet>16</a><span class="kw">use </span>tracing::{info, warn};
+<a href=#17 id=17 data-nosnippet>17</a>
+<a href=#18 id=18 data-nosnippet>18</a><span class="doccomment">/// Hook execution configuration
+<a href=#19 id=19 data-nosnippet>19</a></span><span class="attr">#[derive(Debug, Clone)]
+<a href=#20 id=20 data-nosnippet>20</a></span><span class="kw">pub struct </span>HookExecutorConfig {
+<a href=#21 id=21 data-nosnippet>21</a>    <span class="doccomment">/// Enable circuit breaker protection
+<a href=#22 id=22 data-nosnippet>22</a>    </span><span class="kw">pub </span>enable_circuit_breaker: bool,
+<a href=#23 id=23 data-nosnippet>23</a>    <span class="doccomment">/// Enable performance monitoring
+<a href=#24 id=24 data-nosnippet>24</a>    </span><span class="kw">pub </span>enable_performance_monitoring: bool,
+<a href=#25 id=25 data-nosnippet>25</a>    <span class="doccomment">/// Enable hook persistence
+<a href=#26 id=26 data-nosnippet>26</a>    </span><span class="kw">pub </span>enable_persistence: bool,
+<a href=#27 id=27 data-nosnippet>27</a>    <span class="doccomment">/// Maximum execution time before circuit breaker triggers
+<a href=#28 id=28 data-nosnippet>28</a>    </span><span class="kw">pub </span>max_execution_time: Duration,
+<a href=#29 id=29 data-nosnippet>29</a>    <span class="doccomment">/// Performance overhead target (e.g., 5%)
+<a href=#30 id=30 data-nosnippet>30</a>    </span><span class="kw">pub </span>performance_overhead_target: f64,
+<a href=#31 id=31 data-nosnippet>31</a>    <span class="doccomment">/// Circuit breaker configuration
+<a href=#32 id=32 data-nosnippet>32</a>    </span><span class="kw">pub </span>breaker_config: BreakerConfig,
+<a href=#33 id=33 data-nosnippet>33</a>    <span class="doccomment">/// Performance monitoring configuration
+<a href=#34 id=34 data-nosnippet>34</a>    </span><span class="kw">pub </span>performance_config: PerformanceConfig,
+<a href=#35 id=35 data-nosnippet>35</a>}
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a><span class="kw">impl </span>Default <span class="kw">for </span>HookExecutorConfig {
+<a href=#38 id=38 data-nosnippet>38</a>    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<a href=#39 id=39 data-nosnippet>39</a>        <span class="self">Self </span>{
+<a href=#40 id=40 data-nosnippet>40</a>            enable_circuit_breaker: <span class="bool-val">true</span>,
+<a href=#41 id=41 data-nosnippet>41</a>            enable_performance_monitoring: <span class="bool-val">true</span>,
+<a href=#42 id=42 data-nosnippet>42</a>            enable_persistence: <span class="bool-val">false</span>, <span class="comment">// Opt-in for backward compatibility
+<a href=#43 id=43 data-nosnippet>43</a>            </span>max_execution_time: Duration::from_millis(<span class="number">100</span>),
+<a href=#44 id=44 data-nosnippet>44</a>            performance_overhead_target: <span class="number">0.05</span>, <span class="comment">// 5%
+<a href=#45 id=45 data-nosnippet>45</a>            </span>breaker_config: BreakerConfig::default(),
+<a href=#46 id=46 data-nosnippet>46</a>            performance_config: PerformanceConfig::default(),
+<a href=#47 id=47 data-nosnippet>47</a>        }
+<a href=#48 id=48 data-nosnippet>48</a>    }
+<a href=#49 id=49 data-nosnippet>49</a>}
+<a href=#50 id=50 data-nosnippet>50</a>
+<a href=#51 id=51 data-nosnippet>51</a><span class="doccomment">/// Hook executor with performance protection
+<a href=#52 id=52 data-nosnippet>52</a></span><span class="kw">pub struct </span>HookExecutor {
+<a href=#53 id=53 data-nosnippet>53</a>    config: HookExecutorConfig,
+<a href=#54 id=54 data-nosnippet>54</a>    circuit_breakers: Arc&lt;CircuitBreakerManager&gt;,
+<a href=#55 id=55 data-nosnippet>55</a>    performance_monitor: Arc&lt;PerformanceMonitor&gt;,
+<a href=#56 id=56 data-nosnippet>56</a>    hook_configs: Arc&lt;RwLock&lt;HashMap&lt;String, HookExecutionConfig&gt;&gt;&gt;,
+<a href=#57 id=57 data-nosnippet>57</a>    persistence_manager: <span class="prelude-ty">Option</span>&lt;Arc&lt;HookPersistenceManager&gt;&gt;,
+<a href=#58 id=58 data-nosnippet>58</a>    correlation_tracker: <span class="prelude-ty">Option</span>&lt;Arc&lt;EventCorrelationTracker&gt;&gt;,
+<a href=#59 id=59 data-nosnippet>59</a>}
+<a href=#60 id=60 data-nosnippet>60</a>
+<a href=#61 id=61 data-nosnippet>61</a><span class="doccomment">/// Per-hook execution configuration
+<a href=#62 id=62 data-nosnippet>62</a></span><span class="attr">#[derive(Debug, Clone)]
+<a href=#63 id=63 data-nosnippet>63</a></span><span class="kw">pub struct </span>HookExecutionConfig {
+<a href=#64 id=64 data-nosnippet>64</a>    <span class="doccomment">/// Custom timeout for this hook
+<a href=#65 id=65 data-nosnippet>65</a>    </span><span class="kw">pub </span>timeout: <span class="prelude-ty">Option</span>&lt;Duration&gt;,
+<a href=#66 id=66 data-nosnippet>66</a>    <span class="doccomment">/// Whether circuit breaker is enabled for this hook
+<a href=#67 id=67 data-nosnippet>67</a>    </span><span class="kw">pub </span>use_circuit_breaker: bool,
+<a href=#68 id=68 data-nosnippet>68</a>    <span class="doccomment">/// Custom circuit breaker config
+<a href=#69 id=69 data-nosnippet>69</a>    </span><span class="kw">pub </span>breaker_config: <span class="prelude-ty">Option</span>&lt;BreakerConfig&gt;,
+<a href=#70 id=70 data-nosnippet>70</a>    <span class="doccomment">/// Whether to persist this hook's executions
+<a href=#71 id=71 data-nosnippet>71</a>    </span><span class="kw">pub </span>persist_executions: bool,
+<a href=#72 id=72 data-nosnippet>72</a>    <span class="doccomment">/// Retention priority for persistence
+<a href=#73 id=73 data-nosnippet>73</a>    </span><span class="kw">pub </span>retention_priority: i32,
+<a href=#74 id=74 data-nosnippet>74</a>}
+<a href=#75 id=75 data-nosnippet>75</a>
+<a href=#76 id=76 data-nosnippet>76</a><span class="kw">impl </span>Default <span class="kw">for </span>HookExecutionConfig {
+<a href=#77 id=77 data-nosnippet>77</a>    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<a href=#78 id=78 data-nosnippet>78</a>        <span class="self">Self </span>{
+<a href=#79 id=79 data-nosnippet>79</a>            timeout: <span class="prelude-val">None</span>,
+<a href=#80 id=80 data-nosnippet>80</a>            use_circuit_breaker: <span class="bool-val">true</span>,
+<a href=#81 id=81 data-nosnippet>81</a>            breaker_config: <span class="prelude-val">None</span>,
+<a href=#82 id=82 data-nosnippet>82</a>            persist_executions: <span class="bool-val">true</span>,
+<a href=#83 id=83 data-nosnippet>83</a>            retention_priority: <span class="number">0</span>,
+<a href=#84 id=84 data-nosnippet>84</a>        }
+<a href=#85 id=85 data-nosnippet>85</a>    }
+<a href=#86 id=86 data-nosnippet>86</a>}
+<a href=#87 id=87 data-nosnippet>87</a>
+<a href=#88 id=88 data-nosnippet>88</a><span class="kw">impl </span>HookExecutor {
+<a href=#89 id=89 data-nosnippet>89</a>    <span class="doccomment">/// Create a new hook executor
+<a href=#90 id=90 data-nosnippet>90</a>    </span><span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#91 id=91 data-nosnippet>91</a>        <span class="self">Self</span>::with_config(HookExecutorConfig::default())
+<a href=#92 id=92 data-nosnippet>92</a>    }
+<a href=#93 id=93 data-nosnippet>93</a>
+<a href=#94 id=94 data-nosnippet>94</a>    <span class="doccomment">/// Create with custom configuration
+<a href=#95 id=95 data-nosnippet>95</a>    </span><span class="kw">pub fn </span>with_config(config: HookExecutorConfig) -&gt; <span class="self">Self </span>{
+<a href=#96 id=96 data-nosnippet>96</a>        <span class="kw">let </span>circuit_breakers = Arc::new(CircuitBreakerManager::with_config(
+<a href=#97 id=97 data-nosnippet>97</a>            config.breaker_config.clone(),
+<a href=#98 id=98 data-nosnippet>98</a>        ));
+<a href=#99 id=99 data-nosnippet>99</a>
+<a href=#100 id=100 data-nosnippet>100</a>        <span class="kw">let </span>performance_monitor = Arc::new(PerformanceMonitor::with_config(
+<a href=#101 id=101 data-nosnippet>101</a>            config.performance_config.clone(),
+<a href=#102 id=102 data-nosnippet>102</a>        ));
+<a href=#103 id=103 data-nosnippet>103</a>
+<a href=#104 id=104 data-nosnippet>104</a>        <span class="self">Self </span>{
+<a href=#105 id=105 data-nosnippet>105</a>            config,
+<a href=#106 id=106 data-nosnippet>106</a>            circuit_breakers,
+<a href=#107 id=107 data-nosnippet>107</a>            performance_monitor,
+<a href=#108 id=108 data-nosnippet>108</a>            hook_configs: Arc::new(RwLock::new(HashMap::new())),
+<a href=#109 id=109 data-nosnippet>109</a>            persistence_manager: <span class="prelude-val">None</span>, <span class="comment">// Set later via set_persistence_manager
+<a href=#110 id=110 data-nosnippet>110</a>            </span>correlation_tracker: <span class="prelude-val">None</span>, <span class="comment">// Set later via set_correlation_tracker
+<a href=#111 id=111 data-nosnippet>111</a>        </span>}
+<a href=#112 id=112 data-nosnippet>112</a>    }
+<a href=#113 id=113 data-nosnippet>113</a>
+<a href=#114 id=114 data-nosnippet>114</a>    <span class="doccomment">/// Execute a hook with protection
+<a href=#115 id=115 data-nosnippet>115</a>    </span><span class="kw">pub async fn </span>execute_hook(
+<a href=#116 id=116 data-nosnippet>116</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#117 id=117 data-nosnippet>117</a>        hook: <span class="kw-2">&amp;</span><span class="kw">dyn </span>Hook,
+<a href=#118 id=118 data-nosnippet>118</a>        context: <span class="kw-2">&amp;mut </span>HookContext,
+<a href=#119 id=119 data-nosnippet>119</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;HookResult&gt; {
+<a href=#120 id=120 data-nosnippet>120</a>        <span class="comment">// OPTIMIZATION: Cache metadata to avoid repeated calls
+<a href=#121 id=121 data-nosnippet>121</a>        </span><span class="kw">let </span>metadata = hook.metadata();
+<a href=#122 id=122 data-nosnippet>122</a>        <span class="kw">let </span>hook_name = <span class="kw-2">&amp;</span>metadata.name; <span class="comment">// Use reference instead of clone
+<a href=#123 id=123 data-nosnippet>123</a>
+<a href=#124 id=124 data-nosnippet>124</a>        // Check if hook should execute
+<a href=#125 id=125 data-nosnippet>125</a>        </span><span class="kw">if </span>!hook.should_execute(context) {
+<a href=#126 id=126 data-nosnippet>126</a>            <span class="kw">return </span><span class="prelude-val">Ok</span>(HookResult::Skipped(<span class="string">"Hook conditions not met"</span>.to_string()));
+<a href=#127 id=127 data-nosnippet>127</a>        }
+<a href=#128 id=128 data-nosnippet>128</a>
+<a href=#129 id=129 data-nosnippet>129</a>        <span class="comment">// OPTIMIZATION: Get config and circuit breaker in single operation
+<a href=#130 id=130 data-nosnippet>130</a>        </span><span class="kw">let </span>(hook_config, breaker_opt) = {
+<a href=#131 id=131 data-nosnippet>131</a>            <span class="kw">let </span>configs = <span class="self">self</span>.hook_configs.read();
+<a href=#132 id=132 data-nosnippet>132</a>            <span class="kw">let </span>config = configs.get(hook_name).cloned().unwrap_or_default();
+<a href=#133 id=133 data-nosnippet>133</a>            <span class="kw">let </span>breaker = <span class="kw">if </span><span class="self">self</span>.config.enable_circuit_breaker &amp;&amp; config.use_circuit_breaker {
+<a href=#134 id=134 data-nosnippet>134</a>                <span class="prelude-val">Some</span>(<span class="self">self</span>.get_circuit_breaker(hook_name, <span class="kw-2">&amp;</span>config))
+<a href=#135 id=135 data-nosnippet>135</a>            } <span class="kw">else </span>{
+<a href=#136 id=136 data-nosnippet>136</a>                <span class="prelude-val">None
+<a href=#137 id=137 data-nosnippet>137</a>            </span>};
+<a href=#138 id=138 data-nosnippet>138</a>            (config, breaker)
+<a href=#139 id=139 data-nosnippet>139</a>        };
+<a href=#140 id=140 data-nosnippet>140</a>
+<a href=#141 id=141 data-nosnippet>141</a>        <span class="comment">// Check circuit breaker if enabled
+<a href=#142 id=142 data-nosnippet>142</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>breaker) = breaker_opt {
+<a href=#143 id=143 data-nosnippet>143</a>            <span class="kw">if </span>!breaker.can_execute() {
+<a href=#144 id=144 data-nosnippet>144</a>                <span class="macro">warn!</span>(<span class="string">"Circuit breaker open for hook: {}"</span>, hook_name);
+<a href=#145 id=145 data-nosnippet>145</a>                <span class="kw">return </span><span class="prelude-val">Ok</span>(HookResult::Skipped(<span class="macro">format!</span>(
+<a href=#146 id=146 data-nosnippet>146</a>                    <span class="string">"Circuit breaker open for hook: {}"</span>,
+<a href=#147 id=147 data-nosnippet>147</a>                    hook_name
+<a href=#148 id=148 data-nosnippet>148</a>                )));
+<a href=#149 id=149 data-nosnippet>149</a>            }
+<a href=#150 id=150 data-nosnippet>150</a>        }
+<a href=#151 id=151 data-nosnippet>151</a>
+<a href=#152 id=152 data-nosnippet>152</a>        <span class="comment">// OPTIMIZATION: Combine timer start and instant measurement
+<a href=#153 id=153 data-nosnippet>153</a>        </span><span class="kw">let </span>(timer, start) = <span class="kw">if </span><span class="self">self</span>.config.enable_performance_monitoring {
+<a href=#154 id=154 data-nosnippet>154</a>            <span class="kw">let </span>start = Instant::now();
+<a href=#155 id=155 data-nosnippet>155</a>            <span class="kw">let </span>timer = <span class="prelude-val">Some</span>(<span class="self">self</span>.performance_monitor.start_execution(hook_name));
+<a href=#156 id=156 data-nosnippet>156</a>            (timer, start)
+<a href=#157 id=157 data-nosnippet>157</a>        } <span class="kw">else </span>{
+<a href=#158 id=158 data-nosnippet>158</a>            (<span class="prelude-val">None</span>, Instant::now())
+<a href=#159 id=159 data-nosnippet>159</a>        };
+<a href=#160 id=160 data-nosnippet>160</a>
+<a href=#161 id=161 data-nosnippet>161</a>        <span class="comment">// Create hook execution event for correlation tracking
+<a href=#162 id=162 data-nosnippet>162</a>        </span><span class="kw">let </span>execution_event = <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>tracker) = <span class="self">self</span>.correlation_tracker {
+<a href=#163 id=163 data-nosnippet>163</a>            <span class="kw">let </span>event_data = <span class="macro">serde_json::json!</span>({
+<a href=#164 id=164 data-nosnippet>164</a>                <span class="string">"hook_name"</span>: hook_name,
+<a href=#165 id=165 data-nosnippet>165</a>                <span class="string">"hook_language"</span>: metadata.language,
+<a href=#166 id=166 data-nosnippet>166</a>                <span class="string">"component_id"</span>: context.component_id.name,
+<a href=#167 id=167 data-nosnippet>167</a>                <span class="string">"component_type"</span>: context.component_id.component_type,
+<a href=#168 id=168 data-nosnippet>168</a>                <span class="string">"hook_point"</span>: context.point,
+<a href=#169 id=169 data-nosnippet>169</a>                <span class="string">"operation"</span>: <span class="string">"hook_execution_start"
+<a href=#170 id=170 data-nosnippet>170</a>            </span>});
+<a href=#171 id=171 data-nosnippet>171</a>
+<a href=#172 id=172 data-nosnippet>172</a>            <span class="kw">let </span>event = UniversalEvent::new(
+<a href=#173 id=173 data-nosnippet>173</a>                <span class="string">"hook.execution.start"</span>,
+<a href=#174 id=174 data-nosnippet>174</a>                event_data,
+<a href=#175 id=175 data-nosnippet>175</a>                llmspell_events::Language::Rust,
+<a href=#176 id=176 data-nosnippet>176</a>            )
+<a href=#177 id=177 data-nosnippet>177</a>            .with_correlation_id(context.correlation_id)
+<a href=#178 id=178 data-nosnippet>178</a>            .with_source(<span class="string">"hook_executor"</span>)
+<a href=#179 id=179 data-nosnippet>179</a>            .with_tag(<span class="string">"hook_execution"</span>);
+<a href=#180 id=180 data-nosnippet>180</a>
+<a href=#181 id=181 data-nosnippet>181</a>            tracker.track_event(event.clone());
+<a href=#182 id=182 data-nosnippet>182</a>            <span class="prelude-val">Some</span>(event)
+<a href=#183 id=183 data-nosnippet>183</a>        } <span class="kw">else </span>{
+<a href=#184 id=184 data-nosnippet>184</a>            <span class="prelude-val">None
+<a href=#185 id=185 data-nosnippet>185</a>        </span>};
+<a href=#186 id=186 data-nosnippet>186</a>
+<a href=#187 id=187 data-nosnippet>187</a>        <span class="comment">// Execute the hook
+<a href=#188 id=188 data-nosnippet>188</a>        </span><span class="kw">let </span>result = hook.execute(context).<span class="kw">await</span>;
+<a href=#189 id=189 data-nosnippet>189</a>
+<a href=#190 id=190 data-nosnippet>190</a>        <span class="kw">let </span>duration = start.elapsed();
+<a href=#191 id=191 data-nosnippet>191</a>
+<a href=#192 id=192 data-nosnippet>192</a>        <span class="comment">// Create hook completion event and link to start event
+<a href=#193 id=193 data-nosnippet>193</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>tracker) = <span class="self">self</span>.correlation_tracker {
+<a href=#194 id=194 data-nosnippet>194</a>            <span class="kw">let </span>success = result.is_ok();
+<a href=#195 id=195 data-nosnippet>195</a>            <span class="kw">let </span>event_data = <span class="macro">serde_json::json!</span>({
+<a href=#196 id=196 data-nosnippet>196</a>                <span class="string">"hook_name"</span>: hook_name,
+<a href=#197 id=197 data-nosnippet>197</a>                <span class="string">"success"</span>: success,
+<a href=#198 id=198 data-nosnippet>198</a>                <span class="string">"duration_ms"</span>: duration.as_millis(),
+<a href=#199 id=199 data-nosnippet>199</a>                <span class="string">"operation"</span>: <span class="string">"hook_execution_complete"
+<a href=#200 id=200 data-nosnippet>200</a>            </span>});
+<a href=#201 id=201 data-nosnippet>201</a>
+<a href=#202 id=202 data-nosnippet>202</a>            <span class="kw">let </span>completion_event = UniversalEvent::new(
+<a href=#203 id=203 data-nosnippet>203</a>                <span class="string">"hook.execution.complete"</span>,
+<a href=#204 id=204 data-nosnippet>204</a>                event_data,
+<a href=#205 id=205 data-nosnippet>205</a>                llmspell_events::Language::Rust,
+<a href=#206 id=206 data-nosnippet>206</a>            )
+<a href=#207 id=207 data-nosnippet>207</a>            .with_correlation_id(context.correlation_id)
+<a href=#208 id=208 data-nosnippet>208</a>            .with_source(<span class="string">"hook_executor"</span>)
+<a href=#209 id=209 data-nosnippet>209</a>            .with_tag(<span class="string">"hook_execution"</span>);
+<a href=#210 id=210 data-nosnippet>210</a>
+<a href=#211 id=211 data-nosnippet>211</a>            tracker.track_event(completion_event.clone());
+<a href=#212 id=212 data-nosnippet>212</a>
+<a href=#213 id=213 data-nosnippet>213</a>            <span class="comment">// Create link between start and completion events
+<a href=#214 id=214 data-nosnippet>214</a>            </span><span class="kw">if let </span><span class="prelude-val">Some</span>(start_event) = execution_event {
+<a href=#215 id=215 data-nosnippet>215</a>                <span class="kw">let </span>link = EventLink::new(
+<a href=#216 id=216 data-nosnippet>216</a>                    start_event.id,
+<a href=#217 id=217 data-nosnippet>217</a>                    completion_event.id,
+<a href=#218 id=218 data-nosnippet>218</a>                    EventRelationship::PartOf,
+<a href=#219 id=219 data-nosnippet>219</a>                )
+<a href=#220 id=220 data-nosnippet>220</a>                .with_strength(<span class="number">1.0</span>)
+<a href=#221 id=221 data-nosnippet>221</a>                .with_metadata(<span class="string">"relationship"</span>, <span class="string">"execution_pair"</span>)
+<a href=#222 id=222 data-nosnippet>222</a>                .with_metadata(<span class="string">"hook_name"</span>, hook_name.to_string());
+<a href=#223 id=223 data-nosnippet>223</a>
+<a href=#224 id=224 data-nosnippet>224</a>                tracker.add_link(link);
+<a href=#225 id=225 data-nosnippet>225</a>            }
+<a href=#226 id=226 data-nosnippet>226</a>        }
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a>        <span class="comment">// Complete performance tracking
+<a href=#229 id=229 data-nosnippet>229</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(timer) = timer {
+<a href=#230 id=230 data-nosnippet>230</a>            timer.complete();
+<a href=#231 id=231 data-nosnippet>231</a>        }
+<a href=#232 id=232 data-nosnippet>232</a>
+<a href=#233 id=233 data-nosnippet>233</a>        <span class="comment">// OPTIMIZATION: Update circuit breaker using cached reference
+<a href=#234 id=234 data-nosnippet>234</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(breaker) = breaker_opt {
+<a href=#235 id=235 data-nosnippet>235</a>            <span class="kw">match </span><span class="kw-2">&amp;</span>result {
+<a href=#236 id=236 data-nosnippet>236</a>                <span class="prelude-val">Ok</span>(<span class="kw">_</span>) =&gt; breaker.record_success(duration),
+<a href=#237 id=237 data-nosnippet>237</a>                <span class="prelude-val">Err</span>(e) =&gt; breaker.record_failure(e),
+<a href=#238 id=238 data-nosnippet>238</a>            }
+<a href=#239 id=239 data-nosnippet>239</a>        }
+<a href=#240 id=240 data-nosnippet>240</a>
+<a href=#241 id=241 data-nosnippet>241</a>        <span class="comment">// OPTIMIZATION: Pre-compute timeout check
+<a href=#242 id=242 data-nosnippet>242</a>        </span><span class="kw">let </span>timeout = hook_config
+<a href=#243 id=243 data-nosnippet>243</a>            .timeout
+<a href=#244 id=244 data-nosnippet>244</a>            .unwrap_or(<span class="self">self</span>.config.max_execution_time);
+<a href=#245 id=245 data-nosnippet>245</a>        <span class="kw">if </span>duration &gt; timeout {
+<a href=#246 id=246 data-nosnippet>246</a>            <span class="macro">warn!</span>(
+<a href=#247 id=247 data-nosnippet>247</a>                <span class="string">"Hook {} execution took {:?}, exceeding timeout of {:?}"</span>,
+<a href=#248 id=248 data-nosnippet>248</a>                hook_name, duration, timeout
+<a href=#249 id=249 data-nosnippet>249</a>            );
+<a href=#250 id=250 data-nosnippet>250</a>        }
+<a href=#251 id=251 data-nosnippet>251</a>
+<a href=#252 id=252 data-nosnippet>252</a>        <span class="comment">// Persist hook execution if enabled
+<a href=#253 id=253 data-nosnippet>253</a>        </span><span class="kw">if </span><span class="self">self</span>.config.enable_persistence &amp;&amp; hook_config.persist_executions {
+<a href=#254 id=254 data-nosnippet>254</a>            <span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>_persistence_manager) = <span class="self">self</span>.persistence_manager {
+<a href=#255 id=255 data-nosnippet>255</a>                <span class="comment">// For now, we can't persist hooks that don't implement ReplayableHook
+<a href=#256 id=256 data-nosnippet>256</a>                // This would require all hooks to implement ReplayableHook or a different approach
+<a href=#257 id=257 data-nosnippet>257</a>                // TODO: Consider alternative persistence strategies
+<a href=#258 id=258 data-nosnippet>258</a>                /*
+<a href=#259 id=259 data-nosnippet>259</a>                if let Ok(ref hook_result) = result {
+<a href=#260 id=260 data-nosnippet>260</a>                        // Create hook metadata
+<a href=#261 id=261 data-nosnippet>261</a>                        let mut metadata = HookMetadata::new(
+<a href=#262 id=262 data-nosnippet>262</a>                            hook_name.clone(),
+<a href=#263 id=263 data-nosnippet>263</a>                            context.component_id.component_type.clone(),
+<a href=#264 id=264 data-nosnippet>264</a>                            context.component_id.name.clone(),
+<a href=#265 id=265 data-nosnippet>265</a>                        );
+<a href=#266 id=266 data-nosnippet>266</a>
+<a href=#267 id=267 data-nosnippet>267</a>                        // Set metadata properties
+<a href=#268 id=268 data-nosnippet>268</a>                        metadata.retention_priority = hook_config.retention_priority;
+<a href=#269 id=269 data-nosnippet>269</a>                        metadata.modified_operation = matches!(
+<a href=#270 id=270 data-nosnippet>270</a>                            hook_result,
+<a href=#271 id=271 data-nosnippet>271</a>                            HookResult::Modified(_) | HookResult::Replace(_)
+<a href=#272 id=272 data-nosnippet>272</a>                        );
+<a href=#273 id=273 data-nosnippet>273</a>
+<a href=#274 id=274 data-nosnippet>274</a>                        // Add tags based on result
+<a href=#275 id=275 data-nosnippet>275</a>                        match hook_result {
+<a href=#276 id=276 data-nosnippet>276</a>                            HookResult::Cancel(_) =&gt; metadata.add_tag("cancelled".to_string()),
+<a href=#277 id=277 data-nosnippet>277</a>                            HookResult::Replace(_) =&gt; metadata.add_tag("replaced".to_string()),
+<a href=#278 id=278 data-nosnippet>278</a>                            HookResult::Modified(_) =&gt; metadata.add_tag("modified".to_string()),
+<a href=#279 id=279 data-nosnippet>279</a>                            HookResult::Skipped(_) =&gt; metadata.add_tag("skipped".to_string()),
+<a href=#280 id=280 data-nosnippet>280</a>                            _ =&gt; {}
+<a href=#281 id=281 data-nosnippet>281</a>                        }
+<a href=#282 id=282 data-nosnippet>282</a>
+<a href=#283 id=283 data-nosnippet>283</a>                        // Add performance tags if slow
+<a href=#284 id=284 data-nosnippet>284</a>                        if duration &gt; timeout {
+<a href=#285 id=285 data-nosnippet>285</a>                            metadata.add_tag("slow_execution".to_string());
+<a href=#286 id=286 data-nosnippet>286</a>                        }
+<a href=#287 id=287 data-nosnippet>287</a>
+<a href=#288 id=288 data-nosnippet>288</a>                        // Calculate context size
+<a href=#289 id=289 data-nosnippet>289</a>                        if let Ok(serialized) = replayable_hook.serialize_context(context) {
+<a href=#290 id=290 data-nosnippet>290</a>                            metadata.context_size = serialized.len();
+<a href=#291 id=291 data-nosnippet>291</a>                        }
+<a href=#292 id=292 data-nosnippet>292</a>
+<a href=#293 id=293 data-nosnippet>293</a>                        // Persist the execution
+<a href=#294 id=294 data-nosnippet>294</a>                        if let Err(e) = persistence_manager
+<a href=#295 id=295 data-nosnippet>295</a>                            .persist_execution(
+<a href=#296 id=296 data-nosnippet>296</a>                                replayable_hook,
+<a href=#297 id=297 data-nosnippet>297</a>                                context,
+<a href=#298 id=298 data-nosnippet>298</a>                                hook_result,
+<a href=#299 id=299 data-nosnippet>299</a>                                duration,
+<a href=#300 id=300 data-nosnippet>300</a>                                metadata,
+<a href=#301 id=301 data-nosnippet>301</a>                            )
+<a href=#302 id=302 data-nosnippet>302</a>                            .await
+<a href=#303 id=303 data-nosnippet>303</a>                        {
+<a href=#304 id=304 data-nosnippet>304</a>                            debug!(
+<a href=#305 id=305 data-nosnippet>305</a>                                "Failed to persist hook execution for {}: {}",
+<a href=#306 id=306 data-nosnippet>306</a>                                hook_name, e
+<a href=#307 id=307 data-nosnippet>307</a>                            );
+<a href=#308 id=308 data-nosnippet>308</a>                        }
+<a href=#309 id=309 data-nosnippet>309</a>                    }
+<a href=#310 id=310 data-nosnippet>310</a>                }
+<a href=#311 id=311 data-nosnippet>311</a>                */
+<a href=#312 id=312 data-nosnippet>312</a>            </span>}
+<a href=#313 id=313 data-nosnippet>313</a>        }
+<a href=#314 id=314 data-nosnippet>314</a>
+<a href=#315 id=315 data-nosnippet>315</a>        result
+<a href=#316 id=316 data-nosnippet>316</a>    }
+<a href=#317 id=317 data-nosnippet>317</a>
+<a href=#318 id=318 data-nosnippet>318</a>    <span class="doccomment">/// Execute multiple hooks in sequence
+<a href=#319 id=319 data-nosnippet>319</a>    </span><span class="kw">pub async fn </span>execute_hooks(
+<a href=#320 id=320 data-nosnippet>320</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#321 id=321 data-nosnippet>321</a>        hooks: <span class="kw-2">&amp;</span>[Arc&lt;<span class="kw">dyn </span>Hook&gt;],
+<a href=#322 id=322 data-nosnippet>322</a>        context: <span class="kw-2">&amp;mut </span>HookContext,
+<a href=#323 id=323 data-nosnippet>323</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;HookResult&gt;&gt; {
+<a href=#324 id=324 data-nosnippet>324</a>        <span class="kw">let </span><span class="kw-2">mut </span>results = Vec::with_capacity(hooks.len());
+<a href=#325 id=325 data-nosnippet>325</a>
+<a href=#326 id=326 data-nosnippet>326</a>        <span class="comment">// Create batch execution event for correlation tracking
+<a href=#327 id=327 data-nosnippet>327</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>tracker) = <span class="self">self</span>.correlation_tracker {
+<a href=#328 id=328 data-nosnippet>328</a>            <span class="kw">let </span>event_data = <span class="macro">serde_json::json!</span>({
+<a href=#329 id=329 data-nosnippet>329</a>                <span class="string">"hook_count"</span>: hooks.len(),
+<a href=#330 id=330 data-nosnippet>330</a>                <span class="string">"component_id"</span>: context.component_id.name,
+<a href=#331 id=331 data-nosnippet>331</a>                <span class="string">"component_type"</span>: context.component_id.component_type,
+<a href=#332 id=332 data-nosnippet>332</a>                <span class="string">"hook_point"</span>: context.point,
+<a href=#333 id=333 data-nosnippet>333</a>                <span class="string">"operation"</span>: <span class="string">"batch_hook_execution_start"
+<a href=#334 id=334 data-nosnippet>334</a>            </span>});
+<a href=#335 id=335 data-nosnippet>335</a>
+<a href=#336 id=336 data-nosnippet>336</a>            <span class="kw">let </span>batch_event = UniversalEvent::new(
+<a href=#337 id=337 data-nosnippet>337</a>                <span class="string">"hook.batch_execution.start"</span>,
+<a href=#338 id=338 data-nosnippet>338</a>                event_data,
+<a href=#339 id=339 data-nosnippet>339</a>                llmspell_events::Language::Rust,
+<a href=#340 id=340 data-nosnippet>340</a>            )
+<a href=#341 id=341 data-nosnippet>341</a>            .with_correlation_id(context.correlation_id)
+<a href=#342 id=342 data-nosnippet>342</a>            .with_source(<span class="string">"hook_executor"</span>)
+<a href=#343 id=343 data-nosnippet>343</a>            .with_tag(<span class="string">"batch_execution"</span>);
+<a href=#344 id=344 data-nosnippet>344</a>
+<a href=#345 id=345 data-nosnippet>345</a>            tracker.track_event(batch_event);
+<a href=#346 id=346 data-nosnippet>346</a>        }
+<a href=#347 id=347 data-nosnippet>347</a>
+<a href=#348 id=348 data-nosnippet>348</a>        <span class="kw">for </span>hook <span class="kw">in </span>hooks {
+<a href=#349 id=349 data-nosnippet>349</a>            <span class="kw">let </span>result = <span class="self">self</span>.execute_hook(hook.as_ref(), context).<span class="kw">await</span><span class="question-mark">?</span>;
+<a href=#350 id=350 data-nosnippet>350</a>
+<a href=#351 id=351 data-nosnippet>351</a>            <span class="comment">// Check if we should stop execution
+<a href=#352 id=352 data-nosnippet>352</a>            </span><span class="kw">match </span><span class="kw-2">&amp;</span>result {
+<a href=#353 id=353 data-nosnippet>353</a>                HookResult::Cancel(reason) =&gt; {
+<a href=#354 id=354 data-nosnippet>354</a>                    <span class="macro">info!</span>(<span class="string">"Hook execution cancelled: {}"</span>, reason);
+<a href=#355 id=355 data-nosnippet>355</a>                    results.push(result);
+<a href=#356 id=356 data-nosnippet>356</a>                    <span class="kw">break</span>;
+<a href=#357 id=357 data-nosnippet>357</a>                }
+<a href=#358 id=358 data-nosnippet>358</a>                HookResult::Replace(<span class="kw">_</span>) =&gt; {
+<a href=#359 id=359 data-nosnippet>359</a>                    <span class="comment">// Replace stops further execution
+<a href=#360 id=360 data-nosnippet>360</a>                    </span>results.push(result);
+<a href=#361 id=361 data-nosnippet>361</a>                    <span class="kw">break</span>;
+<a href=#362 id=362 data-nosnippet>362</a>                }
+<a href=#363 id=363 data-nosnippet>363</a>                <span class="kw">_ </span>=&gt; {
+<a href=#364 id=364 data-nosnippet>364</a>                    results.push(result);
+<a href=#365 id=365 data-nosnippet>365</a>                }
+<a href=#366 id=366 data-nosnippet>366</a>            }
+<a href=#367 id=367 data-nosnippet>367</a>        }
+<a href=#368 id=368 data-nosnippet>368</a>
+<a href=#369 id=369 data-nosnippet>369</a>        <span class="comment">// Create batch completion event for correlation tracking
+<a href=#370 id=370 data-nosnippet>370</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(<span class="kw-2">ref </span>tracker) = <span class="self">self</span>.correlation_tracker {
+<a href=#371 id=371 data-nosnippet>371</a>            <span class="kw">let </span>event_data = <span class="macro">serde_json::json!</span>({
+<a href=#372 id=372 data-nosnippet>372</a>                <span class="string">"hook_count"</span>: hooks.len(),
+<a href=#373 id=373 data-nosnippet>373</a>                <span class="string">"results_count"</span>: results.len(),
+<a href=#374 id=374 data-nosnippet>374</a>                <span class="string">"operation"</span>: <span class="string">"batch_hook_execution_complete"
+<a href=#375 id=375 data-nosnippet>375</a>            </span>});
+<a href=#376 id=376 data-nosnippet>376</a>
+<a href=#377 id=377 data-nosnippet>377</a>            <span class="kw">let </span>batch_completion_event = UniversalEvent::new(
+<a href=#378 id=378 data-nosnippet>378</a>                <span class="string">"hook.batch_execution.complete"</span>,
+<a href=#379 id=379 data-nosnippet>379</a>                event_data,
+<a href=#380 id=380 data-nosnippet>380</a>                llmspell_events::Language::Rust,
+<a href=#381 id=381 data-nosnippet>381</a>            )
+<a href=#382 id=382 data-nosnippet>382</a>            .with_correlation_id(context.correlation_id)
+<a href=#383 id=383 data-nosnippet>383</a>            .with_source(<span class="string">"hook_executor"</span>)
+<a href=#384 id=384 data-nosnippet>384</a>            .with_tag(<span class="string">"batch_execution"</span>);
+<a href=#385 id=385 data-nosnippet>385</a>
+<a href=#386 id=386 data-nosnippet>386</a>            tracker.track_event(batch_completion_event);
+<a href=#387 id=387 data-nosnippet>387</a>        }
+<a href=#388 id=388 data-nosnippet>388</a>
+<a href=#389 id=389 data-nosnippet>389</a>        <span class="prelude-val">Ok</span>(results)
+<a href=#390 id=390 data-nosnippet>390</a>    }
+<a href=#391 id=391 data-nosnippet>391</a>
+<a href=#392 id=392 data-nosnippet>392</a>    <span class="doccomment">/// Configure a specific hook
+<a href=#393 id=393 data-nosnippet>393</a>    </span><span class="kw">pub fn </span>configure_hook(<span class="kw-2">&amp;</span><span class="self">self</span>, hook_name: <span class="kw-2">&amp;</span>str, config: HookExecutionConfig) {
+<a href=#394 id=394 data-nosnippet>394</a>        <span class="self">self</span>.hook_configs
+<a href=#395 id=395 data-nosnippet>395</a>            .write()
+<a href=#396 id=396 data-nosnippet>396</a>            .insert(hook_name.to_string(), config);
+<a href=#397 id=397 data-nosnippet>397</a>    }
+<a href=#398 id=398 data-nosnippet>398</a>
+<a href=#399 id=399 data-nosnippet>399</a>    <span class="doccomment">/// Get circuit breaker for a hook
+<a href=#400 id=400 data-nosnippet>400</a>    </span><span class="kw">fn </span>get_circuit_breaker(
+<a href=#401 id=401 data-nosnippet>401</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#402 id=402 data-nosnippet>402</a>        hook_name: <span class="kw-2">&amp;</span>str,
+<a href=#403 id=403 data-nosnippet>403</a>        hook_config: <span class="kw-2">&amp;</span>HookExecutionConfig,
+<a href=#404 id=404 data-nosnippet>404</a>    ) -&gt; Arc&lt;CircuitBreaker&gt; {
+<a href=#405 id=405 data-nosnippet>405</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(custom_config) = <span class="kw-2">&amp;</span>hook_config.breaker_config {
+<a href=#406 id=406 data-nosnippet>406</a>            <span class="self">self</span>.circuit_breakers
+<a href=#407 id=407 data-nosnippet>407</a>                .create_custom(hook_name, custom_config.clone())
+<a href=#408 id=408 data-nosnippet>408</a>        } <span class="kw">else </span>{
+<a href=#409 id=409 data-nosnippet>409</a>            <span class="self">self</span>.circuit_breakers.get_or_create(hook_name)
+<a href=#410 id=410 data-nosnippet>410</a>        }
+<a href=#411 id=411 data-nosnippet>411</a>    }
+<a href=#412 id=412 data-nosnippet>412</a>
+<a href=#413 id=413 data-nosnippet>413</a>    <span class="doccomment">/// Get performance metrics for a hook
+<a href=#414 id=414 data-nosnippet>414</a>    </span><span class="kw">pub fn </span>get_metrics(<span class="kw-2">&amp;</span><span class="self">self</span>, hook_name: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Option</span>&lt;PerformanceMetrics&gt; {
+<a href=#415 id=415 data-nosnippet>415</a>        <span class="self">self</span>.performance_monitor.get_metrics(hook_name)
+<a href=#416 id=416 data-nosnippet>416</a>    }
+<a href=#417 id=417 data-nosnippet>417</a>
+<a href=#418 id=418 data-nosnippet>418</a>    <span class="doccomment">/// Get all performance metrics
+<a href=#419 id=419 data-nosnippet>419</a>    </span><span class="kw">pub fn </span>get_all_metrics(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; HashMap&lt;String, PerformanceMetrics&gt; {
+<a href=#420 id=420 data-nosnippet>420</a>        <span class="self">self</span>.performance_monitor.get_all_metrics()
+<a href=#421 id=421 data-nosnippet>421</a>    }
+<a href=#422 id=422 data-nosnippet>422</a>
+<a href=#423 id=423 data-nosnippet>423</a>    <span class="doccomment">/// Check if overhead is within target
+<a href=#424 id=424 data-nosnippet>424</a>    </span><span class="kw">pub fn </span>is_within_overhead_target(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#425 id=425 data-nosnippet>425</a>        <span class="kw">let </span>metrics = <span class="self">self</span>.get_all_metrics();
+<a href=#426 id=426 data-nosnippet>426</a>        <span class="kw">if </span>metrics.is_empty() {
+<a href=#427 id=427 data-nosnippet>427</a>            <span class="kw">return </span><span class="bool-val">true</span>;
+<a href=#428 id=428 data-nosnippet>428</a>        }
+<a href=#429 id=429 data-nosnippet>429</a>
+<a href=#430 id=430 data-nosnippet>430</a>        <span class="kw">let </span>total_hook_time: Duration = metrics.values().map(|m| m.total_duration).sum();
+<a href=#431 id=431 data-nosnippet>431</a>
+<a href=#432 id=432 data-nosnippet>432</a>        <span class="kw">let </span>total_executions: u64 = metrics.values().map(|m| m.execution_count).sum();
+<a href=#433 id=433 data-nosnippet>433</a>
+<a href=#434 id=434 data-nosnippet>434</a>        <span class="kw">if </span>total_executions == <span class="number">0 </span>{
+<a href=#435 id=435 data-nosnippet>435</a>            <span class="kw">return </span><span class="bool-val">true</span>;
+<a href=#436 id=436 data-nosnippet>436</a>        }
+<a href=#437 id=437 data-nosnippet>437</a>
+<a href=#438 id=438 data-nosnippet>438</a>        <span class="attr">#[allow(clippy::cast_precision_loss)]
+<a href=#439 id=439 data-nosnippet>439</a>        </span><span class="kw">let </span>avg_hook_time = total_hook_time.as_secs_f64() / total_executions <span class="kw">as </span>f64;
+<a href=#440 id=440 data-nosnippet>440</a>        <span class="kw">let </span>overhead_ratio = avg_hook_time / <span class="self">self</span>.config.max_execution_time.as_secs_f64();
+<a href=#441 id=441 data-nosnippet>441</a>
+<a href=#442 id=442 data-nosnippet>442</a>        overhead_ratio &lt;= <span class="self">self</span>.config.performance_overhead_target
+<a href=#443 id=443 data-nosnippet>443</a>    }
+<a href=#444 id=444 data-nosnippet>444</a>
+<a href=#445 id=445 data-nosnippet>445</a>    <span class="doccomment">/// Reset circuit breaker for a hook
+<a href=#446 id=446 data-nosnippet>446</a>    </span><span class="kw">pub fn </span>reset_circuit_breaker(<span class="kw-2">&amp;</span><span class="self">self</span>, hook_name: <span class="kw-2">&amp;</span>str) {
+<a href=#447 id=447 data-nosnippet>447</a>        <span class="kw">let </span>breaker = <span class="self">self</span>.circuit_breakers.get_or_create(hook_name);
+<a href=#448 id=448 data-nosnippet>448</a>        breaker.reset();
+<a href=#449 id=449 data-nosnippet>449</a>    }
+<a href=#450 id=450 data-nosnippet>450</a>
+<a href=#451 id=451 data-nosnippet>451</a>    <span class="doccomment">/// Reset all circuit breakers
+<a href=#452 id=452 data-nosnippet>452</a>    </span><span class="kw">pub fn </span>reset_all_circuit_breakers(<span class="kw-2">&amp;</span><span class="self">self</span>) {
+<a href=#453 id=453 data-nosnippet>453</a>        <span class="self">self</span>.circuit_breakers.reset_all();
+<a href=#454 id=454 data-nosnippet>454</a>    }
+<a href=#455 id=455 data-nosnippet>455</a>
+<a href=#456 id=456 data-nosnippet>456</a>    <span class="doccomment">/// Get circuit breaker stats
+<a href=#457 id=457 data-nosnippet>457</a>    </span><span class="kw">pub fn </span>get_circuit_breaker_stats(
+<a href=#458 id=458 data-nosnippet>458</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#459 id=459 data-nosnippet>459</a>    ) -&gt; Vec&lt;(String, <span class="kw">crate</span>::circuit_breaker::CircuitBreakerStats)&gt; {
+<a href=#460 id=460 data-nosnippet>460</a>        <span class="self">self</span>.circuit_breakers.all_stats()
+<a href=#461 id=461 data-nosnippet>461</a>    }
+<a href=#462 id=462 data-nosnippet>462</a>
+<a href=#463 id=463 data-nosnippet>463</a>    <span class="doccomment">/// Generate performance report
+<a href=#464 id=464 data-nosnippet>464</a>    </span><span class="kw">pub fn </span>generate_performance_report(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw">crate</span>::performance::PerformanceReport {
+<a href=#465 id=465 data-nosnippet>465</a>        <span class="self">self</span>.performance_monitor
+<a href=#466 id=466 data-nosnippet>466</a>            .generate_report(<span class="self">self</span>.config.max_execution_time)
+<a href=#467 id=467 data-nosnippet>467</a>    }
+<a href=#468 id=468 data-nosnippet>468</a>
+<a href=#469 id=469 data-nosnippet>469</a>    <span class="doccomment">/// Set the persistence manager for hook execution history
+<a href=#470 id=470 data-nosnippet>470</a>    </span><span class="kw">pub fn </span>set_persistence_manager(<span class="kw-2">&amp;mut </span><span class="self">self</span>, manager: Arc&lt;HookPersistenceManager&gt;) {
+<a href=#471 id=471 data-nosnippet>471</a>        <span class="self">self</span>.persistence_manager = <span class="prelude-val">Some</span>(manager);
+<a href=#472 id=472 data-nosnippet>472</a>    }
+<a href=#473 id=473 data-nosnippet>473</a>
+<a href=#474 id=474 data-nosnippet>474</a>    <span class="doccomment">/// Check if persistence is enabled
+<a href=#475 id=475 data-nosnippet>475</a>    </span><span class="kw">pub fn </span>is_persistence_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#476 id=476 data-nosnippet>476</a>        <span class="self">self</span>.config.enable_persistence &amp;&amp; <span class="self">self</span>.persistence_manager.is_some()
+<a href=#477 id=477 data-nosnippet>477</a>    }
+<a href=#478 id=478 data-nosnippet>478</a>
+<a href=#479 id=479 data-nosnippet>479</a>    <span class="doccomment">/// Set the correlation tracker for hook execution correlation
+<a href=#480 id=480 data-nosnippet>480</a>    </span><span class="kw">pub fn </span>set_correlation_tracker(<span class="kw-2">&amp;mut </span><span class="self">self</span>, tracker: Arc&lt;EventCorrelationTracker&gt;) {
+<a href=#481 id=481 data-nosnippet>481</a>        <span class="self">self</span>.correlation_tracker = <span class="prelude-val">Some</span>(tracker);
+<a href=#482 id=482 data-nosnippet>482</a>    }
+<a href=#483 id=483 data-nosnippet>483</a>
+<a href=#484 id=484 data-nosnippet>484</a>    <span class="doccomment">/// Check if correlation tracking is enabled
+<a href=#485 id=485 data-nosnippet>485</a>    </span><span class="kw">pub fn </span>is_correlation_tracking_enabled(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; bool {
+<a href=#486 id=486 data-nosnippet>486</a>        <span class="self">self</span>.correlation_tracker.is_some()
+<a href=#487 id=487 data-nosnippet>487</a>    }
+<a href=#488 id=488 data-nosnippet>488</a>
+<a href=#489 id=489 data-nosnippet>489</a>    <span class="doccomment">/// Get the correlation tracker
+<a href=#490 id=490 data-nosnippet>490</a>    </span><span class="kw">pub fn </span>correlation_tracker(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;Arc&lt;EventCorrelationTracker&gt;&gt; {
+<a href=#491 id=491 data-nosnippet>491</a>        <span class="self">self</span>.correlation_tracker.clone()
+<a href=#492 id=492 data-nosnippet>492</a>    }
+<a href=#493 id=493 data-nosnippet>493</a>
+<a href=#494 id=494 data-nosnippet>494</a>    <span class="doccomment">/// Execute hooks for artifact events
+<a href=#495 id=495 data-nosnippet>495</a>    </span><span class="kw">pub async fn </span>execute_artifact_hooks(
+<a href=#496 id=496 data-nosnippet>496</a>        <span class="kw-2">&amp;</span><span class="self">self</span>,
+<a href=#497 id=497 data-nosnippet>497</a>        artifact_event: <span class="kw-2">&amp;</span>llmspell_core::events::ArtifactEvent,
+<a href=#498 id=498 data-nosnippet>498</a>        hooks: <span class="kw-2">&amp;</span>[Arc&lt;<span class="kw">dyn </span>Hook&gt;],
+<a href=#499 id=499 data-nosnippet>499</a>    ) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;HookResult&gt;&gt; {
+<a href=#500 id=500 data-nosnippet>500</a>        <span class="kw">use </span><span class="kw">crate</span>::artifact_hooks::{add_artifact_to_context, event_to_hook_point};
+<a href=#501 id=501 data-nosnippet>501</a>
+<a href=#502 id=502 data-nosnippet>502</a>        <span class="comment">// Convert artifact event to hook point
+<a href=#503 id=503 data-nosnippet>503</a>        </span><span class="kw">let </span>hook_point = event_to_hook_point(artifact_event);
+<a href=#504 id=504 data-nosnippet>504</a>
+<a href=#505 id=505 data-nosnippet>505</a>        <span class="comment">// Create context for artifact hooks
+<a href=#506 id=506 data-nosnippet>506</a>        </span><span class="kw">let </span>component_id = <span class="kw">crate</span>::types::ComponentId::new(
+<a href=#507 id=507 data-nosnippet>507</a>            <span class="kw">crate</span>::types::ComponentType::Custom(<span class="string">"artifact_manager"</span>.to_string()),
+<a href=#508 id=508 data-nosnippet>508</a>            artifact_event.source.to_string(),
+<a href=#509 id=509 data-nosnippet>509</a>        );
+<a href=#510 id=510 data-nosnippet>510</a>
+<a href=#511 id=511 data-nosnippet>511</a>        <span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(hook_point, component_id);
+<a href=#512 id=512 data-nosnippet>512</a>        <span class="kw">if let </span><span class="prelude-val">Some</span>(correlation_id) = artifact_event.metadata.correlation_id() {
+<a href=#513 id=513 data-nosnippet>513</a>            <span class="comment">// Parse UUID from string
+<a href=#514 id=514 data-nosnippet>514</a>            </span><span class="kw">if let </span><span class="prelude-val">Ok</span>(uuid) = uuid::Uuid::parse_str(correlation_id) {
+<a href=#515 id=515 data-nosnippet>515</a>                context = context.with_correlation_id(uuid);
+<a href=#516 id=516 data-nosnippet>516</a>            }
+<a href=#517 id=517 data-nosnippet>517</a>        }
+<a href=#518 id=518 data-nosnippet>518</a>
+<a href=#519 id=519 data-nosnippet>519</a>        <span class="comment">// Add artifact-specific metadata
+<a href=#520 id=520 data-nosnippet>520</a>        </span><span class="kw">match </span><span class="kw-2">&amp;</span>artifact_event.event_type {
+<a href=#521 id=521 data-nosnippet>521</a>            llmspell_core::events::ArtifactEventType::Created(e) =&gt; {
+<a href=#522 id=522 data-nosnippet>522</a>                add_artifact_to_context(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>e.artifact.id, <span class="string">"created"</span>);
+<a href=#523 id=523 data-nosnippet>523</a>                context.insert_metadata(<span class="string">"artifact_name"</span>.to_string(), e.artifact.name.clone());
+<a href=#524 id=524 data-nosnippet>524</a>                context.insert_metadata(
+<a href=#525 id=525 data-nosnippet>525</a>                    <span class="string">"artifact_type"</span>.to_string(),
+<a href=#526 id=526 data-nosnippet>526</a>                    e.artifact.artifact_type.clone(),
+<a href=#527 id=527 data-nosnippet>527</a>                );
+<a href=#528 id=528 data-nosnippet>528</a>            }
+<a href=#529 id=529 data-nosnippet>529</a>            llmspell_core::events::ArtifactEventType::Modified(e) =&gt; {
+<a href=#530 id=530 data-nosnippet>530</a>                add_artifact_to_context(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>e.artifact_id, <span class="string">"modified"</span>);
+<a href=#531 id=531 data-nosnippet>531</a>                context.insert_metadata(
+<a href=#532 id=532 data-nosnippet>532</a>                    <span class="string">"modifications"</span>.to_string(),
+<a href=#533 id=533 data-nosnippet>533</a>                    <span class="macro">format!</span>(<span class="string">"{:?}"</span>, e.modifications),
+<a href=#534 id=534 data-nosnippet>534</a>                );
+<a href=#535 id=535 data-nosnippet>535</a>            }
+<a href=#536 id=536 data-nosnippet>536</a>            llmspell_core::events::ArtifactEventType::Deleted(e) =&gt; {
+<a href=#537 id=537 data-nosnippet>537</a>                add_artifact_to_context(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>e.artifact_id, <span class="string">"deleted"</span>);
+<a href=#538 id=538 data-nosnippet>538</a>                context.insert_metadata(<span class="string">"permanent"</span>.to_string(), e.permanent.to_string());
+<a href=#539 id=539 data-nosnippet>539</a>            }
+<a href=#540 id=540 data-nosnippet>540</a>            llmspell_core::events::ArtifactEventType::Validated(e) =&gt; {
+<a href=#541 id=541 data-nosnippet>541</a>                add_artifact_to_context(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>e.artifact_id, <span class="string">"validated"</span>);
+<a href=#542 id=542 data-nosnippet>542</a>                context.insert_metadata(
+<a href=#543 id=543 data-nosnippet>543</a>                    <span class="string">"validation_type"</span>.to_string(),
+<a href=#544 id=544 data-nosnippet>544</a>                    <span class="macro">format!</span>(<span class="string">"{:?}"</span>, e.validation_type),
+<a href=#545 id=545 data-nosnippet>545</a>                );
+<a href=#546 id=546 data-nosnippet>546</a>                context.insert_metadata(<span class="string">"valid"</span>.to_string(), e.results.valid.to_string());
+<a href=#547 id=547 data-nosnippet>547</a>            }
+<a href=#548 id=548 data-nosnippet>548</a>            llmspell_core::events::ArtifactEventType::ValidationFailed(e) =&gt; {
+<a href=#549 id=549 data-nosnippet>549</a>                add_artifact_to_context(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>e.artifact_id, <span class="string">"validation_failed"</span>);
+<a href=#550 id=550 data-nosnippet>550</a>                context.insert_metadata(
+<a href=#551 id=551 data-nosnippet>551</a>                    <span class="string">"validation_type"</span>.to_string(),
+<a href=#552 id=552 data-nosnippet>552</a>                    <span class="macro">format!</span>(<span class="string">"{:?}"</span>, e.validation_type),
+<a href=#553 id=553 data-nosnippet>553</a>                );
+<a href=#554 id=554 data-nosnippet>554</a>                context.insert_metadata(<span class="string">"failures"</span>.to_string(), <span class="macro">format!</span>(<span class="string">"{:?}"</span>, e.failures));
+<a href=#555 id=555 data-nosnippet>555</a>            }
+<a href=#556 id=556 data-nosnippet>556</a>            llmspell_core::events::ArtifactEventType::Derived(e) =&gt; {
+<a href=#557 id=557 data-nosnippet>557</a>                add_artifact_to_context(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>e.derived_artifact.id, <span class="string">"derived"</span>);
+<a href=#558 id=558 data-nosnippet>558</a>                context.insert_metadata(<span class="string">"parent_artifact"</span>.to_string(), e.parent_id.to_string());
+<a href=#559 id=559 data-nosnippet>559</a>                context.insert_metadata(
+<a href=#560 id=560 data-nosnippet>560</a>                    <span class="string">"derivation_type"</span>.to_string(),
+<a href=#561 id=561 data-nosnippet>561</a>                    <span class="macro">format!</span>(<span class="string">"{:?}"</span>, e.derivation_type),
+<a href=#562 id=562 data-nosnippet>562</a>                );
+<a href=#563 id=563 data-nosnippet>563</a>            }
+<a href=#564 id=564 data-nosnippet>564</a>            llmspell_core::events::ArtifactEventType::Accessed(e) =&gt; {
+<a href=#565 id=565 data-nosnippet>565</a>                add_artifact_to_context(<span class="kw-2">&amp;mut </span>context, <span class="kw-2">&amp;</span>e.artifact_id, <span class="string">"accessed"</span>);
+<a href=#566 id=566 data-nosnippet>566</a>                context.insert_metadata(<span class="string">"access_type"</span>.to_string(), <span class="macro">format!</span>(<span class="string">"{:?}"</span>, e.access_type));
+<a href=#567 id=567 data-nosnippet>567</a>            }
+<a href=#568 id=568 data-nosnippet>568</a>            <span class="kw">_ </span>=&gt; {}
+<a href=#569 id=569 data-nosnippet>569</a>        }
+<a href=#570 id=570 data-nosnippet>570</a>
+<a href=#571 id=571 data-nosnippet>571</a>        <span class="comment">// Execute all hooks for this artifact event
+<a href=#572 id=572 data-nosnippet>572</a>        </span><span class="self">self</span>.execute_hooks(hooks, <span class="kw-2">&amp;mut </span>context).<span class="kw">await
+<a href=#573 id=573 data-nosnippet>573</a>    </span>}
+<a href=#574 id=574 data-nosnippet>574</a>}
+<a href=#575 id=575 data-nosnippet>575</a>
+<a href=#576 id=576 data-nosnippet>576</a><span class="kw">impl </span>Default <span class="kw">for </span>HookExecutor {
+<a href=#577 id=577 data-nosnippet>577</a>    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<a href=#578 id=578 data-nosnippet>578</a>        <span class="self">Self</span>::new()
+<a href=#579 id=579 data-nosnippet>579</a>    }
+<a href=#580 id=580 data-nosnippet>580</a>}
+<a href=#581 id=581 data-nosnippet>581</a>
+<a href=#582 id=582 data-nosnippet>582</a><span class="doccomment">/// Builder for HookExecutor
+<a href=#583 id=583 data-nosnippet>583</a></span><span class="kw">pub struct </span>HookExecutorBuilder {
+<a href=#584 id=584 data-nosnippet>584</a>    config: HookExecutorConfig,
+<a href=#585 id=585 data-nosnippet>585</a>}
+<a href=#586 id=586 data-nosnippet>586</a>
+<a href=#587 id=587 data-nosnippet>587</a><span class="kw">impl </span>HookExecutorBuilder {
+<a href=#588 id=588 data-nosnippet>588</a>    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+<a href=#589 id=589 data-nosnippet>589</a>        <span class="self">Self </span>{
+<a href=#590 id=590 data-nosnippet>590</a>            config: HookExecutorConfig::default(),
+<a href=#591 id=591 data-nosnippet>591</a>        }
+<a href=#592 id=592 data-nosnippet>592</a>    }
+<a href=#593 id=593 data-nosnippet>593</a>
+<a href=#594 id=594 data-nosnippet>594</a>    <span class="kw">pub fn </span>with_circuit_breaker(<span class="kw-2">mut </span><span class="self">self</span>, enabled: bool) -&gt; <span class="self">Self </span>{
+<a href=#595 id=595 data-nosnippet>595</a>        <span class="self">self</span>.config.enable_circuit_breaker = enabled;
+<a href=#596 id=596 data-nosnippet>596</a>        <span class="self">self
+<a href=#597 id=597 data-nosnippet>597</a>    </span>}
+<a href=#598 id=598 data-nosnippet>598</a>
+<a href=#599 id=599 data-nosnippet>599</a>    <span class="kw">pub fn </span>with_performance_monitoring(<span class="kw-2">mut </span><span class="self">self</span>, enabled: bool) -&gt; <span class="self">Self </span>{
+<a href=#600 id=600 data-nosnippet>600</a>        <span class="self">self</span>.config.enable_performance_monitoring = enabled;
+<a href=#601 id=601 data-nosnippet>601</a>        <span class="self">self
+<a href=#602 id=602 data-nosnippet>602</a>    </span>}
+<a href=#603 id=603 data-nosnippet>603</a>
+<a href=#604 id=604 data-nosnippet>604</a>    <span class="kw">pub fn </span>with_max_execution_time(<span class="kw-2">mut </span><span class="self">self</span>, duration: Duration) -&gt; <span class="self">Self </span>{
+<a href=#605 id=605 data-nosnippet>605</a>        <span class="self">self</span>.config.max_execution_time = duration;
+<a href=#606 id=606 data-nosnippet>606</a>        <span class="self">self
+<a href=#607 id=607 data-nosnippet>607</a>    </span>}
+<a href=#608 id=608 data-nosnippet>608</a>
+<a href=#609 id=609 data-nosnippet>609</a>    <span class="kw">pub fn </span>with_overhead_target(<span class="kw-2">mut </span><span class="self">self</span>, target: f64) -&gt; <span class="self">Self </span>{
+<a href=#610 id=610 data-nosnippet>610</a>        <span class="self">self</span>.config.performance_overhead_target = target;
+<a href=#611 id=611 data-nosnippet>611</a>        <span class="self">self
+<a href=#612 id=612 data-nosnippet>612</a>    </span>}
+<a href=#613 id=613 data-nosnippet>613</a>
+<a href=#614 id=614 data-nosnippet>614</a>    <span class="kw">pub fn </span>with_breaker_config(<span class="kw-2">mut </span><span class="self">self</span>, config: BreakerConfig) -&gt; <span class="self">Self </span>{
+<a href=#615 id=615 data-nosnippet>615</a>        <span class="self">self</span>.config.breaker_config = config;
+<a href=#616 id=616 data-nosnippet>616</a>        <span class="self">self
+<a href=#617 id=617 data-nosnippet>617</a>    </span>}
+<a href=#618 id=618 data-nosnippet>618</a>
+<a href=#619 id=619 data-nosnippet>619</a>    <span class="kw">pub fn </span>with_persistence(<span class="kw-2">mut </span><span class="self">self</span>, enabled: bool) -&gt; <span class="self">Self </span>{
+<a href=#620 id=620 data-nosnippet>620</a>        <span class="self">self</span>.config.enable_persistence = enabled;
+<a href=#621 id=621 data-nosnippet>621</a>        <span class="self">self
+<a href=#622 id=622 data-nosnippet>622</a>    </span>}
+<a href=#623 id=623 data-nosnippet>623</a>
+<a href=#624 id=624 data-nosnippet>624</a>    <span class="kw">pub fn </span>build(<span class="self">self</span>) -&gt; HookExecutor {
+<a href=#625 id=625 data-nosnippet>625</a>        HookExecutor::with_config(<span class="self">self</span>.config)
+<a href=#626 id=626 data-nosnippet>626</a>    }
+<a href=#627 id=627 data-nosnippet>627</a>}
+<a href=#628 id=628 data-nosnippet>628</a>
+<a href=#629 id=629 data-nosnippet>629</a><span class="kw">impl </span>Default <span class="kw">for </span>HookExecutorBuilder {
+<a href=#630 id=630 data-nosnippet>630</a>    <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
+<a href=#631 id=631 data-nosnippet>631</a>        <span class="self">Self</span>::new()
+<a href=#632 id=632 data-nosnippet>632</a>    }
+<a href=#633 id=633 data-nosnippet>633</a>}
+<a href=#634 id=634 data-nosnippet>634</a>
+<a href=#635 id=635 data-nosnippet>635</a><span class="attr">#[cfg(test)]
+<a href=#636 id=636 data-nosnippet>636</a></span><span class="kw">mod </span>tests {
+<a href=#637 id=637 data-nosnippet>637</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#638 id=638 data-nosnippet>638</a>    <span class="kw">use </span><span class="kw">crate</span>::traits::FnHook;
+<a href=#639 id=639 data-nosnippet>639</a>    <span class="kw">use </span><span class="kw">crate</span>::types::HookPoint;
+<a href=#640 id=640 data-nosnippet>640</a>    <span class="kw">use </span>tokio;
+<a href=#641 id=641 data-nosnippet>641</a>    <span class="attr">#[tokio::test]
+<a href=#642 id=642 data-nosnippet>642</a>    </span><span class="kw">async fn </span>test_hook_executor_basic() {
+<a href=#643 id=643 data-nosnippet>643</a>        <span class="kw">let </span>executor = HookExecutor::new();
+<a href=#644 id=644 data-nosnippet>644</a>
+<a href=#645 id=645 data-nosnippet>645</a>        <span class="kw">let </span>hook = FnHook::new(<span class="string">"test_hook"</span>, |ctx: <span class="kw-2">&amp;mut </span>HookContext| {
+<a href=#646 id=646 data-nosnippet>646</a>            ctx.insert_metadata(<span class="string">"executed"</span>.to_string(), <span class="string">"true"</span>.to_string());
+<a href=#647 id=647 data-nosnippet>647</a>            <span class="prelude-val">Ok</span>(HookResult::Continue)
+<a href=#648 id=648 data-nosnippet>648</a>        });
+<a href=#649 id=649 data-nosnippet>649</a>
+<a href=#650 id=650 data-nosnippet>650</a>        <span class="kw">let </span>component_id =
+<a href=#651 id=651 data-nosnippet>651</a>            <span class="kw">crate</span>::types::ComponentId::new(<span class="kw">crate</span>::types::ComponentType::System, <span class="string">"test"</span>.to_string());
+<a href=#652 id=652 data-nosnippet>652</a>        <span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(HookPoint::SystemStartup, component_id);
+<a href=#653 id=653 data-nosnippet>653</a>
+<a href=#654 id=654 data-nosnippet>654</a>        <span class="kw">let </span>result = executor.execute_hook(<span class="kw-2">&amp;</span>hook, <span class="kw-2">&amp;mut </span>context).<span class="kw">await</span>.unwrap();
+<a href=#655 id=655 data-nosnippet>655</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(result, HookResult::Continue));
+<a href=#656 id=656 data-nosnippet>656</a>        <span class="macro">assert_eq!</span>(context.get_metadata(<span class="string">"executed"</span>), <span class="prelude-val">Some</span>(<span class="string">"true"</span>));
+<a href=#657 id=657 data-nosnippet>657</a>
+<a href=#658 id=658 data-nosnippet>658</a>        <span class="comment">// Check metrics
+<a href=#659 id=659 data-nosnippet>659</a>        </span><span class="kw">let </span>metrics = executor.get_metrics(<span class="string">"test_hook"</span>).unwrap();
+<a href=#660 id=660 data-nosnippet>660</a>        <span class="macro">assert_eq!</span>(metrics.execution_count, <span class="number">1</span>);
+<a href=#661 id=661 data-nosnippet>661</a>    }
+<a href=#662 id=662 data-nosnippet>662</a>    <span class="attr">#[tokio::test]
+<a href=#663 id=663 data-nosnippet>663</a>    </span><span class="kw">async fn </span>test_circuit_breaker_protection() {
+<a href=#664 id=664 data-nosnippet>664</a>        <span class="kw">let </span>config = HookExecutorConfig {
+<a href=#665 id=665 data-nosnippet>665</a>            breaker_config: BreakerConfig {
+<a href=#666 id=666 data-nosnippet>666</a>                failure_threshold: <span class="number">2</span>,
+<a href=#667 id=667 data-nosnippet>667</a>                ..Default::default()
+<a href=#668 id=668 data-nosnippet>668</a>            },
+<a href=#669 id=669 data-nosnippet>669</a>            ..Default::default()
+<a href=#670 id=670 data-nosnippet>670</a>        };
+<a href=#671 id=671 data-nosnippet>671</a>
+<a href=#672 id=672 data-nosnippet>672</a>        <span class="kw">let </span>executor = HookExecutor::with_config(config);
+<a href=#673 id=673 data-nosnippet>673</a>
+<a href=#674 id=674 data-nosnippet>674</a>        <span class="comment">// Create a failing hook
+<a href=#675 id=675 data-nosnippet>675</a>        </span><span class="kw">let </span>failing_hook = FnHook::new(<span class="string">"failing_hook"</span>, |_ctx: <span class="kw-2">&amp;mut </span>HookContext| {
+<a href=#676 id=676 data-nosnippet>676</a>            <span class="prelude-val">Err</span>(<span class="macro">anyhow::anyhow!</span>(<span class="string">"Test error"</span>))
+<a href=#677 id=677 data-nosnippet>677</a>        });
+<a href=#678 id=678 data-nosnippet>678</a>
+<a href=#679 id=679 data-nosnippet>679</a>        <span class="kw">let </span>component_id =
+<a href=#680 id=680 data-nosnippet>680</a>            <span class="kw">crate</span>::types::ComponentId::new(<span class="kw">crate</span>::types::ComponentType::System, <span class="string">"test"</span>.to_string());
+<a href=#681 id=681 data-nosnippet>681</a>        <span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(HookPoint::SystemStartup, component_id.clone());
+<a href=#682 id=682 data-nosnippet>682</a>
+<a href=#683 id=683 data-nosnippet>683</a>        <span class="comment">// First failure
+<a href=#684 id=684 data-nosnippet>684</a>        </span><span class="kw">let _ </span>= executor.execute_hook(<span class="kw-2">&amp;</span>failing_hook, <span class="kw-2">&amp;mut </span>context).<span class="kw">await</span>;
+<a href=#685 id=685 data-nosnippet>685</a>
+<a href=#686 id=686 data-nosnippet>686</a>        <span class="comment">// Second failure - should open circuit
+<a href=#687 id=687 data-nosnippet>687</a>        </span><span class="kw">let _ </span>= executor.execute_hook(<span class="kw-2">&amp;</span>failing_hook, <span class="kw-2">&amp;mut </span>context).<span class="kw">await</span>;
+<a href=#688 id=688 data-nosnippet>688</a>
+<a href=#689 id=689 data-nosnippet>689</a>        <span class="comment">// Third attempt - should be skipped
+<a href=#690 id=690 data-nosnippet>690</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(HookPoint::SystemStartup, component_id);
+<a href=#691 id=691 data-nosnippet>691</a>        <span class="kw">let </span>result = executor
+<a href=#692 id=692 data-nosnippet>692</a>            .execute_hook(<span class="kw-2">&amp;</span>failing_hook, <span class="kw-2">&amp;mut </span>context)
+<a href=#693 id=693 data-nosnippet>693</a>            .<span class="kw">await
+<a href=#694 id=694 data-nosnippet>694</a>            </span>.unwrap();
+<a href=#695 id=695 data-nosnippet>695</a>
+<a href=#696 id=696 data-nosnippet>696</a>        <span class="kw">match </span>result {
+<a href=#697 id=697 data-nosnippet>697</a>            HookResult::Skipped(reason) =&gt; {
+<a href=#698 id=698 data-nosnippet>698</a>                <span class="macro">assert!</span>(reason.contains(<span class="string">"Circuit breaker open"</span>));
+<a href=#699 id=699 data-nosnippet>699</a>            }
+<a href=#700 id=700 data-nosnippet>700</a>            <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">"Expected Skipped result"</span>),
+<a href=#701 id=701 data-nosnippet>701</a>        }
+<a href=#702 id=702 data-nosnippet>702</a>    }
+<a href=#703 id=703 data-nosnippet>703</a>    <span class="attr">#[tokio::test]
+<a href=#704 id=704 data-nosnippet>704</a>    </span><span class="kw">async fn </span>test_slow_hook_detection() {
+<a href=#705 id=705 data-nosnippet>705</a>        <span class="kw">let </span>config = HookExecutorConfig {
+<a href=#706 id=706 data-nosnippet>706</a>            max_execution_time: Duration::from_millis(<span class="number">50</span>),
+<a href=#707 id=707 data-nosnippet>707</a>            breaker_config: BreakerConfig {
+<a href=#708 id=708 data-nosnippet>708</a>                slow_call_threshold: <span class="number">2</span>,
+<a href=#709 id=709 data-nosnippet>709</a>                slow_call_duration: Duration::from_millis(<span class="number">50</span>),
+<a href=#710 id=710 data-nosnippet>710</a>                ..Default::default()
+<a href=#711 id=711 data-nosnippet>711</a>            },
+<a href=#712 id=712 data-nosnippet>712</a>            ..Default::default()
+<a href=#713 id=713 data-nosnippet>713</a>        };
+<a href=#714 id=714 data-nosnippet>714</a>
+<a href=#715 id=715 data-nosnippet>715</a>        <span class="kw">let </span>executor = HookExecutor::with_config(config);
+<a href=#716 id=716 data-nosnippet>716</a>
+<a href=#717 id=717 data-nosnippet>717</a>        <span class="comment">// Create a slow hook
+<a href=#718 id=718 data-nosnippet>718</a>        </span><span class="kw">let </span>slow_hook = FnHook::new(<span class="string">"slow_hook"</span>, |_ctx: <span class="kw-2">&amp;mut </span>HookContext| {
+<a href=#719 id=719 data-nosnippet>719</a>            std::thread::sleep(Duration::from_millis(<span class="number">60</span>));
+<a href=#720 id=720 data-nosnippet>720</a>            <span class="prelude-val">Ok</span>(HookResult::Continue)
+<a href=#721 id=721 data-nosnippet>721</a>        });
+<a href=#722 id=722 data-nosnippet>722</a>
+<a href=#723 id=723 data-nosnippet>723</a>        <span class="kw">let </span>component_id =
+<a href=#724 id=724 data-nosnippet>724</a>            <span class="kw">crate</span>::types::ComponentId::new(<span class="kw">crate</span>::types::ComponentType::System, <span class="string">"test"</span>.to_string());
+<a href=#725 id=725 data-nosnippet>725</a>
+<a href=#726 id=726 data-nosnippet>726</a>        <span class="comment">// Execute slow hook twice
+<a href=#727 id=727 data-nosnippet>727</a>        </span><span class="kw">for _ in </span><span class="number">0</span>..<span class="number">2 </span>{
+<a href=#728 id=728 data-nosnippet>728</a>            <span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(HookPoint::SystemStartup, component_id.clone());
+<a href=#729 id=729 data-nosnippet>729</a>            <span class="kw">let _ </span>= executor.execute_hook(<span class="kw-2">&amp;</span>slow_hook, <span class="kw-2">&amp;mut </span>context).<span class="kw">await</span>;
+<a href=#730 id=730 data-nosnippet>730</a>        }
+<a href=#731 id=731 data-nosnippet>731</a>
+<a href=#732 id=732 data-nosnippet>732</a>        <span class="comment">// Third execution should be skipped
+<a href=#733 id=733 data-nosnippet>733</a>        </span><span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(HookPoint::SystemStartup, component_id);
+<a href=#734 id=734 data-nosnippet>734</a>        <span class="kw">let </span>result = executor
+<a href=#735 id=735 data-nosnippet>735</a>            .execute_hook(<span class="kw-2">&amp;</span>slow_hook, <span class="kw-2">&amp;mut </span>context)
+<a href=#736 id=736 data-nosnippet>736</a>            .<span class="kw">await
+<a href=#737 id=737 data-nosnippet>737</a>            </span>.unwrap();
+<a href=#738 id=738 data-nosnippet>738</a>
+<a href=#739 id=739 data-nosnippet>739</a>        <span class="kw">match </span>result {
+<a href=#740 id=740 data-nosnippet>740</a>            HookResult::Skipped(<span class="kw">_</span>) =&gt; {
+<a href=#741 id=741 data-nosnippet>741</a>                <span class="comment">// Expected
+<a href=#742 id=742 data-nosnippet>742</a>            </span>}
+<a href=#743 id=743 data-nosnippet>743</a>            <span class="kw">_ </span>=&gt; <span class="macro">panic!</span>(<span class="string">"Expected Skipped result due to slow execution"</span>),
+<a href=#744 id=744 data-nosnippet>744</a>        }
+<a href=#745 id=745 data-nosnippet>745</a>    }
+<a href=#746 id=746 data-nosnippet>746</a>    <span class="attr">#[tokio::test]
+<a href=#747 id=747 data-nosnippet>747</a>    </span><span class="kw">async fn </span>test_hook_cancellation() {
+<a href=#748 id=748 data-nosnippet>748</a>        <span class="kw">let </span>executor = HookExecutor::new();
+<a href=#749 id=749 data-nosnippet>749</a>
+<a href=#750 id=750 data-nosnippet>750</a>        <span class="kw">let </span>hook1: Arc&lt;<span class="kw">dyn </span>Hook&gt; = Arc::new(FnHook::new(<span class="string">"hook1"</span>, |_ctx: <span class="kw-2">&amp;mut </span>HookContext| {
+<a href=#751 id=751 data-nosnippet>751</a>            <span class="prelude-val">Ok</span>(HookResult::Continue)
+<a href=#752 id=752 data-nosnippet>752</a>        }));
+<a href=#753 id=753 data-nosnippet>753</a>
+<a href=#754 id=754 data-nosnippet>754</a>        <span class="kw">let </span>hook2: Arc&lt;<span class="kw">dyn </span>Hook&gt; = Arc::new(FnHook::new(<span class="string">"hook2"</span>, |_ctx: <span class="kw-2">&amp;mut </span>HookContext| {
+<a href=#755 id=755 data-nosnippet>755</a>            <span class="prelude-val">Ok</span>(HookResult::Cancel(<span class="string">"Test cancellation"</span>.to_string()))
+<a href=#756 id=756 data-nosnippet>756</a>        }));
+<a href=#757 id=757 data-nosnippet>757</a>
+<a href=#758 id=758 data-nosnippet>758</a>        <span class="kw">let </span>hook3: Arc&lt;<span class="kw">dyn </span>Hook&gt; = Arc::new(FnHook::new(<span class="string">"hook3"</span>, |_ctx: <span class="kw-2">&amp;mut </span>HookContext| {
+<a href=#759 id=759 data-nosnippet>759</a>            <span class="prelude-val">Ok</span>(HookResult::Continue)
+<a href=#760 id=760 data-nosnippet>760</a>        }));
+<a href=#761 id=761 data-nosnippet>761</a>
+<a href=#762 id=762 data-nosnippet>762</a>        <span class="kw">let </span>hooks = <span class="macro">vec!</span>[hook1, hook2, hook3];
+<a href=#763 id=763 data-nosnippet>763</a>
+<a href=#764 id=764 data-nosnippet>764</a>        <span class="kw">let </span>component_id =
+<a href=#765 id=765 data-nosnippet>765</a>            <span class="kw">crate</span>::types::ComponentId::new(<span class="kw">crate</span>::types::ComponentType::System, <span class="string">"test"</span>.to_string());
+<a href=#766 id=766 data-nosnippet>766</a>        <span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(HookPoint::SystemStartup, component_id);
+<a href=#767 id=767 data-nosnippet>767</a>
+<a href=#768 id=768 data-nosnippet>768</a>        <span class="kw">let </span>results = executor.execute_hooks(<span class="kw-2">&amp;</span>hooks, <span class="kw-2">&amp;mut </span>context).<span class="kw">await</span>.unwrap();
+<a href=#769 id=769 data-nosnippet>769</a>
+<a href=#770 id=770 data-nosnippet>770</a>        <span class="comment">// Should only execute first two hooks
+<a href=#771 id=771 data-nosnippet>771</a>        </span><span class="macro">assert_eq!</span>(results.len(), <span class="number">2</span>);
+<a href=#772 id=772 data-nosnippet>772</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(results[<span class="number">0</span>], HookResult::Continue));
+<a href=#773 id=773 data-nosnippet>773</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(results[<span class="number">1</span>], HookResult::Cancel(<span class="kw">_</span>)));
+<a href=#774 id=774 data-nosnippet>774</a>    }
+<a href=#775 id=775 data-nosnippet>775</a>    <span class="attr">#[tokio::test]
+<a href=#776 id=776 data-nosnippet>776</a>    </span><span class="kw">async fn </span>test_custom_hook_configuration() {
+<a href=#777 id=777 data-nosnippet>777</a>        <span class="kw">let </span>executor = HookExecutor::new();
+<a href=#778 id=778 data-nosnippet>778</a>
+<a href=#779 id=779 data-nosnippet>779</a>        <span class="comment">// Configure a specific hook with custom timeout
+<a href=#780 id=780 data-nosnippet>780</a>        </span>executor.configure_hook(
+<a href=#781 id=781 data-nosnippet>781</a>            <span class="string">"custom_hook"</span>,
+<a href=#782 id=782 data-nosnippet>782</a>            HookExecutionConfig {
+<a href=#783 id=783 data-nosnippet>783</a>                timeout: <span class="prelude-val">Some</span>(Duration::from_millis(<span class="number">200</span>)),
+<a href=#784 id=784 data-nosnippet>784</a>                use_circuit_breaker: <span class="bool-val">true</span>,
+<a href=#785 id=785 data-nosnippet>785</a>                breaker_config: <span class="prelude-val">None</span>,
+<a href=#786 id=786 data-nosnippet>786</a>                persist_executions: <span class="bool-val">true</span>,
+<a href=#787 id=787 data-nosnippet>787</a>                retention_priority: <span class="number">0</span>,
+<a href=#788 id=788 data-nosnippet>788</a>            },
+<a href=#789 id=789 data-nosnippet>789</a>        );
+<a href=#790 id=790 data-nosnippet>790</a>
+<a href=#791 id=791 data-nosnippet>791</a>        <span class="kw">let </span>hook = FnHook::new(<span class="string">"custom_hook"</span>, |_ctx: <span class="kw-2">&amp;mut </span>HookContext| {
+<a href=#792 id=792 data-nosnippet>792</a>            std::thread::sleep(Duration::from_millis(<span class="number">150</span>));
+<a href=#793 id=793 data-nosnippet>793</a>            <span class="prelude-val">Ok</span>(HookResult::Continue)
+<a href=#794 id=794 data-nosnippet>794</a>        });
+<a href=#795 id=795 data-nosnippet>795</a>
+<a href=#796 id=796 data-nosnippet>796</a>        <span class="kw">let </span>component_id =
+<a href=#797 id=797 data-nosnippet>797</a>            <span class="kw">crate</span>::types::ComponentId::new(<span class="kw">crate</span>::types::ComponentType::System, <span class="string">"test"</span>.to_string());
+<a href=#798 id=798 data-nosnippet>798</a>        <span class="kw">let </span><span class="kw-2">mut </span>context = HookContext::new(HookPoint::SystemStartup, component_id);
+<a href=#799 id=799 data-nosnippet>799</a>
+<a href=#800 id=800 data-nosnippet>800</a>        <span class="comment">// Should succeed with custom timeout
+<a href=#801 id=801 data-nosnippet>801</a>        </span><span class="kw">let </span>result = executor.execute_hook(<span class="kw-2">&amp;</span>hook, <span class="kw-2">&amp;mut </span>context).<span class="kw">await</span>.unwrap();
+<a href=#802 id=802 data-nosnippet>802</a>        <span class="macro">assert!</span>(<span class="macro">matches!</span>(result, HookResult::Continue));
+<a href=#803 id=803 data-nosnippet>803</a>    }
+<a href=#804 id=804 data-nosnippet>804</a>}</code></pre></div></section></main></body></html>

@@ -1,6 +1,8 @@
 //! ABOUTME: Orchestrator Agent template for creating agents that coordinate other agents and workflows
 //! ABOUTME: Provides standardized template for orchestration-focused agents with workflow management capabilities
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::base::{AgentTemplate, TemplateInstantiationParams, TemplateInstantiationResult};
 use super::schema::{
     CapabilityRequirement, ComplexityLevel, ParameterConstraint, ParameterDefinition,
@@ -34,14 +36,15 @@ pub enum OrchestrationStrategy {
 }
 
 impl OrchestrationStrategy {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            OrchestrationStrategy::Sequential => "sequential".to_string(),
-            OrchestrationStrategy::Parallel => "parallel".to_string(),
-            OrchestrationStrategy::Conditional => "conditional".to_string(),
-            OrchestrationStrategy::Pipeline => "pipeline".to_string(),
-            OrchestrationStrategy::EventDriven => "event_driven".to_string(),
-            OrchestrationStrategy::Custom(name) => name.clone(),
+            Self::Sequential => "sequential".to_string(),
+            Self::Parallel => "parallel".to_string(),
+            Self::Conditional => "conditional".to_string(),
+            Self::Pipeline => "pipeline".to_string(),
+            Self::EventDriven => "event_driven".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -99,6 +102,8 @@ pub struct OrchestratorAgentTemplate {
 
 impl OrchestratorAgentTemplate {
     /// Create new Orchestrator Agent template
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "orchestrator_agent".to_string(),
@@ -342,12 +347,14 @@ impl OrchestratorAgentTemplate {
     }
 
     /// Create Orchestrator Agent template with custom configuration
+    #[must_use]
     pub fn with_config(mut self, config: OrchestratorAgentConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Create simple orchestrator template for basic workflow coordination
+    #[must_use]
     pub fn simple() -> Self {
         let mut template = Self::new();
 
@@ -380,6 +387,7 @@ impl OrchestratorAgentTemplate {
     }
 
     /// Create enterprise orchestrator template for complex orchestration scenarios
+    #[must_use]
     pub fn enterprise() -> Self {
         let mut template = Self::new();
 
@@ -422,6 +430,7 @@ impl OrchestratorAgentTemplate {
     }
 
     /// Create event-driven orchestrator template
+    #[must_use]
     pub fn event_driven() -> Self {
         let mut template = Self::new();
 
@@ -466,13 +475,14 @@ impl OrchestratorAgentTemplate {
 
     /// Apply parameters to config
     fn apply_parameters_to_config(
-        &self,
         config: &mut OrchestratorAgentConfig,
         params: &HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    ) {
         if let Some(max_agents) = params.get("max_managed_agents") {
             if let Some(value) = max_agents.as_u64() {
-                config.max_managed_agents = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_agents_usize = value as usize;
+                config.max_managed_agents = max_agents_usize;
             }
         }
 
@@ -509,7 +519,9 @@ impl OrchestratorAgentTemplate {
 
         if let Some(max_concurrent) = params.get("max_concurrent_workflows") {
             if let Some(value) = max_concurrent.as_u64() {
-                config.max_concurrent_workflows = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_concurrent_usize = value as usize;
+                config.max_concurrent_workflows = max_concurrent_usize;
             }
         }
 
@@ -521,7 +533,9 @@ impl OrchestratorAgentTemplate {
 
         if let Some(max_retries) = params.get("max_retries") {
             if let Some(value) = max_retries.as_u64() {
-                config.max_retries = value as u32;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_retries_u32 = value as u32;
+                config.max_retries = max_retries_u32;
             }
         }
 
@@ -530,8 +544,6 @@ impl OrchestratorAgentTemplate {
                 config.workflow_templates_dir = Some(value.to_string());
             }
         }
-
-        Ok(())
     }
 }
 
@@ -559,14 +571,16 @@ impl AgentTemplate for OrchestratorAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters)?;
+        Self::apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();
         final_config.insert("agent_type".to_string(), "orchestrator_agent".into());
+        #[allow(clippy::cast_sign_loss)]
+        let max_managed_agents_u64 = agent_config.max_managed_agents as u64;
         final_config.insert(
             "max_managed_agents".to_string(),
-            (agent_config.max_managed_agents as u64).into(),
+            max_managed_agents_u64.into(),
         );
         final_config.insert(
             "orchestration_strategy".to_string(),
@@ -584,9 +598,11 @@ impl AgentTemplate for OrchestratorAgentTemplate {
             "health_check_interval".to_string(),
             agent_config.health_check_interval.into(),
         );
+        #[allow(clippy::cast_sign_loss)]
+        let max_concurrent_workflows_u64 = agent_config.max_concurrent_workflows as u64;
         final_config.insert(
             "max_concurrent_workflows".to_string(),
-            (agent_config.max_concurrent_workflows as u64).into(),
+            max_concurrent_workflows_u64.into(),
         );
         final_config.insert(
             "enable_rollback".to_string(),
@@ -594,7 +610,7 @@ impl AgentTemplate for OrchestratorAgentTemplate {
         );
         final_config.insert(
             "max_retries".to_string(),
-            (agent_config.max_retries as u64).into(),
+            u64::from(agent_config.max_retries).into(),
         );
 
         if let Some(templates_dir) = &agent_config.workflow_templates_dir {
@@ -636,7 +652,7 @@ impl AgentTemplate for OrchestratorAgentTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(OrchestratorAgentTemplate {
+        Box::new(Self {
             schema: self.schema.clone(),
             config: self.config.clone(),
         })
@@ -677,7 +693,7 @@ impl BaseAgent for MockOrchestratorAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         _input: AgentInput,
         _context: ExecutionContext,
@@ -697,7 +713,7 @@ impl BaseAgent for MockOrchestratorAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Orchestrator error handled: {}", error),
+            text: format!("Orchestrator error handled: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),
@@ -709,7 +725,6 @@ impl BaseAgent for MockOrchestratorAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_orchestrator_agent_template_creation() {
         let template = OrchestratorAgentTemplate::new();
@@ -722,7 +737,6 @@ mod tests {
         assert_eq!(required_params.len(), 1);
         assert_eq!(required_params[0].name, "agent_name");
     }
-
     #[tokio::test]
     async fn test_simple_orchestrator() {
         let template = OrchestratorAgentTemplate::simple();
@@ -732,7 +746,6 @@ mod tests {
         assert!(!template.config.enable_health_monitoring);
         assert_eq!(template.complexity(), &ComplexityLevel::Basic);
     }
-
     #[tokio::test]
     async fn test_enterprise_orchestrator() {
         let template = OrchestratorAgentTemplate::enterprise();
@@ -746,7 +759,6 @@ mod tests {
         let enterprise_mode = template.schema().template_config.get("enterprise_mode");
         assert_eq!(enterprise_mode, Some(&true.into()));
     }
-
     #[tokio::test]
     async fn test_event_driven_orchestrator() {
         let template = OrchestratorAgentTemplate::event_driven();
@@ -762,7 +774,6 @@ mod tests {
         assert!(event_bus_dep.is_some());
         assert!(event_bus_dep.unwrap().required);
     }
-
     #[tokio::test]
     async fn test_orchestration_strategies() {
         assert_eq!(OrchestrationStrategy::Sequential.name(), "sequential");
@@ -773,7 +784,6 @@ mod tests {
             "test"
         );
     }
-
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = OrchestratorAgentTemplate::new();
@@ -793,7 +803,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_required_tools() {
         let template = OrchestratorAgentTemplate::new();
@@ -806,7 +815,6 @@ mod tests {
         let optional_tools = template.optional_tools();
         assert!(optional_tools.contains(&"health_monitor".to_string()));
     }
-
     #[tokio::test]
     async fn test_capability_support() {
         let template = OrchestratorAgentTemplate::new();
@@ -817,7 +825,6 @@ mod tests {
         assert!(template.supports_capability("error_recovery"));
         assert!(!template.supports_capability("nonexistent_capability"));
     }
-
     #[tokio::test]
     async fn test_parameter_constraints() {
         let template = OrchestratorAgentTemplate::new();

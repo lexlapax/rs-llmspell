@@ -1,7 +1,13 @@
 //! ABOUTME: Component registry for managing agents, tools, and workflows
 //! ABOUTME: Central registry for all scriptable components accessible from engines
 
-use llmspell_core::{Agent, LLMSpellError, Tool, Workflow};
+use crate::event_bus_adapter::EventBusAdapter;
+use async_trait::async_trait;
+use llmspell_core::traits::event::EventConfig;
+use llmspell_core::{
+    Agent, BaseAgent, ComponentLookup, ExecutionContext, LLMSpellError, Tool, Workflow,
+};
+use llmspell_events::EventBus;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -10,69 +16,158 @@ pub struct ComponentRegistry {
     agents: Arc<RwLock<HashMap<String, Arc<dyn Agent>>>>,
     tools: Arc<RwLock<HashMap<String, Arc<dyn Tool>>>>,
     workflows: Arc<RwLock<HashMap<String, Arc<dyn Workflow>>>>,
+    event_bus: Option<Arc<EventBus>>,
+    event_config: EventConfig,
 }
 
 impl ComponentRegistry {
     /// Create a new empty registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             agents: Arc::new(RwLock::new(HashMap::new())),
             tools: Arc::new(RwLock::new(HashMap::new())),
             workflows: Arc::new(RwLock::new(HashMap::new())),
+            event_bus: None,
+            event_config: EventConfig::default(),
         }
     }
 
+    /// Create a new registry with `EventBus` support
+    #[must_use]
+    pub fn with_event_bus(event_bus: Arc<EventBus>, config: EventConfig) -> Self {
+        Self {
+            agents: Arc::new(RwLock::new(HashMap::new())),
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            workflows: Arc::new(RwLock::new(HashMap::new())),
+            event_bus: Some(event_bus),
+            event_config: config,
+        }
+    }
+
+    /// Get the `EventBus` if available
+    #[must_use]
+    pub fn event_bus(&self) -> Option<Arc<EventBus>> {
+        self.event_bus.clone()
+    }
+
+    /// Create an `ExecutionContext` with registry services (state, events, etc.)
+    #[must_use]
+    pub fn create_execution_context(&self, base_context: ExecutionContext) -> ExecutionContext {
+        let mut ctx = base_context;
+
+        // Add events if available and enabled
+        if let Some(ref event_bus) = self.event_bus {
+            if self.event_config.enabled {
+                let adapter =
+                    EventBusAdapter::with_config(event_bus.clone(), self.event_config.clone());
+                ctx.events = Some(Arc::new(adapter));
+            }
+        }
+
+        // Note: State would be added here too if ComponentRegistry had state_manager
+        // For now, state is managed separately
+
+        ctx
+    }
+
     /// Register an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an agent with the same name is already registered
+    ///
+    /// # Panics
+    ///
+    /// Panics if the agents lock is poisoned
     pub fn register_agent(&self, name: String, agent: Arc<dyn Agent>) -> Result<(), LLMSpellError> {
         let mut agents = self.agents.write().unwrap();
         if agents.contains_key(&name) {
             return Err(LLMSpellError::Validation {
                 field: Some("agent_name".to_string()),
-                message: format!("Agent '{}' already registered", name),
+                message: format!("Agent '{name}' already registered"),
             });
         }
         agents.insert(name, agent);
+        drop(agents); // Explicitly drop the lock
         Ok(())
     }
 
     /// Get an agent by name
+    ///
+    /// # Panics
+    ///
+    /// Panics if the agents lock is poisoned
+    #[must_use]
     pub fn get_agent(&self, name: &str) -> Option<Arc<dyn Agent>> {
         let agents = self.agents.read().unwrap();
         agents.get(name).cloned()
     }
 
     /// List all registered agents
+    ///
+    /// # Panics
+    ///
+    /// Panics if the agents lock is poisoned
+    #[must_use]
     pub fn list_agents(&self) -> Vec<String> {
         let agents = self.agents.read().unwrap();
         agents.keys().cloned().collect()
     }
 
     /// Register a tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a tool with the same name is already registered
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tools lock is poisoned
     pub fn register_tool(&self, name: String, tool: Arc<dyn Tool>) -> Result<(), LLMSpellError> {
         let mut tools = self.tools.write().unwrap();
         if tools.contains_key(&name) {
             return Err(LLMSpellError::Validation {
                 field: Some("tool_name".to_string()),
-                message: format!("Tool '{}' already registered", name),
+                message: format!("Tool '{name}' already registered"),
             });
         }
         tools.insert(name, tool);
+        drop(tools); // Explicitly drop the lock
         Ok(())
     }
 
     /// Get a tool by name
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tools lock is poisoned
+    #[must_use]
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
         let tools = self.tools.read().unwrap();
         tools.get(name).cloned()
     }
 
     /// List all registered tools
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tools lock is poisoned
+    #[must_use]
     pub fn list_tools(&self) -> Vec<String> {
         let tools = self.tools.read().unwrap();
         tools.keys().cloned().collect()
     }
 
     /// Register a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a workflow with the same name is already registered
+    ///
+    /// # Panics
+    ///
+    /// Panics if the workflows lock is poisoned
     pub fn register_workflow(
         &self,
         name: String,
@@ -82,20 +177,31 @@ impl ComponentRegistry {
         if workflows.contains_key(&name) {
             return Err(LLMSpellError::Validation {
                 field: Some("workflow_name".to_string()),
-                message: format!("Workflow '{}' already registered", name),
+                message: format!("Workflow '{name}' already registered"),
             });
         }
         workflows.insert(name, workflow);
+        drop(workflows); // Explicitly drop the lock
         Ok(())
     }
 
     /// Get a workflow by name
+    ///
+    /// # Panics
+    ///
+    /// Panics if the workflows lock is poisoned
+    #[must_use]
     pub fn get_workflow(&self, name: &str) -> Option<Arc<dyn Workflow>> {
         let workflows = self.workflows.read().unwrap();
         workflows.get(name).cloned()
     }
 
     /// List all registered workflows
+    ///
+    /// # Panics
+    ///
+    /// Panics if the workflows lock is poisoned
+    #[must_use]
     pub fn list_workflows(&self) -> Vec<String> {
         let workflows = self.workflows.read().unwrap();
         workflows.keys().cloned().collect()
@@ -105,6 +211,44 @@ impl ComponentRegistry {
 impl Default for ComponentRegistry {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Implementation of `ComponentLookup` trait for `ComponentRegistry`
+/// This allows the registry to be used from llmspell-workflows without circular deps
+#[async_trait]
+impl ComponentLookup for ComponentRegistry {
+    async fn get_agent(&self, name: &str) -> Option<Arc<dyn Agent>> {
+        self.get_agent(name)
+    }
+
+    async fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
+        self.get_tool(name)
+    }
+
+    async fn get_workflow(&self, name: &str) -> Option<Arc<dyn Workflow>> {
+        self.get_workflow(name)
+    }
+
+    async fn get_component(&self, component_type: &str, name: &str) -> Option<Arc<dyn BaseAgent>> {
+        match component_type {
+            "agent" => self.get_agent(name).map(|a| a as Arc<dyn BaseAgent>),
+            "tool" => self.get_tool(name).map(|t| t as Arc<dyn BaseAgent>),
+            "workflow" => self.get_workflow(name).map(|w| w as Arc<dyn BaseAgent>),
+            _ => None,
+        }
+    }
+
+    async fn list_agents(&self) -> Vec<String> {
+        self.list_agents()
+    }
+
+    async fn list_tools(&self) -> Vec<String> {
+        self.list_tools()
+    }
+
+    async fn list_workflows(&self) -> Vec<String> {
+        self.list_workflows()
     }
 }
 
@@ -140,7 +284,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
@@ -153,7 +297,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -180,7 +324,6 @@ mod tests {
             Ok(())
         }
     }
-
     #[test]
     fn test_agent_registration() {
         let registry = ComponentRegistry::new();

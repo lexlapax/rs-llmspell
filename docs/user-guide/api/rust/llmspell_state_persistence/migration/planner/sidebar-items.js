@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["MigrationPlannerError"],"struct":["MigrationComplexity","MigrationPlan","MigrationPlanner","MigrationStep"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["bench_component_id_generation","bench_error_handling","bench_serialization","bench_trait_dispatch","bench_version_operations","measure_async_operation","standard_benchmark_config"]};

@@ -101,7 +101,9 @@ impl RateLimitMetrics {
         if self.total_requests == 0 {
             1.0
         } else {
-            self.allowed_requests as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let ratio = self.allowed_requests as f64 / self.total_requests as f64;
+            ratio
         }
     }
 
@@ -109,7 +111,9 @@ impl RateLimitMetrics {
         if self.total_requests == 0 {
             0.0
         } else {
-            self.rate_limited_requests as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let ratio = self.rate_limited_requests as f64 / self.total_requests as f64;
+            ratio
         }
     }
 }
@@ -184,7 +188,9 @@ impl RateLimitHook {
 
     /// Set rate per second
     pub fn with_rate_per_second(mut self, rate: f64) -> Self {
-        self.config.bucket_config.capacity = rate as usize;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let capacity = rate as usize;
+        self.config.bucket_config.capacity = capacity;
         self.config.bucket_config.refill_rate = rate;
         self.config.bucket_config.refill_interval = Duration::from_secs(1);
         self.rate_limiter = Arc::new(RateLimiter::new(self.config.bucket_config.clone()));
@@ -366,18 +372,22 @@ impl Hook for RateLimitHook {
             {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.allowed_requests += 1;
-                metrics.tokens_consumed += tokens_requested as u64;
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let tokens_consumed = tokens_requested as u64;
+                metrics.tokens_consumed += tokens_consumed;
             }
 
             // Check if we're using burst capacity
             let bucket_state = rate_limiter.get_bucket_state(&key);
-            if tokens_remaining < bucket_state.capacity as f64 - bucket_state.burst_capacity as f64
-            {
+            #[allow(clippy::cast_precision_loss)]
+            let burst_threshold = bucket_state.capacity as f64 - bucket_state.burst_capacity as f64;
+            if tokens_remaining < burst_threshold {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.burst_requests += 1;
             }
 
             // Check warning threshold
+            #[allow(clippy::cast_precision_loss)]
             let total_capacity = (bucket_state.capacity + bucket_state.burst_capacity) as f64;
             if self.check_warning_threshold(tokens_remaining, total_capacity) {
                 let mut metrics = self.metrics.write().unwrap();
@@ -502,7 +512,9 @@ impl MetricHook for RateLimitHook {
 
         if bucket_state.last_refill_amount > 0.0 {
             let mut metrics = self.metrics.write().unwrap();
-            metrics.tokens_refilled += bucket_state.last_refill_amount as u64;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let tokens_refilled = bucket_state.last_refill_amount as u64;
+            metrics.tokens_refilled += tokens_refilled;
         }
 
         Ok(())
@@ -571,11 +583,12 @@ mod tests {
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use std::time::Duration;
 
+    /// Local test helper to avoid circular dependency with llmspell-testing
+    /// (Architectural exception per 7.1.6: foundational crates may have minimal local helpers)
     fn create_test_context() -> HookContext {
         let component_id = ComponentId::new(ComponentType::System, "test".to_string());
         HookContext::new(HookPoint::BeforeToolExecution, component_id)
     }
-
     #[tokio::test]
     async fn test_rate_limit_hook_basic() {
         let hook = RateLimitHook::new()
@@ -593,7 +606,6 @@ mod tests {
         assert!(context.get_metadata("X-RateLimit-Remaining").is_some());
         assert!(context.get_metadata("X-RateLimit-Reset").is_some());
     }
-
     #[tokio::test]
     async fn test_rate_limit_exceeded() {
         let hook = RateLimitHook::new().with_rate_per_second(1.0).with_burst(2);
@@ -613,7 +625,6 @@ mod tests {
         // Check retry-after header
         assert!(context.get_metadata("X-RateLimit-Retry-After").is_some());
     }
-
     #[tokio::test]
     async fn test_rate_limit_strategies() {
         // Test per-component strategy
@@ -634,7 +645,6 @@ mod tests {
         assert!(matches!(result1, HookResult::Continue));
         assert!(matches!(result2, HookResult::Continue));
     }
-
     #[tokio::test]
     async fn test_rate_limit_delay_action() {
         // Use a very fast refill rate for testing
@@ -664,7 +674,6 @@ mod tests {
         assert!(elapsed >= Duration::from_millis(140)); // Allow some tolerance
         assert!(matches!(result, HookResult::Continue));
     }
-
     #[tokio::test]
     async fn test_rate_limit_custom_limits() {
         let hook = RateLimitHook::new()
@@ -693,7 +702,6 @@ mod tests {
         let limit = context.get_metadata("X-RateLimit-Limit").unwrap();
         assert_eq!(limit, "100");
     }
-
     #[tokio::test]
     async fn test_rate_limit_warning_threshold() {
         let hook = RateLimitHook::new()
@@ -713,7 +721,6 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
         assert!(context.get_metadata("X-RateLimit-Warning").is_some());
     }
-
     #[tokio::test]
     async fn test_rate_limit_metrics() {
         let hook = RateLimitHook::new().with_rate_per_second(1.0).with_burst(1); // Total capacity = 2
@@ -731,7 +738,6 @@ mod tests {
         assert_eq!(metrics.rate_limited_requests, 1);
         assert_eq!(metrics.allowed_ratio(), 2.0 / 3.0);
     }
-
     #[test]
     fn test_hook_metadata() {
         let hook = RateLimitHook::new();
@@ -744,7 +750,6 @@ mod tests {
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"rate-limit".to_string()));
     }
-
     #[test]
     fn test_rate_limit_config_defaults() {
         let config = RateLimitConfig::default();
@@ -758,7 +763,6 @@ mod tests {
         assert_eq!(config.header_prefix, "X-RateLimit-");
         assert_eq!(config.warning_threshold, 0.8);
     }
-
     #[tokio::test]
     async fn test_replayable_hook_implementation() {
         let hook = RateLimitHook::new()
@@ -789,8 +793,8 @@ mod tests {
         );
 
         // Ensure rate limit specific data was removed
-        assert!(deserialized.data.get("_rate_limit_config").is_none());
-        assert!(deserialized.data.get("_rate_limit_metrics").is_none());
+        assert!(!deserialized.data.contains_key("_rate_limit_config"));
+        assert!(!deserialized.data.contains_key("_rate_limit_metrics"));
 
         // Test replay ID
         assert_eq!(hook.replay_id(), "RateLimitHook:1.0.0");

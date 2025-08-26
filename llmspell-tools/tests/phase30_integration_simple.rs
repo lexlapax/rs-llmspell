@@ -4,7 +4,7 @@
 //! Phase 3.0 Integration Test Suite - Simplified
 //!
 //! This test validates the core Phase 3.0 achievements:
-//! 1. All tools use ResponseBuilder pattern (consistent JSON responses)
+//! 1. All tools use `ResponseBuilder` pattern (consistent JSON responses)
 //! 2. Parameter standardization for key tools (calculator, hash, etc.)
 //! 3. Tool initialization performance (<10ms)
 //! 4. Security hardening is in place
@@ -14,6 +14,9 @@ use llmspell_core::{
     types::AgentInput,
     ExecutionContext,
 };
+use llmspell_tools::util::hash_calculator::HashCalculatorConfig;
+use llmspell_tools::util::text_manipulator::TextManipulatorConfig;
+use llmspell_tools::util::uuid_generator::UuidGeneratorConfig;
 use llmspell_tools::util::*;
 use serde_json::{json, Value};
 use std::{collections::HashMap, time::Instant};
@@ -44,7 +47,7 @@ async fn test_parameter_standardization_compliance() {
         ),
         (
             "hash_calculator",
-            Box::new(HashCalculatorTool::new(Default::default())),
+            Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
             json!({"operation": "hash", "algorithm": "md5", "input": "test"}),
         ),
         (
@@ -65,27 +68,24 @@ async fn test_parameter_standardization_compliance() {
         let result = tool.execute(test_input, ExecutionContext::default()).await;
         assert!(
             result.is_ok(),
-            "Tool {} should execute without panicking",
-            name
+            "Tool {name} should execute without panicking"
         );
 
         let output = result.unwrap();
-        let error_msg = format!("Tool {} should return valid JSON", name);
+        let error_msg = format!("Tool {name} should return valid JSON");
         let parsed: Value = serde_json::from_str(&output.text).expect(&error_msg);
 
         // Validate ResponseBuilder pattern
         assert!(
             parsed.get("success").is_some(),
-            "Tool {} missing 'success' field",
-            name
+            "Tool {name} missing 'success' field"
         );
         assert!(
             parsed.get("operation").is_some(),
-            "Tool {} missing 'operation' field",
-            name
+            "Tool {name} missing 'operation' field"
         );
 
-        println!("✅ Tool {} uses consistent ResponseBuilder pattern", name);
+        println!("✅ Tool {name} uses consistent ResponseBuilder pattern");
     }
 }
 
@@ -112,7 +112,7 @@ async fn test_tool_initialization_performance() {
                     let _tool = CalculatorTool::new();
                 }
                 "hash_calculator" => {
-                    let _tool = HashCalculatorTool::new(Default::default());
+                    let _tool = HashCalculatorTool::new(HashCalculatorConfig::default());
                 }
                 "base64_encoder" => {
                     let _tool = Base64EncoderTool::new();
@@ -127,10 +127,10 @@ async fn test_tool_initialization_performance() {
                     let _tool = DateTimeHandlerTool::new();
                 }
                 "uuid_generator" => {
-                    let _tool = UuidGeneratorTool::new(Default::default());
+                    let _tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
                 }
                 "text_manipulator" => {
-                    let _tool = TextManipulatorTool::new(Default::default());
+                    let _tool = TextManipulatorTool::new(TextManipulatorConfig::default());
                 }
                 "data_validation" => {
                     let _tool = DataValidationTool::new();
@@ -155,7 +155,7 @@ async fn test_tool_initialization_performance() {
     }
 }
 
-/// Test calculator DoS protection (security hardening from Phase 3.0.12)
+/// Test calculator `DoS` protection (security hardening from Phase 3.0.12)
 #[tokio::test]
 async fn test_security_hardening_compliance() {
     let calculator = CalculatorTool::new();
@@ -198,7 +198,7 @@ async fn test_security_hardening_compliance() {
     println!("✅ Calculator DoS protection is working");
 }
 
-/// Test ResponseBuilder consistency across tool categories
+/// Test `ResponseBuilder` consistency across tool categories
 #[tokio::test]
 async fn test_response_builder_consistency() {
     // Test tools that should reliably return valid responses for simple operations
@@ -210,7 +210,7 @@ async fn test_response_builder_consistency() {
         ),
         (
             "uuid_generator",
-            Box::new(UuidGeneratorTool::new(Default::default())),
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())),
             json!({"operation": "generate", "version": "v4"}),
         ),
         (
@@ -224,41 +224,32 @@ async fn test_response_builder_consistency() {
         let test_input = create_test_input("test", params);
 
         let result = tool.execute(test_input, ExecutionContext::default()).await;
-        assert!(result.is_ok(), "Tool {} should execute successfully", name);
+        assert!(result.is_ok(), "Tool {name} should execute successfully");
 
         let output = result.unwrap();
-        let error_msg = format!("Tool {} should return valid JSON", name);
+        let error_msg = format!("Tool {name} should return valid JSON");
         let parsed: Value = serde_json::from_str(&output.text).expect(&error_msg);
 
         // Validate consistent ResponseBuilder structure
         assert!(
             parsed.get("success").is_some(),
-            "Tool {} missing 'success' field",
-            name
+            "Tool {name} missing 'success' field"
         );
         assert!(
             parsed.get("operation").is_some(),
-            "Tool {} missing 'operation' field",
-            name
+            "Tool {name} missing 'operation' field"
         );
 
         // Check if operation succeeded
         if parsed["success"].as_bool().unwrap_or(false) {
-            println!(
-                "✅ Tool {} returned successful response with consistent format",
-                name
-            );
+            println!("✅ Tool {name} returned successful response with consistent format");
         } else {
             // Even error responses should be consistent
             assert!(
                 parsed.get("error").is_some(),
-                "Tool {} error response missing 'error' field",
-                name
+                "Tool {name} error response missing 'error' field"
             );
-            println!(
-                "✅ Tool {} returned error response with consistent format",
-                name
-            );
+            println!("✅ Tool {name} returned error response with consistent format");
         }
     }
 }
@@ -289,7 +280,7 @@ async fn test_phase30_migration_compliance() {
     );
 
     // 2. Hash calculator uses "input" instead of "data"
-    let hasher = HashCalculatorTool::new(Default::default());
+    let hasher = HashCalculatorTool::new(HashCalculatorConfig::default());
     let test_input = create_test_input(
         "test",
         json!({

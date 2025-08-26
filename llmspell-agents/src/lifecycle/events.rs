@@ -1,6 +1,8 @@
 //! ABOUTME: Lifecycle event system for agent state machine transitions and monitoring
 //! ABOUTME: Provides event-driven notifications for agent lifecycle changes with hooks integration
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::state_machine::{AgentState, StateTransition};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -13,7 +15,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Lifecycle event types
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LifecycleEventType {
     /// Agent state changed
     StateChanged,
@@ -68,6 +70,7 @@ pub struct LifecycleEvent {
 
 impl LifecycleEvent {
     /// Create new lifecycle event
+    #[must_use]
     pub fn new(
         event_type: LifecycleEventType,
         agent_id: String,
@@ -86,12 +89,14 @@ impl LifecycleEvent {
     }
 
     /// Add metadata to event
+    #[must_use]
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.metadata.insert(key.to_string(), value.to_string());
         self
     }
 
     /// Get event age
+    #[must_use]
     pub fn age(&self) -> Duration {
         self.timestamp
             .elapsed()
@@ -139,6 +144,10 @@ pub enum LifecycleEventData {
 #[async_trait]
 pub trait LifecycleEventListener: Send + Sync {
     /// Handle lifecycle event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event handling fails
     async fn handle_event(&self, event: &LifecycleEvent) -> Result<()>;
 
     /// Check if listener is interested in event type
@@ -171,16 +180,19 @@ impl EventSubscription {
         }
     }
 
+    #[must_use]
     pub fn for_agent(mut self, agent_id: String) -> Self {
         self.agent_id = Some(agent_id);
         self
     }
 
+    #[must_use]
     pub fn for_event_types(mut self, event_types: Vec<LifecycleEventType>) -> Self {
         self.event_types = event_types;
         self
     }
 
+    #[must_use]
     pub fn matches(&self, event: &LifecycleEvent) -> bool {
         if !self.active {
             return false;
@@ -263,6 +275,7 @@ impl Default for LifecycleEventSystem {
 
 impl LifecycleEventSystem {
     /// Create new event system
+    #[must_use]
     pub fn new(config: EventSystemConfig) -> Self {
         let (broadcaster, _) = broadcast::channel(1000);
 
@@ -329,6 +342,10 @@ impl LifecycleEventSystem {
     }
 
     /// Unsubscribe from events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unsubscription fails
     pub async fn unsubscribe(&self, subscription_id: &str) -> Result<()> {
         let mut subscriptions = self.subscriptions.write().await;
         if subscriptions.remove(subscription_id).is_some() {
@@ -345,6 +362,13 @@ impl LifecycleEventSystem {
     }
 
     /// Emit lifecycle event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Event processing fails
+    /// - Listener handling fails
+    /// - Metrics recording fails
     pub async fn emit(&self, event: LifecycleEvent) -> Result<()> {
         let start_time = Instant::now();
 
@@ -359,10 +383,7 @@ impl LifecycleEventSystem {
         {
             let mut stats = self.event_stats.lock().await;
             stats.total_events += 1;
-            *stats
-                .events_by_type
-                .entry(event.event_type.clone())
-                .or_insert(0) += 1;
+            *stats.events_by_type.entry(event.event_type).or_insert(0) += 1;
             *stats
                 .events_by_agent
                 .entry(event.agent_id.clone())
@@ -399,8 +420,10 @@ impl LifecycleEventSystem {
             stats.average_processing_time = if stats.total_events == 1 {
                 processing_time
             } else {
-                (stats.average_processing_time * (stats.total_events - 1) as u32 + processing_time)
-                    / stats.total_events as u32
+                (stats.average_processing_time
+                    * u32::try_from(stats.total_events - 1).unwrap_or(u32::MAX)
+                    + processing_time)
+                    / u32::try_from(stats.total_events).unwrap_or(1)
             };
         }
 
@@ -408,6 +431,10 @@ impl LifecycleEventSystem {
     }
 
     /// Process event subscriptions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription processing fails
     async fn process_subscriptions(&self, event: &LifecycleEvent) -> Result<()> {
         let subscriptions = self.subscriptions.read().await;
         let matching_subscriptions: Vec<_> = subscriptions
@@ -465,6 +492,10 @@ impl LifecycleEventSystem {
     }
 
     /// Emit state transition event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn emit_state_transition(
         &self,
         agent_id: String,
@@ -486,6 +517,10 @@ impl LifecycleEventSystem {
     }
 
     /// Emit error event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn emit_error(
         &self,
         agent_id: String,
@@ -508,6 +543,10 @@ impl LifecycleEventSystem {
     }
 
     /// Emit health check event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn emit_health_check(
         &self,
         agent_id: String,
@@ -529,6 +568,7 @@ impl LifecycleEventSystem {
     }
 
     /// Get event receiver for custom processing
+    #[must_use]
     pub fn subscribe_to_broadcast(&self) -> broadcast::Receiver<LifecycleEvent> {
         self.broadcaster.subscribe()
     }
@@ -594,13 +634,15 @@ impl Default for LoggingEventListener {
 }
 
 impl LoggingEventListener {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             log_level: tracing::Level::INFO,
         }
     }
 
-    pub fn with_level(mut self, level: tracing::Level) -> Self {
+    #[must_use]
+    pub const fn with_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }
@@ -608,6 +650,11 @@ impl LoggingEventListener {
 
 #[async_trait]
 impl LifecycleEventListener for LoggingEventListener {
+    /// Handle event for logging
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
         let message = match &event.data {
             LifecycleEventData::StateTransition { from, to, .. } => {
@@ -672,6 +719,7 @@ impl Default for MetricsEventListener {
 }
 
 impl MetricsEventListener {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(Mutex::new(HashMap::new())),
@@ -733,7 +781,6 @@ mod tests {
             self.interested_types.is_empty() || self.interested_types.contains(event_type)
         }
     }
-
     #[tokio::test]
     async fn test_event_system_basic() {
         let event_system = LifecycleEventSystem::default();
@@ -771,7 +818,6 @@ mod tests {
             Some(&1)
         );
     }
-
     #[tokio::test]
     async fn test_event_filtering() {
         let event_system = LifecycleEventSystem::default();
@@ -818,7 +864,6 @@ mod tests {
         // Should only receive the error event
         assert_eq!(listener.get_events_received(), 1);
     }
-
     #[tokio::test]
     async fn test_agent_specific_filtering() {
         let event_system = LifecycleEventSystem::default();
@@ -862,7 +907,6 @@ mod tests {
         // Should only receive the target agent event
         assert_eq!(listener.get_events_received(), 1);
     }
-
     #[tokio::test]
     async fn test_event_history() {
         let event_system = LifecycleEventSystem::default();
@@ -871,9 +915,9 @@ mod tests {
         for i in 0..5 {
             let event = LifecycleEvent::new(
                 LifecycleEventType::StateChanged,
-                format!("agent-{}", i),
+                format!("agent-{i}"),
                 LifecycleEventData::Generic {
-                    message: format!("Event {}", i),
+                    message: format!("Event {i}"),
                     details: HashMap::new(),
                 },
                 "test".to_string(),
@@ -890,7 +934,6 @@ mod tests {
         assert_eq!(agent_events.len(), 1);
         assert_eq!(agent_events[0].agent_id, "agent-2");
     }
-
     #[tokio::test]
     async fn test_logging_listener() {
         let listener = LoggingEventListener::new();
@@ -910,7 +953,6 @@ mod tests {
         // Should not panic
         listener.handle_event(&event).await.unwrap();
     }
-
     #[tokio::test]
     async fn test_metrics_listener() {
         let listener = MetricsEventListener::new();
@@ -921,7 +963,7 @@ mod tests {
                 LifecycleEventType::StateChanged,
                 "test-agent".to_string(),
                 LifecycleEventData::Generic {
-                    message: format!("Event {}", i),
+                    message: format!("Event {i}"),
                     details: HashMap::new(),
                 },
                 "test".to_string(),

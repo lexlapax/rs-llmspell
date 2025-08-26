@@ -519,7 +519,6 @@ mod tests {
     fn create_test_component(name: &str, component_type: ComponentType) -> ComponentId {
         ComponentId::new(component_type, name.to_string())
     }
-
     #[test]
     fn test_dependency_graph_creation() {
         let graph = DependencyGraph::new();
@@ -527,7 +526,6 @@ mod tests {
         assert!(graph.dependencies.is_empty());
         assert!(graph.dependents.is_empty());
     }
-
     #[test]
     fn test_add_node() {
         let mut graph = DependencyGraph::new();
@@ -545,7 +543,6 @@ mod tests {
             .hook_points
             .contains(&HookPoint::BeforeAgentInit));
     }
-
     #[test]
     fn test_add_dependency() {
         let mut graph = DependencyGraph::new();
@@ -564,7 +561,6 @@ mod tests {
         assert_eq!(graph.dependents[&agent_id].len(), 1);
         assert_eq!(graph.dependents[&agent_id][0], tool_id);
     }
-
     #[test]
     fn test_circular_dependency_detection() {
         let mut graph = DependencyGraph::new();
@@ -584,7 +580,6 @@ mod tests {
             assert!(e.to_string().contains("Circular dependency"));
         }
     }
-
     #[test]
     fn test_topological_sort() {
         let mut graph = DependencyGraph::new();
@@ -624,7 +619,6 @@ mod tests {
                     .unwrap()
         );
     }
-
     #[test]
     fn test_parallel_execution_phases() {
         let mut graph = DependencyGraph::new();
@@ -661,7 +655,6 @@ mod tests {
         assert!(order.phases[1].contains(&tool2_id));
         assert!(order.phases[2].contains(&workflow_id));
     }
-
     #[test]
     fn test_hook_point_filtering() {
         let mut graph = DependencyGraph::new();
@@ -695,7 +688,6 @@ mod tests {
         assert_eq!(order.sequence.len(), 1);
         assert_eq!(order.sequence[0], agent_id);
     }
-
     #[test]
     fn test_dependency_removal() {
         let mut graph = DependencyGraph::new();

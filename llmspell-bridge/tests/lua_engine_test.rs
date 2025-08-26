@@ -1,15 +1,15 @@
-//! ABOUTME: Integration tests for LuaEngine implementation
+//! ABOUTME: Integration tests for `LuaEngine` implementation
 //! ABOUTME: Validates basic script execution and API injection
 
 #[cfg(feature = "lua")]
 mod tests {
     use llmspell_bridge::{
         engine::factory::{EngineFactory, LuaConfig},
-        providers::{ProviderManager, ProviderManagerConfig},
+        providers::ProviderManager,
         registry::ComponentRegistry,
     };
+    use llmspell_config::providers::ProviderManagerConfig;
     use std::sync::Arc;
-
     #[tokio::test]
     async fn test_lua_engine_creation() {
         let config = LuaConfig::default();
@@ -44,7 +44,7 @@ mod tests {
             Ok(result) => {
                 assert_eq!(result.output.as_i64(), Some(42));
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -73,7 +73,7 @@ mod tests {
                     "Agent global not found"
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 }

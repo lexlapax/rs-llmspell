@@ -9,7 +9,8 @@ pub struct JsonGlobal {}
 
 impl JsonGlobal {
     /// Create a new JSON global
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 }
@@ -52,7 +53,6 @@ impl Default for JsonGlobal {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_json_global_metadata() {
         let global = JsonGlobal::new();

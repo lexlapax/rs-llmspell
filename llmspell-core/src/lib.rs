@@ -1,9 +1,9 @@
 //! ABOUTME: Core traits, types, and infrastructure for rs-llmspell
-//! ABOUTME: Foundation layer providing BaseAgent, Agent, Tool, and Workflow traits
+//! ABOUTME: Foundation layer providing `BaseAgent`, `Agent`, `Tool`, and `Workflow` traits
 //!
 //! # Overview
 //!
-//! `llmspell-core` is the foundational crate of the LLMSpell system, providing:
+//! `llmspell-core` is the foundational crate of the `LLMSpell` system, providing:
 //!
 //! - **Core Traits**: `BaseAgent`, `Agent`, `Tool`, and `Workflow` for component abstraction
 //! - **Type System**: `ComponentId`, `Version`, and `ComponentMetadata` for identification
@@ -57,7 +57,7 @@
 //!         &self.metadata
 //!     }
 //!     
-//!     async fn execute(
+//!     async fn execute_impl(
 //!         &self,
 //!         input: AgentInput,
 //!         context: ExecutionContext,
@@ -71,7 +71,7 @@
 //!     }
 //!     
 //!     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-//!         Ok(AgentOutput::text(format!("Error: {}", error)))
+//!         Err(error)
 //!     }
 //! }
 //! ```
@@ -121,6 +121,9 @@ pub mod types;
 pub mod traits {
     pub mod agent;
     pub mod base_agent;
+    pub mod component_lookup;
+    pub mod event;
+    pub mod state;
     pub mod tool;
     pub mod tool_capable;
     pub mod workflow;
@@ -130,6 +133,13 @@ pub mod traits {
 pub use error::{LLMSpellError, Result};
 pub use execution_context::{ContextScope, ExecutionContext, InheritancePolicy};
 pub use traits::{
-    agent::Agent, base_agent::BaseAgent, tool::Tool, tool_capable::ToolCapable, workflow::Workflow,
+    agent::Agent,
+    base_agent::BaseAgent,
+    component_lookup::ComponentLookup,
+    event::{EventConfig, EventData, EventEmitter},
+    state::StateAccess,
+    tool::Tool,
+    tool_capable::ToolCapable,
+    workflow::Workflow,
 };
 pub use types::{ComponentId, ComponentMetadata, EventMetadata, Version};

@@ -5,13 +5,21 @@ use crate::globals::GlobalContext;
 use crate::lua::conversion::json_to_lua_value;
 use crate::lua::sync_utils::block_on_async_lua;
 use crate::ComponentRegistry;
+use llmspell_core::execution_context::{ContextScope, ExecutionContextBuilder};
 use mlua::{Lua, Table, Value};
 use std::sync::Arc;
 
 /// Inject Tool global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_tool_global(
     lua: &Lua,
-    _context: &GlobalContext,
+    context: &GlobalContext,
     registry: Arc<ComponentRegistry>,
 ) -> mlua::Result<()> {
     let tool_table = lua.create_table()?;
@@ -36,6 +44,7 @@ pub fn inject_tool_global(
 
     // Create Tool.get() function
     let registry_clone = registry.clone();
+    let context_clone = Arc::new(context.clone());
     let get_fn = lua.create_function(move |lua, name: String| {
         if let Some(tool) = registry_clone.get_tool(&name) {
             let metadata = tool.metadata();
@@ -51,29 +60,31 @@ pub fn inject_tool_global(
             schema_table.set("description", schema.description)?;
 
             // Convert parameters to Lua table
-            let params_table = lua.create_table()?;
+            let parameters_table = lua.create_table()?;
             for (i, param) in schema.parameters.into_iter().enumerate() {
-                let param_table = lua.create_table()?;
-                param_table.set("name", param.name)?;
-                param_table.set("type", format!("{:?}", param.param_type).to_lowercase())?;
-                param_table.set("description", param.description)?;
-                param_table.set("required", param.required)?;
+                let param_entry = lua.create_table()?;
+                param_entry.set("name", param.name)?;
+                param_entry.set("type", format!("{:?}", param.param_type).to_lowercase())?;
+                param_entry.set("description", param.description)?;
+                param_entry.set("required", param.required)?;
                 if let Some(default) = param.default {
-                    param_table.set("default", json_to_lua_value(lua, &default)?)?;
+                    param_entry.set("default", json_to_lua_value(lua, &default)?)?;
                 }
-                params_table.set(i + 1, param_table)?;
+                parameters_table.set(i + 1, param_entry)?;
             }
-            schema_table.set("parameters", params_table)?;
+            schema_table.set("parameters", parameters_table)?;
             tool_table.set("schema", schema_table)?;
 
             // Add execute method to the returned tool
             let tool_arc = tool.clone();
             let tool_name = name.clone();
+            let global_context = context_clone.clone();
             tool_table.set(
                 "execute",
                 lua.create_function(move |lua, (_self, params): (Table, Table)| {
                     let tool_instance = tool_arc.clone();
                     let name = tool_name.clone();
+                    let context_for_exec = global_context.clone();
 
                     // Use shared sync utility to execute async code
                     let result = block_on_async_lua(
@@ -91,18 +102,26 @@ pub fn inject_tool_global(
                             // Convert params to agent input
                             let agent_input = crate::lua::conversion::lua_table_to_agent_input(
                                 lua,
-                                params_table,
+                                &params_table,
                             )?;
 
                             // Execute the tool
-                            let context = llmspell_core::ExecutionContext::default();
+                            // Create ExecutionContext with state if available
+                            let exec_context = context_for_exec.state_access.as_ref().map_or_else(
+                                llmspell_core::ExecutionContext::default,
+                                |state_access| {
+                                    ExecutionContextBuilder::new()
+                                        .scope(ContextScope::Global) // Tools operate at global scope
+                                        .state(state_access.clone())
+                                        .build()
+                                },
+                            );
                             let output = tool_instance
-                                .execute(agent_input, context)
+                                .execute(agent_input, exec_context)
                                 .await
                                 .map_err(|e| {
                                     mlua::Error::RuntimeError(format!(
-                                        "Tool '{}' execution failed: {}",
-                                        name, e
+                                        "Tool '{name}' execution failed: {e}"
                                     ))
                                 })?;
 
@@ -126,17 +145,19 @@ pub fn inject_tool_global(
 
     // Create Tool.invoke() function - synchronous wrapper
     let registry_clone = registry.clone();
+    let context_clone2 = Arc::new(context.clone());
     let invoke_fn = lua.create_function(move |lua, (name, input): (String, Table)| {
         let registry = registry_clone.clone();
+        let global_context = context_clone2.clone();
 
         // Use shared sync utility to execute async code
         let result = block_on_async_lua(
             "tool_invoke",
             async move {
                 // Get the tool
-                let tool = registry.get_tool(&name).ok_or_else(|| {
-                    mlua::Error::RuntimeError(format!("Tool '{}' not found", name))
-                })?;
+                let tool = registry
+                    .get_tool(&name)
+                    .ok_or_else(|| mlua::Error::RuntimeError(format!("Tool '{name}' not found")))?;
 
                 // Create AgentInput with parameters wrapped correctly for extract_parameters
                 let params_table = lua.create_table()?;
@@ -149,12 +170,22 @@ pub fn inject_tool_global(
 
                 // Convert input to agent input
                 let agent_input =
-                    crate::lua::conversion::lua_table_to_agent_input(lua, params_table)?;
+                    crate::lua::conversion::lua_table_to_agent_input(lua, &params_table)?;
+
+                // Create ExecutionContext with state if available
+                let exec_context = global_context.state_access.as_ref().map_or_else(
+                    llmspell_core::ExecutionContext::default,
+                    |state_access| {
+                        ExecutionContextBuilder::new()
+                            .scope(ContextScope::Global) // Tools operate at global scope
+                            .state(state_access.clone())
+                            .build()
+                    },
+                );
 
                 // Execute the tool
-                let context = llmspell_core::ExecutionContext::default();
-                let output = tool.execute(agent_input, context).await.map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Tool execution failed: {}", e))
+                let output = tool.execute(agent_input, exec_context).await.map_err(|e| {
+                    mlua::Error::RuntimeError(format!("Tool execution failed: {e}"))
                 })?;
 
                 // Convert output to Lua table
@@ -200,6 +231,7 @@ pub fn inject_tool_global(
 
     // Add direct tool access via Tool.tool_name pattern
     let registry_for_index = registry.clone();
+    let context_for_index = Arc::new(context.clone());
     let tool_metatable = lua.create_table()?;
     tool_metatable.set(
         "__index",
@@ -229,11 +261,13 @@ pub fn inject_tool_global(
                 // Add execute method
                 let tool_arc = tool.clone();
                 let tool_name = key.clone();
+                let global_context = context_for_index.clone();
                 tool_instance.set(
                     "execute",
                     lua.create_async_function(move |lua, (_self, params): (Table, Table)| {
                         let tool_instance = tool_arc.clone();
                         let name = tool_name.clone();
+                        let context_for_exec = global_context.clone();
                         async move {
                             // Create AgentInput with parameters wrapped correctly for extract_parameters
                             let params_table = lua.create_table()?;
@@ -247,18 +281,26 @@ pub fn inject_tool_global(
                             // Convert params to agent input
                             let agent_input = crate::lua::conversion::lua_table_to_agent_input(
                                 lua,
-                                params_table,
+                                &params_table,
                             )?;
 
                             // Execute the tool
-                            let context = llmspell_core::ExecutionContext::default();
+                            // Create ExecutionContext with state if available
+                            let exec_context = context_for_exec.state_access.as_ref().map_or_else(
+                                llmspell_core::ExecutionContext::default,
+                                |state_access| {
+                                    ExecutionContextBuilder::new()
+                                        .scope(ContextScope::Global) // Tools operate at global scope
+                                        .state(state_access.clone())
+                                        .build()
+                                },
+                            );
                             let output = tool_instance
-                                .execute(agent_input, context)
+                                .execute(agent_input, exec_context)
                                 .await
                                 .map_err(|e| {
                                     mlua::Error::RuntimeError(format!(
-                                        "Tool '{}' execution failed: {}",
-                                        name, e
+                                        "Tool '{name}' execution failed: {e}"
                                     ))
                                 })?;
 
@@ -272,25 +314,25 @@ pub fn inject_tool_global(
                 let schema = tool.schema();
                 tool_instance.set(
                     "getSchema",
-                    lua.create_function(move |lua, _: ()| {
+                    lua.create_function(move |lua, (): ()| {
                         let schema_table = lua.create_table()?;
                         schema_table.set("name", schema.name.clone())?;
                         schema_table.set("description", schema.description.clone())?;
 
-                        let params_table = lua.create_table()?;
+                        let parameters_table = lua.create_table()?;
                         for (i, param) in schema.parameters.iter().enumerate() {
-                            let param_table = lua.create_table()?;
-                            param_table.set("name", param.name.clone())?;
-                            param_table
+                            let param_entry = lua.create_table()?;
+                            param_entry.set("name", param.name.clone())?;
+                            param_entry
                                 .set("type", format!("{:?}", param.param_type).to_lowercase())?;
-                            param_table.set("description", param.description.clone())?;
-                            param_table.set("required", param.required)?;
+                            param_entry.set("description", param.description.clone())?;
+                            param_entry.set("required", param.required)?;
                             if let Some(default) = &param.default {
-                                param_table.set("default", json_to_lua_value(lua, default)?)?;
+                                param_entry.set("default", json_to_lua_value(lua, default)?)?;
                             }
-                            params_table.set(i + 1, param_table)?;
+                            parameters_table.set(i + 1, param_entry)?;
                         }
-                        schema_table.set("parameters", params_table)?;
+                        schema_table.set("parameters", parameters_table)?;
                         Ok(schema_table)
                     })?,
                 )?;
@@ -304,7 +346,7 @@ pub fn inject_tool_global(
     tool_table.set_metatable(Some(tool_metatable));
 
     // Add discover function for tool discovery
-    let registry_clone = registry.clone();
+    let registry_clone = registry;
     let discover_fn = lua.create_function(move |lua, filter: Option<Table>| {
         let tools = registry_clone.list_tools();
         let discover_table = lua.create_table()?;

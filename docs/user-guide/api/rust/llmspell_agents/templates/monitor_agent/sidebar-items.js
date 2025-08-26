@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["AlertSeverity","MonitoringScope"],"struct":["MonitorAgentConfig","MonitorAgentTemplate","MonitoringFeatureFlags"]};

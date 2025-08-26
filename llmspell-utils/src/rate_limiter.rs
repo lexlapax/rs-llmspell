@@ -455,7 +455,6 @@ impl RateLimiterBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_sliding_window_rate_limiter() {
         let limiter = RateLimiterBuilder::default()
@@ -477,7 +476,6 @@ mod tests {
         // Should succeed again
         assert!(limiter.acquire().await.is_ok());
     }
-
     #[tokio::test]
     async fn test_token_bucket_rate_limiter() {
         let limiter = RateLimiterBuilder::default()
@@ -500,7 +498,6 @@ mod tests {
         // Should have ~1 token
         assert!(limiter.acquire().await.is_ok());
     }
-
     #[tokio::test]
     async fn test_fixed_window_rate_limiter() {
         let limiter = RateLimiterBuilder::default()
@@ -521,7 +518,6 @@ mod tests {
         assert!(limiter.acquire().await.is_ok());
         assert!(limiter.acquire().await.is_ok());
     }
-
     #[tokio::test]
     async fn test_available_permits() {
         let limiter = RateLimiterBuilder::default()

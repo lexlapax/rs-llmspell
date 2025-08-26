@@ -331,7 +331,6 @@ impl Default for ExpressionAnalyzer {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_expression_length_check() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -346,7 +345,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("too long"));
     }
-
     #[test]
     fn test_nesting_depth_check() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -362,7 +360,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("too deep"));
     }
-
     #[test]
     fn test_operation_count() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -378,7 +375,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("operations"));
     }
-
     #[test]
     fn test_function_count() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -394,7 +390,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("function"));
     }
-
     #[test]
     fn test_dangerous_patterns() {
         let analyzer = ExpressionAnalyzer::new();
@@ -411,7 +406,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("large number"));
     }
-
     #[test]
     fn test_safe_expressions() {
         let analyzer = ExpressionAnalyzer::new();
@@ -429,7 +423,6 @@ mod tests {
             assert!(result.is_safe, "Expression '{expr}' should be safe");
         }
     }
-
     #[test]
     fn test_config_presets() {
         let strict = ExpressionComplexityConfig::strict();

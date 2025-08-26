@@ -234,7 +234,6 @@ mod tests {
     use super::*;
     use crate::{SessionId, SessionStatus};
     use serde_json::json;
-
     #[test]
     fn test_script_error_new() {
         let error = ScriptError::new("TEST_ERROR", "Test message");
@@ -242,7 +241,6 @@ mod tests {
         assert_eq!(error.message, "Test message");
         assert!(error.details.is_none());
     }
-
     #[test]
     fn test_script_error_with_details() {
         let error =
@@ -252,13 +250,11 @@ mod tests {
         assert_eq!(error.message, "Test message");
         assert_eq!(error.details, Some(json!({ "key": "value" })));
     }
-
     #[test]
     fn test_script_error_display() {
         let error = ScriptError::new("TEST_ERROR", "Test message");
         assert_eq!(error.to_string(), "[TEST_ERROR] Test message");
     }
-
     #[test]
     fn test_session_error_to_script_error() {
         // Test SessionNotFound
@@ -363,7 +359,6 @@ mod tests {
         assert_eq!(script_error.code, "INTEGRITY_ERROR");
         assert_eq!(script_error.message, "Checksum mismatch");
     }
-
     #[test]
     fn test_invalid_session_state_error() {
         let session_id = SessionId::new();
@@ -383,7 +378,6 @@ mod tests {
         assert_eq!(details["state"], "Failed");
         assert_eq!(details["operation"], "save");
     }
-
     #[test]
     fn test_artifact_errors() {
         // Test ArtifactNotFound
@@ -406,7 +400,6 @@ mod tests {
         assert!(script_error.message.contains(&artifact_id.to_string()));
         assert!(script_error.message.contains(&session_id.to_string()));
     }
-
     #[test]
     fn test_io_error_conversion() {
         use std::io;
@@ -416,7 +409,6 @@ mod tests {
         assert_eq!(script_error.code, "IO_ERROR");
         assert!(script_error.message.contains("File not found"));
     }
-
     #[test]
     fn test_error_builder_not_found() {
         let error = ErrorBuilder::not_found("Session", "12345");
@@ -424,7 +416,6 @@ mod tests {
         assert!(error.message.contains("Session"));
         assert!(error.message.contains("12345"));
     }
-
     #[test]
     fn test_error_builder_invalid_input() {
         let error = ErrorBuilder::invalid_input("session_id", "not a valid UUID");
@@ -436,7 +427,6 @@ mod tests {
         assert_eq!(details["field"], "session_id");
         assert_eq!(details["reason"], "not a valid UUID");
     }
-
     #[test]
     fn test_error_builder_permission_denied() {
         let error = ErrorBuilder::permission_denied("write", "session_123");
@@ -448,7 +438,6 @@ mod tests {
         assert_eq!(details["action"], "write");
         assert_eq!(details["resource"], "session_123");
     }
-
     #[test]
     fn test_error_builder_conversion_error() {
         let error =
@@ -463,7 +452,6 @@ mod tests {
         assert_eq!(details["to_type"], "SessionConfig");
         assert_eq!(details["reason"], "missing field 'name'");
     }
-
     #[test]
     fn test_error_codes_constants() {
         // Verify error code constants are correctly defined
@@ -496,10 +484,9 @@ mod tests {
             "SCRIPT_CONVERSION_ERROR"
         );
     }
-
     #[test]
     fn test_general_error_with_source() {
-        let source_error = std::io::Error::new(std::io::ErrorKind::Other, "source error");
+        let source_error = std::io::Error::other("source error");
         let error = SessionError::General {
             message: "General failure".to_string(),
             source: Some(anyhow::Error::new(source_error)),
@@ -508,10 +495,9 @@ mod tests {
         assert_eq!(script_error.code, "GENERAL_ERROR");
         assert_eq!(script_error.message, "General failure");
     }
-
     #[test]
     fn test_replay_error_with_source() {
-        let source_error = std::io::Error::new(std::io::ErrorKind::Other, "replay source");
+        let source_error = std::io::Error::other("replay source");
         let error = SessionError::ReplayError {
             message: "Replay failed".to_string(),
             source: Some(Box::new(source_error)),

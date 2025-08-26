@@ -6,7 +6,6 @@ use anyhow::Result;
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
-
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_hook_execution_and_persistence() -> Result<()> {
@@ -76,7 +75,6 @@ async fn test_anthropic_hook_execution_and_persistence() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_security_hook() -> Result<()> {
@@ -122,7 +120,6 @@ async fn test_anthropic_security_hook() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_conversation_tracking() -> Result<()> {
@@ -137,7 +134,7 @@ async fn test_anthropic_conversation_tracking() -> Result<()> {
     info!("Testing conversation tracking with hooks");
 
     // Run a series of interactions
-    let interactions = vec![
+    let interactions = [
         "Hello! My name is Alice.",
         "What's the weather like?",
         "Do you remember my name?",

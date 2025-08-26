@@ -69,7 +69,6 @@ mod integration_tests {
             Ok(HookResult::Continue)
         }
     }
-
     #[tokio::test]
     async fn test_state_machine_hook_integration() {
         // Create hook registry and register test hook
@@ -89,9 +88,12 @@ mod integration_tests {
 
         // Create state machine with hooks enabled
         let config = StateMachineConfig {
-            enable_hooks: true,
-            enable_circuit_breaker: true,
-            enable_logging: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_hooks: true,
+                enable_circuit_breaker: true,
+                enable_logging: true,
+                ..Default::default()
+            },
             ..StateMachineConfig::default()
         };
 
@@ -113,7 +115,7 @@ mod integration_tests {
         let hook_points = test_hook.get_hook_points();
 
         // Debug output to see what hook points were actually called
-        println!("Hook points called: {:?}", hook_points);
+        println!("Hook points called: {hook_points:?}");
 
         // Check if we have the expected hook points (may use custom hook points)
         assert!(!hook_points.is_empty(), "Should have called some hooks");
@@ -130,7 +132,6 @@ mod integration_tests {
         });
         assert!(has_relevant_hooks, "Should have called relevant hooks");
     }
-
     #[tokio::test]
     async fn test_hook_failure_handling() {
         // Create hook registry with failing hook
@@ -142,7 +143,10 @@ mod integration_tests {
             .unwrap();
 
         let config = StateMachineConfig {
-            enable_hooks: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_hooks: true,
+                ..Default::default()
+            },
             ..StateMachineConfig::default()
         };
 
@@ -163,11 +167,13 @@ mod integration_tests {
             "Failing hook should have been called"
         );
     }
-
     #[tokio::test]
     async fn test_circuit_breaker_protection() {
         let config = StateMachineConfig {
-            enable_circuit_breaker: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_circuit_breaker: true,
+                ..Default::default()
+            },
             ..StateMachineConfig::default()
         };
 
@@ -182,7 +188,6 @@ mod integration_tests {
         // will protect based on failure patterns over time
         assert!(state_machine.is_healthy().await);
     }
-
     #[tokio::test]
     async fn test_cancellation_support() {
         let config = StateMachineConfig::default();
@@ -212,7 +217,6 @@ mod integration_tests {
             assert!(result.is_ok());
         }
     }
-
     #[tokio::test]
     async fn test_state_machine_metrics() {
         let config = StateMachineConfig::default();
@@ -234,11 +238,13 @@ mod integration_tests {
         assert!(metrics.is_healthy);
         assert!(metrics.uptime > Duration::from_millis(0));
     }
-
     #[tokio::test]
     async fn test_error_recovery_flow() {
         let config = StateMachineConfig {
-            auto_recovery: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                auto_recovery: true,
+                ..Default::default()
+            },
             max_recovery_attempts: 2,
             ..StateMachineConfig::default()
         };
@@ -263,7 +269,6 @@ mod integration_tests {
         let metrics = state_machine.get_metrics().await;
         assert_eq!(metrics.recovery_attempts, 0); // Reset after successful recovery
     }
-
     #[tokio::test]
     async fn test_hook_context_metadata() {
         // Hook that verifies context metadata
@@ -312,7 +317,10 @@ mod integration_tests {
             .unwrap();
 
         let config = StateMachineConfig {
-            enable_hooks: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_hooks: true,
+                ..Default::default()
+            },
             ..StateMachineConfig::default()
         };
 
@@ -328,7 +336,6 @@ mod integration_tests {
             "Hook should have verified metadata"
         );
     }
-
     #[tokio::test]
     async fn test_performance_overhead() {
         use std::time::Instant;
@@ -352,11 +359,14 @@ mod integration_tests {
         let start = Instant::now();
         for i in 0..50 {
             let sm_no_hooks = AgentStateMachine::new(
-                format!("perf-test-no-hooks-{}", i),
+                format!("perf-test-no-hooks-{i}"),
                 StateMachineConfig {
-                    enable_hooks: false,
-                    enable_circuit_breaker: false,
-                    enable_logging: false,
+                    feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                        enable_hooks: false,
+                        enable_circuit_breaker: false,
+                        enable_logging: false,
+                        ..Default::default()
+                    },
                     ..StateMachineConfig::default()
                 },
             );
@@ -380,11 +390,14 @@ mod integration_tests {
         let start = Instant::now();
         for i in 0..50 {
             let sm_with_hooks = AgentStateMachine::with_hooks(
-                format!("perf-test-with-hooks-{}", i),
+                format!("perf-test-with-hooks-{i}"),
                 StateMachineConfig {
-                    enable_hooks: true,
-                    enable_circuit_breaker: true,
-                    enable_logging: false, // Disable logging for cleaner measurement
+                    feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                        enable_hooks: true,
+                        enable_circuit_breaker: true,
+                        enable_logging: false, // Disable logging for cleaner measurement
+                        ..Default::default()
+                    },
                     ..StateMachineConfig::default()
                 },
                 hook_registry.clone(),
@@ -402,9 +415,9 @@ mod integration_tests {
         let overhead_percentage = (overhead_ratio - 1.0) * 100.0;
 
         println!("Performance test results:");
-        println!("  Without hooks: {:?}", duration_no_hooks);
-        println!("  With hooks: {:?}", duration_with_hooks);
-        println!("  Overhead: {:.2}%", overhead_percentage);
+        println!("  Without hooks: {duration_no_hooks:?}");
+        println!("  With hooks: {duration_with_hooks:?}");
+        println!("  Overhead: {overhead_percentage:.2}%");
 
         // Note: Test environment has higher overhead due to test harness and async setup
         // In production, the 1% target will be measured under realistic conditions
@@ -417,13 +430,11 @@ mod integration_tests {
         // Verify the hook system doesn't cause catastrophic slowdown (>1000%)
         assert!(
             overhead_percentage < 1000.0,
-            "Hook system should not cause catastrophic slowdown: {:.2}%",
-            overhead_percentage
+            "Hook system should not cause catastrophic slowdown: {overhead_percentage:.2}%"
         );
 
         println!("✅ Hook system is functional and ready for production optimization");
     }
-
     #[tokio::test]
     async fn test_production_performance_validation() {
         use crate::lifecycle::benchmarks::{BenchmarkConfig, PerformanceBenchmark};

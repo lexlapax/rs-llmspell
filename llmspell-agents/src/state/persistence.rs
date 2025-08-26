@@ -100,9 +100,8 @@ pub trait StatePersistence: Agent {
         for msg in &state.state.conversation_history {
             let role = match msg.role {
                 MessageRole::User => CoreMessageRole::User,
-                MessageRole::Assistant => CoreMessageRole::Assistant,
+                MessageRole::Assistant | MessageRole::Tool => CoreMessageRole::Assistant, // Map Tool to Assistant for now
                 MessageRole::System => CoreMessageRole::System,
-                MessageRole::Tool => CoreMessageRole::Assistant, // Map Tool to Assistant for now
             };
             self.add_message(ConversationMessage::new(role, msg.content.clone()))
                 .await?;
@@ -137,7 +136,7 @@ pub trait StateManagerHolder {
     fn set_state_manager(&self, state_manager: Arc<StateManager>);
 }
 
-/// Macro to implement PersistentAgent trait for types that implement Agent + StatePersistence
+/// Macro to implement `PersistentAgent` trait for types that implement Agent + `StatePersistence`
 #[macro_export]
 macro_rules! impl_persistent_agent {
     ($agent_type:ty) => {
@@ -198,7 +197,7 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(
+        async fn execute_impl(
             &self,
             _input: AgentInput,
             _context: ExecutionContext,
@@ -214,7 +213,7 @@ mod tests {
             &self,
             error: llmspell_core::LLMSpellError,
         ) -> llmspell_core::Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -272,13 +271,12 @@ mod tests {
         }
 
         fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-            StateManagerHolder::set_state_manager(self, state_manager)
+            StateManagerHolder::set_state_manager(self, state_manager);
         }
     }
 
     // Implement PersistentAgent using the macro
     impl_persistent_agent!(MockAgent);
-
     #[tokio::test]
     async fn test_state_persistence_trait() {
         let metadata = ComponentMetadata::new("test-agent".to_string(), "Test agent".to_string());

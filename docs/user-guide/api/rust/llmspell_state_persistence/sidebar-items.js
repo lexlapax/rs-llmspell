@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["StateError","StateScope","Value"],"macro":["json"],"mod":["agent_state","backend_adapter","backup","circular_ref","config","hooks","key_manager","manager","migration","performance","prelude","schema","sensitive_data"],"trait":["StateManagerTrait","StatePersistence"],"type":["StateResult"]};

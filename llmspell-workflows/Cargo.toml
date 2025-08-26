@@ -20,14 +20,13 @@ anyhow.workspace = true
 tracing.workspace = true
 chrono = { version = "0.4", features = ["serde"] }
 parking_lot = "0.12"
+uuid = { workspace = true }
 
 [dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
 tracing-subscriber = "0.3"
 criterion = { version = "0.5", features = ["async_tokio"] }
 
-[[test]]
-name = "workflow_hooks"
-path = "tests/workflow_hooks.rs"
 
 [[bench]]
 name = "workflow_hook_overhead"

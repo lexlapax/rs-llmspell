@@ -369,7 +369,6 @@ impl SessionArtifact {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_artifact_creation() {
         let session_id = SessionId::new();
@@ -391,7 +390,6 @@ mod tests {
         assert_eq!(artifact.get_content().unwrap(), content);
         assert!(!artifact.metadata.is_compressed); // Too small to compress
     }
-
     #[test]
     fn test_content_hashing() {
         let content1 = b"Test content".to_vec();
@@ -404,7 +402,6 @@ mod tests {
         assert_ne!(hash1, hash2);
         assert_eq!(hash1, hash3); // Same content = same hash
     }
-
     #[test]
     fn test_compression() {
         let session_id = SessionId::new();
@@ -430,7 +427,6 @@ mod tests {
         let ratio = artifact.compression_ratio().unwrap();
         assert!(ratio < 0.5); // Should compress well for repeated content
     }
-
     #[test]
     fn test_mime_type_detection() {
         let session_id = SessionId::new();
@@ -456,7 +452,6 @@ mod tests {
             assert_eq!(artifact.metadata.mime_type, expected_mime);
         }
     }
-
     #[test]
     fn test_storage_serialize() {
         let session_id = SessionId::new();
@@ -483,7 +478,6 @@ mod tests {
             artifact.get_content().unwrap()
         );
     }
-
     #[test]
     fn test_integrity_verification() {
         let session_id = SessionId::new();
@@ -498,7 +492,6 @@ mod tests {
 
         assert!(artifact.verify_integrity());
     }
-
     #[test]
     fn test_derived_artifact() {
         let session_id = SessionId::new();

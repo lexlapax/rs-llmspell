@@ -29,7 +29,6 @@ mod tests {
     use super::*;
     use crate::universal_event::Language;
     use serde_json::Value;
-
     #[test]
     fn test_json_serialization() {
         let event = UniversalEvent::new("test", Value::Null, Language::Rust);
@@ -40,7 +39,6 @@ mod tests {
         assert_eq!(event.event_type, deserialized.event_type);
         assert_eq!(event.language, deserialized.language);
     }
-
     #[test]
     fn test_pretty_json() {
         let event = UniversalEvent::new(

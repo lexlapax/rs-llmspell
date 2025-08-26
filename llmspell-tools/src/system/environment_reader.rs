@@ -97,6 +97,7 @@ pub struct EnvironmentReaderTool {
 
 impl EnvironmentReaderTool {
     /// Create a new environment reader tool
+    #[must_use]
     pub fn new(config: EnvironmentReaderConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -109,6 +110,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Create a new environment reader tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: EnvironmentReaderConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -124,6 +126,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Check if an environment variable is allowed to be read
+    #[allow(clippy::cognitive_complexity)]
     fn is_var_allowed(&self, var_name: &str) -> bool {
         // Check sandbox permissions first if available
         if let Some(sandbox) = &self.sandbox_context {
@@ -139,13 +142,12 @@ impl EnvironmentReaderTool {
                         var_name
                     );
                     return true;
-                } else {
-                    debug!(
-                        "Environment variable '{}' not allowed by sandbox permissions",
-                        var_name
-                    );
-                    return false;
                 }
+                debug!(
+                    "Environment variable '{}' not allowed by sandbox permissions",
+                    var_name
+                );
+                return false;
             }
         }
 
@@ -193,6 +195,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Simple glob pattern matching for environment variable names
+    #[allow(clippy::unused_self)]
     fn matches_pattern(&self, var_name: &str, pattern: &str) -> bool {
         if pattern == "*" {
             return true;
@@ -213,30 +216,27 @@ impl EnvironmentReaderTool {
     }
 
     /// Get a single environment variable
+    #[allow(clippy::unused_async)]
     async fn get_single_var(&self, var_name: &str) -> LLMResult<Option<String>> {
         if !self.is_var_allowed(var_name) {
             return Err(LLMSpellError::Security {
-                message: format!(
-                    "Access to environment variable '{}' is not permitted",
-                    var_name
-                ),
+                message: format!("Access to environment variable '{var_name}' is not permitted"),
                 violation_type: Some("env_access_denied".to_string()),
             });
         }
 
-        match get_env_var(var_name) {
-            Some(value) => {
+        Ok(get_env_var(var_name)
+            .inspect(|_value| {
                 info!("Retrieved environment variable: {}", var_name);
-                Ok(Some(value))
-            }
-            None => {
+            })
+            .or_else(|| {
                 debug!("Environment variable '{}' not found", var_name);
-                Ok(None)
-            }
-        }
+                None
+            }))
     }
 
     /// Get all allowed environment variables
+    #[allow(clippy::unused_async)]
     async fn get_all_vars(&self) -> LLMResult<HashMap<String, String>> {
         let all_vars = get_all_env_vars();
         let mut allowed_vars = HashMap::new();
@@ -265,6 +265,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Get environment variables matching a pattern
+    #[allow(clippy::unused_async)]
     async fn get_vars_by_pattern(&self, pattern: &str) -> LLMResult<HashMap<String, String>> {
         let all_vars = get_all_env_vars();
         let mut matching_vars = HashMap::new();
@@ -294,6 +295,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Set an environment variable (if allowed)
+    #[allow(clippy::unused_async)]
     async fn set_var(&self, var_name: &str, value: &str) -> LLMResult<()> {
         if !self.config.allow_set_variables {
             return Err(LLMSpellError::Security {
@@ -305,10 +307,7 @@ impl EnvironmentReaderTool {
 
         if !self.is_var_allowed(var_name) {
             return Err(LLMSpellError::Security {
-                message: format!(
-                    "Setting environment variable '{}' is not permitted",
-                    var_name
-                ),
+                message: format!("Setting environment variable '{var_name}' is not permitted"),
                 violation_type: Some("env_set_denied".to_string()),
             });
         }
@@ -319,7 +318,7 @@ impl EnvironmentReaderTool {
                 Ok(())
             }
             Err(e) => Err(LLMSpellError::Tool {
-                message: format!("Failed to set environment variable: {}", e),
+                message: format!("Failed to set environment variable: {e}"),
                 tool_name: Some("environment_reader".to_string()),
                 source: None,
             }),
@@ -333,7 +332,7 @@ impl BaseAgent for EnvironmentReaderTool {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
@@ -346,32 +345,26 @@ impl BaseAgent for EnvironmentReaderTool {
             "get" => {
                 let var_name = extract_required_string(params, "variable_name")?;
 
-                match self.get_single_var(var_name).await? {
-                    Some(value) => {
-                        let response = ResponseBuilder::success("get")
-                            .with_message(format!(
-                                "Environment variable '{}' = '{}'",
-                                var_name, value
-                            ))
-                            .with_result(json!({
-                                "variable_name": var_name,
-                                "value": value,
-                                "found": true
-                            }))
-                            .build();
-                        AgentOutput::text(serde_json::to_string_pretty(&response)?)
-                    }
-                    None => {
-                        let response = ResponseBuilder::success("get")
-                            .with_message(format!("Environment variable '{}' not found", var_name))
-                            .with_result(json!({
-                                "variable_name": var_name,
-                                "value": null,
-                                "found": false
-                            }))
-                            .build();
-                        AgentOutput::text(serde_json::to_string_pretty(&response)?)
-                    }
+                if let Some(value) = self.get_single_var(var_name).await? {
+                    let response = ResponseBuilder::success("get")
+                        .with_message(format!("Environment variable '{var_name}' = '{value}'"))
+                        .with_result(json!({
+                            "variable_name": var_name,
+                            "value": value,
+                            "found": true
+                        }))
+                        .build();
+                    AgentOutput::text(serde_json::to_string_pretty(&response)?)
+                } else {
+                    let response = ResponseBuilder::success("get")
+                        .with_message(format!("Environment variable '{var_name}' not found"))
+                        .with_result(json!({
+                            "variable_name": var_name,
+                            "value": null,
+                            "found": false
+                        }))
+                        .build();
+                    AgentOutput::text(serde_json::to_string_pretty(&response)?)
                 }
             }
             "list" => {
@@ -412,10 +405,7 @@ impl BaseAgent for EnvironmentReaderTool {
 
                 self.set_var(var_name, value).await?;
                 let response = ResponseBuilder::success("set")
-                    .with_message(format!(
-                        "Set environment variable '{}' = '{}'",
-                        var_name, value
-                    ))
+                    .with_message(format!("Set environment variable '{var_name}' = '{value}'"))
                     .with_result(json!({
                         "variable_name": var_name,
                         "value": value,
@@ -427,8 +417,7 @@ impl BaseAgent for EnvironmentReaderTool {
             _ => {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Unknown operation: '{}'. Supported operations: get, list, pattern, set",
-                        operation
+                        "Unknown operation: '{operation}'. Supported operations: get, list, pattern, set"
                     ),
                     field: Some("operation".to_string()),
                 });
@@ -450,8 +439,7 @@ impl BaseAgent for EnvironmentReaderTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Environment reader error: {}",
-            error
+            "Environment reader error: {error}"
         )))
     }
 }
@@ -508,25 +496,12 @@ impl Tool for EnvironmentReaderTool {
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use std::collections::HashMap;
 
-    fn create_test_tool() -> EnvironmentReaderTool {
+    fn create_test_environment_reader() -> EnvironmentReaderTool {
         let config = EnvironmentReaderConfig::default();
         EnvironmentReaderTool::new(config)
-    }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
     }
 
     fn create_test_tool_with_sandbox() -> EnvironmentReaderTool {
@@ -547,19 +522,12 @@ mod tests {
         let config = EnvironmentReaderConfig::default();
         EnvironmentReaderTool::with_sandbox(config, sandbox_context)
     }
-
     #[tokio::test]
     async fn test_get_existing_variable() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // Test getting PATH variable (should be allowed by default)
-        let input = create_test_input(
-            "Get PATH environment variable",
-            json!({
-                "operation": "get",
-                "variable_name": "PATH"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "get"), ("variable_name", "PATH")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -567,7 +535,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("PATH"));
     }
-
     #[tokio::test]
     async fn test_get_nonexistent_variable() {
         let mut config = EnvironmentReaderConfig::default();
@@ -575,13 +542,10 @@ mod tests {
         config.allowed_patterns.push("NONEXISTENT*".to_string());
         let tool = EnvironmentReaderTool::new(config);
 
-        let input = create_test_input(
-            "Get nonexistent variable",
-            json!({
-                "operation": "get",
-                "variable_name": "NONEXISTENT_VAR_12345"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "get"),
+            ("variable_name", "NONEXISTENT_VAR_12345"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -589,34 +553,24 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("not found"));
     }
-
     #[tokio::test]
     async fn test_get_blocked_variable() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Get blocked variable",
-            json!({
-                "operation": "get",
-                "variable_name": "SECRET_PASSWORD"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "get"),
+            ("variable_name", "SECRET_PASSWORD"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not permitted"));
     }
-
     #[tokio::test]
     async fn test_list_variables() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "List environment variables",
-            json!({
-                "operation": "list"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "list")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -625,18 +579,11 @@ mod tests {
         assert!(result.text.contains("Found"));
         assert!(result.text.contains("environment variables"));
     }
-
     #[tokio::test]
     async fn test_pattern_matching() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Get PATH variables",
-            json!({
-                "operation": "pattern",
-                "pattern": "PATH*"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "pattern"), ("pattern", "PATH*")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -644,25 +591,20 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("Found"));
     }
-
     #[tokio::test]
     async fn test_set_variable_disabled() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Set test variable",
-            json!({
-                "operation": "set",
-                "variable_name": "TEST_VAR",
-                "value": "test_value"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "set"),
+            ("variable_name", "TEST_VAR"),
+            ("value", "test_value"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not permitted"));
     }
-
     #[tokio::test]
     async fn test_set_variable_enabled() {
         let allowed_patterns = vec!["TEST_*".to_string()];
@@ -673,14 +615,11 @@ mod tests {
         };
         let tool = EnvironmentReaderTool::new(config);
 
-        let input = create_test_input(
-            "Set test variable",
-            json!({
-                "operation": "set",
-                "variable_name": "TEST_VAR_12345",
-                "value": "test_value"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "set"),
+            ("variable_name", "TEST_VAR_12345"),
+            ("value", "test_value"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -688,17 +627,11 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("Set environment variable"));
     }
-
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -707,49 +640,34 @@ mod tests {
             .to_string()
             .contains("Unknown operation"));
     }
-
     #[tokio::test]
     async fn test_missing_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // Missing operation
-        let input1 = create_test_input("Missing operation", json!({}));
+        let input1 = create_test_tool_input(vec![]);
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
 
         // Missing variable_name for get operation
-        let input2 = create_test_input(
-            "Missing variable name",
-            json!({
-                "operation": "get"
-            }),
-        );
+        let input2 = create_test_tool_input(vec![("operation", "get")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
 
         // Missing pattern for pattern operation
-        let input3 = create_test_input(
-            "Missing pattern",
-            json!({
-                "operation": "pattern"
-            }),
-        );
+        let input3 = create_test_tool_input(vec![("operation", "pattern")]);
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
     }
-
     #[tokio::test]
     async fn test_sandbox_permissions() {
         let tool = create_test_tool_with_sandbox();
 
         // Should allow TEST_* variables due to sandbox permissions
-        let input1 = create_test_input(
-            "Get test variable",
-            json!({
-                "operation": "get",
-                "variable_name": "TEST_ALLOWED"
-            }),
-        );
+        let input1 = create_test_tool_input(vec![
+            ("operation", "get"),
+            ("variable_name", "TEST_ALLOWED"),
+        ]);
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         // Should succeed (even if variable doesn't exist)
         assert!(
@@ -758,34 +676,21 @@ mod tests {
         );
 
         // Should allow PATH due to sandbox permissions
-        let input2 = create_test_input(
-            "Get PATH",
-            json!({
-                "operation": "get",
-                "variable_name": "PATH"
-            }),
-        );
+        let input2 = create_test_tool_input(vec![("operation", "get"), ("variable_name", "PATH")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_ok(), "PATH should be allowed by sandbox");
 
         // Should deny HOME even though it's in default safe vars (sandbox overrides)
-        let input3 = create_test_input(
-            "Get HOME",
-            json!({
-                "operation": "get",
-                "variable_name": "HOME"
-            }),
-        );
+        let input3 = create_test_tool_input(vec![("operation", "get"), ("variable_name", "HOME")]);
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(
             result3.is_err(),
             "HOME should be denied when not in sandbox permissions"
         );
     }
-
     #[tokio::test]
     async fn test_pattern_matching_logic() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // Test exact match
         assert!(tool.matches_pattern("PATH", "PATH"));
@@ -801,10 +706,9 @@ mod tests {
         assert!(!tool.matches_pattern("HOME", "PATH*"));
         assert!(!tool.matches_pattern("HOME", "*PATH"));
     }
-
     #[tokio::test]
     async fn test_blocked_patterns_precedence() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // SECRET_KEY should be blocked even though it might match allowed patterns
         assert!(!tool.is_var_allowed("SECRET_KEY"));
@@ -817,10 +721,9 @@ mod tests {
         assert!(tool.is_var_allowed("HOME"));
         assert!(tool.is_var_allowed("USER"));
     }
-
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "environment_reader");

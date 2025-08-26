@@ -166,7 +166,11 @@ impl CacheStats {
         if self.total_requests == 0 {
             0.0
         } else {
-            self.cache_hits as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let cache_hits_f64 = self.cache_hits as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_requests_f64 = self.total_requests as f64;
+            cache_hits_f64 / total_requests_f64
         }
     }
 
@@ -364,7 +368,9 @@ impl Cache {
 
         if expired_count > 0 {
             let mut stats = self.stats.write().unwrap();
-            stats.expired_entries += expired_count as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let expired_count_u64 = expired_count as u64;
+            stats.expired_entries += expired_count_u64;
             stats.current_size = entries.len();
         }
     }
@@ -388,11 +394,12 @@ mod tests {
     use std::thread;
     use std::time::Duration as StdDuration;
 
+    /// Local test helper to avoid circular dependency with llmspell-testing
+    /// (Architectural exception per 7.1.6: foundational crates may have minimal local helpers)
     fn create_test_context() -> HookContext {
         let component_id = ComponentId::new(ComponentType::System, "test".to_string());
         HookContext::new(HookPoint::SystemStartup, component_id)
     }
-
     #[test]
     fn test_cache_key_generation() {
         let context = create_test_context();
@@ -404,7 +411,6 @@ mod tests {
         assert_eq!(key1.hook_point, "SystemStartup");
         assert!(key1.component_id.contains("System:test"));
     }
-
     #[test]
     fn test_cache_key_uniqueness() {
         let mut context1 = create_test_context();
@@ -420,7 +426,6 @@ mod tests {
         assert_ne!(key1, key2);
         assert_ne!(key1.context_hash, key2.context_hash);
     }
-
     #[test]
     fn test_cache_entry_expiration() {
         let key = CacheKey {
@@ -443,7 +448,6 @@ mod tests {
         entry.mark_accessed();
         assert_eq!(entry.access_count, 2);
     }
-
     #[test]
     fn test_lru_eviction() {
         let lru = LruEviction::new(3);
@@ -467,7 +471,6 @@ mod tests {
         let candidates = lru.get_eviction_candidates(4);
         assert_eq!(candidates[0], "key2"); // Now key2 is least recently used
     }
-
     #[test]
     fn test_cache_basic_operations() {
         let cache = Cache::new(100, Duration::from_secs(60));
@@ -488,7 +491,6 @@ mod tests {
         assert!(cache.get(&key).is_none());
         assert_eq!(cache.stats().cache_misses, 2);
     }
-
     #[test]
     fn test_cache_ttl_expiration() {
         let cache = Cache::new(100, Duration::from_millis(50));
@@ -509,7 +511,6 @@ mod tests {
         thread::sleep(StdDuration::from_millis(150));
         assert!(cache.get(&key).is_none());
     }
-
     #[test]
     fn test_cache_lru_eviction() {
         let cache = Cache::new(2, Duration::from_secs(60)); // Small cache
@@ -539,7 +540,6 @@ mod tests {
         assert!(cache.get(&key2).is_some()); // Should still be there
         assert!(cache.get(&key3).is_some()); // Should still be there
     }
-
     #[test]
     fn test_cache_stats() {
         let cache = Cache::new(100, Duration::from_secs(60));
@@ -567,7 +567,6 @@ mod tests {
         assert_eq!(stats.cache_misses, 1);
         assert_eq!(stats.hit_ratio(), 0.5);
     }
-
     #[test]
     fn test_cache_clear() {
         let cache = Cache::new(100, Duration::from_secs(60));
@@ -582,7 +581,6 @@ mod tests {
         assert!(cache.is_empty());
         assert!(cache.get(&key).is_none());
     }
-
     #[test]
     fn test_cache_cleanup() {
         let cache = Cache::new(100, Duration::from_millis(50));

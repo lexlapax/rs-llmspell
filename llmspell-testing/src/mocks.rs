@@ -19,7 +19,7 @@
 //!
 //! # async fn test_example() {
 //! let mut mock = MockBaseAgent::new();
-//! mock.expect_execute()
+//! mock.expect_execute_impl()
 //!     .times(1)
 //!     .returning(|input, _| {
 //!         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
@@ -39,7 +39,9 @@ use llmspell_core::{
         agent::{Agent, AgentConfig, ConversationMessage},
         base_agent::BaseAgent,
         tool::{SecurityLevel, Tool, ToolCategory, ToolSchema},
-        workflow::{StepResult, Workflow, WorkflowConfig, WorkflowStatus, WorkflowStep},
+        workflow::{
+            Config as WorkflowConfig, Status as WorkflowStatus, StepResult, Workflow, WorkflowStep,
+        },
     },
     types::{AgentInput, AgentOutput, AgentStream, MediaType},
     ComponentId, ComponentMetadata, LLMSpellError, Result,
@@ -53,7 +55,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for BaseAgent {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -70,7 +72,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for Agent {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -97,7 +99,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for Tool {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -122,7 +124,7 @@ mock! {
     #[async_trait]
     impl BaseAgent for Workflow {
         fn metadata(&self) -> &ComponentMetadata;
-        async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+        async fn execute_impl(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
         async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
@@ -159,12 +161,15 @@ pub fn create_simple_mock_agent() -> MockBaseAgent {
 mod tests {
     use super::*;
     use tokio;
-
     #[tokio::test]
     async fn test_mock_base_agent() {
         let mut mock = MockBaseAgent::new();
 
-        mock.expect_execute()
+        // Set up metadata expectation (required by execute() for event emission)
+        let metadata = ComponentMetadata::new("test-mock".to_string(), "Test Mock".to_string());
+        mock.expect_metadata().return_const(metadata);
+
+        mock.expect_execute_impl()
             .times(1)
             .returning(|input, _| Ok(AgentOutput::text(format!("Echo: {}", input.text))));
 
@@ -174,7 +179,6 @@ mod tests {
         let result = mock.execute(input, context).await.unwrap();
         assert_eq!(result.text, "Echo: Hello");
     }
-
     #[tokio::test]
     async fn test_simple_mock_helper() {
         let mock = create_simple_mock_agent();

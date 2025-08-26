@@ -1,5 +1,5 @@
-//! ABOUTME: OpenAI provider integration tests for state persistence
-//! ABOUTME: Tests real OpenAI API calls with conversation state persistence and restoration
+//! ABOUTME: `OpenAI` provider integration tests for state persistence
+//! ABOUTME: Tests real `OpenAI` API calls with conversation state persistence and restoration
 
 use super::common::*;
 use anyhow::Result;
@@ -8,7 +8,6 @@ use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionC
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_conversation_persistence() -> Result<()> {
@@ -45,8 +44,7 @@ async fn test_openai_conversation_persistence() -> Result<()> {
     for (i, response) in responses.iter().enumerate() {
         assert!(
             !response.text.is_empty(),
-            "Response {} should not be empty",
-            i
+            "Response {i} should not be empty"
         );
         info!("Response {}: {}", i + 1, response.text);
     }
@@ -104,7 +102,6 @@ async fn test_openai_conversation_persistence() -> Result<()> {
     info!("OpenAI conversation persistence test completed successfully");
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_token_tracking() -> Result<()> {
@@ -157,7 +154,6 @@ async fn test_openai_token_tracking() -> Result<()> {
     info!("OpenAI token tracking test completed");
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_error_recovery() -> Result<()> {
@@ -198,7 +194,7 @@ async fn test_openai_error_recovery() -> Result<()> {
     agent.save_state().await?;
 
     // Try to trigger an error with a very large request (this might not always fail)
-    let large_input = "A".repeat(100000); // Very large input
+    let large_input = "A".repeat(100_000); // Very large input
     let input2 = AgentInput::text(&large_input);
 
     // This might succeed or fail, we just want to ensure state remains intact
@@ -247,7 +243,6 @@ async fn test_openai_error_recovery() -> Result<()> {
     info!("OpenAI error recovery test completed successfully");
     Ok(())
 }
-
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_system_prompt_persistence() -> Result<()> {

@@ -1,0 +1,1423 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `llmspell-utils/src/file_utils.rs`."><title>file_utils.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Italic-81dc35de.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-MediumItalic-ccf7e434.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-6c3ea77c.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="llmspell_utils" data-themes="" data-resource-suffix="" data-rustdoc-version="1.86.0 (05f9846f8 2025-03-31) (Homebrew)" data-channel="1.86.0" data-search-js="search-581efc7a.js" data-settings-js="settings-6dad6058.js" ><script src="../../static.files/storage-3a5871a4.js"></script><script defer src="../../static.files/src-script-b8d3f215.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-4d63596a.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">llmspell_utils/</div>file_utils.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap digits-4"><pre class="rust"><code><a href=#1 id=1 data-nosnippet>1</a><span class="comment">// ABOUTME: Cross-platform file system operations and path manipulation utilities
+<a href=#2 id=2 data-nosnippet>2</a>// ABOUTME: Provides safe abstractions for file operations used throughout LLMSpell
+<a href=#3 id=3 data-nosnippet>3</a>
+<a href=#4 id=4 data-nosnippet>4</a></span><span class="doccomment">//! File system operations and path utilities
+<a href=#5 id=5 data-nosnippet>5</a>//!
+<a href=#6 id=6 data-nosnippet>6</a>//! This module provides cross-platform file operations, path manipulation,
+<a href=#7 id=7 data-nosnippet>7</a>//! and directory management utilities.
+<a href=#8 id=8 data-nosnippet>8</a>//!
+<a href=#9 id=9 data-nosnippet>9</a>//! # Examples
+<a href=#10 id=10 data-nosnippet>10</a>//!
+<a href=#11 id=11 data-nosnippet>11</a>//! ```rust,no_run
+<a href=#12 id=12 data-nosnippet>12</a>//! use llmspell_utils::file_utils;
+<a href=#13 id=13 data-nosnippet>13</a>//! use std::path::Path;
+<a href=#14 id=14 data-nosnippet>14</a>//!
+<a href=#15 id=15 data-nosnippet>15</a>//! # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#16 id=16 data-nosnippet>16</a>//! // Ensure a directory exists
+<a href=#17 id=17 data-nosnippet>17</a>//! file_utils::ensure_dir(Path::new("/tmp/myapp"))?;
+<a href=#18 id=18 data-nosnippet>18</a>//!
+<a href=#19 id=19 data-nosnippet>19</a>//! // Expand path with environment variables
+<a href=#20 id=20 data-nosnippet>20</a>//! let expanded = file_utils::expand_path("$HOME/.config/myapp")?;
+<a href=#21 id=21 data-nosnippet>21</a>//! println!("Expanded path: {}", expanded.display());
+<a href=#22 id=22 data-nosnippet>22</a>//!
+<a href=#23 id=23 data-nosnippet>23</a>//! // Safe file operations
+<a href=#24 id=24 data-nosnippet>24</a>//! file_utils::write_file_atomic(Path::new("/tmp/test.txt"), b"Hello, world!")?;
+<a href=#25 id=25 data-nosnippet>25</a>//! let content = file_utils::read_file(Path::new("/tmp/test.txt"))?;
+<a href=#26 id=26 data-nosnippet>26</a>//! # Ok(())
+<a href=#27 id=27 data-nosnippet>27</a>//! # }
+<a href=#28 id=28 data-nosnippet>28</a>//! ```
+<a href=#29 id=29 data-nosnippet>29</a>
+<a href=#30 id=30 data-nosnippet>30</a></span><span class="kw">use </span>anyhow::{Context, <span class="prelude-ty">Result</span>};
+<a href=#31 id=31 data-nosnippet>31</a><span class="kw">use </span>path_clean::PathClean;
+<a href=#32 id=32 data-nosnippet>32</a><span class="kw">use </span>std::env;
+<a href=#33 id=33 data-nosnippet>33</a><span class="kw">use </span>std::fs::{<span class="self">self</span>, File};
+<a href=#34 id=34 data-nosnippet>34</a><span class="kw">use </span>std::io::{<span class="self">self</span>, Read, Write};
+<a href=#35 id=35 data-nosnippet>35</a><span class="kw">use </span>std::path::{Path, PathBuf};
+<a href=#36 id=36 data-nosnippet>36</a>
+<a href=#37 id=37 data-nosnippet>37</a><span class="doccomment">/// Maximum file size for safe operations (100MB)
+<a href=#38 id=38 data-nosnippet>38</a></span><span class="kw">const </span>MAX_FILE_SIZE: u64 = <span class="number">100 </span>* <span class="number">1024 </span>* <span class="number">1024</span>;
+<a href=#39 id=39 data-nosnippet>39</a>
+<a href=#40 id=40 data-nosnippet>40</a><span class="doccomment">/// Ensure a directory exists, creating it if necessary
+<a href=#41 id=41 data-nosnippet>41</a>///
+<a href=#42 id=42 data-nosnippet>42</a>/// This function creates the directory and all parent directories if they don't exist.
+<a href=#43 id=43 data-nosnippet>43</a>/// It's safe to call even if the directory already exists.
+<a href=#44 id=44 data-nosnippet>44</a>///
+<a href=#45 id=45 data-nosnippet>45</a>/// # Examples
+<a href=#46 id=46 data-nosnippet>46</a>///
+<a href=#47 id=47 data-nosnippet>47</a>/// ```rust,no_run
+<a href=#48 id=48 data-nosnippet>48</a>/// use llmspell_utils::file_utils::ensure_dir;
+<a href=#49 id=49 data-nosnippet>49</a>/// use std::path::Path;
+<a href=#50 id=50 data-nosnippet>50</a>///
+<a href=#51 id=51 data-nosnippet>51</a>/// # fn main() -&gt; std::io::Result&lt;()&gt; {
+<a href=#52 id=52 data-nosnippet>52</a>/// ensure_dir(Path::new("/tmp/myapp/data"))?;
+<a href=#53 id=53 data-nosnippet>53</a>/// # Ok(())
+<a href=#54 id=54 data-nosnippet>54</a>/// # }
+<a href=#55 id=55 data-nosnippet>55</a>/// ```
+<a href=#56 id=56 data-nosnippet>56</a>///
+<a href=#57 id=57 data-nosnippet>57</a>/// # Errors
+<a href=#58 id=58 data-nosnippet>58</a>///
+<a href=#59 id=59 data-nosnippet>59</a>/// Returns an error if:
+<a href=#60 id=60 data-nosnippet>60</a>/// - The path exists but is not a directory
+<a href=#61 id=61 data-nosnippet>61</a>/// - Directory creation fails due to permissions or other OS errors
+<a href=#62 id=62 data-nosnippet>62</a></span><span class="kw">pub fn </span>ensure_dir(path: <span class="kw-2">&amp;</span>Path) -&gt; io::Result&lt;()&gt; {
+<a href=#63 id=63 data-nosnippet>63</a>    <span class="kw">if </span>path.exists() {
+<a href=#64 id=64 data-nosnippet>64</a>        <span class="kw">if </span>path.is_dir() {
+<a href=#65 id=65 data-nosnippet>65</a>            <span class="prelude-val">Ok</span>(())
+<a href=#66 id=66 data-nosnippet>66</a>        } <span class="kw">else </span>{
+<a href=#67 id=67 data-nosnippet>67</a>            <span class="prelude-val">Err</span>(io::Error::new(
+<a href=#68 id=68 data-nosnippet>68</a>                io::ErrorKind::AlreadyExists,
+<a href=#69 id=69 data-nosnippet>69</a>                <span class="macro">format!</span>(<span class="string">"Path exists but is not a directory: {}"</span>, path.display()),
+<a href=#70 id=70 data-nosnippet>70</a>            ))
+<a href=#71 id=71 data-nosnippet>71</a>        }
+<a href=#72 id=72 data-nosnippet>72</a>    } <span class="kw">else </span>{
+<a href=#73 id=73 data-nosnippet>73</a>        fs::create_dir_all(path).map_err(|e| {
+<a href=#74 id=74 data-nosnippet>74</a>            io::Error::new(
+<a href=#75 id=75 data-nosnippet>75</a>                e.kind(),
+<a href=#76 id=76 data-nosnippet>76</a>                <span class="macro">format!</span>(<span class="string">"Failed to create directory '{}': {}"</span>, path.display(), e),
+<a href=#77 id=77 data-nosnippet>77</a>            )
+<a href=#78 id=78 data-nosnippet>78</a>        })
+<a href=#79 id=79 data-nosnippet>79</a>    }
+<a href=#80 id=80 data-nosnippet>80</a>}
+<a href=#81 id=81 data-nosnippet>81</a>
+<a href=#82 id=82 data-nosnippet>82</a><span class="doccomment">/// Expand path with environment variables and tilde expansion
+<a href=#83 id=83 data-nosnippet>83</a>///
+<a href=#84 id=84 data-nosnippet>84</a>/// Supports:
+<a href=#85 id=85 data-nosnippet>85</a>/// - Environment variable expansion: `$HOME`, `${HOME}`, `%HOME%` (Windows)
+<a href=#86 id=86 data-nosnippet>86</a>/// - Tilde expansion: `~` expands to home directory
+<a href=#87 id=87 data-nosnippet>87</a>/// - Relative path resolution to absolute paths
+<a href=#88 id=88 data-nosnippet>88</a>///
+<a href=#89 id=89 data-nosnippet>89</a>/// # Examples
+<a href=#90 id=90 data-nosnippet>90</a>///
+<a href=#91 id=91 data-nosnippet>91</a>/// ```rust,no_run
+<a href=#92 id=92 data-nosnippet>92</a>/// use llmspell_utils::file_utils::expand_path;
+<a href=#93 id=93 data-nosnippet>93</a>///
+<a href=#94 id=94 data-nosnippet>94</a>/// # fn main() -&gt; Result&lt;(), std::io::Error&gt; {
+<a href=#95 id=95 data-nosnippet>95</a>/// let path = expand_path("~/Documents/config.json")?;
+<a href=#96 id=96 data-nosnippet>96</a>/// let path2 = expand_path("$HOME/.config/app")?;
+<a href=#97 id=97 data-nosnippet>97</a>/// let path3 = expand_path("${TMPDIR}/cache")?;
+<a href=#98 id=98 data-nosnippet>98</a>/// # Ok(())
+<a href=#99 id=99 data-nosnippet>99</a>/// # }
+<a href=#100 id=100 data-nosnippet>100</a>/// ```
+<a href=#101 id=101 data-nosnippet>101</a>///
+<a href=#102 id=102 data-nosnippet>102</a>/// # Errors
+<a href=#103 id=103 data-nosnippet>103</a>///
+<a href=#104 id=104 data-nosnippet>104</a>/// Returns an error if:
+<a href=#105 id=105 data-nosnippet>105</a>/// - Home directory cannot be determined
+<a href=#106 id=106 data-nosnippet>106</a>/// - Environment variable is not found
+<a href=#107 id=107 data-nosnippet>107</a>/// - Path contains invalid UTF-8
+<a href=#108 id=108 data-nosnippet>108</a></span><span class="kw">pub fn </span>expand_path(path: <span class="kw-2">&amp;</span>str) -&gt; <span class="prelude-ty">Result</span>&lt;PathBuf, io::Error&gt; {
+<a href=#109 id=109 data-nosnippet>109</a>    <span class="kw">let </span><span class="kw-2">mut </span>expanded = path.to_string();
+<a href=#110 id=110 data-nosnippet>110</a>
+<a href=#111 id=111 data-nosnippet>111</a>    <span class="comment">// Handle tilde expansion
+<a href=#112 id=112 data-nosnippet>112</a>    </span><span class="kw">if </span>expanded.starts_with(<span class="string">"~/"</span>) || expanded == <span class="string">"~" </span>{
+<a href=#113 id=113 data-nosnippet>113</a>        <span class="kw">let </span>home = env::var(<span class="string">"HOME"</span>)
+<a href=#114 id=114 data-nosnippet>114</a>            .or_else(|<span class="kw">_</span>| env::var(<span class="string">"USERPROFILE"</span>))
+<a href=#115 id=115 data-nosnippet>115</a>            .map_err(|<span class="kw">_</span>| {
+<a href=#116 id=116 data-nosnippet>116</a>                io::Error::new(
+<a href=#117 id=117 data-nosnippet>117</a>                    io::ErrorKind::NotFound,
+<a href=#118 id=118 data-nosnippet>118</a>                    <span class="string">"Could not determine home directory"</span>,
+<a href=#119 id=119 data-nosnippet>119</a>                )
+<a href=#120 id=120 data-nosnippet>120</a>            })<span class="question-mark">?</span>;
+<a href=#121 id=121 data-nosnippet>121</a>
+<a href=#122 id=122 data-nosnippet>122</a>        expanded = <span class="kw">if </span>expanded == <span class="string">"~" </span>{
+<a href=#123 id=123 data-nosnippet>123</a>            home
+<a href=#124 id=124 data-nosnippet>124</a>        } <span class="kw">else </span>{
+<a href=#125 id=125 data-nosnippet>125</a>            <span class="macro">format!</span>(<span class="string">"{}{}"</span>, home, <span class="kw-2">&amp;</span>expanded[<span class="number">1</span>..])
+<a href=#126 id=126 data-nosnippet>126</a>        };
+<a href=#127 id=127 data-nosnippet>127</a>    }
+<a href=#128 id=128 data-nosnippet>128</a>
+<a href=#129 id=129 data-nosnippet>129</a>    <span class="comment">// Handle environment variable expansion
+<a href=#130 id=130 data-nosnippet>130</a>    // Support both $VAR and ${VAR} syntax
+<a href=#131 id=131 data-nosnippet>131</a>    </span><span class="kw">let </span><span class="kw-2">mut </span>result = String::new();
+<a href=#132 id=132 data-nosnippet>132</a>    <span class="kw">let </span><span class="kw-2">mut </span>chars = expanded.chars();
+<a href=#133 id=133 data-nosnippet>133</a>
+<a href=#134 id=134 data-nosnippet>134</a>    <span class="kw">while let </span><span class="prelude-val">Some</span>(ch) = chars.next() {
+<a href=#135 id=135 data-nosnippet>135</a>        <span class="kw">if </span>ch == <span class="string">'$' </span>{
+<a href=#136 id=136 data-nosnippet>136</a>            <span class="kw">let </span><span class="kw-2">mut </span>var_name = String::new();
+<a href=#137 id=137 data-nosnippet>137</a>
+<a href=#138 id=138 data-nosnippet>138</a>            <span class="comment">// Check if it's ${VAR} syntax
+<a href=#139 id=139 data-nosnippet>139</a>            </span><span class="kw">let </span>next_char = chars.clone().next();
+<a href=#140 id=140 data-nosnippet>140</a>            <span class="kw">if </span>next_char == <span class="prelude-val">Some</span>(<span class="string">'{'</span>) {
+<a href=#141 id=141 data-nosnippet>141</a>                chars.next(); <span class="comment">// consume '{'
+<a href=#142 id=142 data-nosnippet>142</a>                              // Collect until we find '}'
+<a href=#143 id=143 data-nosnippet>143</a>                </span><span class="kw">for </span>c <span class="kw">in </span>chars.by_ref() {
+<a href=#144 id=144 data-nosnippet>144</a>                    <span class="kw">if </span>c == <span class="string">'}' </span>{
+<a href=#145 id=145 data-nosnippet>145</a>                        <span class="kw">break</span>;
+<a href=#146 id=146 data-nosnippet>146</a>                    }
+<a href=#147 id=147 data-nosnippet>147</a>                    var_name.push(c);
+<a href=#148 id=148 data-nosnippet>148</a>                }
+<a href=#149 id=149 data-nosnippet>149</a>            } <span class="kw">else </span>{
+<a href=#150 id=150 data-nosnippet>150</a>                <span class="comment">// $VAR syntax - collect alphanumeric and underscore chars
+<a href=#151 id=151 data-nosnippet>151</a>                </span><span class="kw">for </span>c <span class="kw">in </span>chars.clone() {
+<a href=#152 id=152 data-nosnippet>152</a>                    <span class="kw">if </span>c.is_alphanumeric() || c == <span class="string">'_' </span>{
+<a href=#153 id=153 data-nosnippet>153</a>                        var_name.push(c);
+<a href=#154 id=154 data-nosnippet>154</a>                        chars.next(); <span class="comment">// consume the character
+<a href=#155 id=155 data-nosnippet>155</a>                    </span>} <span class="kw">else </span>{
+<a href=#156 id=156 data-nosnippet>156</a>                        <span class="kw">break</span>;
+<a href=#157 id=157 data-nosnippet>157</a>                    }
+<a href=#158 id=158 data-nosnippet>158</a>                }
+<a href=#159 id=159 data-nosnippet>159</a>            }
+<a href=#160 id=160 data-nosnippet>160</a>
+<a href=#161 id=161 data-nosnippet>161</a>            <span class="kw">if </span>var_name.is_empty() {
+<a href=#162 id=162 data-nosnippet>162</a>                result.push(<span class="string">'$'</span>);
+<a href=#163 id=163 data-nosnippet>163</a>            } <span class="kw">else </span>{
+<a href=#164 id=164 data-nosnippet>164</a>                <span class="kw">match </span>env::var(<span class="kw-2">&amp;</span>var_name) {
+<a href=#165 id=165 data-nosnippet>165</a>                    <span class="prelude-val">Ok</span>(value) =&gt; result.push_str(<span class="kw-2">&amp;</span>value),
+<a href=#166 id=166 data-nosnippet>166</a>                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+<a href=#167 id=167 data-nosnippet>167</a>                        <span class="kw">return </span><span class="prelude-val">Err</span>(io::Error::new(
+<a href=#168 id=168 data-nosnippet>168</a>                            io::ErrorKind::NotFound,
+<a href=#169 id=169 data-nosnippet>169</a>                            <span class="macro">format!</span>(<span class="string">"Environment variable '{var_name}' not found"</span>),
+<a href=#170 id=170 data-nosnippet>170</a>                        ));
+<a href=#171 id=171 data-nosnippet>171</a>                    }
+<a href=#172 id=172 data-nosnippet>172</a>                }
+<a href=#173 id=173 data-nosnippet>173</a>            }
+<a href=#174 id=174 data-nosnippet>174</a>        } <span class="kw">else if </span><span class="macro">cfg!</span>(windows) &amp;&amp; ch == <span class="string">'%' </span>{
+<a href=#175 id=175 data-nosnippet>175</a>            <span class="comment">// Windows %VAR% syntax
+<a href=#176 id=176 data-nosnippet>176</a>            </span><span class="kw">let </span><span class="kw-2">mut </span>var_name = String::new();
+<a href=#177 id=177 data-nosnippet>177</a>            <span class="kw">for </span>c <span class="kw">in </span>chars.by_ref() {
+<a href=#178 id=178 data-nosnippet>178</a>                <span class="kw">if </span>c == <span class="string">'%' </span>{
+<a href=#179 id=179 data-nosnippet>179</a>                    <span class="kw">break</span>;
+<a href=#180 id=180 data-nosnippet>180</a>                }
+<a href=#181 id=181 data-nosnippet>181</a>                var_name.push(c);
+<a href=#182 id=182 data-nosnippet>182</a>            }
+<a href=#183 id=183 data-nosnippet>183</a>
+<a href=#184 id=184 data-nosnippet>184</a>            <span class="kw">if </span>var_name.is_empty() {
+<a href=#185 id=185 data-nosnippet>185</a>                result.push(<span class="string">'%'</span>);
+<a href=#186 id=186 data-nosnippet>186</a>            } <span class="kw">else </span>{
+<a href=#187 id=187 data-nosnippet>187</a>                <span class="kw">match </span>env::var(<span class="kw-2">&amp;</span>var_name) {
+<a href=#188 id=188 data-nosnippet>188</a>                    <span class="prelude-val">Ok</span>(value) =&gt; result.push_str(<span class="kw-2">&amp;</span>value),
+<a href=#189 id=189 data-nosnippet>189</a>                    <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; {
+<a href=#190 id=190 data-nosnippet>190</a>                        <span class="kw">return </span><span class="prelude-val">Err</span>(io::Error::new(
+<a href=#191 id=191 data-nosnippet>191</a>                            io::ErrorKind::NotFound,
+<a href=#192 id=192 data-nosnippet>192</a>                            <span class="macro">format!</span>(<span class="string">"Environment variable '{var_name}' not found"</span>),
+<a href=#193 id=193 data-nosnippet>193</a>                        ));
+<a href=#194 id=194 data-nosnippet>194</a>                    }
+<a href=#195 id=195 data-nosnippet>195</a>                }
+<a href=#196 id=196 data-nosnippet>196</a>            }
+<a href=#197 id=197 data-nosnippet>197</a>        } <span class="kw">else </span>{
+<a href=#198 id=198 data-nosnippet>198</a>            result.push(ch);
+<a href=#199 id=199 data-nosnippet>199</a>        }
+<a href=#200 id=200 data-nosnippet>200</a>    }
+<a href=#201 id=201 data-nosnippet>201</a>
+<a href=#202 id=202 data-nosnippet>202</a>    <span class="comment">// Convert to PathBuf and clean the path
+<a href=#203 id=203 data-nosnippet>203</a>    </span><span class="prelude-val">Ok</span>(PathBuf::from(result).clean())
+<a href=#204 id=204 data-nosnippet>204</a>}
+<a href=#205 id=205 data-nosnippet>205</a>
+<a href=#206 id=206 data-nosnippet>206</a><span class="doccomment">/// Normalize a path for cross-platform compatibility
+<a href=#207 id=207 data-nosnippet>207</a>///
+<a href=#208 id=208 data-nosnippet>208</a>/// This function:
+<a href=#209 id=209 data-nosnippet>209</a>/// - Converts backslashes to forward slashes on Unix
+<a href=#210 id=210 data-nosnippet>210</a>/// - Converts forward slashes to backslashes on Windows
+<a href=#211 id=211 data-nosnippet>211</a>/// - Removes redundant separators and dots
+<a href=#212 id=212 data-nosnippet>212</a>/// - Resolves `..` components where possible
+<a href=#213 id=213 data-nosnippet>213</a>///
+<a href=#214 id=214 data-nosnippet>214</a>/// # Examples
+<a href=#215 id=215 data-nosnippet>215</a>///
+<a href=#216 id=216 data-nosnippet>216</a>/// ```rust
+<a href=#217 id=217 data-nosnippet>217</a>/// use llmspell_utils::file_utils::normalize_path;
+<a href=#218 id=218 data-nosnippet>218</a>/// use std::path::Path;
+<a href=#219 id=219 data-nosnippet>219</a>///
+<a href=#220 id=220 data-nosnippet>220</a>/// let normalized = normalize_path(Path::new("/home/user/../user/./docs"));
+<a href=#221 id=221 data-nosnippet>221</a>/// assert_eq!(normalized.to_str().unwrap(), "/home/user/docs");
+<a href=#222 id=222 data-nosnippet>222</a>/// ```
+<a href=#223 id=223 data-nosnippet>223</a></span><span class="attr">#[must_use]
+<a href=#224 id=224 data-nosnippet>224</a></span><span class="kw">pub fn </span>normalize_path(path: <span class="kw-2">&amp;</span>Path) -&gt; PathBuf {
+<a href=#225 id=225 data-nosnippet>225</a>    path.clean()
+<a href=#226 id=226 data-nosnippet>226</a>}
+<a href=#227 id=227 data-nosnippet>227</a>
+<a href=#228 id=228 data-nosnippet>228</a><span class="doccomment">/// Safely read a file with size limits
+<a href=#229 id=229 data-nosnippet>229</a>///
+<a href=#230 id=230 data-nosnippet>230</a>/// Reads the entire contents of a file into memory, with a size limit
+<a href=#231 id=231 data-nosnippet>231</a>/// to prevent memory exhaustion.
+<a href=#232 id=232 data-nosnippet>232</a>///
+<a href=#233 id=233 data-nosnippet>233</a>/// # Examples
+<a href=#234 id=234 data-nosnippet>234</a>///
+<a href=#235 id=235 data-nosnippet>235</a>/// ```rust,no_run
+<a href=#236 id=236 data-nosnippet>236</a>/// use llmspell_utils::file_utils::read_file;
+<a href=#237 id=237 data-nosnippet>237</a>/// use std::path::Path;
+<a href=#238 id=238 data-nosnippet>238</a>///
+<a href=#239 id=239 data-nosnippet>239</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#240 id=240 data-nosnippet>240</a>/// let content = read_file(Path::new("/etc/hosts"))?;
+<a href=#241 id=241 data-nosnippet>241</a>/// println!("File content: {}", String::from_utf8_lossy(&amp;content));
+<a href=#242 id=242 data-nosnippet>242</a>/// # Ok(())
+<a href=#243 id=243 data-nosnippet>243</a>/// # }
+<a href=#244 id=244 data-nosnippet>244</a>/// ```
+<a href=#245 id=245 data-nosnippet>245</a>///
+<a href=#246 id=246 data-nosnippet>246</a>/// # Errors
+<a href=#247 id=247 data-nosnippet>247</a>///
+<a href=#248 id=248 data-nosnippet>248</a>/// Returns an error if:
+<a href=#249 id=249 data-nosnippet>249</a>/// - File does not exist
+<a href=#250 id=250 data-nosnippet>250</a>/// - File is larger than 100MB
+<a href=#251 id=251 data-nosnippet>251</a>/// - Read permissions are denied
+<a href=#252 id=252 data-nosnippet>252</a>/// - I/O error occurs
+<a href=#253 id=253 data-nosnippet>253</a></span><span class="kw">pub fn </span>read_file(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;u8&gt;&gt; {
+<a href=#254 id=254 data-nosnippet>254</a>    <span class="comment">// Check file size first
+<a href=#255 id=255 data-nosnippet>255</a>    </span><span class="kw">let </span>metadata = fs::metadata(path)
+<a href=#256 id=256 data-nosnippet>256</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to read metadata for file: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#257 id=257 data-nosnippet>257</a>
+<a href=#258 id=258 data-nosnippet>258</a>    <span class="kw">if </span>metadata.len() &gt; MAX_FILE_SIZE {
+<a href=#259 id=259 data-nosnippet>259</a>        <span class="macro">anyhow::bail!</span>(
+<a href=#260 id=260 data-nosnippet>260</a>            <span class="string">"File '{}' is too large ({} bytes, max {} bytes)"</span>,
+<a href=#261 id=261 data-nosnippet>261</a>            path.display(),
+<a href=#262 id=262 data-nosnippet>262</a>            metadata.len(),
+<a href=#263 id=263 data-nosnippet>263</a>            MAX_FILE_SIZE
+<a href=#264 id=264 data-nosnippet>264</a>        );
+<a href=#265 id=265 data-nosnippet>265</a>    }
+<a href=#266 id=266 data-nosnippet>266</a>
+<a href=#267 id=267 data-nosnippet>267</a>    <span class="kw">let </span><span class="kw-2">mut </span>file =
+<a href=#268 id=268 data-nosnippet>268</a>        File::open(path).with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to open file: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#269 id=269 data-nosnippet>269</a>
+<a href=#270 id=270 data-nosnippet>270</a>    <span class="comment">// Safe cast: we've already checked the file size is &lt;= MAX_FILE_SIZE (100MB)
+<a href=#271 id=271 data-nosnippet>271</a>    </span><span class="attr">#[allow(clippy::cast_possible_truncation)]
+<a href=#272 id=272 data-nosnippet>272</a>    </span><span class="kw">let </span>capacity = metadata.len().min(usize::MAX <span class="kw">as </span>u64) <span class="kw">as </span>usize;
+<a href=#273 id=273 data-nosnippet>273</a>    <span class="kw">let </span><span class="kw-2">mut </span>contents = Vec::with_capacity(capacity);
+<a href=#274 id=274 data-nosnippet>274</a>    file.read_to_end(<span class="kw-2">&amp;mut </span>contents)
+<a href=#275 id=275 data-nosnippet>275</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to read file: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#276 id=276 data-nosnippet>276</a>
+<a href=#277 id=277 data-nosnippet>277</a>    <span class="prelude-val">Ok</span>(contents)
+<a href=#278 id=278 data-nosnippet>278</a>}
+<a href=#279 id=279 data-nosnippet>279</a>
+<a href=#280 id=280 data-nosnippet>280</a><span class="doccomment">/// Write data to a file with proper error handling
+<a href=#281 id=281 data-nosnippet>281</a>///
+<a href=#282 id=282 data-nosnippet>282</a>/// This is a simple write operation. For critical data, use `write_file_atomic`.
+<a href=#283 id=283 data-nosnippet>283</a>///
+<a href=#284 id=284 data-nosnippet>284</a>/// # Examples
+<a href=#285 id=285 data-nosnippet>285</a>///
+<a href=#286 id=286 data-nosnippet>286</a>/// ```rust,no_run
+<a href=#287 id=287 data-nosnippet>287</a>/// use llmspell_utils::file_utils::write_file;
+<a href=#288 id=288 data-nosnippet>288</a>/// use std::path::Path;
+<a href=#289 id=289 data-nosnippet>289</a>///
+<a href=#290 id=290 data-nosnippet>290</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#291 id=291 data-nosnippet>291</a>/// write_file(Path::new("/tmp/output.txt"), b"Hello, world!")?;
+<a href=#292 id=292 data-nosnippet>292</a>/// # Ok(())
+<a href=#293 id=293 data-nosnippet>293</a>/// # }
+<a href=#294 id=294 data-nosnippet>294</a>/// ```
+<a href=#295 id=295 data-nosnippet>295</a>///
+<a href=#296 id=296 data-nosnippet>296</a>/// # Errors
+<a href=#297 id=297 data-nosnippet>297</a>///
+<a href=#298 id=298 data-nosnippet>298</a>/// Returns an error if:
+<a href=#299 id=299 data-nosnippet>299</a>/// - Parent directory does not exist
+<a href=#300 id=300 data-nosnippet>300</a>/// - Write permissions are denied
+<a href=#301 id=301 data-nosnippet>301</a>/// - Disk is full
+<a href=#302 id=302 data-nosnippet>302</a>/// - I/O error occurs
+<a href=#303 id=303 data-nosnippet>303</a></span><span class="kw">pub fn </span>write_file(path: <span class="kw-2">&amp;</span>Path, data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#304 id=304 data-nosnippet>304</a>    <span class="comment">// Ensure parent directory exists
+<a href=#305 id=305 data-nosnippet>305</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(parent) = path.parent() {
+<a href=#306 id=306 data-nosnippet>306</a>        ensure_dir(parent).with_context(|| {
+<a href=#307 id=307 data-nosnippet>307</a>            <span class="macro">format!</span>(<span class="string">"Failed to create parent directory for: {}"</span>, path.display())
+<a href=#308 id=308 data-nosnippet>308</a>        })<span class="question-mark">?</span>;
+<a href=#309 id=309 data-nosnippet>309</a>    }
+<a href=#310 id=310 data-nosnippet>310</a>
+<a href=#311 id=311 data-nosnippet>311</a>    <span class="kw">let </span><span class="kw-2">mut </span>file =
+<a href=#312 id=312 data-nosnippet>312</a>        File::create(path).with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to create file: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#313 id=313 data-nosnippet>313</a>
+<a href=#314 id=314 data-nosnippet>314</a>    file.write_all(data)
+<a href=#315 id=315 data-nosnippet>315</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to write to file: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#316 id=316 data-nosnippet>316</a>
+<a href=#317 id=317 data-nosnippet>317</a>    file.sync_all()
+<a href=#318 id=318 data-nosnippet>318</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to sync file to disk: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#319 id=319 data-nosnippet>319</a>
+<a href=#320 id=320 data-nosnippet>320</a>    <span class="prelude-val">Ok</span>(())
+<a href=#321 id=321 data-nosnippet>321</a>}
+<a href=#322 id=322 data-nosnippet>322</a>
+<a href=#323 id=323 data-nosnippet>323</a><span class="doccomment">/// Atomically write data to a file
+<a href=#324 id=324 data-nosnippet>324</a>///
+<a href=#325 id=325 data-nosnippet>325</a>/// This function writes data to a temporary file and then atomically renames it
+<a href=#326 id=326 data-nosnippet>326</a>/// to the target path. This ensures that the file is either fully written or
+<a href=#327 id=327 data-nosnippet>327</a>/// not modified at all, preventing partial writes.
+<a href=#328 id=328 data-nosnippet>328</a>///
+<a href=#329 id=329 data-nosnippet>329</a>/// # Examples
+<a href=#330 id=330 data-nosnippet>330</a>///
+<a href=#331 id=331 data-nosnippet>331</a>/// ```rust,no_run
+<a href=#332 id=332 data-nosnippet>332</a>/// use llmspell_utils::file_utils::write_file_atomic;
+<a href=#333 id=333 data-nosnippet>333</a>/// use std::path::Path;
+<a href=#334 id=334 data-nosnippet>334</a>///
+<a href=#335 id=335 data-nosnippet>335</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#336 id=336 data-nosnippet>336</a>/// // This write is atomic - the file will either be fully written or unchanged
+<a href=#337 id=337 data-nosnippet>337</a>/// write_file_atomic(Path::new("/tmp/important.json"), b"{\"status\": \"ok\"}")?;
+<a href=#338 id=338 data-nosnippet>338</a>/// # Ok(())
+<a href=#339 id=339 data-nosnippet>339</a>/// # }
+<a href=#340 id=340 data-nosnippet>340</a>/// ```
+<a href=#341 id=341 data-nosnippet>341</a>///
+<a href=#342 id=342 data-nosnippet>342</a>/// # Errors
+<a href=#343 id=343 data-nosnippet>343</a>///
+<a href=#344 id=344 data-nosnippet>344</a>/// Returns an error if:
+<a href=#345 id=345 data-nosnippet>345</a>/// - Parent directory does not exist
+<a href=#346 id=346 data-nosnippet>346</a>/// - Write permissions are denied
+<a href=#347 id=347 data-nosnippet>347</a>/// - Disk is full
+<a href=#348 id=348 data-nosnippet>348</a>/// - I/O error occurs
+<a href=#349 id=349 data-nosnippet>349</a></span><span class="kw">pub fn </span>write_file_atomic(path: <span class="kw-2">&amp;</span>Path, data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#350 id=350 data-nosnippet>350</a>    <span class="comment">// Ensure parent directory exists
+<a href=#351 id=351 data-nosnippet>351</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(parent) = path.parent() {
+<a href=#352 id=352 data-nosnippet>352</a>        ensure_dir(parent).with_context(|| {
+<a href=#353 id=353 data-nosnippet>353</a>            <span class="macro">format!</span>(<span class="string">"Failed to create parent directory for: {}"</span>, path.display())
+<a href=#354 id=354 data-nosnippet>354</a>        })<span class="question-mark">?</span>;
+<a href=#355 id=355 data-nosnippet>355</a>    }
+<a href=#356 id=356 data-nosnippet>356</a>
+<a href=#357 id=357 data-nosnippet>357</a>    <span class="comment">// Create temporary file in the same directory
+<a href=#358 id=358 data-nosnippet>358</a>    </span><span class="kw">let </span>temp_path = {
+<a href=#359 id=359 data-nosnippet>359</a>        <span class="kw">let </span><span class="kw-2">mut </span>temp = path.to_path_buf();
+<a href=#360 id=360 data-nosnippet>360</a>        <span class="kw">let </span>file_name = path
+<a href=#361 id=361 data-nosnippet>361</a>            .file_name()
+<a href=#362 id=362 data-nosnippet>362</a>            .ok_or_else(|| <span class="macro">anyhow::anyhow!</span>(<span class="string">"Path has no file name: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#363 id=363 data-nosnippet>363</a>
+<a href=#364 id=364 data-nosnippet>364</a>        <span class="kw">let </span>file_name_str = file_name.to_string_lossy();
+<a href=#365 id=365 data-nosnippet>365</a>        <span class="kw">let </span>uuid_str = uuid::Uuid::new_v4().simple();
+<a href=#366 id=366 data-nosnippet>366</a>        <span class="kw">let </span>temp_name = <span class="macro">format!</span>(<span class="string">".{file_name_str}.tmp.{uuid_str}"</span>);
+<a href=#367 id=367 data-nosnippet>367</a>
+<a href=#368 id=368 data-nosnippet>368</a>        temp.set_file_name(temp_name);
+<a href=#369 id=369 data-nosnippet>369</a>        temp
+<a href=#370 id=370 data-nosnippet>370</a>    };
+<a href=#371 id=371 data-nosnippet>371</a>
+<a href=#372 id=372 data-nosnippet>372</a>    <span class="comment">// Write to temporary file
+<a href=#373 id=373 data-nosnippet>373</a>    </span><span class="kw">let </span>result = (|| -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#374 id=374 data-nosnippet>374</a>        <span class="kw">let </span><span class="kw-2">mut </span>file = File::create(<span class="kw-2">&amp;</span>temp_path)
+<a href=#375 id=375 data-nosnippet>375</a>            .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to create temporary file: {}"</span>, temp_path.display()))<span class="question-mark">?</span>;
+<a href=#376 id=376 data-nosnippet>376</a>
+<a href=#377 id=377 data-nosnippet>377</a>        file.write_all(data).with_context(|| {
+<a href=#378 id=378 data-nosnippet>378</a>            <span class="macro">format!</span>(<span class="string">"Failed to write to temporary file: {}"</span>, temp_path.display())
+<a href=#379 id=379 data-nosnippet>379</a>        })<span class="question-mark">?</span>;
+<a href=#380 id=380 data-nosnippet>380</a>
+<a href=#381 id=381 data-nosnippet>381</a>        file.sync_all()
+<a href=#382 id=382 data-nosnippet>382</a>            .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to sync temporary file: {}"</span>, temp_path.display()))<span class="question-mark">?</span>;
+<a href=#383 id=383 data-nosnippet>383</a>
+<a href=#384 id=384 data-nosnippet>384</a>        <span class="prelude-val">Ok</span>(())
+<a href=#385 id=385 data-nosnippet>385</a>    })();
+<a href=#386 id=386 data-nosnippet>386</a>
+<a href=#387 id=387 data-nosnippet>387</a>    <span class="comment">// If write failed, clean up temp file
+<a href=#388 id=388 data-nosnippet>388</a>    </span><span class="kw">if let </span><span class="prelude-val">Err</span>(e) = result {
+<a href=#389 id=389 data-nosnippet>389</a>        <span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>temp_path);
+<a href=#390 id=390 data-nosnippet>390</a>        <span class="kw">return </span><span class="prelude-val">Err</span>(e);
+<a href=#391 id=391 data-nosnippet>391</a>    }
+<a href=#392 id=392 data-nosnippet>392</a>
+<a href=#393 id=393 data-nosnippet>393</a>    <span class="comment">// Atomic rename
+<a href=#394 id=394 data-nosnippet>394</a>    </span>fs::rename(<span class="kw-2">&amp;</span>temp_path, path).with_context(|| {
+<a href=#395 id=395 data-nosnippet>395</a>        <span class="macro">format!</span>(
+<a href=#396 id=396 data-nosnippet>396</a>            <span class="string">"Failed to rename {} to {}"</span>,
+<a href=#397 id=397 data-nosnippet>397</a>            temp_path.display(),
+<a href=#398 id=398 data-nosnippet>398</a>            path.display()
+<a href=#399 id=399 data-nosnippet>399</a>        )
+<a href=#400 id=400 data-nosnippet>400</a>    })<span class="question-mark">?</span>;
+<a href=#401 id=401 data-nosnippet>401</a>
+<a href=#402 id=402 data-nosnippet>402</a>    <span class="prelude-val">Ok</span>(())
+<a href=#403 id=403 data-nosnippet>403</a>}
+<a href=#404 id=404 data-nosnippet>404</a>
+<a href=#405 id=405 data-nosnippet>405</a><span class="doccomment">/// Check if a path is absolute
+<a href=#406 id=406 data-nosnippet>406</a>///
+<a href=#407 id=407 data-nosnippet>407</a>/// This function correctly handles platform differences:
+<a href=#408 id=408 data-nosnippet>408</a>/// - On Unix: paths starting with `/`
+<a href=#409 id=409 data-nosnippet>409</a>/// - On Windows: paths with drive letters (C:\) or UNC paths (\\server\share)
+<a href=#410 id=410 data-nosnippet>410</a>///
+<a href=#411 id=411 data-nosnippet>411</a>/// # Examples
+<a href=#412 id=412 data-nosnippet>412</a>///
+<a href=#413 id=413 data-nosnippet>413</a>/// ```rust
+<a href=#414 id=414 data-nosnippet>414</a>/// use llmspell_utils::file_utils::is_absolute_path;
+<a href=#415 id=415 data-nosnippet>415</a>/// use std::path::Path;
+<a href=#416 id=416 data-nosnippet>416</a>///
+<a href=#417 id=417 data-nosnippet>417</a>/// assert!(is_absolute_path(Path::new("/home/user")));
+<a href=#418 id=418 data-nosnippet>418</a>/// assert!(!is_absolute_path(Path::new("relative/path")));
+<a href=#419 id=419 data-nosnippet>419</a>///
+<a href=#420 id=420 data-nosnippet>420</a>/// #[cfg(windows)]
+<a href=#421 id=421 data-nosnippet>421</a>/// {
+<a href=#422 id=422 data-nosnippet>422</a>///     assert!(is_absolute_path(Path::new("C:\\Windows")));
+<a href=#423 id=423 data-nosnippet>423</a>///     assert!(is_absolute_path(Path::new("\\\\server\\share")));
+<a href=#424 id=424 data-nosnippet>424</a>/// }
+<a href=#425 id=425 data-nosnippet>425</a>/// ```
+<a href=#426 id=426 data-nosnippet>426</a></span><span class="attr">#[must_use]
+<a href=#427 id=427 data-nosnippet>427</a></span><span class="kw">pub fn </span>is_absolute_path(path: <span class="kw-2">&amp;</span>Path) -&gt; bool {
+<a href=#428 id=428 data-nosnippet>428</a>    path.is_absolute()
+<a href=#429 id=429 data-nosnippet>429</a>}
+<a href=#430 id=430 data-nosnippet>430</a>
+<a href=#431 id=431 data-nosnippet>431</a><span class="doccomment">/// Join paths safely, handling platform differences
+<a href=#432 id=432 data-nosnippet>432</a>///
+<a href=#433 id=433 data-nosnippet>433</a>/// This function safely joins path components, handling:
+<a href=#434 id=434 data-nosnippet>434</a>/// - Empty components
+<a href=#435 id=435 data-nosnippet>435</a>/// - Absolute paths in components (which reset the path)
+<a href=#436 id=436 data-nosnippet>436</a>/// - Platform-specific separators
+<a href=#437 id=437 data-nosnippet>437</a>///
+<a href=#438 id=438 data-nosnippet>438</a>/// # Examples
+<a href=#439 id=439 data-nosnippet>439</a>///
+<a href=#440 id=440 data-nosnippet>440</a>/// ```rust
+<a href=#441 id=441 data-nosnippet>441</a>/// use llmspell_utils::file_utils::join_paths;
+<a href=#442 id=442 data-nosnippet>442</a>/// use std::path::Path;
+<a href=#443 id=443 data-nosnippet>443</a>///
+<a href=#444 id=444 data-nosnippet>444</a>/// let joined = join_paths(&amp;[Path::new("/home"), Path::new("user"), Path::new("docs")]);
+<a href=#445 id=445 data-nosnippet>445</a>/// assert_eq!(joined.to_str().unwrap(), "/home/user/docs");
+<a href=#446 id=446 data-nosnippet>446</a>/// ```
+<a href=#447 id=447 data-nosnippet>447</a></span><span class="attr">#[must_use]
+<a href=#448 id=448 data-nosnippet>448</a></span><span class="kw">pub fn </span>join_paths(paths: <span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>Path]) -&gt; PathBuf {
+<a href=#449 id=449 data-nosnippet>449</a>    <span class="kw">let </span><span class="kw-2">mut </span>result = PathBuf::new();
+<a href=#450 id=450 data-nosnippet>450</a>
+<a href=#451 id=451 data-nosnippet>451</a>    <span class="kw">for </span>path <span class="kw">in </span>paths {
+<a href=#452 id=452 data-nosnippet>452</a>        <span class="kw">if </span>path.is_absolute() {
+<a href=#453 id=453 data-nosnippet>453</a>            result = path.to_path_buf();
+<a href=#454 id=454 data-nosnippet>454</a>        } <span class="kw">else </span>{
+<a href=#455 id=455 data-nosnippet>455</a>            result.push(path);
+<a href=#456 id=456 data-nosnippet>456</a>        }
+<a href=#457 id=457 data-nosnippet>457</a>    }
+<a href=#458 id=458 data-nosnippet>458</a>
+<a href=#459 id=459 data-nosnippet>459</a>    result.clean()
+<a href=#460 id=460 data-nosnippet>460</a>}
+<a href=#461 id=461 data-nosnippet>461</a>
+<a href=#462 id=462 data-nosnippet>462</a><span class="doccomment">/// Get the parent directory of a path
+<a href=#463 id=463 data-nosnippet>463</a>///
+<a href=#464 id=464 data-nosnippet>464</a>/// Returns None if the path has no parent (e.g., "/" or "C:\")
+<a href=#465 id=465 data-nosnippet>465</a>///
+<a href=#466 id=466 data-nosnippet>466</a>/// # Examples
+<a href=#467 id=467 data-nosnippet>467</a>///
+<a href=#468 id=468 data-nosnippet>468</a>/// ```rust
+<a href=#469 id=469 data-nosnippet>469</a>/// use llmspell_utils::file_utils::parent_dir;
+<a href=#470 id=470 data-nosnippet>470</a>/// use std::path::Path;
+<a href=#471 id=471 data-nosnippet>471</a>///
+<a href=#472 id=472 data-nosnippet>472</a>/// assert_eq!(
+<a href=#473 id=473 data-nosnippet>473</a>///     parent_dir(Path::new("/home/user/file.txt")),
+<a href=#474 id=474 data-nosnippet>474</a>///     Some(Path::new("/home/user").to_path_buf())
+<a href=#475 id=475 data-nosnippet>475</a>/// );
+<a href=#476 id=476 data-nosnippet>476</a>/// ```
+<a href=#477 id=477 data-nosnippet>477</a></span><span class="attr">#[must_use]
+<a href=#478 id=478 data-nosnippet>478</a></span><span class="kw">pub fn </span>parent_dir(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Option</span>&lt;PathBuf&gt; {
+<a href=#479 id=479 data-nosnippet>479</a>    path.parent().map(std::path::Path::to_path_buf)
+<a href=#480 id=480 data-nosnippet>480</a>}
+<a href=#481 id=481 data-nosnippet>481</a>
+<a href=#482 id=482 data-nosnippet>482</a><span class="doccomment">/// Copy a file with proper error handling
+<a href=#483 id=483 data-nosnippet>483</a>///
+<a href=#484 id=484 data-nosnippet>484</a>/// # Examples
+<a href=#485 id=485 data-nosnippet>485</a>///
+<a href=#486 id=486 data-nosnippet>486</a>/// ```rust,no_run
+<a href=#487 id=487 data-nosnippet>487</a>/// use llmspell_utils::file_utils::copy_file;
+<a href=#488 id=488 data-nosnippet>488</a>/// use std::path::Path;
+<a href=#489 id=489 data-nosnippet>489</a>///
+<a href=#490 id=490 data-nosnippet>490</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#491 id=491 data-nosnippet>491</a>/// copy_file(Path::new("/tmp/source.txt"), Path::new("/tmp/dest.txt"))?;
+<a href=#492 id=492 data-nosnippet>492</a>/// # Ok(())
+<a href=#493 id=493 data-nosnippet>493</a>/// # }
+<a href=#494 id=494 data-nosnippet>494</a>/// ```
+<a href=#495 id=495 data-nosnippet>495</a>///
+<a href=#496 id=496 data-nosnippet>496</a>/// # Errors
+<a href=#497 id=497 data-nosnippet>497</a>///
+<a href=#498 id=498 data-nosnippet>498</a>/// Returns an error if:
+<a href=#499 id=499 data-nosnippet>499</a>/// - Source file does not exist
+<a href=#500 id=500 data-nosnippet>500</a>/// - Destination directory does not exist
+<a href=#501 id=501 data-nosnippet>501</a>/// - Insufficient permissions
+<a href=#502 id=502 data-nosnippet>502</a>/// - I/O error occurs
+<a href=#503 id=503 data-nosnippet>503</a></span><span class="kw">pub fn </span>copy_file(from: <span class="kw-2">&amp;</span>Path, to: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;u64&gt; {
+<a href=#504 id=504 data-nosnippet>504</a>    <span class="comment">// Ensure destination directory exists
+<a href=#505 id=505 data-nosnippet>505</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(parent) = to.parent() {
+<a href=#506 id=506 data-nosnippet>506</a>        ensure_dir(parent).with_context(|| {
+<a href=#507 id=507 data-nosnippet>507</a>            <span class="macro">format!</span>(
+<a href=#508 id=508 data-nosnippet>508</a>                <span class="string">"Failed to create destination directory for: {}"</span>,
+<a href=#509 id=509 data-nosnippet>509</a>                to.display()
+<a href=#510 id=510 data-nosnippet>510</a>            )
+<a href=#511 id=511 data-nosnippet>511</a>        })<span class="question-mark">?</span>;
+<a href=#512 id=512 data-nosnippet>512</a>    }
+<a href=#513 id=513 data-nosnippet>513</a>
+<a href=#514 id=514 data-nosnippet>514</a>    fs::copy(from, to)
+<a href=#515 id=515 data-nosnippet>515</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to copy from {} to {}"</span>, from.display(), to.display()))
+<a href=#516 id=516 data-nosnippet>516</a>}
+<a href=#517 id=517 data-nosnippet>517</a>
+<a href=#518 id=518 data-nosnippet>518</a><span class="doccomment">/// Remove a file if it exists
+<a href=#519 id=519 data-nosnippet>519</a>///
+<a href=#520 id=520 data-nosnippet>520</a>/// This function does not return an error if the file doesn't exist.
+<a href=#521 id=521 data-nosnippet>521</a>///
+<a href=#522 id=522 data-nosnippet>522</a>/// # Examples
+<a href=#523 id=523 data-nosnippet>523</a>///
+<a href=#524 id=524 data-nosnippet>524</a>/// ```rust,no_run
+<a href=#525 id=525 data-nosnippet>525</a>/// use llmspell_utils::file_utils::remove_file_if_exists;
+<a href=#526 id=526 data-nosnippet>526</a>/// use std::path::Path;
+<a href=#527 id=527 data-nosnippet>527</a>///
+<a href=#528 id=528 data-nosnippet>528</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#529 id=529 data-nosnippet>529</a>/// remove_file_if_exists(Path::new("/tmp/old-file.txt"))?;
+<a href=#530 id=530 data-nosnippet>530</a>/// # Ok(())
+<a href=#531 id=531 data-nosnippet>531</a>/// # }
+<a href=#532 id=532 data-nosnippet>532</a>/// ```
+<a href=#533 id=533 data-nosnippet>533</a>///
+<a href=#534 id=534 data-nosnippet>534</a>/// # Errors
+<a href=#535 id=535 data-nosnippet>535</a>///
+<a href=#536 id=536 data-nosnippet>536</a>/// Returns an error if:
+<a href=#537 id=537 data-nosnippet>537</a>/// - The path exists but is a directory
+<a href=#538 id=538 data-nosnippet>538</a>/// - Insufficient permissions
+<a href=#539 id=539 data-nosnippet>539</a>/// - I/O error occurs (other than `NotFound`)
+<a href=#540 id=540 data-nosnippet>540</a></span><span class="kw">pub fn </span>remove_file_if_exists(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#541 id=541 data-nosnippet>541</a>    <span class="kw">match </span>fs::remove_file(path) {
+<a href=#542 id=542 data-nosnippet>542</a>        <span class="prelude-val">Ok</span>(()) =&gt; <span class="prelude-val">Ok</span>(()),
+<a href=#543 id=543 data-nosnippet>543</a>        <span class="prelude-val">Err</span>(e) <span class="kw">if </span>e.kind() == io::ErrorKind::NotFound =&gt; <span class="prelude-val">Ok</span>(()),
+<a href=#544 id=544 data-nosnippet>544</a>        <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e).with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to remove file: {}"</span>, path.display())),
+<a href=#545 id=545 data-nosnippet>545</a>    }
+<a href=#546 id=546 data-nosnippet>546</a>}
+<a href=#547 id=547 data-nosnippet>547</a>
+<a href=#548 id=548 data-nosnippet>548</a><span class="doccomment">/// Remove a directory and all its contents if it exists
+<a href=#549 id=549 data-nosnippet>549</a>///
+<a href=#550 id=550 data-nosnippet>550</a>/// This function does not return an error if the directory doesn't exist.
+<a href=#551 id=551 data-nosnippet>551</a>///
+<a href=#552 id=552 data-nosnippet>552</a>/// # Examples
+<a href=#553 id=553 data-nosnippet>553</a>///
+<a href=#554 id=554 data-nosnippet>554</a>/// ```rust,no_run
+<a href=#555 id=555 data-nosnippet>555</a>/// use llmspell_utils::file_utils::remove_dir_all_if_exists;
+<a href=#556 id=556 data-nosnippet>556</a>/// use std::path::Path;
+<a href=#557 id=557 data-nosnippet>557</a>///
+<a href=#558 id=558 data-nosnippet>558</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#559 id=559 data-nosnippet>559</a>/// remove_dir_all_if_exists(Path::new("/tmp/old-dir"))?;
+<a href=#560 id=560 data-nosnippet>560</a>/// # Ok(())
+<a href=#561 id=561 data-nosnippet>561</a>/// # }
+<a href=#562 id=562 data-nosnippet>562</a>/// ```
+<a href=#563 id=563 data-nosnippet>563</a>///
+<a href=#564 id=564 data-nosnippet>564</a>/// # Errors
+<a href=#565 id=565 data-nosnippet>565</a>///
+<a href=#566 id=566 data-nosnippet>566</a>/// Returns an error if:
+<a href=#567 id=567 data-nosnippet>567</a>/// - The path exists but is a file
+<a href=#568 id=568 data-nosnippet>568</a>/// - Insufficient permissions
+<a href=#569 id=569 data-nosnippet>569</a>/// - I/O error occurs (other than `NotFound`)
+<a href=#570 id=570 data-nosnippet>570</a></span><span class="kw">pub fn </span>remove_dir_all_if_exists(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#571 id=571 data-nosnippet>571</a>    <span class="kw">match </span>fs::remove_dir_all(path) {
+<a href=#572 id=572 data-nosnippet>572</a>        <span class="prelude-val">Ok</span>(()) =&gt; <span class="prelude-val">Ok</span>(()),
+<a href=#573 id=573 data-nosnippet>573</a>        <span class="prelude-val">Err</span>(e) <span class="kw">if </span>e.kind() == io::ErrorKind::NotFound =&gt; <span class="prelude-val">Ok</span>(()),
+<a href=#574 id=574 data-nosnippet>574</a>        <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e).with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to remove directory: {}"</span>, path.display())),
+<a href=#575 id=575 data-nosnippet>575</a>    }
+<a href=#576 id=576 data-nosnippet>576</a>}
+<a href=#577 id=577 data-nosnippet>577</a>
+<a href=#578 id=578 data-nosnippet>578</a><span class="doccomment">/// Append data to a file
+<a href=#579 id=579 data-nosnippet>579</a>///
+<a href=#580 id=580 data-nosnippet>580</a>/// This function appends data to an existing file or creates it if it doesn't exist.
+<a href=#581 id=581 data-nosnippet>581</a>/// The parent directory is created if necessary.
+<a href=#582 id=582 data-nosnippet>582</a>///
+<a href=#583 id=583 data-nosnippet>583</a>/// # Examples
+<a href=#584 id=584 data-nosnippet>584</a>///
+<a href=#585 id=585 data-nosnippet>585</a>/// ```rust,no_run
+<a href=#586 id=586 data-nosnippet>586</a>/// use llmspell_utils::file_utils::append_file;
+<a href=#587 id=587 data-nosnippet>587</a>/// use std::path::Path;
+<a href=#588 id=588 data-nosnippet>588</a>///
+<a href=#589 id=589 data-nosnippet>589</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#590 id=590 data-nosnippet>590</a>/// append_file(Path::new("/tmp/log.txt"), b"\nNew log entry")?;
+<a href=#591 id=591 data-nosnippet>591</a>/// # Ok(())
+<a href=#592 id=592 data-nosnippet>592</a>/// # }
+<a href=#593 id=593 data-nosnippet>593</a>/// ```
+<a href=#594 id=594 data-nosnippet>594</a>///
+<a href=#595 id=595 data-nosnippet>595</a>/// # Errors
+<a href=#596 id=596 data-nosnippet>596</a>///
+<a href=#597 id=597 data-nosnippet>597</a>/// Returns an error if:
+<a href=#598 id=598 data-nosnippet>598</a>/// - Parent directory cannot be created
+<a href=#599 id=599 data-nosnippet>599</a>/// - Write permissions are denied
+<a href=#600 id=600 data-nosnippet>600</a>/// - I/O error occurs
+<a href=#601 id=601 data-nosnippet>601</a></span><span class="kw">pub fn </span>append_file(path: <span class="kw-2">&amp;</span>Path, data: <span class="kw-2">&amp;</span>[u8]) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#602 id=602 data-nosnippet>602</a>    <span class="comment">// Ensure parent directory exists
+<a href=#603 id=603 data-nosnippet>603</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(parent) = path.parent() {
+<a href=#604 id=604 data-nosnippet>604</a>        ensure_dir(parent).with_context(|| {
+<a href=#605 id=605 data-nosnippet>605</a>            <span class="macro">format!</span>(<span class="string">"Failed to create parent directory for: {}"</span>, path.display())
+<a href=#606 id=606 data-nosnippet>606</a>        })<span class="question-mark">?</span>;
+<a href=#607 id=607 data-nosnippet>607</a>    }
+<a href=#608 id=608 data-nosnippet>608</a>
+<a href=#609 id=609 data-nosnippet>609</a>    <span class="kw">let </span><span class="kw-2">mut </span>file = std::fs::OpenOptions::new()
+<a href=#610 id=610 data-nosnippet>610</a>        .create(<span class="bool-val">true</span>)
+<a href=#611 id=611 data-nosnippet>611</a>        .append(<span class="bool-val">true</span>)
+<a href=#612 id=612 data-nosnippet>612</a>        .open(path)
+<a href=#613 id=613 data-nosnippet>613</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to open file for appending: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#614 id=614 data-nosnippet>614</a>
+<a href=#615 id=615 data-nosnippet>615</a>    file.write_all(data)
+<a href=#616 id=616 data-nosnippet>616</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to append to file: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#617 id=617 data-nosnippet>617</a>
+<a href=#618 id=618 data-nosnippet>618</a>    file.sync_all()
+<a href=#619 id=619 data-nosnippet>619</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to sync file to disk: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#620 id=620 data-nosnippet>620</a>
+<a href=#621 id=621 data-nosnippet>621</a>    <span class="prelude-val">Ok</span>(())
+<a href=#622 id=622 data-nosnippet>622</a>}
+<a href=#623 id=623 data-nosnippet>623</a>
+<a href=#624 id=624 data-nosnippet>624</a><span class="doccomment">/// Move or rename a file
+<a href=#625 id=625 data-nosnippet>625</a>///
+<a href=#626 id=626 data-nosnippet>626</a>/// This function moves a file from one location to another, creating parent
+<a href=#627 id=627 data-nosnippet>627</a>/// directories as needed. It's equivalent to rename on the same filesystem.
+<a href=#628 id=628 data-nosnippet>628</a>///
+<a href=#629 id=629 data-nosnippet>629</a>/// # Examples
+<a href=#630 id=630 data-nosnippet>630</a>///
+<a href=#631 id=631 data-nosnippet>631</a>/// ```rust,no_run
+<a href=#632 id=632 data-nosnippet>632</a>/// use llmspell_utils::file_utils::move_file;
+<a href=#633 id=633 data-nosnippet>633</a>/// use std::path::Path;
+<a href=#634 id=634 data-nosnippet>634</a>///
+<a href=#635 id=635 data-nosnippet>635</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#636 id=636 data-nosnippet>636</a>/// move_file(Path::new("/tmp/old.txt"), Path::new("/tmp/new.txt"))?;
+<a href=#637 id=637 data-nosnippet>637</a>/// # Ok(())
+<a href=#638 id=638 data-nosnippet>638</a>/// # }
+<a href=#639 id=639 data-nosnippet>639</a>/// ```
+<a href=#640 id=640 data-nosnippet>640</a>///
+<a href=#641 id=641 data-nosnippet>641</a>/// # Errors
+<a href=#642 id=642 data-nosnippet>642</a>///
+<a href=#643 id=643 data-nosnippet>643</a>/// Returns an error if:
+<a href=#644 id=644 data-nosnippet>644</a>/// - Source file does not exist
+<a href=#645 id=645 data-nosnippet>645</a>/// - Destination directory cannot be created
+<a href=#646 id=646 data-nosnippet>646</a>/// - Insufficient permissions
+<a href=#647 id=647 data-nosnippet>647</a>/// - Files are on different filesystems and copy fails
+<a href=#648 id=648 data-nosnippet>648</a></span><span class="kw">pub fn </span>move_file(from: <span class="kw-2">&amp;</span>Path, to: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;()&gt; {
+<a href=#649 id=649 data-nosnippet>649</a>    <span class="comment">// Ensure destination directory exists
+<a href=#650 id=650 data-nosnippet>650</a>    </span><span class="kw">if let </span><span class="prelude-val">Some</span>(parent) = to.parent() {
+<a href=#651 id=651 data-nosnippet>651</a>        ensure_dir(parent).with_context(|| {
+<a href=#652 id=652 data-nosnippet>652</a>            <span class="macro">format!</span>(
+<a href=#653 id=653 data-nosnippet>653</a>                <span class="string">"Failed to create destination directory for: {}"</span>,
+<a href=#654 id=654 data-nosnippet>654</a>                to.display()
+<a href=#655 id=655 data-nosnippet>655</a>            )
+<a href=#656 id=656 data-nosnippet>656</a>        })<span class="question-mark">?</span>;
+<a href=#657 id=657 data-nosnippet>657</a>    }
+<a href=#658 id=658 data-nosnippet>658</a>
+<a href=#659 id=659 data-nosnippet>659</a>    <span class="comment">// Try to rename first (most efficient)
+<a href=#660 id=660 data-nosnippet>660</a>    </span><span class="kw">match </span>fs::rename(from, to) {
+<a href=#661 id=661 data-nosnippet>661</a>        <span class="prelude-val">Ok</span>(()) =&gt; <span class="prelude-val">Ok</span>(()),
+<a href=#662 id=662 data-nosnippet>662</a>        <span class="prelude-val">Err</span>(e) <span class="kw">if </span>e.raw_os_error() == <span class="prelude-val">Some</span>(<span class="number">18</span>) =&gt; {
+<a href=#663 id=663 data-nosnippet>663</a>            <span class="comment">// Cross-device link error (EXDEV on Unix) - need to copy and delete
+<a href=#664 id=664 data-nosnippet>664</a>            </span>copy_file(from, to)<span class="question-mark">?</span>;
+<a href=#665 id=665 data-nosnippet>665</a>            remove_file_if_exists(from)<span class="question-mark">?</span>;
+<a href=#666 id=666 data-nosnippet>666</a>            <span class="prelude-val">Ok</span>(())
+<a href=#667 id=667 data-nosnippet>667</a>        }
+<a href=#668 id=668 data-nosnippet>668</a>        <span class="prelude-val">Err</span>(e) =&gt; <span class="prelude-val">Err</span>(e).with_context(|| {
+<a href=#669 id=669 data-nosnippet>669</a>            <span class="macro">format!</span>(
+<a href=#670 id=670 data-nosnippet>670</a>                <span class="string">"Failed to move file from {} to {}"</span>,
+<a href=#671 id=671 data-nosnippet>671</a>                from.display(),
+<a href=#672 id=672 data-nosnippet>672</a>                to.display()
+<a href=#673 id=673 data-nosnippet>673</a>            )
+<a href=#674 id=674 data-nosnippet>674</a>        }),
+<a href=#675 id=675 data-nosnippet>675</a>    }
+<a href=#676 id=676 data-nosnippet>676</a>}
+<a href=#677 id=677 data-nosnippet>677</a>
+<a href=#678 id=678 data-nosnippet>678</a><span class="doccomment">/// Get file or directory metadata
+<a href=#679 id=679 data-nosnippet>679</a>///
+<a href=#680 id=680 data-nosnippet>680</a>/// Returns detailed metadata about a file or directory including size,
+<a href=#681 id=681 data-nosnippet>681</a>/// timestamps, and permissions.
+<a href=#682 id=682 data-nosnippet>682</a>///
+<a href=#683 id=683 data-nosnippet>683</a>/// # Examples
+<a href=#684 id=684 data-nosnippet>684</a>///
+<a href=#685 id=685 data-nosnippet>685</a>/// ```rust,no_run
+<a href=#686 id=686 data-nosnippet>686</a>/// use llmspell_utils::file_utils::get_metadata;
+<a href=#687 id=687 data-nosnippet>687</a>/// use std::path::Path;
+<a href=#688 id=688 data-nosnippet>688</a>///
+<a href=#689 id=689 data-nosnippet>689</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#690 id=690 data-nosnippet>690</a>/// let metadata = get_metadata(Path::new("/tmp/file.txt"))?;
+<a href=#691 id=691 data-nosnippet>691</a>/// println!("File size: {} bytes", metadata.size);
+<a href=#692 id=692 data-nosnippet>692</a>/// println!("Is directory: {}", metadata.is_dir);
+<a href=#693 id=693 data-nosnippet>693</a>/// # Ok(())
+<a href=#694 id=694 data-nosnippet>694</a>/// # }
+<a href=#695 id=695 data-nosnippet>695</a>/// ```
+<a href=#696 id=696 data-nosnippet>696</a>///
+<a href=#697 id=697 data-nosnippet>697</a>/// # Errors
+<a href=#698 id=698 data-nosnippet>698</a>///
+<a href=#699 id=699 data-nosnippet>699</a>/// Returns an error if:
+<a href=#700 id=700 data-nosnippet>700</a>/// - Path does not exist
+<a href=#701 id=701 data-nosnippet>701</a>/// - Insufficient permissions to read metadata
+<a href=#702 id=702 data-nosnippet>702</a>/// - I/O error occurs
+<a href=#703 id=703 data-nosnippet>703</a></span><span class="attr">#[derive(Debug, Clone, PartialEq, Eq)]
+<a href=#704 id=704 data-nosnippet>704</a>#[allow(clippy::struct_excessive_bools)] </span><span class="comment">// These are all essential metadata fields
+<a href=#705 id=705 data-nosnippet>705</a></span><span class="kw">pub struct </span>FileMetadata {
+<a href=#706 id=706 data-nosnippet>706</a>    <span class="doccomment">/// File or directory size in bytes
+<a href=#707 id=707 data-nosnippet>707</a>    </span><span class="kw">pub </span>size: u64,
+<a href=#708 id=708 data-nosnippet>708</a>    <span class="doccomment">/// Whether this is a directory
+<a href=#709 id=709 data-nosnippet>709</a>    </span><span class="kw">pub </span>is_dir: bool,
+<a href=#710 id=710 data-nosnippet>710</a>    <span class="doccomment">/// Whether this is a regular file
+<a href=#711 id=711 data-nosnippet>711</a>    </span><span class="kw">pub </span>is_file: bool,
+<a href=#712 id=712 data-nosnippet>712</a>    <span class="doccomment">/// Whether this is a symbolic link
+<a href=#713 id=713 data-nosnippet>713</a>    </span><span class="kw">pub </span>is_symlink: bool,
+<a href=#714 id=714 data-nosnippet>714</a>    <span class="doccomment">/// Whether the file is read-only
+<a href=#715 id=715 data-nosnippet>715</a>    </span><span class="kw">pub </span>readonly: bool,
+<a href=#716 id=716 data-nosnippet>716</a>    <span class="doccomment">/// Creation time (platform-dependent, may not be available)
+<a href=#717 id=717 data-nosnippet>717</a>    </span><span class="kw">pub </span>created: <span class="prelude-ty">Option</span>&lt;std::time::SystemTime&gt;,
+<a href=#718 id=718 data-nosnippet>718</a>    <span class="doccomment">/// Last modification time
+<a href=#719 id=719 data-nosnippet>719</a>    </span><span class="kw">pub </span>modified: <span class="prelude-ty">Option</span>&lt;std::time::SystemTime&gt;,
+<a href=#720 id=720 data-nosnippet>720</a>    <span class="doccomment">/// Last access time (may not be reliable on all systems)
+<a href=#721 id=721 data-nosnippet>721</a>    </span><span class="kw">pub </span>accessed: <span class="prelude-ty">Option</span>&lt;std::time::SystemTime&gt;,
+<a href=#722 id=722 data-nosnippet>722</a>}
+<a href=#723 id=723 data-nosnippet>723</a>
+<a href=#724 id=724 data-nosnippet>724</a><span class="doccomment">/// Get file or directory metadata
+<a href=#725 id=725 data-nosnippet>725</a>///
+<a href=#726 id=726 data-nosnippet>726</a>/// Returns detailed metadata about a file or directory.
+<a href=#727 id=727 data-nosnippet>727</a>///
+<a href=#728 id=728 data-nosnippet>728</a>/// # Examples
+<a href=#729 id=729 data-nosnippet>729</a>///
+<a href=#730 id=730 data-nosnippet>730</a>/// ```rust,no_run
+<a href=#731 id=731 data-nosnippet>731</a>/// use llmspell_utils::file_utils::get_metadata;
+<a href=#732 id=732 data-nosnippet>732</a>/// use std::path::Path;
+<a href=#733 id=733 data-nosnippet>733</a>///
+<a href=#734 id=734 data-nosnippet>734</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#735 id=735 data-nosnippet>735</a>/// let metadata = get_metadata(Path::new("/tmp/file.txt"))?;
+<a href=#736 id=736 data-nosnippet>736</a>/// println!("File size: {} bytes", metadata.size);
+<a href=#737 id=737 data-nosnippet>737</a>/// # Ok(())
+<a href=#738 id=738 data-nosnippet>738</a>/// # }
+<a href=#739 id=739 data-nosnippet>739</a>/// ```
+<a href=#740 id=740 data-nosnippet>740</a>///
+<a href=#741 id=741 data-nosnippet>741</a>/// # Errors
+<a href=#742 id=742 data-nosnippet>742</a>///
+<a href=#743 id=743 data-nosnippet>743</a>/// Returns an error if:
+<a href=#744 id=744 data-nosnippet>744</a>/// - Path does not exist
+<a href=#745 id=745 data-nosnippet>745</a>/// - Insufficient permissions
+<a href=#746 id=746 data-nosnippet>746</a>/// - I/O error occurs
+<a href=#747 id=747 data-nosnippet>747</a></span><span class="kw">pub fn </span>get_metadata(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;FileMetadata&gt; {
+<a href=#748 id=748 data-nosnippet>748</a>    <span class="kw">let </span>metadata = fs::metadata(path)
+<a href=#749 id=749 data-nosnippet>749</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to get metadata for: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#750 id=750 data-nosnippet>750</a>
+<a href=#751 id=751 data-nosnippet>751</a>    <span class="prelude-val">Ok</span>(FileMetadata {
+<a href=#752 id=752 data-nosnippet>752</a>        size: metadata.len(),
+<a href=#753 id=753 data-nosnippet>753</a>        is_dir: metadata.is_dir(),
+<a href=#754 id=754 data-nosnippet>754</a>        is_file: metadata.is_file(),
+<a href=#755 id=755 data-nosnippet>755</a>        is_symlink: metadata.is_symlink(),
+<a href=#756 id=756 data-nosnippet>756</a>        readonly: metadata.permissions().readonly(),
+<a href=#757 id=757 data-nosnippet>757</a>        created: metadata.created().ok(),
+<a href=#758 id=758 data-nosnippet>758</a>        modified: metadata.modified().ok(),
+<a href=#759 id=759 data-nosnippet>759</a>        accessed: metadata.accessed().ok(),
+<a href=#760 id=760 data-nosnippet>760</a>    })
+<a href=#761 id=761 data-nosnippet>761</a>}
+<a href=#762 id=762 data-nosnippet>762</a>
+<a href=#763 id=763 data-nosnippet>763</a><span class="doccomment">/// Check if a file or directory exists
+<a href=#764 id=764 data-nosnippet>764</a>///
+<a href=#765 id=765 data-nosnippet>765</a>/// # Examples
+<a href=#766 id=766 data-nosnippet>766</a>///
+<a href=#767 id=767 data-nosnippet>767</a>/// ```rust
+<a href=#768 id=768 data-nosnippet>768</a>/// use llmspell_utils::file_utils::file_exists;
+<a href=#769 id=769 data-nosnippet>769</a>/// use std::path::Path;
+<a href=#770 id=770 data-nosnippet>770</a>///
+<a href=#771 id=771 data-nosnippet>771</a>/// assert!(!file_exists(Path::new("/tmp/nonexistent.txt")));
+<a href=#772 id=772 data-nosnippet>772</a>/// ```
+<a href=#773 id=773 data-nosnippet>773</a></span><span class="attr">#[must_use]
+<a href=#774 id=774 data-nosnippet>774</a></span><span class="kw">pub fn </span>file_exists(path: <span class="kw-2">&amp;</span>Path) -&gt; bool {
+<a href=#775 id=775 data-nosnippet>775</a>    path.exists()
+<a href=#776 id=776 data-nosnippet>776</a>}
+<a href=#777 id=777 data-nosnippet>777</a>
+<a href=#778 id=778 data-nosnippet>778</a><span class="doccomment">/// List directory contents with metadata
+<a href=#779 id=779 data-nosnippet>779</a>///
+<a href=#780 id=780 data-nosnippet>780</a>/// Returns a vector of directory entries with basic metadata.
+<a href=#781 id=781 data-nosnippet>781</a>/// Entries are sorted alphabetically by name.
+<a href=#782 id=782 data-nosnippet>782</a>///
+<a href=#783 id=783 data-nosnippet>783</a>/// # Examples
+<a href=#784 id=784 data-nosnippet>784</a>///
+<a href=#785 id=785 data-nosnippet>785</a>/// ```rust,no_run
+<a href=#786 id=786 data-nosnippet>786</a>/// use llmspell_utils::file_utils::list_dir;
+<a href=#787 id=787 data-nosnippet>787</a>/// use std::path::Path;
+<a href=#788 id=788 data-nosnippet>788</a>///
+<a href=#789 id=789 data-nosnippet>789</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#790 id=790 data-nosnippet>790</a>/// let entries = list_dir(Path::new("/tmp"))?;
+<a href=#791 id=791 data-nosnippet>791</a>/// for entry in entries {
+<a href=#792 id=792 data-nosnippet>792</a>///     println!("{}: {} bytes", entry.name, entry.size);
+<a href=#793 id=793 data-nosnippet>793</a>/// }
+<a href=#794 id=794 data-nosnippet>794</a>/// # Ok(())
+<a href=#795 id=795 data-nosnippet>795</a>/// # }
+<a href=#796 id=796 data-nosnippet>796</a>/// ```
+<a href=#797 id=797 data-nosnippet>797</a>///
+<a href=#798 id=798 data-nosnippet>798</a>/// # Errors
+<a href=#799 id=799 data-nosnippet>799</a>///
+<a href=#800 id=800 data-nosnippet>800</a>/// Returns an error if:
+<a href=#801 id=801 data-nosnippet>801</a>/// - Path is not a directory
+<a href=#802 id=802 data-nosnippet>802</a>/// - Insufficient permissions
+<a href=#803 id=803 data-nosnippet>803</a>/// - I/O error occurs
+<a href=#804 id=804 data-nosnippet>804</a></span><span class="attr">#[derive(Debug, Clone)]
+<a href=#805 id=805 data-nosnippet>805</a></span><span class="kw">pub struct </span>DirEntry {
+<a href=#806 id=806 data-nosnippet>806</a>    <span class="doccomment">/// File or directory name (not full path)
+<a href=#807 id=807 data-nosnippet>807</a>    </span><span class="kw">pub </span>name: String,
+<a href=#808 id=808 data-nosnippet>808</a>    <span class="doccomment">/// Full path to the entry
+<a href=#809 id=809 data-nosnippet>809</a>    </span><span class="kw">pub </span>path: PathBuf,
+<a href=#810 id=810 data-nosnippet>810</a>    <span class="doccomment">/// File size in bytes
+<a href=#811 id=811 data-nosnippet>811</a>    </span><span class="kw">pub </span>size: u64,
+<a href=#812 id=812 data-nosnippet>812</a>    <span class="doccomment">/// Whether this is a directory
+<a href=#813 id=813 data-nosnippet>813</a>    </span><span class="kw">pub </span>is_dir: bool,
+<a href=#814 id=814 data-nosnippet>814</a>    <span class="doccomment">/// Whether this is a regular file
+<a href=#815 id=815 data-nosnippet>815</a>    </span><span class="kw">pub </span>is_file: bool,
+<a href=#816 id=816 data-nosnippet>816</a>    <span class="doccomment">/// Whether this is a symbolic link
+<a href=#817 id=817 data-nosnippet>817</a>    </span><span class="kw">pub </span>is_symlink: bool,
+<a href=#818 id=818 data-nosnippet>818</a>    <span class="doccomment">/// Last modification time
+<a href=#819 id=819 data-nosnippet>819</a>    </span><span class="kw">pub </span>modified: <span class="prelude-ty">Option</span>&lt;std::time::SystemTime&gt;,
+<a href=#820 id=820 data-nosnippet>820</a>}
+<a href=#821 id=821 data-nosnippet>821</a>
+<a href=#822 id=822 data-nosnippet>822</a><span class="doccomment">/// List directory contents with metadata
+<a href=#823 id=823 data-nosnippet>823</a>///
+<a href=#824 id=824 data-nosnippet>824</a>/// Returns a vector of directory entries sorted alphabetically.
+<a href=#825 id=825 data-nosnippet>825</a>///
+<a href=#826 id=826 data-nosnippet>826</a>/// # Examples
+<a href=#827 id=827 data-nosnippet>827</a>///
+<a href=#828 id=828 data-nosnippet>828</a>/// ```rust,no_run
+<a href=#829 id=829 data-nosnippet>829</a>/// use llmspell_utils::file_utils::list_dir;
+<a href=#830 id=830 data-nosnippet>830</a>/// use std::path::Path;
+<a href=#831 id=831 data-nosnippet>831</a>///
+<a href=#832 id=832 data-nosnippet>832</a>/// # fn main() -&gt; Result&lt;(), Box&lt;dyn std::error::Error&gt;&gt; {
+<a href=#833 id=833 data-nosnippet>833</a>/// let entries = list_dir(Path::new("/tmp"))?;
+<a href=#834 id=834 data-nosnippet>834</a>/// for entry in entries {
+<a href=#835 id=835 data-nosnippet>835</a>///     println!("{}: {} bytes", entry.name, entry.size);
+<a href=#836 id=836 data-nosnippet>836</a>/// }
+<a href=#837 id=837 data-nosnippet>837</a>/// # Ok(())
+<a href=#838 id=838 data-nosnippet>838</a>/// # }
+<a href=#839 id=839 data-nosnippet>839</a>/// ```
+<a href=#840 id=840 data-nosnippet>840</a>///
+<a href=#841 id=841 data-nosnippet>841</a>/// # Errors
+<a href=#842 id=842 data-nosnippet>842</a>///
+<a href=#843 id=843 data-nosnippet>843</a>/// Returns an error if:
+<a href=#844 id=844 data-nosnippet>844</a>/// - Path is not a directory
+<a href=#845 id=845 data-nosnippet>845</a>/// - Insufficient permissions
+<a href=#846 id=846 data-nosnippet>846</a>/// - I/O error occurs
+<a href=#847 id=847 data-nosnippet>847</a></span><span class="kw">pub fn </span>list_dir(path: <span class="kw-2">&amp;</span>Path) -&gt; <span class="prelude-ty">Result</span>&lt;Vec&lt;DirEntry&gt;&gt; {
+<a href=#848 id=848 data-nosnippet>848</a>    <span class="kw">let </span><span class="kw-2">mut </span>entries = Vec::new();
+<a href=#849 id=849 data-nosnippet>849</a>
+<a href=#850 id=850 data-nosnippet>850</a>    <span class="kw">let </span>dir = fs::read_dir(path)
+<a href=#851 id=851 data-nosnippet>851</a>        .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to read directory: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#852 id=852 data-nosnippet>852</a>
+<a href=#853 id=853 data-nosnippet>853</a>    <span class="kw">for </span>entry <span class="kw">in </span>dir {
+<a href=#854 id=854 data-nosnippet>854</a>        <span class="kw">let </span>entry = entry
+<a href=#855 id=855 data-nosnippet>855</a>            .with_context(|| <span class="macro">format!</span>(<span class="string">"Failed to read directory entry in: {}"</span>, path.display()))<span class="question-mark">?</span>;
+<a href=#856 id=856 data-nosnippet>856</a>
+<a href=#857 id=857 data-nosnippet>857</a>        <span class="kw">let </span>file_name = entry.file_name();
+<a href=#858 id=858 data-nosnippet>858</a>        <span class="kw">let </span>file_name_str = file_name.to_string_lossy().to_string();
+<a href=#859 id=859 data-nosnippet>859</a>        <span class="kw">let </span>entry_path = entry.path();
+<a href=#860 id=860 data-nosnippet>860</a>
+<a href=#861 id=861 data-nosnippet>861</a>        <span class="comment">// Get metadata - if it fails, create minimal entry
+<a href=#862 id=862 data-nosnippet>862</a>        </span><span class="kw">let </span>(size, is_dir, is_file, is_symlink, modified) = <span class="kw">match </span>entry.metadata() {
+<a href=#863 id=863 data-nosnippet>863</a>            <span class="prelude-val">Ok</span>(metadata) =&gt; (
+<a href=#864 id=864 data-nosnippet>864</a>                metadata.len(),
+<a href=#865 id=865 data-nosnippet>865</a>                metadata.is_dir(),
+<a href=#866 id=866 data-nosnippet>866</a>                metadata.is_file(),
+<a href=#867 id=867 data-nosnippet>867</a>                metadata.is_symlink(),
+<a href=#868 id=868 data-nosnippet>868</a>                metadata.modified().ok(),
+<a href=#869 id=869 data-nosnippet>869</a>            ),
+<a href=#870 id=870 data-nosnippet>870</a>            <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; (<span class="number">0</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="bool-val">false</span>, <span class="prelude-val">None</span>),
+<a href=#871 id=871 data-nosnippet>871</a>        };
+<a href=#872 id=872 data-nosnippet>872</a>
+<a href=#873 id=873 data-nosnippet>873</a>        entries.push(DirEntry {
+<a href=#874 id=874 data-nosnippet>874</a>            name: file_name_str,
+<a href=#875 id=875 data-nosnippet>875</a>            path: entry_path,
+<a href=#876 id=876 data-nosnippet>876</a>            size,
+<a href=#877 id=877 data-nosnippet>877</a>            is_dir,
+<a href=#878 id=878 data-nosnippet>878</a>            is_file,
+<a href=#879 id=879 data-nosnippet>879</a>            is_symlink,
+<a href=#880 id=880 data-nosnippet>880</a>            modified,
+<a href=#881 id=881 data-nosnippet>881</a>        });
+<a href=#882 id=882 data-nosnippet>882</a>    }
+<a href=#883 id=883 data-nosnippet>883</a>
+<a href=#884 id=884 data-nosnippet>884</a>    <span class="comment">// Sort entries by name
+<a href=#885 id=885 data-nosnippet>885</a>    </span>entries.sort_by(|a, b| a.name.cmp(<span class="kw-2">&amp;</span>b.name));
+<a href=#886 id=886 data-nosnippet>886</a>
+<a href=#887 id=887 data-nosnippet>887</a>    <span class="prelude-val">Ok</span>(entries)
+<a href=#888 id=888 data-nosnippet>888</a>}
+<a href=#889 id=889 data-nosnippet>889</a>
+<a href=#890 id=890 data-nosnippet>890</a><span class="attr">#[cfg(test)]
+<a href=#891 id=891 data-nosnippet>891</a></span><span class="kw">mod </span>tests {
+<a href=#892 id=892 data-nosnippet>892</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#893 id=893 data-nosnippet>893</a>    <span class="kw">use </span>std::env;
+<a href=#894 id=894 data-nosnippet>894</a>    <span class="kw">use </span>std::fs;
+<a href=#895 id=895 data-nosnippet>895</a>    <span class="attr">#[test]
+<a href=#896 id=896 data-nosnippet>896</a>    </span><span class="kw">fn </span>test_normalize_path() {
+<a href=#897 id=897 data-nosnippet>897</a>        <span class="comment">// Test basic normalization
+<a href=#898 id=898 data-nosnippet>898</a>        </span><span class="kw">let </span>path = normalize_path(Path::new(<span class="string">"/home/user/../user/./docs"</span>));
+<a href=#899 id=899 data-nosnippet>899</a>        <span class="macro">assert_eq!</span>(path, Path::new(<span class="string">"/home/user/docs"</span>));
+<a href=#900 id=900 data-nosnippet>900</a>
+<a href=#901 id=901 data-nosnippet>901</a>        <span class="comment">// Test with multiple dots
+<a href=#902 id=902 data-nosnippet>902</a>        </span><span class="kw">let </span>path = normalize_path(Path::new(<span class="string">"./foo/./bar/../baz"</span>));
+<a href=#903 id=903 data-nosnippet>903</a>        <span class="macro">assert_eq!</span>(path, Path::new(<span class="string">"foo/baz"</span>));
+<a href=#904 id=904 data-nosnippet>904</a>
+<a href=#905 id=905 data-nosnippet>905</a>        <span class="comment">// Test with trailing slash
+<a href=#906 id=906 data-nosnippet>906</a>        </span><span class="kw">let </span>path = normalize_path(Path::new(<span class="string">"/home/user/"</span>));
+<a href=#907 id=907 data-nosnippet>907</a>        <span class="macro">assert_eq!</span>(path, Path::new(<span class="string">"/home/user"</span>));
+<a href=#908 id=908 data-nosnippet>908</a>    }
+<a href=#909 id=909 data-nosnippet>909</a>    <span class="attr">#[test]
+<a href=#910 id=910 data-nosnippet>910</a>    </span><span class="kw">fn </span>test_is_absolute_path() {
+<a href=#911 id=911 data-nosnippet>911</a>        <span class="macro">assert!</span>(is_absolute_path(Path::new(<span class="string">"/home/user"</span>)));
+<a href=#912 id=912 data-nosnippet>912</a>        <span class="macro">assert!</span>(!is_absolute_path(Path::new(<span class="string">"relative/path"</span>)));
+<a href=#913 id=913 data-nosnippet>913</a>        <span class="macro">assert!</span>(!is_absolute_path(Path::new(<span class="string">"./relative"</span>)));
+<a href=#914 id=914 data-nosnippet>914</a>        <span class="macro">assert!</span>(!is_absolute_path(Path::new(<span class="string">"../parent"</span>)));
+<a href=#915 id=915 data-nosnippet>915</a>    }
+<a href=#916 id=916 data-nosnippet>916</a>    <span class="attr">#[test]
+<a href=#917 id=917 data-nosnippet>917</a>    </span><span class="kw">fn </span>test_join_paths() {
+<a href=#918 id=918 data-nosnippet>918</a>        <span class="comment">// Basic join
+<a href=#919 id=919 data-nosnippet>919</a>        </span><span class="kw">let </span>joined = join_paths(<span class="kw-2">&amp;</span>[Path::new(<span class="string">"/home"</span>), Path::new(<span class="string">"user"</span>), Path::new(<span class="string">"docs"</span>)]);
+<a href=#920 id=920 data-nosnippet>920</a>        <span class="macro">assert_eq!</span>(joined, Path::new(<span class="string">"/home/user/docs"</span>));
+<a href=#921 id=921 data-nosnippet>921</a>
+<a href=#922 id=922 data-nosnippet>922</a>        <span class="comment">// Join with absolute path in middle (should reset)
+<a href=#923 id=923 data-nosnippet>923</a>        </span><span class="kw">let </span>joined = join_paths(<span class="kw-2">&amp;</span>[Path::new(<span class="string">"/home"</span>), Path::new(<span class="string">"/usr"</span>), Path::new(<span class="string">"bin"</span>)]);
+<a href=#924 id=924 data-nosnippet>924</a>        <span class="macro">assert_eq!</span>(joined, Path::new(<span class="string">"/usr/bin"</span>));
+<a href=#925 id=925 data-nosnippet>925</a>
+<a href=#926 id=926 data-nosnippet>926</a>        <span class="comment">// Join with empty components
+<a href=#927 id=927 data-nosnippet>927</a>        </span><span class="kw">let </span>joined = join_paths(<span class="kw-2">&amp;</span>[Path::new(<span class="string">"/home"</span>), Path::new(<span class="string">""</span>), Path::new(<span class="string">"user"</span>)]);
+<a href=#928 id=928 data-nosnippet>928</a>        <span class="macro">assert_eq!</span>(joined, Path::new(<span class="string">"/home/user"</span>));
+<a href=#929 id=929 data-nosnippet>929</a>    }
+<a href=#930 id=930 data-nosnippet>930</a>    <span class="attr">#[test]
+<a href=#931 id=931 data-nosnippet>931</a>    </span><span class="kw">fn </span>test_parent_dir() {
+<a href=#932 id=932 data-nosnippet>932</a>        <span class="macro">assert_eq!</span>(
+<a href=#933 id=933 data-nosnippet>933</a>            parent_dir(Path::new(<span class="string">"/home/user/file.txt"</span>)),
+<a href=#934 id=934 data-nosnippet>934</a>            <span class="prelude-val">Some</span>(Path::new(<span class="string">"/home/user"</span>).to_path_buf())
+<a href=#935 id=935 data-nosnippet>935</a>        );
+<a href=#936 id=936 data-nosnippet>936</a>
+<a href=#937 id=937 data-nosnippet>937</a>        <span class="macro">assert_eq!</span>(
+<a href=#938 id=938 data-nosnippet>938</a>            parent_dir(Path::new(<span class="string">"/home"</span>)),
+<a href=#939 id=939 data-nosnippet>939</a>            <span class="prelude-val">Some</span>(Path::new(<span class="string">"/"</span>).to_path_buf())
+<a href=#940 id=940 data-nosnippet>940</a>        );
+<a href=#941 id=941 data-nosnippet>941</a>
+<a href=#942 id=942 data-nosnippet>942</a>        <span class="comment">// Root has no parent
+<a href=#943 id=943 data-nosnippet>943</a>        </span><span class="macro">assert_eq!</span>(parent_dir(Path::new(<span class="string">"/"</span>)), <span class="prelude-val">None</span>);
+<a href=#944 id=944 data-nosnippet>944</a>    }
+<a href=#945 id=945 data-nosnippet>945</a>    <span class="attr">#[test]
+<a href=#946 id=946 data-nosnippet>946</a>    </span><span class="kw">fn </span>test_expand_path_tilde() {
+<a href=#947 id=947 data-nosnippet>947</a>        <span class="comment">// Set HOME for consistent testing
+<a href=#948 id=948 data-nosnippet>948</a>        </span><span class="kw">let </span>original_home = env::var(<span class="string">"HOME"</span>).ok();
+<a href=#949 id=949 data-nosnippet>949</a>        env::set_var(<span class="string">"HOME"</span>, <span class="string">"/test/home"</span>);
+<a href=#950 id=950 data-nosnippet>950</a>
+<a href=#951 id=951 data-nosnippet>951</a>        <span class="macro">assert_eq!</span>(expand_path(<span class="string">"~"</span>).unwrap(), Path::new(<span class="string">"/test/home"</span>));
+<a href=#952 id=952 data-nosnippet>952</a>
+<a href=#953 id=953 data-nosnippet>953</a>        <span class="macro">assert_eq!</span>(
+<a href=#954 id=954 data-nosnippet>954</a>            expand_path(<span class="string">"~/Documents"</span>).unwrap(),
+<a href=#955 id=955 data-nosnippet>955</a>            Path::new(<span class="string">"/test/home/Documents"</span>)
+<a href=#956 id=956 data-nosnippet>956</a>        );
+<a href=#957 id=957 data-nosnippet>957</a>
+<a href=#958 id=958 data-nosnippet>958</a>        <span class="comment">// Restore original HOME
+<a href=#959 id=959 data-nosnippet>959</a>        </span><span class="kw">if let </span><span class="prelude-val">Some</span>(home) = original_home {
+<a href=#960 id=960 data-nosnippet>960</a>            env::set_var(<span class="string">"HOME"</span>, home);
+<a href=#961 id=961 data-nosnippet>961</a>        } <span class="kw">else </span>{
+<a href=#962 id=962 data-nosnippet>962</a>            env::remove_var(<span class="string">"HOME"</span>);
+<a href=#963 id=963 data-nosnippet>963</a>        }
+<a href=#964 id=964 data-nosnippet>964</a>    }
+<a href=#965 id=965 data-nosnippet>965</a>    <span class="attr">#[test]
+<a href=#966 id=966 data-nosnippet>966</a>    </span><span class="kw">fn </span>test_expand_path_env_vars() {
+<a href=#967 id=967 data-nosnippet>967</a>        <span class="comment">// Set test environment variable
+<a href=#968 id=968 data-nosnippet>968</a>        </span>env::set_var(<span class="string">"TEST_VAR"</span>, <span class="string">"/test/path"</span>);
+<a href=#969 id=969 data-nosnippet>969</a>
+<a href=#970 id=970 data-nosnippet>970</a>        <span class="comment">// Test $VAR syntax
+<a href=#971 id=971 data-nosnippet>971</a>        </span><span class="macro">assert_eq!</span>(
+<a href=#972 id=972 data-nosnippet>972</a>            expand_path(<span class="string">"$TEST_VAR/file.txt"</span>).unwrap(),
+<a href=#973 id=973 data-nosnippet>973</a>            Path::new(<span class="string">"/test/path/file.txt"</span>)
+<a href=#974 id=974 data-nosnippet>974</a>        );
+<a href=#975 id=975 data-nosnippet>975</a>
+<a href=#976 id=976 data-nosnippet>976</a>        <span class="comment">// Test ${VAR} syntax
+<a href=#977 id=977 data-nosnippet>977</a>        </span><span class="macro">assert_eq!</span>(
+<a href=#978 id=978 data-nosnippet>978</a>            expand_path(<span class="string">"${TEST_VAR}/file.txt"</span>).unwrap(),
+<a href=#979 id=979 data-nosnippet>979</a>            Path::new(<span class="string">"/test/path/file.txt"</span>)
+<a href=#980 id=980 data-nosnippet>980</a>        );
+<a href=#981 id=981 data-nosnippet>981</a>
+<a href=#982 id=982 data-nosnippet>982</a>        <span class="comment">// Test missing variable
+<a href=#983 id=983 data-nosnippet>983</a>        </span><span class="macro">assert!</span>(expand_path(<span class="string">"$NONEXISTENT_VAR/file.txt"</span>).is_err());
+<a href=#984 id=984 data-nosnippet>984</a>
+<a href=#985 id=985 data-nosnippet>985</a>        <span class="comment">// Cleanup
+<a href=#986 id=986 data-nosnippet>986</a>        </span>env::remove_var(<span class="string">"TEST_VAR"</span>);
+<a href=#987 id=987 data-nosnippet>987</a>    }
+<a href=#988 id=988 data-nosnippet>988</a>    <span class="attr">#[test]
+<a href=#989 id=989 data-nosnippet>989</a>    </span><span class="kw">fn </span>test_ensure_dir() {
+<a href=#990 id=990 data-nosnippet>990</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#991 id=991 data-nosnippet>991</a>        <span class="kw">let </span>test_dir = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#992 id=992 data-nosnippet>992</a>
+<a href=#993 id=993 data-nosnippet>993</a>        <span class="comment">// Test creating new directory
+<a href=#994 id=994 data-nosnippet>994</a>        </span><span class="macro">assert!</span>(ensure_dir(<span class="kw-2">&amp;</span>test_dir).is_ok());
+<a href=#995 id=995 data-nosnippet>995</a>        <span class="macro">assert!</span>(test_dir.exists());
+<a href=#996 id=996 data-nosnippet>996</a>        <span class="macro">assert!</span>(test_dir.is_dir());
+<a href=#997 id=997 data-nosnippet>997</a>
+<a href=#998 id=998 data-nosnippet>998</a>        <span class="comment">// Test calling on existing directory (should be no-op)
+<a href=#999 id=999 data-nosnippet>999</a>        </span><span class="macro">assert!</span>(ensure_dir(<span class="kw-2">&amp;</span>test_dir).is_ok());
+<a href=#1000 id=1000 data-nosnippet>1000</a>
+<a href=#1001 id=1001 data-nosnippet>1001</a>        <span class="comment">// Test with nested directories
+<a href=#1002 id=1002 data-nosnippet>1002</a>        </span><span class="kw">let </span>nested = test_dir.join(<span class="string">"a/b/c"</span>);
+<a href=#1003 id=1003 data-nosnippet>1003</a>        <span class="macro">assert!</span>(ensure_dir(<span class="kw-2">&amp;</span>nested).is_ok());
+<a href=#1004 id=1004 data-nosnippet>1004</a>        <span class="macro">assert!</span>(nested.exists());
+<a href=#1005 id=1005 data-nosnippet>1005</a>
+<a href=#1006 id=1006 data-nosnippet>1006</a>        <span class="comment">// Cleanup
+<a href=#1007 id=1007 data-nosnippet>1007</a>        </span><span class="kw">let _ </span>= fs::remove_dir_all(<span class="kw-2">&amp;</span>test_dir);
+<a href=#1008 id=1008 data-nosnippet>1008</a>    }
+<a href=#1009 id=1009 data-nosnippet>1009</a>    <span class="attr">#[test]
+<a href=#1010 id=1010 data-nosnippet>1010</a>    </span><span class="kw">fn </span>test_ensure_dir_file_exists() {
+<a href=#1011 id=1011 data-nosnippet>1011</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1012 id=1012 data-nosnippet>1012</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_file_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1013 id=1013 data-nosnippet>1013</a>
+<a href=#1014 id=1014 data-nosnippet>1014</a>        <span class="comment">// Create a file
+<a href=#1015 id=1015 data-nosnippet>1015</a>        </span>fs::write(<span class="kw-2">&amp;</span>test_file, <span class="string">"test"</span>).unwrap();
+<a href=#1016 id=1016 data-nosnippet>1016</a>
+<a href=#1017 id=1017 data-nosnippet>1017</a>        <span class="comment">// Try to ensure_dir on a file (should fail)
+<a href=#1018 id=1018 data-nosnippet>1018</a>        </span><span class="kw">let </span>result = ensure_dir(<span class="kw-2">&amp;</span>test_file);
+<a href=#1019 id=1019 data-nosnippet>1019</a>        <span class="macro">assert!</span>(result.is_err());
+<a href=#1020 id=1020 data-nosnippet>1020</a>        <span class="macro">assert_eq!</span>(result.unwrap_err().kind(), io::ErrorKind::AlreadyExists);
+<a href=#1021 id=1021 data-nosnippet>1021</a>
+<a href=#1022 id=1022 data-nosnippet>1022</a>        <span class="comment">// Cleanup
+<a href=#1023 id=1023 data-nosnippet>1023</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>test_file);
+<a href=#1024 id=1024 data-nosnippet>1024</a>    }
+<a href=#1025 id=1025 data-nosnippet>1025</a>    <span class="attr">#[test]
+<a href=#1026 id=1026 data-nosnippet>1026</a>    </span><span class="kw">fn </span>test_read_write_file() {
+<a href=#1027 id=1027 data-nosnippet>1027</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1028 id=1028 data-nosnippet>1028</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_rw_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1029 id=1029 data-nosnippet>1029</a>
+<a href=#1030 id=1030 data-nosnippet>1030</a>        <span class="kw">let </span>data = <span class="string">b"Hello, world!"</span>;
+<a href=#1031 id=1031 data-nosnippet>1031</a>
+<a href=#1032 id=1032 data-nosnippet>1032</a>        <span class="comment">// Test write
+<a href=#1033 id=1033 data-nosnippet>1033</a>        </span><span class="macro">assert!</span>(write_file(<span class="kw-2">&amp;</span>test_file, data).is_ok());
+<a href=#1034 id=1034 data-nosnippet>1034</a>        <span class="macro">assert!</span>(test_file.exists());
+<a href=#1035 id=1035 data-nosnippet>1035</a>
+<a href=#1036 id=1036 data-nosnippet>1036</a>        <span class="comment">// Test read
+<a href=#1037 id=1037 data-nosnippet>1037</a>        </span><span class="kw">let </span>read_data = read_file(<span class="kw-2">&amp;</span>test_file).unwrap();
+<a href=#1038 id=1038 data-nosnippet>1038</a>        <span class="macro">assert_eq!</span>(read_data, data);
+<a href=#1039 id=1039 data-nosnippet>1039</a>
+<a href=#1040 id=1040 data-nosnippet>1040</a>        <span class="comment">// Cleanup
+<a href=#1041 id=1041 data-nosnippet>1041</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>test_file);
+<a href=#1042 id=1042 data-nosnippet>1042</a>    }
+<a href=#1043 id=1043 data-nosnippet>1043</a>    <span class="attr">#[test]
+<a href=#1044 id=1044 data-nosnippet>1044</a>    </span><span class="kw">fn </span>test_write_file_creates_parent_dirs() {
+<a href=#1045 id=1045 data-nosnippet>1045</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1046 id=1046 data-nosnippet>1046</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(
+<a href=#1047 id=1047 data-nosnippet>1047</a>            <span class="string">"llmspell_test_{}/nested/file.txt"</span>,
+<a href=#1048 id=1048 data-nosnippet>1048</a>            uuid::Uuid::new_v4()
+<a href=#1049 id=1049 data-nosnippet>1049</a>        ));
+<a href=#1050 id=1050 data-nosnippet>1050</a>
+<a href=#1051 id=1051 data-nosnippet>1051</a>        <span class="kw">let </span>data = <span class="string">b"Test data"</span>;
+<a href=#1052 id=1052 data-nosnippet>1052</a>
+<a href=#1053 id=1053 data-nosnippet>1053</a>        <span class="comment">// Parent directories don't exist yet
+<a href=#1054 id=1054 data-nosnippet>1054</a>        </span><span class="macro">assert!</span>(!test_file.parent().unwrap().exists());
+<a href=#1055 id=1055 data-nosnippet>1055</a>
+<a href=#1056 id=1056 data-nosnippet>1056</a>        <span class="comment">// Write should create parent directories
+<a href=#1057 id=1057 data-nosnippet>1057</a>        </span><span class="macro">assert!</span>(write_file(<span class="kw-2">&amp;</span>test_file, data).is_ok());
+<a href=#1058 id=1058 data-nosnippet>1058</a>        <span class="macro">assert!</span>(test_file.exists());
+<a href=#1059 id=1059 data-nosnippet>1059</a>
+<a href=#1060 id=1060 data-nosnippet>1060</a>        <span class="comment">// Verify content
+<a href=#1061 id=1061 data-nosnippet>1061</a>        </span><span class="kw">let </span>read_data = read_file(<span class="kw-2">&amp;</span>test_file).unwrap();
+<a href=#1062 id=1062 data-nosnippet>1062</a>        <span class="macro">assert_eq!</span>(read_data, data);
+<a href=#1063 id=1063 data-nosnippet>1063</a>
+<a href=#1064 id=1064 data-nosnippet>1064</a>        <span class="comment">// Cleanup
+<a href=#1065 id=1065 data-nosnippet>1065</a>        </span><span class="kw">let _ </span>= fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
+<a href=#1066 id=1066 data-nosnippet>1066</a>    }
+<a href=#1067 id=1067 data-nosnippet>1067</a>    <span class="attr">#[test]
+<a href=#1068 id=1068 data-nosnippet>1068</a>    </span><span class="kw">fn </span>test_atomic_write() {
+<a href=#1069 id=1069 data-nosnippet>1069</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1070 id=1070 data-nosnippet>1070</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_atomic_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1071 id=1071 data-nosnippet>1071</a>
+<a href=#1072 id=1072 data-nosnippet>1072</a>        <span class="kw">let </span>data1 = <span class="string">b"Initial data"</span>;
+<a href=#1073 id=1073 data-nosnippet>1073</a>        <span class="kw">let </span>data2 = <span class="string">b"Updated data"</span>;
+<a href=#1074 id=1074 data-nosnippet>1074</a>
+<a href=#1075 id=1075 data-nosnippet>1075</a>        <span class="comment">// Initial write
+<a href=#1076 id=1076 data-nosnippet>1076</a>        </span><span class="macro">assert!</span>(write_file_atomic(<span class="kw-2">&amp;</span>test_file, data1).is_ok());
+<a href=#1077 id=1077 data-nosnippet>1077</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>test_file).unwrap(), data1);
+<a href=#1078 id=1078 data-nosnippet>1078</a>
+<a href=#1079 id=1079 data-nosnippet>1079</a>        <span class="comment">// Atomic update
+<a href=#1080 id=1080 data-nosnippet>1080</a>        </span><span class="macro">assert!</span>(write_file_atomic(<span class="kw-2">&amp;</span>test_file, data2).is_ok());
+<a href=#1081 id=1081 data-nosnippet>1081</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>test_file).unwrap(), data2);
+<a href=#1082 id=1082 data-nosnippet>1082</a>
+<a href=#1083 id=1083 data-nosnippet>1083</a>        <span class="comment">// Verify no temp files remain
+<a href=#1084 id=1084 data-nosnippet>1084</a>        </span><span class="kw">let </span>parent = test_file.parent().unwrap();
+<a href=#1085 id=1085 data-nosnippet>1085</a>        <span class="kw">for </span>entry <span class="kw">in </span>fs::read_dir(parent).unwrap() {
+<a href=#1086 id=1086 data-nosnippet>1086</a>            <span class="kw">let </span>entry = entry.unwrap();
+<a href=#1087 id=1087 data-nosnippet>1087</a>            <span class="kw">let </span>name = entry.file_name();
+<a href=#1088 id=1088 data-nosnippet>1088</a>            <span class="kw">let </span>name_str = name.to_string_lossy();
+<a href=#1089 id=1089 data-nosnippet>1089</a>            <span class="macro">assert!</span>(!name_str.contains(<span class="string">".tmp."</span>), <span class="string">"Found temp file: {name_str}"</span>);
+<a href=#1090 id=1090 data-nosnippet>1090</a>        }
+<a href=#1091 id=1091 data-nosnippet>1091</a>
+<a href=#1092 id=1092 data-nosnippet>1092</a>        <span class="comment">// Cleanup
+<a href=#1093 id=1093 data-nosnippet>1093</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>test_file);
+<a href=#1094 id=1094 data-nosnippet>1094</a>    }
+<a href=#1095 id=1095 data-nosnippet>1095</a>    <span class="attr">#[test]
+<a href=#1096 id=1096 data-nosnippet>1096</a>    </span><span class="kw">fn </span>test_copy_file() {
+<a href=#1097 id=1097 data-nosnippet>1097</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1098 id=1098 data-nosnippet>1098</a>        <span class="kw">let </span>source = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_src_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1099 id=1099 data-nosnippet>1099</a>        <span class="kw">let </span>dest = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_dst_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1100 id=1100 data-nosnippet>1100</a>
+<a href=#1101 id=1101 data-nosnippet>1101</a>        <span class="kw">let </span>data = <span class="string">b"Test data for copy"</span>;
+<a href=#1102 id=1102 data-nosnippet>1102</a>
+<a href=#1103 id=1103 data-nosnippet>1103</a>        <span class="comment">// Create source file
+<a href=#1104 id=1104 data-nosnippet>1104</a>        </span>write_file(<span class="kw-2">&amp;</span>source, data).unwrap();
+<a href=#1105 id=1105 data-nosnippet>1105</a>
+<a href=#1106 id=1106 data-nosnippet>1106</a>        <span class="comment">// Copy file
+<a href=#1107 id=1107 data-nosnippet>1107</a>        </span><span class="kw">let </span>bytes_copied = copy_file(<span class="kw-2">&amp;</span>source, <span class="kw-2">&amp;</span>dest).unwrap();
+<a href=#1108 id=1108 data-nosnippet>1108</a>        <span class="macro">assert_eq!</span>(bytes_copied, data.len() <span class="kw">as </span>u64);
+<a href=#1109 id=1109 data-nosnippet>1109</a>
+<a href=#1110 id=1110 data-nosnippet>1110</a>        <span class="comment">// Verify destination
+<a href=#1111 id=1111 data-nosnippet>1111</a>        </span><span class="macro">assert!</span>(dest.exists());
+<a href=#1112 id=1112 data-nosnippet>1112</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>dest).unwrap(), data);
+<a href=#1113 id=1113 data-nosnippet>1113</a>
+<a href=#1114 id=1114 data-nosnippet>1114</a>        <span class="comment">// Cleanup
+<a href=#1115 id=1115 data-nosnippet>1115</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>source);
+<a href=#1116 id=1116 data-nosnippet>1116</a>        <span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>dest);
+<a href=#1117 id=1117 data-nosnippet>1117</a>    }
+<a href=#1118 id=1118 data-nosnippet>1118</a>    <span class="attr">#[test]
+<a href=#1119 id=1119 data-nosnippet>1119</a>    </span><span class="kw">fn </span>test_remove_file_if_exists() {
+<a href=#1120 id=1120 data-nosnippet>1120</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1121 id=1121 data-nosnippet>1121</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_rm_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1122 id=1122 data-nosnippet>1122</a>
+<a href=#1123 id=1123 data-nosnippet>1123</a>        <span class="comment">// Remove non-existent file (should succeed)
+<a href=#1124 id=1124 data-nosnippet>1124</a>        </span><span class="macro">assert!</span>(remove_file_if_exists(<span class="kw-2">&amp;</span>test_file).is_ok());
+<a href=#1125 id=1125 data-nosnippet>1125</a>
+<a href=#1126 id=1126 data-nosnippet>1126</a>        <span class="comment">// Create and remove file
+<a href=#1127 id=1127 data-nosnippet>1127</a>        </span>write_file(<span class="kw-2">&amp;</span>test_file, <span class="string">b"test"</span>).unwrap();
+<a href=#1128 id=1128 data-nosnippet>1128</a>        <span class="macro">assert!</span>(test_file.exists());
+<a href=#1129 id=1129 data-nosnippet>1129</a>        <span class="macro">assert!</span>(remove_file_if_exists(<span class="kw-2">&amp;</span>test_file).is_ok());
+<a href=#1130 id=1130 data-nosnippet>1130</a>        <span class="macro">assert!</span>(!test_file.exists());
+<a href=#1131 id=1131 data-nosnippet>1131</a>
+<a href=#1132 id=1132 data-nosnippet>1132</a>        <span class="comment">// Remove again (should still succeed)
+<a href=#1133 id=1133 data-nosnippet>1133</a>        </span><span class="macro">assert!</span>(remove_file_if_exists(<span class="kw-2">&amp;</span>test_file).is_ok());
+<a href=#1134 id=1134 data-nosnippet>1134</a>    }
+<a href=#1135 id=1135 data-nosnippet>1135</a>    <span class="attr">#[test]
+<a href=#1136 id=1136 data-nosnippet>1136</a>    </span><span class="kw">fn </span>test_remove_dir_all_if_exists() {
+<a href=#1137 id=1137 data-nosnippet>1137</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1138 id=1138 data-nosnippet>1138</a>        <span class="kw">let </span>test_dir = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_rmdir_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1139 id=1139 data-nosnippet>1139</a>
+<a href=#1140 id=1140 data-nosnippet>1140</a>        <span class="comment">// Remove non-existent directory (should succeed)
+<a href=#1141 id=1141 data-nosnippet>1141</a>        </span><span class="macro">assert!</span>(remove_dir_all_if_exists(<span class="kw-2">&amp;</span>test_dir).is_ok());
+<a href=#1142 id=1142 data-nosnippet>1142</a>
+<a href=#1143 id=1143 data-nosnippet>1143</a>        <span class="comment">// Create directory with contents
+<a href=#1144 id=1144 data-nosnippet>1144</a>        </span><span class="kw">let </span>nested = test_dir.join(<span class="string">"nested"</span>);
+<a href=#1145 id=1145 data-nosnippet>1145</a>        ensure_dir(<span class="kw-2">&amp;</span>nested).unwrap();
+<a href=#1146 id=1146 data-nosnippet>1146</a>        write_file(<span class="kw-2">&amp;</span>nested.join(<span class="string">"file.txt"</span>), <span class="string">b"test"</span>).unwrap();
+<a href=#1147 id=1147 data-nosnippet>1147</a>
+<a href=#1148 id=1148 data-nosnippet>1148</a>        <span class="macro">assert!</span>(test_dir.exists());
+<a href=#1149 id=1149 data-nosnippet>1149</a>        <span class="macro">assert!</span>(remove_dir_all_if_exists(<span class="kw-2">&amp;</span>test_dir).is_ok());
+<a href=#1150 id=1150 data-nosnippet>1150</a>        <span class="macro">assert!</span>(!test_dir.exists());
+<a href=#1151 id=1151 data-nosnippet>1151</a>
+<a href=#1152 id=1152 data-nosnippet>1152</a>        <span class="comment">// Remove again (should still succeed)
+<a href=#1153 id=1153 data-nosnippet>1153</a>        </span><span class="macro">assert!</span>(remove_dir_all_if_exists(<span class="kw-2">&amp;</span>test_dir).is_ok());
+<a href=#1154 id=1154 data-nosnippet>1154</a>    }
+<a href=#1155 id=1155 data-nosnippet>1155</a>    <span class="attr">#[test]
+<a href=#1156 id=1156 data-nosnippet>1156</a>    </span><span class="kw">fn </span>test_append_file() {
+<a href=#1157 id=1157 data-nosnippet>1157</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1158 id=1158 data-nosnippet>1158</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_append_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1159 id=1159 data-nosnippet>1159</a>
+<a href=#1160 id=1160 data-nosnippet>1160</a>        <span class="comment">// Append to non-existent file (should create it)
+<a href=#1161 id=1161 data-nosnippet>1161</a>        </span><span class="macro">assert!</span>(append_file(<span class="kw-2">&amp;</span>test_file, <span class="string">b"Hello"</span>).is_ok());
+<a href=#1162 id=1162 data-nosnippet>1162</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>test_file).unwrap(), <span class="string">b"Hello"</span>);
+<a href=#1163 id=1163 data-nosnippet>1163</a>
+<a href=#1164 id=1164 data-nosnippet>1164</a>        <span class="comment">// Append to existing file
+<a href=#1165 id=1165 data-nosnippet>1165</a>        </span><span class="macro">assert!</span>(append_file(<span class="kw-2">&amp;</span>test_file, <span class="string">b" World"</span>).is_ok());
+<a href=#1166 id=1166 data-nosnippet>1166</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>test_file).unwrap(), <span class="string">b"Hello World"</span>);
+<a href=#1167 id=1167 data-nosnippet>1167</a>
+<a href=#1168 id=1168 data-nosnippet>1168</a>        <span class="comment">// Append with newline
+<a href=#1169 id=1169 data-nosnippet>1169</a>        </span><span class="macro">assert!</span>(append_file(<span class="kw-2">&amp;</span>test_file, <span class="string">b"\nNew line"</span>).is_ok());
+<a href=#1170 id=1170 data-nosnippet>1170</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>test_file).unwrap(), <span class="string">b"Hello World\nNew line"</span>);
+<a href=#1171 id=1171 data-nosnippet>1171</a>
+<a href=#1172 id=1172 data-nosnippet>1172</a>        <span class="comment">// Cleanup
+<a href=#1173 id=1173 data-nosnippet>1173</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>test_file);
+<a href=#1174 id=1174 data-nosnippet>1174</a>    }
+<a href=#1175 id=1175 data-nosnippet>1175</a>    <span class="attr">#[test]
+<a href=#1176 id=1176 data-nosnippet>1176</a>    </span><span class="kw">fn </span>test_append_file_creates_parent_dirs() {
+<a href=#1177 id=1177 data-nosnippet>1177</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1178 id=1178 data-nosnippet>1178</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(
+<a href=#1179 id=1179 data-nosnippet>1179</a>            <span class="string">"llmspell_test_{}/nested/append.txt"</span>,
+<a href=#1180 id=1180 data-nosnippet>1180</a>            uuid::Uuid::new_v4()
+<a href=#1181 id=1181 data-nosnippet>1181</a>        ));
+<a href=#1182 id=1182 data-nosnippet>1182</a>
+<a href=#1183 id=1183 data-nosnippet>1183</a>        <span class="comment">// Parent directories don't exist yet
+<a href=#1184 id=1184 data-nosnippet>1184</a>        </span><span class="macro">assert!</span>(!test_file.parent().unwrap().exists());
+<a href=#1185 id=1185 data-nosnippet>1185</a>
+<a href=#1186 id=1186 data-nosnippet>1186</a>        <span class="comment">// Append should create parent directories
+<a href=#1187 id=1187 data-nosnippet>1187</a>        </span><span class="macro">assert!</span>(append_file(<span class="kw-2">&amp;</span>test_file, <span class="string">b"Test"</span>).is_ok());
+<a href=#1188 id=1188 data-nosnippet>1188</a>        <span class="macro">assert!</span>(test_file.exists());
+<a href=#1189 id=1189 data-nosnippet>1189</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>test_file).unwrap(), <span class="string">b"Test"</span>);
+<a href=#1190 id=1190 data-nosnippet>1190</a>
+<a href=#1191 id=1191 data-nosnippet>1191</a>        <span class="comment">// Cleanup
+<a href=#1192 id=1192 data-nosnippet>1192</a>        </span><span class="kw">let _ </span>= fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
+<a href=#1193 id=1193 data-nosnippet>1193</a>    }
+<a href=#1194 id=1194 data-nosnippet>1194</a>    <span class="attr">#[test]
+<a href=#1195 id=1195 data-nosnippet>1195</a>    </span><span class="kw">fn </span>test_move_file() {
+<a href=#1196 id=1196 data-nosnippet>1196</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1197 id=1197 data-nosnippet>1197</a>        <span class="kw">let </span>source = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_src_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1198 id=1198 data-nosnippet>1198</a>        <span class="kw">let </span>dest = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_dst_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1199 id=1199 data-nosnippet>1199</a>
+<a href=#1200 id=1200 data-nosnippet>1200</a>        <span class="kw">let </span>data = <span class="string">b"Test data for move"</span>;
+<a href=#1201 id=1201 data-nosnippet>1201</a>
+<a href=#1202 id=1202 data-nosnippet>1202</a>        <span class="comment">// Create source file
+<a href=#1203 id=1203 data-nosnippet>1203</a>        </span>write_file(<span class="kw-2">&amp;</span>source, data).unwrap();
+<a href=#1204 id=1204 data-nosnippet>1204</a>        <span class="macro">assert!</span>(source.exists());
+<a href=#1205 id=1205 data-nosnippet>1205</a>
+<a href=#1206 id=1206 data-nosnippet>1206</a>        <span class="comment">// Move file
+<a href=#1207 id=1207 data-nosnippet>1207</a>        </span><span class="macro">assert!</span>(move_file(<span class="kw-2">&amp;</span>source, <span class="kw-2">&amp;</span>dest).is_ok());
+<a href=#1208 id=1208 data-nosnippet>1208</a>
+<a href=#1209 id=1209 data-nosnippet>1209</a>        <span class="comment">// Verify move
+<a href=#1210 id=1210 data-nosnippet>1210</a>        </span><span class="macro">assert!</span>(!source.exists(), <span class="string">"Source file should not exist after move"</span>);
+<a href=#1211 id=1211 data-nosnippet>1211</a>        <span class="macro">assert!</span>(dest.exists(), <span class="string">"Destination file should exist after move"</span>);
+<a href=#1212 id=1212 data-nosnippet>1212</a>        <span class="macro">assert_eq!</span>(read_file(<span class="kw-2">&amp;</span>dest).unwrap(), data);
+<a href=#1213 id=1213 data-nosnippet>1213</a>
+<a href=#1214 id=1214 data-nosnippet>1214</a>        <span class="comment">// Cleanup
+<a href=#1215 id=1215 data-nosnippet>1215</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>dest);
+<a href=#1216 id=1216 data-nosnippet>1216</a>    }
+<a href=#1217 id=1217 data-nosnippet>1217</a>    <span class="attr">#[test]
+<a href=#1218 id=1218 data-nosnippet>1218</a>    </span><span class="kw">fn </span>test_move_file_creates_parent_dirs() {
+<a href=#1219 id=1219 data-nosnippet>1219</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1220 id=1220 data-nosnippet>1220</a>        <span class="kw">let </span>source = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_src_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1221 id=1221 data-nosnippet>1221</a>        <span class="kw">let </span>dest = temp_dir.join(<span class="macro">format!</span>(
+<a href=#1222 id=1222 data-nosnippet>1222</a>            <span class="string">"llmspell_test_{}/nested/moved.txt"</span>,
+<a href=#1223 id=1223 data-nosnippet>1223</a>            uuid::Uuid::new_v4()
+<a href=#1224 id=1224 data-nosnippet>1224</a>        ));
+<a href=#1225 id=1225 data-nosnippet>1225</a>
+<a href=#1226 id=1226 data-nosnippet>1226</a>        <span class="comment">// Create source file
+<a href=#1227 id=1227 data-nosnippet>1227</a>        </span>write_file(<span class="kw-2">&amp;</span>source, <span class="string">b"test"</span>).unwrap();
+<a href=#1228 id=1228 data-nosnippet>1228</a>
+<a href=#1229 id=1229 data-nosnippet>1229</a>        <span class="comment">// Parent directories don't exist yet
+<a href=#1230 id=1230 data-nosnippet>1230</a>        </span><span class="macro">assert!</span>(!dest.parent().unwrap().exists());
+<a href=#1231 id=1231 data-nosnippet>1231</a>
+<a href=#1232 id=1232 data-nosnippet>1232</a>        <span class="comment">// Move should create parent directories
+<a href=#1233 id=1233 data-nosnippet>1233</a>        </span><span class="macro">assert!</span>(move_file(<span class="kw-2">&amp;</span>source, <span class="kw-2">&amp;</span>dest).is_ok());
+<a href=#1234 id=1234 data-nosnippet>1234</a>        <span class="macro">assert!</span>(!source.exists());
+<a href=#1235 id=1235 data-nosnippet>1235</a>        <span class="macro">assert!</span>(dest.exists());
+<a href=#1236 id=1236 data-nosnippet>1236</a>
+<a href=#1237 id=1237 data-nosnippet>1237</a>        <span class="comment">// Cleanup
+<a href=#1238 id=1238 data-nosnippet>1238</a>        </span><span class="kw">let _ </span>= fs::remove_dir_all(dest.parent().unwrap().parent().unwrap());
+<a href=#1239 id=1239 data-nosnippet>1239</a>    }
+<a href=#1240 id=1240 data-nosnippet>1240</a>    <span class="attr">#[test]
+<a href=#1241 id=1241 data-nosnippet>1241</a>    </span><span class="kw">fn </span>test_get_metadata() {
+<a href=#1242 id=1242 data-nosnippet>1242</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1243 id=1243 data-nosnippet>1243</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_meta_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1244 id=1244 data-nosnippet>1244</a>        <span class="kw">let </span>test_dir = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_metadir_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1245 id=1245 data-nosnippet>1245</a>
+<a href=#1246 id=1246 data-nosnippet>1246</a>        <span class="comment">// Test file metadata
+<a href=#1247 id=1247 data-nosnippet>1247</a>        </span><span class="kw">let </span>data = <span class="string">b"Test content"</span>;
+<a href=#1248 id=1248 data-nosnippet>1248</a>        write_file(<span class="kw-2">&amp;</span>test_file, data).unwrap();
+<a href=#1249 id=1249 data-nosnippet>1249</a>
+<a href=#1250 id=1250 data-nosnippet>1250</a>        <span class="kw">let </span>metadata = get_metadata(<span class="kw-2">&amp;</span>test_file).unwrap();
+<a href=#1251 id=1251 data-nosnippet>1251</a>        <span class="macro">assert_eq!</span>(metadata.size, data.len() <span class="kw">as </span>u64);
+<a href=#1252 id=1252 data-nosnippet>1252</a>        <span class="macro">assert!</span>(metadata.is_file);
+<a href=#1253 id=1253 data-nosnippet>1253</a>        <span class="macro">assert!</span>(!metadata.is_dir);
+<a href=#1254 id=1254 data-nosnippet>1254</a>        <span class="macro">assert!</span>(!metadata.is_symlink);
+<a href=#1255 id=1255 data-nosnippet>1255</a>        <span class="macro">assert!</span>(metadata.modified.is_some());
+<a href=#1256 id=1256 data-nosnippet>1256</a>
+<a href=#1257 id=1257 data-nosnippet>1257</a>        <span class="comment">// Test directory metadata
+<a href=#1258 id=1258 data-nosnippet>1258</a>        </span>ensure_dir(<span class="kw-2">&amp;</span>test_dir).unwrap();
+<a href=#1259 id=1259 data-nosnippet>1259</a>        <span class="kw">let </span>dir_metadata = get_metadata(<span class="kw-2">&amp;</span>test_dir).unwrap();
+<a href=#1260 id=1260 data-nosnippet>1260</a>        <span class="macro">assert!</span>(dir_metadata.is_dir);
+<a href=#1261 id=1261 data-nosnippet>1261</a>        <span class="macro">assert!</span>(!dir_metadata.is_file);
+<a href=#1262 id=1262 data-nosnippet>1262</a>
+<a href=#1263 id=1263 data-nosnippet>1263</a>        <span class="comment">// Cleanup
+<a href=#1264 id=1264 data-nosnippet>1264</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>test_file);
+<a href=#1265 id=1265 data-nosnippet>1265</a>        <span class="kw">let _ </span>= fs::remove_dir(<span class="kw-2">&amp;</span>test_dir);
+<a href=#1266 id=1266 data-nosnippet>1266</a>    }
+<a href=#1267 id=1267 data-nosnippet>1267</a>    <span class="attr">#[test]
+<a href=#1268 id=1268 data-nosnippet>1268</a>    </span><span class="kw">fn </span>test_file_exists() {
+<a href=#1269 id=1269 data-nosnippet>1269</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1270 id=1270 data-nosnippet>1270</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_exists_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1271 id=1271 data-nosnippet>1271</a>
+<a href=#1272 id=1272 data-nosnippet>1272</a>        <span class="comment">// File doesn't exist
+<a href=#1273 id=1273 data-nosnippet>1273</a>        </span><span class="macro">assert!</span>(!file_exists(<span class="kw-2">&amp;</span>test_file));
+<a href=#1274 id=1274 data-nosnippet>1274</a>
+<a href=#1275 id=1275 data-nosnippet>1275</a>        <span class="comment">// Create file
+<a href=#1276 id=1276 data-nosnippet>1276</a>        </span>write_file(<span class="kw-2">&amp;</span>test_file, <span class="string">b"test"</span>).unwrap();
+<a href=#1277 id=1277 data-nosnippet>1277</a>        <span class="macro">assert!</span>(file_exists(<span class="kw-2">&amp;</span>test_file));
+<a href=#1278 id=1278 data-nosnippet>1278</a>
+<a href=#1279 id=1279 data-nosnippet>1279</a>        <span class="comment">// Remove file
+<a href=#1280 id=1280 data-nosnippet>1280</a>        </span>fs::remove_file(<span class="kw-2">&amp;</span>test_file).unwrap();
+<a href=#1281 id=1281 data-nosnippet>1281</a>        <span class="macro">assert!</span>(!file_exists(<span class="kw-2">&amp;</span>test_file));
+<a href=#1282 id=1282 data-nosnippet>1282</a>    }
+<a href=#1283 id=1283 data-nosnippet>1283</a>    <span class="attr">#[test]
+<a href=#1284 id=1284 data-nosnippet>1284</a>    </span><span class="kw">fn </span>test_list_dir() {
+<a href=#1285 id=1285 data-nosnippet>1285</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1286 id=1286 data-nosnippet>1286</a>        <span class="kw">let </span>test_dir = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_list_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1287 id=1287 data-nosnippet>1287</a>
+<a href=#1288 id=1288 data-nosnippet>1288</a>        <span class="comment">// Create test directory structure
+<a href=#1289 id=1289 data-nosnippet>1289</a>        </span>ensure_dir(<span class="kw-2">&amp;</span>test_dir).unwrap();
+<a href=#1290 id=1290 data-nosnippet>1290</a>        write_file(<span class="kw-2">&amp;</span>test_dir.join(<span class="string">"file1.txt"</span>), <span class="string">b"content1"</span>).unwrap();
+<a href=#1291 id=1291 data-nosnippet>1291</a>        write_file(<span class="kw-2">&amp;</span>test_dir.join(<span class="string">"file2.txt"</span>), <span class="string">b"content22"</span>).unwrap();
+<a href=#1292 id=1292 data-nosnippet>1292</a>        ensure_dir(<span class="kw-2">&amp;</span>test_dir.join(<span class="string">"subdir"</span>)).unwrap();
+<a href=#1293 id=1293 data-nosnippet>1293</a>        write_file(<span class="kw-2">&amp;</span>test_dir.join(<span class="string">"subdir/nested.txt"</span>), <span class="string">b"nested"</span>).unwrap();
+<a href=#1294 id=1294 data-nosnippet>1294</a>
+<a href=#1295 id=1295 data-nosnippet>1295</a>        <span class="comment">// List directory
+<a href=#1296 id=1296 data-nosnippet>1296</a>        </span><span class="kw">let </span>entries = list_dir(<span class="kw-2">&amp;</span>test_dir).unwrap();
+<a href=#1297 id=1297 data-nosnippet>1297</a>
+<a href=#1298 id=1298 data-nosnippet>1298</a>        <span class="comment">// Verify entries (should be sorted alphabetically)
+<a href=#1299 id=1299 data-nosnippet>1299</a>        </span><span class="macro">assert_eq!</span>(entries.len(), <span class="number">3</span>);
+<a href=#1300 id=1300 data-nosnippet>1300</a>
+<a href=#1301 id=1301 data-nosnippet>1301</a>        <span class="macro">assert_eq!</span>(entries[<span class="number">0</span>].name, <span class="string">"file1.txt"</span>);
+<a href=#1302 id=1302 data-nosnippet>1302</a>        <span class="macro">assert!</span>(entries[<span class="number">0</span>].is_file);
+<a href=#1303 id=1303 data-nosnippet>1303</a>        <span class="macro">assert!</span>(!entries[<span class="number">0</span>].is_dir);
+<a href=#1304 id=1304 data-nosnippet>1304</a>        <span class="macro">assert_eq!</span>(entries[<span class="number">0</span>].size, <span class="number">8</span>); <span class="comment">// "content1"
+<a href=#1305 id=1305 data-nosnippet>1305</a>
+<a href=#1306 id=1306 data-nosnippet>1306</a>        </span><span class="macro">assert_eq!</span>(entries[<span class="number">1</span>].name, <span class="string">"file2.txt"</span>);
+<a href=#1307 id=1307 data-nosnippet>1307</a>        <span class="macro">assert!</span>(entries[<span class="number">1</span>].is_file);
+<a href=#1308 id=1308 data-nosnippet>1308</a>        <span class="macro">assert_eq!</span>(entries[<span class="number">1</span>].size, <span class="number">9</span>); <span class="comment">// "content22"
+<a href=#1309 id=1309 data-nosnippet>1309</a>
+<a href=#1310 id=1310 data-nosnippet>1310</a>        </span><span class="macro">assert_eq!</span>(entries[<span class="number">2</span>].name, <span class="string">"subdir"</span>);
+<a href=#1311 id=1311 data-nosnippet>1311</a>        <span class="macro">assert!</span>(entries[<span class="number">2</span>].is_dir);
+<a href=#1312 id=1312 data-nosnippet>1312</a>        <span class="macro">assert!</span>(!entries[<span class="number">2</span>].is_file);
+<a href=#1313 id=1313 data-nosnippet>1313</a>
+<a href=#1314 id=1314 data-nosnippet>1314</a>        <span class="comment">// All entries should have modification times
+<a href=#1315 id=1315 data-nosnippet>1315</a>        </span><span class="kw">for </span>entry <span class="kw">in </span><span class="kw-2">&amp;</span>entries {
+<a href=#1316 id=1316 data-nosnippet>1316</a>            <span class="macro">assert!</span>(entry.modified.is_some());
+<a href=#1317 id=1317 data-nosnippet>1317</a>        }
+<a href=#1318 id=1318 data-nosnippet>1318</a>
+<a href=#1319 id=1319 data-nosnippet>1319</a>        <span class="comment">// Cleanup
+<a href=#1320 id=1320 data-nosnippet>1320</a>        </span><span class="kw">let _ </span>= fs::remove_dir_all(<span class="kw-2">&amp;</span>test_dir);
+<a href=#1321 id=1321 data-nosnippet>1321</a>    }
+<a href=#1322 id=1322 data-nosnippet>1322</a>    <span class="attr">#[test]
+<a href=#1323 id=1323 data-nosnippet>1323</a>    </span><span class="kw">fn </span>test_list_empty_dir() {
+<a href=#1324 id=1324 data-nosnippet>1324</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1325 id=1325 data-nosnippet>1325</a>        <span class="kw">let </span>test_dir = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_empty_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1326 id=1326 data-nosnippet>1326</a>
+<a href=#1327 id=1327 data-nosnippet>1327</a>        ensure_dir(<span class="kw-2">&amp;</span>test_dir).unwrap();
+<a href=#1328 id=1328 data-nosnippet>1328</a>        <span class="kw">let </span>entries = list_dir(<span class="kw-2">&amp;</span>test_dir).unwrap();
+<a href=#1329 id=1329 data-nosnippet>1329</a>        <span class="macro">assert!</span>(entries.is_empty());
+<a href=#1330 id=1330 data-nosnippet>1330</a>
+<a href=#1331 id=1331 data-nosnippet>1331</a>        <span class="comment">// Cleanup
+<a href=#1332 id=1332 data-nosnippet>1332</a>        </span><span class="kw">let _ </span>= fs::remove_dir(<span class="kw-2">&amp;</span>test_dir);
+<a href=#1333 id=1333 data-nosnippet>1333</a>    }
+<a href=#1334 id=1334 data-nosnippet>1334</a>    <span class="attr">#[test]
+<a href=#1335 id=1335 data-nosnippet>1335</a>    </span><span class="kw">fn </span>test_list_dir_error() {
+<a href=#1336 id=1336 data-nosnippet>1336</a>        <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1337 id=1337 data-nosnippet>1337</a>        <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_test_notdir_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1338 id=1338 data-nosnippet>1338</a>
+<a href=#1339 id=1339 data-nosnippet>1339</a>        <span class="comment">// Create a file, not a directory
+<a href=#1340 id=1340 data-nosnippet>1340</a>        </span>write_file(<span class="kw-2">&amp;</span>test_file, <span class="string">b"test"</span>).unwrap();
+<a href=#1341 id=1341 data-nosnippet>1341</a>
+<a href=#1342 id=1342 data-nosnippet>1342</a>        <span class="comment">// Trying to list a file should fail
+<a href=#1343 id=1343 data-nosnippet>1343</a>        </span><span class="kw">let </span>result = list_dir(<span class="kw-2">&amp;</span>test_file);
+<a href=#1344 id=1344 data-nosnippet>1344</a>        <span class="macro">assert!</span>(result.is_err());
+<a href=#1345 id=1345 data-nosnippet>1345</a>
+<a href=#1346 id=1346 data-nosnippet>1346</a>        <span class="comment">// Cleanup
+<a href=#1347 id=1347 data-nosnippet>1347</a>        </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>test_file);
+<a href=#1348 id=1348 data-nosnippet>1348</a>    }
+<a href=#1349 id=1349 data-nosnippet>1349</a>
+<a href=#1350 id=1350 data-nosnippet>1350</a>    <span class="attr">#[cfg(unix)]
+<a href=#1351 id=1351 data-nosnippet>1351</a>    #[test]
+<a href=#1352 id=1352 data-nosnippet>1352</a>    </span><span class="kw">fn </span>test_unix_specific_paths() {
+<a href=#1353 id=1353 data-nosnippet>1353</a>        <span class="comment">// Test Unix-specific path handling
+<a href=#1354 id=1354 data-nosnippet>1354</a>        </span><span class="macro">assert!</span>(is_absolute_path(Path::new(<span class="string">"/usr/bin"</span>)));
+<a href=#1355 id=1355 data-nosnippet>1355</a>        <span class="macro">assert!</span>(is_absolute_path(Path::new(<span class="string">"/home/user/.config"</span>)));
+<a href=#1356 id=1356 data-nosnippet>1356</a>        <span class="macro">assert!</span>(!is_absolute_path(Path::new(<span class="string">"usr/bin"</span>)));
+<a href=#1357 id=1357 data-nosnippet>1357</a>    }
+<a href=#1358 id=1358 data-nosnippet>1358</a>
+<a href=#1359 id=1359 data-nosnippet>1359</a>    <span class="attr">#[cfg(windows)]
+<a href=#1360 id=1360 data-nosnippet>1360</a>    #[test]
+<a href=#1361 id=1361 data-nosnippet>1361</a>    </span><span class="kw">fn </span>test_windows_specific_paths() {
+<a href=#1362 id=1362 data-nosnippet>1362</a>        <span class="comment">// Test Windows-specific path handling
+<a href=#1363 id=1363 data-nosnippet>1363</a>        </span><span class="macro">assert!</span>(is_absolute_path(Path::new(<span class="string">"C:\\Windows"</span>)));
+<a href=#1364 id=1364 data-nosnippet>1364</a>        <span class="macro">assert!</span>(is_absolute_path(Path::new(<span class="string">"\\\\server\\share"</span>)));
+<a href=#1365 id=1365 data-nosnippet>1365</a>        <span class="macro">assert!</span>(!is_absolute_path(Path::new(<span class="string">"Windows\\System32"</span>)));
+<a href=#1366 id=1366 data-nosnippet>1366</a>
+<a href=#1367 id=1367 data-nosnippet>1367</a>        <span class="comment">// Test Windows environment variable syntax
+<a href=#1368 id=1368 data-nosnippet>1368</a>        </span>env::set_var(<span class="string">"WINTEST"</span>, <span class="string">"C:\\Test"</span>);
+<a href=#1369 id=1369 data-nosnippet>1369</a>        <span class="macro">assert_eq!</span>(
+<a href=#1370 id=1370 data-nosnippet>1370</a>            expand_path(<span class="string">"%WINTEST%\\file.txt"</span>).unwrap(),
+<a href=#1371 id=1371 data-nosnippet>1371</a>            Path::new(<span class="string">"C:\\Test\\file.txt"</span>)
+<a href=#1372 id=1372 data-nosnippet>1372</a>        );
+<a href=#1373 id=1373 data-nosnippet>1373</a>        env::remove_var(<span class="string">"WINTEST"</span>);
+<a href=#1374 id=1374 data-nosnippet>1374</a>    }
+<a href=#1375 id=1375 data-nosnippet>1375</a>}
+<a href=#1376 id=1376 data-nosnippet>1376</a>
+<a href=#1377 id=1377 data-nosnippet>1377</a><span class="attr">#[cfg(test)]
+<a href=#1378 id=1378 data-nosnippet>1378</a></span><span class="kw">mod </span>property_tests {
+<a href=#1379 id=1379 data-nosnippet>1379</a>    <span class="kw">use super</span>::<span class="kw-2">*</span>;
+<a href=#1380 id=1380 data-nosnippet>1380</a>    <span class="kw">use </span>proptest::prelude::<span class="kw-2">*</span>;
+<a href=#1381 id=1381 data-nosnippet>1381</a>
+<a href=#1382 id=1382 data-nosnippet>1382</a>    <span class="macro">proptest!</span> {
+<a href=#1383 id=1383 data-nosnippet>1383</a>        <span class="attr">#[test]
+<a href=#1384 id=1384 data-nosnippet>1384</a>        </span><span class="kw">fn </span>test_normalize_path_idempotent(path <span class="kw">in </span>prop::collection::vec(<span class="string">"[a-zA-Z0-9./\\-_]+"</span>, <span class="number">1</span>..<span class="number">10</span>)) {
+<a href=#1385 id=1385 data-nosnippet>1385</a>            <span class="kw">let </span>path_str = path.join(<span class="string">"/"</span>);
+<a href=#1386 id=1386 data-nosnippet>1386</a>            <span class="kw">let </span>path = Path::new(<span class="kw-2">&amp;</span>path_str);
+<a href=#1387 id=1387 data-nosnippet>1387</a>            <span class="kw">let </span>normalized = normalize_path(path);
+<a href=#1388 id=1388 data-nosnippet>1388</a>            <span class="kw">let </span>normalized_again = normalize_path(<span class="kw-2">&amp;</span>normalized);
+<a href=#1389 id=1389 data-nosnippet>1389</a>            <span class="macro">assert_eq!</span>(normalized, normalized_again);
+<a href=#1390 id=1390 data-nosnippet>1390</a>        }
+<a href=#1391 id=1391 data-nosnippet>1391</a>        <span class="attr">#[test]
+<a href=#1392 id=1392 data-nosnippet>1392</a>        </span><span class="kw">fn </span>test_join_paths_associative(
+<a href=#1393 id=1393 data-nosnippet>1393</a>            a <span class="kw">in </span><span class="string">"[a-zA-Z0-9]+"</span>,
+<a href=#1394 id=1394 data-nosnippet>1394</a>            b <span class="kw">in </span><span class="string">"[a-zA-Z0-9]+"</span>,
+<a href=#1395 id=1395 data-nosnippet>1395</a>            c <span class="kw">in </span><span class="string">"[a-zA-Z0-9]+"
+<a href=#1396 id=1396 data-nosnippet>1396</a>        </span>) {
+<a href=#1397 id=1397 data-nosnippet>1397</a>            <span class="kw">let </span>path_a = Path::new(<span class="kw-2">&amp;</span>a);
+<a href=#1398 id=1398 data-nosnippet>1398</a>            <span class="kw">let </span>path_b = Path::new(<span class="kw-2">&amp;</span>b);
+<a href=#1399 id=1399 data-nosnippet>1399</a>            <span class="kw">let </span>path_c = Path::new(<span class="kw-2">&amp;</span>c);
+<a href=#1400 id=1400 data-nosnippet>1400</a>
+<a href=#1401 id=1401 data-nosnippet>1401</a>            <span class="kw">let </span>result1 = join_paths(<span class="kw-2">&amp;</span>[<span class="kw-2">&amp;</span>join_paths(<span class="kw-2">&amp;</span>[path_a, path_b]), path_c]);
+<a href=#1402 id=1402 data-nosnippet>1402</a>            <span class="kw">let </span>result2 = join_paths(<span class="kw-2">&amp;</span>[path_a, <span class="kw-2">&amp;</span>join_paths(<span class="kw-2">&amp;</span>[path_b, path_c])]);
+<a href=#1403 id=1403 data-nosnippet>1403</a>            <span class="macro">assert_eq!</span>(result1, result2);
+<a href=#1404 id=1404 data-nosnippet>1404</a>        }
+<a href=#1405 id=1405 data-nosnippet>1405</a>        <span class="attr">#[test]
+<a href=#1406 id=1406 data-nosnippet>1406</a>        </span><span class="kw">fn </span>test_write_read_roundtrip(data: Vec&lt;u8&gt;) {
+<a href=#1407 id=1407 data-nosnippet>1407</a>            <span class="kw">let </span>temp_dir = std::env::temp_dir();
+<a href=#1408 id=1408 data-nosnippet>1408</a>            <span class="kw">let </span>test_file = temp_dir.join(<span class="macro">format!</span>(<span class="string">"llmspell_prop_{}"</span>, uuid::Uuid::new_v4()));
+<a href=#1409 id=1409 data-nosnippet>1409</a>
+<a href=#1410 id=1410 data-nosnippet>1410</a>            <span class="comment">// Skip if data is too large
+<a href=#1411 id=1411 data-nosnippet>1411</a>            </span><span class="kw">if </span>data.len() &gt; <span class="number">1_000_000 </span>{
+<a href=#1412 id=1412 data-nosnippet>1412</a>                <span class="kw">return </span><span class="prelude-val">Ok</span>(());
+<a href=#1413 id=1413 data-nosnippet>1413</a>            }
+<a href=#1414 id=1414 data-nosnippet>1414</a>
+<a href=#1415 id=1415 data-nosnippet>1415</a>            write_file(<span class="kw-2">&amp;</span>test_file, <span class="kw-2">&amp;</span>data).unwrap();
+<a href=#1416 id=1416 data-nosnippet>1416</a>            <span class="kw">let </span>read_data = read_file(<span class="kw-2">&amp;</span>test_file).unwrap();
+<a href=#1417 id=1417 data-nosnippet>1417</a>            <span class="macro">assert_eq!</span>(data, read_data);
+<a href=#1418 id=1418 data-nosnippet>1418</a>
+<a href=#1419 id=1419 data-nosnippet>1419</a>            <span class="comment">// Cleanup
+<a href=#1420 id=1420 data-nosnippet>1420</a>            </span><span class="kw">let _ </span>= fs::remove_file(<span class="kw-2">&amp;</span>test_file);
+<a href=#1421 id=1421 data-nosnippet>1421</a>        }
+<a href=#1422 id=1422 data-nosnippet>1422</a>    }
+<a href=#1423 id=1423 data-nosnippet>1423</a>}</code></pre></div></section></main></body></html>

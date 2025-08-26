@@ -8,7 +8,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-
 #[tokio::test]
 async fn test_circuit_breaker_basic_flow() {
     let config = CircuitBreakerConfig::new()
@@ -34,12 +33,7 @@ async fn test_circuit_breaker_basic_flow() {
     for _ in 0..3 {
         let result = breaker
             .execute(|| {
-                Box::pin(async {
-                    Err::<i32, _>(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        "simulated failure",
-                    ))
-                })
+                Box::pin(async { Err::<i32, _>(std::io::Error::other("simulated failure")) })
             })
             .await;
         assert!(result.is_err());
@@ -69,7 +63,6 @@ async fn test_circuit_breaker_basic_flow() {
     assert!(result.is_ok());
     assert_eq!(breaker.current_state().await, CircuitState::Closed);
 }
-
 #[tokio::test]
 async fn test_circuit_breaker_half_open_failure() {
     let config = CircuitBreakerConfig::new()
@@ -96,7 +89,6 @@ async fn test_circuit_breaker_half_open_failure() {
     breaker.record_failure().await;
     assert_eq!(breaker.current_state().await, CircuitState::Open);
 }
-
 #[tokio::test]
 async fn test_circuit_breaker_manager() {
     let manager = CircuitBreakerManager::default();
@@ -129,7 +121,6 @@ async fn test_circuit_breaker_manager() {
     assert!(metrics.contains_key("critical-api"));
     assert!(metrics.contains_key("high-volume-api"));
 }
-
 #[tokio::test]
 async fn test_circuit_breaker_concurrent_access() {
     let breaker = Arc::new(CircuitBreaker::new(
@@ -159,11 +150,7 @@ async fn test_circuit_breaker_concurrent_access() {
                 }
             } else {
                 let result = breaker
-                    .execute(|| {
-                        Box::pin(async {
-                            Err::<i32, _>(std::io::Error::new(std::io::ErrorKind::Other, "failure"))
-                        })
-                    })
+                    .execute(|| Box::pin(async { Err::<i32, _>(std::io::Error::other("failure")) }))
                     .await;
                 if result.is_err() {
                     failure_count.fetch_add(1, Ordering::SeqCst);
@@ -186,7 +173,6 @@ async fn test_circuit_breaker_concurrent_access() {
         success_count.load(Ordering::SeqCst) as u64 + failure_count.load(Ordering::SeqCst) as u64
     );
 }
-
 #[tokio::test]
 async fn test_circuit_breaker_alert_handler() {
     let alerts = Arc::new(RwLock::new(Vec::<String>::new()));
@@ -214,7 +200,6 @@ async fn test_circuit_breaker_alert_handler() {
     assert_eq!(alerts.len(), 1);
     assert!(alerts[0].contains("Circuit opened"));
 }
-
 #[tokio::test]
 async fn test_service_presets() {
     // Test HTTP API preset
@@ -232,7 +217,6 @@ async fn test_service_presets() {
     assert_eq!(critical_config.failure_threshold_count, 2);
     assert_eq!(critical_config.reset_timeout, Duration::from_secs(300));
 }
-
 #[tokio::test]
 async fn test_circuit_breaker_metrics() {
     let breaker = CircuitBreaker::new(
@@ -268,7 +252,6 @@ async fn test_circuit_breaker_metrics() {
     assert!(metrics.success_rate() > 95.0);
     assert!(metrics.is_healthy());
 }
-
 #[tokio::test]
 async fn test_force_state() {
     let breaker = CircuitBreaker::new(CircuitBreakerConfig::default());
@@ -287,7 +270,6 @@ async fn test_force_state() {
     breaker.force_state(CircuitState::Closed).await;
     assert_eq!(breaker.current_state().await, CircuitState::Closed);
 }
-
 #[tokio::test]
 async fn test_open_circuits_tracking() {
     let manager = CircuitBreakerManager::default();

@@ -602,7 +602,6 @@ impl Default for EventCorrelator {
 mod tests {
     use super::*;
     use crate::ComponentType;
-
     #[test]
     fn test_correlation_id_creation() {
         let id1 = CorrelationId::new();
@@ -611,7 +610,6 @@ mod tests {
         assert_ne!(id1, id2);
         assert!(!id1.to_string().is_empty());
     }
-
     #[test]
     fn test_correlation_id_child() {
         let parent = CorrelationId::new();
@@ -622,7 +620,6 @@ mod tests {
         let child2 = parent.create_child();
         assert_ne!(child, child2);
     }
-
     #[tokio::test]
     async fn test_correlator_creation() {
         let correlator = EventCorrelator::new();
@@ -634,7 +631,6 @@ mod tests {
         assert_eq!(traces.len(), 1);
         assert_eq!(traces[0].correlation_id, correlation_id);
     }
-
     #[tokio::test]
     async fn test_event_recording() {
         let correlator = EventCorrelator::new();
@@ -663,7 +659,6 @@ mod tests {
         assert_eq!(trace.events[0].component_id, component_id);
         assert_eq!(trace.events[0].message, "Test event");
     }
-
     #[tokio::test]
     async fn test_chain_trace() {
         let correlator = EventCorrelator::new();
@@ -723,7 +718,6 @@ mod tests {
             Some(&"cross_component".to_string())
         );
     }
-
     #[tokio::test]
     async fn test_trace_completion() {
         let correlator = EventCorrelator::new();
@@ -741,7 +735,6 @@ mod tests {
 
         assert_eq!(trace.status, TraceStatus::Completed);
     }
-
     #[tokio::test]
     async fn test_trace_failure() {
         let correlator = EventCorrelator::new();
@@ -763,7 +756,6 @@ mod tests {
             Some(&"Test failure".to_string())
         );
     }
-
     #[tokio::test]
     async fn test_trace_analysis() {
         let correlator = EventCorrelator::new();

@@ -1,10 +1,11 @@
-//! ABOUTME: Integration tests for SessionGlobal functionality
+//! ABOUTME: Integration tests for `SessionGlobal` functionality
 //! ABOUTME: Tests CRUD operations, error handling, and session lifecycle through Lua
 
 #[cfg(feature = "lua")]
 mod session_tests {
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
-    use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
+    use llmspell_bridge::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     use llmspell_events::bus::EventBus;
     use llmspell_hooks::{HookExecutor, HookRegistry};
     use llmspell_sessions::{SessionManager, SessionManagerConfig};
@@ -193,18 +194,18 @@ mod session_tests {
         let (_context, lua) = setup_test_context_with_sessions().await;
         let lua_code = r#"
         -- Initially no current session
-        assert(Session.getCurrent() == nil, "Should have no current session")
+        assert(Session.get_current() == nil, "Should have no current session")
         
         -- Create and set current
         local session_id = Session.create({name = "Context Test"})
-        Session.setCurrent(session_id)
+        Session.set_current(session_id)
         
         -- Verify current
-        assert(Session.getCurrent() == session_id, "Current session should match")
+        assert(Session.get_current() == session_id, "Current session should match")
         
         -- Clear current
-        Session.setCurrent(nil)
-        assert(Session.getCurrent() == nil, "Current session should be cleared")
+        Session.set_current(nil)
+        assert(Session.get_current() == nil, "Current session should be cleared")
         
         return true
     "#;

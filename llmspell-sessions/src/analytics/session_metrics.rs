@@ -498,7 +498,6 @@ pub struct SessionMetricsSummary {
 mod tests {
     use super::*;
     use llmspell_hooks::types::{ComponentId, ComponentType};
-
     #[tokio::test]
     async fn test_session_metrics_collector() {
         let storage = Arc::new(MetricsStorage::new());
@@ -522,7 +521,6 @@ mod tests {
         let start_times = collector.session_start_times.read().await;
         assert!(start_times.contains_key("test-session-123"));
     }
-
     #[tokio::test]
     async fn test_session_analytics() {
         let analytics = SessionAnalytics::new(SessionAnalyticsConfig::default());
@@ -553,11 +551,12 @@ mod tests {
         assert!(summary.total_operations > 0);
         assert!(summary.session_duration.is_some());
     }
-
     #[tokio::test]
     async fn test_privacy_mode() {
-        let mut config = SessionAnalyticsConfig::default();
-        config.privacy_mode = true;
+        let config = SessionAnalyticsConfig {
+            privacy_mode: true,
+            ..Default::default()
+        };
 
         let analytics = SessionAnalytics::new(config);
 
@@ -577,7 +576,6 @@ mod tests {
         assert_ne!(summary.session_id, "sensitive-id-789");
         assert!(summary.session_id.starts_with("session_"));
     }
-
     #[test]
     fn test_aggregated_metrics() {
         let analytics = SessionAnalytics::new(SessionAnalyticsConfig::default());

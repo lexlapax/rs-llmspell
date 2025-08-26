@@ -359,7 +359,6 @@ impl CircuitBreakerManager {
 mod tests {
     use super::*;
     use std::time::Duration;
-
     #[tokio::test]
     async fn test_circuit_breaker_state_transitions() {
         let config = CircuitBreakerConfig {
@@ -396,7 +395,6 @@ mod tests {
         breaker.record_success().await;
         assert_eq!(breaker.current_state().await, CircuitState::Closed);
     }
-
     #[tokio::test]
     async fn test_circuit_breaker_execute() {
         let breaker = CircuitBreaker::new(CircuitBreakerConfig::default());
@@ -411,11 +409,7 @@ mod tests {
 
         // Failed operation
         let result = breaker
-            .execute(|| {
-                Box::pin(async {
-                    Err::<i32, _>(std::io::Error::new(std::io::ErrorKind::Other, "test error"))
-                })
-            })
+            .execute(|| Box::pin(async { Err::<i32, _>(std::io::Error::other("test error")) }))
             .await;
 
         assert!(result.is_err());

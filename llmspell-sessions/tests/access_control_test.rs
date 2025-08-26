@@ -33,7 +33,6 @@ mod tests {
         )
         .unwrap()
     }
-
     #[tokio::test]
     async fn test_artifact_owner_permissions() {
         let manager = create_test_session_manager().await;
@@ -66,7 +65,6 @@ mod tests {
             .await
             .is_ok());
     }
-
     #[tokio::test]
     async fn test_cross_session_access_denied() {
         let manager = create_test_session_manager().await;
@@ -103,7 +101,6 @@ mod tests {
             .to_string()
             .contains("does not have delete permission"));
     }
-
     #[tokio::test]
     async fn test_permission_granting() {
         let manager = create_test_session_manager().await;
@@ -173,7 +170,6 @@ mod tests {
             .await
             .is_ok());
     }
-
     #[tokio::test]
     async fn test_permission_revocation() {
         let manager = create_test_session_manager().await;
@@ -225,7 +221,6 @@ mod tests {
             .await
             .is_err());
     }
-
     #[tokio::test]
     async fn test_acl_viewing() {
         let manager = create_test_session_manager().await;
@@ -280,7 +275,6 @@ mod tests {
             .await
             .is_err());
     }
-
     #[tokio::test]
     async fn test_audit_logging() {
         let manager = create_test_session_manager().await;
@@ -319,7 +313,6 @@ mod tests {
         assert!(!granted_entries.is_empty());
         assert!(!denied_entries.is_empty());
     }
-
     #[tokio::test]
     async fn test_session_isolation() {
         let manager = create_test_session_manager().await;
@@ -371,7 +364,6 @@ mod tests {
         assert_eq!(artifacts1[0].name, "common.txt");
         assert_eq!(artifacts2[0].name, "common.txt");
     }
-
     #[tokio::test]
     async fn test_non_admin_cannot_grant_permissions() {
         let manager = create_test_session_manager().await;
@@ -420,7 +412,6 @@ mod tests {
             .to_string()
             .contains("cannot grant permissions"));
     }
-
     #[tokio::test]
     async fn test_access_control_with_different_artifact_types() {
         let manager = create_test_session_manager().await;
@@ -475,7 +466,6 @@ mod tests {
         }
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_access_control_performance_impact() {
         use std::time::Instant;
@@ -513,7 +503,6 @@ mod tests {
             avg_per_access
         );
     }
-
     #[tokio::test]
     async fn test_security_edge_cases() {
         let manager = create_test_session_manager().await;
@@ -571,7 +560,6 @@ mod tests {
             .to_string()
             .contains("Cannot revoke owner's permissions"));
     }
-
     #[tokio::test]
     async fn test_audit_log_completeness() {
         let manager = create_test_session_manager().await;

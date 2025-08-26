@@ -1,5 +1,5 @@
 //! ABOUTME: Enhanced web search tool implementation with multiple provider support
-//! ABOUTME: Supports DuckDuckGo, Google, Brave, SerpApi, and SerperDev with rate limiting
+//! ABOUTME: Supports `DuckDuckGo`, Google, Brave, `SerpApi`, and `SerperDev` with rate limiting
 
 use async_trait::async_trait;
 use llmspell_core::{
@@ -70,6 +70,7 @@ impl Default for WebSearchConfig {
 
 impl WebSearchConfig {
     /// Load configuration from environment variables
+    #[must_use]
     pub fn from_env() -> Self {
         let mut config = Self::default();
         let mut providers = HashMap::new();
@@ -78,14 +79,14 @@ impl WebSearchConfig {
         if let Some(api_key) =
             get_api_key("google_search").or_else(|| std::env::var("WEBSEARCH_GOOGLE_API_KEY").ok())
         {
-            let additional_config =
-                if let Ok(engine_id) = std::env::var("WEBSEARCH_GOOGLE_SEARCH_ENGINE_ID") {
+            let additional_config = std::env::var("WEBSEARCH_GOOGLE_SEARCH_ENGINE_ID").map_or(
+                serde_json::Value::Null,
+                |engine_id| {
                     serde_json::json!({
                         "search_engine_id": engine_id
                     })
-                } else {
-                    serde_json::Value::Null
-                };
+                },
+            );
             let google_config = ProviderConfig {
                 api_key: Some(api_key),
                 additional_config,
@@ -169,6 +170,11 @@ impl RequiresApiKey for WebSearchTool {
 
 impl WebSearchTool {
     /// Create a new web search tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if provider initialization fails
+    #[allow(clippy::too_many_lines)]
     pub fn new(config: WebSearchConfig) -> Result<Self> {
         let mut providers = HashMap::new();
 
@@ -196,7 +202,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -216,7 +222,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -236,7 +242,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -256,7 +262,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -287,11 +293,18 @@ impl WebSearchTool {
     }
 
     /// Create from environment configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Environment configuration is invalid
+    /// - Tool creation fails
     pub fn from_env() -> Result<Self> {
         Self::new(WebSearchConfig::from_env())
     }
 
     /// Perform search with fallback support
+    #[allow(clippy::cognitive_complexity)]
     async fn search_with_fallback(
         &self,
         query: &str,
@@ -301,26 +314,29 @@ impl WebSearchTool {
         let providers = self.providers.lock().await;
 
         // Determine provider order
-        let provider_chain = if let Some(requested) = requested_provider {
-            // If specific provider requested, try it first
-            let mut chain = vec![requested.to_string()];
-            // Then add fallback chain excluding the requested one
-            for fallback in &self.config.fallback_chain {
-                if fallback != requested {
-                    chain.push(fallback.clone());
+        let provider_chain = requested_provider.map_or_else(
+            || {
+                // Use default provider first, then fallback chain
+                let mut chain = vec![self.config.default_provider.clone()];
+                for fallback in &self.config.fallback_chain {
+                    if fallback != &self.config.default_provider {
+                        chain.push(fallback.clone());
+                    }
                 }
-            }
-            chain
-        } else {
-            // Use default provider first, then fallback chain
-            let mut chain = vec![self.config.default_provider.clone()];
-            for fallback in &self.config.fallback_chain {
-                if fallback != &self.config.default_provider {
-                    chain.push(fallback.clone());
+                chain
+            },
+            |requested| {
+                // If specific provider requested, try it first
+                let mut chain = vec![requested.to_string()];
+                // Then add fallback chain excluding the requested one
+                for fallback in &self.config.fallback_chain {
+                    if fallback != requested {
+                        chain.push(fallback.clone());
+                    }
                 }
-            }
-            chain
-        };
+                chain
+            },
+        );
 
         // Try each provider in order
         let mut last_error = None;
@@ -330,7 +346,7 @@ impl WebSearchTool {
                 // Check rate limit if applicable
                 if let Some(rate_limiter) = &wrapper.rate_limiter {
                     match rate_limiter.try_acquire().await {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(e) => {
                             warn!("Rate limit exceeded for {}: {}", provider_name, e);
                             continue;
@@ -342,10 +358,10 @@ impl WebSearchTool {
                 info!("Searching with provider: {}", provider_name);
                 match wrapper.provider.search(query, &options).await {
                     Ok(results) => {
-                        if !results.is_empty() {
-                            return Ok(results);
-                        } else {
+                        if results.is_empty() {
                             warn!("Provider {} returned no results", provider_name);
+                        } else {
+                            return Ok(results);
                         }
                     }
                     Err(e) => {
@@ -446,7 +462,11 @@ impl BaseAgent for WebSearchTool {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Get parameters
         let params = extract_parameters(&input)?;
 
@@ -457,16 +477,17 @@ impl BaseAgent for WebSearchTool {
         let provider = extract_optional_string(params, "provider");
         let max_results = params
             .get("max_results")
-            .and_then(|v| v.as_u64())
-            .map(|n| n as usize)
-            .unwrap_or(self.config.max_results);
+            .and_then(serde_json::Value::as_u64)
+            .map_or(self.config.max_results, |n| {
+                usize::try_from(n).unwrap_or(usize::MAX)
+            });
         let search_type = Self::parse_search_type(extract_optional_string(params, "search_type"));
         let safe_search = params
             .get("safe_search")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(self.config.safe_search);
         let language = extract_optional_string(params, "language")
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| self.config.language.clone());
 
         debug!(
@@ -488,8 +509,7 @@ impl BaseAgent for WebSearchTool {
         // Create response
         let provider_used = results
             .first()
-            .map(|r| r.provider.clone())
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "unknown".to_string(), |r| r.provider.clone());
 
         let message = format!(
             "Found {} results for '{}' using {}",

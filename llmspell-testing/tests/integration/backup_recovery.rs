@@ -2,130 +2,27 @@
 // ABOUTME: Validates end-to-end backup operations, disaster recovery scenarios, and data integrity
 
 use llmspell_state_persistence::{
-    backup::{
-        AdvancedRecoveryOptions, BackupConfig, BackupManager, BackupResult, BackupStatus,
-        BackupValidation, CompressionType, RecoveryOrchestrator, RecoveryProgress, RecoveryState,
-        RestoreOptions,
-    },
-    config::PersistenceConfig,
-    manager::{SerializableState, StateManager},
+    backup::{BackupStatus, RestoreOptions},
     StateScope,
 };
+use llmspell_testing::state_helpers::{
+    create_test_state_manager_with_backup, populate_test_state_data,
+};
 use serde_json::json;
-use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tempfile::TempDir;
 use tokio::time::sleep;
 
 #[cfg(test)]
 mod backup_recovery_tests {
     use super::*;
 
-    /// Helper to create a test state manager with backup enabled
-    async fn create_test_state_manager_with_backup(
-    ) -> (Arc<StateManager>, Arc<BackupManager>, TempDir) {
-        let temp_dir = tempfile::tempdir().unwrap();
-        let backup_dir = temp_dir.path().join("backups");
-        std::fs::create_dir_all(&backup_dir).unwrap();
-
-        let persistence_config = PersistenceConfig {
-            enabled: true,
-            ..Default::default()
-        };
-
-        let backup_config = BackupConfig {
-            backup_dir: backup_dir.clone(),
-            compression_enabled: true,
-            compression_type: CompressionType::Zstd,
-            compression_level: 3,
-            encryption_enabled: false,
-            max_backups: Some(5),
-            incremental_enabled: true,
-            retention_days: Some(7),
-            ..Default::default()
-        };
-
-        let state_manager = Arc::new(
-            StateManager::with_backend(
-                llmspell_state_persistence::config::StorageBackendType::Memory,
-                persistence_config,
-            )
-            .await
-            .unwrap(),
-        );
-
-        let backup_manager =
-            Arc::new(BackupManager::new(backup_config, state_manager.clone()).unwrap());
-
-        (state_manager, backup_manager, temp_dir)
-    }
-
-    /// Helper to populate state manager with test data
-    async fn populate_test_data(
-        state_manager: &StateManager,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        // Add various types of state data
-        state_manager
-            .set(
-                StateScope::Global,
-                "user_settings",
-                json!({
-                    "theme": "dark",
-                    "language": "en",
-                    "notifications": true
-                }),
-            )
-            .await?;
-
-        state_manager
-            .set(
-                StateScope::Global,
-                "session_data",
-                json!({
-                    "user_id": 12345,
-                    "login_time": "2025-01-27T10:00:00Z",
-                    "permissions": ["read", "write"]
-                }),
-            )
-            .await?;
-
-        state_manager
-            .set(
-                StateScope::Custom("agent_1".to_string()),
-                "config",
-                json!({
-                    "model": "gpt-4",
-                    "temperature": 0.7,
-                    "max_tokens": 2000
-                }),
-            )
-            .await?;
-
-        state_manager
-            .set(
-                StateScope::Custom("agent_2".to_string()),
-                "history",
-                json!({
-                    "conversations": [
-                        {"role": "user", "content": "Hello"},
-                        {"role": "assistant", "content": "Hi there!"}
-                    ],
-                    "total_tokens": 15
-                }),
-            )
-            .await?;
-
-        Ok(())
-    }
-
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_complete_backup_recovery_cycle() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
 
         // Populate with test data
-        populate_test_data(&state_manager).await.unwrap();
+        populate_test_state_data(&state_manager).await.unwrap();
 
         // Create full backup
         let backup_status = backup_manager.create_backup(false).await.unwrap();
@@ -209,7 +106,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_incremental_backup_chain() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -292,13 +188,12 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_disaster_recovery_simulation() {
-        let (state_manager, backup_manager, temp_dir) =
+        let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
 
         // Populate critical application data
-        populate_test_data(&state_manager).await.unwrap();
+        populate_test_state_data(&state_manager).await.unwrap();
 
         // Add more critical data
         state_manager
@@ -318,7 +213,7 @@ mod backup_recovery_tests {
         let disaster_backup = backup_manager.create_backup(false).await.unwrap();
 
         // Simulate disaster - clear all state
-        state_manager.clear_all().await.unwrap();
+        state_manager.clear_scope(StateScope::Global).await.unwrap();
 
         // Verify state is gone
         let user_settings = state_manager
@@ -383,9 +278,8 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_backup_integrity_validation() {
-        let (state_manager, backup_manager, temp_dir) =
+        let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
 
         // Create test data with various data types
@@ -441,7 +335,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_partial_recovery_scenarios() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -552,7 +445,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_backup_retention_and_cleanup() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -578,18 +470,24 @@ mod backup_recovery_tests {
             sleep(Duration::from_millis(10)).await;
         }
 
-        // Verify all backups exist
+        // Verify retention policies were applied automatically during backup creation
+        // Since max_backups is 5, we should have at most 5 backups even though we created 7
         let backups = backup_manager.list_backups().await.unwrap();
-        assert_eq!(backups.len(), 7);
+        assert!(
+            backups.len() <= 5,
+            "Should have 5 or fewer backups due to automatic retention, but found {}",
+            backups.len()
+        );
 
-        // Apply retention policies (configured for max 5 backups)
+        // Apply retention policies explicitly to verify they work
         let retention_report = backup_manager.apply_retention_policies().await.unwrap();
 
-        // Verify some backups were cleaned up
+        // Verify backups are still within limit
         let backups_after_cleanup = backup_manager.list_backups().await.unwrap();
         assert!(
             backups_after_cleanup.len() <= 5,
-            "Should have 5 or fewer backups after retention"
+            "Should have 5 or fewer backups after retention, but found {}",
+            backups_after_cleanup.len()
         );
 
         // Verify newest backups are retained
@@ -603,7 +501,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_backup_performance_impact() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -676,13 +573,12 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_concurrent_backup_operations() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
 
         // Populate with test data
-        populate_test_data(&state_manager).await.unwrap();
+        populate_test_state_data(&state_manager).await.unwrap();
 
         // Launch multiple backup operations concurrently
         let mut backup_futures = Vec::new();

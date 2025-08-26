@@ -1,6 +1,8 @@
 //! ABOUTME: Monitor Agent template for creating agents that monitor systems, agents, and resources
 //! ABOUTME: Provides standardized template for monitoring-focused agents with alerting and metrics collection
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::base::{AgentTemplate, TemplateInstantiationParams, TemplateInstantiationResult};
 use super::schema::{
     CapabilityRequirement, ComplexityLevel, ParameterConstraint, ParameterDefinition,
@@ -17,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Monitoring scope types
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MonitoringScope {
     /// Monitor system resources (CPU, memory, disk, network)
     System,
@@ -36,15 +38,16 @@ pub enum MonitoringScope {
 }
 
 impl MonitoringScope {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            MonitoringScope::System => "system".to_string(),
-            MonitoringScope::Agent => "agent".to_string(),
-            MonitoringScope::Application => "application".to_string(),
-            MonitoringScope::Network => "network".to_string(),
-            MonitoringScope::Database => "database".to_string(),
-            MonitoringScope::Logs => "logs".to_string(),
-            MonitoringScope::Custom(name) => name.clone(),
+            Self::System => "system".to_string(),
+            Self::Agent => "agent".to_string(),
+            Self::Application => "application".to_string(),
+            Self::Network => "network".to_string(),
+            Self::Database => "database".to_string(),
+            Self::Logs => "logs".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -59,12 +62,13 @@ pub enum AlertSeverity {
 }
 
 impl AlertSeverity {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            AlertSeverity::Info => "info".to_string(),
-            AlertSeverity::Warning => "warning".to_string(),
-            AlertSeverity::Error => "error".to_string(),
-            AlertSeverity::Critical => "critical".to_string(),
+            Self::Info => "info".to_string(),
+            Self::Warning => "warning".to_string(),
+            Self::Error => "error".to_string(),
+            Self::Critical => "critical".to_string(),
         }
     }
 }
@@ -76,28 +80,36 @@ pub struct MonitorAgentConfig {
     pub monitoring_scopes: Vec<MonitoringScope>,
     /// Monitoring interval in seconds
     pub monitoring_interval: u64,
-    /// Enable alerting
-    pub enable_alerting: bool,
     /// Alert thresholds configuration
     pub alert_thresholds: HashMap<String, f64>,
     /// Alert severity mapping
     pub severity_mapping: HashMap<String, AlertSeverity>,
     /// Maximum number of alerts per minute
     pub max_alerts_per_minute: u32,
-    /// Enable metrics collection
-    pub enable_metrics_collection: bool,
     /// Metrics retention period in seconds
     pub metrics_retention_period: u64,
-    /// Enable log monitoring
-    pub enable_log_monitoring: bool,
     /// Log file patterns to monitor
     pub log_patterns: Vec<String>,
-    /// Enable health checks
-    pub enable_health_checks: bool,
     /// Health check timeout in seconds
     pub health_check_timeout: u64,
     /// Maximum concurrent monitoring tasks
     pub max_concurrent_tasks: usize,
+    /// Feature flags for monitoring behavior
+    pub feature_flags: MonitoringFeatureFlags,
+}
+
+/// Feature flags for monitoring behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct MonitoringFeatureFlags {
+    /// Enable alerting
+    pub enable_alerting: bool,
+    /// Enable metrics collection
+    pub enable_metrics_collection: bool,
+    /// Enable log monitoring
+    pub enable_log_monitoring: bool,
+    /// Enable health checks
+    pub enable_health_checks: bool,
 }
 
 impl Default for MonitorAgentConfig {
@@ -105,7 +117,6 @@ impl Default for MonitorAgentConfig {
         Self {
             monitoring_scopes: vec![MonitoringScope::System, MonitoringScope::Agent],
             monitoring_interval: 30, // 30 seconds
-            enable_alerting: true,
             alert_thresholds: HashMap::from([
                 ("cpu_usage".to_string(), 80.0),
                 ("memory_usage".to_string(), 85.0),
@@ -119,13 +130,22 @@ impl Default for MonitorAgentConfig {
                 ("response_time".to_string(), AlertSeverity::Warning),
             ]),
             max_alerts_per_minute: 10,
-            enable_metrics_collection: true,
             metrics_retention_period: 86400, // 24 hours
-            enable_log_monitoring: false,
             log_patterns: vec!["*.log".to_string(), "logs/*.log".to_string()],
-            enable_health_checks: true,
             health_check_timeout: 10,
             max_concurrent_tasks: 5,
+            feature_flags: MonitoringFeatureFlags::default(),
+        }
+    }
+}
+
+impl Default for MonitoringFeatureFlags {
+    fn default() -> Self {
+        Self {
+            enable_alerting: true,
+            enable_metrics_collection: true,
+            enable_log_monitoring: false,
+            enable_health_checks: true,
         }
     }
 }
@@ -138,6 +158,8 @@ pub struct MonitorAgentTemplate {
 
 impl MonitorAgentTemplate {
     /// Create new Monitor Agent template
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "monitor_agent".to_string(),
@@ -397,19 +419,21 @@ impl MonitorAgentTemplate {
     }
 
     /// Create Monitor Agent template with custom configuration
+    #[must_use]
     pub fn with_config(mut self, config: MonitorAgentConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Create system monitor template focused on system resources
+    #[must_use]
     pub fn system_monitor() -> Self {
         let mut template = Self::new();
 
         // Update configuration for system monitoring
         template.config.monitoring_scopes = vec![MonitoringScope::System];
         template.config.monitoring_interval = 10; // More frequent for system monitoring
-        template.config.enable_log_monitoring = false;
+        template.config.feature_flags.enable_log_monitoring = false;
 
         // Update metadata
         template.schema.metadata.id = "monitor_agent_system".to_string();
@@ -427,13 +451,14 @@ impl MonitorAgentTemplate {
     }
 
     /// Create application monitor template for application monitoring
+    #[must_use]
     pub fn application_monitor() -> Self {
         let mut template = Self::new();
 
         // Update configuration for application monitoring
         template.config.monitoring_scopes =
             vec![MonitoringScope::Application, MonitoringScope::Logs];
-        template.config.enable_log_monitoring = true;
+        template.config.feature_flags.enable_log_monitoring = true;
         template.config.monitoring_interval = 60; // Less frequent for applications
         template.config.health_check_timeout = 30;
 
@@ -465,14 +490,15 @@ impl MonitorAgentTemplate {
     }
 
     /// Create lightweight monitor template for basic monitoring
+    #[must_use]
     pub fn lightweight() -> Self {
         let mut template = Self::new();
 
         // Update configuration for lightweight operation
         template.config.monitoring_scopes = vec![MonitoringScope::System];
         template.config.monitoring_interval = 60;
-        template.config.enable_metrics_collection = false;
-        template.config.enable_log_monitoring = false;
+        template.config.feature_flags.enable_metrics_collection = false;
+        template.config.feature_flags.enable_log_monitoring = false;
         template.config.max_concurrent_tasks = 2;
 
         // Update resource requirements
@@ -498,10 +524,9 @@ impl MonitorAgentTemplate {
 
     /// Apply parameters to config
     fn apply_parameters_to_config(
-        &self,
         config: &mut MonitorAgentConfig,
         params: &HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    ) {
         if let Some(scopes) = params.get("monitoring_scopes") {
             if let Some(array) = scopes.as_array() {
                 config.monitoring_scopes = array
@@ -528,7 +553,7 @@ impl MonitorAgentTemplate {
 
         if let Some(enable_alerting) = params.get("enable_alerting") {
             if let Some(value) = enable_alerting.as_bool() {
-                config.enable_alerting = value;
+                config.feature_flags.enable_alerting = value;
             }
         }
 
@@ -559,13 +584,15 @@ impl MonitorAgentTemplate {
 
         if let Some(max_alerts) = params.get("max_alerts_per_minute") {
             if let Some(value) = max_alerts.as_u64() {
-                config.max_alerts_per_minute = value as u32;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_alerts = value as u32;
+                config.max_alerts_per_minute = max_alerts;
             }
         }
 
         if let Some(enable_metrics) = params.get("enable_metrics_collection") {
             if let Some(value) = enable_metrics.as_bool() {
-                config.enable_metrics_collection = value;
+                config.feature_flags.enable_metrics_collection = value;
             }
         }
 
@@ -577,7 +604,7 @@ impl MonitorAgentTemplate {
 
         if let Some(enable_log_monitoring) = params.get("enable_log_monitoring") {
             if let Some(value) = enable_log_monitoring.as_bool() {
-                config.enable_log_monitoring = value;
+                config.feature_flags.enable_log_monitoring = value;
             }
         }
 
@@ -585,12 +612,10 @@ impl MonitorAgentTemplate {
             if let Some(array) = patterns.as_array() {
                 config.log_patterns = array
                     .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                     .collect();
             }
         }
-
-        Ok(())
     }
 }
 
@@ -618,7 +643,7 @@ impl AgentTemplate for MonitorAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters)?;
+        Self::apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();
@@ -628,7 +653,7 @@ impl AgentTemplate for MonitorAgentTemplate {
             agent_config
                 .monitoring_scopes
                 .iter()
-                .map(|s| s.name())
+                .map(MonitoringScope::name)
                 .collect::<Vec<_>>()
                 .into(),
         );
@@ -638,15 +663,15 @@ impl AgentTemplate for MonitorAgentTemplate {
         );
         final_config.insert(
             "enable_alerting".to_string(),
-            agent_config.enable_alerting.into(),
+            agent_config.feature_flags.enable_alerting.into(),
         );
         final_config.insert(
             "max_alerts_per_minute".to_string(),
-            (agent_config.max_alerts_per_minute as u64).into(),
+            u64::from(agent_config.max_alerts_per_minute).into(),
         );
         final_config.insert(
             "enable_metrics_collection".to_string(),
-            agent_config.enable_metrics_collection.into(),
+            agent_config.feature_flags.enable_metrics_collection.into(),
         );
         final_config.insert(
             "metrics_retention_period".to_string(),
@@ -654,7 +679,7 @@ impl AgentTemplate for MonitorAgentTemplate {
         );
         final_config.insert(
             "enable_log_monitoring".to_string(),
-            agent_config.enable_log_monitoring.into(),
+            agent_config.feature_flags.enable_log_monitoring.into(),
         );
         final_config.insert(
             "max_concurrent_tasks".to_string(),
@@ -663,17 +688,17 @@ impl AgentTemplate for MonitorAgentTemplate {
 
         // Add alert thresholds
         for (key, value) in &agent_config.alert_thresholds {
-            final_config.insert(format!("threshold_{}", key), (*value).into());
+            final_config.insert(format!("threshold_{key}"), (*value).into());
         }
 
         // Add log patterns if enabled
-        if agent_config.enable_log_monitoring {
+        if agent_config.feature_flags.enable_log_monitoring {
             final_config.insert(
                 "log_patterns".to_string(),
                 agent_config
                     .log_patterns
                     .iter()
-                    .map(|s| s.as_str())
+                    .map(std::string::String::as_str)
                     .collect::<Vec<_>>()
                     .into(),
             );
@@ -706,7 +731,7 @@ impl AgentTemplate for MonitorAgentTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(MonitorAgentTemplate {
+        Box::new(Self {
             schema: self.schema.clone(),
             config: self.config.clone(),
         })
@@ -747,7 +772,7 @@ impl BaseAgent for MockMonitorAgent {
         &self.metadata
     }
 
-    async fn execute(
+    async fn execute_impl(
         &self,
         _input: AgentInput,
         _context: ExecutionContext,
@@ -767,7 +792,7 @@ impl BaseAgent for MockMonitorAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Monitor error handled: {}", error),
+            text: format!("Monitor error handled: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),
@@ -779,7 +804,6 @@ impl BaseAgent for MockMonitorAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_monitor_agent_template_creation() {
         let template = MonitorAgentTemplate::new();
@@ -792,7 +816,6 @@ mod tests {
         assert_eq!(required_params.len(), 1);
         assert_eq!(required_params[0].name, "agent_name");
     }
-
     #[tokio::test]
     async fn test_system_monitor() {
         let template = MonitorAgentTemplate::system_monitor();
@@ -803,7 +826,7 @@ mod tests {
             MonitoringScope::System
         ));
         assert_eq!(template.config.monitoring_interval, 10);
-        assert!(!template.config.enable_log_monitoring);
+        assert!(!template.config.feature_flags.enable_log_monitoring);
 
         // Check system-specific configuration
         let system_mode = template
@@ -812,7 +835,6 @@ mod tests {
             .get("system_monitoring_mode");
         assert_eq!(system_mode, Some(&true.into()));
     }
-
     #[tokio::test]
     async fn test_application_monitor() {
         let template = MonitorAgentTemplate::application_monitor();
@@ -826,7 +848,7 @@ mod tests {
             .config
             .monitoring_scopes
             .contains(&MonitoringScope::Logs));
-        assert!(template.config.enable_log_monitoring);
+        assert!(template.config.feature_flags.enable_log_monitoring);
 
         // Check application-specific configuration
         let app_mode = template
@@ -835,25 +857,22 @@ mod tests {
             .get("application_monitoring_mode");
         assert_eq!(app_mode, Some(&true.into()));
     }
-
     #[tokio::test]
     async fn test_lightweight_monitor() {
         let template = MonitorAgentTemplate::lightweight();
 
         assert_eq!(template.config.monitoring_interval, 60);
-        assert!(!template.config.enable_metrics_collection);
-        assert!(!template.config.enable_log_monitoring);
+        assert!(!template.config.feature_flags.enable_metrics_collection);
+        assert!(!template.config.feature_flags.enable_log_monitoring);
         assert_eq!(template.config.max_concurrent_tasks, 2);
         assert_eq!(template.complexity(), &ComplexityLevel::Basic);
     }
-
     #[tokio::test]
     async fn test_monitoring_scopes() {
         assert_eq!(MonitoringScope::System.name(), "system");
         assert_eq!(MonitoringScope::Agent.name(), "agent");
         assert_eq!(MonitoringScope::Custom("test".to_string()).name(), "test");
     }
-
     #[tokio::test]
     async fn test_alert_severities() {
         assert_eq!(AlertSeverity::Info.name(), "info");
@@ -861,7 +880,6 @@ mod tests {
         assert_eq!(AlertSeverity::Error.name(), "error");
         assert_eq!(AlertSeverity::Critical.name(), "critical");
     }
-
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = MonitorAgentTemplate::new();
@@ -881,7 +899,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_ok());
     }
-
     #[tokio::test]
     async fn test_threshold_constraints() {
         let template = MonitorAgentTemplate::new();
@@ -902,7 +919,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_err());
     }
-
     #[tokio::test]
     async fn test_required_tools() {
         let template = MonitorAgentTemplate::new();
@@ -916,7 +932,6 @@ mod tests {
         assert!(optional_tools.contains(&"health_checker".to_string()));
         assert!(optional_tools.contains(&"log_analyzer".to_string()));
     }
-
     #[tokio::test]
     async fn test_capability_support() {
         let template = MonitorAgentTemplate::new();

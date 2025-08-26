@@ -1,0 +1,34 @@
+# Universal Layer Configuration - File Organizer
+# Minimal configuration for universal appeal - just the basics
+
+[runtime]
+name = "file-organizer"
+description = "Universal file organization solution"
+
+# Single provider for simplicity (universal users)
+[providers.openai]
+name = "openai"
+api_key_env = "OPENAI_API_KEY"
+api_base = "https://api.openai.com/v1"
+default_model = "gpt-4o-mini"  # Cost-effective for universal use
+
+# Minimal tools - just what's needed
+[tools]
+file_operations = { enabled = true }
+text_manipulator = { enabled = true }
+
+# No state persistence for universal simplicity
+[state]
+enabled = false
+
+# No sessions needed for simple file organization
+[sessions]
+enabled = false
+
+# No events for universal layer
+[events]
+enabled = false
+
+# No hooks for simplicity
+[hooks]
+enabled = false

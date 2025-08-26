@@ -1,6 +1,8 @@
-//! ABOUTME: Enhanced ExecutionContext with hierarchical support and service bundle architecture
+//! ABOUTME: Enhanced `ExecutionContext` with hierarchical support and service bundle architecture
 //! ABOUTME: Provides comprehensive runtime services for agents, tools, and workflows
 
+use crate::traits::event::EventEmitter;
+use crate::traits::state::StateAccess;
 use crate::types::{ComponentId, EventMetadata};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -40,10 +42,10 @@ impl fmt::Display for ContextScope {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ContextScope::Global => write!(f, "global"),
-            ContextScope::Session(id) => write!(f, "session:{}", id),
-            ContextScope::Workflow(id) => write!(f, "workflow:{}", id),
-            ContextScope::Agent(id) => write!(f, "agent:{}", id),
-            ContextScope::User(id) => write!(f, "user:{}", id),
+            ContextScope::Session(id) => write!(f, "session:{id}"),
+            ContextScope::Workflow(id) => write!(f, "workflow:{id}"),
+            ContextScope::Agent(id) => write!(f, "agent:{id}"),
+            ContextScope::User(id) => write!(f, "user:{id}"),
         }
     }
 }
@@ -57,6 +59,7 @@ pub struct SharedMemory {
 
 impl SharedMemory {
     /// Create new shared memory
+    #[must_use]
     pub fn new() -> Self {
         Self {
             regions: Arc::new(RwLock::new(HashMap::new())),
@@ -64,37 +67,49 @@ impl SharedMemory {
     }
 
     /// Get value from a memory region
+    #[must_use]
     pub fn get(&self, scope: &ContextScope, key: &str) -> Option<Value> {
         self.regions
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .get(scope)
             .and_then(|region| region.get(key).cloned())
     }
 
     /// Set value in a memory region
     pub fn set(&self, scope: ContextScope, key: String, value: Value) {
-        let mut regions = self.regions.write().unwrap();
+        let mut regions = self
+            .regions
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         regions.entry(scope).or_default().insert(key, value);
     }
 
     /// Remove value from a memory region
+    #[must_use]
     pub fn remove(&self, scope: &ContextScope, key: &str) -> Option<Value> {
-        let mut regions = self.regions.write().unwrap();
+        let mut regions = self
+            .regions
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         regions.get_mut(scope).and_then(|region| region.remove(key))
     }
 
     /// Clear all data in a scope
     pub fn clear_scope(&self, scope: &ContextScope) {
-        let mut regions = self.regions.write().unwrap();
+        let mut regions = self
+            .regions
+            .write()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
         regions.remove(scope);
     }
 
     /// Get all keys in a scope
+    #[must_use]
     pub fn keys(&self, scope: &ContextScope) -> Vec<String> {
         self.regions
             .read()
-            .unwrap()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
             .get(scope)
             .map(|region| region.keys().cloned().collect())
             .unwrap_or_default()
@@ -134,9 +149,19 @@ pub struct ExecutionContext {
     /// Local context data
     pub data: HashMap<String, Value>,
 
-    /// Shared memory for inter-agent communication
+    /// Shared memory for inter-agent communication (transient data)
     #[serde(skip)]
     pub shared_memory: SharedMemory,
+
+    /// State access for persistent data (first-class citizen for component communication)
+    /// Uses StateAccess trait to avoid direct dependency on llmspell-state-persistence
+    #[serde(skip)]
+    pub state: Option<Arc<dyn StateAccess>>,
+
+    /// Event emitter for component lifecycle events (observability and coordination)
+    /// Uses EventEmitter trait to avoid direct dependency on llmspell-events
+    #[serde(skip)]
+    pub events: Option<Arc<dyn EventEmitter>>,
 
     /// Event metadata for correlation
     pub metadata: EventMetadata,
@@ -156,6 +181,7 @@ pub struct SecurityContext {
 
 impl ExecutionContext {
     /// Create a new root execution context
+    #[must_use]
     pub fn new() -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -167,12 +193,15 @@ impl ExecutionContext {
             session_id: None,
             data: HashMap::new(),
             shared_memory: SharedMemory::new(),
+            state: None,
+            events: None,
             metadata: EventMetadata::default(),
             security_context: None,
         }
     }
 
     /// Create with conversation ID
+    #[must_use]
     pub fn with_conversation(conversation_id: String) -> Self {
         let mut ctx = Self::new();
         ctx.conversation_id = Some(conversation_id);
@@ -180,6 +209,7 @@ impl ExecutionContext {
     }
 
     /// Create a child context with inheritance
+    #[must_use]
     pub fn create_child(&self, scope: ContextScope, inheritance: InheritancePolicy) -> Self {
         let mut child = Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -191,6 +221,8 @@ impl ExecutionContext {
             session_id: self.session_id.clone(),
             data: HashMap::new(),
             shared_memory: self.shared_memory.clone(), // Shared across hierarchy
+            state: self.state.clone(),                 // State is shared across hierarchy
+            events: self.events.clone(),               // Events are shared across hierarchy
             metadata: self.metadata.clone(),
             security_context: self.security_context.clone(),
         };
@@ -210,11 +242,9 @@ impl ExecutionContext {
                         .insert("conversation_context".to_string(), conv.clone());
                 }
             }
-            InheritancePolicy::Isolate => {
-                // Start fresh, no data copied
-            }
-            InheritancePolicy::Share => {
-                // Parent data accessible via parent reference
+            InheritancePolicy::Isolate | InheritancePolicy::Share => {
+                // Isolate: Start fresh, no data copied
+                // Share: Parent data accessible via parent reference
             }
         }
 
@@ -272,6 +302,12 @@ impl ExecutionContext {
         self
     }
 
+    /// Set the state access provider
+    pub fn with_state(mut self, state: Arc<dyn StateAccess>) -> Self {
+        self.state = Some(state);
+        self
+    }
+
     /// Check if context has a specific capability
     pub fn has_capability(&self, capability: &str) -> bool {
         self.get("capabilities")
@@ -313,7 +349,7 @@ impl Default for ExecutionContext {
     }
 }
 
-/// Builder for ExecutionContext
+/// Builder for `ExecutionContext`
 pub struct ExecutionContextBuilder {
     context: ExecutionContext,
 }
@@ -374,6 +410,18 @@ impl ExecutionContextBuilder {
         self
     }
 
+    /// Set state access provider
+    pub fn state(mut self, state: Arc<dyn StateAccess>) -> Self {
+        self.context.state = Some(state);
+        self
+    }
+
+    /// Set event emitter provider
+    pub fn events(mut self, events: Arc<dyn EventEmitter>) -> Self {
+        self.context.events = Some(events);
+        self
+    }
+
     /// Build the context
     pub fn build(self) -> ExecutionContext {
         self.context
@@ -390,7 +438,6 @@ impl Default for ExecutionContextBuilder {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_context_creation() {
         let ctx = ExecutionContext::with_conversation("conv-123".to_string());
@@ -398,7 +445,6 @@ mod tests {
         assert!(ctx.parent_id.is_none());
         assert_eq!(ctx.scope, ContextScope::Global);
     }
-
     #[test]
     fn test_context_hierarchy() {
         let root = ExecutionContext::new().with_data("root_data".to_string(), json!("root_value"));
@@ -414,7 +460,6 @@ mod tests {
         // Note: get() no longer checks parent data directly
         // HierarchicalContext should handle inheritance
     }
-
     #[test]
     fn test_inheritance_policies() {
         let parent = ExecutionContext::new()
@@ -447,7 +492,6 @@ mod tests {
         );
         assert_eq!(copy_child.get("parent_key"), None);
     }
-
     #[test]
     fn test_shared_memory() {
         let ctx = ExecutionContext::new()
@@ -474,7 +518,6 @@ mod tests {
         );
         assert_eq!(value2, None);
     }
-
     #[test]
     fn test_context_builder() {
         let ctx = ExecutionContextBuilder::new()
@@ -490,7 +533,6 @@ mod tests {
         assert_eq!(ctx.session_id, Some("session-123".to_string()));
         assert_eq!(ctx.get("preference"), Some(json!("dark_mode")));
     }
-
     #[test]
     fn test_capability_checking() {
         let mut ctx = ExecutionContext::new();
@@ -503,7 +545,6 @@ mod tests {
         assert!(ctx.has_capability("write"));
         assert!(!ctx.has_capability("delete"));
     }
-
     #[test]
     fn test_context_merging() {
         let mut ctx1 = ExecutionContext::new().with_data("key1".to_string(), json!("value1"));
@@ -518,7 +559,6 @@ mod tests {
         assert_eq!(ctx1.get("key2"), Some(json!("value2")));
         assert_eq!(ctx1.get("key3"), Some(json!("value3")));
     }
-
     #[test]
     fn test_scope_display() {
         assert_eq!(ContextScope::Global.to_string(), "global");

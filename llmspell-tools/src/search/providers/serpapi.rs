@@ -1,5 +1,5 @@
-//! ABOUTME: SerpApi search provider implementation
-//! ABOUTME: Supports multiple search engines through a unified API (Google, Bing, DuckDuckGo, etc.)
+//! ABOUTME: `SerpApi` search provider implementation
+//! ABOUTME: Supports multiple search engines through a unified API (Google, Bing, `DuckDuckGo`, etc.)
 
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
@@ -9,7 +9,7 @@ use serde::Deserialize;
 use serde_json::Value;
 use tracing::{debug, info, warn};
 
-/// SerpApi provider - supports multiple search engines
+/// `SerpApi` provider - supports multiple search engines
 pub struct SerpApiProvider {
     client: Client,
     api_key: Option<String>,
@@ -17,6 +17,7 @@ pub struct SerpApiProvider {
 }
 
 impl SerpApiProvider {
+    #[must_use]
     pub fn new(config: ProviderConfig) -> Self {
         let default_engine = config
             .additional_config
@@ -33,7 +34,7 @@ impl SerpApiProvider {
     }
 }
 
-/// SerpApi response structure (varies by engine, this is common subset)
+/// `SerpApi` response structure (varies by engine, this is common subset)
 #[derive(Debug, Deserialize)]
 #[allow(dead_code)]
 struct SerpApiResponse {
@@ -114,7 +115,7 @@ struct ImageResult {
 
 #[async_trait]
 impl SearchProvider for SerpApiProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "serpapi"
     }
 
@@ -126,6 +127,7 @@ impl SearchProvider for SerpApiProvider {
         Some(100) // Base plan: 100 searches/month
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key
@@ -175,7 +177,7 @@ impl SearchProvider for SerpApiProvider {
             .send()
             .await
             .map_err(|e| LLMSpellError::Network {
-                message: format!("SerpApi request failed: {}", e),
+                message: format!("SerpApi request failed: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -183,21 +185,21 @@ impl SearchProvider for SerpApiProvider {
             let status = response.status();
             let error_body = response.text().await.unwrap_or_default();
             return Err(LLMSpellError::Network {
-                message: format!("SerpApi returned status {}: {}", status, error_body),
+                message: format!("SerpApi returned status {status}: {error_body}"),
                 source: None,
             });
         }
 
         let serpapi_response: SerpApiResponse =
             response.json().await.map_err(|e| LLMSpellError::Network {
-                message: format!("Failed to parse SerpApi response: {}", e),
+                message: format!("Failed to parse SerpApi response: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
         // Check for API errors
         if let Some(error) = serpapi_response.error {
             return Err(LLMSpellError::Network {
-                message: format!("SerpApi error: {}", error),
+                message: format!("SerpApi error: {error}"),
                 source: None,
             });
         }
@@ -217,7 +219,18 @@ impl SearchProvider for SerpApiProvider {
                                     .snippet
                                     .unwrap_or_else(|| "No description available".to_string()),
                                 provider: format!("{} ({})", self.name(), self.default_engine),
-                                rank: result.position.unwrap_or(results.len() as i32 + 1) as usize,
+                                rank: {
+                                    #[allow(
+                                        clippy::cast_possible_truncation,
+                                        clippy::cast_sign_loss,
+                                        clippy::cast_possible_wrap
+                                    )]
+                                    let fallback_rank = results.len() as i32 + 1;
+                                    #[allow(clippy::cast_sign_loss)]
+                                    let position =
+                                        result.position.unwrap_or(fallback_rank) as usize;
+                                    position
+                                },
                             });
                         }
                     }
@@ -234,7 +247,18 @@ impl SearchProvider for SerpApiProvider {
                                     .snippet
                                     .unwrap_or_else(|| "No description available".to_string()),
                                 provider: format!("{} ({})", self.name(), self.default_engine),
-                                rank: result.position.unwrap_or(results.len() as i32 + 1) as usize,
+                                rank: {
+                                    #[allow(
+                                        clippy::cast_possible_truncation,
+                                        clippy::cast_sign_loss,
+                                        clippy::cast_possible_wrap
+                                    )]
+                                    let fallback_rank = results.len() as i32 + 1;
+                                    #[allow(clippy::cast_sign_loss)]
+                                    let position =
+                                        result.position.unwrap_or(fallback_rank) as usize;
+                                    position
+                                },
                             });
                         }
                     }
@@ -251,7 +275,18 @@ impl SearchProvider for SerpApiProvider {
                                     .source
                                     .unwrap_or_else(|| "Image result".to_string()),
                                 provider: format!("{} ({})", self.name(), self.default_engine),
-                                rank: result.position.unwrap_or(results.len() as i32 + 1) as usize,
+                                rank: {
+                                    #[allow(
+                                        clippy::cast_possible_truncation,
+                                        clippy::cast_sign_loss,
+                                        clippy::cast_possible_wrap
+                                    )]
+                                    let fallback_rank = results.len() as i32 + 1;
+                                    #[allow(clippy::cast_sign_loss)]
+                                    let position =
+                                        result.position.unwrap_or(fallback_rank) as usize;
+                                    position
+                                },
                             });
                         }
                     }

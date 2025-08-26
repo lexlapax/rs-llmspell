@@ -302,13 +302,13 @@ impl MigrationPlanner {
         ) {
             let compatibility = CompatibilityChecker::check_compatibility(&from_schema, &to_schema);
 
+            #[allow(clippy::cast_possible_truncation)]
+            let field_changes_count = compatibility.field_changes.len() as u64;
             let complexity = MigrationComplexity {
                 risk_level: compatibility.risk_level.clone(),
                 field_changes: compatibility.field_changes.len(),
                 breaking_changes: compatibility.breaking_changes.len(),
-                estimated_duration: Duration::from_secs(
-                    (compatibility.field_changes.len() * 10 + 60) as u64,
-                ),
+                estimated_duration: Duration::from_secs(field_changes_count * 10 + 60),
                 requires_backup: compatibility.risk_level
                     >= crate::schema::compatibility::RiskLevel::High,
                 complexity_score: self.calculate_complexity_score(&compatibility),
@@ -328,7 +328,9 @@ impl MigrationPlanner {
         let mut score = 0u32;
 
         // Base score for field changes
-        score += compatibility.field_changes.len() as u32 * 10;
+        #[allow(clippy::cast_possible_truncation)]
+        let field_changes_u32 = compatibility.field_changes.len() as u32;
+        score += field_changes_u32 * 10;
 
         // Penalty for breaking changes
         score += compatibility.breaking_changes.len() as u32 * 50;
@@ -397,7 +399,6 @@ mod tests {
         );
         schema
     }
-
     #[test]
     fn test_migration_step_conversion() {
         let legacy = LegacyMigrationStep {
@@ -417,7 +418,6 @@ mod tests {
         assert_eq!(converted_back.to_version, legacy.to_version);
         assert_eq!(converted_back.migration_type, legacy.migration_type);
     }
-
     #[tokio::test]
     async fn test_migration_planner() {
         let mut planner = MigrationPlanner::new();
@@ -453,7 +453,6 @@ mod tests {
         let paths = planner.find_migration_paths(&v1_0_0).unwrap();
         assert!(!paths.is_empty());
     }
-
     #[test]
     fn test_migration_complexity() {
         let complexity = MigrationComplexity {
@@ -468,7 +467,6 @@ mod tests {
         assert!(complexity.is_simple());
         assert!(!complexity.is_complex());
     }
-
     #[test]
     fn test_plan_validation() {
         let planner = MigrationPlanner::new();

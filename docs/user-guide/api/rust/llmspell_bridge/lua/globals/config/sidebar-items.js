@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"fn":["config_lua_examples","inject_config_global"]};

@@ -1,6 +1,8 @@
 //! ABOUTME: Agent discovery and search capabilities
 //! ABOUTME: Provides advanced search, filtering, and recommendation features
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::{
     metadata::{CapabilityType, ExtendedAgentMetadata, HealthState},
     AgentMetadata, AgentQuery, AgentRegistry, AgentStatus,
@@ -11,7 +13,7 @@ use std::{collections::HashMap, sync::Arc};
 /// Advanced search criteria
 #[derive(Debug, Clone, Default)]
 pub struct SearchCriteria {
-    /// Basic query from AgentQuery
+    /// Basic query from `AgentQuery`
     pub base_query: AgentQuery,
 
     /// Search by capabilities
@@ -34,7 +36,7 @@ pub struct SearchCriteria {
 }
 
 /// Fields to sort by
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SortField {
     /// Sort by name
     Name,
@@ -56,7 +58,7 @@ pub enum SortField {
 }
 
 /// Sort order
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SortOrder {
     /// Ascending order
     Ascending,
@@ -103,6 +105,13 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Search agents with advanced criteria
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent querying fails
+    /// - Metadata retrieval fails
+    /// - Scoring calculation fails
     pub async fn search(&self, criteria: &SearchCriteria) -> Result<Vec<SearchResult>> {
         // First, get basic results from registry
         let basic_results = self.registry.query_agents(&criteria.base_query).await?;
@@ -192,17 +201,26 @@ impl<R: AgentRegistry> Discovery<R> {
         }
 
         // Sort results
-        self.sort_results(&mut scored_results, &criteria.sort_by, &criteria.sort_order);
+        Self::sort_results(
+            &mut scored_results,
+            criteria.sort_by.as_ref(),
+            &criteria.sort_order,
+        );
 
         Ok(scored_results)
     }
 
     /// Find similar agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Reference agent metadata is not found
+    /// - Agent similarity search fails
     pub async fn find_similar(&self, agent_id: &str, limit: usize) -> Result<Vec<SearchResult>> {
         // Get the reference agent
-        let reference = match self.registry.get_metadata(agent_id).await? {
-            Some(metadata) => metadata,
-            None => anyhow::bail!("Agent '{}' not found", agent_id),
+        let Some(reference) = self.registry.get_metadata(agent_id).await? else {
+            anyhow::bail!("Agent '{}' not found", agent_id);
         };
 
         // Build search criteria based on reference
@@ -224,6 +242,14 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Get recommended agents based on usage patterns
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if recommendation generation fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if `DateTime` conversion fails
     pub async fn get_recommendations(
         &self,
         context: &RecommendationContext,
@@ -292,13 +318,8 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Sort search results
-    fn sort_results(
-        &self,
-        results: &mut [SearchResult],
-        sort_by: &Option<SortField>,
-        order: &SortOrder,
-    ) {
-        let field = sort_by.as_ref().unwrap_or(&SortField::Name);
+    fn sort_results(results: &mut [SearchResult], sort_by: Option<&SortField>, order: &SortOrder) {
+        let field = sort_by.unwrap_or(&SortField::Name);
 
         results.sort_by(|a, b| {
             let cmp = match field {
@@ -370,6 +391,7 @@ pub struct SearchBuilder {
 
 impl SearchBuilder {
     /// Create new search builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             criteria: SearchCriteria::default(),
@@ -377,18 +399,21 @@ impl SearchBuilder {
     }
 
     /// Filter by name
+    #[must_use]
     pub fn with_name(mut self, name: &str) -> Self {
         self.criteria.base_query.name_filter = Some(name.to_string());
         self
     }
 
     /// Filter by type
+    #[must_use]
     pub fn with_type(mut self, agent_type: &str) -> Self {
         self.criteria.base_query.type_filter = Some(agent_type.to_string());
         self
     }
 
     /// Filter by category
+    #[must_use]
     pub fn in_category(mut self, category: &str) -> Self {
         self.criteria
             .base_query
@@ -398,48 +423,56 @@ impl SearchBuilder {
     }
 
     /// Filter by status
+    #[must_use]
     pub fn with_status(mut self, status: AgentStatus) -> Self {
         self.criteria.base_query.status_filter = Some(status);
         self
     }
 
     /// Require capability
+    #[must_use]
     pub fn with_capability(mut self, capability: CapabilityType) -> Self {
         self.criteria.capabilities.push(capability);
         self
     }
 
     /// Set minimum success rate
-    pub fn min_success_rate(mut self, rate: f64) -> Self {
+    #[must_use]
+    pub const fn min_success_rate(mut self, rate: f64) -> Self {
         self.criteria.min_success_rate = Some(rate);
         self
     }
 
     /// Set maximum execution time
-    pub fn max_execution_time(mut self, ms: f64) -> Self {
+    #[must_use]
+    pub const fn max_execution_time(mut self, ms: f64) -> Self {
         self.criteria.max_execution_time_ms = Some(ms);
         self
     }
 
     /// Set sort field
-    pub fn sort_by(mut self, field: SortField) -> Self {
+    #[must_use]
+    pub const fn sort_by(mut self, field: SortField) -> Self {
         self.criteria.sort_by = Some(field);
         self
     }
 
     /// Set sort order
-    pub fn order(mut self, order: SortOrder) -> Self {
+    #[must_use]
+    pub const fn order(mut self, order: SortOrder) -> Self {
         self.criteria.sort_order = order;
         self
     }
 
     /// Set result limit
-    pub fn limit(mut self, limit: usize) -> Self {
+    #[must_use]
+    pub const fn limit(mut self, limit: usize) -> Self {
         self.criteria.base_query.limit = Some(limit);
         self
     }
 
     /// Build search criteria
+    #[must_use]
     pub fn build(self) -> SearchCriteria {
         self.criteria
     }
@@ -454,7 +487,6 @@ impl Default for SearchBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_search_builder() {
         let criteria = SearchBuilder::new()

@@ -2,14 +2,18 @@
 // ABOUTME: Tests that tools are protected against various injection attacks
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
+use llmspell_testing::tool_helpers::create_default_test_sandbox;
 use llmspell_tools::{
-    data::JsonProcessorTool,
-    system::{EnvironmentReaderTool, ProcessExecutorTool},
+    api::{graphql_query::GraphQLConfig, http_request::HttpRequestConfig},
+    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
+    system::{
+        environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
+        EnvironmentReaderTool, ProcessExecutorTool,
+    },
     util::{DataValidationTool, TemplateEngineTool},
     GraphQLQueryTool, HttpRequestTool,
 };
 use serde_json::json;
-
 #[tokio::test]
 async fn test_template_engine_code_injection() {
     let template_tool = TemplateEngineTool::new();
@@ -59,17 +63,15 @@ async fn test_template_engine_code_injection() {
                         && !rendered.contains("/bin/bash")
                         && !rendered.contains("SECRET")
                         && !rendered.contains("__class__"),
-                    "Template injection not prevented for: {}",
-                    template
+                    "Template injection not prevented for: {template}"
                 );
             }
         }
     }
 }
-
 #[tokio::test]
 async fn test_json_processor_jq_injection() {
-    let json_tool = JsonProcessorTool::new(Default::default());
+    let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
 
     // Attempt jq injection attacks
     let injection_queries = vec![
@@ -110,22 +112,20 @@ async fn test_json_processor_jq_injection() {
                     && !response_text.contains("secret")
                     && !response_text.contains("root:")
                     && !response_text.contains("api_key"),
-                "JQ injection not prevented for query: {}",
-                query
+                "JQ injection not prevented for query: {query}"
             );
         }
     }
 }
-
 #[tokio::test]
 async fn test_graphql_query_injection() {
     let graphql_tool =
-        GraphQLQueryTool::new(Default::default()).expect("Failed to create GraphQL tool");
+        GraphQLQueryTool::new(GraphQLConfig::default()).expect("Failed to create GraphQL tool");
 
     // GraphQL injection attempts
     let injections = vec![
         // Introspection attacks
-        r#"{
+        r"{
             __schema {
                 types {
                     name
@@ -137,7 +137,7 @@ async fn test_graphql_query_injection() {
                     }
                 }
             }
-        }"#,
+        }",
         // Alias abuse
         r#"{
             a1: user(id: "1") { password }
@@ -145,7 +145,7 @@ async fn test_graphql_query_injection() {
             a3: user(id: "3") { password }
         }"#,
         // Nested query explosion
-        r#"{
+        r"{
             user {
                 posts {
                     comments {
@@ -161,7 +161,7 @@ async fn test_graphql_query_injection() {
                     }
                 }
             }
-        }"#,
+        }",
     ];
 
     for query in injections {
@@ -181,7 +181,7 @@ async fn test_graphql_query_injection() {
         // Should handle safely (likely fail due to no real endpoint)
         if let Ok(output) = result {
             let response: serde_json::Value =
-                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
             // Should not expose sensitive schema information
             if response["success"].as_bool() == Some(true) {
@@ -196,10 +196,10 @@ async fn test_graphql_query_injection() {
         }
     }
 }
-
 #[tokio::test]
 async fn test_process_executor_argument_injection() {
-    let process_tool = ProcessExecutorTool::new(Default::default());
+    let sandbox = create_default_test_sandbox();
+    let process_tool = ProcessExecutorTool::new(ProcessExecutorConfig::default(), sandbox);
 
     // Command argument injection attempts
     let dangerous_args = vec![
@@ -226,30 +226,25 @@ async fn test_process_executor_argument_injection() {
             .await;
 
         // Should either fail or be restricted
-        match result {
-            Ok(output) => {
-                let response: serde_json::Value =
-                    serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+        if let Ok(output) = result {
+            let response: serde_json::Value =
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
-                if response["success"].as_bool() == Some(true) {
-                    let stdout = response["result"]["stdout"].as_str().unwrap_or("");
-                    assert!(
-                        !stdout.contains("root:")
-                            && !stdout.contains("password:")
-                            && !stdout.contains(".key")
-                            && !stdout.contains("malicious"),
-                        "Process argument injection not prevented for: {:?}",
-                        args
-                    );
-                }
+            if response["success"].as_bool() == Some(true) {
+                let stdout = response["result"]["stdout"].as_str().unwrap_or("");
+                assert!(
+                    !stdout.contains("root:")
+                        && !stdout.contains("password:")
+                        && !stdout.contains(".key")
+                        && !stdout.contains("malicious"),
+                    "Process argument injection not prevented for: {args:?}"
+                );
             }
-            Err(_) => {
-                // Expected for dangerous commands
-            }
+        } else {
+            // Expected for dangerous commands
         }
     }
 }
-
 #[tokio::test]
 async fn test_data_validation_regex_dos() {
     let validator_tool = DataValidationTool::new();
@@ -287,16 +282,14 @@ async fn test_data_validation_regex_dos() {
         // Should complete quickly even with pathological input
         assert!(
             elapsed < std::time::Duration::from_millis(100),
-            "Validation took too long for {}: {:?}",
-            validation_type,
-            elapsed
+            "Validation took too long for {validation_type}: {elapsed:?}"
         );
     }
 }
-
 #[tokio::test]
 async fn test_http_request_header_injection() {
-    let http_tool = HttpRequestTool::new(Default::default()).expect("Failed to create HTTP tool");
+    let http_tool =
+        HttpRequestTool::new(HttpRequestConfig::default()).expect("Failed to create HTTP tool");
 
     // HTTP header injection attempts
     let dangerous_headers = vec![
@@ -329,7 +322,7 @@ async fn test_http_request_header_injection() {
         // Headers should be sanitized or request should fail
         if let Ok(output) = result {
             let response: serde_json::Value =
-                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
             if response["success"].as_bool() == Some(true) {
                 let headers = &response["result"]["headers"];
@@ -343,10 +336,9 @@ async fn test_http_request_header_injection() {
         }
     }
 }
-
 #[tokio::test]
 async fn test_environment_reader_information_leak() {
-    let env_tool = EnvironmentReaderTool::new(Default::default());
+    let env_tool = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
 
     // Try to read sensitive environment variables
     let sensitive_vars = vec![
@@ -372,14 +364,13 @@ async fn test_environment_reader_information_leak() {
         // Should either fail or return sanitized/empty value
         if let Ok(output) = result {
             let response: serde_json::Value =
-                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+                serde_json::from_str(&output.text).unwrap_or_else(|_| json!({"success": false}));
 
             if response["success"].as_bool() == Some(true) {
                 let value = response["result"]["value"].as_str().unwrap_or("");
                 assert!(
                     value.is_empty() || value == "***" || value == "[REDACTED]",
-                    "Sensitive environment variable exposed: {}",
-                    var
+                    "Sensitive environment variable exposed: {var}"
                 );
             }
         }

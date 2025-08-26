@@ -1,4 +1,4 @@
-//! ABOUTME: Lua-specific event global bindings with EventBridge integration
+//! ABOUTME: Lua-specific event global bindings with `EventBridge` integration
 //! ABOUTME: Provides Lua-native event publishing, subscription, and management
 
 use crate::globals::event_global::EventGlobal;
@@ -6,6 +6,10 @@ use crate::globals::types::{GlobalContext, GlobalObject};
 use llmspell_core::error::LLMSpellError;
 
 /// Inject the Event global into a Lua environment
+///
+/// # Errors
+///
+/// Returns an error if global injection fails
 pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
     let event_global = EventGlobal::new();
     event_global.inject_lua(lua, context)
@@ -15,15 +19,19 @@ pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
+    use llmspell_config::providers::ProviderManagerConfig;
     use mlua::Lua;
     use std::sync::Arc;
 
     async fn create_test_context() -> GlobalContext {
         let registry = Arc::new(ComponentRegistry::new());
-        let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+        let providers = Arc::new(
+            ProviderManager::new(ProviderManagerConfig::default())
+                .await
+                .unwrap(),
+        );
         GlobalContext::new(registry, providers)
     }
-
     #[tokio::test]
     async fn test_event_global_injection() {
         let lua = Lua::new();
@@ -87,12 +95,11 @@ mod tests {
             Ok(outcome) => {
                 assert!(
                     outcome == "received_event" || outcome == "timeout",
-                    "Should either receive event or timeout, got: {}",
-                    outcome
+                    "Should either receive event or timeout, got: {outcome}"
                 );
             }
             Err(e) => {
-                panic!("Event flow test failed: {}", e);
+                panic!("Event flow test failed: {e}");
             }
         }
     }
@@ -142,10 +149,10 @@ mod tests {
 
         let result: mlua::Result<bool> = lua
             .load(
-                r#"
+                r"
             local stats = Event.get_stats()
             return stats ~= nil and stats.event_bus_stats ~= nil and stats.bridge_stats ~= nil
-        "#,
+        ",
             )
             .eval();
 

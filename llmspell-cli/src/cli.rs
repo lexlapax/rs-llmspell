@@ -27,6 +27,26 @@ pub struct Cli {
     #[arg(long, value_enum, default_value = "text")]
     pub output: OutputFormat,
 
+    /// Enable debug output
+    #[arg(long, global = true)]
+    pub debug: bool,
+
+    /// Set debug level (trace, debug, info, warn, error, off)
+    #[arg(long, global = true)]
+    pub debug_level: Option<String>,
+
+    /// Set debug output format (text, json, json_pretty)
+    #[arg(long, global = true)]
+    pub debug_format: Option<String>,
+
+    /// Filter debug output by modules (comma-separated, use + to enable, - to disable)
+    #[arg(long, global = true)]
+    pub debug_modules: Option<String>,
+
+    /// Enable performance profiling
+    #[arg(long, global = true)]
+    pub debug_perf: bool,
+
     #[command(subcommand)]
     pub command: Commands,
 }
@@ -153,6 +173,76 @@ pub enum Commands {
 
     /// Backup and restore state data
     Backup(crate::commands::backup::BackupCommand),
+
+    /// Run example applications
+    Apps {
+        /// Application to run (file-organizer, research-collector, etc.)
+        #[command(subcommand)]
+        app: Option<AppsSubcommand>,
+    },
+
+    /// Interactive setup for first-time users
+    Setup {
+        /// Force overwrite existing configuration
+        #[arg(short, long)]
+        force: bool,
+    },
+}
+
+/// Available example applications
+#[derive(Subcommand, Debug)]
+pub enum AppsSubcommand {
+    /// List all available applications
+    List,
+
+    /// Organize messy files with AI categorization
+    FileOrganizer {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// Research any topic thoroughly
+    ResearchCollector {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// Create content efficiently
+    ContentCreator {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// Manage business communications
+    CommunicationManager {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// Orchestrate complex processes
+    ProcessOrchestrator {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// Review code for quality and security
+    CodeReviewAssistant {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// Create complete web applications
+    WebappCreator {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
 }
 
 impl Cli {

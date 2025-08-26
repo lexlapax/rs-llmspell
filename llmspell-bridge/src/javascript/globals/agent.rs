@@ -5,8 +5,12 @@ use crate::globals::GlobalContext;
 use llmspell_core::error::LLMSpellError;
 
 /// Inject Agent global into JavaScript engine
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
-pub fn inject_agent_global(
+pub const fn inject_agent_global(
     _ctx: &mut boa_engine::Context,
     _context: &GlobalContext,
 ) -> Result<(), LLMSpellError> {
@@ -19,14 +23,17 @@ pub fn inject_agent_global(
 }
 
 /// Stub for when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
-pub fn inject_agent_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
+pub const fn inject_agent_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
-
     #[test]
     fn test_agent_global_stub() {
         // Basic compilation test - just verify function exists

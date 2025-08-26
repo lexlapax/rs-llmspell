@@ -1,4 +1,4 @@
-//! Integration tests for JsonProcessorTool
+//! Integration tests for `JsonProcessorTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
@@ -7,7 +7,6 @@ use llmspell_core::{
 };
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
-
 #[tokio::test]
 async fn test_json_processor_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -17,13 +16,13 @@ async fn test_json_processor_complex_workflow() {
         "company": {
             "name": "TechCorp",
             "employees": [
-                {"name": "Alice", "department": "Engineering", "salary": 120000},
-                {"name": "Bob", "department": "Sales", "salary": 90000},
-                {"name": "Charlie", "department": "Engineering", "salary": 110000}
+                {"name": "Alice", "department": "Engineering", "salary": 120_000},
+                {"name": "Bob", "department": "Sales", "salary": 90_000},
+                {"name": "Charlie", "department": "Engineering", "salary": 110_000}
             ],
             "departments": {
-                "Engineering": {"budget": 5000000, "head": "Alice"},
-                "Sales": {"budget": 2000000, "head": "David"}
+                "Engineering": {"budget": 5_000_000, "head": "Alice"},
+                "Sales": {"budget": 2_000_000, "head": "David"}
             }
         }
     });
@@ -61,7 +60,6 @@ async fn test_json_processor_complex_workflow() {
     let employees: serde_json::Value = serde_json::from_str(&output.text).unwrap();
     assert_eq!(employees.as_array().unwrap().len(), 3);
 }
-
 #[tokio::test]
 async fn test_json_processor_schema_validation_complex() {
     let tool = JsonProcessorTool::default();
@@ -143,7 +141,6 @@ async fn test_json_processor_schema_validation_complex() {
     let errors = validation_result["errors"].as_array().unwrap();
     assert!(!errors.is_empty());
 }
-
 #[tokio::test]
 async fn test_json_processor_array_filtering() {
     let tool = JsonProcessorTool::default();
@@ -174,7 +171,6 @@ async fn test_json_processor_array_filtering() {
     assert_eq!(items.len(), 2);
     assert!(items.iter().all(|item| item["category"] == "electronics"));
 }
-
 #[tokio::test]
 async fn test_json_processor_merge_complex() {
     let tool = JsonProcessorTool::default();
@@ -231,7 +227,6 @@ async fn test_json_processor_merge_complex() {
 
     assert_eq!(merged["api"]["version"], "v2");
 }
-
 #[tokio::test]
 async fn test_json_processor_tool_metadata() {
     let tool = JsonProcessorTool::default();
@@ -257,7 +252,6 @@ async fn test_json_processor_tool_metadata() {
     assert!(params.iter().any(|p| p.name == "query"));
     assert!(params.iter().any(|p| p.name == "schema"));
 }
-
 #[tokio::test]
 async fn test_json_processor_error_handling() {
     let tool = JsonProcessorTool::default();
@@ -298,7 +292,6 @@ async fn test_json_processor_error_handling() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_enhanced_jq_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -359,11 +352,11 @@ async fn test_enhanced_jq_complex_workflow() {
             "departments": {
                 "engineering": {
                     "employees": ["Alice", "Bob", "Charlie"],
-                    "budget": 1000000
+                    "budget": 1_000_000
                 },
                 "sales": {
                     "employees": ["David", "Eve"],
-                    "budget": 500000
+                    "budget": 500_000
                 }
             }
         }
@@ -385,7 +378,6 @@ async fn test_enhanced_jq_complex_workflow() {
     assert!(output.text.contains("\"engineering\""));
     assert!(output.text.contains("\"sales\""));
 }
-
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();
@@ -435,7 +427,6 @@ async fn test_streaming_json_lines() {
     assert!(output.text.contains("ERROR"));
     assert!(output.text.contains("WARN"));
 }
-
 #[tokio::test]
 async fn test_advanced_array_operations() {
     let tool = JsonProcessorTool::default();
@@ -471,9 +462,7 @@ async fn test_advanced_array_operations() {
         for value in expected_values {
             assert!(
                 output.text.contains(value),
-                "Query {} failed - missing value {}",
-                query,
-                value
+                "Query {query} failed - missing value {value}"
             );
         }
     }

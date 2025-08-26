@@ -1,5 +1,5 @@
 //! ABOUTME: Lua-specific JSON global implementation
-//! ABOUTME: Provides JSON.parse() and JSON.stringify() for Lua scripts
+//! ABOUTME: Provides `JSON.parse()` and `JSON.stringify()` for Lua scripts
 
 use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use llmspell_core::error::LLMSpellError;
@@ -7,9 +7,13 @@ use mlua::Lua;
 use serde_json;
 
 /// Inject JSON global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if JSON global injection or table creation fails
 pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
     let json_table = lua.create_table().map_err(|e| LLMSpellError::Component {
-        message: format!("Failed to create JSON table: {}", e),
+        message: format!("Failed to create JSON table: {e}"),
         source: None,
     })?;
 
@@ -17,11 +21,11 @@ pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
     let parse_fn = lua
         .create_function(|lua, json_str: String| {
             let json_value = serde_json::from_str::<serde_json::Value>(&json_str)
-                .map_err(|e| mlua::Error::RuntimeError(format!("JSON parse error: {}", e)))?;
+                .map_err(|e| mlua::Error::RuntimeError(format!("JSON parse error: {e}")))?;
             json_to_lua_value(lua, &json_value)
         })
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create parse function: {}", e),
+            message: format!("Failed to create parse function: {e}"),
             source: None,
         })?;
 
@@ -30,31 +34,31 @@ pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
         .create_function(|_lua, value: mlua::Value| {
             let json_value = lua_value_to_json(value)?;
             serde_json::to_string(&json_value)
-                .map_err(|e| mlua::Error::RuntimeError(format!("JSON stringify error: {}", e)))
+                .map_err(|e| mlua::Error::RuntimeError(format!("JSON stringify error: {e}")))
         })
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create stringify function: {}", e),
+            message: format!("Failed to create stringify function: {e}"),
             source: None,
         })?;
 
     json_table
         .set("parse", parse_fn)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set parse function: {}", e),
+            message: format!("Failed to set parse function: {e}"),
             source: None,
         })?;
 
     json_table
         .set("stringify", stringify_fn)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set stringify function: {}", e),
+            message: format!("Failed to set stringify function: {e}"),
             source: None,
         })?;
 
     lua.globals()
         .set("JSON", json_table)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set JSON global: {}", e),
+            message: format!("Failed to set JSON global: {e}"),
             source: None,
         })?;
 
@@ -64,7 +68,6 @@ pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_json_roundtrip() {
         let lua = mlua::Lua::new();

@@ -164,7 +164,6 @@ mod tests {
             usage_count: 0,
         }
     }
-
     #[test]
     fn test_persistent_storage() {
         let temp_dir = TempDir::new().unwrap();
@@ -200,7 +199,6 @@ mod tests {
         storage.delete("test_key").unwrap();
         assert_eq!(storage.get("test_key").unwrap(), None);
     }
-
     #[test]
     fn test_encryption_decryption() {
         let temp_dir = TempDir::new().unwrap();

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["ContextInheritanceRule"],"struct":["ContextEnhancementOptions","ContextState","ToolContextManager","ToolExecutionContext","ToolExecutionRecord"]};

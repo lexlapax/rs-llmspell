@@ -1,10 +1,11 @@
-//! ABOUTME: Rate limiting and DoS protection security tests
+//! ABOUTME: Rate limiting and `DoS` protection security tests
 //! ABOUTME: Tests for rate limit bypass, resource exhaustion, and denial of service attacks
 
 use super::test_framework::*;
 use serde_json::json;
 
 /// Basic rate limit bypass tests
+#[must_use]
 pub fn rate_limit_bypass_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -67,6 +68,7 @@ pub fn rate_limit_bypass_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Resource exhaustion tests
+#[must_use]
 pub fn resource_exhaustion_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -121,6 +123,7 @@ pub fn resource_exhaustion_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Slowloris and slow attack tests
+#[must_use]
 pub fn slow_attack_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -140,7 +143,7 @@ pub fn slow_attack_tests() -> Vec<SecurityTestCase> {
             name: "SLOW_POST_ATTACK".to_string(),
             description: "Slow POST attack".to_string(),
             payload: json!({
-                "content_length": 1000000,
+                "content_length": 1_000_000,
                 "send_rate": 1,
                 "operation": "slow_post"
             }),
@@ -163,7 +166,8 @@ pub fn slow_attack_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// Application-layer DoS tests
+/// Application-layer `DoS` tests
+#[must_use]
 pub fn application_dos_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -206,7 +210,7 @@ pub fn application_dos_tests() -> Vec<SecurityTestCase> {
             payload: json!({
                 "keys": ["Aa", "BB", "C#", "D4"],
                 "operation": "hash_attack",
-                "collision_count": 1000000
+                "collision_count": 1_000_000
             }),
             expected_behavior: ExpectedBehavior::Reject,
             severity: Severity::Medium,
@@ -215,7 +219,8 @@ pub fn application_dos_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// Protocol-specific DoS tests
+/// Protocol-specific `DoS` tests
+#[must_use]
 pub fn protocol_dos_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -257,6 +262,7 @@ pub fn protocol_dos_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Rate limit evasion techniques
+#[must_use]
 pub fn rate_limit_evasion_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -305,6 +311,7 @@ pub fn rate_limit_evasion_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Burst attack tests
+#[must_use]
 pub fn burst_attack_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -348,7 +355,8 @@ pub fn burst_attack_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// Create all rate limiting and DoS test cases
+/// Create all rate limiting and `DoS` test cases
+#[must_use]
 pub fn all_rate_limit_tests() -> Vec<SecurityTestCase> {
     let mut tests = Vec::new();
     tests.extend(rate_limit_bypass_tests());
@@ -364,7 +372,6 @@ pub fn all_rate_limit_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_rate_limit_test_creation() {
         let tests = all_rate_limit_tests();
@@ -376,7 +383,7 @@ mod tests {
             .map(|t| t.name.split('_').next().unwrap_or(""))
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         assert!(categories.contains(&"RATE".to_string()));
@@ -387,7 +394,6 @@ mod tests {
         assert!(categories.contains(&"EVASION".to_string()));
         assert!(categories.contains(&"BURST".to_string()));
     }
-
     #[test]
     fn test_critical_dos_tests() {
         let tests = all_rate_limit_tests();
@@ -407,16 +413,15 @@ mod tests {
         // XML bomb should be critical
         assert!(critical_tests.iter().any(|t| t.name == "APP_XML_BOMB"));
     }
-
     #[test]
     fn test_dos_category_coverage() {
         let tests = all_rate_limit_tests();
-        let dos_tests: Vec<_> = tests
+        let dos_test_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::DoS))
-            .collect();
+            .count();
 
         // All rate limit tests should be DoS category
-        assert_eq!(dos_tests.len(), tests.len());
+        assert_eq!(dos_test_count, tests.len());
     }
 }

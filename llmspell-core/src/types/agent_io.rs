@@ -1,5 +1,5 @@
 //! ABOUTME: Agent input/output types with multimodal support
-//! ABOUTME: Provides AgentInput, AgentOutput, and related types for agent communication
+//! ABOUTME: Provides `AgentInput`, `AgentOutput`, and related types for agent communication
 
 use super::{ComponentId, MediaContent, MediaType};
 use crate::execution_context::ExecutionContext;
@@ -77,18 +77,21 @@ impl AgentInput {
     }
 
     /// Add media content to the input
+    #[must_use]
     pub fn with_media(mut self, media: MediaContent) -> Self {
         self.media.push(media);
         self
     }
 
     /// Add multiple media items
+    #[must_use]
     pub fn with_media_vec(mut self, media: Vec<MediaContent>) -> Self {
         self.media.extend(media);
         self
     }
 
     /// Set the execution context
+    #[must_use]
     pub fn with_context(mut self, context: ExecutionContext) -> Self {
         self.context = Some(context);
         self
@@ -101,22 +104,26 @@ impl AgentInput {
     }
 
     /// Set output modalities
+    #[must_use]
     pub fn with_output_modalities(mut self, modalities: Vec<MediaType>) -> Self {
         self.output_modalities = modalities;
         self
     }
 
     /// Create a builder for more complex inputs
+    #[must_use]
     pub fn builder() -> AgentInputBuilder {
         AgentInputBuilder::new()
     }
 
     /// Check if input has media content
+    #[must_use]
     pub fn has_media(&self) -> bool {
         !self.media.is_empty()
     }
 
     /// Get media of a specific type
+    #[must_use]
     pub fn get_media_by_type(&self, media_type: MediaType) -> Vec<&MediaContent> {
         self.media
             .iter()
@@ -144,7 +151,7 @@ impl fmt::Display for AgentInput {
     }
 }
 
-/// Builder for AgentInput
+/// Builder for `AgentInput`
 pub struct AgentInputBuilder {
     text: String,
     media: Vec<MediaContent>,
@@ -155,6 +162,7 @@ pub struct AgentInputBuilder {
 
 impl AgentInputBuilder {
     /// Create a new builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             text: String::new(),
@@ -172,12 +180,14 @@ impl AgentInputBuilder {
     }
 
     /// Add media content
+    #[must_use]
     pub fn add_media(mut self, media: MediaContent) -> Self {
         self.media.push(media);
         self
     }
 
     /// Set the context
+    #[must_use]
     pub fn context(mut self, context: ExecutionContext) -> Self {
         self.context = Some(context);
         self
@@ -190,12 +200,14 @@ impl AgentInputBuilder {
     }
 
     /// Set output modalities
+    #[must_use]
     pub fn output_modalities(mut self, modalities: Vec<MediaType>) -> Self {
         self.output_modalities = modalities;
         self
     }
 
-    /// Build the AgentInput
+    /// Build the `AgentInput`
+    #[must_use]
     pub fn build(self) -> AgentInput {
         AgentInput {
             text: self.text,
@@ -241,45 +253,53 @@ impl AgentOutput {
     }
 
     /// Add media content to the output
+    #[must_use]
     pub fn with_media(mut self, media: MediaContent) -> Self {
         self.media.push(media);
         self
     }
 
     /// Add a tool call
+    #[must_use]
     pub fn with_tool_call(mut self, tool_call: ToolCall) -> Self {
         self.tool_calls.push(tool_call);
         self
     }
 
     /// Set metadata
+    #[must_use]
     pub fn with_metadata(mut self, metadata: OutputMetadata) -> Self {
         self.metadata = metadata;
         self
     }
 
     /// Set transfer target
+    #[must_use]
     pub fn with_transfer(mut self, agent_id: ComponentId) -> Self {
         self.transfer_to = Some(agent_id);
         self
     }
 
     /// Create a builder for more complex outputs
+    #[must_use]
     pub fn builder() -> AgentOutputBuilder {
         AgentOutputBuilder::new()
     }
 
     /// Check if output has media content
+    #[must_use]
     pub fn has_media(&self) -> bool {
         !self.media.is_empty()
     }
 
     /// Check if output has tool calls
+    #[must_use]
     pub fn has_tool_calls(&self) -> bool {
         !self.tool_calls.is_empty()
     }
 
     /// Check if this is a transfer response
+    #[must_use]
     pub fn is_transfer(&self) -> bool {
         self.transfer_to.is_some()
     }
@@ -301,13 +321,13 @@ impl fmt::Display for AgentOutput {
             write!(f, ", tool_calls: {} items", self.tool_calls.len())?;
         }
         if let Some(ref agent_id) = self.transfer_to {
-            write!(f, ", transfer_to: {}", agent_id)?;
+            write!(f, ", transfer_to: {agent_id}")?;
         }
         write!(f, " }}")
     }
 }
 
-/// Builder for AgentOutput
+/// Builder for `AgentOutput`
 pub struct AgentOutputBuilder {
     text: String,
     media: Vec<MediaContent>,
@@ -318,6 +338,7 @@ pub struct AgentOutputBuilder {
 
 impl AgentOutputBuilder {
     /// Create a new builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             text: String::new(),
@@ -335,30 +356,35 @@ impl AgentOutputBuilder {
     }
 
     /// Add media content
+    #[must_use]
     pub fn add_media(mut self, media: MediaContent) -> Self {
         self.media.push(media);
         self
     }
 
     /// Add a tool call
+    #[must_use]
     pub fn add_tool_call(mut self, tool_call: ToolCall) -> Self {
         self.tool_calls.push(tool_call);
         self
     }
 
     /// Set metadata
+    #[must_use]
     pub fn metadata(mut self, metadata: OutputMetadata) -> Self {
         self.metadata = metadata;
         self
     }
 
     /// Set transfer target
+    #[must_use]
     pub fn transfer_to(mut self, agent_id: ComponentId) -> Self {
         self.transfer_to = Some(agent_id);
         self
     }
 
-    /// Build the AgentOutput
+    /// Build the `AgentOutput`
+    #[must_use]
     pub fn build(self) -> AgentOutput {
         AgentOutput {
             text: self.text,
@@ -379,7 +405,6 @@ impl Default for AgentOutputBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_agent_input_text_constructor() {
         let input = AgentInput::text("Hello, world!");
@@ -389,7 +414,6 @@ mod tests {
         assert!(input.parameters.is_empty());
         assert_eq!(input.output_modalities, vec![MediaType::Text]);
     }
-
     #[test]
     fn test_agent_input_builder() {
         let context = ExecutionContext::new()
@@ -410,7 +434,6 @@ mod tests {
         assert_eq!(input.parameters["max_tokens"], 100);
         assert_eq!(input.output_modalities.len(), 2);
     }
-
     #[test]
     fn test_agent_input_with_media() {
         let media = MediaContent::Text("Additional context".to_string());
@@ -420,7 +443,6 @@ mod tests {
         assert_eq!(input.media.len(), 1);
         assert!(input.has_media());
     }
-
     #[test]
     fn test_agent_output_text_constructor() {
         let output = AgentOutput::text("Response text");
@@ -429,7 +451,6 @@ mod tests {
         assert!(output.tool_calls.is_empty());
         assert!(output.transfer_to.is_none());
     }
-
     #[test]
     fn test_agent_output_builder() {
         let tool_call = ToolCall {
@@ -457,7 +478,6 @@ mod tests {
         assert_eq!(output.metadata.model, Some("gpt-4".to_string()));
         assert_eq!(output.metadata.token_count, Some(150));
     }
-
     #[test]
     fn test_agent_output_with_transfer() {
         let agent_id = ComponentId::from_name("next-agent");
@@ -466,7 +486,6 @@ mod tests {
         assert!(output.is_transfer());
         assert_eq!(output.transfer_to, Some(agent_id));
     }
-
     #[test]
     fn test_execution_context() {
         let context = ExecutionContext::with_conversation("conv-123".to_string())
@@ -480,7 +499,6 @@ mod tests {
         assert_eq!(context.data.len(), 2);
         assert_eq!(context.data["user_name"], "Alice");
     }
-
     #[test]
     fn test_tool_output() {
         let output = ToolOutput {
@@ -495,7 +513,6 @@ mod tests {
         assert!(output.error.is_none());
         assert_eq!(output.execution_time_ms, Some(25));
     }
-
     #[test]
     fn test_serialization() {
         let input = AgentInput::text("Test").with_parameter("key", "value");
@@ -509,7 +526,6 @@ mod tests {
         let deserialized: AgentOutput = serde_json::from_str(&json).unwrap();
         assert_eq!(output.text, deserialized.text);
     }
-
     #[test]
     fn test_display_formatting() {
         let input = AgentInput::text("This is a very long prompt that should be truncated in the display output for readability");

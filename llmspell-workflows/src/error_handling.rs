@@ -90,7 +90,11 @@ impl ErrorHandler {
         let progress = if completed_steps.is_empty() && remaining_steps == 0 {
             0.0
         } else {
-            completed_steps.len() as f64 / (completed_steps.len() + remaining_steps) as f64
+            #[allow(clippy::cast_precision_loss)]
+            let completed_len_f64 = completed_steps.len() as f64;
+            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+            let total_steps_f64 = (completed_steps.len() + remaining_steps) as f64;
+            completed_len_f64 / total_steps_f64
         };
 
         let successful_steps = completed_steps.iter().filter(|r| r.success).count();
@@ -101,6 +105,7 @@ impl ErrorHandler {
         Ok(WorkflowErrorAnalysis {
             error_type,
             error_message: error.to_string(),
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             progress_percentage: (progress * 100.0) as u32,
             successful_steps,
             failed_steps,
@@ -243,7 +248,6 @@ mod tests {
     use super::*;
     use llmspell_core::ComponentId;
     use std::time::Duration;
-
     #[tokio::test]
     async fn test_fail_fast_strategy() {
         let handler = ErrorHandler::new(ErrorStrategy::FailFast);
@@ -262,7 +266,6 @@ mod tests {
             .unwrap();
         assert_eq!(action, ErrorAction::StopWorkflow);
     }
-
     #[tokio::test]
     async fn test_continue_strategy() {
         let handler = ErrorHandler::new(ErrorStrategy::Continue);
@@ -281,7 +284,6 @@ mod tests {
             .unwrap();
         assert_eq!(action, ErrorAction::ContinueToNext);
     }
-
     #[tokio::test]
     async fn test_retry_strategy() {
         let handler = ErrorHandler::new(ErrorStrategy::Retry {
@@ -319,7 +321,6 @@ mod tests {
             .unwrap();
         assert_eq!(action, ErrorAction::StopWorkflow);
     }
-
     #[tokio::test]
     async fn test_retry_delay_calculation() {
         let handler = ErrorHandler::new(ErrorStrategy::FailFast);
@@ -341,7 +342,6 @@ mod tests {
         let delay_fixed = handler.calculate_retry_delay(&strategy, 2, false);
         assert_eq!(delay_fixed, Duration::from_millis(1000));
     }
-
     #[tokio::test]
     async fn test_workflow_error_analysis() {
         let handler = ErrorHandler::new(ErrorStrategy::FailFast);

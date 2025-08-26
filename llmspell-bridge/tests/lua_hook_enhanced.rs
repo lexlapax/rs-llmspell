@@ -5,15 +5,20 @@ use llmspell_bridge::globals::types::GlobalContext;
 use llmspell_bridge::hook_bridge::HookBridge;
 use llmspell_bridge::lua::globals::hook::inject_hook_global;
 use llmspell_bridge::{ComponentRegistry, ProviderManager};
+use llmspell_config::providers::ProviderManagerConfig;
 use mlua::Lua;
 use std::sync::Arc;
 
 async fn create_test_environment() -> (Lua, GlobalContext, Arc<HookBridge>) {
     let lua = Lua::new();
     let registry = Arc::new(ComponentRegistry::new());
-    let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+    let providers = Arc::new(
+        ProviderManager::new(ProviderManagerConfig::default())
+            .await
+            .unwrap(),
+    );
     let context = GlobalContext::new(registry, providers);
-    let hook_bridge = Arc::new(HookBridge::new(Arc::new(context.clone())).await.unwrap());
+    let hook_bridge = Arc::new(HookBridge::new(Arc::new(context.clone())).unwrap());
 
     inject_hook_global(&lua, &context, hook_bridge.clone()).unwrap();
 
@@ -145,15 +150,14 @@ async fn test_hook_list_enhanced_filtering() {
     match result {
         Ok((success, debug_info)) => {
             if !success {
-                println!("Debug info: {}", debug_info);
+                println!("Debug info: {debug_info}");
             }
             assert!(
                 success,
-                "Should filter hooks using enhanced filtering options. Debug: {}",
-                debug_info
+                "Should filter hooks using enhanced filtering options. Debug: {debug_info}"
             );
         }
-        Err(e) => panic!("Test failed with error: {}", e),
+        Err(e) => panic!("Test failed with error: {e}"),
     }
 }
 

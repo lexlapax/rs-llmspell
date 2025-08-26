@@ -1,6 +1,8 @@
 // ABOUTME: Simplified performance test for hook system overhead measurement
 // ABOUTME: Tests the overhead of hooks on agent, tool, and workflow operations
 
+// Benchmark file
+
 use async_trait::async_trait;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_hooks::{

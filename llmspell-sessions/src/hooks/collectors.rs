@@ -211,7 +211,6 @@ mod tests {
     use llmspell_hooks::{ComponentId, ComponentType};
     use llmspell_storage::MemoryBackend;
     use serde_json::json;
-
     #[tokio::test]
     async fn test_process_collected_artifact() {
         let storage = Arc::new(MemoryBackend::new());
@@ -251,7 +250,6 @@ mod tests {
         assert_eq!(artifacts.len(), 1);
         assert_eq!(artifacts[0].name, "test_result.json");
     }
-
     #[tokio::test]
     async fn test_artifact_collection_processor() {
         let storage = Arc::new(MemoryBackend::new());
@@ -286,7 +284,6 @@ mod tests {
         let result = processor.process_hook_context(&context, &session_id).await;
         assert!(result.is_ok());
     }
-
     #[test]
     fn test_should_process_hook_point() {
         assert!(ArtifactCollectionProcessor::should_process_hook_point(

@@ -306,7 +306,6 @@ mod tests {
         metadata.tags = tags;
         (artifact_id, metadata)
     }
-
     #[test]
     fn test_search_by_name_pattern() {
         let mut index = MetadataIndex::new();
@@ -335,7 +334,6 @@ mod tests {
         assert_eq!(result.total_count, 2);
         assert!(result.artifacts.iter().all(|a| a.name.contains("test")));
     }
-
     #[test]
     fn test_search_by_type() {
         let mut index = MetadataIndex::new();
@@ -360,7 +358,6 @@ mod tests {
             .iter()
             .all(|a| a.artifact_type == ArtifactType::UserInput));
     }
-
     #[test]
     fn test_search_with_tags() {
         let mut index = MetadataIndex::new();
@@ -404,7 +401,6 @@ mod tests {
             .iter()
             .all(|a| a.tags.contains(&"important".to_string())));
     }
-
     #[test]
     fn test_search_with_size_filters() {
         let mut index = MetadataIndex::new();
@@ -432,7 +428,6 @@ mod tests {
         assert_eq!(result.total_count, 1);
         assert_eq!(result.artifacts[0].name, "medium.txt");
     }
-
     #[test]
     fn test_search_sorting() {
         let mut index = MetadataIndex::new();
@@ -470,7 +465,6 @@ mod tests {
         assert_eq!(result.artifacts[1].size, 512); // zebra.txt
         assert_eq!(result.artifacts[2].size, 256); // beta.txt
     }
-
     #[test]
     fn test_search_pagination() {
         let mut index = MetadataIndex::new();

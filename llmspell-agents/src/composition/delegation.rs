@@ -1,6 +1,8 @@
 //! ABOUTME: Delegation patterns for agent composition
 //! ABOUTME: Enables agents to delegate tasks to other agents based on capabilities
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::traits::{
     Capability, CapabilityCategory, Composable, CompositionMetadata, CompositionType,
 };
@@ -128,7 +130,7 @@ impl DelegatingAgent {
     /// Create a new delegating agent
     pub fn new(name: impl Into<String>, config: DelegationConfig) -> Self {
         let name = name.into();
-        let description = format!("Delegating agent: {}", name);
+        let description = format!("Delegating agent: {name}");
         Self {
             metadata: ComponentMetadata::new(name, description),
             agents: TokioRwLock::new(HashMap::new()),
@@ -141,12 +143,17 @@ impl DelegatingAgent {
     }
 
     /// Register an agent for delegation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent registration fails
     pub async fn register_agent(&self, agent: Arc<dyn BaseAgent>) -> Result<()> {
         let agent_id = agent.metadata().id.to_string();
 
         // Store the agent
         let mut agents = self.agents.write().await;
         agents.insert(agent_id.clone(), agent.clone());
+        drop(agents);
 
         // Index capabilities if caching is enabled
         if self.config.cache_capabilities {
@@ -157,15 +164,21 @@ impl DelegatingAgent {
     }
 
     /// Unregister an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent unregistration fails
     pub async fn unregister_agent(&self, agent_id: &str) -> Result<()> {
         let mut agents = self.agents.write().await;
         agents.remove(agent_id);
+        drop(agents);
 
         // Remove from capabilities index
         let mut index = self.capabilities_index.write().await;
         for agents in index.values_mut() {
             agents.retain(|id| id != agent_id);
         }
+        drop(index);
 
         Ok(())
     }
@@ -193,6 +206,7 @@ impl DelegatingAgent {
                 .or_default()
                 .push(agent_id.to_string());
         }
+        drop(index);
 
         Ok(())
     }
@@ -222,7 +236,7 @@ impl DelegatingAgent {
     }
 
     /// Select an agent based on the configured strategy
-    async fn select_agent(
+    fn select_agent(
         &self,
         matching_agents: Vec<String>,
         _request: &DelegationRequest,
@@ -242,9 +256,12 @@ impl DelegatingAgent {
             }
 
             DelegationStrategy::RoundRobin => {
-                let mut index = self.round_robin_index.write().unwrap();
-                let selected = matching_agents[*index % matching_agents.len()].clone();
-                *index += 1;
+                let selected = {
+                    let mut index = self.round_robin_index.write().unwrap();
+                    let selected = matching_agents[*index % matching_agents.len()].clone();
+                    *index += 1;
+                    selected
+                };
                 Some(selected)
             }
 
@@ -271,6 +288,17 @@ impl DelegatingAgent {
     }
 
     /// Delegate a request to an appropriate agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No suitable agent is found
+    /// - Agent execution fails
+    /// - Strategy processing fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if a `RwLock` is poisoned
     pub async fn delegate(&self, request: DelegationRequest) -> Result<DelegationResult> {
         let start_time = std::time::Instant::now();
 
@@ -282,7 +310,6 @@ impl DelegatingAgent {
         // Select an agent
         let selected_agent = self
             .select_agent(matching_agents, &request)
-            .await
             .ok_or_else(|| LLMSpellError::Component {
                 message: "No matching agent found for delegation".to_string(),
                 source: None,
@@ -303,7 +330,7 @@ impl DelegatingAgent {
         let agent = agents
             .get(&selected_agent)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Agent not found: {}", selected_agent),
+                message: format!("Agent not found: {selected_agent}"),
                 source: None,
             })?;
 
@@ -324,13 +351,16 @@ impl DelegatingAgent {
         // Update metrics and create result
         match result {
             Ok(output) => {
-                let mut metrics = self.metrics.write().unwrap();
-                metrics.successful_delegations += 1;
-                metrics.avg_delegation_time = std::time::Duration::from_secs(
-                    (metrics.avg_delegation_time.as_secs() * (metrics.successful_delegations - 1)
-                        + duration.as_secs())
-                        / metrics.successful_delegations,
-                );
+                {
+                    let mut metrics = self.metrics.write().unwrap();
+                    metrics.successful_delegations += 1;
+                    metrics.avg_delegation_time = std::time::Duration::from_secs(
+                        (metrics.avg_delegation_time.as_secs()
+                            * (metrics.successful_delegations - 1)
+                            + duration.as_secs())
+                            / metrics.successful_delegations,
+                    );
+                }
 
                 Ok(DelegationResult {
                     task_id: request.task_id,
@@ -342,8 +372,10 @@ impl DelegatingAgent {
                 })
             }
             Err(e) => {
-                let mut metrics = self.metrics.write().unwrap();
-                metrics.failed_delegations += 1;
+                {
+                    let mut metrics = self.metrics.write().unwrap();
+                    metrics.failed_delegations += 1;
+                }
 
                 if self.config.retry_on_failure && request.priority > 5 {
                     // Could implement retry logic here
@@ -362,11 +394,19 @@ impl DelegatingAgent {
     }
 
     /// Set the delegation strategy
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn set_strategy(&self, strategy: DelegationStrategy) {
         *self.strategy.write().unwrap() = strategy;
     }
 
     /// Get delegation metrics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned
     pub fn metrics(&self) -> DelegationMetrics {
         self.metrics.read().unwrap().clone()
     }
@@ -378,7 +418,11 @@ impl BaseAgent for DelegatingAgent {
         &self.metadata
     }
 
-    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+    async fn execute_impl(
+        &self,
+        input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentOutput> {
         // Parse the input as a delegation request
         let request: DelegationRequest = serde_json::from_str(&input.text)?;
 
@@ -396,7 +440,7 @@ impl BaseAgent for DelegatingAgent {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Delegation error: {}", error)))
+        Ok(AgentOutput::text(format!("Delegation error: {error}")))
     }
 }
 
@@ -474,24 +518,31 @@ impl DelegatingAgentBuilder {
     }
 
     /// Set the configuration
-    pub fn config(mut self, config: DelegationConfig) -> Self {
+    #[must_use]
+    pub const fn config(mut self, config: DelegationConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Set the delegation strategy
+    #[must_use]
     pub fn strategy(mut self, strategy: DelegationStrategy) -> Self {
         self.strategy = strategy;
         self
     }
 
     /// Add an initial agent
+    #[must_use]
     pub fn add_agent(mut self, agent: Arc<dyn BaseAgent>) -> Self {
         self.initial_agents.push(agent);
         self
     }
 
     /// Build the delegating agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent building fails
     pub async fn build(self) -> Result<DelegatingAgent> {
         let agent = DelegatingAgent::new(self.name, self.config);
         agent.set_strategy(self.strategy);
@@ -508,14 +559,13 @@ impl DelegatingAgentBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[tokio::test]
     async fn test_delegating_agent_creation() {
         let agent = DelegatingAgent::new("test-delegator", DelegationConfig::default());
         assert_eq!(agent.metadata().name, "test-delegator");
     }
-
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_agent_registration() {
         let delegator = DelegatingAgent::new("delegator", DelegationConfig::default());
 
@@ -530,7 +580,7 @@ mod tests {
                 &self.metadata
             }
 
-            async fn execute(
+            async fn execute_impl(
                 &self,
                 _input: AgentInput,
                 _context: ExecutionContext,
@@ -543,7 +593,7 @@ mod tests {
             }
 
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-                Ok(AgentOutput::text(format!("Error: {}", error)))
+                Ok(AgentOutput::text(format!("Error: {error}")))
             }
         }
 
@@ -559,7 +609,6 @@ mod tests {
         let agents = delegator.agents.read().await;
         assert_eq!(agents.len(), 1);
     }
-
     #[test]
     fn test_delegation_strategy() {
         let strategies = vec![
@@ -573,16 +622,15 @@ mod tests {
 
         for strategy in strategies {
             match strategy {
-                DelegationStrategy::FirstMatch => {}
-                DelegationStrategy::BestMatch => {}
-                DelegationStrategy::RoundRobin => {}
-                DelegationStrategy::Random => {}
-                DelegationStrategy::LoadBalanced => {}
+                DelegationStrategy::FirstMatch
+                | DelegationStrategy::BestMatch
+                | DelegationStrategy::RoundRobin
+                | DelegationStrategy::Random
+                | DelegationStrategy::LoadBalanced => {}
                 DelegationStrategy::Custom(s) => assert_eq!(s, "test"),
             }
         }
     }
-
     #[test]
     fn test_delegation_request() {
         let request = DelegationRequest {

@@ -1,11 +1,6 @@
-# ABOUTME: Comprehensive security guide for rs-llmspell developers
-# ABOUTME: Guidelines, best practices, and code examples for secure tool development
-
 # Security Development Guide for rs-llmspell
 
-⚠️ **EVOLVING CODEBASE**: This guide contains API examples that may not match the current security implementation. Always verify against the actual `llmspell-security` crate before implementing.
-
-**Phase 3.3 Status**: Security framework is implemented but APIs differ from examples shown here.
+✅ **CURRENT**: Updated for Phase 7 with correct APIs and implementation patterns.
 
 This comprehensive guide provides security guidelines, best practices, and code examples for developers contributing to rs-llmspell. Following these guidelines ensures tools are secure, reliable, and resistant to common attack vectors.
 
@@ -90,23 +85,24 @@ impl Tool for YourTool {
 
 ### Required Validations
 
+**CRITICAL SECURITY UPDATE**: All filesystem-accessing tools MUST use bridge-provided sandbox.
+
 ```rust
-use llmspell_security::{SandboxContext, FileSandbox};
+use llmspell_security::sandbox::FileSandbox;
+use std::sync::Arc;
 
 impl YourTool {
-    fn validate_input(&self, input: &str) -> LLMResult<String> {
-        // ✅ CORRECT: Create sandbox context for validation
-        let context = SandboxContext::new(
-            "input-validation".to_string(),
-            self.security_requirements(),
-            self.resource_limits(),
-        );
-        
-        // ✅ CORRECT: Validate paths using file sandbox
-        if self.handles_paths() {
-            let file_sandbox = FileSandbox::new(context.clone())?;
-            let _validated_path = file_sandbox.validate_path(&std::path::Path::new(input))?;
+    // ✅ MANDATORY: Tools with file access must accept bridge-provided sandbox
+    pub fn new(config: YourToolConfig, sandbox: Arc<FileSandbox>) -> Self {
+        Self {
+            config,
+            sandbox, // Store bridge-provided sandbox
         }
+    }
+
+    fn validate_input(&self, input: &str) -> LLMResult<String> {
+        // ✅ CORRECT: Use bridge-provided sandbox (NEVER create your own)
+        let validated_path = self.sandbox.validate_path(Path::new(input))?;
         
         // ✅ CORRECT: Basic input sanitization
         let sanitized = input.trim();

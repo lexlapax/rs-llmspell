@@ -1,6 +1,8 @@
 //! ABOUTME: Core registry types and traits
 //! ABOUTME: Defines the foundational types for agent registry
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::traits::agent::Agent;
@@ -42,7 +44,7 @@ pub struct AgentMetadata {
 }
 
 /// Agent status in the registry
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AgentStatus {
     /// Agent is active and ready
     Active,
@@ -171,6 +173,7 @@ pub struct InMemoryAgentRegistry {
 
 impl InMemoryAgentRegistry {
     /// Create new in-memory registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             agents: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
@@ -336,14 +339,13 @@ impl AgentRegistry for InMemoryAgentRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_agent_status_equality() {
         assert_eq!(AgentStatus::Active, AgentStatus::Active);
         assert_ne!(AgentStatus::Active, AgentStatus::Paused);
     }
-
     #[test]
+    #[allow(clippy::float_cmp)] // Test assertion on float values
     fn test_agent_metrics_default() {
         let metrics = AgentMetrics::default();
         assert_eq!(metrics.execution_count, 0);

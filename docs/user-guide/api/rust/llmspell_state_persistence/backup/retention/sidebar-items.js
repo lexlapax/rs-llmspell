@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["RetentionPriority"],"struct":["CompositePolicy","CountBasedPolicy","ImportanceBasedPolicy","RetentionContext","RetentionDecision","RetentionReport","TimeBasedPolicy"],"trait":["RetentionPolicy"]};

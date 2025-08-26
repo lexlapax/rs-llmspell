@@ -5,6 +5,7 @@ use super::test_framework::*;
 use serde_json::json;
 
 /// SQL injection test vectors
+#[must_use]
 pub fn sql_injection_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -65,7 +66,8 @@ pub fn sql_injection_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// NoSQL injection test vectors
+/// `NoSQL` injection test vectors
+#[must_use]
 pub fn nosql_injection_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -105,6 +107,7 @@ pub fn nosql_injection_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Command injection test vectors
+#[must_use]
 pub fn command_injection_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -166,6 +169,7 @@ pub fn command_injection_tests() -> Vec<SecurityTestCase> {
 }
 
 /// LDAP injection test vectors
+#[must_use]
 pub fn ldap_injection_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -193,7 +197,8 @@ pub fn ldap_injection_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// XPath injection test vectors
+/// `XPath` injection test vectors
+#[must_use]
 pub fn xpath_injection_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -222,6 +227,7 @@ pub fn xpath_injection_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Script injection test vectors
+#[must_use]
 pub fn script_injection_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -261,13 +267,14 @@ pub fn script_injection_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Buffer overflow test vectors
+#[must_use]
 pub fn buffer_overflow_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
             name: "BUFFER_LONG_STRING".to_string(),
             description: "Extremely long string".to_string(),
             payload: json!({
-                "input": "A".repeat(100000),
+                "input": "A".repeat(100_000),
                 "field": "text"
             }),
             expected_behavior: ExpectedBehavior::Reject,
@@ -300,6 +307,7 @@ pub fn buffer_overflow_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Malformed input test vectors
+#[must_use]
 pub fn malformed_input_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -349,7 +357,8 @@ pub fn malformed_input_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// Regular expression DoS test vectors
+/// Regular expression `DoS` test vectors
+#[must_use]
 pub fn regex_dos_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -378,6 +387,7 @@ pub fn regex_dos_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Protocol-specific injection tests
+#[must_use]
 pub fn protocol_injection_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -417,6 +427,7 @@ pub fn protocol_injection_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Create all input validation test cases
+#[must_use]
 pub fn all_input_validation_tests() -> Vec<SecurityTestCase> {
     let mut tests = Vec::new();
     tests.extend(sql_injection_tests());
@@ -435,7 +446,6 @@ pub fn all_input_validation_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     #[test]
     fn test_input_validation_test_creation() {
         let tests = all_input_validation_tests();
@@ -447,7 +457,7 @@ mod tests {
             .map(|t| t.name.split('_').next().unwrap_or(""))
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         assert!(categories.contains(&"SQL".to_string()));
@@ -461,7 +471,6 @@ mod tests {
         assert!(categories.contains(&"REGEX".to_string()));
         assert!(categories.contains(&"PROTO".to_string()));
     }
-
     #[test]
     fn test_critical_severity_tests() {
         let tests = all_input_validation_tests();
@@ -479,16 +488,15 @@ mod tests {
         // Command injection should be critical
         assert!(critical_tests.iter().any(|t| t.name.starts_with("CMD_")));
     }
-
     #[test]
     fn test_injection_category_coverage() {
         let tests = all_input_validation_tests();
-        let injection_tests: Vec<_> = tests
+        let injection_test_count = tests
             .iter()
             .filter(|t| t.categories.contains(&TestCategory::Injection))
-            .collect();
+            .count();
 
         // Should have comprehensive injection test coverage
-        assert!(injection_tests.len() > 20);
+        assert!(injection_test_count > 20);
     }
 }

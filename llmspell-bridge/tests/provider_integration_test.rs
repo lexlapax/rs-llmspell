@@ -1,11 +1,8 @@
 //! Test provider integration with script runtime
 
-use llmspell_bridge::{
-    providers::{ProviderConfig, ProviderManagerConfig},
-    RuntimeConfig, ScriptRuntime,
-};
+use llmspell_bridge::ScriptRuntime;
+use llmspell_config::{LLMSpellConfig, ProviderConfig, ProviderManagerConfig};
 use std::collections::HashMap;
-
 #[tokio::test]
 async fn test_lua_agent_creation_with_mock_provider() {
     // Create runtime config with a mock provider
@@ -13,16 +10,23 @@ async fn test_lua_agent_creation_with_mock_provider() {
     provider_config.insert(
         "test".to_string(),
         ProviderConfig {
+            name: "test".to_string(),
             provider_type: "mock".to_string(),
-            api_key_env: None,
+            enabled: true,
             base_url: None,
-            model: Some("test-model".to_string()),
+            api_key_env: None,
+            api_key: None,
+            default_model: Some("test-model".to_string()),
             max_tokens: None,
-            extra: HashMap::new(),
+            timeout_seconds: None,
+            max_retries: None,
+            rate_limit: None,
+            retry: None,
+            options: HashMap::new(),
         },
     );
 
-    let runtime_config = RuntimeConfig {
+    let runtime_config = LLMSpellConfig {
         default_engine: "lua".to_string(),
         providers: ProviderManagerConfig {
             default_provider: Some("test".to_string()),
@@ -40,7 +44,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_lua_script_provider_access() {
-    let runtime_config = RuntimeConfig::default();
+    let runtime_config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(runtime_config).await.unwrap();
 
     // Test script that tries to create an agent

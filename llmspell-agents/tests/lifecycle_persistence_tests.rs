@@ -18,10 +18,10 @@ use llmspell_core::{
     ExecutionContext,
 };
 use llmspell_state_persistence::StateManager;
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-
 #[tokio::test]
 async fn test_save_on_pause() -> Result<()> {
     // Create state manager
@@ -86,7 +86,7 @@ async fn test_save_on_pause() -> Result<()> {
             agent_id,
             LifecycleEventData::Generic {
                 message: "Test pause".to_string(),
-                details: Default::default(),
+                details: HashMap::default(),
             },
             "test".to_string(),
         ))
@@ -106,7 +106,6 @@ async fn test_save_on_pause() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_save_on_stop() -> Result<()> {
     // Create state manager
@@ -171,7 +170,7 @@ async fn test_save_on_stop() -> Result<()> {
             agent_id,
             LifecycleEventData::Generic {
                 message: "Test stop".to_string(),
-                details: Default::default(),
+                details: HashMap::default(),
             },
             "test".to_string(),
         ))
@@ -191,7 +190,6 @@ async fn test_save_on_stop() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_auto_save() -> Result<()> {
     // Create state manager
@@ -245,7 +243,6 @@ async fn test_auto_save() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_circuit_breaker() -> Result<()> {
     // Create state manager
@@ -294,8 +291,8 @@ async fn test_circuit_breaker() -> Result<()> {
                 LifecycleEventType::AgentPaused,
                 agent_id.clone(),
                 LifecycleEventData::Generic {
-                    message: format!("Test pause {}", i),
-                    details: Default::default(),
+                    message: format!("Test pause {i}"),
+                    details: HashMap::default(),
                 },
                 "test".to_string(),
             ))
@@ -314,7 +311,6 @@ async fn test_circuit_breaker() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_non_blocking_saves() -> Result<()> {
     // Create state manager
@@ -378,7 +374,7 @@ async fn test_non_blocking_saves() -> Result<()> {
             agent_id,
             LifecycleEventData::Generic {
                 message: "Test pause".to_string(),
-                details: Default::default(),
+                details: HashMap::default(),
             },
             "test".to_string(),
         ))
@@ -405,20 +401,19 @@ async fn test_non_blocking_saves() -> Result<()> {
 
     Ok(())
 }
-
 #[tokio::test]
 async fn test_presets() -> Result<()> {
     // Test different preset configurations
     let dev_config = presets::development();
     assert_eq!(dev_config.auto_save_interval, Some(Duration::from_secs(60)));
-    assert!(!dev_config.non_blocking);
+    assert!(!dev_config.event_settings.non_blocking);
 
     let prod_config = presets::production();
     assert_eq!(
         prod_config.auto_save_interval,
         Some(Duration::from_secs(300))
     );
-    assert!(prod_config.non_blocking);
+    assert!(prod_config.event_settings.non_blocking);
 
     let test_config = presets::testing();
     assert_eq!(
@@ -429,8 +424,8 @@ async fn test_presets() -> Result<()> {
 
     let minimal_config = presets::minimal();
     assert!(minimal_config.auto_save_interval.is_none());
-    assert!(!minimal_config.save_on_pause);
-    assert!(minimal_config.save_on_stop);
+    assert!(!minimal_config.event_settings.save_on_pause);
+    assert!(minimal_config.event_settings.save_on_stop);
 
     Ok(())
 }

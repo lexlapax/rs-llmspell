@@ -29,7 +29,7 @@ use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
         tool::{SecurityLevel, ToolCategory, ToolSchema},
-        workflow::{RetryPolicy, WorkflowConfig, WorkflowStatus, WorkflowStep},
+        workflow::{Config as WorkflowConfig, RetryPolicy, Status as WorkflowStatus, WorkflowStep},
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, Version,
@@ -179,10 +179,8 @@ pub fn tool_schema_strategy() -> impl Strategy<Value = ToolSchema> {
 /// Strategy for generating RetryPolicy
 pub fn retry_policy_strategy() -> impl Strategy<Value = RetryPolicy> {
     (1u32..10u32, 1u32..60u32, any::<bool>()).prop_map(
-        |(max_attempts, backoff_seconds, exponential_backoff)| RetryPolicy {
-            max_attempts,
-            backoff_seconds,
-            exponential_backoff,
+        |(max_attempts, backoff_seconds, exponential_backoff)| {
+            RetryPolicy::new(max_attempts, backoff_seconds, exponential_backoff)
         },
     )
 }
@@ -214,13 +212,12 @@ pub fn workflow_config_strategy() -> impl Strategy<Value = WorkflowConfig> {
         any::<bool>(),
         prop::option::of(1u64..86400u64),
     )
-        .prop_map(
-            |(max_parallel, continue_on_error, timeout_secs)| WorkflowConfig {
-                max_parallel,
-                continue_on_error,
-                timeout: timeout_secs.map(Duration::from_secs),
-            },
-        )
+        .prop_map(|(max_parallel, continue_on_error, timeout_secs)| {
+            WorkflowConfig::new()
+                .with_max_parallel(max_parallel)
+                .with_continue_on_error(continue_on_error)
+                .with_timeout(timeout_secs.map(Duration::from_secs))
+        })
 }
 
 /// Strategy for generating WorkflowStatus
@@ -369,14 +366,12 @@ mod tests {
             // We can't check internals, but can verify it was created
             let _ = id;
         }
-
         #[test]
         fn test_component_id_from_name((name, id) in component_id_from_name_strategy()) {
             // Same name should generate same ID
             let id2 = ComponentId::from_name(&name);
             assert_eq!(id, id2);
         }
-
         #[test]
         fn test_version_generation(version in version_strategy()) {
             // Version should serialize/deserialize correctly
@@ -384,13 +379,11 @@ mod tests {
             let parsed: Version = serde_json::from_str(&json).unwrap();
             assert_eq!(version, parsed);
         }
-
         #[test]
         fn test_agent_input_generation(input in agent_input_strategy()) {
             // Should have a non-empty prompt
             assert!(!input.text.is_empty() || input.text.is_empty()); // tautology but tests generation
         }
-
         #[test]
         fn test_workflow_step_generation(step in workflow_step_strategy()) {
             // Step should have a name
@@ -400,7 +393,6 @@ mod tests {
             let _ = step.component_id;
             let _ = step.dependencies;
         }
-
         #[test]
         fn test_file_path_generation(path in test_file_path_strategy()) {
             // Path should not be empty
@@ -408,7 +400,6 @@ mod tests {
             // Should have an extension or be a known test file
             assert!(path.contains('.') || path == "test");
         }
-
         #[test]
         fn test_json_data_generation(data in sample_json_data_strategy()) {
             // Should be valid JSON that can round-trip
@@ -416,7 +407,6 @@ mod tests {
             let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
             assert_eq!(data, parsed);
         }
-
         #[test]
         fn test_mock_api_response_generation(response in mock_api_response_strategy()) {
             // Should be an object
@@ -425,7 +415,6 @@ mod tests {
             let obj = response.as_object().unwrap();
             assert!(!obj.is_empty());
         }
-
         #[test]
         fn test_env_vars_generation(vars in env_vars_strategy()) {
             // All keys should be uppercase
@@ -433,7 +422,6 @@ mod tests {
                 assert!(key.chars().all(|c| c.is_uppercase() || c == '_' || c.is_numeric()));
             }
         }
-
         #[test]
         fn test_timeout_duration_generation(duration in timeout_duration_strategy()) {
             // Should be within reasonable bounds

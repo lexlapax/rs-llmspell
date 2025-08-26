@@ -13,7 +13,6 @@ fn extract_result(response_text: &str) -> Value {
     assert!(output["success"].as_bool().unwrap_or(false));
     output["result"].clone()
 }
-
 #[tokio::test]
 async fn test_text_diff_formats() {
     let tool = DiffCalculatorTool::new();
@@ -115,7 +114,6 @@ async fn test_text_diff_formats() {
     // The simple format shows "Replaced" for modified lines
     assert!(diff.contains("Replaced at lines"));
 }
-
 #[tokio::test]
 async fn test_json_diff_simple() {
     let tool = DiffCalculatorTool::new();
@@ -161,7 +159,6 @@ async fn test_json_diff_simple() {
     assert_eq!(summary["modified"], 1);
     assert_eq!(summary["unchanged"], 1); // "name" is unchanged
 }
-
 #[tokio::test]
 async fn test_json_diff_nested() {
     let tool = DiffCalculatorTool::new();
@@ -214,7 +211,6 @@ async fn test_json_diff_nested() {
     assert_eq!(diff["modified"]["data"]["old"], json!([1, 2, 3]));
     assert_eq!(diff["modified"]["data"]["new"], json!([1, 2, 3, 4]));
 }
-
 #[tokio::test]
 async fn test_file_diff() {
     let tool = DiffCalculatorTool::new();
@@ -253,7 +249,6 @@ async fn test_file_diff() {
     assert!(diff.contains("+Line 2 modified"));
     assert!(diff.contains("+Line 4"));
 }
-
 #[tokio::test]
 async fn test_json_file_diff() {
     let tool = DiffCalculatorTool::new();
@@ -298,7 +293,6 @@ async fn test_json_file_diff() {
     assert_eq!(diff["modified"]["version"]["old"], "1.0.0");
     assert_eq!(diff["modified"]["version"]["new"], "1.1.0");
 }
-
 #[tokio::test]
 async fn test_empty_diff() {
     let tool = DiffCalculatorTool::new();
@@ -324,7 +318,6 @@ async fn test_empty_diff() {
     let diff = output["diff"].as_str().unwrap();
     assert!(diff.contains("Total changes: 0"));
 }
-
 #[tokio::test]
 async fn test_large_text_diff() {
     let tool = DiffCalculatorTool::new();
@@ -334,11 +327,11 @@ async fn test_large_text_diff() {
     let mut new_lines = vec![];
 
     for i in 0..1000 {
-        old_lines.push(format!("Line {}", i));
+        old_lines.push(format!("Line {i}"));
         if i % 10 == 0 {
-            new_lines.push(format!("Modified line {}", i));
+            new_lines.push(format!("Modified line {i}"));
         } else {
-            new_lines.push(format!("Line {}", i));
+            new_lines.push(format!("Line {i}"));
         }
     }
 
@@ -367,7 +360,6 @@ async fn test_large_text_diff() {
     let diff = output["diff"].as_str().unwrap();
     assert!(diff.contains("Total changes: 100")); // 100 modifications
 }
-
 #[tokio::test]
 async fn test_error_handling() {
     let tool = DiffCalculatorTool::new();
@@ -424,7 +416,6 @@ async fn test_error_handling() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

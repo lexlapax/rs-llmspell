@@ -28,12 +28,14 @@ impl AgentBuilder {
     }
 
     /// Set the agent description
+    #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.config.description = description.into();
         self
     }
 
     /// Configure the model for LLM-based agents
+    #[must_use]
     pub fn with_model(mut self, provider: impl Into<String>, model_id: impl Into<String>) -> Self {
         self.config.model = Some(ModelConfig {
             provider: provider.into(),
@@ -46,7 +48,12 @@ impl AgentBuilder {
     }
 
     /// Set model temperature
-    pub fn temperature(mut self, temperature: f32) -> Self {
+    ///
+    /// # Panics
+    ///
+    /// Will not panic. This function only modifies the temperature if a model config exists.
+    #[must_use]
+    pub const fn temperature(mut self, temperature: f32) -> Self {
         if let Some(model) = &mut self.config.model {
             model.temperature = Some(temperature);
         }
@@ -54,7 +61,12 @@ impl AgentBuilder {
     }
 
     /// Set maximum tokens for model
-    pub fn max_tokens(mut self, max_tokens: u32) -> Self {
+    ///
+    /// # Panics
+    ///
+    /// Will not panic. This function only modifies the max tokens if a model config exists.
+    #[must_use]
+    pub const fn max_tokens(mut self, max_tokens: u32) -> Self {
         if let Some(model) = &mut self.config.model {
             model.max_tokens = Some(max_tokens);
         }
@@ -62,6 +74,11 @@ impl AgentBuilder {
     }
 
     /// Add a model setting
+    ///
+    /// # Panics
+    ///
+    /// Will not panic. This function only adds settings if a model config exists.
+    #[must_use]
     pub fn model_setting(mut self, key: impl Into<String>, value: Value) -> Self {
         if let Some(model) = &mut self.config.model {
             model.settings.insert(key.into(), value);
@@ -70,60 +87,77 @@ impl AgentBuilder {
     }
 
     /// Allow access to specific tools
+    #[must_use]
     pub fn allow_tool(mut self, tool_id: impl Into<String>) -> Self {
         self.config.allowed_tools.push(tool_id.into());
         self
     }
 
     /// Allow access to multiple tools
+    #[must_use]
     pub fn allow_tools(mut self, tool_ids: Vec<String>) -> Self {
         self.config.allowed_tools.extend(tool_ids);
         self
     }
 
     /// Allow access to all tools
+    #[must_use]
     pub fn allow_all_tools(mut self) -> Self {
         self.config.allowed_tools = vec!["*".to_string()];
         self
     }
 
     /// Add a custom configuration parameter
+    #[must_use]
     pub fn custom(mut self, key: impl Into<String>, value: Value) -> Self {
         self.config.custom_config.insert(key.into(), value);
         self
     }
 
     /// Set maximum execution time
-    pub fn max_execution_time_secs(mut self, secs: u64) -> Self {
+    #[must_use]
+    pub const fn max_execution_time_secs(mut self, secs: u64) -> Self {
         self.config.resource_limits.max_execution_time_secs = secs;
         self
     }
 
     /// Set maximum memory usage
-    pub fn max_memory_mb(mut self, mb: u64) -> Self {
+    #[must_use]
+    pub const fn max_memory_mb(mut self, mb: u64) -> Self {
         self.config.resource_limits.max_memory_mb = mb;
         self
     }
 
     /// Set maximum number of tool calls
-    pub fn max_tool_calls(mut self, calls: u32) -> Self {
+    #[must_use]
+    pub const fn max_tool_calls(mut self, calls: u32) -> Self {
         self.config.resource_limits.max_tool_calls = calls;
         self
     }
 
     /// Set maximum recursion depth
-    pub fn max_recursion_depth(mut self, depth: u8) -> Self {
+    #[must_use]
+    pub const fn max_recursion_depth(mut self, depth: u8) -> Self {
         self.config.resource_limits.max_recursion_depth = depth;
         self
     }
 
     /// Set all resource limits at once
-    pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+    #[must_use]
+    pub const fn resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.config.resource_limits = limits;
         self
     }
 
     /// Build the agent configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent name is empty
+    /// - Agent type is empty
+    /// - Invalid tool IDs are specified
+    /// - Configuration validation fails
     pub fn build(self) -> Result<AgentConfig> {
         // Validate the configuration
         if self.config.name.is_empty() {
@@ -173,7 +207,6 @@ impl AgentBuilder {
 mod tests {
     use super::*;
     use serde_json::json;
-
     #[test]
     fn test_basic_builder() {
         let config = AgentBuilder::new("test-agent", "basic")
@@ -185,7 +218,6 @@ mod tests {
         assert_eq!(config.agent_type, "basic");
         assert_eq!(config.description, "A test agent");
     }
-
     #[test]
     fn test_fluent_api() {
         let config = AgentBuilder::new("complex-agent", "llm")
@@ -216,7 +248,6 @@ mod tests {
         assert_eq!(config.resource_limits.max_execution_time_secs, 600);
         assert_eq!(config.resource_limits.max_memory_mb, 1024);
     }
-
     #[test]
     fn test_convenience_builders() {
         // Test basic builder
@@ -243,7 +274,6 @@ mod tests {
         let workflow = AgentBuilder::workflow("my-workflow").build().unwrap();
         assert_eq!(workflow.agent_type, "workflow");
     }
-
     #[test]
     fn test_validation() {
         // Empty name should fail

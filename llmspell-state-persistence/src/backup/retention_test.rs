@@ -7,7 +7,6 @@ mod test {
     use crate::backup::*;
     use std::collections::HashMap;
     use std::time::{Duration, SystemTime};
-
     #[tokio::test]
     async fn test_retention_basic() {
         // Create test metadata

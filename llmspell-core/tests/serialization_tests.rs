@@ -6,12 +6,11 @@ use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
         tool::{ParameterDef, ParameterType, SecurityLevel, ToolCategory, ToolSchema},
-        workflow::{RetryPolicy, StepResult, WorkflowStatus, WorkflowStep},
+        workflow::{RetryPolicy, Status as WorkflowStatus, StepResult, WorkflowStep},
     },
     types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, ExecutionContext, Version,
 };
-
 #[test]
 fn test_component_id_json_roundtrip() {
     let id = ComponentId::from_name("test-component");
@@ -21,7 +20,6 @@ fn test_component_id_json_roundtrip() {
 
     assert_eq!(id, deserialized);
 }
-
 #[test]
 fn test_version_json_roundtrip() {
     let version = Version::new(1, 2, 3);
@@ -34,7 +32,6 @@ fn test_version_json_roundtrip() {
     assert_eq!(deserialized.minor, 2);
     assert_eq!(deserialized.patch, 3);
 }
-
 #[test]
 fn test_component_metadata_json_roundtrip() {
     let metadata = ComponentMetadata::new(
@@ -50,7 +47,6 @@ fn test_component_metadata_json_roundtrip() {
     assert_eq!(metadata.description, deserialized.description);
     assert_eq!(metadata.version, deserialized.version);
 }
-
 #[test]
 fn test_agent_input_json_roundtrip() {
     let input = AgentInput::text("test prompt".to_string())
@@ -70,7 +66,6 @@ fn test_agent_input_json_roundtrip() {
     assert_eq!(input.text, deserialized.text);
     assert_eq!(input.parameters, deserialized.parameters);
 }
-
 #[test]
 fn test_agent_output_json_roundtrip() {
     let metadata = llmspell_core::types::OutputMetadata {
@@ -92,7 +87,6 @@ fn test_agent_output_json_roundtrip() {
     );
     assert_eq!(output.metadata.model, deserialized.metadata.model);
 }
-
 #[test]
 fn test_execution_context_json_roundtrip() {
     let mut context = ExecutionContext::with_conversation("session-123".to_string());
@@ -106,7 +100,6 @@ fn test_execution_context_json_roundtrip() {
     assert_eq!(context.user_id, deserialized.user_id);
     assert_eq!(context.data, deserialized.data);
 }
-
 #[test]
 fn test_conversation_message_json_roundtrip() {
     let messages = vec![
@@ -125,7 +118,6 @@ fn test_conversation_message_json_roundtrip() {
         assert!(deserialized.timestamp.timestamp() > 0);
     }
 }
-
 #[test]
 fn test_message_role_json_roundtrip() {
     let roles = vec![
@@ -140,7 +132,6 @@ fn test_message_role_json_roundtrip() {
         assert_eq!(role, deserialized);
     }
 }
-
 #[test]
 fn test_agent_config_json_roundtrip() {
     let config = AgentConfig {
@@ -161,7 +152,6 @@ fn test_agent_config_json_roundtrip() {
     assert_eq!(config.temperature, deserialized.temperature);
     assert_eq!(config.max_tokens, deserialized.max_tokens);
 }
-
 #[test]
 fn test_tool_schema_json_roundtrip() {
     let schema = ToolSchema::new("test_tool".to_string(), "A test tool".to_string())
@@ -187,7 +177,6 @@ fn test_tool_schema_json_roundtrip() {
     assert_eq!(schema.description, deserialized.description);
     assert_eq!(schema.parameters.len(), deserialized.parameters.len());
 }
-
 #[test]
 fn test_tool_category_json_roundtrip() {
     let categories = vec![
@@ -206,7 +195,6 @@ fn test_tool_category_json_roundtrip() {
         assert_eq!(category, deserialized);
     }
 }
-
 #[test]
 fn test_security_level_json_roundtrip() {
     let levels = vec![
@@ -221,7 +209,6 @@ fn test_security_level_json_roundtrip() {
         assert_eq!(level, deserialized);
     }
 }
-
 #[test]
 fn test_parameter_type_json_roundtrip() {
     let types = vec![
@@ -239,7 +226,6 @@ fn test_parameter_type_json_roundtrip() {
         assert_eq!(param_type, deserialized);
     }
 }
-
 #[test]
 fn test_workflow_step_json_roundtrip() {
     let component_id = ComponentId::from_name("process-component");
@@ -258,7 +244,6 @@ fn test_workflow_step_json_roundtrip() {
     assert_eq!(step.component_id, deserialized.component_id);
     assert_eq!(step.dependencies, deserialized.dependencies);
 }
-
 #[test]
 fn test_step_result_json_roundtrip() {
     let step_id = ComponentId::from_name("test-step");
@@ -291,7 +276,6 @@ fn test_step_result_json_roundtrip() {
     assert_eq!(deserialized.error, Some("Processing failed".to_string()));
     assert_eq!(deserialized.retry_count, 2);
 }
-
 #[test]
 fn test_workflow_status_json_roundtrip() {
     let statuses = vec![
@@ -308,21 +292,12 @@ fn test_workflow_status_json_roundtrip() {
         assert_eq!(status, deserialized);
     }
 }
-
 #[test]
 fn test_retry_policy_json_roundtrip() {
     let policies = vec![
         RetryPolicy::default(),
-        RetryPolicy {
-            max_attempts: 5,
-            backoff_seconds: 2,
-            exponential_backoff: false,
-        },
-        RetryPolicy {
-            max_attempts: 10,
-            backoff_seconds: 5,
-            exponential_backoff: true,
-        },
+        RetryPolicy::new(5, 2, false),
+        RetryPolicy::new(10, 5, true),
     ];
 
     for policy in policies {
@@ -334,7 +309,6 @@ fn test_retry_policy_json_roundtrip() {
         assert_eq!(policy.exponential_backoff, deserialized.exponential_backoff);
     }
 }
-
 #[test]
 fn test_complex_nested_serialization() {
     // Test deeply nested structures

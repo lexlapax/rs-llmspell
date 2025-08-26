@@ -26,7 +26,6 @@ mod tests {
     use crate::context::HookContext;
     use crate::traits::Hook;
     use crate::types::{ComponentId, ComponentType, HookPoint};
-
     #[tokio::test]
     async fn test_all_builtin_hooks_basic_execution() {
         let component_id = ComponentId::new(ComponentType::System, "test".to_string());
