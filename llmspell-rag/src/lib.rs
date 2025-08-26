@@ -58,11 +58,8 @@
 #![warn(missing_docs)]
 #![warn(missing_debug_implementations)]
 
-/// Core trait definitions for vector storage and retrieval
+/// Core trait definitions for hybrid retrieval
 pub mod traits;
-
-/// Vector storage implementations
-pub mod storage;
 
 /// Embedding generation and management
 pub mod embeddings;
@@ -91,10 +88,16 @@ pub mod retrieval;
 /// Prelude for convenient imports
 pub mod prelude {
 
-    // Core traits are now available
-    pub use crate::traits::{
-        HNSWConfig, HNSWStorage, HybridQuery, HybridResult, HybridStorage, RetrievalWeights,
-        ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
+    // Hybrid retrieval traits
+    pub use crate::traits::hybrid::{
+        ComponentScores, HybridQuery, HybridResult, HybridStorage, RerankingStrategy,
+        RetrievalStrategy, RetrievalWeights,
+    };
+
+    // Re-export commonly used types from llmspell-storage
+    pub use llmspell_storage::{
+        DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
+        VectorEntry, VectorQuery, VectorResult, VectorStorage,
     };
 
     // Pipeline exports will be added when implemented

@@ -179,9 +179,8 @@ impl ChunkingStrategy for SlidingWindowChunker {
         let mut chunk_index = 0;
 
         while current_pos < text.len() {
-            // Estimate chunk end position
-            let estimated_end =
-                current_pos + self.estimate_chunk_size(text, current_pos, config.max_tokens);
+            // Estimate chunk end position (estimate_chunk_size returns absolute position)
+            let estimated_end = self.estimate_chunk_size(text, current_pos, config.max_tokens);
 
             // Adjust for boundaries if configured
             let chunk_end = if config.respect_paragraphs {
@@ -212,13 +211,20 @@ impl ChunkingStrategy for SlidingWindowChunker {
                 break;
             }
 
-            // Calculate overlap position
-            let overlap_size = self.estimate_chunk_size(text, current_pos, config.overlap_tokens);
-            current_pos = if chunk_end > overlap_size {
-                chunk_end - overlap_size
+            // Ensure we make progress to avoid infinite loop
+            if chunk_end <= current_pos {
+                current_pos += 1;
+            } else if config.overlap_tokens > 0 {
+                // Calculate overlap - estimate bytes for overlap_tokens
+                let overlap_bytes = config.overlap_tokens * 4; // Rough estimate
+                current_pos = chunk_end.saturating_sub(overlap_bytes);
+                // Ensure forward progress
+                if current_pos <= chunk_end.saturating_sub(chunk_text.len()) {
+                    current_pos = chunk_end;
+                }
             } else {
-                chunk_end
-            };
+                current_pos = chunk_end;
+            }
         }
 
         Ok(chunks)
@@ -246,18 +252,52 @@ impl SlidingWindowChunker {
                 start + estimated_chars.min(text.len() - start)
             },
             |tokenizer| {
-                // Use tokenizer for accurate estimation
-                let mut end = start;
+                // Use binary search for efficient estimation
+                let text_slice = &text[start..];
+                if text_slice.is_empty() {
+                    return start;
+                }
 
-                for ch in text[start..].chars() {
-                    end += ch.len_utf8();
-                    let token_count = tokenizer.count_tokens(&text[start..end]);
-                    if token_count >= target_tokens {
-                        break;
+                // Binary search for the right chunk size
+                let mut left = 0;
+                let mut right = text_slice.len();
+                let mut best_end = start;
+
+                while left < right {
+                    let mid = (left + right).div_ceil(2);
+
+                    // Find char boundary at mid position
+                    let mid_byte = if mid >= text_slice.len() {
+                        text_slice.len()
+                    } else {
+                        // Find the next valid UTF-8 boundary
+                        let mut boundary = mid;
+                        while boundary < text_slice.len() && !text_slice.is_char_boundary(boundary)
+                        {
+                            boundary += 1;
+                        }
+                        boundary
+                    };
+
+                    let token_count = tokenizer.count_tokens(&text_slice[..mid_byte]);
+
+                    match token_count.cmp(&target_tokens) {
+                        std::cmp::Ordering::Less => {
+                            left = mid_byte + 1;
+                            best_end = start + mid_byte;
+                        }
+                        std::cmp::Ordering::Greater => {
+                            right = mid_byte.saturating_sub(1);
+                        }
+                        std::cmp::Ordering::Equal => {
+                            // Exact match
+                            return start + mid_byte;
+                        }
                     }
                 }
 
-                end
+                // Return the best position found
+                best_end.max(start + 1) // Ensure we make progress
             },
         )
     }
