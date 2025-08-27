@@ -1,10 +1,10 @@
 //! State-aware vector storage integration with tenant management
 
+use crate::multi_tenant_integration::MultiTenantRAG;
 use anyhow::Result;
 use llmspell_state_persistence::StateManager;
-use llmspell_state_traits::StateScope;
+use llmspell_state_persistence::StateScope;
 use llmspell_storage::VectorStorage;
-use llmspell_tenancy::MultiTenantVectorManager;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tracing::debug;
@@ -17,7 +17,7 @@ pub struct StateAwareVectorStorage {
     state_manager: Arc<StateManager>,
     /// Tenant manager for multi-tenant operations
     #[allow(dead_code)]
-    tenant_manager: Arc<MultiTenantVectorManager>,
+    tenant_manager: Arc<MultiTenantRAG>,
 }
 
 impl std::fmt::Debug for StateAwareVectorStorage {
@@ -25,7 +25,7 @@ impl std::fmt::Debug for StateAwareVectorStorage {
         f.debug_struct("StateAwareVectorStorage")
             .field("storage", &"Arc<dyn VectorStorage>")
             .field("state_manager", &"Arc<StateManager>")
-            .field("tenant_manager", &"Arc<MultiTenantVectorManager>")
+            .field("tenant_manager", &"Arc<MultiTenantRAG>")
             .finish()
     }
 }
@@ -51,7 +51,7 @@ impl StateAwareVectorStorage {
     pub fn new(
         storage: Arc<dyn VectorStorage>,
         state_manager: Arc<StateManager>,
-        tenant_manager: Arc<MultiTenantVectorManager>,
+        tenant_manager: Arc<MultiTenantRAG>,
     ) -> Self {
         Self {
             storage,
@@ -131,7 +131,7 @@ impl StateAwareVectorStorage {
 
     /// Get tenant manager reference  
     #[must_use]
-    pub const fn tenant_manager(&self) -> &Arc<MultiTenantVectorManager> {
+    pub const fn tenant_manager(&self) -> &Arc<MultiTenantRAG> {
         &self.tenant_manager
     }
 }

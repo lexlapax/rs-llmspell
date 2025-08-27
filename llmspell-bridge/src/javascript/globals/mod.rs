@@ -6,6 +6,7 @@ pub mod event;
 pub mod hook;
 pub mod json;
 pub mod provider;
+pub mod rag;
 pub mod state;
 pub mod streaming;
 pub mod tool;
