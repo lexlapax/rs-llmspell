@@ -126,18 +126,18 @@ fn register_ingest_method(
             // Determine if this is a single document or array of documents
             let mut docs = Vec::new();
             let mut is_single_doc = false;
-            
+
             // Check if params has 'content' field (single document format)
             if params.get::<_, String>("content").is_ok() {
                 // Single document format: { content = "...", metadata = {...} }
                 is_single_doc = true;
                 let content = params.get::<_, String>("content")
                     .map_err(|_| mlua::Error::RuntimeError("RAG.ingest requires 'content' field".to_string()))?;
-                
+
                 // Generate a unique ID if not provided
                 let id = params.get::<_, String>("id")
                     .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
-                
+
                 let metadata = if let Ok(meta) = params.get::<_, Table>("metadata") {
                     let json_value = lua_table_to_json(meta)?;
                     if let serde_json::Value::Object(map) = json_value {
@@ -148,26 +148,26 @@ fn register_ingest_method(
                 } else {
                     None
                 };
-                
-                docs.push(RAGDocument { 
-                    id, 
-                    text: content, 
-                    metadata 
+
+                docs.push(RAGDocument {
+                    id,
+                    text: content,
+                    metadata
                 });
             } else if params.get::<_, Table>("documents").is_ok() {
                 // Array format: { documents = [{content = "...", ...}, ...] }
                 let documents: Table = params.get("documents")?;
                 for i in 1..=documents.len()? {
                     let doc_table: Table = documents.get(i)?;
-                    
+
                     // Support both 'content' and 'text' fields
                     let text = doc_table.get::<_, String>("content")
                         .or_else(|_| doc_table.get::<_, String>("text"))
                         .map_err(|_| mlua::Error::RuntimeError("Document requires 'content' or 'text' field".to_string()))?;
-                    
+
                     let id = doc_table.get::<_, String>("id")
                         .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
-                    
+
                     let metadata = if let Ok(meta) = doc_table.get::<_, Table>("metadata") {
                         let json_value = lua_table_to_json(meta)?;
                         if let serde_json::Value::Object(map) = json_value {
@@ -178,7 +178,7 @@ fn register_ingest_method(
                     } else {
                         None
                     };
-                    
+
                     docs.push(RAGDocument { id, text, metadata });
                 }
             } else {
@@ -190,10 +190,10 @@ fn register_ingest_method(
                             let text = doc_table.get::<_, String>("content")
                                 .or_else(|_| doc_table.get::<_, String>("text"))
                                 .map_err(|_| mlua::Error::RuntimeError("Document requires 'content' or 'text' field".to_string()))?;
-                            
+
                             let id = doc_table.get::<_, String>("id")
                                 .unwrap_or_else(|_| uuid::Uuid::new_v4().to_string());
-                            
+
                             let metadata = if let Ok(meta) = doc_table.get::<_, Table>("metadata") {
                                 let json_value = lua_table_to_json(meta)?;
                                 if let serde_json::Value::Object(map) = json_value {
@@ -204,7 +204,7 @@ fn register_ingest_method(
                             } else {
                                 None
                             };
-                            
+
                             docs.push(RAGDocument { id, text, metadata });
                         } else {
                             return Err(mlua::Error::RuntimeError(
@@ -285,7 +285,7 @@ fn register_ingest_method(
             if is_single_doc {
                 // For single document, return the document ID directly (first doc ID)
                 if first_doc_id.is_some() {
-                    Ok(mlua::Value::String(lua.create_string(&first_doc_id.unwrap())?))
+                    Ok(mlua::Value::String(lua.create_string(first_doc_id.unwrap())?))
                 } else {
                     Err(mlua::Error::RuntimeError("Failed to ingest document".to_string()))
                 }
@@ -432,13 +432,11 @@ fn register_get_stats_method(
 fn register_save_method(lua: &Lua, table: &Table, _bridge: &Arc<RAGBridge>) -> mlua::Result<()> {
     // For now, save is a no-op since we can't access the HNSW storage directly
     // The save will happen automatically when the storage is dropped
-    let save_func = lua.create_async_function(move |_lua, ()| {
-        async move {
-            debug!("RAG.save() called - persistence will happen on shutdown");
-            Ok(())
-        }
+    let save_func = lua.create_async_function(move |_lua, ()| async move {
+        debug!("RAG.save() called - persistence will happen on shutdown");
+        Ok(())
     })?;
-    
+
     table.set("save", save_func)?;
     Ok(())
 }

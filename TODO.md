@@ -1623,56 +1623,58 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 
 ## Phase 8.9: HNSW Persistence Implementation (Day 8-9)
 
-### Task 8.9.1: Replace Mock HNSW with hnsw_rs Crate
+### Task 8.9.1: Implement Data-First HNSW Architecture
 **Priority**: CRITICAL  
-**Estimated Time**: 6 hours  
-**Status**: [ ] Not Started
+**Estimated Time**: 5 hours  
+**Status**: ✅ Complete  
+**See**: `docs/in-progress/hnsw-implementation-plan.md` for full details
 
-**Description**: Replace the current mock vector storage implementation (`SimpleHnsw = Vec<(Vec<f32>, String, usize)>`) in `llmspell-storage/src/backends/vector/hnsw.rs` with the production-ready `hnsw_rs` crate that provides real HNSW indexing with built-in persistence support.
+**Description**: Refactor the HNSW implementation to use a data-first persistence strategy that avoids hnsw_rs lifetime issues by storing raw vector data separately and rebuilding the index on load.
 
 **Acceptance Criteria**:
-- [ ] Add `hnsw_rs` dependency to `llmspell-storage/Cargo.toml` with features: `["serde"]`
-- [ ] Replace `SimpleHnsw` type with `hnsw_rs::hnsw::Hnsw` 
-- [ ] Implement proper HNSW index initialization with configurable parameters
-- [ ] Convert distance metrics between our types and hnsw_rs types
-- [ ] Implement real k-NN search using HNSW algorithm instead of brute force
-- [ ] Support all four distance metrics: Cosine, Euclidean, InnerProduct, Manhattan
-- [ ] Maintain backward compatibility with existing VectorStorage trait
-- [ ] All existing vector storage tests continue to pass
+- [x] Create `HnswContainer` struct that owns vector data
+- [x] Remove `'static` lifetime constraints from `HnswIndex` enum
+- [x] Store vectors + metadata separately from HNSW graph structure
+- [x] Implement rebuild-on-load strategy for persistence
+- [x] Use `bincode` for efficient vector serialization
+- [x] Support parallel insertion using owned data references
+- [x] Fix lifetime issues preventing compilation with `--features hnsw-real`
+- [x] Maintain multi-tenant namespace isolation
 
-### Task 8.9.2: Implement Save/Load Functionality
+### Task 8.9.2: Complete Real HNSW Integration
 **Priority**: CRITICAL  
-**Estimated Time**: 4 hours  
-**Status**: [x] COMPLETED
+**Estimated Time**: 3 hours  
+**Status**: [x] In Progress
 
-**Description**: Implement the currently stubbed `save()` and `load()` methods in `HNSWVectorStorage` using hnsw_rs's `hnswio` module for persistence.
+**Description**: Integrate the real HNSW implementation into the RAG infrastructure, replacing all mock implementations for production use.
 
 **Acceptance Criteria**:
-- [x] Implement `save()` method ~~using hnsw_rs's file_dump functionality~~ (using JSON serialization for mock impl)
-- [x] Implement `load()` method ~~using hnsw_rs's reload functionality~~ (using JSON deserialization for mock impl)
-- [x] Store both graph structure and vector data
-- [x] Serialize metadata using serde for tenant/scope information
-- [ ] Support incremental saves for large datasets (future work)
-- [x] Add error handling for disk I/O failures
-- [x] Implement automatic save on shutdown if persistence_dir is configured (via Drop trait)
-- [x] Test persistence across application restarts (test_rag_persistence passes)
+- [x] Update `rag_infrastructure.rs` to use `RealHNSWVectorStorage` 
+- [x] Add feature flag `hnsw-real` to control implementation selection
+- [x] Ensure `VectorStorage` trait is fully implemented
+- [x] Support save/load with data-first persistence strategy
+- [ ] Implement Drop trait for auto-save on shutdown
+- [ ] Create migration path from mock to real implementation
+- [ ] Update `llmspell-config` to support HNSW backend selection
+- [ ] All 9 RAG integration tests pass with real implementation
 
-### Task 8.9.3: Multi-Tenant Namespace Management
+### Task 8.9.3: Testing and Performance Validation  
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Status**: [ ] Not Started
 
-**Description**: Adapt the multi-tenant namespace system to work with hnsw_rs's single-index architecture, potentially using multiple HNSW instances or metadata filtering.
+**Description**: Comprehensive testing and benchmarking of the real HNSW implementation to ensure production readiness and performance targets are met.
 
 **Acceptance Criteria**:
-- [ ] Design namespace isolation strategy (separate indices vs. filtered single index)
-- [ ] Implement namespace-to-HNSW mapping if using multiple indices
-- [ ] Ensure tenant data isolation in search results
-- [ ] Implement efficient namespace deletion without full index rebuild
-- [ ] Add namespace-specific persistence (separate files per namespace)
-- [ ] Optimize memory usage for multiple namespaces
-- [ ] Test concurrent access across namespaces
-- [ ] Benchmark performance impact of namespace isolation
+- [ ] Unit tests for insert/search/delete operations pass
+- [ ] Persistence tests verify data survives restarts  
+- [ ] Multi-tenant namespace isolation is verified
+- [ ] All four distance metrics (Cosine, Euclidean, InnerProduct, Manhattan) work correctly
+- [ ] Performance benchmarks show <2x slowdown vs mock for small datasets
+- [ ] Memory usage stays under 1GB for 100K vectors
+- [ ] Load time is acceptable (<5 seconds for 100K vectors)
+- [ ] Concurrent operations are thread-safe
+- [ ] Integration tests pass with `--features hnsw-real`
 
 ### Task 8.9.4: Configuration and Migration
 **Priority**: HIGH  
@@ -1694,43 +1696,39 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - [ ] Implement config migration from old to new format
 - [ ] Add performance tuning guide in configuration docs
 
-### Task 8.9.5: Performance Optimization and Benchmarks
+### Task 8.9.5: Documentation and Examples
 **Priority**: MEDIUM  
-**Estimated Time**: 3 hours  
+**Estimated Time**: 2 hours  
 **Status**: [ ] Not Started
 
-**Description**: Optimize HNSW performance and create benchmarks to validate improvement over mock implementation.
+**Description**: Document the real HNSW implementation and provide migration guides for users.
 
 **Acceptance Criteria**:
-- [ ] Implement parallel insertion using hnsw_rs's insert_parallel
-- [ ] Add batch insertion optimization for bulk ingestion
-- [ ] Implement memory-mapped data loading for large datasets  
-- [ ] Create benchmarks comparing mock vs. hnsw_rs performance:
-  - [ ] Insertion speed (single and batch)
-  - [ ] Search latency at various k values
-  - [ ] Memory usage per vector
-  - [ ] Index build time
-- [ ] Profile and optimize hot paths
-- [ ] Document performance characteristics and tuning
-- [ ] Add performance regression tests
+- [ ] Document data-first persistence strategy in architecture docs
+- [ ] Create migration guide from mock to real HNSW
+- [ ] Document HNSW configuration parameters and tuning
+- [ ] Add troubleshooting section for common issues
+- [ ] Update RAG documentation with real HNSW details
+- [ ] Create example showing real HNSW usage
+- [ ] Document performance characteristics and benchmarks
+- [ ] Add feature flag documentation for `hnsw-real`
 
-### Task 8.9.6: Integration Testing and Examples
+### Task 8.9.6: Final Integration and Validation
 **Priority**: HIGH  
 **Estimated Time**: 2 hours  
-**Status**: [x] In Progress
+**Status**: [ ] Not Started
 
-**Description**: Ensure all RAG integration tests pass with the new HNSW implementation and update examples.
+**Description**: Final integration testing to ensure the real HNSW implementation is production-ready.
 
 **Acceptance Criteria**:
-- [x] Fix `test_rag_persistence` test in `rag_e2e_integration_test.rs` (COMPLETED - test now passes with mock persistence)
-- [ ] All 9 RAG integration tests pass
-- [ ] Update example scripts in `examples/script-users/tests/`:
-  - [ ] test-rag-basic.lua works with persistence
-  - [ ] test-rag-e2e.lua demonstrates save/load
-- [ ] Add benchmark example showing performance improvement
-- [ ] Create migration example for existing users
-- [ ] Document breaking changes if any
-- [ ] Update RAG documentation with persistence details
+- [ ] All 9 RAG integration tests pass with `--features hnsw-real`
+- [ ] No mock implementations in production code paths
+- [ ] Verify feature flag switching works correctly
+- [ ] Test backward compatibility with existing deployments  
+- [ ] Ensure graceful fallback if real HNSW fails
+- [ ] Validate multi-tenant isolation in production scenarios
+- [ ] Performance meets or exceeds requirements
+- [ ] Memory usage is within acceptable limits
 
 ---
 

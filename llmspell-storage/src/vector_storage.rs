@@ -257,7 +257,7 @@ pub trait HNSWStorage: VectorStorage {
 
     /// Get namespace statistics
     async fn namespace_stats(&self, namespace: &str) -> Result<NamespaceStats>;
-    
+
     /// Save index to persistent storage
     async fn save(&self) -> Result<()>;
 }

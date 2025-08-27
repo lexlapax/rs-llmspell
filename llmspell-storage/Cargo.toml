@@ -21,8 +21,14 @@ dashmap = "5.5"
 parking_lot = "0.12"
 uuid = { version = "1.7", features = ["v4", "serde"] }
 tempfile = { workspace = true, optional = true }
-hnsw_rs = "0.3"
-bincode = "1.3"
+
+# HNSW implementation dependencies
+hnsw_rs = { version = "0.3.2", optional = true }
+bincode = { version = "1.3", optional = true }
+
+[features]
+default = []
+hnsw-real = ["hnsw_rs", "bincode"]
 
 [dev-dependencies]
 tempfile.workspace = true

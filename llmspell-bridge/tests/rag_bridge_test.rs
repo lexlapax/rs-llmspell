@@ -1,9 +1,7 @@
 //! ABOUTME: Integration tests for RAG bridge functionality
 //! ABOUTME: Tests RAG operations with real vector storage
 
-use llmspell_bridge::rag_bridge::{
-    ChunkingConfig, RAGBridge, RAGDocument, RAGIngestRequest, RAGSearchRequest,
-};
+use llmspell_bridge::rag_bridge::{ChunkingConfig, RAGBridge, RAGDocument};
 use llmspell_bridge::ProviderManager;
 use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
@@ -89,42 +87,30 @@ async fn test_rag_bridge_search_basic() {
     let mut metadata2 = HashMap::new();
     metadata2.insert("source".to_string(), serde_json::json!("test2.txt"));
 
-    let ingest_request = RAGIngestRequest {
-        documents: vec![
-            RAGDocument {
-                id: "doc1".to_string(),
-                text: "The quick brown fox jumps over the lazy dog".to_string(),
-                metadata: Some(metadata1),
-            },
-            RAGDocument {
-                id: "doc2".to_string(),
-                text: "Machine learning is a subset of artificial intelligence".to_string(),
-                metadata: Some(metadata2),
-            },
-        ],
-        scope: Some("test".to_string()),
-        scope_id: Some("test_search".to_string()),
-        provider: None,
-        chunking: None,
-    };
+    let documents = vec![
+        RAGDocument {
+            id: "doc1".to_string(),
+            text: "The quick brown fox jumps over the lazy dog".to_string(),
+            metadata: Some(metadata1),
+        },
+        RAGDocument {
+            id: "doc2".to_string(),
+            text: "Machine learning is a subset of artificial intelligence".to_string(),
+            metadata: Some(metadata2),
+        },
+    ];
 
-    let ingest_response = bridge.ingest(ingest_request, None).await.unwrap();
-    assert!(ingest_response.success);
+    let ingest_response = bridge
+        .ingest(documents, None, None, None, None, None)
+        .await
+        .unwrap();
     assert_eq!(ingest_response.documents_processed, 2);
 
     // Now search
-    let search_request = RAGSearchRequest {
-        query: "artificial intelligence".to_string(),
-        k: Some(2),
-        scope: Some("test".to_string()),
-        scope_id: Some("test_search".to_string()),
-        filters: None,
-        threshold: None,
-    };
-
-    let search_response = bridge.search(search_request, None).await.unwrap();
-    assert!(search_response.success);
-    assert!(search_response.total > 0);
+    let search_response = bridge
+        .search("fox jumps", Some(5), None, None, None, None, None)
+        .await
+        .unwrap();
     assert!(!search_response.results.is_empty());
 }
 
@@ -134,24 +120,22 @@ async fn test_rag_bridge_ingest_with_chunking() {
 
     let long_text = "This is a very long document. ".repeat(100);
 
-    let ingest_request = RAGIngestRequest {
-        documents: vec![RAGDocument {
-            id: "long_doc".to_string(),
-            text: long_text,
-            metadata: None,
-        }],
-        scope: Some("test".to_string()),
-        scope_id: Some("test_chunking".to_string()),
-        provider: None,
-        chunking: Some(ChunkingConfig {
-            chunk_size: Some(100),
-            overlap: Some(20),
-            strategy: Some("sliding_window".to_string()),
-        }),
+    let documents = vec![RAGDocument {
+        id: "long_doc".to_string(),
+        text: long_text,
+        metadata: None,
+    }];
+
+    let chunking = ChunkingConfig {
+        chunk_size: Some(100),
+        overlap: Some(20),
+        strategy: Some("sliding_window".to_string()),
     };
 
-    let response = bridge.ingest(ingest_request, None).await.unwrap();
-    assert!(response.success);
+    let response = bridge
+        .ingest(documents, None, None, None, Some(chunking), None)
+        .await
+        .unwrap();
     assert_eq!(response.documents_processed, 1);
     // Should create multiple vectors due to chunking
     assert!(response.vectors_created >= response.documents_processed);
@@ -166,35 +150,34 @@ async fn test_rag_bridge_search_with_filters() {
     metadata.insert("category".to_string(), serde_json::json!("science"));
     metadata.insert("year".to_string(), serde_json::json!(2024));
 
-    let ingest_request = RAGIngestRequest {
-        documents: vec![RAGDocument {
-            id: "sci_doc".to_string(),
-            text: "Quantum computing breakthrough announced".to_string(),
-            metadata: Some(metadata.clone()),
-        }],
-        scope: Some("test".to_string()),
-        scope_id: Some("test_filters".to_string()),
-        provider: None,
-        chunking: None,
-    };
+    let documents = vec![RAGDocument {
+        id: "sci_doc".to_string(),
+        text: "Quantum computing breakthrough announced".to_string(),
+        metadata: Some(metadata.clone()),
+    }];
 
-    bridge.ingest(ingest_request, None).await.unwrap();
+    bridge
+        .ingest(documents, None, None, None, None, None)
+        .await
+        .unwrap();
 
     // Search with filters
     let mut filters = HashMap::new();
     filters.insert("category".to_string(), serde_json::json!("science"));
 
-    let search_request = RAGSearchRequest {
-        query: "quantum".to_string(),
-        k: Some(5),
-        scope: Some("test".to_string()),
-        scope_id: Some("test_filters".to_string()),
-        filters: Some(filters),
-        threshold: Some(0.5),
-    };
-
-    let response = bridge.search(search_request, None).await.unwrap();
-    assert!(response.success);
+    let response = bridge
+        .search(
+            "quantum",
+            Some(5),
+            None,
+            None,
+            Some(filters),
+            Some(0.5),
+            None,
+        )
+        .await
+        .unwrap();
+    assert!(!response.results.is_empty());
 }
 
 #[tokio::test]
@@ -202,36 +185,41 @@ async fn test_rag_bridge_cleanup_scope() {
     let bridge = setup_test_bridge().await;
 
     // Ingest documents
-    let ingest_request = RAGIngestRequest {
-        documents: vec![RAGDocument {
-            id: "cleanup_doc".to_string(),
-            text: "Document to be cleaned up".to_string(),
-            metadata: None,
-        }],
-        scope: Some("test".to_string()),
-        scope_id: Some("test_cleanup".to_string()),
-        provider: None,
-        chunking: None,
-    };
+    let documents = vec![RAGDocument {
+        id: "cleanup_doc".to_string(),
+        text: "Document to be cleaned up".to_string(),
+        metadata: None,
+    }];
 
-    bridge.ingest(ingest_request, None).await.unwrap();
+    bridge
+        .ingest(
+            documents,
+            Some("test".to_string()),
+            Some("test_cleanup".to_string()),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
     // Clean up the scope
     let deleted = bridge.cleanup_scope("test", "test_cleanup").await.unwrap();
     assert!(deleted > 0);
 
     // Verify documents are gone
-    let search_request = RAGSearchRequest {
-        query: "cleanup".to_string(),
-        k: Some(5),
-        scope: Some("test".to_string()),
-        scope_id: Some("test_cleanup".to_string()),
-        filters: None,
-        threshold: None,
-    };
-
-    let response = bridge.search(search_request, None).await.unwrap();
-    assert!(response.success);
+    let response = bridge
+        .search(
+            "cleanup",
+            Some(5),
+            Some("test".to_string()),
+            Some("test_cleanup".to_string()),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(response.total, 0);
     assert!(response.results.is_empty());
 }
@@ -241,26 +229,30 @@ async fn test_rag_bridge_get_stats() {
     let bridge = setup_test_bridge().await;
 
     // Ingest some documents
-    let ingest_request = RAGIngestRequest {
-        documents: vec![
-            RAGDocument {
-                id: "stats_doc1".to_string(),
-                text: "First document for stats".to_string(),
-                metadata: None,
-            },
-            RAGDocument {
-                id: "stats_doc2".to_string(),
-                text: "Second document for stats".to_string(),
-                metadata: None,
-            },
-        ],
-        scope: Some("test".to_string()),
-        scope_id: Some("test_stats".to_string()),
-        provider: None,
-        chunking: None,
-    };
+    let documents = vec![
+        RAGDocument {
+            id: "stats_doc1".to_string(),
+            text: "First document for stats".to_string(),
+            metadata: None,
+        },
+        RAGDocument {
+            id: "stats_doc2".to_string(),
+            text: "Second document for stats".to_string(),
+            metadata: None,
+        },
+    ];
 
-    bridge.ingest(ingest_request, None).await.unwrap();
+    bridge
+        .ingest(
+            documents,
+            Some("test".to_string()),
+            Some("test_stats".to_string()),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
 
     // Get stats
     let stats = bridge.get_stats("test", Some("test_stats")).await.unwrap();
@@ -273,15 +265,15 @@ async fn test_rag_bridge_configure() {
     let bridge = setup_test_bridge().await;
 
     // Configure RAG settings
-    let config_request = llmspell_bridge::rag_bridge::RAGConfigRequest {
-        session_ttl: Some(3600),
-        default_provider: Some("openai".to_string()),
-        enable_cache: Some(true),
-        cache_ttl: Some(1800),
-    };
-
     // Should not error
-    bridge.configure(config_request).unwrap();
+    bridge
+        .configure(
+            Some(3600),
+            Some("openai".to_string()),
+            Some(true),
+            Some(1800),
+        )
+        .unwrap();
 }
 
 #[tokio::test]
@@ -303,33 +295,38 @@ async fn test_rag_bridge_concurrent_operations() {
     let bridge2 = bridge.clone();
 
     let ingest_handle = tokio::spawn(async move {
-        let request = RAGIngestRequest {
-            documents: vec![RAGDocument {
-                id: "concurrent_doc".to_string(),
-                text: "Testing concurrent operations".to_string(),
-                metadata: None,
-            }],
-            scope: Some("test".to_string()),
-            scope_id: Some("test_concurrent".to_string()),
-            provider: None,
-            chunking: None,
-        };
-        bridge1.ingest(request, None).await
+        let documents = vec![RAGDocument {
+            id: "concurrent_doc".to_string(),
+            text: "Testing concurrent operations".to_string(),
+            metadata: None,
+        }];
+        bridge1
+            .ingest(
+                documents,
+                Some("test".to_string()),
+                Some("test_concurrent".to_string()),
+                None,
+                None,
+                None,
+            )
+            .await
     });
 
     let search_handle = tokio::spawn(async move {
         // Small delay to let ingest start
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-        let request = RAGSearchRequest {
-            query: "concurrent".to_string(),
-            k: Some(5),
-            scope: Some("test".to_string()),
-            scope_id: Some("test_concurrent".to_string()),
-            filters: None,
-            threshold: None,
-        };
-        bridge2.search(request, None).await
+        bridge2
+            .search(
+                "concurrent",
+                Some(5),
+                Some("test".to_string()),
+                Some("test_concurrent".to_string()),
+                None,
+                None,
+                None,
+            )
+            .await
     });
 
     // Both should complete successfully
@@ -345,29 +342,24 @@ async fn test_rag_bridge_error_handling() {
     let bridge = setup_test_bridge().await;
 
     // Test empty document list
-    let empty_request = RAGIngestRequest {
-        documents: vec![],
-        scope: Some("test".to_string()),
-        scope_id: Some("test_empty".to_string()),
-        provider: None,
-        chunking: None,
-    };
-
-    let response = bridge.ingest(empty_request, None).await.unwrap();
-    assert!(response.success);
+    let response = bridge
+        .ingest(vec![], None, None, None, None, None)
+        .await
+        .unwrap();
     assert_eq!(response.documents_processed, 0);
 
     // Test search with invalid scope (should return empty)
-    let search_request = RAGSearchRequest {
-        query: "test".to_string(),
-        k: Some(5),
-        scope: Some("nonexistent".to_string()),
-        scope_id: Some("nonexistent".to_string()),
-        filters: None,
-        threshold: None,
-    };
-
-    let response = bridge.search(search_request, None).await.unwrap();
-    assert!(response.success);
+    let response = bridge
+        .search(
+            "test",
+            Some(5),
+            Some("nonexistent".to_string()),
+            Some("nonexistent".to_string()),
+            None,
+            None,
+            None,
+        )
+        .await
+        .unwrap();
     assert_eq!(response.total, 0);
 }

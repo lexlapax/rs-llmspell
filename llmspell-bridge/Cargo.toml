@@ -62,6 +62,9 @@ integration-tests = []
 bridge-tests = []
 workflow-tests = []
 
+# Storage features
+hnsw-real = ["llmspell-storage/hnsw-real"]
+
 [[bench]]
 name = "workflow_bridge_bench"
 harness = false

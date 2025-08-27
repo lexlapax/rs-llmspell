@@ -80,7 +80,7 @@ impl Drop for HNSWVectorStorage {
                 let metadata_snapshot = self.metadata.clone();
                 let dimensions = self.dimensions;
                 let config = self.config.clone();
-                
+
                 // Spawn save task
                 handle.spawn(async move {
                     // Create a temporary storage to save
@@ -91,7 +91,7 @@ impl Drop for HNSWVectorStorage {
                         metadata: metadata_snapshot,
                         dimensions,
                     };
-                    
+
                     if let Err(e) = temp_storage.save().await {
                         tracing::error!("Failed to save HNSW storage on drop: {}", e);
                     } else {
@@ -507,7 +507,7 @@ impl HNSWStorage for HNSWVectorStorage {
             anyhow::bail!("Namespace {} not found", namespace)
         }
     }
-    
+
     async fn save(&self) -> Result<()> {
         // Call the save implementation directly
         HNSWVectorStorage::save(self).await
@@ -525,18 +525,18 @@ impl HNSWVectorStorage {
         let Some(ref base_dir) = self.persistence_dir else {
             return Ok(());
         };
-        
+
         // Create base directory
         std::fs::create_dir_all(base_dir)?;
-        
+
         // Save each namespace
         for namespace_entry in &self.namespaces {
             let namespace_name = namespace_entry.key();
             let namespace_data = namespace_entry.value();
-            
+
             let namespace_dir = base_dir.join(namespace_name);
             std::fs::create_dir_all(&namespace_dir)?;
-            
+
             // Save namespace index data
             let index_file = namespace_dir.join("index.json");
             let index_data = {
@@ -549,15 +549,16 @@ impl HNSWVectorStorage {
             };
             std::fs::write(index_file, serde_json::to_string_pretty(&index_data)?)?;
         }
-        
+
         // Save all metadata
         let metadata_file = base_dir.join("metadata.json");
-        let metadata_data: HashMap<String, VectorMetadata> = self.metadata
+        let metadata_data: HashMap<String, VectorMetadata> = self
+            .metadata
             .iter()
             .map(|entry| (entry.key().clone(), entry.value().clone()))
             .collect();
         std::fs::write(metadata_file, serde_json::to_string_pretty(&metadata_data)?)?;
-        
+
         // Save config
         let config_file = base_dir.join("config.json");
         let config_data = serde_json::json!({
@@ -565,7 +566,7 @@ impl HNSWVectorStorage {
             "config": self.config
         });
         std::fs::write(config_file, serde_json::to_string_pretty(&config_data)?)?;
-        
+
         info!("Saved HNSW index to {:?}", base_dir);
         Ok(())
     }
@@ -580,17 +581,18 @@ impl HNSWVectorStorage {
             info!("No existing index found at {:?}, creating new", path);
             return Ok(Self::new(dimensions, config).with_persistence(path.to_path_buf()));
         }
-        
+
         // Load config (verify dimensions match)
         let config_file = path.join("config.json");
         if config_file.exists() {
             let config_data = std::fs::read_to_string(&config_file)?;
             let config_json: serde_json::Value = serde_json::from_str(&config_data)?;
-            
+
             let saved_dimensions = config_json["dimensions"]
                 .as_u64()
-                .ok_or_else(|| anyhow::anyhow!("Invalid dimensions in config"))? as usize;
-            
+                .ok_or_else(|| anyhow::anyhow!("Invalid dimensions in config"))?
+                as usize;
+
             if saved_dimensions != dimensions {
                 anyhow::bail!(
                     "Dimension mismatch: saved index has {} dimensions, expected {}",
@@ -599,51 +601,49 @@ impl HNSWVectorStorage {
                 );
             }
         }
-        
+
         let storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
-        
+
         // Load metadata
         let metadata_file = path.join("metadata.json");
         if metadata_file.exists() {
             let metadata_data = std::fs::read_to_string(&metadata_file)?;
             let metadata: HashMap<String, VectorMetadata> = serde_json::from_str(&metadata_data)?;
-            
+
             for (id, meta) in metadata {
                 storage.metadata.insert(id, meta);
             }
         }
-        
+
         // Load namespaces
         for entry in std::fs::read_dir(path)? {
             let entry = entry?;
             let path = entry.path();
-            
+
             if path.is_dir() {
-                let namespace_name = path.file_name()
+                let namespace_name = path
+                    .file_name()
                     .and_then(|n| n.to_str())
                     .ok_or_else(|| anyhow::anyhow!("Invalid namespace directory name"))?;
-                
+
                 let index_file = path.join("index.json");
                 if index_file.exists() {
                     let index_data = std::fs::read_to_string(&index_file)?;
                     let index_json: serde_json::Value = serde_json::from_str(&index_data)?;
-                    
-                    let vectors: SimpleHnsw = serde_json::from_value(
-                        index_json["vectors"].clone()
-                    )?;
-                    let stats: NamespaceStats = serde_json::from_value(
-                        index_json["stats"].clone()
-                    )?;
-                    let created_at: std::time::SystemTime = serde_json::from_value(
-                        index_json["created_at"].clone()
-                    )?;
-                    
+
+                    let vectors: SimpleHnsw =
+                        serde_json::from_value(index_json["vectors"].clone())?;
+                    let stats: NamespaceStats =
+                        serde_json::from_value(index_json["stats"].clone())?;
+                    let created_at: std::time::SystemTime =
+                        serde_json::from_value(index_json["created_at"].clone())?;
+
                     let namespace_index = NamespaceIndex {
                         vectors,
                         stats,
                         created_at,
                     };
-                    
+
                     storage.namespaces.insert(
                         namespace_name.to_string(),
                         Arc::new(RwLock::new(namespace_index)),
@@ -651,7 +651,7 @@ impl HNSWVectorStorage {
                 }
             }
         }
-        
+
         info!("Loaded HNSW index from {:?}", path);
         Ok(storage)
     }

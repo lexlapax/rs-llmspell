@@ -372,10 +372,10 @@ async fn test_rag_persistence() {
         "#;
 
         runtime.execute_script(script).await.unwrap();
-        
+
         // Drop the runtime to trigger save
         drop(runtime);
-        
+
         // Give the save task a moment to complete
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
     }
