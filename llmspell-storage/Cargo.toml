@@ -21,6 +21,8 @@ dashmap = "5.5"
 parking_lot = "0.12"
 uuid = { version = "1.7", features = ["v4", "serde"] }
 tempfile = { workspace = true, optional = true }
+hnsw_rs = "0.3"
+bincode = "1.3"
 
 [dev-dependencies]
 tempfile.workspace = true

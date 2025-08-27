@@ -30,7 +30,11 @@ pub async fn get_or_create_rag_infrastructure(
     // Check if already initialized
     if let Some(multi_tenant_rag) = context.get_bridge::<MultiTenantRAG>("multi_tenant_rag") {
         debug!("Using existing RAG infrastructure from GlobalContext");
-        return Ok(RAGInfrastructure { multi_tenant_rag });
+        return Ok(RAGInfrastructure {
+            multi_tenant_rag,
+            vector_storage: None, // Storage is embedded in multi_tenant_rag
+            hnsw_storage: context.get_bridge::<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage>("hnsw_storage"),
+        });
     }
 
     // Initialize new infrastructure
@@ -41,10 +45,10 @@ pub async fn get_or_create_rag_infrastructure(
     let session_manager = get_or_create_session_manager(context, &state_manager)?;
 
     // Create vector storage based on configuration
-    let vector_storage = create_vector_storage(config);
+    let vector_storage = create_vector_storage(config, context).await;
 
     // Create multi-tenant vector manager
-    let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage));
+    let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage.clone()));
 
     // Create multi-tenant RAG
     let multi_tenant_rag = Arc::new(MultiTenantRAG::new(tenant_manager));
@@ -54,7 +58,11 @@ pub async fn get_or_create_rag_infrastructure(
     context.set_bridge("session_manager", session_manager);
     context.set_bridge("multi_tenant_rag", multi_tenant_rag.clone());
 
-    Ok(RAGInfrastructure { multi_tenant_rag })
+    Ok(RAGInfrastructure {
+        multi_tenant_rag,
+        vector_storage: Some(vector_storage),
+        hnsw_storage: context.get_bridge::<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage>("hnsw_storage"),
+    })
 }
 
 /// Get or create `StateManager`
@@ -156,7 +164,7 @@ fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
 }
 
 /// Create vector storage based on RAG configuration
-fn create_vector_storage(config: &RAGConfig) -> Arc<dyn VectorStorage> {
+async fn create_vector_storage(config: &RAGConfig, context: &GlobalContext) -> Arc<dyn VectorStorage> {
     match config.vector_storage.backend {
         llmspell_config::VectorBackend::HNSW => {
             debug!("Creating HNSW vector storage for RAG");
@@ -183,13 +191,37 @@ fn create_vector_storage(config: &RAGConfig) -> Arc<dyn VectorStorage> {
                 num_threads: config.vector_storage.hnsw.num_threads,
             };
 
-            // Create HNSW storage
-            let storage = llmspell_storage::backends::vector::hnsw::HNSWVectorStorage::new(
-                config.vector_storage.dimensions,
-                hnsw_config,
-            );
-
-            Arc::new(storage)
+            // Create HNSW storage with optional persistence
+            if let Some(ref path) = config.vector_storage.persistence_path {
+                debug!("Loading or creating HNSW storage with persistence at: {:?}", path);
+                
+                // Try to load existing index
+                let storage = llmspell_storage::backends::vector::hnsw::HNSWVectorStorage::load(
+                    path,
+                    config.vector_storage.dimensions,
+                    hnsw_config.clone(),
+                )
+                .await
+                .unwrap_or_else(|e| {
+                    warn!("Failed to load existing HNSW index: {}, creating new", e);
+                    llmspell_storage::backends::vector::hnsw::HNSWVectorStorage::new(
+                        config.vector_storage.dimensions,
+                        hnsw_config,
+                    )
+                    .with_persistence(path.clone())
+                });
+                
+                let storage_arc = Arc::new(storage);
+                // Store the HNSW storage reference for later save operations
+                context.set_bridge("hnsw_storage", storage_arc.clone());
+                storage_arc
+            } else {
+                warn!("HNSW storage created without persistence - data will not survive restarts");
+                Arc::new(llmspell_storage::backends::vector::hnsw::HNSWVectorStorage::new(
+                    config.vector_storage.dimensions,
+                    hnsw_config,
+                ))
+            }
         }
         llmspell_config::VectorBackend::Mock => {
             debug!("Creating mock vector storage for RAG (testing)");
@@ -234,6 +266,27 @@ fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>>
 /// Container for RAG infrastructure components
 pub struct RAGInfrastructure {
     pub multi_tenant_rag: Arc<MultiTenantRAG>,
+    pub vector_storage: Option<Arc<dyn VectorStorage>>,
+    /// Keep a reference to the concrete HNSW storage for save/load operations
+    pub hnsw_storage: Option<Arc<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage>>,
+}
+
+impl RAGInfrastructure {
+    /// Save vector storage to disk if persistence is configured
+    pub async fn save(&self) -> Result<()> {
+        if let Some(ref hnsw) = self.hnsw_storage {
+            info!("Saving HNSW vector storage to disk");
+            hnsw.save()
+                .await
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to save HNSW storage: {e}"),
+                    source: None,
+                })?;
+        } else {
+            debug!("No HNSW storage to save (using different backend or no persistence)");
+        }
+        Ok(())
+    }
 }
 
 #[cfg(test)]

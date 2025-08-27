@@ -332,7 +332,10 @@ impl ScriptEngineBridge for LuaEngine {
                         &global_context,
                         &runtime_config.rag,
                     )) {
-                        Ok(_) => {
+                        Ok(infrastructure) => {
+                            // Store the infrastructure for RAGGlobal to use
+                            global_context
+                                .set_bridge("rag_infrastructure", Arc::new(infrastructure));
                             tracing::debug!("RAG infrastructure initialized successfully");
                         }
                         Err(e) => {

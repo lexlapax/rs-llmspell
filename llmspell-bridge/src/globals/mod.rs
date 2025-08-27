@@ -71,6 +71,11 @@ async fn register_rag_global(
     context: &Arc<GlobalContext>,
     session_manager_opt: Option<Arc<llmspell_sessions::manager::SessionManager>>,
 ) {
+    // Try to get vector storage from infrastructure
+    let vector_storage = context
+        .get_bridge::<crate::globals::rag_infrastructure::RAGInfrastructure>("rag_infrastructure")
+        .and_then(|infra| infra.vector_storage.clone());
+
     if let (Some(state_manager), Some(session_manager), Some(multi_tenant_rag)) = (
         context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager"),
         session_manager_opt,
@@ -84,6 +89,7 @@ async fn register_rag_global(
             state_manager,
             session_manager,
             multi_tenant_rag,
+            vector_storage,
         )
         .await
         {

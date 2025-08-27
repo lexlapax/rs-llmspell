@@ -8,6 +8,7 @@ use llmspell_core::Result;
 use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
 use llmspell_sessions::SessionManager;
 use llmspell_state_persistence::StateManager;
+use llmspell_storage::VectorStorage;
 use std::sync::Arc;
 
 /// RAG global object for script engines
@@ -31,6 +32,7 @@ impl RAGGlobal {
         state_manager: Arc<StateManager>,
         session_manager: Arc<SessionManager>,
         multi_tenant_rag: Arc<MultiTenantRAG>,
+        vector_storage: Option<Arc<dyn VectorStorage>>,
     ) -> Result<Self> {
         // Create provider manager for RAG operations
         let core_providers = providers.create_core_manager_arc().await?;
@@ -40,6 +42,7 @@ impl RAGGlobal {
             session_manager,
             multi_tenant_rag,
             core_providers,
+            vector_storage,
         ));
 
         Ok(Self {
@@ -60,6 +63,7 @@ impl RAGGlobal {
         state_manager: Arc<StateManager>,
         session_manager: Arc<SessionManager>,
         multi_tenant_rag: Arc<MultiTenantRAG>,
+        vector_storage: Option<Arc<dyn VectorStorage>>,
     ) -> Result<Self> {
         let core_providers = providers.create_core_manager_arc().await?;
 
@@ -68,6 +72,7 @@ impl RAGGlobal {
             session_manager,
             multi_tenant_rag,
             core_providers,
+            vector_storage,
         ));
 
         Ok(Self {
