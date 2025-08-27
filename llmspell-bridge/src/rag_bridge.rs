@@ -201,6 +201,7 @@ impl RAGBridge {
     /// - Session ID parsing fails
     /// - Vector search fails
     /// - Tenant operations fail
+    #[allow(clippy::cognitive_complexity)]
     pub async fn search(
         &self,
         request: RAGSearchRequest,
@@ -325,6 +326,7 @@ impl RAGBridge {
     /// - Session ID parsing fails
     /// - Vector insertion fails
     /// - Tenant operations fail
+    #[allow(clippy::cognitive_complexity)]
     pub async fn ingest(
         &self,
         request: RAGIngestRequest,
@@ -637,9 +639,11 @@ impl RAGBridge {
 }
 
 // Mock vector storage implementation until HNSWStorage is available
+#[derive(Default)]
 pub struct MockVectorStorage;
 
 impl MockVectorStorage {
+    #[must_use]
     pub const fn new() -> Self {
         Self
     }

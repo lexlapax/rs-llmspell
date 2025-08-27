@@ -14,6 +14,10 @@ pub use crate::debug::DebugConfig;
 pub use crate::engines::{EngineConfigs, JSConfig, LuaConfig};
 pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, IsolationMode};
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
+pub use crate::rag::{
+    ChunkingConfig, ChunkingStrategy, DistanceMetric, EmbeddingConfig, HNSWConfig, RAGCacheConfig,
+    RAGConfig, RAGConfigBuilder, VectorBackend, VectorStorageConfig,
+};
 pub use crate::tools::{FileOperationsConfig, ToolsConfig};
 
 pub mod debug;
@@ -21,6 +25,7 @@ pub mod engines;
 pub mod env;
 pub mod env_registry;
 pub mod providers;
+pub mod rag;
 pub mod tools;
 pub mod validation;
 
@@ -59,6 +64,8 @@ pub struct LLMSpellConfig {
     pub events: EventsConfig,
     /// Debug system configuration
     pub debug: DebugConfig,
+    /// RAG (Retrieval-Augmented Generation) configuration
+    pub rag: RAGConfig,
 }
 
 impl Default for LLMSpellConfig {
@@ -72,6 +79,7 @@ impl Default for LLMSpellConfig {
             hooks: None,
             events: EventsConfig::default(),
             debug: DebugConfig::default(),
+            rag: RAGConfig::default(),
         }
     }
 }
@@ -513,6 +521,313 @@ impl LLMSpellConfig {
             }
         }
 
+        // Merge RAG configuration
+        if let Some(rag) = json.get("rag").and_then(|v| v.as_object()) {
+            if let Some(enabled) = rag.get("enabled").and_then(|v| v.as_bool()) {
+                debug!("Overriding rag.enabled from env: {}", enabled);
+                self.rag.enabled = enabled;
+            }
+
+            if let Some(multi_tenant) = rag.get("multi_tenant").and_then(|v| v.as_bool()) {
+                debug!("Overriding rag.multi_tenant from env: {}", multi_tenant);
+                self.rag.multi_tenant = multi_tenant;
+            }
+
+            // Merge vector storage configuration
+            if let Some(vector_storage) = rag.get("vector_storage").and_then(|v| v.as_object()) {
+                if let Some(dimensions) = vector_storage.get("dimensions").and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.vector_storage.dimensions from env: {}",
+                        dimensions
+                    );
+                    self.rag.vector_storage.dimensions = dimensions as usize;
+                }
+
+                if let Some(backend) = vector_storage.get("backend").and_then(|v| v.as_str()) {
+                    debug!(
+                        "Overriding rag.vector_storage.backend from env: {}",
+                        backend
+                    );
+                    self.rag.vector_storage.backend = match backend {
+                        "hnsw" => crate::rag::VectorBackend::HNSW,
+                        "mock" => crate::rag::VectorBackend::Mock,
+                        _ => {
+                            debug!("Unknown vector backend '{}', defaulting to HNSW", backend);
+                            crate::rag::VectorBackend::HNSW
+                        }
+                    };
+                }
+
+                if let Some(persistence_path) = vector_storage
+                    .get("persistence_path")
+                    .and_then(|v| v.as_str())
+                {
+                    debug!(
+                        "Overriding rag.vector_storage.persistence_path from env: {}",
+                        persistence_path
+                    );
+                    self.rag.vector_storage.persistence_path =
+                        Some(PathBuf::from(persistence_path));
+                }
+
+                if let Some(max_memory) =
+                    vector_storage.get("max_memory_mb").and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.vector_storage.max_memory_mb from env: {}",
+                        max_memory
+                    );
+                    self.rag.vector_storage.max_memory_mb = Some(max_memory as usize);
+                }
+
+                // Merge HNSW configuration
+                if let Some(hnsw) = vector_storage.get("hnsw").and_then(|v| v.as_object()) {
+                    if let Some(m) = hnsw.get("m").and_then(|v| v.as_u64()) {
+                        debug!("Overriding rag.vector_storage.hnsw.m from env: {}", m);
+                        self.rag.vector_storage.hnsw.m = m as usize;
+                    }
+
+                    if let Some(ef_construction) =
+                        hnsw.get("ef_construction").and_then(|v| v.as_u64())
+                    {
+                        debug!(
+                            "Overriding rag.vector_storage.hnsw.ef_construction from env: {}",
+                            ef_construction
+                        );
+                        self.rag.vector_storage.hnsw.ef_construction = ef_construction as usize;
+                    }
+
+                    if let Some(ef_search) = hnsw.get("ef_search").and_then(|v| v.as_u64()) {
+                        debug!(
+                            "Overriding rag.vector_storage.hnsw.ef_search from env: {}",
+                            ef_search
+                        );
+                        self.rag.vector_storage.hnsw.ef_search = ef_search as usize;
+                    }
+
+                    if let Some(max_elements) = hnsw.get("max_elements").and_then(|v| v.as_u64()) {
+                        debug!(
+                            "Overriding rag.vector_storage.hnsw.max_elements from env: {}",
+                            max_elements
+                        );
+                        self.rag.vector_storage.hnsw.max_elements = max_elements as usize;
+                    }
+
+                    if let Some(seed) = hnsw.get("seed").and_then(|v| v.as_u64()) {
+                        debug!("Overriding rag.vector_storage.hnsw.seed from env: {}", seed);
+                        self.rag.vector_storage.hnsw.seed = Some(seed);
+                    }
+
+                    if let Some(metric) = hnsw.get("metric").and_then(|v| v.as_str()) {
+                        debug!(
+                            "Overriding rag.vector_storage.hnsw.metric from env: {}",
+                            metric
+                        );
+                        self.rag.vector_storage.hnsw.metric = match metric {
+                            "cosine" => crate::rag::DistanceMetric::Cosine,
+                            "euclidean" => crate::rag::DistanceMetric::Euclidean,
+                            "inner_product" => crate::rag::DistanceMetric::InnerProduct,
+                            _ => {
+                                debug!(
+                                    "Unknown distance metric '{}', defaulting to Cosine",
+                                    metric
+                                );
+                                crate::rag::DistanceMetric::Cosine
+                            }
+                        };
+                    }
+
+                    if let Some(allow_replace) =
+                        hnsw.get("allow_replace_deleted").and_then(|v| v.as_bool())
+                    {
+                        debug!(
+                            "Overriding rag.vector_storage.hnsw.allow_replace_deleted from env: {}",
+                            allow_replace
+                        );
+                        self.rag.vector_storage.hnsw.allow_replace_deleted = allow_replace;
+                    }
+
+                    if let Some(num_threads) = hnsw.get("num_threads").and_then(|v| v.as_u64()) {
+                        debug!(
+                            "Overriding rag.vector_storage.hnsw.num_threads from env: {}",
+                            num_threads
+                        );
+                        self.rag.vector_storage.hnsw.num_threads = Some(num_threads as usize);
+                    }
+                }
+            }
+
+            // Merge embedding configuration
+            if let Some(embedding) = rag.get("embedding").and_then(|v| v.as_object()) {
+                if let Some(provider) = embedding.get("default_provider").and_then(|v| v.as_str()) {
+                    debug!(
+                        "Overriding rag.embedding.default_provider from env: {}",
+                        provider
+                    );
+                    self.rag.embedding.default_provider = provider.to_string();
+                }
+
+                if let Some(cache_enabled) =
+                    embedding.get("cache_enabled").and_then(|v| v.as_bool())
+                {
+                    debug!(
+                        "Overriding rag.embedding.cache_enabled from env: {}",
+                        cache_enabled
+                    );
+                    self.rag.embedding.cache_enabled = cache_enabled;
+                }
+
+                if let Some(cache_size) = embedding.get("cache_size").and_then(|v| v.as_u64()) {
+                    debug!(
+                        "Overriding rag.embedding.cache_size from env: {}",
+                        cache_size
+                    );
+                    self.rag.embedding.cache_size = cache_size as usize;
+                }
+
+                if let Some(cache_ttl) = embedding.get("cache_ttl_seconds").and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.embedding.cache_ttl_seconds from env: {}",
+                        cache_ttl
+                    );
+                    self.rag.embedding.cache_ttl_seconds = cache_ttl;
+                }
+
+                if let Some(batch_size) = embedding.get("batch_size").and_then(|v| v.as_u64()) {
+                    debug!(
+                        "Overriding rag.embedding.batch_size from env: {}",
+                        batch_size
+                    );
+                    self.rag.embedding.batch_size = batch_size as usize;
+                }
+
+                if let Some(timeout) = embedding.get("timeout_seconds").and_then(|v| v.as_u64()) {
+                    debug!(
+                        "Overriding rag.embedding.timeout_seconds from env: {}",
+                        timeout
+                    );
+                    self.rag.embedding.timeout_seconds = timeout;
+                }
+
+                if let Some(max_retries) = embedding.get("max_retries").and_then(|v| v.as_u64()) {
+                    debug!(
+                        "Overriding rag.embedding.max_retries from env: {}",
+                        max_retries
+                    );
+                    self.rag.embedding.max_retries = max_retries as u32;
+                }
+            }
+
+            // Merge chunking configuration
+            if let Some(chunking) = rag.get("chunking").and_then(|v| v.as_object()) {
+                if let Some(strategy) = chunking.get("strategy").and_then(|v| v.as_str()) {
+                    debug!("Overriding rag.chunking.strategy from env: {}", strategy);
+                    self.rag.chunking.strategy = match strategy {
+                        "sliding_window" => crate::rag::ChunkingStrategy::SlidingWindow,
+                        "semantic" => crate::rag::ChunkingStrategy::Semantic,
+                        "sentence" => crate::rag::ChunkingStrategy::Sentence,
+                        _ => {
+                            debug!(
+                                "Unknown chunking strategy '{}', defaulting to SlidingWindow",
+                                strategy
+                            );
+                            crate::rag::ChunkingStrategy::SlidingWindow
+                        }
+                    };
+                }
+
+                if let Some(chunk_size) = chunking.get("chunk_size").and_then(|v| v.as_u64()) {
+                    debug!(
+                        "Overriding rag.chunking.chunk_size from env: {}",
+                        chunk_size
+                    );
+                    self.rag.chunking.chunk_size = chunk_size as usize;
+                }
+
+                if let Some(overlap) = chunking.get("overlap").and_then(|v| v.as_u64()) {
+                    debug!("Overriding rag.chunking.overlap from env: {}", overlap);
+                    self.rag.chunking.overlap = overlap as usize;
+                }
+
+                if let Some(max_chunk_size) =
+                    chunking.get("max_chunk_size").and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.chunking.max_chunk_size from env: {}",
+                        max_chunk_size
+                    );
+                    self.rag.chunking.max_chunk_size = max_chunk_size as usize;
+                }
+
+                if let Some(min_chunk_size) =
+                    chunking.get("min_chunk_size").and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.chunking.min_chunk_size from env: {}",
+                        min_chunk_size
+                    );
+                    self.rag.chunking.min_chunk_size = min_chunk_size as usize;
+                }
+            }
+
+            // Merge cache configuration
+            if let Some(cache) = rag.get("cache").and_then(|v| v.as_object()) {
+                if let Some(search_cache_enabled) =
+                    cache.get("search_cache_enabled").and_then(|v| v.as_bool())
+                {
+                    debug!(
+                        "Overriding rag.cache.search_cache_enabled from env: {}",
+                        search_cache_enabled
+                    );
+                    self.rag.cache.search_cache_enabled = search_cache_enabled;
+                }
+
+                if let Some(search_cache_size) =
+                    cache.get("search_cache_size").and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.cache.search_cache_size from env: {}",
+                        search_cache_size
+                    );
+                    self.rag.cache.search_cache_size = search_cache_size as usize;
+                }
+
+                if let Some(search_cache_ttl) = cache
+                    .get("search_cache_ttl_seconds")
+                    .and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.cache.search_cache_ttl_seconds from env: {}",
+                        search_cache_ttl
+                    );
+                    self.rag.cache.search_cache_ttl_seconds = search_cache_ttl;
+                }
+
+                if let Some(document_cache_enabled) = cache
+                    .get("document_cache_enabled")
+                    .and_then(|v| v.as_bool())
+                {
+                    debug!(
+                        "Overriding rag.cache.document_cache_enabled from env: {}",
+                        document_cache_enabled
+                    );
+                    self.rag.cache.document_cache_enabled = document_cache_enabled;
+                }
+
+                if let Some(document_cache_size) =
+                    cache.get("document_cache_size_mb").and_then(|v| v.as_u64())
+                {
+                    debug!(
+                        "Overriding rag.cache.document_cache_size_mb from env: {}",
+                        document_cache_size
+                    );
+                    self.rag.cache.document_cache_size_mb = document_cache_size as usize;
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -678,6 +993,13 @@ impl LLMSpellConfigBuilder {
     #[must_use]
     pub fn debug(mut self, debug: DebugConfig) -> Self {
         self.config.debug = debug;
+        self
+    }
+
+    /// Set the RAG configuration
+    #[must_use]
+    pub fn rag(mut self, rag: RAGConfig) -> Self {
+        self.config.rag = rag;
         self
     }
 
@@ -1137,5 +1459,161 @@ mod tests {
 
         let config = result.unwrap();
         assert_eq!(config.default_engine, "lua");
+    }
+
+    #[test]
+    fn test_rag_config_environment_merge() {
+        use serde_json::json;
+
+        let mut config = LLMSpellConfig::default();
+
+        // Verify initial defaults
+        assert!(!config.rag.enabled);
+        assert_eq!(config.rag.vector_storage.dimensions, 384);
+        assert_eq!(config.rag.embedding.default_provider, "openai");
+        assert!(!config.rag.multi_tenant);
+
+        // Simulate environment variable override
+        let env_json = json!({
+            "rag": {
+                "enabled": true,
+                "multi_tenant": true,
+                "vector_storage": {
+                    "dimensions": 768,
+                    "backend": "hnsw",
+                    "persistence_path": "/tmp/vectors",
+                    "max_memory_mb": 1000,
+                    "hnsw": {
+                        "m": 32,
+                        "ef_construction": 400,
+                        "ef_search": 100,
+                        "max_elements": 500000,
+                        "seed": 42,
+                        "metric": "cosine",
+                        "allow_replace_deleted": false,
+                        "num_threads": 4
+                    }
+                },
+                "embedding": {
+                    "default_provider": "local",
+                    "cache_enabled": false,
+                    "cache_size": 5000,
+                    "cache_ttl_seconds": 7200,
+                    "batch_size": 64,
+                    "timeout_seconds": 60,
+                    "max_retries": 5
+                },
+                "chunking": {
+                    "strategy": "semantic",
+                    "chunk_size": 1024,
+                    "overlap": 128,
+                    "max_chunk_size": 4096,
+                    "min_chunk_size": 200
+                },
+                "cache": {
+                    "search_cache_enabled": false,
+                    "search_cache_size": 2000,
+                    "search_cache_ttl_seconds": 900,
+                    "document_cache_enabled": false,
+                    "document_cache_size_mb": 200
+                }
+            }
+        });
+
+        // Apply environment overrides
+        config.merge_from_json(&env_json).unwrap();
+
+        // Verify overrides were applied
+        assert!(config.rag.enabled);
+        assert!(config.rag.multi_tenant);
+
+        // Vector storage
+        assert_eq!(config.rag.vector_storage.dimensions, 768);
+        assert!(matches!(
+            config.rag.vector_storage.backend,
+            crate::rag::VectorBackend::HNSW
+        ));
+        assert_eq!(
+            config.rag.vector_storage.persistence_path,
+            Some(PathBuf::from("/tmp/vectors"))
+        );
+        assert_eq!(config.rag.vector_storage.max_memory_mb, Some(1000));
+
+        // HNSW
+        assert_eq!(config.rag.vector_storage.hnsw.m, 32);
+        assert_eq!(config.rag.vector_storage.hnsw.ef_construction, 400);
+        assert_eq!(config.rag.vector_storage.hnsw.ef_search, 100);
+        assert_eq!(config.rag.vector_storage.hnsw.max_elements, 500000);
+        assert_eq!(config.rag.vector_storage.hnsw.seed, Some(42));
+        assert!(matches!(
+            config.rag.vector_storage.hnsw.metric,
+            crate::rag::DistanceMetric::Cosine
+        ));
+        assert!(!config.rag.vector_storage.hnsw.allow_replace_deleted);
+        assert_eq!(config.rag.vector_storage.hnsw.num_threads, Some(4));
+
+        // Embedding
+        assert_eq!(config.rag.embedding.default_provider, "local");
+        assert!(!config.rag.embedding.cache_enabled);
+        assert_eq!(config.rag.embedding.cache_size, 5000);
+        assert_eq!(config.rag.embedding.cache_ttl_seconds, 7200);
+        assert_eq!(config.rag.embedding.batch_size, 64);
+        assert_eq!(config.rag.embedding.timeout_seconds, 60);
+        assert_eq!(config.rag.embedding.max_retries, 5);
+
+        // Chunking
+        assert!(matches!(
+            config.rag.chunking.strategy,
+            crate::rag::ChunkingStrategy::Semantic
+        ));
+        assert_eq!(config.rag.chunking.chunk_size, 1024);
+        assert_eq!(config.rag.chunking.overlap, 128);
+        assert_eq!(config.rag.chunking.max_chunk_size, 4096);
+        assert_eq!(config.rag.chunking.min_chunk_size, 200);
+
+        // Cache
+        assert!(!config.rag.cache.search_cache_enabled);
+        assert_eq!(config.rag.cache.search_cache_size, 2000);
+        assert_eq!(config.rag.cache.search_cache_ttl_seconds, 900);
+        assert!(!config.rag.cache.document_cache_enabled);
+        assert_eq!(config.rag.cache.document_cache_size_mb, 200);
+    }
+
+    #[test]
+    fn test_rag_config_unknown_enum_fallbacks() {
+        use serde_json::json;
+
+        let mut config = LLMSpellConfig::default();
+
+        let env_json = json!({
+            "rag": {
+                "vector_storage": {
+                    "backend": "unknown_backend",
+                    "hnsw": {
+                        "metric": "unknown_metric"
+                    }
+                },
+                "chunking": {
+                    "strategy": "unknown_strategy"
+                }
+            }
+        });
+
+        // Should not fail and use fallback values
+        config.merge_from_json(&env_json).unwrap();
+
+        // Verify fallbacks were used
+        assert!(matches!(
+            config.rag.vector_storage.backend,
+            crate::rag::VectorBackend::HNSW
+        ));
+        assert!(matches!(
+            config.rag.vector_storage.hnsw.metric,
+            crate::rag::DistanceMetric::Cosine
+        ));
+        assert!(matches!(
+            config.rag.chunking.strategy,
+            crate::rag::ChunkingStrategy::SlidingWindow
+        ));
     }
 }

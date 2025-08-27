@@ -1160,11 +1160,11 @@ This ensures clean separation of concerns, reusability across all components, an
 **Description**: Extend llmspell-config crate with comprehensive RAG configuration support.
 
 **Acceptance Criteria:**
-- [ ] RAGConfig struct with vector storage options
-- [ ] HNSW configuration parameters  
-- [ ] Provider configuration for embeddings
-- [ ] Persistence and dimension settings
-- [ ] TOML serialization/deserialization works
+- [x] RAGConfig struct with vector storage options
+- [x] HNSW configuration parameters  
+- [x] Provider configuration for embeddings
+- [x] Persistence and dimension settings
+- [x] TOML serialization/deserialization works
 
 **Implementation Steps:**
 1. Create `llmspell-config/src/rag.rs`:
@@ -1194,63 +1194,77 @@ This ensures clean separation of concerns, reusability across all components, an
 5. Update TOML examples and tests
 
 **Definition of Done:**
-- [ ] RAGConfig compiles and serializes correctly
-- [ ] Integrated into main LLMSpellConfig
-- [ ] TOML files can configure RAG settings
-- [ ] Backward compatibility maintained
-- [ ] Tests pass with new config fields
+- [x] RAGConfig compiles and serializes correctly
+- [x] Integrated into main LLMSpellConfig
+- [x] TOML files can configure RAG settings
+- [x] Backward compatibility maintained
+- [x] Tests pass with new config fields
+- [x] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
-### Task 8.8.2: Enhance ScriptRuntime with RAG Support  
+### Task 8.8.2: Enhance ScriptRuntime with RAG Support ✅ 
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: Runtime Team Lead
 
-**Description**: Modify ScriptRuntime to automatically set up RAG infrastructure based on configuration.
+**Status**: ✅ COMPLETED
+
+**Description**: Modify ScriptRuntime to automatically set up RAG infrastructure based on configuration using existing dependency injection architecture.
+
+**ARCHITECTURAL DECISION - Option 1: Configuration-Driven Dependency Injection**
+
+**WHY Option 1 (vs other approaches):**
+- ✅ **Follows Established Patterns**: Leverages existing GlobalContext + register_rag_global system
+- ✅ **Configuration-Driven**: Aligns with how all other components work (events, tools, providers)  
+- ✅ **Zero API Proliferation**: No new constructors needed - `new_with_lua()` works unchanged
+- ✅ **Automatic Registration**: Existing `create_standard_registry()` auto-detects dependencies
+- ✅ **Engine Agnostic**: Works with Lua, JavaScript, any future engines
+- ✅ **Backward Compatible**: RAG disabled by default, no breaking changes
+- ✅ **Minimal Code**: ~15 lines vs 200+ lines of complex engine detection
+
+**Rejected Approaches:**
+- ❌ Factory Enhancement: Makes factory RAG-aware, breaks separation of concerns
+- ❌ Explicit RAG Constructor: API proliferation, not config-driven
+- ❌ Runtime Detection: Unreliable, runtime overhead, brittle
 
 **Acceptance Criteria:**
-- [ ] ScriptRuntime detects RAG usage in scripts
-- [ ] RAG components initialize on-demand
-- [ ] Configuration drives RAG setup
-- [ ] Graceful fallback when RAG disabled
-- [ ] Existing tests continue to pass
+- [x] **ARCHITECTURAL**: RAG components created conditionally in `lua/engine.rs`
+- [x] **DEPENDENCY**: RAG dependencies stored in GlobalContext for auto-detection
+- [x] **CONFIGURATION**: `config.rag.enabled` drives RAG setup
+- [x] **COMPATIBILITY**: All existing ScriptRuntime APIs work unchanged  
+- [x] **AUTO-REGISTRATION**: Existing `register_rag_global` detects and registers RAG
 
-**Implementation Steps:**
-1. Add RAG detection to ScriptRuntime:
-   ```rust
-   impl ScriptRuntime {
-       pub async fn new_with_rag_support(config: LLMSpellConfig) -> Result<Self> {
-           let mut runtime = Self::new_with_lua(config.clone()).await?;
-           if config.rag.enabled {
-               runtime.setup_rag(config.rag).await?;
-           }
-           Ok(runtime)
-       }
-   }
-   ```
-2. Implement `setup_rag()` method:
-   - Create HNSW vector storage with config parameters
-   - Initialize multi-tenant manager if enabled
-   - Create RAG bridge with proper storage
-   - Inject RAG global into Lua environment
-3. Add script analysis for auto-detection:
-   ```rust
-   fn script_uses_rag(script_content: &str) -> bool {
-       script_content.contains("RAG.")
-   }
-   ```
-4. Modify `new_with_lua()` to optionally enable RAG:
-   - Check if script uses RAG.* calls
-   - Auto-enable if detected and config allows
-5. Handle initialization errors gracefully:
-   - Provide clear error messages
-   - Fall back to no-RAG mode if possible
+**Implementation Completed:**
+1. ✅ **Created `globals/rag_infrastructure.rs`** with `get_or_create_rag_infrastructure()`:
+   - Follows established `session_infrastructure.rs` pattern for consistency
+   - Handles vector storage creation (HNSW or Mock based on config.vector_storage.backend)
+   - Creates all required dependencies (StateManager, SessionManager, MultiTenantRAG)
+   - Stores dependencies in GlobalContext for auto-detection
+
+2. ✅ **Modified `lua/engine.rs`** to initialize RAG when `config.rag.enabled = true`:
+   - Added conditional initialization in `inject_apis()` method (lines 328-345)
+   - Calls `get_or_create_rag_infrastructure()` when RAG enabled
+   - Graceful failure with warning if initialization fails
+   - No changes to ScriptRuntime needed - works through engine
+
+3. ✅ **Existing `register_rag_global()`** auto-detects dependencies:
+   - No changes needed - already checks GlobalContext for dependencies
+   - RAG global available when config enabled, nil when disabled
+   - Confirmed by test validating RAG == nil when disabled
+
+4. ✅ **Added comprehensive tests** validating configuration-driven behavior:
+   - `test_lua_rag_with_runtime`: Tests HNSW backend (default)
+   - `test_lua_rag_with_mock_backend`: Tests Mock backend
+   - `test_lua_rag_disabled`: Validates RAG is nil when disabled
+   - All 11 RAG integration tests passing
 
 **Definition of Done:**
-- [ ] ScriptRuntime can initialize RAG components
-- [ ] Configuration properly drives setup
-- [ ] Auto-detection works for RAG usage
-- [ ] Error handling comprehensive
-- [ ] All existing ScriptRuntime tests pass
+- [x] **CORE**: `get_or_create_rag_infrastructure()` implemented in `globals/rag_infrastructure.rs`
+- [x] **CONFIG**: `config.rag.enabled=true` creates RAG dependencies in GlobalContext
+- [x] **AUTO**: Existing `register_rag_global` auto-detects and registers RAG global
+- [x] **COMPAT**: All existing ScriptRuntime tests pass unchanged
+- [x] **VALIDATION**: RAG global available in Lua when `config.rag.enabled=true`
+- [x] **FALLBACK**: Graceful behavior when `config.rag.enabled=false` (no RAG global)
+- [x] **QUALITY**: Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
 ### Task 8.8.3: Update CLI for RAG Integration
 **Priority**: HIGH  
@@ -1296,6 +1310,7 @@ This ensures clean separation of concerns, reusability across all components, an
 - [ ] Command-line options functional
 - [ ] Help text complete and accurate
 - [ ] Examples updated and tested
+- [ ] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
 ### Task 8.8.4: Create Configuration Templates and Examples
 **Priority**: HIGH  
@@ -1312,7 +1327,7 @@ This ensures clean separation of concerns, reusability across all components, an
 - [ ] Configuration validation examples
 
 **Implementation Steps:**
-1. Create `examples/configs/rag-basic.toml`:
+1. Create `examples/script-users/configs/rag-basic.toml`:
    ```toml
    [rag]
    enabled = true
@@ -1325,9 +1340,9 @@ This ensures clean separation of concerns, reusability across all components, an
    default_provider = "openai"
    cache_enabled = true
    ```
-2. Create `examples/configs/rag-multi-tenant.toml`
-3. Create `examples/configs/rag-performance.toml` 
-4. Create `examples/configs/rag-development.toml`
+2. Create `examples/script-users/configs/rag-multi-tenant.toml`
+3. Create `examples/script-users/configs/rag-performance.toml` 
+4. Create `examples/script-users/configs/rag-development.toml`
 5. Add validation script to test configurations
 6. Document configuration options in README
 7. Create migration guide from test setup to production
@@ -1338,6 +1353,7 @@ This ensures clean separation of concerns, reusability across all components, an
 - [ ] Validation scripts work
 - [ ] Documentation clear and helpful
 - [ ] Migration guide complete
+- [ ] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
 ### Task 8.8.5: Fix Remaining ScriptRuntime RAG Test
 **Priority**: HIGH  
@@ -1373,6 +1389,7 @@ This ensures clean separation of concerns, reusability across all components, an
 - [ ] Uses proper configuration approach
 - [ ] No test regressions
 - [ ] Clean test code
+- [ ] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
 ### Task 8.8.6: End-to-End Validation
 **Priority**: CRITICAL  
@@ -1419,6 +1436,7 @@ This ensures clean separation of concerns, reusability across all components, an
 - [ ] Performance acceptable
 - [ ] Error handling robust
 - [ ] Examples functional via CLI
+- [ ] Zero clippy warnings from `scripts/quality-check-minimal.sh`
 
 ---
 

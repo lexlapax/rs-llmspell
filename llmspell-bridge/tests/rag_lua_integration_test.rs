@@ -69,17 +69,20 @@ mod rag_lua_tests {
 
         // Inject only RAG global to avoid Hook registration issues
         let rag_bridge = llmspell_bridge::rag_bridge::RAGBridge::from_components(
-            Arc::new(llmspell_rag::state_integration::StateAwareVectorStorage::new(
-                vector_storage,
-                state_manager.clone(),
-                multi_tenant_rag.clone(),
-            )),
+            Arc::new(
+                llmspell_rag::state_integration::StateAwareVectorStorage::new(
+                    vector_storage,
+                    state_manager.clone(),
+                    multi_tenant_rag.clone(),
+                ),
+            ),
             session_manager,
             multi_tenant_rag,
             providers.create_core_manager_arc().await.unwrap(),
         );
-        
-        llmspell_bridge::lua::globals::rag::inject_rag_global(&lua, &context, Arc::new(rag_bridge)).unwrap();
+
+        llmspell_bridge::lua::globals::rag::inject_rag_global(&lua, &context, Arc::new(rag_bridge))
+            .unwrap();
 
         (context, lua)
     }
@@ -138,7 +141,7 @@ mod rag_lua_tests {
         let result: mlua::Value = lua.load(script).eval().unwrap();
         let table = result.as_table().unwrap();
 
-        assert_eq!(table.get::<_, bool>("success").unwrap(), true);
+        assert!(table.get::<_, bool>("success").unwrap());
         assert_eq!(table.get::<_, u32>("ingest_docs").unwrap(), 2);
         assert!(table.get::<_, u32>("search_results").unwrap() > 0);
     }
@@ -177,7 +180,7 @@ mod rag_lua_tests {
         let result: mlua::Value = lua.load(script).eval().unwrap();
         let table = result.as_table().unwrap();
 
-        assert_eq!(table.get::<_, bool>("success").unwrap(), true);
+        assert!(table.get::<_, bool>("success").unwrap());
         assert_eq!(table.get::<_, u32>("documents").unwrap(), 1);
         // Should create multiple vectors due to chunking
         assert!(table.get::<_, u32>("vectors").unwrap() >= 1);
@@ -229,7 +232,7 @@ mod rag_lua_tests {
         let result: mlua::Value = lua.load(script).eval().unwrap();
         let table = result.as_table().unwrap();
 
-        assert_eq!(table.get::<_, bool>("success").unwrap(), true);
+        assert!(table.get::<_, bool>("success").unwrap());
         // Should find science documents
         assert!(table.get::<_, u32>("total").unwrap() > 0);
     }
@@ -303,7 +306,7 @@ mod rag_lua_tests {
         let result: mlua::Value = lua.load(script).eval().unwrap();
         let table = result.as_table().unwrap();
 
-        assert_eq!(table.get::<_, bool>("session_created").unwrap(), true);
+        assert!(table.get::<_, bool>("session_created").unwrap());
         assert_eq!(
             table.get::<_, String>("session_id").unwrap(),
             "test_session_123"
@@ -312,7 +315,7 @@ mod rag_lua_tests {
             .get::<_, String>("namespace")
             .unwrap()
             .contains("session"));
-        assert_eq!(table.get::<_, bool>("config_ok").unwrap(), true);
+        assert!(table.get::<_, bool>("config_ok").unwrap());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -375,7 +378,7 @@ mod rag_lua_tests {
         let result: mlua::Value = lua.load(script).eval().unwrap();
         let table = result.as_table().unwrap();
 
-        assert_eq!(table.get::<_, bool>("has_stats").unwrap(), true);
+        assert!(table.get::<_, bool>("has_stats").unwrap());
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -407,19 +410,23 @@ mod rag_lua_tests {
         let result: mlua::Value = lua.load(script).eval().unwrap();
         let table = result.as_table().unwrap();
 
-        assert_eq!(table.get::<_, bool>("empty_ok").unwrap(), true);
+        assert!(table.get::<_, bool>("empty_ok").unwrap());
         assert_eq!(table.get::<_, u32>("empty_docs").unwrap(), 0);
-        assert_eq!(table.get::<_, bool>("search_ok").unwrap(), true);
+        assert!(table.get::<_, bool>("search_ok").unwrap());
         assert_eq!(table.get::<_, u32>("search_count").unwrap(), 0);
     }
 
     #[tokio::test(flavor = "multi_thread")]
     async fn test_lua_rag_with_runtime() {
         // Test using ScriptRuntime instead of direct Lua
-        let config = LLMSpellConfig {
+        let mut config = LLMSpellConfig {
             default_engine: "lua".to_string(),
             ..Default::default()
         };
+        config.rag.enabled = true; // Enable RAG functionality
+                                   // Explicitly configure vector backend (default is HNSW)
+        config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
+        config.rag.vector_storage.dimensions = 384;
 
         let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
 
@@ -442,5 +449,66 @@ mod rag_lua_tests {
         let result = runtime.execute_script(script).await.unwrap();
         assert!(result.metadata.warnings.is_empty());
         // Output verification would depend on the script's return format
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_lua_rag_with_mock_backend() {
+        // Test using ScriptRuntime with Mock backend
+        let mut config = LLMSpellConfig {
+            default_engine: "lua".to_string(),
+            ..Default::default()
+        };
+        config.rag.enabled = true;
+        // Use Mock backend for testing
+        config.rag.vector_storage.backend = llmspell_config::VectorBackend::Mock;
+        config.rag.vector_storage.dimensions = 768; // Different dimensions to verify config
+
+        let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+
+        let script = r#"
+            -- Verify RAG is available with Mock backend
+            local docs = {
+                { id = "mock1", text = "Mock backend test document" }
+            }
+            
+            local ingest = RAG.ingest(docs, { scope = "mock", scope_id = "test" })
+            local search = RAG.search("mock", { scope = "mock", scope_id = "test" })
+            
+            return {
+                ingest_success = ingest.success,
+                search_success = search.success,
+                backend_working = ingest.success and search.success
+            }
+        "#;
+
+        let result = runtime.execute_script(script).await.unwrap();
+        assert!(result.metadata.warnings.is_empty());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_lua_rag_disabled() {
+        // Test that RAG is not available when disabled
+        let mut config = LLMSpellConfig {
+            default_engine: "lua".to_string(),
+            ..Default::default()
+        };
+        config.rag.enabled = false; // RAG disabled
+
+        let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
+
+        let script = r"
+            -- RAG should be nil when disabled
+            return {
+                rag_is_nil = RAG == nil
+            }
+        ";
+
+        let result = runtime.execute_script(script).await.unwrap();
+        // Verify RAG is indeed nil when disabled
+        if let serde_json::Value::Object(obj) = result.output {
+            assert_eq!(obj.get("rag_is_nil"), Some(&serde_json::Value::Bool(true)));
+        } else {
+            panic!("Expected object output");
+        }
     }
 }

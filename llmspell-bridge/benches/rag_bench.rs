@@ -15,7 +15,6 @@ use llmspell_tenancy::manager::MultiTenantVectorManager;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
-use uuid::Uuid;
 
 fn setup_rag_bridge(rt: &Runtime) -> Arc<RAGBridge> {
     rt.block_on(async {
@@ -108,7 +107,7 @@ fn bench_vector_search(c: &mut Criterion) {
     let mut group = c.benchmark_group("vector_search");
 
     // Benchmark different k values
-    for k in [1, 5, 10, 50].iter() {
+    for k in &[1, 5, 10, 50] {
         group.bench_with_input(BenchmarkId::new("k", k), k, |b, &k| {
             b.to_async(&rt).iter(|| async {
                 let request = RAGSearchRequest {
@@ -134,7 +133,7 @@ fn bench_document_ingestion(c: &mut Criterion) {
     let mut group = c.benchmark_group("document_ingestion");
 
     // Benchmark different document counts
-    for count in [1, 10, 100, 500].iter() {
+    for count in &[1, 10, 100, 500] {
         let docs = generate_documents(*count);
 
         group.bench_with_input(BenchmarkId::new("docs", count), &docs, |b, docs| {
@@ -238,7 +237,7 @@ fn bench_chunking_strategies(c: &mut Criterion) {
     let mut group = c.benchmark_group("chunking_strategies");
 
     // Benchmark different chunk sizes
-    for chunk_size in [100, 250, 500, 1000].iter() {
+    for chunk_size in &[100, 250, 500, 1000] {
         group.bench_with_input(
             BenchmarkId::new("chunk_size", chunk_size),
             chunk_size,
@@ -284,7 +283,7 @@ fn bench_concurrent_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("concurrent_operations");
 
     // Benchmark concurrent searches
-    for concurrency in [1, 2, 4, 8].iter() {
+    for concurrency in &[1, 2, 4, 8] {
         group.bench_with_input(
             BenchmarkId::new("concurrent_searches", concurrency),
             concurrency,
@@ -326,7 +325,7 @@ fn bench_memory_usage(c: &mut Criterion) {
     group.sample_size(10); // Smaller sample for memory benchmarks
 
     // Benchmark memory per vector
-    for vector_count in [100, 1000, 5000].iter() {
+    for vector_count in &[100, 1000, 5000] {
         group.bench_with_input(
             BenchmarkId::new("vectors", vector_count),
             vector_count,

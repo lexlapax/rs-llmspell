@@ -57,11 +57,13 @@ async fn setup_test_bridge() -> Arc<RAGBridge> {
     let multi_tenant_rag = Arc::new(MultiTenantRAG::new(tenant_manager));
 
     // Create state-aware storage with real HNSW storage
-    let state_aware_storage = Arc::new(llmspell_rag::state_integration::StateAwareVectorStorage::new(
-        vector_storage,
-        state_manager,
-        multi_tenant_rag.clone(),
-    ));
+    let state_aware_storage = Arc::new(
+        llmspell_rag::state_integration::StateAwareVectorStorage::new(
+            vector_storage,
+            state_manager,
+            multi_tenant_rag.clone(),
+        ),
+    );
 
     // Setup provider manager
     let config = ProviderManagerConfig::default();

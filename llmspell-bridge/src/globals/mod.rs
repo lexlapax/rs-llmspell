@@ -12,6 +12,7 @@ pub mod injection;
 pub mod json_global;
 pub mod provider_global;
 pub mod rag_global;
+pub mod rag_infrastructure;
 pub mod registry;
 pub mod replay_global;
 pub mod session_global;
