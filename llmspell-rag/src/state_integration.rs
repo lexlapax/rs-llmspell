@@ -60,6 +60,12 @@ impl StateAwareVectorStorage {
         }
     }
 
+    /// Get the underlying vector storage
+    #[must_use]
+    pub const fn storage(&self) -> &Arc<dyn VectorStorage> {
+        &self.storage
+    }
+
     /// Extract tenant ID from scope
     #[must_use]
     pub fn extract_tenant_id(scope: &StateScope) -> Option<String> {
@@ -115,12 +121,6 @@ impl StateAwareVectorStorage {
         // In a full implementation, this would use state_manager.set_with_scope
 
         Ok(())
-    }
-
-    /// Get underlying storage reference
-    #[must_use]
-    pub fn storage(&self) -> &Arc<dyn VectorStorage> {
-        &self.storage
     }
 
     /// Get state manager reference

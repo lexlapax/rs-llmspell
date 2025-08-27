@@ -231,7 +231,7 @@ impl VectorStorage for HNSWVectorStorage {
             ids.push(id);
         }
 
-        debug!("Inserted {} vectors", ids.len());
+        debug!("Inserted {} vectors: {:?}", ids.len(), ids);
         Ok(ids)
     }
 

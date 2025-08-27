@@ -172,6 +172,27 @@ impl RAGBridge {
         }
     }
 
+    /// Create from pre-built components (for testing)
+    #[must_use]
+    pub fn from_components(
+        state_aware_storage: Arc<StateAwareVectorStorage>,
+        session_manager: Arc<SessionManager>,
+        multi_tenant_rag: Arc<MultiTenantRAG>,
+        provider_manager: Arc<ProviderManager>,
+    ) -> Self {
+        // Create session pipeline
+        let session_pipeline = Arc::new(SessionAwareRAGPipeline::new(
+            state_aware_storage.clone(),
+            session_manager,
+        ));
+        Self {
+            state_aware_storage,
+            session_pipeline,
+            multi_tenant_rag,
+            provider_manager,
+        }
+    }
+
     /// Search for similar vectors
     ///
     /// # Errors
@@ -189,6 +210,7 @@ impl RAGBridge {
 
         // Determine scope
         let scope = Self::determine_scope(&request, context);
+        debug!("Determined search scope: {:?}", scope);
 
         // Perform search based on scope
         let results = match &scope {
@@ -247,15 +269,25 @@ impl RAGBridge {
                     llmspell_storage::VectorQuery::new(query_vector, request.k.unwrap_or(10))
                         .with_scope(scope.clone());
 
-                let results = self
+                let results = match self
                     .state_aware_storage
                     .storage()
                     .search(&search_query)
                     .await
-                    .map_err(|e| llmspell_core::LLMSpellError::Component {
-                        message: format!("Vector search failed: {e}"),
-                        source: None,
-                    })?;
+                {
+                    Ok(results) => results,
+                    Err(e) if e.to_string().contains("not found") => {
+                        // Return empty results for non-existent namespaces
+                        debug!("Namespace not found, returning empty results: {e}");
+                        Vec::new()
+                    }
+                    Err(e) => {
+                        return Err(llmspell_core::LLMSpellError::Component {
+                            message: format!("Vector search failed: {e}"),
+                            source: None,
+                        });
+                    }
+                };
 
                 results
                     .into_iter()
@@ -302,6 +334,7 @@ impl RAGBridge {
 
         // Determine scope
         let scope = Self::determine_scope_ingest(&request, context);
+        debug!("Determined ingest scope: {:?}", scope);
 
         // Convert documents to texts
         let texts: Vec<String> = request.documents.iter().map(|d| d.text.clone()).collect();
@@ -419,7 +452,8 @@ impl RAGBridge {
         let state_scope = match scope {
             "session" => StateScope::Custom(format!("session:{scope_id}")),
             "tenant" => StateScope::Custom(format!("tenant:{scope_id}")),
-            _ => StateScope::Global,
+            "test" => StateScope::Custom(format!("test:{scope_id}")),
+            _ => StateScope::Custom(format!("{scope}:{scope_id}")),
         };
 
         let deleted = self
@@ -447,6 +481,7 @@ impl RAGBridge {
             "openai".to_string(),
             "anthropic".to_string(),
             "local".to_string(),
+            "mock".to_string(),
         ])
     }
 
@@ -487,6 +522,40 @@ impl RAGBridge {
                 "searches_performed".to_string(),
                 serde_json::Value::Number(usage.searches_performed.into()),
             );
+        } else {
+            // For non-tenant scopes, return basic stats
+            let state_scope = match scope {
+                "session" if scope_id.is_some() => {
+                    StateScope::Custom(format!("session:{}", scope_id.unwrap()))
+                }
+                "test" if scope_id.is_some() => {
+                    StateScope::Custom(format!("test:{}", scope_id.unwrap()))
+                }
+                _ if scope_id.is_some() => {
+                    StateScope::Custom(format!("{scope}:{}", scope_id.unwrap()))
+                }
+                _ => StateScope::Global,
+            };
+
+            // Get storage stats for this scope
+            let storage_stats = self
+                .state_aware_storage
+                .storage()
+                .stats_for_scope(&state_scope)
+                .await
+                .map_err(|e| llmspell_core::LLMSpellError::Component {
+                    message: format!("Failed to get storage stats: {e}"),
+                    source: None,
+                })?;
+
+            stats.insert(
+                "total_vectors".to_string(),
+                serde_json::Value::Number(storage_stats.vector_count.into()),
+            );
+            stats.insert(
+                "total_storage_bytes".to_string(),
+                serde_json::Value::Number(storage_stats.storage_bytes.into()),
+            );
         }
 
         Ok(stats)
@@ -523,7 +592,9 @@ impl RAGBridge {
                 "tenant" => request.scope_id.as_ref().map_or(StateScope::Global, |id| {
                     StateScope::Custom(format!("tenant:{id}"))
                 }),
-                _ => StateScope::Global,
+                _ => request.scope_id.as_ref().map_or(StateScope::Global, |id| {
+                    StateScope::Custom(format!("{scope}:{id}"))
+                }),
             },
         )
     }
@@ -557,17 +628,19 @@ impl RAGBridge {
                 "tenant" => request.scope_id.as_ref().map_or(StateScope::Global, |id| {
                     StateScope::Custom(format!("tenant:{id}"))
                 }),
-                _ => StateScope::Global,
+                _ => request.scope_id.as_ref().map_or(StateScope::Global, |id| {
+                    StateScope::Custom(format!("{scope}:{id}"))
+                }),
             },
         )
     }
 }
 
 // Mock vector storage implementation until HNSWStorage is available
-struct MockVectorStorage;
+pub struct MockVectorStorage;
 
 impl MockVectorStorage {
-    const fn new() -> Self {
+    pub const fn new() -> Self {
         Self
     }
 }
