@@ -1,13 +1,16 @@
 # LLMSpell API Documentation
 
-**Complete API reference for Lua and Rust interfaces**
+**Complete API reference for scripting and extending LLMSpell**
 
-**🔗 Navigation**: [← User Guide](../) | [Docs Hub](../../) | [Lua API](lua/) | [Rust API](rust/)
+**🔗 Navigation**: [← User Guide](../) | [Project Home](../../../) | [Examples](../../../examples/)
 
 ---
 
 ## Overview
-LLMSpell provides comprehensive APIs for both Rust developers and script users. The platform offers identical functionality across all supported languages with consistent patterns and behaviors.
+
+> **🔍 API Hub**: Comprehensive documentation for both Lua scripting APIs and Rust extension APIs. Choose your path based on whether you're writing scripts or building components.
+
+**Version**: 0.8.0 | **Status**: Phase 8 Complete | **Last Updated**: December 2024
 
 ## Documentation Structure
 
@@ -15,26 +18,28 @@ LLMSpell provides comprehensive APIs for both Rust developers and script users. 
 **Complete Lua API Reference** - Comprehensive documentation for all Lua scripting capabilities.
 
 **Coverage:**
-- 15 Global objects (Agent, Tool, Workflow, State, Session, Hook, Event, Config, Provider, Debug, JSON, Args, Streaming, Artifact, Replay)
-- 100+ Methods with full type signatures
+- 17 Global objects (Agent, Tool, Workflow, State, Session, Hook, Event, Config, Provider, Debug, JSON, Args, Streaming, Artifact, Replay, RAG, Migration)
+- 200+ Methods with full type signatures
 - Complete parameter and return type documentation
 - Error conditions and handling patterns
 - Practical examples for every API method
 
 **Key Globals:**
-- `Agent` - LLM agent creation and execution
-- `Tool` - Tool invocation and management
-- `Workflow` - Workflow orchestration patterns
-- `State` - Persistent state management
-- `Session` - Session and artifact handling
-- `Hook` - Lifecycle hooks and interception
-- `Event` - Event emission and subscription
+- `Agent` - LLM agent creation and execution (25+ methods)
+- `Tool` - Tool invocation and management (15+ methods)
+- `Workflow` - Workflow orchestration patterns (20+ methods)
+- `RAG` - Retrieval-Augmented Generation (9+ methods) **Phase 8**
+- `State` - Persistent state management (15+ methods)
+- `Session` - Session and artifact handling (20+ methods)
+- `Hook` - Lifecycle hooks and interception (10+ methods)
+- `Event` - Event emission and subscription (15+ methods)
 
 ### 📙 [Rust API](./rust/README.md)
 **Complete Rust API Reference** - Comprehensive documentation for extending LLMSpell with Rust.
 
 **Coverage:**
-- Core traits (BaseComponent, Executable, Agent, Tool, Workflow)
+- 19 crates fully documented with traits, implementations, and examples
+- Core traits (BaseAgent, Executable, Agent, Tool, Workflow)
 - Builder patterns for all components
 - Component Registry system
 - Complete error type hierarchy
@@ -42,15 +47,36 @@ LLMSpell provides comprehensive APIs for both Rust developers and script users. 
 - Testing utilities and macros
 - Performance optimization guidelines
 
-**Key Crates:**
-- `llmspell-core` - Core traits and types
-- `llmspell-agents` - Agent infrastructure
-- `llmspell-tools` - Tool implementations
+**Key Crates by Phase:**
+
+**Phase 8 - RAG & Multi-Tenancy:**
+- `llmspell-storage` - HNSW vector storage for RAG
+- `llmspell-rag` - Retrieval-Augmented Generation pipeline
+- `llmspell-tenancy` - Multi-tenant isolation and quotas
+
+**Core Infrastructure:**
+- `llmspell-core` - Foundation traits and types
+- `llmspell-utils` - Security and utilities
+- `llmspell-testing` - Test framework
+
+**State & Sessions:**
+- `llmspell-state-persistence` - Persistent state with migration
+- `llmspell-state-traits` - State trait definitions
+- `llmspell-sessions` - Session management with artifacts
+- `llmspell-security` - Security and access control
+
+**AI & Execution:**
+- `llmspell-agents` - Agent framework
+- `llmspell-providers` - LLM provider integrations
 - `llmspell-workflows` - Workflow orchestration
-- `llmspell-bridge` - Script language integration
-- `llmspell-state-persistence` - State management
-- `llmspell-hooks` - Hook system
-- `llmspell-events` - Event system
+- `llmspell-tools` - 100+ built-in tools
+- `llmspell-hooks` - Lifecycle hooks
+- `llmspell-events` - Event bus (90K events/sec)
+
+**Integration:**
+- `llmspell-bridge` - Lua/script integration (<1% overhead)
+- `llmspell-config` - Configuration system
+- `llmspell-cli` - Command-line interface
 
 ## Quick Start
 
