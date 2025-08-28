@@ -1,1506 +1,2008 @@
-# LLMSpell Lua API Reference
+# LLMSpell Lua API Documentation
 
-**Version**: 0.6.0  
-**Status**: Production Ready  
-**Purpose**: Complete API reference for LLMSpell Lua scripting
-
-> **📚 COMPREHENSIVE REFERENCE**: This document provides complete API documentation for all Lua globals, methods, and patterns available in LLMSpell. Designed for both human developers and LLM-based coding assistants.
+This document provides comprehensive documentation of all Lua globals available in LLMSpell scripts. Each global object provides specific functionality for building LLM-powered applications.
 
 ## Table of Contents
 
-1. [Agent API](#agent-api) - LLM agent creation and execution
-2. [Tool API](#tool-api) - Tool invocation and management
-3. [Workflow API](#workflow-api) - Workflow orchestration patterns
-4. [State API](#state-api) - State persistence and management
-5. [Session API](#session-api) - Session and artifact management
-6. [Hook API](#hook-api) - Event hooks and lifecycle management
-7. [Event API](#event-api) - Event emission and subscription
-8. [Config API](#config-api) - Configuration access
-9. [Provider API](#provider-api) - Provider management
-10. [Debug API](#debug-api) - Debugging utilities
-11. [JSON API](#json-api) - JSON parsing utilities
-12. [Args API](#args-api) - Command-line arguments
-13. [Streaming API](#streaming-api) - Streaming responses
-14. [Artifact API](#artifact-api) - Artifact storage
-15. [Replay API](#replay-api) - Event replay system
+1. [Agent](#agent) - LLM agent creation and management
+2. [Tool](#tool) - Tool invocation and discovery  
+3. [Workflow](#workflow) - Workflow orchestration
+4. [Session](#session) - Session management and persistence
+5. [State](#state) - Global state management
+6. [Event](#event) - Event publishing and subscription
+7. [Hook](#hook) - Hook registration and management
+8. [RAG](#rag) - Retrieval-Augmented Generation with vector storage
+9. [Config](#config) - Configuration access and management
+10. [Provider](#provider) - LLM provider information
+11. [Artifact](#artifact) - Artifact storage and retrieval
+12. [Replay](#replay) - Hook replay and testing
+13. [Debug](#debug) - Debugging and profiling utilities
+14. [JSON](#json) - JSON parsing and serialization
+15. [ARGS](#args) - Command-line argument access
+16. [Streaming](#streaming) - Streaming and coroutine utilities
 
 ---
 
-## Agent API
+## Agent
 
-The Agent global provides LLM agent creation and execution capabilities.
+The `Agent` global provides functionality for creating and managing LLM agents.
 
-### Agent.builder()
+### Core Methods
 
+#### Agent.builder()
 Creates a new agent builder for configuring agents.
 
-**Returns:** `AgentBuilder` - Builder instance for method chaining
-
-**Example:**
-```lua
-local builder = Agent.builder()
-```
-
-### AgentBuilder Methods
-
-#### :name(string) → AgentBuilder
-Sets the agent's name (required).
-
-**Parameters:**
-- `name: string` - Unique identifier for the agent
-
-**Example:**
-```lua
-builder:name("assistant")
-```
-
-#### :type(string) → AgentBuilder
-Sets the agent type (required).
-
-**Parameters:**
-- `type: string` - Agent type ("llm", "tool", "workflow")
-
-**Example:**
-```lua
-builder:type("llm")
-```
-
-#### :model(string) → AgentBuilder
-Sets the model to use.
-
-**Parameters:**
-- `model: string` - Model identifier (e.g., "gpt-4", "claude-3-opus")
-
-**Example:**
-```lua
-builder:model("gpt-4")
-```
-
-#### :provider(string) → AgentBuilder
-Sets the provider to use.
-
-**Parameters:**
-- `provider: string` - Provider name from configuration
-
-**Example:**
-```lua
-builder:provider("openai")
-```
-
-#### :system_prompt(string) → AgentBuilder
-Sets the system prompt for the agent.
-
-**Parameters:**
-- `system_prompt: string` - Instructions for agent behavior
-
-**Example:**
-```lua
-builder:system_prompt("You are a helpful assistant")
-```
-
-#### :temperature(number) → AgentBuilder
-Sets the temperature for response generation.
-
-**Parameters:**
-- `temperature: number` - Value between 0.0 and 2.0 (default: 0.7)
-
-**Example:**
-```lua
-builder:temperature(0.5)
-```
-
-#### :max_tokens(integer) → AgentBuilder
-Sets the maximum tokens for responses.
-
-**Parameters:**
-- `max_tokens: integer` - Maximum tokens to generate
-
-**Example:**
-```lua
-builder:max_tokens(1000)
-```
-
-#### :timeout(integer) → AgentBuilder
-Sets the timeout in seconds.
-
-**Parameters:**
-- `timeout: integer` - Timeout in seconds
-
-**Example:**
-```lua
-builder:timeout(30)
-```
-
-#### :tools(table) → AgentBuilder
-Sets available tools for the agent.
-
-**Parameters:**
-- `tools: table` - Array of tool names
-
-**Example:**
-```lua
-builder:tools({"file-reader", "web-search"})
-```
-
-#### :build() → Agent
-Creates the agent with configured settings.
-
-**Returns:** `Agent` - Configured agent instance
-
-**Errors:**
-- Throws error if required fields (name, type) are missing
-- Throws error if invalid configuration provided
-
-**Example:**
 ```lua
 local agent = Agent.builder()
     :name("assistant")
-    :type("llm")
-    :model("gpt-4")
+    :type("llm")  -- or "tool", "composite"
+    :model("openai/gpt-4")
+    :temperature(0.7)
+    :max_tokens(2000)
+    :system_prompt("You are a helpful assistant")
+    :tool("calculator")
+    :tool("file-reader")
+    :capability("reasoning")
+    :capability("code-generation")
+    :memory_enabled(true)
+    :context_window(8000)
     :build()
+```
+
+#### Agent.create(config)
+Creates an agent directly from configuration.
+
+```lua
+local agent = Agent.create({
+    name = "my-agent",
+    type = "llm",
+    model = "anthropic/claude-3",
+    temperature = 0.5
+})
+```
+
+#### Agent.list()
+Lists all available agents.
+
+```lua
+local agents = Agent.list()
+for i, agent_info in ipairs(agents) do
+    print(agent_info.name, agent_info.type)
+end
+```
+
+#### Agent.get(name)
+Gets a specific agent by name.
+
+```lua
+local agent = Agent.get("assistant")
+if agent then
+    local response = agent:execute("Hello!")
+end
+```
+
+### Agent Discovery
+
+#### Agent.discover(options)
+Discovers agents based on criteria.
+
+```lua
+local agents = Agent.discover({
+    type = "llm",
+    capabilities = {"code-generation"},
+    min_context = 4000
+})
+```
+
+#### Agent.discover_by_capability(capability)
+Finds agents with a specific capability.
+
+```lua
+local coders = Agent.discover_by_capability("code-generation")
+```
+
+### Agent Templates
+
+#### Agent.list_templates()
+Lists available agent templates.
+
+```lua
+local templates = Agent.list_templates()
+```
+
+#### Agent.create_from_template(template_name, overrides)
+Creates an agent from a template.
+
+```lua
+local agent = Agent.create_from_template("code-assistant", {
+    model = "openai/gpt-4-turbo"
+})
+```
+
+#### Agent.register(name, config)
+Registers a new agent configuration.
+
+```lua
+Agent.register("custom-agent", {
+    type = "llm",
+    model = "openai/gpt-4",
+    system_prompt = "Custom prompt"
+})
+```
+
+### Agent Context Management
+
+#### Agent.create_context(name, data)
+Creates a new agent context.
+
+```lua
+local ctx = Agent.create_context("session-123", {
+    user = "alice",
+    preferences = {theme = "dark"}
+})
+```
+
+#### Agent.get_context_data(name)
+Gets context data.
+
+```lua
+local data = Agent.get_context_data("session-123")
+```
+
+#### Agent.update_context(name, data)
+Updates existing context.
+
+```lua
+Agent.update_context("session-123", {
+    last_query = "What is the weather?"
+})
+```
+
+#### Agent.create_child_context(parent, name, data)
+Creates a child context.
+
+```lua
+Agent.create_child_context("session-123", "subsession-1", {
+    task = "weather-query"
+})
+```
+
+#### Agent.remove_context(name)
+Removes a context.
+
+```lua
+Agent.remove_context("session-123")
+```
+
+### Agent Memory
+
+#### Agent.set_shared_memory(key, value)
+Sets shared memory accessible to all agents.
+
+```lua
+Agent.set_shared_memory("api_results", {data = results})
+```
+
+#### Agent.get_shared_memory(key)
+Gets shared memory value.
+
+```lua
+local data = Agent.get_shared_memory("api_results")
+```
+
+### Agent Composition
+
+#### Agent.create_composite(config)
+Creates a composite agent that coordinates multiple agents.
+
+```lua
+local composite = Agent.create_composite({
+    name = "research-team",
+    agents = {"researcher", "writer", "reviewer"},
+    strategy = "sequential"  -- or "parallel", "vote"
+})
+```
+
+#### Agent.wrap_as_tool(agent_name)
+Wraps an agent as a tool for use by other agents.
+
+```lua
+local tool = Agent.wrap_as_tool("calculator-agent")
+```
+
+### Agent Information
+
+#### Agent.get_info(name)
+Gets detailed information about an agent.
+
+```lua
+local info = Agent.get_info("assistant")
+print(info.model, info.capabilities)
+```
+
+#### Agent.list_capabilities(name)
+Lists capabilities of an agent.
+
+```lua
+local caps = Agent.list_capabilities("assistant")
+```
+
+#### Agent.list_instances()
+Lists all running agent instances.
+
+```lua
+local instances = Agent.list_instances()
+```
+
+#### Agent.get_hierarchy()
+Gets the agent hierarchy tree.
+
+```lua
+local tree = Agent.get_hierarchy()
+```
+
+#### Agent.get_details(name)
+Gets comprehensive agent details.
+
+```lua
+local details = Agent.get_details("assistant")
 ```
 
 ### Agent Instance Methods
 
-#### agent:execute(table) → table
-Executes the agent with given input.
+When you have an agent instance:
 
-**Parameters:**
-- `input: table` - Input parameters
-  - `text: string` - The text to process (required)
-  - `parameters: table` - Optional parameters
-  - `temperature: number` - Override temperature for this execution
-  - `max_tokens: integer` - Override max tokens for this execution
+#### agent:execute(prompt, options)
+Executes the agent with a prompt.
 
-**Returns:** `table` - Agent's response
-  - `text: string` - The response text
-  - `metadata: table` - Optional response metadata
-
-**Errors:**
-- Throws error if text is missing
-- Throws error if agent execution fails
-
-**Example:**
 ```lua
-local response = agent:execute({
-    text = "What is 2 + 2?",
-    temperature = 0.1
-})
-print(response.text) -- "4"
-```
-
-### Agent.list() → table
-Lists all registered agents.
-
-**Returns:** `table` - Array of agent information
-- Each entry contains:
-  - `id: string` - Agent identifier
-  - `type: string` - Agent type
-  - `description: string` - Agent description
-
-**Example:**
-```lua
-local agents = Agent.list()
-for i, agent in ipairs(agents) do
-    print(agent.id, agent.type)
-end
-```
-
-### Agent.get(string) → Agent
-Retrieves an agent by ID.
-
-**Parameters:**
-- `id: string` - Agent identifier
-
-**Returns:** `Agent` - Agent instance or nil if not found
-
-**Example:**
-```lua
-local agent = Agent.get("assistant")
-if agent then
-    local response = agent:execute({text = "Hello"})
-    print(response.text)
-end
-```
-
----
-
-## Tool API
-
-The Tool global provides access to tool functionality.
-
-### Tool.list() → table
-Lists all available tools.
-
-**Returns:** `table` - Array of tool names
-
-**Example:**
-```lua
-local tools = Tool.list()
-for i, tool in ipairs(tools) do
-    print(i, tool)
-end
-```
-
-### Tool.invoke(string, table) → table
-Invokes a tool with parameters.
-
-**Parameters:**
-- `tool_name: string` - Name of the tool to invoke
-- `parameters: table` - Tool-specific parameters
-
-**Returns:** `table` - Tool execution result
-- `success: boolean` - Whether execution succeeded
-- `result: any` - Tool-specific result data
-- `error: string` - Error message if failed
-
-**Errors:**
-- Throws error if tool not found
-- Tool-specific errors may be thrown
-
-**Example:**
-```lua
-local result = Tool.invoke("file-reader", {
-    path = "/tmp/data.txt"
-})
-
-if result.success then
-    print(result.result)
-else
-    print("Error:", result.error)
-end
-```
-
-### Tool.register(table) → boolean
-Registers a custom tool (if enabled).
-
-**Parameters:**
-- `definition: table` - Tool definition
-  - `name: string` - Tool identifier (required)
-  - `description: string` - Tool description
-  - `parameters: table` - Parameter schema
-  - `handler: function` - Execution handler
-
-**Returns:** `boolean` - Registration success
-
-**Example:**
-```lua
-local success = Tool.register({
-    name = "custom-tool",
-    description = "My custom tool",
-    parameters = {
-        input = {type = "string", required = true}
-    },
-    handler = function(params)
-        return {result = "Processed: " .. params.input}
-    end
+local response = agent:execute("Write a poem", {
+    temperature = 0.9,
+    max_tokens = 500
 })
 ```
 
----
+#### agent:execute_streaming(prompt, options, callback)
+Executes with streaming response.
 
-## Workflow API
-
-The Workflow global provides workflow orchestration capabilities.
-
-### Workflow.builder() → WorkflowBuilder
-Creates a new workflow builder.
-
-**Returns:** `WorkflowBuilder` - Builder for configuring workflows
-
-**Example:**
 ```lua
-local builder = Workflow.builder()
-```
-
-### WorkflowBuilder Methods
-
-#### :name(string) → WorkflowBuilder
-Sets the workflow name (required).
-
-**Parameters:**
-- `name: string` - Workflow identifier
-
-**Example:**
-```lua
-builder:name("data-pipeline")
-```
-
-#### :type(string) → WorkflowBuilder
-Sets the workflow type.
-
-**Parameters:**
-- `type: string` - Type ("sequential", "parallel", "conditional", "loop", "nested")
-
-**Example:**
-```lua
-builder:type("sequential")
-```
-
-#### :add_step(table) → WorkflowBuilder
-Adds a step to the workflow.
-
-**Parameters:**
-- `step: table` - Step configuration
-  - `name: string` - Step identifier (required)
-  - `type: string` - Step type ("agent", "tool", "function")
-  - `agent: string` - Agent ID (if type="agent")
-  - `tool: string` - Tool name (if type="tool")
-  - `input: table` - Step input parameters
-  - `timeout_ms: integer` - Step timeout in milliseconds
-
-**Example:**
-```lua
-builder:add_step({
-    name = "analyze",
-    type = "agent",
-    agent = "analyzer",
-    input = {prompt = "Analyze this data"}
-})
-```
-
-#### :add_sequential_step(table) → WorkflowBuilder
-Adds a sequential step (shorthand).
-
-**Parameters:** Same as `add_step`
-
-#### :add_parallel_step(table) → WorkflowBuilder
-Adds a parallel step (shorthand).
-
-**Parameters:** Same as `add_step`
-
-#### :condition(table) → WorkflowBuilder
-Sets the condition for a conditional workflow.
-
-**Parameters:**
-- `condition: table` - Condition configuration
-  - `type: string` - Condition type ("always", "never", "shared_data_equals", "shared_data_exists")
-  - `key: string` - State key (for shared_data conditions)
-  - `value: any` - Expected value (for shared_data_equals)
-
-**Example:**
-```lua
--- Always true condition
-builder:condition({type = "always"})
-
--- Check if shared data equals value
-builder:condition({
-    type = "shared_data_equals",
-    key = "priority",
-    value = "urgent"
-})
-
--- Check if shared data exists
-builder:condition({
-    type = "shared_data_exists", 
-    key = "user_id"
-})
-```
-
-#### :add_then_step(table) → WorkflowBuilder
-Adds a step to execute when condition is true.
-
-**Parameters:** Same as `add_step`
-
-#### :add_else_step(table) → WorkflowBuilder  
-Adds a step to execute when condition is false.
-
-**Parameters:** Same as `add_step`
-
-#### :parallel() → WorkflowBuilder
-Sets workflow to parallel execution mode.
-
-**Returns:** `WorkflowBuilder` - Builder for method chaining
-
-**Example:**
-```lua
-local workflow = Workflow.builder()
-    :name("parallel_tasks")
-    :parallel()
-    :max_concurrency(3)  -- Optional: limit concurrent executions
-    :add_step({name = "task1", type = "tool", tool = "processor"})
-    :add_step({name = "task2", type = "tool", tool = "analyzer"})
-    :build()
-```
-
-#### :conditional() → WorkflowBuilder
-Sets workflow to conditional execution mode.
-
-**Returns:** `WorkflowBuilder` - Builder for method chaining
-
-**Example:**
-```lua
-local workflow = Workflow.builder()
-    :name("conditional_flow")
-    :conditional()
-    :condition({type = "shared_data_equals", key = "priority", value = "urgent"})
-    :add_then_step({name = "urgent_handler", type = "agent", agent = "urgent_processor"})
-    :add_else_step({name = "normal_handler", type = "agent", agent = "normal_processor"})
-    :build()
-```
-
-#### :loop() → WorkflowBuilder
-Sets workflow to loop execution mode.
-
-**Returns:** `WorkflowBuilder` - Builder for method chaining
-
-#### :with_range(table) → WorkflowBuilder
-Configure range-based iteration for loop workflows.
-
-**Parameters:**
-- `range: table` - Range configuration
-  - `start: integer` - Starting value (inclusive)
-  - `["end"]: integer` - Ending value (exclusive)
-  - `step: integer` - Step increment (default: 1)
-
-**Example:**
-```lua
-local workflow = Workflow.builder()
-    :name("range_loop")
-    :loop()
-    :with_range({start = 1, ["end"] = 10, step = 1})
-    :max_iterations(5)  -- Safety limit
-    :add_step({name = "process_item", type = "tool", tool = "processor"})
-    :build()
-```
-
-#### :with_collection(table) → WorkflowBuilder
-Configure collection-based iteration for loop workflows.
-
-**Parameters:**
-- `items: table` - Array of items to iterate over
-
-**Example:**
-```lua
-local workflow = Workflow.builder()
-    :name("collection_loop")
-    :loop()
-    :with_collection({"file1.txt", "file2.txt", "file3.txt"})
-    :add_step({name = "process_file", type = "tool", tool = "file_processor"})
-    :build()
-```
-
-#### :with_while(string) → WorkflowBuilder
-Configure condition-based iteration for loop workflows.
-
-**Parameters:**
-- `condition: string` - Condition expression to evaluate
-
-**Example:**
-```lua
-local workflow = Workflow.builder()
-    :name("while_loop")
-    :loop()
-    :with_while("condition_expression")
-    :max_iterations(10)  -- Required safety limit
-    :add_step({name = "process_while", type = "tool", tool = "processor"})
-    :build()
-```
-
-#### :max_concurrency(integer) → WorkflowBuilder
-Set maximum concurrent executions for parallel workflows.
-
-**Parameters:**
-- `limit: integer` - Maximum number of concurrent steps
-
-**Example:**
-```lua
-builder:max_concurrency(3)  -- Limit to 3 concurrent steps
-```
-
-#### :max_iterations(integer) → WorkflowBuilder
-Set maximum iterations for loop workflows (safety limit).
-
-**Parameters:**
-- `limit: integer` - Maximum number of iterations
-
-**Example:**
-```lua
-builder:max_iterations(100)  -- Prevent infinite loops
-```
-
-#### :build() → Workflow
-Creates the workflow.
-
-**Returns:** `Workflow` - Configured workflow instance
-
-**Example:**
-```lua
-local workflow = builder:build()
-```
-
-### Workflow Instance Methods
-
-#### workflow:execute(table) → table
-Executes the workflow.
-
-**Parameters:**
-- `context: table` - Execution context (can be empty `{}`)
-  - Any key-value pairs passed as input to the workflow
-
-**Returns:** `table` - AgentOutput object
-- `text: string` - Summary text (check for "completed successfully")
-- `metadata: table` - Execution metadata
-- Other fields per AgentOutput structure
-
-#### workflow:set_shared_data(string, any) → nil
-Sets shared data for conditional workflows.
-
-**Parameters:**
-- `key: string` - Data key
-- `value: any` - Data value
-
-**Note:** Must be called before execute() for conditional workflows
-
-**Example:**
-```lua
-local result = workflow:execute({
-    state = {input = "data"}
-})
-
-if result.success then
-    print("Result:", result.data)
-end
-```
-
-### Workflow.sequential(table) → Workflow
-Creates a sequential workflow (shorthand).
-
-**Parameters:**
-- `config: table` - Workflow configuration
-  - `name: string` - Workflow name
-  - `steps: table` - Array of steps
-
-**Returns:** `Workflow` - Sequential workflow
-
-**Example:**
-```lua
-local workflow = Workflow.sequential({
-    name = "pipeline",
-    steps = {
-        {name = "step1", type = "tool", tool = "processor"},
-        {name = "step2", type = "agent", agent = "analyzer"}
-    }
-})
-```
-
-### Workflow.parallel(table) → Workflow
-Creates a parallel workflow (shorthand).
-
-**Parameters:** Same as `sequential`
-
-**Returns:** `Workflow` - Parallel workflow
-
-### Workflow.conditional(table) → Workflow
-Creates a conditional workflow.
-
-**Parameters:**
-- `config: table` - Workflow configuration
-  - `name: string` - Workflow name
-  - `condition: table` - Condition configuration
-
-**Returns:** `Workflow` - Conditional workflow
-
-### Workflow.loop(table) → Workflow
-Creates a loop workflow.
-
-**Parameters:**
-- `config: table` - Loop configuration
-  - `name: string` - Workflow name
-  - `iterator: string` - Iterator type ("range", "collection", "while")
-  - `start: integer` - Start value (for range)
-  - `end: integer` - End value (for range)
-  - `items: table` - Items (for collection)
-  - `condition: string` - Loop condition (for while)
-  - `body: table` - Loop body steps
-
-**Returns:** `Workflow` - Loop workflow
-
-**Example:**
-```lua
-local workflow = Workflow.loop({
-    name = "processor",
-    iterator = "collection",
-    items = {"file1.txt", "file2.txt"},
-    body = {
-        {name = "process", type = "tool", tool = "file-processor"}
-    }
-})
-```
-
-### Workflow.list() → table
-Lists all registered workflows.
-
-**Returns:** `table` - Array of workflow information
-- Each entry contains:
-  - `id: string` - Workflow identifier
-  - `type: string` - Workflow type
-  - `description: string` - Workflow description
-
----
-
-## State API
-
-The State global provides persistent state management with scoped namespaces.
-
-### State.save(string, string, string) → nil
-Saves a value to state within a scope.
-
-**Parameters:**
-- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
-- `key: string` - State key
-- `value: string` - Value to save (serialized as JSON)
-
-**Returns:** `nil`
-
-**Example:**
-```lua
-State.save("global", "user_preference", "dark_mode")
-State.save("custom", "session_data", "active")
-```
-
-### State.load(string, string) → any|nil
-Loads a value from state within a scope.
-
-**Parameters:**
-- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
-- `key: string` - State key
-
-**Returns:** `any|nil` - Saved value (deserialized from JSON) or nil if not found
-
-**Example:**
-```lua
-local value = State.load("global", "user_preference")
-if value then
-    print("Preference:", value)
-end
-```
-
-### State.delete(string, string) → nil
-Deletes a key from state within a scope.
-
-**Parameters:**
-- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
-- `key: string` - State key
-
-**Returns:** `nil`
-
-**Example:**
-```lua
-State.delete("global", "old_key")
-```
-
-### State.list_keys(string) → table
-Lists all state keys within a scope.
-
-**Parameters:**
-- `scope: string` - Scope namespace ('global', 'custom', 'workflow', 'agent', 'tool')
-
-**Returns:** `table` - Array of state keys in the specified scope
-
-**Example:**
-```lua
-local keys = State.list_keys("global")
-for i, key in ipairs(keys) do
-    local value = State.load("global", key)
-    print(key, value)
-end
-```
-
-### Workflow-specific helpers
-
-#### State.workflow_get(string, string) → any|nil
-Gets state for a specific workflow step.
-
-**Parameters:**
-- `workflow_id: string` - Workflow identifier
-- `step_name: string` - Step name
-
-**Returns:** `any|nil` - Step state or nil
-
-**Example:**
-```lua
-local data = State.workflow_get("my_workflow", "step_1")
-```
-
-#### State.workflow_list(string) → table
-Lists all steps with state in a workflow.
-
-**Parameters:**
-- `workflow_id: string` - Workflow identifier
-
-**Returns:** `table` - Array of step names
-
-### Agent-specific helpers
-
-#### State.agent_get(string, string) → any|nil
-Gets state for a specific agent.
-
-**Parameters:**
-- `agent_id: string` - Agent identifier
-- `key: string` - State key
-
-**Returns:** `any|nil` - Agent state or nil
-
-#### State.agent_set(string, string, any) → nil
-Sets state for a specific agent.
-
-**Parameters:**
-- `agent_id: string` - Agent identifier
-- `key: string` - State key
-- `value: any` - Value to store
-
-### Tool-specific helpers
-
-#### State.tool_get(string, string) → any|nil
-Gets state for a specific tool.
-
-**Parameters:**
-- `tool_name: string` - Tool name
-- `key: string` - State key
-
-**Returns:** `any|nil` - Tool state or nil
-
-#### State.tool_set(string, string, any) → nil
-Sets state for a specific tool.
-
-**Parameters:**
-- `tool_name: string` - Tool name
-- `key: string` - State key
-- `value: any` - Value to store
-
----
-
-## Session API
-
-The Session global manages sessions and artifacts.
-
-### Session.current() → string|nil
-Gets the current session ID.
-
-**Returns:** `string|nil` - Session ID or nil if no active session
-
-**Example:**
-```lua
-local session_id = Session.current()
-if session_id then
-    print("Active session:", session_id)
-end
-```
-
-### Session.create(table) → string
-Creates a new session.
-
-**Parameters:**
-- `config: table` - Session configuration
-  - `name: string` - Session name
-  - `metadata: table` - Session metadata
-
-**Returns:** `string` - New session ID
-
-**Example:**
-```lua
-local session_id = Session.create({
-    name = "analysis-session",
-    metadata = {user = "john", project = "data-analysis"}
-})
-```
-
-### Session.store_artifact(string, any) → table
-Stores an artifact in the session.
-
-**Parameters:**
-- `type: string` - Artifact type identifier
-- `content: any` - Artifact content
-
-**Returns:** `table` - Artifact information
-- `id: string` - Artifact ID
-- `session_id: string` - Session ID
-- `type: string` - Artifact type
-
-**Example:**
-```lua
-local artifact = Session.store_artifact("report", "Analysis complete")
-print("Artifact stored:", artifact.id)
-```
-
-### Session.load_artifact(string) → any|nil
-Loads an artifact by ID.
-
-**Parameters:**
-- `id: string` - Artifact ID
-
-**Returns:** `any|nil` - Artifact content or nil if not found
-
-**Example:**
-```lua
-local content = Session.load_artifact("artifact_123")
-if content then
-    print("Artifact:", content)
-end
-```
-
-### Session.list_artifacts(string) → table
-Lists artifacts for a session.
-
-**Parameters:**
-- `session_id: string` - Session ID (optional, defaults to current)
-
-**Returns:** `table` - Array of artifact information
-
-**Example:**
-```lua
-local artifacts = Session.list_artifacts()
-for i, artifact in ipairs(artifacts) do
-    print(artifact.id, artifact.type)
-end
-```
-
----
-
-## Hook API
-
-The Hook global manages lifecycle hooks and event handlers.
-
-### Hook.register(string, function) → boolean
-Registers a hook handler.
-
-**Parameters:**
-- `event: string` - Event name to hook
-- `handler: function` - Handler function
-
-**Returns:** `boolean` - Registration success
-
-**Handler Function Signature:**
-```lua
-function(event_data)
-    -- event_data contains event-specific information
-    return {
-        continue = true,  -- Whether to continue processing
-        modify = {}      -- Optional data modifications
-    }
-end
-```
-
-**Example:**
-```lua
-Hook.register("BeforeAgentExecution", function(data)
-    print("Agent executing:", data.agent_id)
-    return {continue = true}
+agent:execute_streaming("Tell a story", {}, function(chunk)
+    print(chunk)
 end)
 ```
 
-### Hook.emit(string, table) → table
-Emits a hook event.
+#### agent:reset()
+Resets the agent's state.
 
-**Parameters:**
-- `event: string` - Event name
-- `data: table` - Event data
-
-**Returns:** `table` - Hook processing result
-
-**Example:**
 ```lua
-local result = Hook.emit("CustomEvent", {
-    message = "Something happened"
-})
+agent:reset()
 ```
 
-### Hook Events
+#### agent:get_history()
+Gets conversation history.
 
-Standard hook events:
-- `BeforeToolExecution` - Before tool executes
-- `AfterToolExecution` - After tool completes
-- `BeforeAgentExecution` - Before agent executes
-- `AfterAgentExecution` - After agent completes
-- `BeforeWorkflowStep` - Before workflow step
-- `AfterWorkflowStep` - After workflow step
-- `SessionStart` - Session begins
-- `SessionEnd` - Session ends
+```lua
+local history = agent:get_history()
+```
 
 ---
 
-## Event API
+## Tool
 
-The Event global provides event emission and subscription.
+The `Tool` global provides functionality for tool execution and management.
 
-### Event.emit(string, table) → boolean
-Emits an event.
+### Core Methods
 
-**Parameters:**
-- `event_type: string` - Event type identifier
-- `data: table` - Event data
+#### Tool.list()
+Lists all available tools.
 
-**Returns:** `boolean` - Emission success
-
-**Example:**
 ```lua
-Event.emit("user_action", {
-    action = "button_click",
+local tools = Tool.list()
+for i, tool in ipairs(tools) do
+    print(tool.name, tool.category)
+end
+```
+
+#### Tool.invoke(name, params)
+Invokes a tool by name with parameters.
+
+```lua
+local result = Tool.invoke("calculator", {
+    operation = "add",
+    a = 5,
+    b = 3
+})
+```
+
+#### Tool.execute(name, params, options)
+Executes a tool with additional options.
+
+```lua
+local result = Tool.execute("web-search", {
+    query = "LLMSpell documentation"
+}, {
+    timeout = 5000,
+    retry = 3
+})
+```
+
+### Tool Discovery
+
+#### Tool.discover(filter)
+Discovers tools matching criteria.
+
+```lua
+local tools = Tool.discover({
+    category = "data",
+    capabilities = {"json"}
+})
+```
+
+#### Tool.get_info(name)
+Gets detailed tool information.
+
+```lua
+local info = Tool.get_info("calculator")
+print(info.description)
+print(info.parameters)
+```
+
+#### Tool.get_schema(name)
+Gets the parameter schema for a tool.
+
+```lua
+local schema = Tool.get_schema("file-reader")
+```
+
+### Tool Registration
+
+#### Tool.register(name, handler)
+Registers a new tool.
+
+```lua
+Tool.register("custom-tool", function(params)
+    return {result = params.input * 2}
+end)
+```
+
+#### Tool.unregister(name)
+Unregisters a tool.
+
+```lua
+Tool.unregister("custom-tool")
+```
+
+#### Tool.is_available(name)
+Checks if a tool is available.
+
+```lua
+if Tool.is_available("calculator") then
+    -- Use calculator
+end
+```
+
+### Batch Operations
+
+#### Tool.batch(operations)
+Executes multiple tool operations.
+
+```lua
+local results = Tool.batch({
+    {tool = "calculator", params = {operation = "add", a = 1, b = 2}},
+    {tool = "calculator", params = {operation = "multiply", a = 3, b = 4}}
+})
+```
+
+---
+
+## Workflow
+
+The `Workflow` global provides workflow orchestration capabilities.
+
+### Workflow Builders
+
+#### Workflow.sequential()
+Creates a sequential workflow builder.
+
+```lua
+local workflow = Workflow.sequential()
+    :name("data-pipeline")
+    :step("load", {tool = "file-reader", params = {file = "data.json"}})
+    :step("process", {agent = "processor", prompt = "Clean this data"})
+    :step("save", {tool = "file-writer", params = {file = "output.json"}})
+    :on_error("retry")  -- or "skip", "fail"
+    :max_retries(3)
+    :timeout(30000)
+    :build()
+```
+
+#### Workflow.parallel()
+Creates a parallel workflow builder.
+
+```lua
+local workflow = Workflow.parallel()
+    :name("multi-search")
+    :branch("web", {tool = "web-search", params = {query = "topic"}})
+    :branch("docs", {tool = "doc-search", params = {query = "topic"}})
+    :branch("db", {tool = "database", params = {query = "topic"}})
+    :merge_strategy("combine")  -- or "first", "vote"
+    :build()
+```
+
+#### Workflow.conditional()
+Creates a conditional workflow builder.
+
+```lua
+local workflow = Workflow.conditional()
+    :name("smart-router")
+    :condition(function(context)
+        return context.input_type == "code"
+    end)
+    :when_true({agent = "code-assistant"})
+    :when_false({agent = "general-assistant"})
+    :build()
+```
+
+#### Workflow.loop()
+Creates a loop workflow builder.
+
+```lua
+local workflow = Workflow.loop()
+    :name("data-processor")
+    :condition(function(context)
+        return context.items_remaining > 0
+    end)
+    :body({
+        tool = "process-item",
+        update = function(context, result)
+            context.items_remaining = context.items_remaining - 1
+            table.insert(context.results, result)
+        end
+    })
+    :max_iterations(100)
+    :build()
+```
+
+### Workflow Creation
+
+#### Workflow.create(config)
+Creates a workflow from configuration.
+
+```lua
+local workflow = Workflow.create({
+    name = "my-workflow",
+    type = "sequential",
+    steps = {
+        {id = "step1", action = {tool = "calculator"}},
+        {id = "step2", action = {agent = "assistant"}}
+    }
+})
+```
+
+#### Workflow.from_yaml(yaml_string)
+Creates a workflow from YAML.
+
+```lua
+local yaml = [[
+name: my-workflow
+type: sequential
+steps:
+  - id: fetch
+    tool: web-fetch
+  - id: process
+    agent: processor
+]]
+local workflow = Workflow.from_yaml(yaml)
+```
+
+#### Workflow.from_file(filepath)
+Loads a workflow from a file.
+
+```lua
+local workflow = Workflow.from_file("workflows/pipeline.yaml")
+```
+
+### Workflow Management
+
+#### Workflow.list()
+Lists all workflows.
+
+```lua
+local workflows = Workflow.list()
+```
+
+#### Workflow.get(name)
+Gets a workflow by name.
+
+```lua
+local workflow = Workflow.get("data-pipeline")
+```
+
+#### Workflow.save(name, workflow)
+Saves a workflow.
+
+```lua
+Workflow.save("my-pipeline", workflow)
+```
+
+#### Workflow.delete(name)
+Deletes a saved workflow.
+
+```lua
+Workflow.delete("old-pipeline")
+```
+
+### Workflow Execution
+
+#### workflow:execute(input)
+Executes a workflow.
+
+```lua
+local result = workflow:execute({
+    data = "input data",
+    options = {verbose = true}
+})
+```
+
+#### workflow:execute_async(input, callback)
+Executes workflow asynchronously.
+
+```lua
+workflow:execute_async(input, function(result, error)
+    if error then
+        print("Error:", error)
+    else
+        print("Result:", result)
+    end
+end)
+```
+
+#### workflow:validate()
+Validates workflow configuration.
+
+```lua
+local is_valid, errors = workflow:validate()
+```
+
+#### workflow:get_status()
+Gets workflow execution status.
+
+```lua
+local status = workflow:get_status()
+print(status.state)  -- "running", "completed", "failed"
+```
+
+---
+
+## Session
+
+The `Session` global manages user sessions and their persistence.
+
+### Session Creation
+
+#### Session.create(config)
+Creates a new session.
+
+```lua
+local session = Session.create({
+    id = "user-123",
+    metadata = {
+        username = "alice",
+        created_at = os.time()
+    }
+})
+```
+
+#### Session.builder()
+Creates a session builder.
+
+```lua
+local session = Session.builder()
+    :id("session-456")
+    :user("bob")
+    :ttl(3600)
+    :metadata({source = "web"})
+    :build()
+```
+
+### Session Management
+
+#### Session.get(id)
+Gets a session by ID.
+
+```lua
+local session = Session.get("user-123")
+```
+
+#### Session.list(filter)
+Lists sessions with optional filter.
+
+```lua
+local sessions = Session.list({
+    user = "alice",
+    active = true
+})
+```
+
+#### Session.get_current()
+Gets the current active session.
+
+```lua
+local session = Session.get_current()
+```
+
+#### Session.set_current(id)
+Sets the current active session.
+
+```lua
+Session.set_current("user-123")
+```
+
+### Session Lifecycle
+
+#### Session.save(id)
+Saves session to persistent storage.
+
+```lua
+Session.save("user-123")
+```
+
+#### Session.load(id)
+Loads session from storage.
+
+```lua
+local session = Session.load("user-123")
+```
+
+#### Session.delete(id)
+Deletes a session.
+
+```lua
+Session.delete("old-session")
+```
+
+#### Session.complete(id, summary)
+Marks session as complete.
+
+```lua
+Session.complete("user-123", {
+    total_queries = 10,
+    duration = 3600
+})
+```
+
+#### Session.suspend(id)
+Suspends a session.
+
+```lua
+Session.suspend("user-123")
+```
+
+#### Session.resume(id)
+Resumes a suspended session.
+
+```lua
+Session.resume("user-123")
+```
+
+### Session Replay
+
+#### Session.can_replay(id)
+Checks if session can be replayed.
+
+```lua
+if Session.can_replay("user-123") then
+    -- Session has replay data
+end
+```
+
+#### Session.replay(id, options)
+Replays a session.
+
+```lua
+local results = Session.replay("user-123", {
+    speed = 2.0,
+    skip_delays = true
+})
+```
+
+#### Session.get_replay_metadata(id)
+Gets replay metadata.
+
+```lua
+local meta = Session.get_replay_metadata("user-123")
+```
+
+#### Session.list_replayable()
+Lists all replayable sessions.
+
+```lua
+local replayable = Session.list_replayable()
+```
+
+### Session Instance Methods
+
+#### session:get(key)
+Gets a session value.
+
+```lua
+local value = session:get("user_preference")
+```
+
+#### session:set(key, value)
+Sets a session value.
+
+```lua
+session:set("last_query", "weather")
+```
+
+#### session:delete(key)
+Deletes a session value.
+
+```lua
+session:delete("temp_data")
+```
+
+#### session:store_artifact(name, data)
+Stores an artifact in the session.
+
+```lua
+session:store_artifact("query_results", results)
+```
+
+---
+
+## State
+
+The `State` global provides persistent state management.
+
+### Basic Operations
+
+#### State.get(key)
+Gets a state value.
+
+```lua
+local value = State.get("app_config")
+```
+
+#### State.set(key, value)
+Sets a state value.
+
+```lua
+State.set("app_config", {
+    theme = "dark",
+    language = "en"
+})
+```
+
+#### State.delete(key)
+Deletes a state entry.
+
+```lua
+State.delete("temp_state")
+```
+
+#### State.exists(key)
+Checks if a key exists.
+
+```lua
+if State.exists("user_settings") then
+    -- Key exists
+end
+```
+
+#### State.clear()
+Clears all state.
+
+```lua
+State.clear()
+```
+
+#### State.list()
+Lists all state keys.
+
+```lua
+local keys = State.list()
+```
+
+### Scoped State
+
+#### State.get_scoped(scope, key)
+Gets value from a scope.
+
+```lua
+local value = State.get_scoped("user:123", "preferences")
+```
+
+#### State.set_scoped(scope, key, value)
+Sets value in a scope.
+
+```lua
+State.set_scoped("tenant:abc", "settings", config)
+```
+
+#### State.delete_scoped(scope, key)
+Deletes from a scope.
+
+```lua
+State.delete_scoped("session:456", "temp")
+```
+
+#### State.clear_scope(scope)
+Clears an entire scope.
+
+```lua
+State.clear_scope("user:123")
+```
+
+#### State.list_scoped(scope)
+Lists keys in a scope.
+
+```lua
+local keys = State.list_scoped("tenant:abc")
+```
+
+### Atomic Operations
+
+#### State.increment(key, amount)
+Atomically increments a numeric value.
+
+```lua
+local new_value = State.increment("counter", 1)
+```
+
+#### State.append(key, value)
+Appends to a list value.
+
+```lua
+State.append("event_log", {timestamp = os.time(), event = "login"})
+```
+
+#### State.compare_and_swap(key, old_value, new_value)
+Atomic compare and swap.
+
+```lua
+local success = State.compare_and_swap("status", "pending", "active")
+```
+
+### State Migrations
+
+#### State.migrate(version)
+Migrates state to a new version.
+
+```lua
+State.migrate("2.0.0")
+```
+
+#### State.get_migration_status()
+Gets migration status.
+
+```lua
+local status = State.get_migration_status()
+```
+
+#### State.get_schema_versions()
+Gets schema version history.
+
+```lua
+local versions = State.get_schema_versions()
+```
+
+### State Backups
+
+#### State.create_backup(name)
+Creates a state backup.
+
+```lua
+local backup_id = State.create_backup("before_upgrade")
+```
+
+#### State.list_backups()
+Lists available backups.
+
+```lua
+local backups = State.list_backups()
+```
+
+#### State.restore_backup(id)
+Restores from a backup.
+
+```lua
+State.restore_backup("backup_123")
+```
+
+#### State.validate_backup(id)
+Validates a backup.
+
+```lua
+local is_valid = State.validate_backup("backup_123")
+```
+
+#### State.cleanup_backups(keep_count)
+Cleans up old backups.
+
+```lua
+State.cleanup_backups(5)  -- Keep only 5 most recent
+```
+
+### State Utilities
+
+#### State.get_storage_usage()
+Gets storage usage statistics.
+
+```lua
+local usage = State.get_storage_usage()
+print(usage.bytes_used, usage.entries_count)
+```
+
+---
+
+## Event
+
+The `Event` global provides event publishing and subscription.
+
+### Publishing Events
+
+#### Event.publish(topic, data)
+Publishes an event.
+
+```lua
+local success = Event.publish("user.login", {
+    user_id = "123",
     timestamp = os.time()
 })
 ```
 
-### Event.subscribe(string, function) → string
-Subscribes to an event type.
+### Subscribing to Events
 
-**Parameters:**
-- `event_type: string` - Event type to subscribe to
-- `handler: function` - Event handler function
+#### Event.subscribe(pattern)
+Subscribes to events matching a pattern.
 
-**Returns:** `string` - Subscription ID
-
-**Example:**
 ```lua
-local sub_id = Event.subscribe("user_action", function(data)
-    print("User action:", data.action)
-end)
+local subscription_id = Event.subscribe("user.*")
 ```
 
-### Event.unsubscribe(string) → boolean
+#### Event.receive(subscription_id, timeout_ms)
+Receives events for a subscription.
+
+```lua
+local event = Event.receive(subscription_id, 5000)
+if event then
+    print(event.topic, event.data)
+end
+```
+
+#### Event.unsubscribe(subscription_id)
 Unsubscribes from events.
 
-**Parameters:**
-- `subscription_id: string` - Subscription ID from subscribe()
-
-**Returns:** `boolean` - Unsubscribe success
-
-**Example:**
 ```lua
-Event.unsubscribe(sub_id)
+Event.unsubscribe(subscription_id)
 ```
 
----
+### Event Management
 
-## Config API
+#### Event.list_subscriptions()
+Lists active subscriptions.
 
-The Config global provides access to configuration.
-
-### Config.get(string) → any
-Gets a configuration value.
-
-**Parameters:**
-- `path: string` - Configuration path (dot-separated)
-
-**Returns:** `any` - Configuration value or nil
-
-**Example:**
 ```lua
-local model = Config.get("providers.openai.default_model")
-local timeout = Config.get("runtime.timeout_seconds")
-```
-
-### Config.exists(string) → boolean
-Checks if a configuration path exists.
-
-**Parameters:**
-- `path: string` - Configuration path
-
-**Returns:** `boolean` - Whether path exists
-
-**Example:**
-```lua
-if Config.exists("providers.anthropic") then
-    -- Anthropic provider is configured
+local subs = Event.list_subscriptions()
+for i, sub in ipairs(subs) do
+    print(sub.id, sub.pattern)
 end
 ```
 
----
+#### Event.get_stats()
+Gets event system statistics.
 
-## Provider API
-
-The Provider global manages LLM providers.
-
-### Provider.list() → table
-Lists available providers.
-
-**Returns:** `table` - Array of provider names
-
-**Example:**
 ```lua
-local providers = Provider.list()
-for i, provider in ipairs(providers) do
-    print(provider)
-end
-```
-
-### Provider.get(string) → table
-Gets provider information.
-
-**Parameters:**
-- `name: string` - Provider name
-
-**Returns:** `table` - Provider configuration
-- `name: string` - Provider name
-- `api_base: string` - API base URL
-- `default_model: string` - Default model
-- `models: table` - Available models
-
-**Example:**
-```lua
-local provider = Provider.get("openai")
-print("Default model:", provider.default_model)
+local stats = Event.get_stats()
+print(stats.event_bus_stats.total_published)
+print(stats.bridge_stats.active_subscriptions)
 ```
 
 ---
 
-## Debug API
+## Hook
 
-The Debug global provides comprehensive debugging, logging, and performance monitoring capabilities.
+The `Hook` global provides hook registration for intercepting operations.
 
-### Logging Methods
+### Hook Registration
 
-#### Debug.log(level, message, [module])
-Log a message at the specified level.
+#### Hook.register(hook_point, callback, priority)
+Registers a hook.
 
-**Parameters:**
-- `level: string` - Log level ("error", "warn", "info", "debug", "trace")
-- `message: string` - The message to log
-- `module: string` (optional) - Module name for filtering
-
-**Example:**
 ```lua
-Debug.log("info", "Operation completed", "workflow.step1")
+local handle = Hook.register("BeforeToolExecution", function(context)
+    print("Tool executing:", context.data.tool_name)
+    return "continue"  -- or "skip", "cancel", {type = "modified", data = {...}}
+end, "normal")  -- priority: "highest", "high", "normal", "low", "lowest"
 ```
 
-#### Debug.error(message, [module])
-Log an error message.
+### Hook Points
 
-**Example:**
+Available hook points:
+- `SystemStartup`, `SystemShutdown`
+- `BeforeAgentInit`, `AfterAgentInit`
+- `BeforeAgentExecution`, `AfterAgentExecution`
+- `BeforeAgentShutdown`, `AfterAgentShutdown`
+- `AgentError`
+- `BeforeToolDiscovery`, `AfterToolDiscovery`
+- `BeforeToolExecution`, `AfterToolExecution`
+- `ToolValidation`, `ToolError`
+- `BeforeWorkflowStart`, `AfterWorkflowComplete`
+- `WorkflowStageTransition`, `BeforeWorkflowStage`, `AfterWorkflowStage`
+- `WorkflowCheckpoint`, `WorkflowRollback`, `WorkflowError`
+
+### Hook Results
+
+Hooks can return:
+- `"continue"` - Continue normal execution
+- `"skip"` or `"skipped"` - Skip this operation
+- `"cancel"` - Cancel the operation
+- `{type = "modified", data = {...}}` - Modify the data
+- `{type = "redirect", target = "..."}` - Redirect to another target
+- `{type = "replace", data = {...}}` - Replace the data
+- `{type = "retry", delay_ms = 1000, max_attempts = 3}` - Retry with delay
+
+### Hook Management
+
+#### Hook.list(filter)
+Lists registered hooks.
+
 ```lua
-Debug.error("Connection failed", "network.client")
+-- List all hooks
+local hooks = Hook.list()
+
+-- List hooks for specific point
+local hooks = Hook.list("BeforeToolExecution")
+
+-- List with complex filter
+local hooks = Hook.list({
+    hook_point = "BeforeToolExecution",
+    language = "lua",
+    priority = "high",
+    tag = "security"
+})
 ```
 
-#### Debug.warn(message, [module])
-Log a warning message.
+#### Hook.unregister(handle)
+Unregisters a hook.
 
-#### Debug.info(message, [module])
-Log an info message.
-
-#### Debug.debug(message, [module])
-Log a debug message.
-
-#### Debug.trace(message, [module])
-Log a trace message.
-
-#### Debug.logWithData(level, message, data, [module])
-Log a message with structured metadata.
-
-**Parameters:**
-- `level: string` - Log level
-- `message: string` - Message text
-- `data: table` - Structured data to include
-- `module: string` (optional) - Module name
-
-**Example:**
 ```lua
-Debug.logWithData("info", "User action", {
-    user_id = "123",
-    action = "login",
-    duration_ms = 150
-}, "auth.tracking")
+Hook.unregister(handle)
+-- or
+handle:unregister()
 ```
 
-### Performance Timing
+### Hook Handle Methods
 
-#### Debug.timer(name) → timer
-Create a new performance timer.
+#### handle:id()
+Gets the hook ID.
 
-**Parameters:**
-- `name: string` - Timer name for reporting
-
-**Returns:** Timer object with methods:
-- `timer:stop()` - Stop timer and return duration in milliseconds
-- `timer:lap(name)` - Record a lap/checkpoint
-- `timer:elapsed()` - Get elapsed time without stopping
-
-**Example:**
 ```lua
-local timer = Debug.timer("data_processing")
--- Do work...
-timer:lap("data_loaded")
--- More work...
-local duration = timer:stop()
-print("Operation took " .. duration .. "ms")
+local id = handle:id()
+```
+
+#### handle:hook_point()
+Gets the hook point.
+
+```lua
+local point = handle:hook_point()
+```
+
+---
+
+## RAG
+
+The `RAG` global provides Retrieval-Augmented Generation with vector storage.
+
+### Vector Search
+
+#### RAG.search(query, options)
+Searches for similar vectors.
+
+```lua
+local results = RAG.search("How do I create an agent?", {
+    limit = 5,
+    threshold = 0.7,
+    collection = "documentation"
+})
+```
+
+### Data Ingestion
+
+#### RAG.ingest(data, options)
+Ingests data into vector storage.
+
+```lua
+local success = RAG.ingest({
+    content = "Agent creation guide...",
+    metadata = {
+        source = "docs/agents.md",
+        type = "documentation"
+    }
+}, {
+    collection = "documentation",
+    chunk_size = 500,
+    chunk_overlap = 50
+})
 ```
 
 ### Configuration
 
-#### Debug.setLevel(level)
-Set the global debug level.
+#### RAG.configure(options)
+Configures RAG settings.
 
-**Parameters:**
-- `level: string` - Debug level ("off", "error", "warn", "info", "debug", "trace")
-
-#### Debug.getLevel() → string
-Get the current debug level.
-
-#### Debug.setEnabled(enabled)
-Enable or disable debugging entirely.
-
-#### Debug.isEnabled() → boolean
-Check if debugging is enabled.
-
-### Module Filtering
-
-#### Debug.addModuleFilter(pattern, enabled)
-Add a simple module filter rule.
-
-**Parameters:**
-- `pattern: string` - Filter pattern (supports wildcards)
-- `enabled: boolean` - Whether to enable or disable matching modules
-
-**Example:**
 ```lua
-Debug.addModuleFilter("workflow.*", true)  -- Enable workflow modules
-Debug.addModuleFilter("*.test", false)     -- Disable test modules
-```
-
-#### Debug.addAdvancedFilter(pattern, pattern_type, enabled)
-Add an advanced filter rule with specific pattern type.
-
-**Parameters:**
-- `pattern: string` - Filter pattern
-- `pattern_type: string` - Pattern type ("exact", "wildcard", "regex", "hierarchical")
-- `enabled: boolean` - Whether to enable or disable
-
-#### Debug.clearModuleFilters()
-Remove all module filter rules.
-
-#### Debug.removeModuleFilter(pattern) → boolean
-Remove a specific filter pattern.
-
-#### Debug.setDefaultFilterEnabled(enabled)
-Set the default behavior when no filter rules match.
-
-#### Debug.getFilterSummary() → table
-Get a summary of current filter configuration.
-
-### Object Dumping
-
-#### Debug.dump(value, [label]) → string
-Dump a Lua value with default formatting.
-
-**Example:**
-```lua
-local data = {name = "test", items = {1, 2, 3}}
-print(Debug.dump(data, "test_data"))
-```
-
-#### Debug.dumpCompact(value, [label]) → string
-Dump a value in compact (one-line) format.
-
-#### Debug.dumpVerbose(value, [label]) → string
-Dump a value with verbose details including types and addresses.
-
-#### Debug.dumpWithOptions(value, options, [label]) → string
-Dump a value with custom formatting options.
-
-**Options:**
-- `max_depth: number` - Maximum nesting depth
-- `indent_size: number` - Spaces per indent level
-- `max_string_length: number` - Max string length before truncation
-- `show_types: boolean` - Include type information
-- `compact_mode: boolean` - Use compact formatting
-
-### Stack Traces
-
-#### Debug.stackTrace([options]) → string
-Capture and format a stack trace.
-
-**Options:**
-- `max_depth: number` - Maximum stack depth
-- `capture_locals: boolean` - Include local variables
-- `include_source: boolean` - Include source information
-
-#### Debug.stackTraceJson([options]) → string
-Capture stack trace and return as JSON.
-
-### Memory Monitoring
-
-#### Debug.memoryStats() → table
-Get current memory statistics.
-
-**Returns:** Table with:
-- `used_bytes: number` - Used memory
-- `allocated_bytes: number` - Allocated memory
-- `resident_bytes: number` - Resident memory
-- `collections: number` - GC collection count
-
-#### Debug.memorySnapshot() → table
-Take a memory usage snapshot.
-
-### Event Recording
-
-#### Debug.recordEvent(timer_id, event_name, [metadata]) → boolean
-Record a custom event within a timer's measurement.
-
-**Example:**
-```lua
-local timer = Debug.timer("operation")
-Debug.recordEvent(timer.id, "initialization", {config_loaded = true})
--- Do work...
-Debug.recordEvent(timer.id, "completion", {items_processed = 100})
-timer:stop()
-```
-
-### Captured Entries
-
-#### Debug.getCapturedEntries([limit]) → table
-Get captured debug entries.
-
-**Returns:** Array of entry tables with:
-- `timestamp: string` - ISO 8601 timestamp
-- `level: string` - Log level
-- `message: string` - Log message
-- `module: string` - Module name (optional)
-- `metadata: table` - Structured metadata (optional)
-
-#### Debug.clearCaptured()
-Clear all captured debug entries.
-
-### Performance Reports
-
-#### Debug.performanceReport() → string
-Generate a text-based performance report.
-
-#### Debug.jsonReport() → string
-Generate a JSON performance report for external tools.
-
-#### Debug.flameGraph() → string
-Generate flame graph compatible output for tools like speedscope.
-
----
-
-## JSON API
-
-The JSON global provides JSON utilities.
-
-### JSON.parse(string) → table
-Parses JSON string to Lua table.
-
-**Parameters:**
-- `json: string` - JSON string
-
-**Returns:** `table` - Parsed data
-
-**Errors:**
-- Throws error if JSON is invalid
-
-**Example:**
-```lua
-local data = JSON.parse('{"name": "test", "value": 42}')
-print(data.name) -- "test"
-```
-
-### JSON.stringify(table) → string
-Converts Lua table to JSON string.
-
-**Parameters:**
-- `data: table` - Data to serialize
-
-**Returns:** `string` - JSON string
-
-**Example:**
-```lua
-local json = JSON.stringify({name = "test", value = 42})
-print(json) -- '{"name":"test","value":42}'
-```
-
----
-
-## Args API
-
-The Args global provides command-line argument access.
-
-### Args.get(integer) → string|nil
-Gets a command-line argument by index.
-
-**Parameters:**
-- `index: integer` - Argument index (1-based)
-
-**Returns:** `string|nil` - Argument value or nil
-
-**Example:**
-```lua
--- If run with: llmspell run script.lua arg1 arg2
-local first_arg = Args.get(1)  -- "arg1"
-local second_arg = Args.get(2) -- "arg2"
-```
-
-### Args.all() → table
-Gets all command-line arguments.
-
-**Returns:** `table` - Array of arguments
-
-**Example:**
-```lua
-local args = Args.all()
-for i, arg in ipairs(args) do
-    print(i, arg)
-end
-```
-
----
-
-## Streaming API
-
-The Streaming global provides streaming response capabilities.
-
-### Streaming.create(function) → Stream
-Creates a streaming handler.
-
-**Parameters:**
-- `handler: function` - Stream handler function
-
-**Returns:** `Stream` - Stream instance
-
-**Handler Function Signature:**
-```lua
-function(chunk)
-    -- Process streaming chunk
-    print(chunk)
-end
-```
-
-**Example:**
-```lua
-local stream = Streaming.create(function(chunk)
-    io.write(chunk)
-    io.flush()
-end)
-```
-
-### Stream:process(string) → nil
-Processes a stream chunk.
-
-**Parameters:**
-- `chunk: string` - Stream chunk
-
-**Example:**
-```lua
-stream:process("Streaming ")
-stream:process("data...")
-```
-
----
-
-## Artifact API
-
-The Artifact global manages artifact storage.
-
-### Artifact.store(table) → string
-Stores an artifact.
-
-**Parameters:**
-- `artifact: table` - Artifact data
-  - `type: string` - Artifact type
-  - `content: any` - Artifact content
-  - `metadata: table` - Optional metadata
-
-**Returns:** `string` - Artifact ID
-
-**Example:**
-```lua
-local id = Artifact.store({
-    type = "report",
-    content = "Analysis results...",
-    metadata = {generated_at = os.time()}
+RAG.configure({
+    provider = "openai",
+    embedding_model = "text-embedding-ada-002",
+    vector_dimensions = 1536
 })
 ```
 
-### Artifact.load(string) → table|nil
-Loads an artifact.
+#### RAG.list_providers()
+Lists available RAG providers.
 
-**Parameters:**
-- `id: string` - Artifact ID
-
-**Returns:** `table|nil` - Artifact data or nil
-
-**Example:**
 ```lua
-local artifact = Artifact.load("artifact_123")
-if artifact then
-    print(artifact.content)
+local providers = RAG.list_providers()
+```
+
+### Session Collections
+
+#### RAG.create_session_collection(session_id, options)
+Creates a session-specific collection.
+
+```lua
+local collection = RAG.create_session_collection("session-123", {
+    ttl = 3600,
+    max_vectors = 1000
+})
+```
+
+#### RAG.configure_session(session_id, options)
+Configures session-specific settings.
+
+```lua
+RAG.configure_session("session-123", {
+    auto_ingest = true,
+    persist = false
+})
+```
+
+### Management
+
+#### RAG.cleanup_scope(scope)
+Cleans up vectors in a scope.
+
+```lua
+RAG.cleanup_scope("session:123")
+```
+
+#### RAG.get_stats()
+Gets RAG statistics.
+
+```lua
+local stats = RAG.get_stats()
+print(stats.total_vectors)
+print(stats.collections)
+```
+
+#### RAG.save()
+Saves RAG state to persistent storage.
+
+```lua
+RAG.save()
+```
+
+---
+
+## Config
+
+The `Config` global provides access to configuration.
+
+### Configuration Access
+
+#### Config.get()
+Gets full configuration.
+
+```lua
+local config = Config.get()
+print(config.default_engine)
+```
+
+#### Config.getSection(name)
+Gets a specific configuration section.
+
+```lua
+local tools_config = Config.getSection("tools")
+```
+
+#### Config.getDefaultEngine()
+Gets the default engine name.
+
+```lua
+local engine = Config.getDefaultEngine()
+```
+
+### Provider Configuration
+
+#### Config.getProvider(name)
+Gets provider configuration.
+
+```lua
+local openai_config = Config.getProvider("openai")
+```
+
+#### Config.listProviders()
+Lists all configured providers.
+
+```lua
+local providers = Config.listProviders()
+```
+
+#### Config.setProvider(name, config)
+Sets provider configuration (if permitted).
+
+```lua
+Config.setProvider("custom", {
+    provider_type = "openai",
+    api_key_env = "CUSTOM_API_KEY",
+    model = "gpt-4"
+})
+```
+
+### Security Configuration
+
+#### Config.getSecurity()
+Gets security settings.
+
+```lua
+local security = Config.getSecurity()
+print(security.allow_file_access)
+```
+
+#### Config.setSecurity(config)
+Sets security configuration (dangerous!).
+
+```lua
+Config.setSecurity({
+    allow_file_access = true,
+    allow_network_access = true
+})
+```
+
+#### Config.isFileAccessAllowed()
+Checks if file access is allowed.
+
+```lua
+if Config.isFileAccessAllowed() then
+    -- Can access files
+end
+```
+
+#### Config.isNetworkAccessAllowed()
+Checks if network access is allowed.
+
+```lua
+if Config.isNetworkAccessAllowed() then
+    -- Can make network requests
+end
+```
+
+### Tools Configuration
+
+#### Config.getTools()
+Gets tools configuration.
+
+```lua
+local tools = Config.getTools()
+```
+
+#### Config.addAllowedPath(path)
+Adds an allowed path for file operations.
+
+```lua
+Config.addAllowedPath("/tmp/myapp")
+```
+
+### Permissions
+
+#### Config.getPermissions()
+Gets current permissions.
+
+```lua
+local perms = Config.getPermissions()
+print(perms.modify_providers)
+print(perms.modify_security)
+```
+
+### Configuration Management
+
+#### Config.snapshot()
+Creates a configuration snapshot.
+
+```lua
+Config.snapshot()
+```
+
+#### Config.restoreSnapshot(timestamp)
+Restores from a snapshot.
+
+```lua
+Config.restoreSnapshot(1234567890)
+```
+
+#### Config.toJson()
+Exports configuration as JSON.
+
+```lua
+local json = Config.toJson()
+```
+
+---
+
+## Provider
+
+The `Provider` global provides LLM provider information.
+
+### Provider Information
+
+#### Provider.list()
+Lists all available providers.
+
+```lua
+local providers = Provider.list()
+for i, provider in ipairs(providers) do
+    print(provider.name, provider.enabled)
+    if provider.capabilities then
+        print("  Streaming:", provider.capabilities.supports_streaming)
+        print("  Multimodal:", provider.capabilities.supports_multimodal)
+        print("  Max tokens:", provider.capabilities.max_context_tokens)
+    end
+end
+```
+
+#### Provider.get(name)
+Gets specific provider information.
+
+```lua
+local provider = Provider.get("openai")
+if provider then
+    print(provider.name, provider.enabled)
+end
+```
+
+#### Provider.getCapabilities(name)
+Gets provider capabilities.
+
+```lua
+local caps = Provider.getCapabilities("anthropic")
+if caps then
+    print("Models:", table.concat(caps.available_models, ", "))
+end
+```
+
+#### Provider.isAvailable(name)
+Checks if a provider is available.
+
+```lua
+if Provider.isAvailable("openai") then
+    -- Provider is configured and enabled
 end
 ```
 
 ---
 
-## Replay API
+## Artifact
 
-The Replay global provides event replay capabilities.
+The `Artifact` global manages session artifacts.
 
-### Replay.record(boolean) → nil
-Enables or disables event recording.
+### Storing Artifacts
 
-**Parameters:**
-- `enabled: boolean` - Whether to record events
+#### Artifact.store(session_id, type, name, content, metadata)
+Stores an artifact.
 
-**Example:**
 ```lua
-Replay.record(true)  -- Start recording
--- Perform operations
-Replay.record(false) -- Stop recording
+local artifact_id = Artifact.store("session-123", "data", "results.json", 
+    '{"data": "results"}', {
+        created_by = "processor",
+        version = "1.0"
+    })
 ```
 
-### Replay.play(string) → boolean
-Replays recorded events.
+#### Artifact.store_file(session_id, file_path, type, metadata)
+Stores a file as an artifact.
 
-**Parameters:**
-- `recording_id: string` - Recording identifier
-
-**Returns:** `boolean` - Replay success
-
-**Example:**
 ```lua
-local success = Replay.play("session_123")
+local artifact_id = Artifact.store_file("session-123", 
+    "/tmp/report.pdf", "document", {
+        title = "Analysis Report"
+    })
+```
+
+### Retrieving Artifacts
+
+#### Artifact.get(session_id, artifact_id)
+Gets an artifact.
+
+```lua
+local artifact = Artifact.get("session-123", artifact_id)
+print(artifact.content)
+print(artifact.metadata)
+```
+
+#### Artifact.list(session_id)
+Lists artifacts for a session.
+
+```lua
+local artifacts = Artifact.list("session-123")
+```
+
+#### Artifact.query(query)
+Queries artifacts with filters.
+
+```lua
+local artifacts = Artifact.query({
+    session_id = "session-123",
+    type = "data",
+    name_pattern = "results*",
+    tags = {"processed"},
+    created_after = "2024-01-01T00:00:00Z",
+    limit = 10
+})
+```
+
+### Managing Artifacts
+
+#### Artifact.delete(session_id, artifact_id)
+Deletes an artifact.
+
+```lua
+Artifact.delete("session-123", artifact_id)
 ```
 
 ---
 
-## Error Handling
+## Replay
 
-All API methods may throw errors. Use pcall for safe execution:
+The `Replay` global provides hook replay functionality for testing.
+
+### Replay Modes
+
+#### Replay.modes
+Available replay modes.
 
 ```lua
-local success, result = pcall(function()
-    return agent:execute({text = "test"})
+local mode = Replay.modes.exact     -- Exact replay
+local mode = Replay.modes.modified  -- With modifications
+local mode = Replay.modes.simulate  -- Simulation mode
+local mode = Replay.modes.debug     -- Debug mode
+```
+
+### Replay Configuration
+
+#### Replay.create_config(mode)
+Creates a replay configuration.
+
+```lua
+local config = Replay.create_config(Replay.modes.modified)
+config:add_modification("params.temperature", 0.5, true)
+```
+
+#### Replay.create_modification(path, value, enabled)
+Creates a parameter modification.
+
+```lua
+local mod = Replay.create_modification("params.max_tokens", 1000, true)
+```
+
+### Replay Scheduling
+
+#### Replay.schedules.once(delay_seconds)
+Creates a one-time schedule.
+
+```lua
+local schedule = Replay.schedules.once(5.0)
+```
+
+#### Replay.schedules.interval(initial_delay, interval, max_executions)
+Creates an interval schedule.
+
+```lua
+local schedule = Replay.schedules.interval(0, 60, 10)
+```
+
+#### Replay.schedules.cron(expression)
+Creates a cron schedule.
+
+```lua
+local schedule = Replay.schedules.cron("0 */5 * * * *")
+```
+
+### Result Comparison
+
+#### Replay.create_comparator()
+Creates a result comparator.
+
+```lua
+local comparator = Replay.create_comparator()
+local comparison = comparator:compare_json(original, replayed)
+print(comparison.identical)
+print(comparison.similarity_score)
+print(comparison.summary)
+```
+
+---
+
+## Debug
+
+The `Debug` global provides comprehensive debugging utilities.
+
+### Logging
+
+#### Debug.log(level, message, module)
+Logs a message at specified level.
+
+```lua
+Debug.log("info", "Processing started", "processor")
+```
+
+#### Debug.trace(message, module)
+Logs at trace level.
+
+```lua
+Debug.trace("Detailed trace info", "module")
+```
+
+#### Debug.debug(message, module)
+Logs at debug level.
+
+```lua
+Debug.debug("Debug information", "module")
+```
+
+#### Debug.info(message, module)
+Logs at info level.
+
+```lua
+Debug.info("Processing complete", "module")
+```
+
+#### Debug.warn(message, module)
+Logs at warning level.
+
+```lua
+Debug.warn("Deprecated function used", "module")
+```
+
+#### Debug.error(message, module)
+Logs at error level.
+
+```lua
+Debug.error("Failed to process", "module")
+```
+
+#### Debug.logWithData(level, message, data, module)
+Logs with structured data.
+
+```lua
+Debug.logWithData("info", "Request processed", {
+    duration = 1500,
+    status = 200
+}, "api")
+```
+
+### Timing
+
+#### Debug.timer(name)
+Creates a timer.
+
+```lua
+local timer = Debug.timer("operation")
+-- Do work...
+local duration = timer:stop()
+```
+
+Timer methods:
+- `timer:stop()` - Stops timer and returns duration
+- `timer:lap(name)` - Records a lap time
+- `timer:elapsed()` - Gets elapsed time without stopping
+
+### Debug Configuration
+
+#### Debug.setLevel(level)
+Sets the debug level.
+
+```lua
+Debug.setLevel("debug")
+```
+
+#### Debug.getLevel()
+Gets current debug level.
+
+```lua
+local level = Debug.getLevel()
+```
+
+#### Debug.setEnabled(enabled)
+Enables/disables debugging.
+
+```lua
+Debug.setEnabled(true)
+```
+
+#### Debug.isEnabled()
+Checks if debugging is enabled.
+
+```lua
+if Debug.isEnabled() then
+    -- Debug is on
+end
+```
+
+### Filtering
+
+#### Debug.addModuleFilter(pattern, enabled)
+Adds a module filter.
+
+```lua
+Debug.addModuleFilter("api.*", true)
+Debug.addModuleFilter("verbose.*", false)
+```
+
+#### Debug.clearModuleFilters()
+Clears all module filters.
+
+```lua
+Debug.clearModuleFilters()
+```
+
+#### Debug.removeModuleFilter(pattern)
+Removes a specific filter.
+
+```lua
+Debug.removeModuleFilter("api.*")
+```
+
+#### Debug.setDefaultFilterEnabled(enabled)
+Sets default filter behavior.
+
+```lua
+Debug.setDefaultFilterEnabled(false)
+```
+
+#### Debug.addAdvancedFilter(pattern, pattern_type, enabled)
+Adds an advanced filter.
+
+```lua
+Debug.addAdvancedFilter("api.*", "wildcard", true)
+Debug.addAdvancedFilter("^core\\..*", "regex", false)
+```
+
+#### Debug.getFilterSummary()
+Gets filter configuration summary.
+
+```lua
+local summary = Debug.getFilterSummary()
+print(summary.total_rules)
+```
+
+### Capture
+
+#### Debug.getCapturedEntries(limit)
+Gets captured debug entries.
+
+```lua
+local entries = Debug.getCapturedEntries(100)
+for i, entry in ipairs(entries) do
+    print(entry.timestamp, entry.level, entry.message)
+end
+```
+
+#### Debug.clearCaptured()
+Clears captured entries.
+
+```lua
+Debug.clearCaptured()
+```
+
+### Value Dumping
+
+#### Debug.dump(value, label)
+Dumps a value with formatting.
+
+```lua
+Debug.dump(complex_table, "Configuration")
+```
+
+#### Debug.dumpCompact(value, label)
+Compact one-line dump.
+
+```lua
+Debug.dumpCompact(data, "Data")
+```
+
+#### Debug.dumpVerbose(value, label)
+Detailed verbose dump.
+
+```lua
+Debug.dumpVerbose(object, "Object")
+```
+
+#### Debug.dumpWithOptions(value, options, label)
+Dump with custom options.
+
+```lua
+Debug.dumpWithOptions(data, {
+    max_depth = 5,
+    indent_size = 4,
+    max_string_length = 100,
+    show_types = true,
+    show_addresses = false
+}, "Custom")
+```
+
+### Performance
+
+#### Debug.performanceReport()
+Generates performance report.
+
+```lua
+local report = Debug.performanceReport()
+```
+
+#### Debug.memoryStats()
+Gets memory statistics.
+
+```lua
+local stats = Debug.memoryStats()
+print(stats.used_bytes)
+print(stats.allocated_bytes)
+```
+
+#### Debug.jsonReport()
+Generates JSON debug report.
+
+```lua
+local json = Debug.jsonReport()
+```
+
+#### Debug.flameGraph()
+Generates flame graph data.
+
+```lua
+local flame_data = Debug.flameGraph()
+```
+
+#### Debug.memorySnapshot()
+Takes a memory snapshot.
+
+```lua
+local snapshot = Debug.memorySnapshot()
+print(snapshot.timestamp_secs)
+print(snapshot.active_trackers)
+```
+
+#### Debug.recordEvent(timer_id, event_name, metadata)
+Records a timing event.
+
+```lua
+Debug.recordEvent("timer-123", "checkpoint", {step = 5})
+```
+
+### Stack Traces
+
+#### Debug.stackTrace(options)
+Captures stack trace.
+
+```lua
+local trace = Debug.stackTrace({
+    max_depth = 50,
+    capture_locals = true,
+    capture_upvalues = false,
+    include_source = true
+})
+```
+
+#### Debug.stackTraceJson(options)
+Gets stack trace as JSON.
+
+```lua
+local json = Debug.stackTraceJson()
+```
+
+---
+
+## JSON
+
+The `JSON` global provides JSON utilities.
+
+### JSON Operations
+
+#### JSON.parse(string)
+Parses JSON string to Lua value.
+
+```lua
+local data = JSON.parse('{"name": "Alice", "age": 30}')
+print(data.name)  -- "Alice"
+```
+
+#### JSON.stringify(value)
+Converts Lua value to JSON string.
+
+```lua
+local json = JSON.stringify({
+    name = "Bob",
+    items = {1, 2, 3},
+    active = true
+})
+```
+
+---
+
+## ARGS
+
+The `ARGS` global provides command-line argument access.
+
+### Accessing Arguments
+
+#### Positional Arguments
+Access by numeric index.
+
+```lua
+local script_name = ARGS[0]  -- Script name
+local first_arg = ARGS[1]    -- First positional argument
+local second_arg = ARGS[2]   -- Second positional argument
+```
+
+#### Named Arguments
+Access by name.
+
+```lua
+local input_file = ARGS.input or "default.txt"
+local output_file = ARGS.output or "result.txt"
+local debug_mode = ARGS.debug == "true"
+```
+
+#### Traditional arg Table
+For Lua compatibility.
+
+```lua
+local script = arg[0]
+local first = arg[1]
+```
+
+---
+
+## Streaming
+
+The `Streaming` global provides streaming and coroutine utilities.
+
+### Stream Creation
+
+#### Streaming.create(generator_function)
+Creates a stream from a generator.
+
+```lua
+local stream = Streaming.create(function()
+    for i = 1, 10 do
+        coroutine.yield(i * 2)
+    end
 end)
+```
 
-if success then
-    print("Result:", result)
-else
-    print("Error:", result)
+### Stream Methods
+
+#### stream:next()
+Gets the next value from the stream.
+
+```lua
+local value = stream:next()
+```
+
+#### stream:isDone()
+Checks if stream is exhausted.
+
+```lua
+if stream:isDone() then
+    -- No more values
 end
 ```
 
-## Type Conventions
+#### stream:collect()
+Collects all remaining values.
 
-- **string** - Lua string
-- **integer** - Whole number
-- **number** - Floating point number
-- **boolean** - true or false
-- **table** - Lua table (object or array)
-- **function** - Lua function
-- **any** - Any Lua type
-- **nil** - Lua nil value
+```lua
+local all_values = stream:collect()
+```
+
+### Streaming Utilities
+
+#### Streaming.yield(value)
+Yields a value in a coroutine (placeholder).
+
+```lua
+Streaming.yield(computed_value)
+```
+
+---
+
+## Common Patterns
+
+### Error Handling
+
+Most operations return nil or false on failure:
+
+```lua
+local result = Tool.invoke("calculator", {operation = "divide", a = 10, b = 0})
+if not result then
+    print("Operation failed")
+elseif result.error then
+    print("Error:", result.error)
+else
+    print("Result:", result.value)
+end
+```
+
+### Async Operations
+
+Many operations support both sync and async variants:
+
+```lua
+-- Synchronous
+local result = agent:execute("Hello")
+
+-- Asynchronous with callback
+agent:execute_async("Hello", function(result, error)
+    if error then
+        print("Error:", error)
+    else
+        print("Result:", result)
+    end
+end)
+```
+
+### Builder Patterns
+
+Many objects support fluent builder interfaces:
+
+```lua
+local agent = Agent.builder()
+    :name("assistant")
+    :model("gpt-4")
+    :temperature(0.7)
+    :build()
+
+local workflow = Workflow.sequential()
+    :step("fetch", {tool = "web-fetch"})
+    :step("process", {agent = "processor"})
+    :build()
+```
+
+### Configuration Tables
+
+Most methods accept configuration tables:
+
+```lua
+local result = Tool.execute("web-search", {
+    query = "LLMSpell"
+}, {
+    timeout = 5000,
+    retry = 3,
+    cache = true
+})
+```
 
 ## Best Practices
 
-1. **Always check return values** - Many methods return success booleans
-2. **Use pcall for error handling** - Wrap risky operations
-3. **Clean up resources** - Unsubscribe from events, clear state when done
-4. **Use builders for complex objects** - Agent and Workflow builders provide validation
-5. **Check Debug.enabled()** - Before expensive debug operations
-
-## Examples
-
-See [Example Index](../../../../examples/EXAMPLE-INDEX.md) for complete working examples.
-
-## See Also
-
-- [Rust API Reference](../rust/README.md) - Rust API documentation
-- [Getting Started](../../getting-started.md) - Introduction to LLMSpell
-- [Agent API Guide](../../agent-api.md) - Detailed agent documentation
-- [Workflow API Guide](../../workflow-api.md) - Detailed workflow documentation
+1. **Always check for nil/false returns** - Operations may fail
+2. **Use scoped state for isolation** - Prefix keys with scope
+3. **Clean up resources** - Unsubscribe from events, unregister hooks
+4. **Handle streaming data incrementally** - Don't collect all at once
+5. **Use appropriate debug levels** - trace < debug < info < warn < error
+6. **Validate inputs** - Check types and ranges before operations
+7. **Use builders for complex objects** - Cleaner than configuration tables
+8. **Batch operations when possible** - Tool.batch() for multiple operations
+9. **Set timeouts for external calls** - Prevent hanging on network/LLM calls
+10. **Use session artifacts for persistence** - Better than global state for user data

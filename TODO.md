@@ -2023,34 +2023,62 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - **Multi-Tenant Focus**: Extensive documentation of tenant isolation and security patterns across all components
 
 
-### Task 8.10.4: Lua API Documentation Updates  
+### Task 8.10.4: Lua API Documentation Updates ✅
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Assignee**: Bridge Team
+**Status**: ✅ COMPLETED
 
 **Description**: Update lua API docs with HNSW/RAG changes from Phase 8.
 
 **Acceptance Criteria:**
-- [ ] RAG global object documented
-- [ ] Vector storage operations documented
-- [ ] Security context usage documented  
-- [ ] Multi-tenant patterns documented
+- [x] RAG global object documented
+- [x] Vector storage operations documented
+- [x] Security context usage documented  
+- [x] Multi-tenant patterns documented
 
 **Implementation Steps:**
-1. Update lua api docs in `docs/user-guide/api/lua/README.md` . this requires you to actually look at the implementation code. Any user facing top level object Agent, Workflow, Tools, RAG and anything that glues them together, Hooks, Sessions, Events, Config, Providers, State, Tenancy, needs to be documented properly.
-2. Update rust api docs in `docs/user-guide/api/rust/*` do it for all crates - recreate the api docs. this requires you to actually look at the implementation code.
-3. Examine `llmspell-bridge/src/lua/globals/rag.rs` implementation
-4. Update `docs/user-guide/api/lua/README.md` with RAG.* methods
-5. Document RAG.search(), RAG.ingest(), RAG.configure() usage patterns
-6. Add multi-tenant scope examples with RAG operations
-7. Update `docs/user-guide/api/lua/globals.md` with security context usage
-8. Verify all documented examples work with current implementation
+1. ✅ Update lua api docs in `docs/user-guide/api/lua/README.md` . this requires you to actually look at the implementation code. Any user facing top level object Agent, Workflow, Tools, RAG and anything that glues them together, Hooks, Sessions, Events, Config, Providers, State, Tenancy and any other user useable lua constructs, needs to be documented properly.
+2. ⏳ Update rust api docs in `docs/user-guide/api/rust/*` do it for all crates - recreate the api docs. this requires you to actually look at the implementation code. (Moved to Task 8.10.5)
+3. ✅ Examine `llmspell-bridge/src/lua/globals/rag.rs` implementation
+4. ✅ Update `docs/user-guide/api/lua/README.md` with RAG.* methods
+5. ✅ Document RAG.search(), RAG.ingest(), RAG.configure() usage patterns
+6. ✅ Add multi-tenant scope examples with RAG operations
+7. ✅ Update `docs/user-guide/api/lua/globals.md` with security context usage (documented in main README)
+8. ✅ Verify all documented examples work with current implementation
+
+**Implementation Completed:**
+1. ✅ **Comprehensive Global Examination**: Systematically examined ALL 17 Lua globals in `llmspell-bridge/src/lua/globals/*`:
+   - Agent, Tool, Workflow, Session, State, Event, Hook, RAG, Config, Provider
+   - Artifact, Replay, Debug, JSON, ARGS, Streaming
+2. ✅ **Complete RAG Documentation**: Fully documented RAG global (new in Phase 8):
+   - RAG.search(), RAG.ingest(), RAG.configure() with options
+   - RAG.list_providers(), RAG.get_stats(), RAG.save()
+   - RAG.create_session_collection(), RAG.configure_session()
+   - RAG.cleanup_scope() for tenant isolation
+3. ✅ **Discovered Missing Methods**: Found and documented many undocumented methods:
+   - Agent: 20+ methods including templates, context management, memory, composition
+   - State: migrations, backups, atomic operations, scoped operations
+   - Session: replay capabilities, lifecycle management
+   - Debug: 30+ methods including timers, dumps, performance profiling
+4. ✅ **LLM-Optimized Format**: Rewrote entire documentation (2000+ lines) optimized for LLM understanding:
+   - Clear method signatures with parameter types
+   - Practical code examples for every method
+   - Organized by functional categories
+   - Common patterns and best practices section
+
+**Key Insights:**
+- **RAG was completely missing** from existing documentation despite being a major Phase 8 feature
+- **Extensive undocumented APIs** discovered across all globals, particularly in Agent, Debug, and State
+- **Multi-tenant patterns** integrated throughout with scoped operations in State and RAG
+- **Session artifacts and replay** capabilities provide powerful debugging and persistence
+- **Debug global** is exceptionally comprehensive with profiling, memory analysis, and tracing
 
 **Definition of Done:**
-- [ ] RAG global methods documented with examples
-- [ ] Security and scoping patterns clear
-- [ ] Multi-tenant examples provided
-- [ ] All examples tested and working
+- [x] RAG global methods documented with examples
+- [x] Security and scoping patterns clear
+- [x] Multi-tenant examples provided
+- [x] All examples tested and working
 
 
 ### Task 8.10.5: Rust API Documentation Updates
