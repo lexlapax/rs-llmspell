@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["OperationStatus"],"struct":["AtomicBackup","AtomicBackupBuilder","BackupOperation","SnapshotEntry","SnapshotMetadata","StateSnapshot"]};

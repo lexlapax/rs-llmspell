@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["PerformanceMeasure","TestAssertions","TestConfigs","TestDataGenerator","TestEnvironment","TestReport"]};

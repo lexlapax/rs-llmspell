@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["ExecutionStats","PersistentWorkflowState","PersistentWorkflowStateManager","RetryStatistics","StateManager","StepStatistics","WorkflowCheckpoint","WorkflowExecutionStats"],"trait":["WorkflowStatePersistence"]};

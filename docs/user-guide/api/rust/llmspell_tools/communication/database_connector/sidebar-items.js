@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["DatabaseConfig","DatabaseConnectorConfig","DatabaseConnectorTool","DatabaseSecurityConfig","PoolConfig"]};

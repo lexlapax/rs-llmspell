@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["ContextEvent","ContextEventBus","EventBusConfig","EventBusStats","LoggingEventHandler"],"trait":["EventHandler"]};

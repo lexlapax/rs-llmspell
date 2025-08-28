@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"attr":["instrument"],"fn":["init_from_env","init_logging","update_log_filter"],"macro":["debug","error","info","span","trace","warn"],"mod":["instrument","span"],"struct":["LogLevel","LoggingConfig"]};

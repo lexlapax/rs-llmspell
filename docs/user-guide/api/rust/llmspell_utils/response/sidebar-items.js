@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["error_response","file_operation_response","list_response","success_response","validation_response"],"struct":["ErrorDetails","ResponseBuilder","ValidationError"]};

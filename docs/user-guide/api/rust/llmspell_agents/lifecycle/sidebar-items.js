@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["benchmarks","events","hooks","middleware","resources","shutdown","state_machine"]};

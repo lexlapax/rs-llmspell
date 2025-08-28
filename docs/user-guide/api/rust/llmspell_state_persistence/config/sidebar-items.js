@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["CompatibilityLevel","CompressionType","EncryptionAlgorithm","StorageBackendType"],"struct":["BackupConfig","EncryptionConfig","FieldSchema","KeyDerivationConfig","MigrationStep","PerformanceConfig","PersistenceConfig","PersistenceConfigBuilder","RocksDBConfig","SledConfig","StateSchema"]};

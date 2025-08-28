@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["StateOperation"],"fn":["aggregate_hook_results"],"struct":["StateAuditHook","StateCacheHook","StateChangeEvent","StateValidationHook"]};

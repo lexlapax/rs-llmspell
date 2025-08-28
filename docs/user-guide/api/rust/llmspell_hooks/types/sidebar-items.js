@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ComponentType","HookPoint","Language"],"struct":["ComponentId","HookMetadata","Priority"]};

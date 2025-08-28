@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["agent","base_agent","component_lookup","event","state","tool","tool_capable","workflow"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["JsonReport","JsonSummary","Lap","MemorySnapshot","PerformanceTracker","ProfileReport","Profiler","TimingEvent","TimingStats","TrackerMemoryInfo"]};

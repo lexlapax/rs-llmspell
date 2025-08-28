@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["BackoffStrategy"],"struct":["MetricsCollector","ProviderLimits","ProviderRateLimitConfig","ProviderRateLimiter","RateLimitInfo","RateLimitMetrics","RetryHandler","RetryPolicy"]};

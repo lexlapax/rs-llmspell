@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["FilterPattern"],"struct":["EnhancedModuleFilter","FilterRule","FilterStats","FilterSummary"]};

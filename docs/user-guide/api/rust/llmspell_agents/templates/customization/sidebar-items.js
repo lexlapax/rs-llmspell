@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["create_pattern_parameter","create_range_parameter","create_validated_parameter"],"struct":["BasicTemplate","TemplateBuilder","TemplateCustomization","TemplateCustomizer"],"trait":["TemplateMixin"]};

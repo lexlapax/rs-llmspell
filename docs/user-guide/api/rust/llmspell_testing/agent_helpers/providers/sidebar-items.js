@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["create_anthropic_agent","create_gemini_agent","create_local_agent","create_openai_agent"]};

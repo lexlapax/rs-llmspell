@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SortOrder"],"struct":["QueryResult","QueryResultEntry","TimeRange","TimelineQuery","TimelineQueryBuilder","TimelineQueryExecutor"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["get_all_tool_names","get_tool_by_name","register_all_tools"],"struct":["ToolDiscovery","ToolInfo"]};

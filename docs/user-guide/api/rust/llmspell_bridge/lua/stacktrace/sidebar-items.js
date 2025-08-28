@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["capture_stack_trace","create_stacktrace_function"],"struct":["StackFrame","StackTrace","StackTraceOptions"]};

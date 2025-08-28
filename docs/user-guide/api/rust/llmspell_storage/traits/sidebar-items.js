@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["StorageBackendType"],"struct":["StorageCharacteristics"],"trait":["StorageBackend","StorageSerialize"]};

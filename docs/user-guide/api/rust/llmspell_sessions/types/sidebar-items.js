@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SessionSortBy","SessionStatus"],"struct":["CreateSessionOptions","CreateSessionOptionsBuilder","HookConfig","ResourceLimits","SessionConfig","SessionId","SessionMetadata","SessionQuery"]};

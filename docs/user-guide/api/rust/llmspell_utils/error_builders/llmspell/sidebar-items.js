@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["component_error","config_error","provider_error","script_error","security_error","storage_error","tool_error","validation_error","workflow_error"]};

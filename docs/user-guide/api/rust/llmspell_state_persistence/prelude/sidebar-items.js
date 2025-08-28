@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["StateError","StateScope"],"trait":["StateManagerTrait","StatePersistence"],"type":["StateResult"]};

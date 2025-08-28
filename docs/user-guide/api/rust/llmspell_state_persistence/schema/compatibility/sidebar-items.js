@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["CompatibilityError","FieldChange","RiskLevel"],"struct":["CompatibilityChecker","CompatibilityMatrix","CompatibilityResult","CompatibilityStats"]};

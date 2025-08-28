@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["get_or_create_state_infrastructure"],"struct":["StateInfrastructure"]};

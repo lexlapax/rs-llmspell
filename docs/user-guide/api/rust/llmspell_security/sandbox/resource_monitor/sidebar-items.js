@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["EfficiencyMetrics","ResourceMonitor","ResourceStats","ResourceUsage"]};

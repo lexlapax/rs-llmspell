@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["PoolError"],"struct":["ConnectionPool","PoolBuilder","PoolConfig","PoolGuard","PoolStats"],"trait":["ConnectionFactory","PoolableConnection"]};

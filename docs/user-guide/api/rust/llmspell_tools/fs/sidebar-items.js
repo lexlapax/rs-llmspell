@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["archive_handler","file_converter","file_operations","file_search","file_watcher"]};

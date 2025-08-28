@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["HookEventType"],"struct":["AsyncHookProcessor","HookBatcher","HookCompletionEvent","HookEvent","HookProcessorStats","HookProcessorStatsSnapshot"]};

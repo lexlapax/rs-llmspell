@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["environment_reader","process_executor","service_checker","system_monitor"]};

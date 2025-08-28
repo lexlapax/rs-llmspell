@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["AlertCondition","AlertSeverity","AlertState","ThresholdOperator"],"struct":["Alert","AlertConfig","AlertContext","AlertManager","AlertRule","AlertStatistics","ConsoleNotificationChannel"],"trait":["AlertEvaluator","NotificationChannel"]};

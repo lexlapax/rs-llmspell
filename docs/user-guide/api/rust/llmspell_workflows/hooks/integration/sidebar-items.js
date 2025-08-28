@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["WorkflowExecutionPhase"],"struct":["WorkflowExecutor","WorkflowHookContext","WorkflowLifecycleConfig"],"trait":["HookableWorkflowExecution"]};

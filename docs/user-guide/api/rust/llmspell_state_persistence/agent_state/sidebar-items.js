@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ExecutionState","MessageRole"],"struct":["AgentMetadata","AgentStateData","ConversationMessage","PersistentAgentState","ToolPerformance","ToolUsageStats"],"trait":["PersistentAgent"]};

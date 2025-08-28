@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["SESSION_EVENT_PREFIX"],"enum":["SessionEventType"],"fn":["create_correlated_event","create_session_event"],"struct":["SessionEvent","SessionEventBuilder"]};

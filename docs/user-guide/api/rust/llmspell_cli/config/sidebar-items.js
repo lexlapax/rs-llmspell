@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["create_default_config","load_runtime_config","validate_config"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SearchType"],"mod":["brave","duckduckgo","google","serpapi","serperdev"],"struct":["ProviderConfig","SearchOptions","SearchResult"],"trait":["SearchProvider"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["AsyncError"],"fn":["concurrent_map","race_to_success","retry_async","timeout","timeout_with_default"],"struct":["Cancellable","CancellableFuture","RetryConfig"],"type":["AsyncResult","BoxedResultFuture"]};

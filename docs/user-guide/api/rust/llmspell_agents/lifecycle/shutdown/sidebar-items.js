@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ShutdownPriority"],"struct":["LoggingShutdownHook","ResourceCleanupHook","ShutdownConfig","ShutdownCoordinator","ShutdownRequest","ShutdownResult"],"trait":["ShutdownHook"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ConflictResolution","FieldTransform"],"struct":["FieldInheritance","InheritanceRules","SecurityFieldValidator"],"trait":["InheritanceValidator"]};

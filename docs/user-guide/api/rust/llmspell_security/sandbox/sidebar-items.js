@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SandboxViolation"],"mod":["file_sandbox","network_sandbox","resource_monitor"],"struct":["IntegratedSandbox","SandboxContext"]};

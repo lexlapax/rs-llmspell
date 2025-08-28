@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["VERSION"],"mod":["artifact_hooks","builtin","cache","circuit_breaker","collectors","context","coordination","distributed","executor","performance","persistence","prelude","priority","rate_limiter","registry","replay","result","selective","traits","types"]};

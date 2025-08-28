@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["CachedResult","RegistryStatistics","ResourceUsageStats","ToolExecutionStats","ToolState","ToolStateRegistry"],"trait":["ToolStateManagerHolder","ToolStatePersistence"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["PolicyComposition","PolicyType"],"mod":["rate_limit","resource_limit","timeout"],"struct":["PolicyEvaluationResult","SessionPolicyConfig","SessionPolicyManager"]};

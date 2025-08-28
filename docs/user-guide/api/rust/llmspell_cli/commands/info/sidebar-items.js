@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["show_engine_info"]};

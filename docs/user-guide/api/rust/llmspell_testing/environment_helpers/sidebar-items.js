@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["create_test_context","create_test_context_with_data","with_test_env_vars"],"mod":["assertions","configs","test_data"],"struct":["TestEnvironment"]};

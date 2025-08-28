@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["analytics","artifact","bridge","config","error","events","hooks","manager","middleware","policies","prelude","replay","security","session","types"]};

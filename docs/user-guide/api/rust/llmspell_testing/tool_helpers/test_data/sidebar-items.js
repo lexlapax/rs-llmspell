@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["test_commands","test_file_paths","test_json_data","test_urls"]};

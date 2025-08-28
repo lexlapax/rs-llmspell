@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["ArtifactQuery","ArtifactStorage","ArtifactStorageConfig","SessionStorageStats"],"trait":["ArtifactStorageOps"]};

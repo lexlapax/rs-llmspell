@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["ttl"],"struct":["Cache","CacheEntry","CacheKey","CacheStats","LruEviction"]};

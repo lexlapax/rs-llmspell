@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["OutputFormat"],"struct":["HashCalculatorConfig","HashCalculatorTool"]};

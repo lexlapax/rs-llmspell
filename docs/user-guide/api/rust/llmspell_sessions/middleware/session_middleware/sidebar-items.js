@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["MiddlewarePattern","MiddlewareType"],"fn":["create_operation_middleware","create_session_middleware"],"struct":["MiddlewareConfig","ParallelMiddleware","SequentialMiddleware","SessionMiddleware","VotingMiddleware"]};

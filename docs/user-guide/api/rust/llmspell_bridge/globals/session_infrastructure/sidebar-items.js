@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["get_or_create_session_infrastructure"],"struct":["SessionInfrastructure"]};

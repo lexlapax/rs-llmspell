@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["CapabilityType","DependencyType","HealthState","IssueSeverity"],"struct":["AgentCapability","AgentDependency","DeploymentInfo","ExtendedAgentMetadata","ExtendedMetadataBuilder","HealthCheck","HealthIssue","HealthStatus","MetadataManager","ResourceRequirements","VersionInfo"]};

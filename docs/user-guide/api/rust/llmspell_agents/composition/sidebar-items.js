@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["capabilities","delegation","hierarchical","lifecycle","tool_composition","traits"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["UuidFormat","UuidVersion"],"struct":["UuidGeneratorConfig","UuidGeneratorTool"]};

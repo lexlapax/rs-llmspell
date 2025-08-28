@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["SNAPSHOT_VERSION"],"struct":["Session","SessionSnapshot"]};

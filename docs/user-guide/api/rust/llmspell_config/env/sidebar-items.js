@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["EnvCategory","IsolationMode"],"struct":["EnvRegistry","EnvVarDef","EnvVarDefBuilder"]};

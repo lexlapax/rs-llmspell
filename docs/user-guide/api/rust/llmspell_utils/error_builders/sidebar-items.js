@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["llmspell","templates"],"struct":["BuiltError","ErrorBuilder"],"trait":["WithContext"]};

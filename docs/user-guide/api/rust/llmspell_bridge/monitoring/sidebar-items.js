@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["check_agent_health"],"struct":["HealthCheckImpl"]};

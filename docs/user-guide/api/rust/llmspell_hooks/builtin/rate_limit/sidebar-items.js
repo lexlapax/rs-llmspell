@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["RateLimitAction","RateLimitStrategy"],"struct":["RateLimitConfig","RateLimitHook","RateLimitMetrics"]};

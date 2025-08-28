@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["to_standard_schema"],"struct":["StandardParameterDef","StandardToolInfo","StandardToolSchema"],"trait":["StandardToolApi"]};

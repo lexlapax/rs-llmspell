@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["agent_metadata","agent_output","final_output","nested_workflow_metadata","nested_workflow_output","step_metadata","step_output","workflow_error","workflow_state"]};

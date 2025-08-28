@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["create_dump_functions","dump_labeled_value","dump_value"],"struct":["DumpOptions"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["credential_protection","expression_analyzer_enhanced","file_upload_security","information_disclosure","input_sanitizer","memory_tracker","path","ssrf_protection"],"struct":["ExpressionAnalyzer","ExpressionComplexity","ExpressionComplexityConfig"]};

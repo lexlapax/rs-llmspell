@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["__add_message","__clear_conversation","__config","__conversation_length","__get_conversation","__trim_conversation"]};

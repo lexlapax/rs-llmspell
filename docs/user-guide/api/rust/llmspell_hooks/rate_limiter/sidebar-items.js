@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["token_bucket"],"struct":["BucketState","RateLimiter","RateLimiterConfig","TokenBucketConfig"]};

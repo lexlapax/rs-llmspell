@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SessionBreakpointCondition","SessionReplayState"],"struct":["SessionBreakpoint","SessionReplayControlConfig","SessionReplayControls","SessionReplayProgress","SessionReplaySpeed"],"type":["BreakpointCallback","ProgressCallback"]};

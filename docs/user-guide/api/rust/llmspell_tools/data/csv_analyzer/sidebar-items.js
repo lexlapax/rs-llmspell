@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ColumnType","CsvOperation","ExportFormat"],"struct":["ColumnStats","CsvAnalysisResult","CsvAnalyzerConfig","CsvAnalyzerTool","StreamingColumnStats"]};

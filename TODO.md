@@ -2081,32 +2081,249 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - [x] All examples tested and working
 
 
-### Task 8.10.5: Rust API Documentation Updates
-**Priority**: MEDIUM
-**Estimated Time**: 3 hours  
+### Task 8.10.5: Rust API Documentation Updates - Complete Rewrite
+**Priority**: HIGH
+**Estimated Time**: 8 hours  
 **Assignee**: Documentation Team
 
-**Description**: Update rust API docs with Phase 8 changes across all modified crates.
+**Description**: Complete rewrite of Rust API documentation for all 19 crates with LLM-readable format optimized for AI comprehension.
 
 **Acceptance Criteria:**
-- [ ] VectorStorage trait usage patterns documented
-- [ ] HNSW configuration guides updated
-- [ ] Security policy implementation guides added
-- [ ] Multi-tenant integration patterns documented
+- [ ] All 19 crates have dedicated documentation files
+- [ ] Each trait, struct, and enum is documented with purpose, usage, and examples
+- [ ] Phase 8 features (RAG, HNSW, multi-tenancy) prominently documented
+- [ ] Documentation optimized for LLM parsing with clear structure and patterns
+- [ ] Cross-references between related components
+- [ ] Real-world integration examples for each major component
+- [ ] A Base README.md at `docs/user-guide/api/rust/README.md` that's a directory guide. it should follow navigation link guidelines of what's in `docs/user-guide/README.md`
 
-**Implementation Steps:**
-1. Update `docs/user-guide/api/rust/storage.md` with VectorStorage and HNSWVectorStorage usage
-2. Update `docs/user-guide/api/rust/security.md` with access control policy implementation
-3. Create `docs/user-guide/api/rust/multi-tenant.md` with StateScope and tenant isolation patterns
-4. Update `docs/user-guide/api/rust/README.md` with Phase 8 crate overview
-5. Add comprehensive integration examples showing RAG pipeline setup
-6. Update `docs/user-guide/api/rust/configuration.md` with HNSW tuning parameters
+**Implementation Steps - Documentation Structure:**
+
+1. **`docs/user-guide/api/rust/llmspell-core.md`** - Core traits and types
+   - Document all base traits: BaseAgent, Executable, Component
+   - Error types and Result aliases
+   - Execution context and security context
+   - Component metadata and lifecycle
+   - Logging macros and instrumentation
+
+2. **`docs/user-guide/api/rust/llmspell-utils.md`** - Shared utilities
+   - Async utilities and runtime helpers
+   - Serialization/deserialization helpers
+   - Path and file system utilities
+   - Security utilities and sandboxing
+   - Performance tracking and metrics
+
+3. **`docs/user-guide/api/rust/llmspell-testing.md`** - Testing framework
+   - Test fixtures and mocks
+   - Category-based testing macros
+   - Integration test helpers
+   - Performance benchmarking utilities
+   - Test data generators
+
+4. **`docs/user-guide/api/rust/llmspell-storage.md`** - Vector storage (NEW Phase 8)
+   - VectorStorage trait and implementations
+   - HNSWVectorStorage configuration and tuning
+   - Collection management and multi-tenancy
+   - Embedding generation and storage
+   - Search and similarity operations
+   - Persistence and backup strategies
+
+5. **`docs/user-guide/api/rust/llmspell-state-persistence.md`** - State management
+   - StateManager trait and implementations
+   - Scoped state operations
+   - Migration system and versioning
+   - Backup and restore operations
+   - Atomic operations and transactions
+   - Cache strategies and TTL
+
+6. **`docs/user-guide/api/rust/llmspell-state-traits.md`** - State trait definitions
+   - Core state traits
+   - Persistence traits
+   - Migration traits
+   - Scope and isolation traits
+
+7. **`docs/user-guide/api/rust/llmspell-security.md`** - Security framework
+   - Access control policies
+   - Authentication and authorization
+   - Sandboxing and isolation
+   - Input validation and sanitization
+   - Audit logging and compliance
+
+8. **`docs/user-guide/api/rust/llmspell-tenancy.md`** - Multi-tenancy (NEW Phase 8)
+   - Tenant isolation strategies
+   - Resource quotas and limits
+   - Tenant-specific configurations
+   - Data isolation and security
+   - Cross-tenant operations
+
+9. **`docs/user-guide/api/rust/llmspell-sessions.md`** - Session management
+   - Session lifecycle and persistence
+   - Artifact storage and retrieval
+   - Session replay capabilities
+   - Session-scoped state
+   - Security contexts per session
+
+10. **`docs/user-guide/api/rust/llmspell-rag.md`** - RAG system (NEW Phase 8)
+    - RAG trait and implementations
+    - Embedding providers and models
+    - Document chunking strategies
+    - Vector indexing and retrieval
+    - Multi-tenant RAG isolation
+    - Session-specific collections
+    - Performance optimization
+
+11. **`docs/user-guide/api/rust/llmspell-agents.md`** - Agent framework
+    - Agent trait and lifecycle
+    - Agent builders and factories
+    - Context management and memory
+    - Tool integration for agents
+    - Agent composition patterns
+    - Template system and discovery
+    - Health monitoring and recovery
+
+12. **`docs/user-guide/api/rust/llmspell-providers.md`** - LLM providers
+    - Provider trait and implementations
+    - Model configuration and selection
+    - Streaming and batch operations
+    - Rate limiting and quotas
+    - Provider-specific optimizations
+    - Multi-provider strategies
+
+13. **`docs/user-guide/api/rust/llmspell-workflows.md`** - Workflow engine
+    - Workflow types and patterns
+    - Step definitions and execution
+    - Conditional and parallel flows
+    - State management in workflows
+    - Error handling and recovery
+    - Performance optimization
+
+14. **`docs/user-guide/api/rust/llmspell-tools.md`** - Tool system
+    - Tool trait and registry
+    - Built-in tool implementations
+    - Custom tool development
+    - Tool discovery and metadata
+    - Security levels and validation
+    - Tool composition and chaining
+
+15. **`docs/user-guide/api/rust/llmspell-hooks.md`** - Hook system
+    - Hook points and lifecycle
+    - Hook registration and priority
+    - Event interception patterns
+    - Replay system integration
+    - Performance considerations
+
+16. **`docs/user-guide/api/rust/llmspell-events.md`** - Event system
+    - Event bus architecture
+    - Event emission and subscription
+    - Event filtering and routing
+    - Event persistence and replay
+    - Performance and scalability
+
+17. **`docs/user-guide/api/rust/llmspell-bridge.md`** - Script bridges
+    - Bridge trait and implementations
+    - Lua integration details
+    - JavaScript integration (future)
+    - Type conversions and marshaling
+    - Global object injection
+    - Performance optimization
+
+18. **`docs/user-guide/api/rust/llmspell-config.md`** - Configuration system
+    - Configuration schema and validation
+    - Environment variable handling
+    - Provider configurations
+    - Security configurations
+    - Tool configurations
+    - Runtime configurations
+
+19. **`docs/user-guide/api/rust/llmspell-cli.md`** - CLI framework
+    - Command structure and parsing
+    - Runtime initialization
+    - Script execution
+    - Output formatting
+    - Debug and profiling options
+
+20. **`docs/user-guide/api/rust/README.md`** - Rust API guide. 
+    - it should follow navigation link guidelines of what's in `docs/user-guide/README.md`
+    - should link to parent README.md and peer readme.md ../lua/README.md
+
+**Documentation Format Requirements (LLM-Optimized):**
+
+Each crate documentation must follow this structure:
+```markdown
+# Crate Name
+
+## Purpose
+Clear one-paragraph description of what this crate does and why it exists.
+
+## Core Concepts
+- Bullet points of key concepts
+- Main abstractions provided
+- Relationship to other crates
+
+## Primary Traits/Structs
+
+### TraitName
+**Purpose**: What this trait represents
+**When to implement**: Use cases for custom implementations
+**Required methods**: List with descriptions
+**Optional methods**: List with defaults
+
+```rust
+// Complete trait definition with all methods
+```
+
+**Implementation Example**:
+```rust
+// Working implementation example
+```
+
+## Usage Patterns
+
+### Pattern Name
+**When to use**: Scenario description
+**Benefits**: Why this pattern
+**Example**:
+```rust
+// Complete working example
+```
+
+## Integration Examples
+
+### With Other Crates
+```rust
+// Show how this crate integrates with others
+```
+
+## Configuration
+```toml
+# Relevant configuration options
+```
+
+## Performance Considerations
+- Key performance tips
+- Common pitfalls
+- Optimization strategies
+
+## Security Considerations
+- Security implications
+- Best practices
+- Common vulnerabilities
+
+## Migration Guide (if applicable)
+- From previous versions
+- Breaking changes
+- Update strategies
+```
 
 **Definition of Done:**
-- [ ] All Phase 8 Rust APIs documented
-- [ ] Integration patterns clear
-- [ ] Configuration guides complete
-- [ ] Examples compile and work correctly
+- [ ] All 19 crates documented with dedicated files
+- [ ] Each file follows LLM-optimized format
+- [ ] Phase 8 features prominently documented
+- [ ] Cross-references between related components
+- [ ] All code examples compile and work
+- [ ] Performance and security sections complete
+- [ ] Integration patterns documented
+- [ ] Migration guides where applicable
 
 
 ### Task 8.10.6: Lua Script Examples

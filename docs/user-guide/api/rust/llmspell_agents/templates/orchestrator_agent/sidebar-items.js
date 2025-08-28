@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["OrchestrationStrategy"],"struct":["OrchestratorAgentConfig","OrchestratorAgentTemplate"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["install_output_capture","override_io_functions","override_print"],"struct":["ConsoleCapture"]};

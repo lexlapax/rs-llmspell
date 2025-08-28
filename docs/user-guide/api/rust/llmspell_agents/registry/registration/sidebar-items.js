@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AgentRegistrar","CompositeRegistrationHook","RegistrationBuilder","RegistrationOptions"],"trait":["RegistrationHook"]};

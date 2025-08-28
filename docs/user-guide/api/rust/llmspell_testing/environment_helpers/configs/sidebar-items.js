@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["ci_env","development_env","minimal_env","production_env"]};

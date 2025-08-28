@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["RegistryError"],"struct":["HookRegistry","HookRegistryConfig","HookRegistryConfigBuilder","RegistryStats"]};

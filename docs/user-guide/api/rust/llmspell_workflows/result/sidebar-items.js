@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["WorkflowError","WorkflowType"],"struct":["WorkflowResult"],"trait":["WorkflowResultExt"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["TextOperation"],"struct":["TextManipulatorConfig","TextManipulatorTool"]};
