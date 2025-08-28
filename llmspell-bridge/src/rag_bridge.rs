@@ -9,9 +9,7 @@ use llmspell_rag::{
 };
 use llmspell_sessions::{SessionId, SessionManager};
 use llmspell_state_persistence::{StateManager, StateScope};
-use llmspell_storage::{
-    ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
-};
+use llmspell_storage::{VectorEntry, VectorResult, VectorStorage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -125,6 +123,12 @@ pub struct RAGConfig {
 
 impl RAGBridge {
     /// Create a new RAG bridge
+    ///
+    /// # Panics
+    ///
+    /// Panics if `vector_storage` is `None`. Vector storage is required for RAG operations
+    /// and must be provided. Use `HNSWVectorStorage` or another implementation of the
+    /// `VectorStorage` trait.
     #[must_use]
     pub fn new(
         state_manager: Arc<StateManager>,
@@ -133,8 +137,8 @@ impl RAGBridge {
         provider_manager: Arc<ProviderManager>,
         vector_storage: Option<Arc<dyn VectorStorage>>,
     ) -> Self {
-        // Use the provided vector storage or fall back to mock
-        let storage = vector_storage.unwrap_or_else(|| Arc::new(MockVectorStorage::new()));
+        // Require vector storage to be provided - no fallback to mock
+        let storage = vector_storage.expect("Vector storage must be provided");
 
         // Create state-aware storage
         let state_aware_storage = Arc::new(StateAwareVectorStorage::new(
@@ -815,74 +819,6 @@ fn generate_mock_embedding(text: &str, dimensions: usize) -> Vec<f32> {
     }
 
     embedding
-}
-
-// Mock vector storage implementation until HNSWStorage is available
-#[derive(Default)]
-pub struct MockVectorStorage;
-
-impl MockVectorStorage {
-    #[must_use]
-    pub const fn new() -> Self {
-        Self
-    }
-}
-
-#[async_trait::async_trait]
-impl VectorStorage for MockVectorStorage {
-    async fn insert(&self, _vectors: Vec<VectorEntry>) -> anyhow::Result<Vec<String>> {
-        Ok(vec!["mock-id".to_string()])
-    }
-
-    async fn search(&self, _query: &VectorQuery) -> anyhow::Result<Vec<VectorResult>> {
-        Ok(vec![])
-    }
-
-    async fn search_scoped(
-        &self,
-        _query: &VectorQuery,
-        _scope: &StateScope,
-    ) -> anyhow::Result<Vec<VectorResult>> {
-        Ok(vec![])
-    }
-
-    async fn update_metadata(
-        &self,
-        _id: &str,
-        _metadata: HashMap<String, serde_json::Value>,
-    ) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    async fn delete(&self, _ids: &[String]) -> anyhow::Result<()> {
-        Ok(())
-    }
-
-    async fn delete_scope(&self, _scope: &StateScope) -> anyhow::Result<usize> {
-        Ok(0)
-    }
-
-    async fn stats(&self) -> anyhow::Result<StorageStats> {
-        Ok(StorageStats {
-            total_vectors: 0,
-            storage_bytes: 0,
-            namespace_count: 0,
-            index_build_time_ms: None,
-            avg_query_time_ms: None,
-            dimensions: None,
-        })
-    }
-
-    async fn stats_for_scope(&self, _scope: &StateScope) -> anyhow::Result<ScopedStats> {
-        Ok(ScopedStats {
-            scope: StateScope::Global,
-            vector_count: 0,
-            storage_bytes: 0,
-            query_count: 0,
-            tokens_processed: 0,
-            estimated_cost: 0.0,
-        })
-    }
 }
 
 #[cfg(test)]

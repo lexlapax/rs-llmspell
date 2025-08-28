@@ -11,7 +11,7 @@ use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
 use llmspell_sessions::{SessionManager, SessionManagerConfig};
 use llmspell_state_persistence::StateManager;
 use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
-use llmspell_storage::vector_storage::HNSWConfig;
+use llmspell_storage::vector_storage::{HNSWConfig, VectorStorage};
 use llmspell_storage::MemoryBackend;
 use llmspell_tenancy::MultiTenantVectorManager;
 use std::collections::HashMap;
@@ -60,7 +60,7 @@ async fn setup_bridge() -> Arc<RAGBridge> {
     let vector_storage = Arc::new(HNSWVectorStorage::new(384, hnsw_config));
 
     // Setup multi-tenant infrastructure
-    let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage));
+    let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage.clone()));
     let multi_tenant_rag = Arc::new(MultiTenantRAG::new(tenant_manager));
 
     // Setup provider manager
@@ -73,7 +73,7 @@ async fn setup_bridge() -> Arc<RAGBridge> {
         session_manager,
         multi_tenant_rag,
         core_providers,
-        None, // vector_storage
+        Some(vector_storage as Arc<dyn VectorStorage>),
     ))
 }
 
