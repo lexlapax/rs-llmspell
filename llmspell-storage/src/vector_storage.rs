@@ -18,32 +18,276 @@ use std::time::SystemTime;
 /// Core vector storage trait with multi-tenant support
 #[async_trait]
 pub trait VectorStorage: Send + Sync {
-    /// Insert vectors with metadata and scope
+    /// Insert vectors with metadata and scope into storage.
+    ///
+    /// Stores a batch of vectors with their embeddings, metadata, and tenant scope
+    /// information. Each vector is assigned a unique ID and can be retrieved later
+    /// for similarity search.
+    ///
+    /// # Arguments
+    ///
+    /// * `vectors` - A vector of `VectorEntry` structs containing embeddings,
+    ///   metadata, and scope information
+    ///
+    /// # Returns
+    ///
+    /// A vector of unique IDs assigned to the inserted vectors, in the same order
+    /// as the input vectors.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::{VectorEntry, VectorStorage};
+    /// use llmspell_state_traits::StateScope;
+    /// use std::collections::HashMap;
+    /// use serde_json::Value;
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let vectors = vec![
+    ///     VectorEntry::new("doc1".to_string(), vec![0.1, 0.2, 0.3])
+    ///         .with_scope(StateScope::User("user-123".to_string()))
+    ///         .with_metadata(HashMap::from([
+    ///             ("source".to_string(), Value::String("document.txt".to_string())),
+    ///             ("timestamp".to_string(), Value::Number(1234567890.into())),
+    ///         ])),
+    /// ];
+    ///
+    /// let ids = storage.insert(vectors).await?;
+    /// println!("Inserted vectors with IDs: {:?}", ids);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The storage backend is unavailable
+    /// - Vector dimensions don't match the storage configuration
+    /// - Duplicate IDs are provided
+    /// - Storage capacity is exceeded
     async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>>;
 
-    /// Search for similar vectors
+    /// Search for vectors similar to the query vector.
+    ///
+    /// Performs approximate nearest neighbor search to find the most similar vectors
+    /// to the provided query vector. Results are ordered by similarity score
+    /// (descending - higher scores indicate greater similarity).
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query parameters including the search vector, number of results,
+    ///   and optional filters
+    ///
+    /// # Returns
+    ///
+    /// A vector of `VectorResult` structs containing matching vectors with similarity
+    /// scores, ordered by relevance (highest similarity first).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::{VectorQuery, VectorStorage};
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let query = VectorQuery::new(vec![0.1, 0.2, 0.3], 5)
+    ///     .with_threshold(0.7);  // Only return results with >70% similarity
+    ///
+    /// let results = storage.search(&query).await?;
+    /// for result in results {
+    ///     println!("Found vector {} with similarity {:.3}", result.id, result.score);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn search(&self, query: &VectorQuery) -> Result<Vec<VectorResult>>;
 
-    /// Scoped search with tenant isolation
+    /// Search for vectors with tenant isolation and scope filtering.
+    ///
+    /// Like `search()`, but restricts results to vectors within the specified scope.
+    /// This ensures tenant isolation in multi-tenant systems by preventing users
+    /// from accessing vectors outside their authorized scope.
+    ///
+    /// # Arguments
+    ///
+    /// * `query` - Query parameters (scope in query is ignored in favor of explicit scope)
+    /// * `scope` - The scope to restrict search results to
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::{VectorQuery, VectorStorage};
+    /// use llmspell_state_traits::StateScope;
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let query = VectorQuery::new(vec![0.1, 0.2, 0.3], 10);
+    /// let user_scope = StateScope::User("user-123".to_string());
+    ///
+    /// // Only returns vectors belonging to this user
+    /// let results = storage.search_scoped(&query, &user_scope).await?;
+    /// assert!(results.iter().all(|r| r.metadata.is_some()));
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn search_scoped(
         &self,
         query: &VectorQuery,
         scope: &StateScope,
     ) -> Result<Vec<VectorResult>>;
 
-    /// Update vector metadata
+    /// Update metadata for an existing vector without changing its embedding.
+    ///
+    /// Allows modification of vector metadata while preserving the embedding and
+    /// its position in the search index. Useful for updating document properties,
+    /// tags, or other contextual information.
+    ///
+    /// # Arguments
+    ///
+    /// * `id` - The unique identifier of the vector to update
+    /// * `metadata` - New metadata to replace the existing metadata
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::VectorStorage;
+    /// use std::collections::HashMap;
+    /// use serde_json::Value;
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let new_metadata = HashMap::from([
+    ///     ("status".to_string(), Value::String("processed".to_string())),
+    ///     ("updated_at".to_string(), Value::Number(1234567890.into())),
+    /// ]);
+    ///
+    /// storage.update_metadata("vector-123", new_metadata).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the vector ID is not found or the storage is read-only.
     async fn update_metadata(&self, id: &str, metadata: HashMap<String, Value>) -> Result<()>;
 
-    /// Delete vectors by ID
+    /// Delete vectors by their unique identifiers.
+    ///
+    /// Removes vectors from both the search index and persistent storage.
+    /// This operation cannot be undone, so use with caution.
+    ///
+    /// # Arguments
+    ///
+    /// * `ids` - Slice of vector IDs to delete
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::VectorStorage;
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let ids_to_delete = vec!["vector-1".to_string(), "vector-2".to_string()];
+    /// storage.delete(&ids_to_delete).await?;
+    /// println!("Deleted {} vectors", ids_to_delete.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if some IDs are not found or storage is read-only.
+    /// The operation may partially succeed, deleting some but not all vectors.
     async fn delete(&self, ids: &[String]) -> Result<()>;
 
-    /// Delete all vectors for a scope (tenant cleanup)
+    /// Delete all vectors belonging to a specific scope.
+    ///
+    /// Performs bulk deletion of all vectors within a tenant or user scope.
+    /// This is typically used for tenant cleanup, account deletion, or
+    /// session expiration scenarios.
+    ///
+    /// # Arguments
+    ///
+    /// * `scope` - The scope for which all vectors should be deleted
+    ///
+    /// # Returns
+    ///
+    /// The number of vectors that were deleted.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::VectorStorage;
+    /// use llmspell_state_traits::StateScope;
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let user_scope = StateScope::User("user-to-delete".to_string());
+    /// let deleted_count = storage.delete_scope(&user_scope).await?;
+    /// println!("Deleted {} vectors for user", deleted_count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Performance
+    ///
+    /// This operation may be expensive for large scopes. Consider implementing
+    /// batch deletion strategies for better performance.
     async fn delete_scope(&self, scope: &StateScope) -> Result<usize>;
 
-    /// Get storage statistics
+    /// Get overall storage statistics and performance metrics.
+    ///
+    /// Provides insights into storage usage, performance characteristics,
+    /// and system health. Useful for monitoring, capacity planning, and
+    /// optimization decisions.
+    ///
+    /// # Returns
+    ///
+    /// A `StorageStats` struct containing various metrics including vector counts,
+    /// storage size, query performance, and index statistics.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::VectorStorage;
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let stats = storage.stats().await?;
+    /// println!("Storage contains {} vectors using {} bytes",
+    ///          stats.total_vectors, stats.storage_bytes);
+    ///
+    /// if let Some(query_time) = stats.avg_query_time_ms {
+    ///     println!("Average query time: {:.2}ms", query_time);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn stats(&self) -> Result<StorageStats>;
 
-    /// Get tenant-specific statistics
+    /// Get statistics for a specific scope (tenant, user, or session).
+    ///
+    /// Provides detailed metrics for vectors within a particular scope,
+    /// enabling per-tenant billing, usage tracking, and performance analysis.
+    ///
+    /// # Arguments
+    ///
+    /// * `scope` - The scope to get statistics for
+    ///
+    /// # Returns
+    ///
+    /// A `ScopedStats` struct containing scope-specific metrics including
+    /// vector counts, storage usage, query patterns, and cost estimates.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::VectorStorage;
+    /// use llmspell_state_traits::StateScope;
+    ///
+    /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
+    /// let tenant_scope = StateScope::Custom("tenant:acme-corp".to_string());
+    /// let stats = storage.stats_for_scope(&tenant_scope).await?;
+    ///
+    /// println!("Tenant has {} vectors, estimated cost: ${:.2}",
+    ///          stats.vector_count, stats.estimated_cost);
+    /// # Ok(())
+    /// # }
+    /// ```
     async fn stats_for_scope(&self, scope: &StateScope) -> Result<ScopedStats>;
 
     /// Save vectors to persistent storage (if supported)

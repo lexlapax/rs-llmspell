@@ -230,7 +230,33 @@ struct NamespacePersistence {
 }
 
 impl HNSWVectorStorage {
-    /// Create a new real HNSW vector storage
+    /// Creates a new HNSW vector storage instance.
+    ///
+    /// This creates an in-memory HNSW index suitable for fast vector similarity search.
+    /// The index supports multiple namespaces (tenants) and can optionally persist
+    /// data to disk.
+    ///
+    /// # Arguments
+    ///
+    /// * `dimensions` - The dimensionality of vectors that will be stored (e.g., 384 for OpenAI embeddings)
+    /// * `config` - HNSW configuration parameters controlling index behavior
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
+    /// use llmspell_storage::vector_storage::HNSWConfig;
+    ///
+    /// // Create storage for 384-dimensional vectors (e.g., OpenAI text-embedding-ada-002)
+    /// let config = HNSWConfig::default();
+    /// let storage = HNSWVectorStorage::new(384, config);
+    /// ```
+    ///
+    /// # Performance Notes
+    ///
+    /// - Vector insertion is amortized O(log n) per vector
+    /// - Search is approximately O(log n) with configurable accuracy/speed tradeoff
+    /// - Memory usage is approximately 2-3KB per vector including HNSW graph overhead
     pub fn new(dimensions: usize, config: HNSWConfig) -> Self {
         Self {
             namespaces: DashMap::new(),
@@ -241,7 +267,39 @@ impl HNSWVectorStorage {
         }
     }
 
-    /// Set persistence directory
+    /// Enables persistence for the HNSW storage.
+    ///
+    /// When persistence is enabled, vector data and HNSW indices are automatically
+    /// saved to disk and can be restored across application restarts. Each namespace
+    /// (tenant) gets its own subdirectory within the persistence directory.
+    ///
+    /// # Arguments
+    ///
+    /// * `dir` - Directory path where vector data will be persisted
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
+    /// use llmspell_storage::vector_storage::HNSWConfig;
+    /// use std::path::PathBuf;
+    ///
+    /// let config = HNSWConfig::default();
+    /// let storage = HNSWVectorStorage::new(384, config)
+    ///     .with_persistence(PathBuf::from("/app/data/vectors"));
+    /// ```
+    ///
+    /// # Storage Structure
+    ///
+    /// ```text
+    /// /app/data/vectors/
+    /// ├── tenant1/
+    /// │   └── vectors.bin
+    /// ├── tenant2/
+    /// │   └── vectors.bin
+    /// └── global/
+    ///     └── vectors.bin
+    /// ```
     pub fn with_persistence(mut self, dir: PathBuf) -> Self {
         self.persistence_dir = Some(dir);
         self
@@ -746,7 +804,46 @@ impl HNSWStorage for HNSWVectorStorage {
 
 /// Persistence support
 impl HNSWVectorStorage {
-    /// Create from a persistence directory, loading existing data
+    /// Loads HNSW storage from a persisted directory.
+    ///
+    /// This reconstructs the HNSW indices and vector data from a previously persisted
+    /// storage directory. All namespaces and their vectors will be restored with their
+    /// HNSW indices rebuilt for immediate searching.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - Path to the directory containing persisted vector data
+    /// * `dimensions` - Expected dimensionality of stored vectors
+    /// * `config` - HNSW configuration (should match original configuration for best results)
+    ///
+    /// # Returns
+    ///
+    /// Returns a fully initialized HNSW storage with all persisted data loaded,
+    /// or an error if the data cannot be read or is corrupted.
+    ///
+    /// # Examples
+    ///
+    /// ```rust,no_run
+    /// use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
+    /// use llmspell_storage::vector_storage::HNSWConfig;
+    /// use std::path::Path;
+    ///
+    /// # async fn example() -> anyhow::Result<()> {
+    /// let config = HNSWConfig::default();
+    /// let storage = HNSWVectorStorage::from_path(
+    ///     Path::new("/app/data/vectors"),
+    ///     384,
+    ///     config
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Performance Notes
+    ///
+    /// - Loading time is approximately O(n log n) where n is the number of vectors
+    /// - For 100K vectors, expect load times under 5 seconds
+    /// - Memory usage during loading may temporarily spike during index reconstruction
     pub async fn from_path(path: &Path, dimensions: usize, config: HNSWConfig) -> Result<Self> {
         let storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
         // Don't call load() on an immutable storage - load() mutates self

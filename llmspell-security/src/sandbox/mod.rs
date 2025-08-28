@@ -16,22 +16,82 @@ use llmspell_core::{
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
-/// Sandbox execution context
+/// Security sandbox execution context that defines the boundaries for safe code execution.
+///
+/// `SandboxContext` encapsulates all the security constraints and permissions for
+/// a sandboxed execution environment. It defines what file paths, network domains,
+/// and environment variables a sandboxed process is allowed to access, along with
+/// resource limits to prevent abuse.
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_security::SandboxContext;
+/// use llmspell_core::traits::tool::{SecurityRequirements, ResourceLimits};
+///
+/// // Create a restricted sandbox for untrusted code
+/// let security_reqs = SecurityRequirements::safe()
+///     .with_file_access("/tmp")  // Only allow /tmp access
+///     .with_network_access("api.example.com")  // Only allow specific API
+///     .with_env_access("HOME");  // Only allow HOME environment variable
+///
+/// let resource_limits = ResourceLimits::strict(); // CPU/memory limits
+///
+/// let context = SandboxContext::new(
+///     "untrusted-script-123".to_string(),
+///     security_reqs,
+///     resource_limits
+/// );
+///
+/// // Check permissions before allowing operations
+/// assert!(context.is_path_allowed(&std::path::Path::new("/tmp/output.txt")));
+/// assert!(!context.is_path_allowed(&std::path::Path::new("/etc/passwd")));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SandboxContext {
-    /// Unique sandbox ID
+    /// Unique identifier for this sandbox instance.
+    ///
+    /// Used for logging, debugging, and tracking sandbox sessions across
+    /// the system. Should be unique within the application instance.
     pub id: String,
-    /// Security requirements
+    
+    /// The security requirements that define what operations are allowed.
+    ///
+    /// This contains the high-level security policy that was used to create
+    /// this sandbox context. Preserved for auditing and policy validation.
     pub security_requirements: SecurityRequirements,
-    /// Resource limits
+    
+    /// Resource limits to prevent resource exhaustion attacks.
+    ///
+    /// Defines CPU time, memory usage, disk space, and network bandwidth
+    /// limits to prevent sandboxed code from consuming excessive resources.
     pub resource_limits: ResourceLimits,
-    /// Working directory
+    
+    /// The working directory for sandboxed operations.
+    ///
+    /// All relative path operations will be resolved relative to this directory.
+    /// Defaults to current directory or /tmp if current directory is inaccessible.
     pub working_directory: String,
-    /// Allowed file paths
+    
+    /// List of file paths that sandboxed code is allowed to access.
+    ///
+    /// Can include exact paths or path prefixes. Use "*" for unrestricted
+    /// file access (only for trusted code). Paths are checked using prefix
+    /// matching, so "/tmp" allows access to "/tmp/anything".
     pub allowed_paths: Vec<String>,
-    /// Allowed network domains
+    
+    /// List of network domains that sandboxed code can connect to.
+    ///
+    /// Can include exact domain names or domain suffixes (starting with ".").
+    /// Use "*" for unrestricted network access (only for trusted code).
+    /// Domain matching supports both exact matches and suffix matches.
     pub allowed_domains: Vec<String>,
-    /// Environment variables allowed
+    
+    /// List of environment variables that sandboxed code can access.
+    ///
+    /// Only the specified environment variables will be visible to the
+    /// sandboxed process. Use "*" for unrestricted environment access
+    /// (only for trusted code).
     pub allowed_env_vars: Vec<String>,
 }
 
@@ -104,11 +164,53 @@ impl SandboxContext {
     }
 }
 
-/// Integrated sandbox that combines file, network, and resource controls
+/// A comprehensive sandbox that integrates file, network, and resource controls.
+///
+/// `IntegratedSandbox` provides a unified interface for all sandbox security
+/// controls, combining file system access control, network access control,
+/// and resource monitoring into a single, easy-to-use interface.
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_security::{SandboxContext, IntegratedSandbox};
+/// use llmspell_core::traits::tool::{SecurityRequirements, ResourceLimits};
+///
+/// # async fn example() -> anyhow::Result<()> {
+/// // Create a sandbox context
+/// let security_reqs = SecurityRequirements::safe()
+///     .with_file_access("/tmp")
+///     .with_network_access("api.example.com");
+/// let resource_limits = ResourceLimits::strict();
+/// let context = SandboxContext::new("example".to_string(), security_reqs, resource_limits);
+///
+/// // Create the integrated sandbox
+/// let mut sandbox = IntegratedSandbox::new(context)?;
+///
+/// // Start monitoring for violations
+/// sandbox.start_monitoring().await?;
+///
+/// // ... run untrusted code ...
+///
+/// // Check for security violations
+/// if sandbox.has_violations().await {
+///     let violations = sandbox.get_violations().await;
+///     println!("Security violations detected: {:?}", violations);
+/// }
+///
+/// // Stop monitoring
+/// sandbox.stop_monitoring().await?;
+/// # Ok(())
+/// # }
+/// ```
 pub struct IntegratedSandbox {
+    /// The sandbox context containing security policies and limits
     context: SandboxContext,
+    /// File system access control component
     file_sandbox: FileSandbox,
+    /// Network access control component
     network_sandbox: NetworkSandbox,
+    /// Resource usage monitoring component
     resource_monitor: ResourceMonitor,
 }
 

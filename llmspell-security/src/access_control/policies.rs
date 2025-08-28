@@ -12,25 +12,103 @@ use tracing::debug;
 use super::context::SecurityContext;
 use crate::audit::{AuditEvent, AuditLogger};
 
-/// Security decision for an operation
+/// Represents a security decision made by access control policies.
+///
+/// Used by security policies to communicate whether an operation should be
+/// allowed, denied, or allowed with additional filtering constraints.
 #[derive(Debug, Clone, PartialEq)]
 pub enum AccessDecision {
-    /// Access allowed
+    /// Access is allowed without restrictions.
+    ///
+    /// The operation can proceed normally with no additional constraints
+    /// or filtering requirements.
     Allow,
-    /// Access denied with reason
+    
+    /// Access is denied with an explanatory reason.
+    ///
+    /// The operation should be blocked and the provided reason should be
+    /// logged for audit purposes and potentially returned to the caller
+    /// (depending on security requirements).
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_security::AccessDecision;
+    ///
+    /// let decision = AccessDecision::Deny("Insufficient permissions".to_string());
+    /// ```
     Deny(String),
-    /// Access allowed with filters applied
+    
+    /// Access is allowed but additional security filters must be applied.
+    ///
+    /// The operation can proceed but the provided filters must be applied
+    /// to restrict the data that can be accessed. This enables row-level
+    /// security where users can only see data they are authorized for.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// use llmspell_security::{AccessDecision, SecurityFilter};
+    /// use std::collections::HashSet;
+    ///
+    /// let filter = SecurityFilter {
+    ///     field: "tenant_id".to_string(),
+    ///     allowed_values: HashSet::from(["tenant-123".to_string()]),
+    ///     exclude: false,
+    /// };
+    /// let decision = AccessDecision::AllowWithFilters(vec![filter]);
+    /// ```
     AllowWithFilters(Vec<SecurityFilter>),
 }
 
-/// Security filter to apply to queries
+/// A security filter that restricts data access based on field values.
+///
+/// Security filters implement row-level security by constraining queries
+/// to only return data matching specified field values. This enables
+/// multi-tenant isolation and fine-grained access control.
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_security::SecurityFilter;
+/// use std::collections::HashSet;
+///
+/// // Allow access only to data belonging to specific tenants
+/// let tenant_filter = SecurityFilter {
+///     field: "tenant_id".to_string(),
+///     allowed_values: HashSet::from([
+///         "tenant-123".to_string(),
+///         "tenant-456".to_string(),
+///     ]),
+///     exclude: false,
+/// };
+///
+/// // Exclude data with specific status values
+/// let status_filter = SecurityFilter {
+///     field: "status".to_string(),
+///     allowed_values: HashSet::from(["deleted".to_string(), "archived".to_string()]),
+///     exclude: true,
+/// };
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct SecurityFilter {
-    /// Field to filter on
+    /// The field name to filter on.
+    ///
+    /// This should correspond to a field in the data being queried,
+    /// such as "tenant_id", "user_id", or "status".
     pub field: String,
-    /// Allowed values
+    
+    /// The set of values that are allowed (or disallowed if `exclude` is true).
+    ///
+    /// When `exclude` is false, only records with field values in this set
+    /// will be returned. When `exclude` is true, records with field values
+    /// in this set will be filtered out.
     pub allowed_values: HashSet<String>,
-    /// Whether to exclude these values instead
+    
+    /// Whether this is an inclusion filter (false) or exclusion filter (true).
+    ///
+    /// - `false`: Only include records where the field value is in `allowed_values`
+    /// - `true`: Exclude records where the field value is in `allowed_values`
     pub exclude: bool,
 }
 
@@ -56,25 +134,143 @@ pub struct OperationContext {
     pub source_ip: Option<String>,
 }
 
-/// Security policy trait
+/// Core trait for implementing security policies in the access control system.
+///
+/// Security policies evaluate operation requests and determine whether they should
+/// be allowed, denied, or allowed with additional filtering constraints. Policies
+/// can be chained together with different priorities to create complex authorization
+/// rules.
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_security::{SecurityPolicy, AccessDecision, OperationContext};
+/// use async_trait::async_trait;
+///
+/// pub struct TenantIsolationPolicy;
+///
+/// #[async_trait]
+/// impl SecurityPolicy for TenantIsolationPolicy {
+///     async fn evaluate(&self, context: &OperationContext) -> AccessDecision {
+///         if let Some(tenant_id) = &context.tenant_id {
+///             if tenant_id.starts_with("authorized-") {
+///                 AccessDecision::Allow
+///             } else {
+///                 AccessDecision::Deny("Unauthorized tenant".to_string())
+///             }
+///         } else {
+///             AccessDecision::Deny("No tenant context provided".to_string())
+///         }
+///     }
+///
+///     fn name(&self) -> &str {
+///         "tenant_isolation"
+///     }
+///
+///     fn priority(&self) -> i32 {
+///         100  // High priority for security-critical policies
+///     }
+/// }
+/// ```
 #[async_trait]
 pub trait SecurityPolicy: Send + Sync {
-    /// Evaluate access for an operation
+    /// Evaluate whether an operation should be allowed.
+    ///
+    /// This is the core method that implements the security logic. It receives
+    /// an operation context containing information about the requester, operation
+    /// type, and target resources, then returns a decision about whether to allow
+    /// or deny the operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - The operation context containing security-relevant information
+    ///
+    /// # Returns
+    ///
+    /// An `AccessDecision` indicating whether to allow, deny, or allow with filters.
     async fn evaluate(&self, context: &OperationContext) -> AccessDecision;
 
-    /// Get policy name
+    /// Get the human-readable name of this policy.
+    ///
+    /// Used for logging, debugging, and policy management. Should be unique
+    /// within a security manager to avoid confusion.
     fn name(&self) -> &str;
 
-    /// Get policy priority (higher = evaluated first)
+    /// Get the evaluation priority of this policy.
+    ///
+    /// Policies with higher priority values are evaluated first. This allows
+    /// security-critical policies (like authentication) to run before less
+    /// critical ones (like rate limiting).
+    ///
+    /// # Returns
+    ///
+    /// Priority value where higher numbers mean higher priority. Default is 0.
     fn priority(&self) -> i32 {
         0
     }
 }
 
-/// Enhanced access control policy trait with SecurityContext support
+/// Enhanced access control policy trait with rich SecurityContext support.
+///
+/// This is the next-generation security policy interface that provides richer
+/// context information and more sophisticated policy matching. It extends the
+/// basic `SecurityPolicy` trait with additional metadata and version support
+/// for more complex deployment scenarios.
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_security::{AccessControlPolicy, AccessDecision, SecurityContext};
+/// use async_trait::async_trait;
+/// use anyhow::Result;
+///
+/// pub struct ResourceBasedPolicy {
+///     allowed_resources: Vec<String>,
+/// }
+///
+/// #[async_trait]
+/// impl AccessControlPolicy for ResourceBasedPolicy {
+///     async fn evaluate_access(
+///         &self,
+///         security_context: &SecurityContext,
+///         operation: &str,
+///         resource: &str,
+///     ) -> Result<AccessDecision> {
+///         if self.allowed_resources.contains(&resource.to_string()) {
+///             Ok(AccessDecision::Allow)
+///         } else {
+///             Ok(AccessDecision::Deny(
+///                 format!("Access denied to resource: {}", resource)
+///             ))
+///         }
+///     }
+///
+///     fn applies_to(&self, _context: &SecurityContext, operation: &str) -> bool {
+///         operation.starts_with("resource_")
+///     }
+///
+///     fn policy_id(&self) -> &str {
+///         "resource_based_v1"
+///     }
+/// }
+/// ```
 #[async_trait]
 pub trait AccessControlPolicy: Send + Sync {
-    /// Evaluate access using enhanced security context
+    /// Evaluate access using enhanced security context and resource information.
+    ///
+    /// This method provides richer context than the basic `SecurityPolicy::evaluate`
+    /// method, including structured security context and explicit resource identifiers.
+    ///
+    /// # Arguments
+    ///
+    /// * `security_context` - Rich security context with user, tenant, and metadata
+    /// * `operation` - The operation being attempted (e.g., "read", "write", "delete")
+    /// * `resource` - The resource identifier being accessed
+    ///
+    /// # Returns
+    ///
+    /// A `Result<AccessDecision>` indicating the policy's decision. The `Result`
+    /// allows for error handling during policy evaluation.
     async fn evaluate_access(
         &self,
         security_context: &SecurityContext,
@@ -82,18 +278,48 @@ pub trait AccessControlPolicy: Send + Sync {
         resource: &str,
     ) -> Result<AccessDecision>;
 
-    /// Check if the policy applies to the given context
+    /// Check if this policy should be evaluated for the given context and operation.
+    ///
+    /// This method allows policies to opt out of evaluation for operations they
+    /// don't care about, improving performance by reducing unnecessary evaluations.
+    ///
+    /// # Arguments
+    ///
+    /// * `security_context` - The security context for the operation
+    /// * `operation` - The operation being attempted
+    ///
+    /// # Returns
+    ///
+    /// `true` if this policy should be evaluated, `false` to skip evaluation.
     fn applies_to(&self, security_context: &SecurityContext, operation: &str) -> bool;
 
-    /// Get policy identifier
+    /// Get the unique identifier for this policy.
+    ///
+    /// Used for policy management, caching, and debugging. Should be unique
+    /// across the entire policy set to avoid conflicts.
     fn policy_id(&self) -> &str;
 
-    /// Get policy version for cache invalidation
+    /// Get the version of this policy for cache invalidation.
+    ///
+    /// When policy logic changes, increment this version to invalidate any
+    /// cached policy decisions. Useful in distributed deployments where
+    /// policy evaluation results might be cached.
+    ///
+    /// # Returns
+    ///
+    /// Version number, defaults to 1.
     fn version(&self) -> u32 {
         1
     }
 
-    /// Get policy priority (higher = evaluated first)
+    /// Get the evaluation priority of this policy.
+    ///
+    /// Same semantics as `SecurityPolicy::priority()` - higher values are
+    /// evaluated first.
+    ///
+    /// # Returns
+    ///
+    /// Priority value where higher numbers mean higher priority. Default is 0.
     fn priority(&self) -> i32 {
         0
     }
