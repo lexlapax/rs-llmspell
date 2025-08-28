@@ -2302,7 +2302,6 @@ Clear one-paragraph description of what this crate does and why it exists.
 ## Configuration
 ```toml
 # Relevant configuration options
-```
 
 ## Performance Considerations
 - Key performance tips
@@ -2361,7 +2360,7 @@ Clear one-paragraph description of what this crate does and why it exists.
 - **llmspell-events**: 90K+ events/sec throughput
 - **llmspell-bridge**: <1% overhead Lua integration
 
-### Task 8.10.6: Lua Script Examples
+### Task 8.10.6: Lua Script Examples ✅
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Examples Team
@@ -2369,31 +2368,58 @@ Clear one-paragraph description of what this crate does and why it exists.
 **Description**: Create example Lua scripts showcasing RAG features.
 
 **Acceptance Criteria:**
-- [ ] Basic search example
-- [ ] Multi-tenant example
-- [ ] Session example
-- [ ] Cost optimization example
+- [x] Basic search example ✅
+- [x] Multi-tenant example ✅
+- [x] Session example ✅
+- [x] Cost optimization example ✅
 
 **Implementation Steps:**
-1. Create `examples/script-users/getting-started/06-first-rag.lua`
-2. Create `examples/script-users/cookbook/rag-multi-tenant.lua`
-3. Create `examples/script-users/cookbook/rag-session.lua`
-4. Create `examples/script-users/cookbook/rag-cost-optimization.lua`
-5. Test all examples
-6. Update respective README.md files 
+1. Create `examples/script-users/getting-started/06-first-rag.lua` ✅
+2. Create `examples/script-users/cookbook/rag-multi-tenant.lua` ✅
+3. Create `examples/script-users/cookbook/rag-session.lua` ✅
+4. Create `examples/script-users/cookbook/rag-cost-optimization.lua` ✅
+5. Test all examples ✅
+6. Update respective README.md files ✅ 
 
 **Definition of Done:**
-- [ ] Examples run correctly
-- [ ] Well commented
-- [ ] Cover main features
-- [ ] Progressive difficulty
+- [x] Examples run correctly ✅ (all 4 examples tested and working)
+- [x] Well commented ✅
+- [x] Cover main features ✅
+- [x] Progressive difficulty ✅
+
+**Key Learnings & Fixes Applied:**
+1. **Provider Configuration**: Must use nested structure `[providers.providers.name]` in TOML - first "providers" is config section, second is HashMap field (Phase 7 flattening fix)
+2. **RAG API Syntax**: 
+   - `RAG.search(query_string, options_table)` - positional parameters, not table
+   - Use "limit" not "top_k" for result count
+   - `RAG.get_stats(scope, scope_id)` requires both parameters
+3. **Tenant Isolation**: 
+   - `RAG.configure()` is currently a no-op placeholder
+   - Use `scope="tenant", scope_id=tenant_id` for isolation, not "collection" parameter
+   - Lua bridge only handles scope/scope_id, not collection
+4. **Session Integration**:
+   - `Session.create()` returns session ID string, not table
+   - Must create Session before using session-scoped RAG
+   - UUID format required for session IDs
+5. **Artifact Storage**:
+   - `Artifact.store()` returns artifact ID table with fields: content_hash, session_id, sequence
+   - Not a result table with success field
+   - Use pcall for error handling
+6. **Agent Integration**:
+   - Agent.execute() requires input table: `{prompt = "..."}` 
+   - Response format varies, check multiple fields for content
+7. **Provider Discovery**:
+   - `Provider.list()` returns array of provider info tables
+   - Providers are initialized with hierarchical naming: "rig/openai/gpt-3.5-turbo"
+   - Both API keys must be set for multi-provider configs
 
 ### Task 8.10.7: Enhanced CLI Applications
 **Priority**: MEDIUM  
 **Estimated Time**: 4 hours  
 **Assignee**: Applications Team
 
-**Description**: Enhance embedded CLI applications with RAG.
+**Description**: Enhance embedded CLI applications with RAG. 
+Check the `docs/user-guide/api/lua/README.md` to actually see what API calls to make in lua, or look at lua globals implementation.
 
 **Acceptance Criteria:**
 - [ ] Research collector uses RAG
@@ -2402,16 +2428,19 @@ Clear one-paragraph description of what this crate does and why it exists.
 - [ ] Configurations included
 
 **Implementation Steps:**
-1. Enhance `llmspell-cli/resources/applications/research-collector/`
-2. Create `llmspell-cli/resources/applications/knowledge-base/`
-3. Create `llmspell-cli/resources/applications/personal-assistant/`
+1. Enhance `examples/script-users/applications/research-collector/`
+2. Create `examples/script-users/applications/knowledge-base/`
+3. Create `examples/script-users/applications/personal-assistant/`
 4. Add RAG configurations
-5. Test applications
+5. Test applications via command line as `llmspell -c <config file> run <filename>` arguments first.
+6. Copy over the applications to `llmspell-cli/resources/applications/`
+7. Recompile the binary with updated embedded apps.
+8. Test the applications via `llmspell apps <appname>`
 
 **Definition of Done:**
 - [ ] Apps use RAG features
 - [ ] Configurations work
-- [ ] Documentation updated
+- [ ] Documentation updated for each application and the index README.md for applications.
 - [ ] Examples tested
 
 ---

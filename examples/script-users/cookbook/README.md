@@ -20,6 +20,11 @@ Enterprise-grade patterns for building production LLMSpell applications. Each pa
 - **[07 - Security Patterns](security-patterns.lua)** - Input validation and secure handling
 - **[08 - State Management](state-management.lua)** - Versioning and persistence
 
+### 🔍 RAG & Knowledge Management
+- **[09 - Multi-Tenant RAG](rag-multi-tenant.lua)** - Isolated vector stores per tenant
+- **[10 - Session RAG](rag-session.lua)** - Conversational memory with context
+- **[11 - RAG Cost Optimization](rag-cost-optimization.lua)** - Efficient embedding strategies
+
 ## 🚀 Quick Start
 
 ### Basic Patterns (No API Key Required)
@@ -51,6 +56,21 @@ Enterprise-grade patterns for building production LLMSpell applications. Each pa
 ./target/debug/llmspell run examples/script-users/cookbook/state-management.lua
 ```
 
+### RAG Patterns (Requires RAG Config)
+```bash
+# Multi-tenant RAG system
+./target/debug/llmspell -c examples/script-users/configs/rag-production.toml \
+  run examples/script-users/cookbook/rag-multi-tenant.lua
+
+# Session-based RAG
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/cookbook/rag-session.lua
+
+# Cost optimization patterns
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/cookbook/rag-cost-optimization.lua
+```
+
 ## 📊 Pattern Overview
 
 | Pattern | Complexity | Prerequisites | Time | Key Features |
@@ -63,6 +83,9 @@ Enterprise-grade patterns for building production LLMSpell applications. Each pa
 | Performance | PRODUCTION | None | <3s | Timing, memory tracking, percentiles, reports |
 | Security | PRODUCTION | None | <2s | Validation, injection prevention, audit logging |
 | State Mgmt | PRODUCTION | Optional | <3s | Versioning, migration, conflict resolution |
+| Multi-Tenant RAG | PRODUCTION | RAG Config | <20s | Tenant isolation, quota management, admin ops |
+| Session RAG | INTERMEDIATE | RAG Config | <15s | Conversational memory, context windows, replay |
+| RAG Cost Opt | INTERMEDIATE | RAG Config | <20s | Caching, batching, tiered processing, budgets |
 
 ## 🎯 When to Use Each Pattern
 
@@ -121,6 +144,27 @@ Use when you need:
 - State versioning and history
 - Distributed state handling
 - Schema migration support
+
+### Multi-Tenant RAG
+Use when you need:
+- Isolated vector stores per customer
+- Tenant-specific knowledge bases
+- Usage tracking and quotas
+- Cross-tenant admin operations
+
+### Session RAG
+Use when you need:
+- Conversational memory in chat apps
+- Context-aware responses
+- Session replay capabilities
+- Temporary knowledge stores
+
+### RAG Cost Optimization
+Use when you need:
+- Reduced embedding API costs
+- Efficient document processing
+- Smart caching strategies
+- Budget enforcement
 
 ## 🏗️ Production Architecture
 
