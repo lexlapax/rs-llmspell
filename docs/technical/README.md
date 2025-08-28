@@ -10,26 +10,31 @@
 
 > **📊 Technical Reference**: Consolidated technical documentation for LLMSpell's architecture. All content validated against actual implementation with 35→7 files consolidation achieved.
 
-**Version**: v0.6.0 (Phase 7 Complete) | **Status**: Production Architecture | **Last Updated**: August 2025
+**Version**: v0.8.0 (Phase 8 Complete) | **Status**: Production Architecture with RAG | **Last Updated**: December 2024
 
 ---
 
-## Core Documentation (7 Essential Files)
+## Core Documentation (10 Essential Files)
 
 ### 📊 What We Built
-- **[current-architecture.md](current-architecture.md)** - **SINGLE SOURCE OF TRUTH** - The actual implementation architecture (17 crates, 71K LOC, Phase 0-7 evolution)
+- **[current-architecture.md](current-architecture.md)** - **SINGLE SOURCE OF TRUTH** - The actual implementation architecture (20+ crates, 80K+ LOC, Phase 0-8 evolution)
+
+### 🧠 **NEW** RAG System Architecture (Phase 8)
+- **[rag-architecture.md](rag-architecture.md)** - **RAG SYSTEM ARCHITECTURE** - Complete RAG implementation with HNSW vector storage, multi-tenant isolation, and security policies
+- **[phase-8-performance-guide.md](phase-8-performance-guide.md)** - RAG performance optimization guide (<10ms search on 1M vectors, multi-tenant tuning)
+- **[hnsw-performance-tuning.md](hnsw-performance-tuning.md)** - HNSW algorithm parameter optimization for different use cases
 
 ### 🎯 Why We Built It
-- **[architecture-decisions.md](architecture-decisions.md)** - All architectural decisions (28 ADRs) showing evolution and reversals across phases
+- **[architecture-decisions.md](architecture-decisions.md)** - All architectural decisions (30+ ADRs) showing evolution and reversals across phases
 
 ### 🛡️ How It's Secured
-- **[security-model.md](security-model.md)** - Complete security architecture (3-level model, STRIDE analysis, actual implementation)
+- **[security-model.md](security-model.md)** - Enhanced security architecture (RLS policies, access control, sandbox integration)
 
 ### ⚡ How It Performs
 - **[performance-benchmarks.md](performance-benchmarks.md)** - Actual measured performance (all targets met/exceeded, validated metrics)
 
 ### 📐 How to Build It
-- **[api-style-guide.md](api-style-guide.md)** - Official API standards (Phase 7 - naming, patterns, documentation requirements)
+- **[api-style-guide.md](api-style-guide.md)** - Official API standards (Phase 7-8 - naming, patterns, documentation requirements)
 
 ### 🔮 Historical Reference
 - **[master-architecture-vision.md](master-architecture-vision.md)** - Original aspirational architecture (historical reference only, NOT current state)

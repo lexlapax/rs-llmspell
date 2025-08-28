@@ -4,7 +4,7 @@
 
 **🔗 Navigation**: [← Project Home](../README.md) | [Examples](../examples/) | [Contributing](../CONTRIBUTING.md)
 
-> **📖 Documentation Hub**: All documentation for rs-llmspell v0.6.0 (Phase 7 Complete). Consolidated, validated, and organized for clarity.
+> **📖 Documentation Hub**: All documentation for rs-llmspell v0.8.0 (Phase 8 Complete). Consolidated, validated, and organized for clarity. **Phase 8 adds complete RAG system with multi-tenant vector storage.**
 
 ---
 
@@ -31,8 +31,9 @@
 ### 🏗️ [Technical](technical/) - *For Architects*
 **Purpose**: Core architectural documentation and implementation decisions.
 
-**Status**: ✅ Consolidated from 35→7 essential files  
-**Contents**: Current architecture, decisions (ADRs), security model, performance benchmarks, API standards  
+**Status**: ✅ Updated for Phase 8 with RAG architecture  
+**Contents**: Current architecture, RAG architecture, performance tuning, security model, API standards  
+**Phase 8 Additions**: RAG architecture documentation, HNSW performance guide, multi-tenant patterns  
 **Start here if**: You need to understand system architecture, security, or performance
 
 ---
@@ -57,15 +58,17 @@
 
 ## What Rs-LLMSpell Actually Is
 
-**Production-Ready Features** (v0.6.0):
+**Production-Ready Features** (v0.8.0):
 - ✅ **37+ tools** across 9 categories (file, web, data, media, system)
-- ✅ **Lua scripting** with 15 zero-import globals
+- ✅ **Lua scripting** with 16 zero-import globals (including RAG)
 - ✅ **Agent infrastructure** with builder patterns and templates
 - ✅ **4 workflow patterns** (Sequential, Parallel, Conditional, Loop)
+- ✅ **RAG system** with HNSW vector search (<10ms on 1M vectors)
+- ✅ **Multi-tenant architecture** with namespace isolation (<5% overhead)
 - ✅ **State persistence** with 3 backends (Memory, Sled, RocksDB)
 - ✅ **Hook system** with 40+ points and circuit breakers
 - ✅ **Event bus** with 90K+ events/sec throughput
-- ✅ **3-level security** model with sandboxing
+- ✅ **Enhanced security** with access control policies and sandbox
 
 **What it doesn't do**:
 - ❌ GUI or web interface (CLI and library only)
