@@ -1,8 +1,6 @@
 //! End-to-end RAG integration tests
 //! Tests complete RAG functionality from CLI to storage
 
-#![cfg(feature = "integration-tests")]
-
 use llmspell_bridge::runtime::ScriptRuntime;
 use llmspell_config::{
     rag::{
@@ -16,16 +14,13 @@ use tempfile::TempDir;
 use tokio::time::{timeout, Duration};
 
 /// Test helper to create a test RAG configuration
-fn create_test_rag_config(backend: &str, multi_tenant: bool) -> RAGConfig {
+fn create_test_rag_config(_backend: &str, multi_tenant: bool) -> RAGConfig {
     RAGConfig {
         enabled: true,
         multi_tenant,
         vector_storage: VectorStorageConfig {
             dimensions: 384,
-            backend: match backend {
-                "hnsw" => VectorBackend::HNSW,
-                _ => VectorBackend::Mock,
-            },
+            backend: VectorBackend::HNSW,
             persistence_path: None,
             max_memory_mb: Some(512),
             hnsw: HNSWConfig {
@@ -84,36 +79,33 @@ async fn test_rag_cli_to_storage_flow() {
         end
         
         -- Test ingestion
-        local doc_id = RAG.ingest({
+        local ingest_result = RAG.ingest({
             content = "The quick brown fox jumps over the lazy dog",
             metadata = { source = "test", type = "example" }
-        })
+        }, {})
         
-        if not doc_id then
+        if not ingest_result or not ingest_result.success then
             error("Failed to ingest document")
         end
         
-        print("Document ingested:", doc_id)
+        print("Document ingested:", type(ingest_result))
         
         -- Test search
-        local results = RAG.search({
-            query = "fox",
-            top_k = 5
-        })
+        local search_response = RAG.search("fox", { k = 5 })
         
-        if not results then
+        if not search_response or not search_response.success then
             error("Search failed")
         end
         
-        print("Search results:", #results)
+        print("Search results:", search_response.total)
         
         -- Verify we got results
-        if #results == 0 then
+        if search_response.total == 0 then
             error("No results found")
         end
         
         -- Test result structure
-        local result = results[1]
+        local result = search_response.results[1]
         if not result.score or not result.content then
             error("Invalid result structure")
         end
@@ -148,28 +140,29 @@ async fn test_rag_multi_tenant_isolation() {
         end
         
         -- Ingest to tenant1
-        local doc1 = RAG.ingest({
+        local ingest1 = RAG.ingest({
             content = "Tenant 1 private data",
-            metadata = { tenant = "tenant1" },
+            metadata = { tenant = "tenant1" }
+        }, {
             tenant_id = "tenant1"
         })
         
         -- Ingest to tenant2
-        local doc2 = RAG.ingest({
+        local ingest2 = RAG.ingest({
             content = "Tenant 2 confidential information",
-            metadata = { tenant = "tenant2" },
+            metadata = { tenant = "tenant2" }
+        }, {
             tenant_id = "tenant2"
         })
         
         -- Search as tenant1 - should only see tenant1 data
-        local results1 = RAG.search({
-            query = "data",
+        local search1 = RAG.search("data", {
             tenant_id = "tenant1",
-            top_k = 10
+            k = 10
         })
         
         -- Verify isolation
-        for _, result in ipairs(results1) do
+        for _, result in ipairs(search1.results) do
             if result.content:find("Tenant 2") then
                 error("Tenant isolation violated!")
             end
@@ -264,9 +257,8 @@ async fn test_rag_performance_benchmarks() {
     let search_script = r#"
         local start = os.clock()
         for i = 1, 50 do
-            RAG.search({
-                query = "test content " .. i,
-                top_k = 10
+            RAG.search("test content " .. tostring(i), {
+                k = 10
             })
         end
         local elapsed = os.clock() - start
@@ -297,7 +289,7 @@ async fn test_rag_error_handling() {
             "invalid_ingest",
             r#"
                 local ok, err = pcall(function()
-                    RAG.ingest({})  -- Missing required fields
+                    RAG.ingest(nil, {})  -- Invalid: nil documents
                 end)
                 if ok then
                     error("Should have failed on invalid input")
@@ -309,8 +301,8 @@ async fn test_rag_error_handling() {
             "invalid_search",
             r#"
                 local ok, err = pcall(function()
-                    RAG.search({
-                        top_k = -1  -- Invalid parameter
+                    RAG.search("", {
+                        k = -1  -- Invalid parameter
                     })
                 end)
                 if ok then
@@ -323,7 +315,7 @@ async fn test_rag_error_handling() {
             "missing_query",
             r#"
                 local ok, err = pcall(function()
-                    RAG.search({ top_k = 5 })  -- Missing query
+                    RAG.search(nil, { k = 5 })  -- Missing query
                 end)
                 if ok then
                     error("Should have failed on missing query")
@@ -360,15 +352,20 @@ async fn test_rag_persistence() {
         );
 
         let script = r#"
-            RAG.ingest({
+            local result = RAG.ingest({
                 content = "Persistent data that should survive restart",
                 metadata = { persistent = true }
             })
-            print("Data ingested")
+            print("Data ingested:", result and result.success)
+            print("Vectors created:", result and result.vectors_created)
             
-            -- Save the vector storage to disk (currently no-op)
+            -- Save the vector storage to disk
             RAG.save()
-            print("Data saved - note: save is currently no-op")
+            print("Data saved to disk")
+            
+            -- Verify data is searchable before saving
+            local search_before = RAG.search("persistent data", { k = 1 })
+            print("Search before restart - found:", search_before and search_before.total or 0)
         "#;
 
         runtime.execute_script(script).await.unwrap();
@@ -377,11 +374,24 @@ async fn test_rag_persistence() {
         drop(runtime);
 
         // Give the save task a moment to complete
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+
+        // Check if persistence directory exists
+        println!("Checking persistence path: {persistence_path:?}");
+        if persistence_path.exists() {
+            println!("Path exists, contents:");
+            for entry in std::fs::read_dir(&persistence_path).unwrap() {
+                let entry = entry.unwrap();
+                println!("  - {:?}", entry.path());
+            }
+        } else {
+            println!("Path does not exist!");
+        }
     }
 
     // Second runtime - verify data persisted
     {
+        println!("\n=== Creating second runtime to load persisted data ===");
         let runtime = Arc::new(
             ScriptRuntime::new_with_lua(config)
                 .await
@@ -389,12 +399,21 @@ async fn test_rag_persistence() {
         );
 
         let script = r#"
-            local results = RAG.search({
-                query = "persistent data",
-                top_k = 1
+            print("Searching for persisted data...")
+            local search_response = RAG.search("persistent data", {
+                k = 1
             })
             
-            if #results == 0 then
+            print("Search response:", search_response and "exists" or "nil")
+            if search_response then
+                print("Total results:", search_response.total)
+                print("Success:", search_response.success)
+                if search_response.results and #search_response.results > 0 then
+                    print("First result:", search_response.results[1].content)
+                end
+            end
+            
+            if not search_response or search_response.total == 0 then
                 error("Persisted data not found!")
             end
             
@@ -438,12 +457,11 @@ async fn test_rag_memory_limits() {
         print("Ingested documents before limit:", count - 1)
         
         -- System should still be functional
-        local results = RAG.search({
-            query = "document",
-            top_k = 5
+        local search_response = RAG.search("document", {
+            k = 5
         })
         
-        print("Search still works:", #results > 0)
+        print("Search still works:", search_response and search_response.total > 0)
     "#;
 
     let result = runtime.execute_script(script).await;
@@ -479,9 +497,8 @@ async fn test_rag_concurrent_operations() {
         
         for i = 1, 5 do
             table.insert(operations, function()
-                RAG.search({
-                    query = "concurrent",
-                    top_k = 3
+                RAG.search("concurrent", {
+                    k = 3
                 })
             end)
         end
@@ -536,13 +553,12 @@ async fn test_rag_cleanup_and_shutdown() {
         end
         
         -- Verify cleanup
-        local results = RAG.search({
-            query = "cleanup test",
-            top_k = 10
+        local search_response = RAG.search("cleanup test", {
+            k = 10
         })
         
         -- After clear, we should have no results (or fresh state)
-        print("Results after cleanup:", #results)
+        print("Results after cleanup:", search_response and search_response.total or 0)
     "#;
 
     let result = runtime.execute_script(script).await;

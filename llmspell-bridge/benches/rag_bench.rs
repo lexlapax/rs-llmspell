@@ -119,15 +119,15 @@ fn bench_vector_search(c: &mut Criterion) {
             b.to_async(&rt).iter(|| async {
                 black_box(
                     bridge
-                        .search(
-                            "document information category",
-                            Some(k),
-                            Some("bench".to_string()),
-                            Some("search_bench".to_string()),
-                            None,
-                            None,
-                            None,
-                        )
+                        .search(llmspell_bridge::rag_bridge::RAGSearchParams {
+                            query: "document information category".to_string(),
+                            k: Some(k),
+                            scope: Some("bench".to_string()),
+                            scope_id: Some("search_bench".to_string()),
+                            filters: None,
+                            threshold: None,
+                            context: None,
+                        })
                         .await
                         .unwrap(),
                 )
@@ -199,15 +199,15 @@ fn bench_filtered_search(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             black_box(
                 bridge
-                    .search(
-                        "document information",
-                        Some(10),
-                        Some("bench".to_string()),
-                        Some("filter_bench".to_string()),
-                        None,
-                        None,
-                        None,
-                    )
+                    .search(llmspell_bridge::rag_bridge::RAGSearchParams {
+                        query: "document information".to_string(),
+                        k: Some(10),
+                        scope: Some("bench".to_string()),
+                        scope_id: Some("filter_bench".to_string()),
+                        filters: None,
+                        threshold: None,
+                        context: None,
+                    })
                     .await
                     .unwrap(),
             )
@@ -222,15 +222,15 @@ fn bench_filtered_search(c: &mut Criterion) {
 
             black_box(
                 bridge
-                    .search(
-                        "document information",
-                        Some(10),
-                        Some("bench".to_string()),
-                        Some("filter_bench".to_string()),
-                        Some(filters),
-                        None,
-                        None,
-                    )
+                    .search(llmspell_bridge::rag_bridge::RAGSearchParams {
+                        query: "document information".to_string(),
+                        k: Some(10),
+                        scope: Some("bench".to_string()),
+                        scope_id: Some("filter_bench".to_string()),
+                        filters: Some(filters),
+                        threshold: None,
+                        context: None,
+                    })
                     .await
                     .unwrap(),
             )
@@ -242,15 +242,15 @@ fn bench_filtered_search(c: &mut Criterion) {
         b.to_async(&rt).iter(|| async {
             black_box(
                 bridge
-                    .search(
-                        "document information",
-                        Some(10),
-                        Some("bench".to_string()),
-                        Some("filter_bench".to_string()),
-                        None,
-                        Some(0.7),
-                        None,
-                    )
+                    .search(llmspell_bridge::rag_bridge::RAGSearchParams {
+                        query: "document information".to_string(),
+                        k: Some(10),
+                        scope: Some("bench".to_string()),
+                        scope_id: Some("filter_bench".to_string()),
+                        filters: None,
+                        threshold: Some(0.7),
+                        context: None,
+                    })
                     .await
                     .unwrap(),
             )
@@ -341,15 +341,15 @@ fn bench_concurrent_operations(c: &mut Criterion) {
                             let bridge = bridge.clone();
                             tokio::spawn(async move {
                                 bridge
-                                    .search(
-                                        &format!("document information {i}"),
-                                        Some(10),
-                                        Some("bench".to_string()),
-                                        Some("concurrent_bench".to_string()),
-                                        None,
-                                        None,
-                                        None,
-                                    )
+                                    .search(llmspell_bridge::rag_bridge::RAGSearchParams {
+                                        query: format!("document information {i}"),
+                                        k: Some(10),
+                                        scope: Some("bench".to_string()),
+                                        scope_id: Some("concurrent_bench".to_string()),
+                                        filters: None,
+                                        threshold: None,
+                                        context: None,
+                                    })
                                     .await
                                     .unwrap()
                             })

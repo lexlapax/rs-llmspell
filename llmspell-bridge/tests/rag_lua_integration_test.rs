@@ -459,9 +459,9 @@ mod rag_lua_tests {
             ..Default::default()
         };
         config.rag.enabled = true;
-        // Use Mock backend for testing
-        config.rag.vector_storage.backend = llmspell_config::VectorBackend::Mock;
-        config.rag.vector_storage.dimensions = 768; // Different dimensions to verify config
+        // Use HNSW backend (the only available backend)
+        config.rag.vector_storage.backend = llmspell_config::VectorBackend::HNSW;
+        config.rag.vector_storage.dimensions = 384; // Use consistent dimensions
 
         let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
 

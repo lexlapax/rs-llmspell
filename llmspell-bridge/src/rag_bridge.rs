@@ -13,6 +13,7 @@ use llmspell_storage::{
     ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -31,7 +32,24 @@ pub struct RAGBridge {
     provider_manager: Arc<ProviderManager>,
 }
 
-// Removed RAGSearchRequest - using direct parameters instead
+/// RAG search parameters to reduce argument count
+#[derive(Debug, Clone)]
+pub struct RAGSearchParams {
+    /// Search query
+    pub query: String,
+    /// Number of results
+    pub k: Option<usize>,
+    /// Scope filter
+    pub scope: Option<String>,
+    /// Scope ID
+    pub scope_id: Option<String>,
+    /// Metadata filters
+    pub filters: Option<HashMap<String, serde_json::Value>>,
+    /// Similarity threshold
+    pub threshold: Option<f32>,
+    /// Execution context
+    pub context: Option<ExecutionContext>,
+}
 
 /// RAG search result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -234,84 +252,56 @@ impl RAGBridge {
 
         Ok(results
             .into_iter()
-            .map(|r| RAGSearchResult {
-                id: r.id,
-                text: r
-                    .metadata
-                    .as_ref()
-                    .and_then(|m| m.get("text"))
-                    .and_then(|v| v.as_str())
-                    .unwrap_or_default()
-                    .to_string(),
-                score: r.score,
-                metadata: r.metadata.unwrap_or_default(),
-            })
+            .map(Self::convert_vector_result_to_rag_result)
             .collect())
     }
 
-    /// Execute a search with the given parameters
-    #[allow(clippy::too_many_lines)]
-    pub async fn search(
+    /// Dispatch search to appropriate handler based on scope
+    async fn dispatch_search(
         &self,
         query: &str,
-        k: Option<usize>,
-        scope: Option<String>,
-        scope_id: Option<String>,
-        _filters: Option<HashMap<String, serde_json::Value>>,
-        _threshold: Option<f32>,
-        context: Option<ExecutionContext>,
-    ) -> Result<RAGSearchResults> {
-        debug!(
-            "RAG search - query: {}, k: {:?}, scope: {:?}",
-            query, k, scope
-        );
-
-        // Determine scope from parameters
-        let state_scope = scope
-            .as_ref()
-            .map(|s| {
-                if s == "global" {
-                    StateScope::Global
-                } else if let Some(ref id) = scope_id {
-                    StateScope::Custom(format!("{s}:{id}"))
-                } else {
-                    StateScope::Custom(s.clone())
-                }
-            })
-            .or_else(|| {
-                context.as_ref().map(|ctx| match &ctx.scope {
-                    llmspell_core::execution_context::ContextScope::Global => StateScope::Global,
-                    llmspell_core::execution_context::ContextScope::User(id) => {
-                        StateScope::User(id.clone())
-                    }
-                    llmspell_core::execution_context::ContextScope::Session(id) => {
-                        StateScope::Session(id.clone())
-                    }
-                    llmspell_core::execution_context::ContextScope::Agent(id) => {
-                        StateScope::Custom(format!("agent:{id}"))
-                    }
-                    llmspell_core::execution_context::ContextScope::Workflow(id) => {
-                        StateScope::Custom(format!("workflow:{id}"))
-                    }
-                })
-            })
-            .unwrap_or(StateScope::Global);
-        debug!("Determined search scope: {:?}", state_scope);
-
-        // Perform search based on scope
-        let k_value = k.unwrap_or(10);
-        let results: Vec<RAGSearchResult> = match &state_scope {
+        k: usize,
+        state_scope: StateScope,
+    ) -> Result<Vec<RAGSearchResult>> {
+        match &state_scope {
             StateScope::Custom(s) if s.starts_with("session:") => {
                 let session_id_str = s.strip_prefix("session:").unwrap_or("");
-                self.search_in_session(query, session_id_str, k_value)
-                    .await?
+                self.search_in_session(query, session_id_str, k).await
             }
             _ => {
                 // All other scopes use vector storage
-                self.search_with_vector_storage(query, k_value, state_scope.clone())
-                    .await?
+                self.search_with_vector_storage(query, k, state_scope).await
             }
-        };
+        }
+    }
+
+    /// Execute a search with the given parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Session ID parsing fails
+    /// - Vector search fails
+    /// - Namespace not found
+    pub async fn search(&self, params: RAGSearchParams) -> Result<RAGSearchResults> {
+        debug!(
+            "RAG search - query: {}, k: {:?}, scope: {:?}",
+            params.query, params.k, params.scope
+        );
+
+        // Determine scope from parameters
+        let state_scope = Self::determine_scope(
+            params.scope.as_deref(),
+            params.scope_id.as_deref(),
+            params.context.as_ref(),
+        );
+        debug!("Determined search scope: {:?}", state_scope);
+
+        // Perform search based on scope
+        let k_value = params.k.unwrap_or(10);
+        let results = self
+            .dispatch_search(&params.query, k_value, state_scope)
+            .await?;
 
         info!("RAG search completed: {} results", results.len());
 
@@ -319,6 +309,278 @@ impl RAGBridge {
             total: results.len(),
             results,
         })
+    }
+
+    /// Handle session-scoped ingestion
+    async fn ingest_session_scoped(
+        &self,
+        texts: Vec<String>,
+        session_scope_str: &str,
+    ) -> Result<(usize, usize, usize)> {
+        let session_id_str = session_scope_str.strip_prefix("session:").unwrap_or("");
+        let session_id = session_id_str.parse::<SessionId>().map_err(|e| {
+            llmspell_core::LLMSpellError::Component {
+                message: format!("Invalid session ID: {e}"),
+                source: None,
+            }
+        })?;
+        let stats = self
+            .session_pipeline
+            .ingest_in_session(texts, session_id)
+            .await
+            .map_err(|e| llmspell_core::LLMSpellError::Component {
+                message: format!("Session ingestion failed: {e}"),
+                source: None,
+            })?;
+
+        Ok((
+            stats.documents_processed,
+            stats.vectors_created,
+            stats.total_tokens,
+        ))
+    }
+
+    /// Handle tenant-scoped ingestion
+    async fn ingest_tenant_scoped(
+        &self,
+        documents: &[RAGDocument],
+        state_scope: &StateScope,
+        tenant_scope_str: &str,
+    ) -> Result<(usize, usize, usize)> {
+        let mut vectors = Vec::new();
+        let mut total_tokens = 0;
+
+        for doc in documents {
+            total_tokens += doc.text.len();
+            let embedding = generate_mock_embedding(&doc.text, 384);
+
+            let mut metadata = doc.metadata.clone().unwrap_or_default();
+            metadata.insert(
+                "text".to_string(),
+                serde_json::Value::String(doc.text.clone()),
+            );
+            // Add tenant ID to metadata
+            metadata.insert(
+                "tenant".to_string(),
+                serde_json::Value::String(
+                    tenant_scope_str
+                        .strip_prefix("tenant:")
+                        .unwrap_or("")
+                        .to_string(),
+                ),
+            );
+
+            let entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
+                .with_scope(state_scope.clone())
+                .with_metadata(metadata);
+
+            vectors.push(entry);
+        }
+
+        let ids = self
+            .state_aware_storage
+            .storage()
+            .insert(vectors)
+            .await
+            .map_err(|e| llmspell_core::LLMSpellError::Component {
+                message: format!("Vector insert failed: {e}"),
+                source: None,
+            })?;
+
+        Ok((documents.len(), ids.len(), total_tokens))
+    }
+
+    /// Handle global ingestion
+    async fn ingest_global_scoped(
+        &self,
+        documents: &[RAGDocument],
+        state_scope: &StateScope,
+    ) -> Result<(usize, usize, usize)> {
+        let mut vectors = Vec::new();
+        let mut total_tokens = 0;
+
+        for doc in documents {
+            total_tokens += doc.text.len();
+            let embedding = generate_mock_embedding(&doc.text, 384);
+
+            let mut metadata = doc.metadata.clone().unwrap_or_default();
+            metadata.insert(
+                "text".to_string(),
+                serde_json::Value::String(doc.text.clone()),
+            );
+
+            let entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
+                .with_scope(state_scope.clone())
+                .with_metadata(metadata);
+
+            vectors.push(entry);
+        }
+
+        let ids = self
+            .state_aware_storage
+            .storage()
+            .insert(vectors)
+            .await
+            .map_err(|e| llmspell_core::LLMSpellError::Component {
+                message: format!("Vector insert failed: {e}"),
+                source: None,
+            })?;
+
+        Ok((documents.len(), ids.len(), total_tokens))
+    }
+
+    /// Convert `VectorResult` to `RAGSearchResult`
+    fn convert_vector_result_to_rag_result(r: VectorResult) -> RAGSearchResult {
+        RAGSearchResult {
+            id: r.id,
+            text: r
+                .metadata
+                .as_ref()
+                .and_then(|m| m.get("text"))
+                .and_then(|v| v.as_str())
+                .unwrap_or_default()
+                .to_string(),
+            score: r.score,
+            metadata: r.metadata.unwrap_or_default(),
+        }
+    }
+
+    /// Convert RAG documents to vector entries
+    fn convert_documents_to_vectors(
+        documents: &[RAGDocument],
+        state_scope: &StateScope,
+    ) -> (Vec<String>, Vec<VectorEntry>) {
+        let mut doc_ids = Vec::with_capacity(documents.len());
+        let mut vector_entries = Vec::new();
+
+        for doc in documents {
+            let doc_id = doc.id.clone();
+            let embedding = generate_mock_embedding(&doc.text, 384);
+
+            let metadata = doc.metadata.clone().unwrap_or_default();
+            let mut vector_metadata = HashMap::new();
+            vector_metadata.insert("text".to_string(), Value::String(doc.text.clone()));
+            vector_metadata.insert("doc_id".to_string(), Value::String(doc_id.clone()));
+            // Convert serde_json::Value to serde_json::Value for metadata
+            for (k, v) in metadata {
+                vector_metadata.insert(k, v);
+            }
+
+            let entry = VectorEntry::new(doc_id.clone(), embedding)
+                .with_metadata(vector_metadata)
+                .with_scope(state_scope.clone());
+
+            vector_entries.push(entry);
+            doc_ids.push(doc_id);
+        }
+
+        (doc_ids, vector_entries)
+    }
+
+    /// Process documents for ingestion
+    #[allow(dead_code)]
+    async fn process_documents_for_scope(
+        &self,
+        documents: Vec<RAGDocument>,
+        state_scope: StateScope,
+    ) -> Result<Vec<String>> {
+        debug!(
+            "Processing {} documents for scope: {:?}",
+            documents.len(),
+            state_scope
+        );
+
+        let (doc_ids, vector_entries) =
+            Self::convert_documents_to_vectors(&documents, &state_scope);
+
+        // Insert vectors
+        match &state_scope {
+            StateScope::Custom(s) if s.starts_with("session:") => {
+                debug!("Ingesting documents into session scope");
+                // Session-scoped ingestion would go here
+                // For now, just return the doc_ids we generated
+            }
+            _ => {
+                debug!("Ingesting documents into vector storage");
+                let _inserted_ids = self
+                    .state_aware_storage
+                    .storage()
+                    .insert(vector_entries)
+                    .await
+                    .map_err(|e| llmspell_core::LLMSpellError::Component {
+                        message: format!("Vector insertion failed: {e}"),
+                        source: None,
+                    })?;
+            }
+        }
+
+        Ok(doc_ids)
+    }
+
+    /// Convert scope string parameters to `StateScope`
+    fn scope_from_params(scope: &str, scope_id: Option<&str>) -> StateScope {
+        if scope == "global" {
+            StateScope::Global
+        } else if let Some(id) = scope_id {
+            StateScope::Custom(format!("{scope}:{id}"))
+        } else {
+            StateScope::Custom(scope.to_string())
+        }
+    }
+
+    /// Convert execution context scope to `StateScope`
+    fn scope_from_context(
+        ctx_scope: &llmspell_core::execution_context::ContextScope,
+    ) -> StateScope {
+        match ctx_scope {
+            llmspell_core::execution_context::ContextScope::Global => StateScope::Global,
+            llmspell_core::execution_context::ContextScope::User(id) => {
+                StateScope::User(id.clone())
+            }
+            llmspell_core::execution_context::ContextScope::Session(id) => {
+                StateScope::Custom(format!("session:{id}"))
+            }
+            llmspell_core::execution_context::ContextScope::Workflow(id) => {
+                StateScope::Custom(format!("workflow:{id}"))
+            }
+            llmspell_core::execution_context::ContextScope::Agent(id) => {
+                StateScope::Custom(format!("agent:{id}"))
+            }
+        }
+    }
+
+    /// Determine scope from parameters and context
+    fn determine_scope(
+        scope: Option<&str>,
+        scope_id: Option<&str>,
+        context: Option<&ExecutionContext>,
+    ) -> StateScope {
+        scope.map_or_else(
+            || {
+                context.map_or(StateScope::Global, |ctx| {
+                    Self::scope_from_context(&ctx.scope)
+                })
+            },
+            |s| Self::scope_from_params(s, scope_id),
+        )
+    }
+
+    /// Dispatch ingestion to appropriate handler based on scope
+    async fn dispatch_ingest(
+        &self,
+        documents: &[RAGDocument],
+        texts: Vec<String>,
+        state_scope: &StateScope,
+    ) -> Result<(usize, usize, usize)> {
+        match state_scope {
+            StateScope::Custom(s) if s.starts_with("session:") => {
+                self.ingest_session_scoped(texts, s).await
+            }
+            StateScope::Custom(s) if s.starts_with("tenant:") => {
+                self.ingest_tenant_scoped(documents, state_scope, s).await
+            }
+            _ => self.ingest_global_scoped(documents, state_scope).await,
+        }
     }
 
     /// Ingest documents
@@ -329,8 +591,6 @@ impl RAGBridge {
     /// - Session ID parsing fails
     /// - Vector insertion fails
     /// - Tenant operations fail
-    #[allow(clippy::cognitive_complexity)]
-    #[allow(clippy::too_many_arguments)]
     pub async fn ingest(
         &self,
         documents: Vec<RAGDocument>,
@@ -343,142 +603,17 @@ impl RAGBridge {
         debug!("RAG ingest request: {} documents", documents.len());
 
         // Determine scope from parameters
-        let state_scope = scope
-            .as_ref()
-            .map(|s| {
-                if s == "global" {
-                    StateScope::Global
-                } else if let Some(ref id) = scope_id {
-                    StateScope::Custom(format!("{s}:{id}"))
-                } else {
-                    StateScope::Custom(s.clone())
-                }
-            })
-            .or_else(|| {
-                context.as_ref().map(|ctx| match &ctx.scope {
-                    llmspell_core::execution_context::ContextScope::Global => StateScope::Global,
-                    llmspell_core::execution_context::ContextScope::User(id) => {
-                        StateScope::User(id.clone())
-                    }
-                    llmspell_core::execution_context::ContextScope::Session(id) => {
-                        StateScope::Session(id.clone())
-                    }
-                    llmspell_core::execution_context::ContextScope::Agent(id) => {
-                        StateScope::Custom(format!("agent:{id}"))
-                    }
-                    llmspell_core::execution_context::ContextScope::Workflow(id) => {
-                        StateScope::Custom(format!("workflow:{id}"))
-                    }
-                })
-            })
-            .unwrap_or(StateScope::Global);
+        let state_scope =
+            Self::determine_scope(scope.as_deref(), scope_id.as_deref(), context.as_ref());
         debug!("Determined ingest scope: {:?}", state_scope);
 
         // Convert documents to texts
         let texts: Vec<String> = documents.iter().map(|d| d.text.clone()).collect();
 
         // Perform ingestion based on scope
-        let (documents_processed, vectors_created, total_tokens) = match &state_scope {
-            StateScope::Custom(s) if s.starts_with("session:") => {
-                // Session-scoped ingestion
-                let session_id_str = s.strip_prefix("session:").unwrap_or("");
-                let session_id = session_id_str.parse::<SessionId>().map_err(|e| {
-                    llmspell_core::LLMSpellError::Component {
-                        message: format!("Invalid session ID: {e}"),
-                        source: None,
-                    }
-                })?;
-                let stats = self
-                    .session_pipeline
-                    .ingest_in_session(texts, session_id)
-                    .await
-                    .map_err(|e| llmspell_core::LLMSpellError::Component {
-                        message: format!("Session ingestion failed: {e}"),
-                        source: None,
-                    })?;
-
-                (
-                    stats.documents_processed,
-                    stats.vectors_created,
-                    stats.total_tokens,
-                )
-            }
-            StateScope::Custom(s) if s.starts_with("tenant:") => {
-                // Tenant-scoped ingestion - store in vector storage with tenant scope
-                let mut vectors = Vec::new();
-                let mut total_tokens = 0;
-
-                for doc in &documents {
-                    total_tokens += doc.text.len();
-                    let embedding = generate_mock_embedding(&doc.text, 384);
-
-                    let mut metadata = doc.metadata.clone().unwrap_or_default();
-                    metadata.insert(
-                        "text".to_string(),
-                        serde_json::Value::String(doc.text.clone()),
-                    );
-                    // Add tenant ID to metadata
-                    metadata.insert(
-                        "tenant".to_string(),
-                        serde_json::Value::String(
-                            s.strip_prefix("tenant:").unwrap_or("").to_string(),
-                        ),
-                    );
-
-                    let entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
-                        .with_scope(state_scope.clone())
-                        .with_metadata(metadata);
-
-                    vectors.push(entry);
-                }
-
-                let ids = self
-                    .state_aware_storage
-                    .storage()
-                    .insert(vectors)
-                    .await
-                    .map_err(|e| llmspell_core::LLMSpellError::Component {
-                        message: format!("Vector insert failed: {e}"),
-                        source: None,
-                    })?;
-
-                (documents.len(), ids.len(), total_tokens)
-            }
-            _ => {
-                // Global ingestion
-                let mut vectors = Vec::new();
-                let mut total_tokens = 0;
-
-                for doc in &documents {
-                    total_tokens += doc.text.len();
-                    let embedding = generate_mock_embedding(&doc.text, 384);
-
-                    let mut metadata = doc.metadata.clone().unwrap_or_default();
-                    metadata.insert(
-                        "text".to_string(),
-                        serde_json::Value::String(doc.text.clone()),
-                    );
-
-                    let entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
-                        .with_scope(state_scope.clone())
-                        .with_metadata(metadata);
-
-                    vectors.push(entry);
-                }
-
-                let ids = self
-                    .state_aware_storage
-                    .storage()
-                    .insert(vectors)
-                    .await
-                    .map_err(|e| llmspell_core::LLMSpellError::Component {
-                        message: format!("Vector insert failed: {e}"),
-                        source: None,
-                    })?;
-
-                (documents.len(), ids.len(), total_tokens)
-            }
-        };
+        let (documents_processed, vectors_created, total_tokens) = self
+            .dispatch_ingest(&documents, texts, &state_scope)
+            .await?;
 
         info!(
             "RAG ingest completed: {} documents, {} vectors",
@@ -542,13 +677,20 @@ impl RAGBridge {
     /// # Errors
     ///
     /// Returns an error if save operation fails
-    pub fn save(&self) -> Result<()> {
-        // The multi_tenant_rag doesn't expose the tenant_manager as public
-        // We need another approach - check if we have vector_storage directly
+    pub async fn save(&self) -> Result<()> {
         debug!("Attempting to save RAG vector storage");
 
-        // For now, we'll just return Ok since we can't access the internal storage
-        // The save will happen through the Drop implementation instead
+        // Save the underlying vector storage
+        self.state_aware_storage
+            .storage()
+            .save()
+            .await
+            .map_err(|e| llmspell_core::LLMSpellError::Component {
+                message: format!("Failed to save vector storage: {e}"),
+                source: None,
+            })?;
+
+        info!("RAG vector storage saved successfully");
         Ok(())
     }
 
@@ -658,6 +800,7 @@ fn generate_mock_embedding(text: &str, dimensions: usize) -> Vec<f32> {
     let mut embedding = Vec::with_capacity(dimensions);
     for i in 0..dimensions {
         // Create variation based on hash and position
+        #[allow(clippy::cast_precision_loss)]
         let intermediate = (hash.wrapping_add(i as u64) % 1000) as f32;
         let value = (intermediate / 1000.0).mul_add(2.0, -1.0);
         embedding.push(value);

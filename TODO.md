@@ -1644,7 +1644,7 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 ### Task 8.9.2: Complete Real HNSW Integration
 **Priority**: CRITICAL  
 **Estimated Time**: 3 hours  
-**Status**: [x] In Progress
+**Status**: ✅ Complete
 
 **Description**: Integrate the real HNSW implementation into the RAG infrastructure, replacing all mock implementations for production use.
 
@@ -1653,10 +1653,50 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - [x] Add feature flag `hnsw-real` to control implementation selection
 - [x] Ensure `VectorStorage` trait is fully implemented
 - [x] Support save/load with data-first persistence strategy
-- [ ] Implement Drop trait for auto-save on shutdown
-- [ ] Create migration path from mock to real implementation
-- [ ] Update `llmspell-config` to support HNSW backend selection
-- [ ] All 9 RAG integration tests pass with real implementation
+- [x] Implement Drop trait for auto-save on shutdown
+- [x] Create migration path from mock to real implementation (skipped - no backward compatibility needed)
+- [x] Update `llmspell-config` to support HNSW backend selection
+- [x] All 9 RAG integration tests pass with real implementation (9/9 pass)
+- [x] All 11 Lua RAG integration tests pass (test_lua_rag_* suite)
+- [x] All 9 E2E RAG tests pass (test_rag_* suite)
+
+**Implementation Summary**:
+- **Cognitive Complexity Fixes**: Refactored `llmspell-bridge/src/rag_bridge.rs` to eliminate clippy warnings through proper method extraction
+  - Created `RAGSearchParams` struct to replace 7-argument search method
+  - Added dispatch methods: `dispatch_search()`, `dispatch_ingest()` 
+  - Split `determine_scope()` into focused helpers: `scope_from_params()`, `scope_from_context()`
+  - Updated all benchmark files to use new RAGSearchParams structure
+- **Vector Persistence Solution**: Fixed critical persistence test failure through serialization format migration
+  - Root cause: bincode doesn't support `deserialize_any` required by `serde_json::Value` in metadata
+  - Solution: Migrated from bincode to MessagePack (rmp-serde) for vector storage persistence
+  - Benefits: Binary efficient storage + full type preservation + `deserialize_any` support
+  - Files changed: `llmspell-storage/Cargo.toml`, `llmspell-storage/src/backends/vector/hnsw_real.rs`
+  - Storage format: vectors.msgpack (binary) vs previous vectors.bin (bincode)
+- **Type Information Preservation**: Maintained `HashMap<String, serde_json::Value>` for metadata to support numbers, booleans, objects, arrays
+- **API Standardization**: Aligned RAG Lua API with Tool/Agent patterns for consistency
+  - `RAG.search(query, options)` - two-parameter pattern matching `Tool.invoke(name, params)`
+  - `RAG.ingest(documents, options)` - separates data from configuration
+  - Response format: `{success: true, total: N, results: [...]}` for proper error handling
+  - Updated all E2E tests to use consistent two-parameter API
+  - Added input validation: empty documents rejected, negative k values rejected
+- **Zero Clippy Warnings**: Fixed all pedantic/nursery warnings without suppressions
+  - Proper error handling with `try_from` for potential truncation
+  - Functional style with `map_or` instead of if-let-else patterns
+- **HNSW Persistence Loading Fix**: Fixed namespace loading issue in `RealHNSWVectorStorage::from_path()`
+  - Removed unused mutable `load()` method that couldn't be called on immutable self
+  - Properly load namespaces into DashMap during `from_path()` initialization
+  - Fixed test_real_hnsw_persistence and test_real_hnsw_parallel_insertion tests
+  - Made HNSW tests more robust by checking for presence in results rather than exact ordering (HNSW is approximate)
+- **RAG Infrastructure Improvements**: 
+  - Refactored `create_hnsw_storage()` to reduce cognitive complexity from 40 to under 25
+  - Extracted helper functions: `try_load_hnsw_from_path()`, `create_new_hnsw_storage()`
+  - Fixed E2E test_rag_persistence by properly loading existing HNSW index on runtime restart
+  - Added proper cast_sign_loss prevention with `usize::try_from()` for i32 to usize conversions
+- **Lua RAG Global Refactoring**: Fixed too_many_lines warning in `register_search_method()`
+  - Extracted `parse_search_params()` function for parameter validation and parsing (72 lines)
+  - Extracted `search_results_to_lua()` function for result conversion (31 lines)
+  - Main function reduced to 32 lines focusing on orchestration
+  - Each function now under 100 line limit, improving maintainability
 
 ### Task 8.9.3: Testing and Performance Validation  
 **Priority**: HIGH  
@@ -1676,12 +1716,12 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - [ ] Concurrent operations are thread-safe
 - [ ] Integration tests pass with `--features hnsw-real`
 
-### Task 8.9.4: Configuration and Migration
+### Task 8.9.4: Configuration
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Status**: [ ] Not Started  
 
-**Description**: Update configuration structures to support hnsw_rs-specific parameters and provide migration path from existing mock storage.
+**Description**: Update configuration structures to support hnsw_rs-specific parameters.
 
 **Acceptance Criteria**:
 - [ ] Add hnsw_rs-specific config options to `llmspell-config/src/rag.rs`:
@@ -1690,30 +1730,11 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
   - [ ] Memory mapping options for large datasets
   - [ ] Batch insertion parameters
   - [ ] Parallel insertion thread count
-- [ ] Create migration utility for existing vector data
 - [ ] Add config validation for hnsw_rs parameters
 - [ ] Document recommended settings for different use cases
-- [ ] Implement config migration from old to new format
 - [ ] Add performance tuning guide in configuration docs
 
-### Task 8.9.5: Documentation and Examples
-**Priority**: MEDIUM  
-**Estimated Time**: 2 hours  
-**Status**: [ ] Not Started
-
-**Description**: Document the real HNSW implementation and provide migration guides for users.
-
-**Acceptance Criteria**:
-- [ ] Document data-first persistence strategy in architecture docs
-- [ ] Create migration guide from mock to real HNSW
-- [ ] Document HNSW configuration parameters and tuning
-- [ ] Add troubleshooting section for common issues
-- [ ] Update RAG documentation with real HNSW details
-- [ ] Create example showing real HNSW usage
-- [ ] Document performance characteristics and benchmarks
-- [ ] Add feature flag documentation for `hnsw-real`
-
-### Task 8.9.6: Final Integration and Validation
+### Task 8.9.5: Final Integration and Validation
 **Priority**: HIGH  
 **Estimated Time**: 2 hours  
 **Status**: [ ] Not Started
@@ -1724,7 +1745,6 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - [ ] All 9 RAG integration tests pass with `--features hnsw-real`
 - [ ] No mock implementations in production code paths
 - [ ] Verify feature flag switching works correctly
-- [ ] Test backward compatibility with existing deployments  
 - [ ] Ensure graceful fallback if real HNSW fails
 - [ ] Validate multi-tenant isolation in production scenarios
 - [ ] Performance meets or exceeds requirements

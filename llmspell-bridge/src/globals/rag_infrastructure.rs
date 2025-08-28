@@ -170,7 +170,7 @@ fn get_or_create_event_bus(context: &GlobalContext) -> Arc<EventBus> {
 }
 
 /// Convert config distance metric to storage distance metric
-fn convert_distance_metric(
+const fn convert_distance_metric(
     metric: &llmspell_config::DistanceMetric,
 ) -> llmspell_storage::vector_storage::DistanceMetric {
     match metric {
@@ -187,7 +187,7 @@ fn convert_distance_metric(
 }
 
 /// Convert config HNSW configuration to storage HNSW configuration
-fn convert_hnsw_config(
+const fn convert_hnsw_config(
     config: &llmspell_config::HNSWConfig,
 ) -> llmspell_storage::vector_storage::HNSWConfig {
     llmspell_storage::vector_storage::HNSWConfig {
@@ -202,84 +202,76 @@ fn convert_hnsw_config(
     }
 }
 
-/// Create HNSW storage with real implementation
-#[cfg(feature = "hnsw-real")]
-async fn create_real_hnsw_storage(
-    config: &RAGConfig,
+/// Try to load existing HNSW storage from path
+async fn try_load_hnsw_from_path(
+    path: &std::path::Path,
+    dimensions: usize,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
-) -> Arc<dyn VectorStorage> {
+) -> Option<llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage> {
     use llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage;
 
-    debug!("Creating real HNSW vector storage for RAG");
+    if !path.exists() {
+        return None;
+    }
 
-    if let Some(ref path) = config.vector_storage.persistence_path {
-        debug!(
-            "Loading or creating real HNSW storage with persistence at: {:?}",
-            path
-        );
-
-        let mut storage = RealHNSWVectorStorage::new(config.vector_storage.dimensions, hnsw_config)
-            .with_persistence(path.clone());
-
-        if let Err(e) = storage.load().await {
-            warn!(
-                "Failed to load existing real HNSW index: {}, starting fresh",
-                e
-            );
+    match RealHNSWVectorStorage::from_path(path, dimensions, hnsw_config).await {
+        Ok(storage) => {
+            info!("Successfully loaded existing HNSW index from {:?}", path);
+            Some(storage)
         }
-
-        Arc::new(storage)
-    } else {
-        warn!("Real HNSW storage created without persistence - data will not survive restarts");
-        Arc::new(RealHNSWVectorStorage::new(
-            config.vector_storage.dimensions,
-            hnsw_config,
-        ))
+        Err(e) => {
+            warn!("Failed to load existing HNSW index: {}, starting fresh", e);
+            None
+        }
     }
 }
 
-/// Create HNSW storage with mock implementation
-#[cfg(not(feature = "hnsw-real"))]
-async fn create_mock_hnsw_storage(
+/// Create new HNSW storage with optional persistence
+fn create_new_hnsw_storage(
+    dimensions: usize,
+    hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
+    persistence_path: Option<&std::path::Path>,
+) -> llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage {
+    use llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage;
+
+    let storage = RealHNSWVectorStorage::new(dimensions, hnsw_config);
+
+    if let Some(path) = persistence_path {
+        storage.with_persistence(path.to_path_buf())
+    } else {
+        storage
+    }
+}
+
+/// Create HNSW storage with real implementation
+async fn create_hnsw_storage(
     config: &RAGConfig,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
-    context: &GlobalContext,
 ) -> Arc<dyn VectorStorage> {
+    debug!("Creating HNSW vector storage for RAG");
+
     if let Some(ref path) = config.vector_storage.persistence_path {
         debug!(
-            "Loading or creating mock HNSW storage with persistence at: {:?}",
+            "Loading or creating HNSW storage with persistence at: {:?}",
             path
         );
 
-        let storage = llmspell_storage::backends::vector::hnsw::HNSWVectorStorage::load(
-            path,
-            config.vector_storage.dimensions,
-            hnsw_config.clone(),
-        )
-        .await
-        .unwrap_or_else(|e| {
-            warn!(
-                "Failed to load existing mock HNSW index: {}, creating new",
-                e
-            );
-            llmspell_storage::backends::vector::hnsw::HNSWVectorStorage::new(
-                config.vector_storage.dimensions,
-                hnsw_config,
-            )
-            .with_persistence(path.clone())
-        });
+        // Try to load existing data first
+        if let Some(storage) =
+            try_load_hnsw_from_path(path, config.vector_storage.dimensions, hnsw_config.clone())
+                .await
+        {
+            return Arc::new(storage);
+        }
 
-        let storage_arc = Arc::new(storage);
-        context.set_bridge("hnsw_storage", storage_arc.clone());
-        storage_arc
+        // Create new storage with persistence
+        let storage =
+            create_new_hnsw_storage(config.vector_storage.dimensions, hnsw_config, Some(path));
+        Arc::new(storage)
     } else {
-        warn!("Mock HNSW storage created without persistence - data will not survive restarts");
-        Arc::new(
-            llmspell_storage::backends::vector::hnsw::HNSWVectorStorage::new(
-                config.vector_storage.dimensions,
-                hnsw_config,
-            ),
-        )
+        warn!("HNSW storage created without persistence - data will not survive restarts");
+        let storage = create_new_hnsw_storage(config.vector_storage.dimensions, hnsw_config, None);
+        Arc::new(storage)
     }
 }
 
@@ -291,24 +283,8 @@ async fn create_vector_storage(
     match config.vector_storage.backend {
         llmspell_config::VectorBackend::HNSW => {
             debug!("Creating HNSW vector storage for RAG");
-
             let hnsw_config = convert_hnsw_config(&config.vector_storage.hnsw);
-
-            #[cfg(feature = "hnsw-real")]
-            {
-                create_real_hnsw_storage(config, hnsw_config).await
-            }
-
-            #[cfg(not(feature = "hnsw-real"))]
-            {
-                create_mock_hnsw_storage(config, hnsw_config, _context).await
-            }
-        }
-        llmspell_config::VectorBackend::Mock => {
-            debug!("Creating mock vector storage for RAG (testing)");
-            // Use the existing MockVectorStorage from rag_bridge
-            let storage = crate::rag_bridge::MockVectorStorage::new();
-            Arc::new(storage)
+            create_hnsw_storage(config, hnsw_config).await
         }
     }
 }
@@ -392,7 +368,7 @@ mod tests {
         let config = RAGConfig::builder()
             .enabled(true)
             .dimensions(384)
-            .backend(llmspell_config::VectorBackend::Mock)
+            .backend(llmspell_config::VectorBackend::HNSW)
             .build();
 
         let infrastructure = get_or_create_rag_infrastructure(&context, &config)

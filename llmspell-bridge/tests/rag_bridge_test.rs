@@ -107,10 +107,16 @@ async fn test_rag_bridge_search_basic() {
     assert_eq!(ingest_response.documents_processed, 2);
 
     // Now search
-    let search_response = bridge
-        .search("fox jumps", Some(5), None, None, None, None, None)
-        .await
-        .unwrap();
+    let search_params = llmspell_bridge::rag_bridge::RAGSearchParams {
+        query: "fox jumps".to_string(),
+        k: Some(5),
+        scope: None,
+        scope_id: None,
+        filters: None,
+        threshold: None,
+        context: None,
+    };
+    let search_response = bridge.search(search_params).await.unwrap();
     assert!(!search_response.results.is_empty());
 }
 
@@ -165,18 +171,16 @@ async fn test_rag_bridge_search_with_filters() {
     let mut filters = HashMap::new();
     filters.insert("category".to_string(), serde_json::json!("science"));
 
-    let response = bridge
-        .search(
-            "quantum",
-            Some(5),
-            None,
-            None,
-            Some(filters),
-            Some(0.5),
-            None,
-        )
-        .await
-        .unwrap();
+    let search_params = llmspell_bridge::rag_bridge::RAGSearchParams {
+        query: "quantum".to_string(),
+        k: Some(5),
+        scope: None,
+        scope_id: None,
+        filters: Some(filters),
+        threshold: Some(0.5),
+        context: None,
+    };
+    let response = bridge.search(search_params).await.unwrap();
     assert!(!response.results.is_empty());
 }
 
@@ -208,18 +212,16 @@ async fn test_rag_bridge_cleanup_scope() {
     assert!(deleted > 0);
 
     // Verify documents are gone
-    let response = bridge
-        .search(
-            "cleanup",
-            Some(5),
-            Some("test".to_string()),
-            Some("test_cleanup".to_string()),
-            None,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+    let search_params = llmspell_bridge::rag_bridge::RAGSearchParams {
+        query: "cleanup".to_string(),
+        k: Some(5),
+        scope: Some("test".to_string()),
+        scope_id: Some("test_cleanup".to_string()),
+        filters: None,
+        threshold: None,
+        context: None,
+    };
+    let response = bridge.search(search_params).await.unwrap();
     assert_eq!(response.total, 0);
     assert!(response.results.is_empty());
 }
@@ -317,15 +319,15 @@ async fn test_rag_bridge_concurrent_operations() {
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
         bridge2
-            .search(
-                "concurrent",
-                Some(5),
-                Some("test".to_string()),
-                Some("test_concurrent".to_string()),
-                None,
-                None,
-                None,
-            )
+            .search(llmspell_bridge::rag_bridge::RAGSearchParams {
+                query: "concurrent".to_string(),
+                k: Some(5),
+                scope: Some("test".to_string()),
+                scope_id: Some("test_concurrent".to_string()),
+                filters: None,
+                threshold: None,
+                context: None,
+            })
             .await
     });
 
@@ -349,17 +351,15 @@ async fn test_rag_bridge_error_handling() {
     assert_eq!(response.documents_processed, 0);
 
     // Test search with invalid scope (should return empty)
-    let response = bridge
-        .search(
-            "test",
-            Some(5),
-            Some("nonexistent".to_string()),
-            Some("nonexistent".to_string()),
-            None,
-            None,
-            None,
-        )
-        .await
-        .unwrap();
+    let search_params = llmspell_bridge::rag_bridge::RAGSearchParams {
+        query: "test".to_string(),
+        k: Some(5),
+        scope: Some("nonexistent".to_string()),
+        scope_id: Some("nonexistent".to_string()),
+        filters: None,
+        threshold: None,
+        context: None,
+    };
+    let response = bridge.search(search_params).await.unwrap();
     assert_eq!(response.total, 0);
 }

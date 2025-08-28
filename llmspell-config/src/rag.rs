@@ -58,8 +58,6 @@ impl Default for VectorStorageConfig {
 pub enum VectorBackend {
     /// HNSW (Hierarchical Navigable Small World) index
     HNSW,
-    /// Mock storage for testing
-    Mock,
 }
 
 /// HNSW index configuration

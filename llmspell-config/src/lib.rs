@@ -551,7 +551,6 @@ impl LLMSpellConfig {
                     );
                     self.rag.vector_storage.backend = match backend {
                         "hnsw" => crate::rag::VectorBackend::HNSW,
-                        "mock" => crate::rag::VectorBackend::Mock,
                         _ => {
                             debug!("Unknown vector backend '{}', defaulting to HNSW", backend);
                             crate::rag::VectorBackend::HNSW

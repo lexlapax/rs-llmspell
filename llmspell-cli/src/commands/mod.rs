@@ -55,8 +55,7 @@ impl RagOptions {
         if let Some(backend) = &self.rag_backend {
             config.rag.vector_storage.backend = match backend.to_lowercase().as_str() {
                 "hnsw" => llmspell_config::VectorBackend::HNSW,
-                "mock" => llmspell_config::VectorBackend::Mock,
-                _ => anyhow::bail!("Unknown RAG backend: {}. Available: hnsw, mock", backend),
+                _ => anyhow::bail!("Unknown RAG backend: {}. Only 'hnsw' is available", backend),
             };
         }
 

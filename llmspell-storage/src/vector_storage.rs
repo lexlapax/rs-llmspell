@@ -45,6 +45,18 @@ pub trait VectorStorage: Send + Sync {
 
     /// Get tenant-specific statistics
     async fn stats_for_scope(&self, scope: &StateScope) -> Result<ScopedStats>;
+
+    /// Save vectors to persistent storage (if supported)
+    async fn save(&self) -> Result<()> {
+        // Default implementation for storages that don't support persistence
+        Ok(())
+    }
+
+    /// Load vectors from persistent storage (if supported)
+    async fn load(&self) -> Result<()> {
+        // Default implementation for storages that don't support persistence
+        Ok(())
+    }
 }
 
 /// Multi-tenant aware vector entry
