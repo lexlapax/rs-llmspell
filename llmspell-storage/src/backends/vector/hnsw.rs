@@ -72,7 +72,11 @@ impl HnswContainer {
     /// Build HNSW index from stored vectors with parallel insertion
     fn build_index(&self, metric: DistanceMetric) -> HnswIndex {
         let max_elements = self.vectors.len().max(1000);
-        let nb_layers = 16.min((max_elements as f32).ln() as usize).max(1);
+        // Use configured nb_layers or calculate based on max_elements
+        let nb_layers = self
+            .config
+            .nb_layers
+            .unwrap_or_else(|| 16.min((max_elements as f32).ln() as usize).max(1));
 
         // Prepare vectors for parallel insertion
         let vector_refs: Vec<(&Vec<f32>, usize)> = self
@@ -973,7 +977,11 @@ mod tests {
         let dimensions = 3;
         let vec1 = vec![1.0, 0.0, 0.0];
         let vec2 = vec![0.0, 1.0, 0.0];
-        let vec3 = vec![0.7071, 0.7071, 0.0]; // 45 degrees between vec1 and vec2
+        let vec3 = vec![
+            std::f32::consts::FRAC_1_SQRT_2,
+            std::f32::consts::FRAC_1_SQRT_2,
+            0.0,
+        ]; // 45 degrees between vec1 and vec2
 
         // Test Cosine distance (default)
         {
@@ -984,9 +992,12 @@ mod tests {
             let storage = HNSWVectorStorage::new(dimensions, config);
             storage
                 .insert(vec![
-                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
-                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
-                    VectorEntry::new("vec3".to_string(), vec3.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec1".to_string(), vec1.clone())
+                        .with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone())
+                        .with_scope(StateScope::Global),
+                    VectorEntry::new("vec3".to_string(), vec3.clone())
+                        .with_scope(StateScope::Global),
                 ])
                 .await
                 .unwrap();
@@ -1006,9 +1017,12 @@ mod tests {
             let storage = HNSWVectorStorage::new(dimensions, config);
             storage
                 .insert(vec![
-                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
-                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
-                    VectorEntry::new("vec3".to_string(), vec3.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec1".to_string(), vec1.clone())
+                        .with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone())
+                        .with_scope(StateScope::Global),
+                    VectorEntry::new("vec3".to_string(), vec3.clone())
+                        .with_scope(StateScope::Global),
                 ])
                 .await
                 .unwrap();
@@ -1028,8 +1042,10 @@ mod tests {
             let storage = HNSWVectorStorage::new(dimensions, config);
             storage
                 .insert(vec![
-                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
-                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec1".to_string(), vec1.clone())
+                        .with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone())
+                        .with_scope(StateScope::Global),
                 ])
                 .await
                 .unwrap();
@@ -1049,8 +1065,10 @@ mod tests {
             let storage = HNSWVectorStorage::new(dimensions, config);
             storage
                 .insert(vec![
-                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
-                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec1".to_string(), vec1.clone())
+                        .with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone())
+                        .with_scope(StateScope::Global),
                 ])
                 .await
                 .unwrap();

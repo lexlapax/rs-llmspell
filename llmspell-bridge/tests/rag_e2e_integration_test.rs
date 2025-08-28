@@ -32,6 +32,10 @@ fn create_test_rag_config(_backend: &str, multi_tenant: bool) -> RAGConfig {
                 allow_replace_deleted: true,
                 num_threads: Some(2),
                 seed: None,
+                nb_layers: None,
+                parallel_batch_size: Some(32),
+                enable_mmap: false,
+                mmap_sync_interval: Some(60),
             },
         },
         embedding: EmbeddingConfig {

@@ -199,6 +199,10 @@ const fn convert_hnsw_config(
         metric: convert_distance_metric(&config.metric),
         allow_replace_deleted: config.allow_replace_deleted,
         num_threads: config.num_threads,
+        nb_layers: config.nb_layers,
+        parallel_batch_size: config.parallel_batch_size,
+        enable_mmap: config.enable_mmap,
+        mmap_sync_interval: config.mmap_sync_interval,
     }
 }
 

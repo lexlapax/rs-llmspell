@@ -303,6 +303,18 @@ pub struct HNSWConfig {
 
     /// Number of threads to use for index operations
     pub num_threads: Option<usize>,
+
+    /// Number of hierarchical layers in the graph (auto-calculated if None)
+    pub nb_layers: Option<usize>,
+
+    /// Batch size for parallel insertion operations
+    pub parallel_batch_size: Option<usize>,
+
+    /// Enable memory-mapped storage for large datasets (future feature)
+    pub enable_mmap: bool,
+
+    /// Memory map sync interval in seconds (if mmap enabled)
+    pub mmap_sync_interval: Option<u64>,
 }
 
 impl Default for HNSWConfig {
@@ -316,6 +328,10 @@ impl Default for HNSWConfig {
             metric: DistanceMetric::Cosine,
             allow_replace_deleted: true,
             num_threads: None,
+            nb_layers: None,
+            parallel_batch_size: Some(128),
+            enable_mmap: false,
+            mmap_sync_interval: Some(60),
         }
     }
 }

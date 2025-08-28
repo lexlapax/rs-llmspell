@@ -80,6 +80,15 @@ pub struct HNSWConfig {
     pub allow_replace_deleted: bool,
     /// Number of threads for parallel operations
     pub num_threads: Option<usize>,
+    /// Number of hierarchical layers in the graph (auto-calculated if None)
+    /// Formula: min(16, max(1, ln(max_elements)))
+    pub nb_layers: Option<usize>,
+    /// Batch size for parallel insertion operations
+    pub parallel_batch_size: Option<usize>,
+    /// Enable memory-mapped storage for large datasets (future feature)
+    pub enable_mmap: bool,
+    /// Memory map sync interval in seconds (if mmap enabled)
+    pub mmap_sync_interval: Option<u64>,
 }
 
 impl Default for HNSWConfig {
@@ -92,7 +101,129 @@ impl Default for HNSWConfig {
             seed: None,
             metric: DistanceMetric::Cosine,
             allow_replace_deleted: true,
-            num_threads: None, // Use system default
+            num_threads: None,              // Use system default
+            nb_layers: None,                // Auto-calculate based on max_elements
+            parallel_batch_size: Some(128), // Default batch size for parallel ops
+            enable_mmap: false,             // Disabled by default
+            mmap_sync_interval: Some(60),   // Sync every minute if enabled
+        }
+    }
+}
+
+impl HNSWConfig {
+    /// Validates the configuration parameters
+    pub fn validate(&self) -> Result<(), String> {
+        // M should be between 2 and 100
+        if self.m < 2 || self.m > 100 {
+            return Err(format!("m must be between 2 and 100, got {}", self.m));
+        }
+
+        // ef_construction should be at least m
+        if self.ef_construction < self.m {
+            return Err(format!(
+                "ef_construction ({}) should be at least m ({})",
+                self.ef_construction, self.m
+            ));
+        }
+
+        // ef_search should be at least k (but we don't know k here, so check minimum)
+        if self.ef_search < 1 {
+            return Err("ef_search must be at least 1".to_string());
+        }
+
+        // max_elements should be reasonable
+        if self.max_elements == 0 {
+            return Err("max_elements must be greater than 0".to_string());
+        }
+
+        // nb_layers validation (if specified)
+        if let Some(layers) = self.nb_layers {
+            if layers == 0 || layers > 64 {
+                return Err(format!(
+                    "nb_layers must be between 1 and 64, got {}",
+                    layers
+                ));
+            }
+        }
+
+        // parallel_batch_size validation
+        if let Some(batch_size) = self.parallel_batch_size {
+            if batch_size == 0 {
+                return Err("parallel_batch_size must be greater than 0".to_string());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Configuration for small datasets (<10K vectors)
+    pub fn small_dataset() -> Self {
+        Self {
+            m: 12,
+            ef_construction: 100,
+            ef_search: 50,
+            max_elements: 10_000,
+            parallel_batch_size: Some(32),
+            ..Default::default()
+        }
+    }
+
+    /// Configuration for medium datasets (10K-100K vectors)
+    pub fn medium_dataset() -> Self {
+        Self {
+            m: 16,
+            ef_construction: 200,
+            ef_search: 100,
+            max_elements: 100_000,
+            parallel_batch_size: Some(64),
+            ..Default::default()
+        }
+    }
+
+    /// Configuration for large datasets (100K-1M vectors)
+    pub fn large_dataset() -> Self {
+        Self {
+            m: 32,
+            ef_construction: 400,
+            ef_search: 200,
+            max_elements: 1_000_000,
+            parallel_batch_size: Some(128),
+            num_threads: Some(4),
+            ..Default::default()
+        }
+    }
+
+    /// Configuration optimized for speed over accuracy
+    pub fn speed_optimized() -> Self {
+        Self {
+            m: 8,
+            ef_construction: 50,
+            ef_search: 25,
+            parallel_batch_size: Some(256),
+            ..Default::default()
+        }
+    }
+
+    /// Configuration optimized for accuracy over speed
+    pub fn accuracy_optimized() -> Self {
+        Self {
+            m: 48,
+            ef_construction: 500,
+            ef_search: 300,
+            parallel_batch_size: Some(32),
+            ..Default::default()
+        }
+    }
+
+    /// Configuration for real-time applications (low latency)
+    pub fn real_time() -> Self {
+        Self {
+            m: 12,
+            ef_construction: 100,
+            ef_search: 40,
+            parallel_batch_size: Some(64),
+            num_threads: Some(2),
+            ..Default::default()
         }
     }
 }

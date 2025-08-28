@@ -1774,23 +1774,31 @@ Refactor RAG bridge to match Agent/Tool bridge patterns:
 - All concurrent operations properly synchronized through Arc<DashMap> and async locks
 - Multi-tenant isolation verified through namespace separation in HNSW storage
 
-### Task 8.9.5: Configuration
+### Task 8.9.5: Configuration ✅
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
-**Status**: [ ] Not Started  
+**Actual Time**: 1 hour
+**Status**: ✅ COMPLETED
 
 **Description**: Update configuration structures to support hnsw_rs-specific parameters.
 
 **Acceptance Criteria**:
-- [ ] Add hnsw_rs-specific config options to `llmspell-config/src/rag.rs`:
-  - [ ] Graph layers configuration (nb_layers)
-  - [ ] Search width (ef) parameter  
-  - [ ] Memory mapping options for large datasets
-  - [ ] Batch insertion parameters
-  - [ ] Parallel insertion thread count
-- [ ] Add config validation for hnsw_rs parameters
-- [ ] Document recommended settings for different use cases
-- [ ] Add performance tuning guide in configuration docs
+- [x] Add hnsw_rs-specific config options to `llmspell-config/src/rag.rs`:
+  - [x] Graph layers configuration (nb_layers)
+  - [x] Search width (ef) parameter (already existed as ef_search)
+  - [x] Memory mapping options for large datasets (added enable_mmap, mmap_sync_interval)
+  - [x] Batch insertion parameters (added parallel_batch_size)
+  - [x] Parallel insertion thread count (already existed as num_threads)
+- [x] Add config validation for hnsw_rs parameters (validate() method added)
+- [x] Document recommended settings for different use cases (6 presets added)
+- [x] Add performance tuning guide in configuration docs (created hnsw-performance-tuning.md)
+
+**Implementation Summary**:
+- Extended HNSWConfig in both `llmspell-config` and `llmspell-storage` with new fields
+- Added validation method to ensure parameter constraints (m range, ef_construction >= m, etc.)
+- Created 6 preset configurations: small_dataset, medium_dataset, large_dataset, speed_optimized, accuracy_optimized, real_time
+- Documented comprehensive performance tuning guide with benchmarks and recommendations
+- Updated HNSW implementation to use nb_layers from config when specified
 
 ### Task 8.9.6: Final Integration and Validation
 **Priority**: HIGH  

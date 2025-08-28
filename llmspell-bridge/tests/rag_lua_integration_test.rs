@@ -54,6 +54,10 @@ mod rag_lua_tests {
             metric: llmspell_storage::vector_storage::DistanceMetric::Cosine,
             allow_replace_deleted: true,
             num_threads: None,
+            nb_layers: None,
+            parallel_batch_size: Some(128),
+            enable_mmap: false,
+            mmap_sync_interval: Some(60),
         };
         let vector_storage = Arc::new(HNSWVectorStorage::new(384, hnsw_config));
         let tenant_manager = Arc::new(MultiTenantVectorManager::new(vector_storage.clone()));
