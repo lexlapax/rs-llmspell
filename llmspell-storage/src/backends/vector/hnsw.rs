@@ -848,29 +848,33 @@ mod tests {
         let storage = HNSWVectorStorage::new(128, HNSWConfig::default());
 
         // Insert a large batch of vectors to trigger parallel insertion
+        // Use denser vectors for better HNSW performance
         let mut vectors = Vec::new();
         for i in 0..100 {
-            let mut vec = vec![0.0; 128];
+            let mut vec = vec![0.1; 128];
+            // Create distinctive patterns for each vector
             vec[i % 128] = 1.0;
+            vec[(i + 1) % 128] = 0.8;
+            vec[(i + 2) % 128] = 0.6;
             vectors.push(VectorEntry::new(format!("vec{}", i), vec).with_scope(StateScope::Global));
         }
 
-        let ids = storage.insert(vectors).await.unwrap();
+        let ids = storage.insert(vectors.clone()).await.unwrap();
         assert_eq!(ids.len(), 100);
 
         // Verify we can search and find vectors
-        let mut query_vec = vec![0.0; 128];
-        query_vec[5] = 1.0;
-        // Search for more results since HNSW is approximate and sparse vectors reduce accuracy
-        let query = VectorQuery::new(query_vec, 20);
+        // Use the exact vector pattern for vec5
+        let query_vec = vectors[5].embedding.clone();
+        // Search for more results to ensure we find our target
+        let query = VectorQuery::new(query_vec, 50);
         let results = storage.search(&query).await.unwrap();
 
         assert!(!results.is_empty());
-        // The exact match should be among the results (HNSW is approximate, especially with sparse vectors)
-        let found_vec5 = results.iter().any(|r| r.id == "vec5");
+        // The exact match should be among the top results
+        let found_vec5 = results.iter().take(10).any(|r| r.id == "vec5");
         assert!(
             found_vec5,
-            "vec5 not found in search results. First 10: {:?}",
+            "vec5 not found in top 10 search results. First 10: {:?}",
             results.iter().take(10).map(|r| &r.id).collect::<Vec<_>>()
         );
     }
@@ -880,22 +884,27 @@ mod tests {
         // Test that incremental insertion via parallel_insert works
         let storage = HNSWVectorStorage::new(64, HNSWConfig::default());
 
-        // First batch
+        // First batch - use denser vectors
         let batch1: Vec<VectorEntry> = (0..50)
             .map(|i| {
-                let mut vec = vec![0.0; 64];
+                let mut vec = vec![0.2; 64];
                 vec[i % 64] = 1.0;
+                vec[(i + 1) % 64] = 0.8;
+                vec[(i + 2) % 64] = 0.6;
                 VectorEntry::new(format!("batch1_{}", i), vec).with_scope(StateScope::Global)
             })
             .collect();
 
+        let batch1_clone = batch1.clone();
         storage.insert(batch1).await.unwrap();
 
         // Second batch - should use parallel_insert on existing index
         let batch2: Vec<VectorEntry> = (0..50)
             .map(|i| {
-                let mut vec = vec![0.0; 64];
+                let mut vec = vec![0.2; 64];
                 vec[(i + 32) % 64] = 1.0;
+                vec[(i + 33) % 64] = 0.8;
+                vec[(i + 34) % 64] = 0.6;
                 VectorEntry::new(format!("batch2_{}", i), vec).with_scope(StateScope::Global)
             })
             .collect();
@@ -903,18 +912,18 @@ mod tests {
         storage.insert(batch2).await.unwrap();
 
         // Verify both batches are searchable
-        let mut query_vec = vec![0.0; 64];
-        query_vec[10] = 1.0;
-        // Search for more results since HNSW is approximate and sparse vectors reduce accuracy
-        let query = VectorQuery::new(query_vec, 15);
+        // Use the exact vector from batch1_10
+        let query_vec = batch1_clone[10].embedding.clone();
+        // Search for more results to ensure we find our target
+        let query = VectorQuery::new(query_vec, 30);
         let results = storage.search(&query).await.unwrap();
 
         assert!(!results.is_empty());
-        // The exact match should be among the results (HNSW is approximate, especially with sparse vectors)
-        let found_batch1_10 = results.iter().any(|r| r.id == "batch1_10");
+        // The exact match should be among the top results
+        let found_batch1_10 = results.iter().take(10).any(|r| r.id == "batch1_10");
         assert!(
             found_batch1_10,
-            "batch1_10 not found in search results. First 10: {:?}",
+            "batch1_10 not found in top 10 search results. First 10: {:?}",
             results.iter().take(10).map(|r| &r.id).collect::<Vec<_>>()
         );
     }
@@ -955,6 +964,102 @@ mod tests {
 
             assert_eq!(results.len(), 1);
             assert_eq!(results[0].id, "persist1");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_distance_metrics() {
+        // Test all four distance metrics
+        let dimensions = 3;
+        let vec1 = vec![1.0, 0.0, 0.0];
+        let vec2 = vec![0.0, 1.0, 0.0];
+        let vec3 = vec![0.7071, 0.7071, 0.0]; // 45 degrees between vec1 and vec2
+
+        // Test Cosine distance (default)
+        {
+            let config = HNSWConfig {
+                metric: DistanceMetric::Cosine,
+                ..Default::default()
+            };
+            let storage = HNSWVectorStorage::new(dimensions, config);
+            storage
+                .insert(vec![
+                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec3".to_string(), vec3.clone()).with_scope(StateScope::Global),
+                ])
+                .await
+                .unwrap();
+
+            let query = VectorQuery::new(vec3.clone(), 2);
+            let results = storage.search(&query).await.unwrap();
+            assert_eq!(results.len(), 2);
+            // vec3 should be closest to itself, then roughly equidistant from vec1 and vec2
+        }
+
+        // Test Euclidean distance
+        {
+            let config = HNSWConfig {
+                metric: DistanceMetric::Euclidean,
+                ..Default::default()
+            };
+            let storage = HNSWVectorStorage::new(dimensions, config);
+            storage
+                .insert(vec![
+                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec3".to_string(), vec3.clone()).with_scope(StateScope::Global),
+                ])
+                .await
+                .unwrap();
+
+            let query = VectorQuery::new(vec1.clone(), 3);
+            let results = storage.search(&query).await.unwrap();
+            assert_eq!(results.len(), 3);
+            assert_eq!(results[0].id, "vec1"); // Exact match should be first
+        }
+
+        // Test Manhattan distance
+        {
+            let config = HNSWConfig {
+                metric: DistanceMetric::Manhattan,
+                ..Default::default()
+            };
+            let storage = HNSWVectorStorage::new(dimensions, config);
+            storage
+                .insert(vec![
+                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
+                ])
+                .await
+                .unwrap();
+
+            let query = VectorQuery::new(vec![0.5, 0.5, 0.0], 2);
+            let results = storage.search(&query).await.unwrap();
+            assert_eq!(results.len(), 2);
+            // Both should be equidistant in Manhattan metric (distance = 1.0)
+        }
+
+        // Test InnerProduct distance
+        {
+            let config = HNSWConfig {
+                metric: DistanceMetric::InnerProduct,
+                ..Default::default()
+            };
+            let storage = HNSWVectorStorage::new(dimensions, config);
+            storage
+                .insert(vec![
+                    VectorEntry::new("vec1".to_string(), vec1.clone()).with_scope(StateScope::Global),
+                    VectorEntry::new("vec2".to_string(), vec2.clone()).with_scope(StateScope::Global),
+                ])
+                .await
+                .unwrap();
+
+            // Query with vec1 should return vec1 first (inner product = 1.0)
+            let query = VectorQuery::new(vec1.clone(), 2);
+            let results = storage.search(&query).await.unwrap();
+            assert_eq!(results.len(), 2);
+            assert_eq!(results[0].id, "vec1");
         }
     }
 }
