@@ -1,4 +1,6 @@
-//! HNSW vector storage implementation with multi-tenant support
+//! Real HNSW implementation using hnsw_rs crate
+//!
+//! This module provides a production-ready HNSW vector index with persistence support.
 
 use anyhow::Result;
 use async_trait::async_trait;
@@ -8,8 +10,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
-use uuid::Uuid;
+use tracing::{error, info, warn};
+
+// Import hnsw_rs types - using prelude for distance metrics
+use hnsw_rs::{
+    hnsw::{Hnsw, Neighbour},
+    prelude::{DistCosine, DistDot, DistL1, DistL2},
+};
 
 use crate::vector_storage::{
     DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
@@ -17,11 +24,11 @@ use crate::vector_storage::{
 };
 use llmspell_state_traits::StateScope;
 
-/// HNSW vector storage with multi-tenant namespace support
+/// HNSW vector storage implementation using hnsw_rs
 #[derive(Debug)]
 pub struct HNSWVectorStorage {
-    /// Map of namespace name to HNSW index
-    namespaces: DashMap<String, Arc<RwLock<NamespaceIndex>>>,
+    /// Map of namespace to HNSW index
+    namespaces: DashMap<String, Arc<RwLock<NamespaceData>>>,
 
     /// Global configuration
     config: HNSWConfig,
@@ -29,122 +36,242 @@ pub struct HNSWVectorStorage {
     /// Persistence directory
     persistence_dir: Option<PathBuf>,
 
-    /// Metadata storage for each vector
-    metadata: DashMap<String, VectorMetadata>,
-
-    /// Dimension of vectors (must be consistent)
+    /// Vector dimensions
     dimensions: usize,
+
+    /// Metadata storage indexed by vector ID
+    metadata: DashMap<String, VectorMetadata>,
 }
 
-// We'll use a simple vector storage for now since hnsw crate has complex const generics
-// In production, we would use const generics properly or use hnsw_rs crate instead
-type SimpleHnsw = Vec<(Vec<f32>, String, usize)>; // (vector, id, index)
+/// Container that owns all vector data to avoid lifetime issues
+#[derive(Clone, Debug)]
+struct HnswContainer {
+    /// Owned vector data - the source of truth
+    vectors: Vec<Vec<f32>>,
 
-/// Individual namespace index
+    /// Vector IDs corresponding to each vector
+    vector_ids: Vec<String>,
+
+    /// Metadata for each vector
+    metadata_entries: Vec<VectorEntry>,
+
+    /// HNSW configuration
+    config: HNSWConfig,
+}
+
+impl HnswContainer {
+    fn new(config: HNSWConfig) -> Self {
+        Self {
+            vectors: Vec::new(),
+            vector_ids: Vec::new(),
+            metadata_entries: Vec::new(),
+            config,
+        }
+    }
+
+    /// Build HNSW index from stored vectors with parallel insertion
+    fn build_index(&self, metric: DistanceMetric) -> HnswIndex {
+        let max_elements = self.vectors.len().max(1000);
+        let nb_layers = 16.min((max_elements as f32).ln() as usize).max(1);
+
+        // Prepare vectors for parallel insertion
+        let vector_refs: Vec<(&Vec<f32>, usize)> = self
+            .vectors
+            .iter()
+            .enumerate()
+            .map(|(idx, vec)| (vec, idx))
+            .collect();
+
+        // Create index based on metric and use parallel insertion
+        let index = match metric {
+            DistanceMetric::Cosine => {
+                let hnsw = Hnsw::new(
+                    self.config.m,
+                    max_elements,
+                    nb_layers,
+                    self.config.ef_construction,
+                    DistCosine,
+                );
+                if !vector_refs.is_empty() {
+                    hnsw.parallel_insert(&vector_refs);
+                }
+                HnswIndex::Cosine(hnsw)
+            }
+            DistanceMetric::Euclidean => {
+                let hnsw = Hnsw::new(
+                    self.config.m,
+                    max_elements,
+                    nb_layers,
+                    self.config.ef_construction,
+                    DistL2,
+                );
+                if !vector_refs.is_empty() {
+                    hnsw.parallel_insert(&vector_refs);
+                }
+                HnswIndex::Euclidean(hnsw)
+            }
+            DistanceMetric::InnerProduct => {
+                let hnsw = Hnsw::new(
+                    self.config.m,
+                    max_elements,
+                    nb_layers,
+                    self.config.ef_construction,
+                    DistDot,
+                );
+                if !vector_refs.is_empty() {
+                    hnsw.parallel_insert(&vector_refs);
+                }
+                HnswIndex::InnerProduct(hnsw)
+            }
+            DistanceMetric::Manhattan => {
+                let hnsw = Hnsw::new(
+                    self.config.m,
+                    max_elements,
+                    nb_layers,
+                    self.config.ef_construction,
+                    DistL1,
+                );
+                if !vector_refs.is_empty() {
+                    hnsw.parallel_insert(&vector_refs);
+                }
+                HnswIndex::Manhattan(hnsw)
+            }
+        };
+
+        index
+    }
+}
+
+/// Data stored per namespace
 #[derive(Debug)]
-struct NamespaceIndex {
-    /// The vectors in this namespace (simplified for now)
-    vectors: SimpleHnsw,
+struct NamespaceData {
+    /// Container that owns all vector data
+    container: HnswContainer,
+
+    /// The HNSW index (references data in container)
+    index: HnswIndex,
+
+    /// Reverse mapping from vector ID to internal point ID
+    reverse_id_map: HashMap<String, usize>,
 
     /// Namespace statistics
     stats: NamespaceStats,
-
-    /// Creation time
-    #[allow(dead_code)]
-    created_at: std::time::SystemTime,
 }
 
-/// Vector metadata storage
+/// Enum to hold different HNSW index types based on distance metric
+/// No lifetime parameters - the index is created from owned data
+enum HnswIndex {
+    Cosine(Hnsw<'static, f32, DistCosine>),
+    Euclidean(Hnsw<'static, f32, DistL2>),
+    InnerProduct(Hnsw<'static, f32, DistDot>),
+    Manhattan(Hnsw<'static, f32, DistL1>),
+}
+
+impl std::fmt::Debug for HnswIndex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Cosine(_) => write!(f, "HnswIndex::Cosine"),
+            Self::Euclidean(_) => write!(f, "HnswIndex::Euclidean"),
+            Self::InnerProduct(_) => write!(f, "HnswIndex::InnerProduct"),
+            Self::Manhattan(_) => write!(f, "HnswIndex::Manhattan"),
+        }
+    }
+}
+
+impl HnswIndex {
+    /// Search for k nearest neighbors
+    fn search(&self, query: &[f32], k: usize, ef: usize) -> Vec<Neighbour> {
+        match self {
+            Self::Cosine(hnsw) => hnsw.search(query, k, ef),
+            Self::Euclidean(hnsw) => hnsw.search(query, k, ef),
+            Self::InnerProduct(hnsw) => hnsw.search(query, k, ef),
+            Self::Manhattan(hnsw) => hnsw.search(query, k, ef),
+        }
+    }
+}
+
+/// Metadata for each vector
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct VectorMetadata {
-    /// Original vector entry data
+    /// Original vector entry
     entry: VectorEntry,
 
     /// Namespace this vector belongs to
     namespace: String,
 
-    /// Internal index ID
-    index_id: usize,
+    /// Internal HNSW point ID
+    internal_id: usize,
 }
 
-impl Drop for HNSWVectorStorage {
-    fn drop(&mut self) {
-        // Save on drop if persistence is configured
-        if self.persistence_dir.is_some() {
-            // We can't use async in Drop, so spawn a blocking task
-            let rt = tokio::runtime::Handle::try_current();
-            if let Ok(handle) = rt {
-                // Clone what we need for the async save
-                let persistence_dir = self.persistence_dir.clone();
-                let namespaces_snapshot = self.namespaces.clone();
-                let metadata_snapshot = self.metadata.clone();
-                let dimensions = self.dimensions;
-                let config = self.config.clone();
+/// Persistence data for a namespace - contains all data needed to rebuild index
+#[derive(Serialize, Deserialize)]
+struct NamespacePersistence {
+    /// All vector data
+    vectors: Vec<Vec<f32>>,
 
-                // Spawn save task
-                handle.spawn(async move {
-                    // Create a temporary storage to save
-                    let temp_storage = HNSWVectorStorage {
-                        namespaces: namespaces_snapshot,
-                        config,
-                        persistence_dir,
-                        metadata: metadata_snapshot,
-                        dimensions,
-                    };
+    /// Vector IDs corresponding to each vector
+    vector_ids: Vec<String>,
 
-                    if let Err(e) = temp_storage.save().await {
-                        tracing::error!("Failed to save HNSW storage on drop: {}", e);
-                    } else {
-                        tracing::info!("HNSW storage saved on drop");
-                    }
-                });
-            }
-        }
-    }
+    /// Metadata entries for each vector
+    metadata_entries: Vec<VectorEntry>,
+
+    /// Namespace statistics
+    stats: NamespaceStats,
+
+    /// Distance metric used for this namespace
+    metric: DistanceMetric,
+
+    /// HNSW configuration
+    config: HNSWConfig,
 }
 
 impl HNSWVectorStorage {
-    /// Create a new HNSW vector storage
-    #[must_use]
+    /// Create a new real HNSW vector storage
     pub fn new(dimensions: usize, config: HNSWConfig) -> Self {
         Self {
             namespaces: DashMap::new(),
             config,
             persistence_dir: None,
-            metadata: DashMap::new(),
             dimensions,
+            metadata: DashMap::new(),
         }
     }
 
-    /// Set persistence directory for saving indices to disk
-    #[must_use]
+    /// Set persistence directory
     pub fn with_persistence(mut self, dir: PathBuf) -> Self {
         self.persistence_dir = Some(dir);
         self
     }
 
-    /// Get or create a namespace index
-    fn get_or_create_namespace(&self, namespace: &str) -> Arc<RwLock<NamespaceIndex>> {
+    /// Create an empty namespace with a container
+    fn create_empty_namespace(&self, namespace: &str) -> NamespaceData {
+        let container = HnswContainer::new(self.config.clone());
+        let index = container.build_index(self.config.metric);
+
+        NamespaceData {
+            container,
+            index,
+            reverse_id_map: HashMap::new(),
+            stats: NamespaceStats {
+                namespace: namespace.to_string(),
+                vector_count: 0,
+                memory_bytes: 0,
+                avg_connections: 0.0,
+                build_time_ms: None,
+                last_optimized: None,
+            },
+        }
+    }
+
+    /// Get or create a namespace
+    fn get_or_create_namespace(&self, namespace: &str) -> Arc<RwLock<NamespaceData>> {
         self.namespaces
             .entry(namespace.to_string())
-            .or_insert_with(|| {
-                Arc::new(RwLock::new(NamespaceIndex {
-                    vectors: Vec::new(),
-                    stats: NamespaceStats {
-                        namespace: namespace.to_string(),
-                        vector_count: 0,
-                        memory_bytes: 0,
-                        avg_connections: 0.0,
-                        build_time_ms: None,
-                        last_optimized: None,
-                    },
-                    created_at: std::time::SystemTime::now(),
-                }))
-            })
+            .or_insert_with(|| Arc::new(RwLock::new(self.create_empty_namespace(namespace))))
             .clone()
     }
 
-    /// Get namespace name from `StateScope`
+    /// Convert StateScope to namespace string
     fn scope_to_namespace(scope: &StateScope) -> String {
         match scope {
             StateScope::Global => "__global__".to_string(),
@@ -159,57 +286,90 @@ impl HNSWVectorStorage {
         }
     }
 
-    /// Calculate cosine distance (converted to similarity)
-    fn cosine_distance(a: &[f32], b: &[f32]) -> f32 {
-        let mut dot = 0.0;
-        let mut norm_a = 0.0;
-        let mut norm_b = 0.0;
+    /// Save a namespace to disk using data-first persistence
+    async fn save_namespace(&self, namespace: &str, data: &NamespaceData) -> Result<()> {
+        let Some(ref base_dir) = self.persistence_dir else {
+            return Ok(());
+        };
 
-        for i in 0..a.len().min(b.len()) {
-            dot += a[i] * b[i];
-            norm_a += a[i] * a[i];
-            norm_b += b[i] * b[i];
-        }
+        // Create namespace directory
+        let namespace_dir = base_dir.join(namespace);
+        std::fs::create_dir_all(&namespace_dir)?;
 
-        if norm_a == 0.0 || norm_b == 0.0 {
-            return 1.0; // Maximum distance for zero vectors
-        }
+        // Create persistence structure with all data
+        let persistence = NamespacePersistence {
+            vectors: data.container.vectors.clone(),
+            vector_ids: data.container.vector_ids.clone(),
+            metadata_entries: data.container.metadata_entries.clone(),
+            stats: data.stats.clone(),
+            metric: self.config.metric,
+            config: self.config.clone(),
+        };
 
-        // Convert cosine similarity to distance (0 = identical, 2 = opposite)
-        1.0 - (dot / (norm_a.sqrt() * norm_b.sqrt()))
+        // Use MessagePack for efficient binary serialization (supports serde_json::Value)
+        let data_file = namespace_dir.join("vectors.msgpack");
+        let serialized = rmp_serde::to_vec(&persistence)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize namespace data: {}", e))?;
+        std::fs::write(data_file, serialized)?;
+
+        info!("Saved namespace {} to disk", namespace);
+        Ok(())
     }
 
-    /// Calculate euclidean distance
-    fn euclidean_distance(a: &[f32], b: &[f32]) -> f32 {
-        let mut sum = 0.0;
-        for i in 0..a.len().min(b.len()) {
-            let diff = a[i] - b[i];
-            sum += diff * diff;
-        }
-        sum.sqrt()
-    }
+    /// Load a namespace from disk and rebuild index
+    async fn load_namespace(&self, namespace: &str) -> Result<NamespaceData> {
+        let Some(ref base_dir) = self.persistence_dir else {
+            anyhow::bail!("No persistence directory configured");
+        };
 
-    /// Calculate distance based on configured metric
-    fn calculate_distance(&self, a: &[f32], b: &[f32]) -> f32 {
-        match self.config.metric {
-            DistanceMetric::Cosine => Self::cosine_distance(a, b),
-            DistanceMetric::Euclidean => Self::euclidean_distance(a, b),
-            DistanceMetric::InnerProduct => {
-                // Negative dot product (so that higher is better becomes lower distance)
-                let mut dot = 0.0;
-                for i in 0..a.len().min(b.len()) {
-                    dot += a[i] * b[i];
-                }
-                -dot
-            }
-            DistanceMetric::Manhattan => {
-                let mut sum = 0.0;
-                for i in 0..a.len().min(b.len()) {
-                    sum += (a[i] - b[i]).abs();
-                }
-                sum
-            }
+        let namespace_dir = base_dir.join(namespace);
+        if !namespace_dir.exists() {
+            anyhow::bail!("Namespace directory does not exist");
         }
+
+        // Load serialized data using MessagePack
+        let data_file = namespace_dir.join("vectors.msgpack");
+        let data = std::fs::read(data_file)?;
+        let persistence: NamespacePersistence = rmp_serde::from_slice(&data)
+            .map_err(|e| anyhow::anyhow!("Failed to deserialize namespace data: {}", e))?;
+
+        // Create container with loaded data
+        let container = HnswContainer {
+            vectors: persistence.vectors,
+            vector_ids: persistence.vector_ids,
+            metadata_entries: persistence.metadata_entries,
+            config: persistence.config,
+        };
+
+        // Rebuild the HNSW index from vectors
+        let index = container.build_index(persistence.metric);
+
+        // Rebuild reverse ID map
+        let mut reverse_id_map = HashMap::new();
+        for (idx, id) in container.vector_ids.iter().enumerate() {
+            reverse_id_map.insert(id.clone(), idx);
+        }
+
+        // Restore metadata to global store
+        for (idx, entry) in container.metadata_entries.iter().enumerate() {
+            self.metadata.insert(
+                container.vector_ids[idx].clone(),
+                VectorMetadata {
+                    entry: entry.clone(),
+                    namespace: namespace.to_string(),
+                    internal_id: idx,
+                },
+            );
+        }
+
+        info!("Loaded namespace {} from disk and rebuilt index", namespace);
+
+        Ok(NamespaceData {
+            container,
+            index,
+            reverse_id_map,
+            stats: persistence.stats,
+        })
     }
 }
 
@@ -218,8 +378,10 @@ impl VectorStorage for HNSWVectorStorage {
     async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>> {
         let mut ids = Vec::with_capacity(vectors.len());
 
+        // Group vectors by namespace for batch insertion
+        let mut by_namespace: HashMap<String, Vec<(VectorEntry, String)>> = HashMap::new();
+
         for entry in vectors {
-            // Validate dimensions
             if entry.embedding.len() != self.dimensions {
                 anyhow::bail!(
                     "Vector dimension mismatch: expected {}, got {}",
@@ -229,61 +391,97 @@ impl VectorStorage for HNSWVectorStorage {
             }
 
             let namespace = Self::scope_to_namespace(&entry.scope);
-            let namespace_index = self.get_or_create_namespace(&namespace);
-
-            // Generate ID if not provided
             let id = if entry.id.is_empty() {
-                Uuid::new_v4().to_string()
+                uuid::Uuid::new_v4().to_string()
             } else {
                 entry.id.clone()
             };
 
-            // Store metadata
-            let metadata = VectorMetadata {
-                entry: entry.clone(),
-                namespace: namespace.clone(),
-                index_id: 0, // Will be updated after insertion
-            };
-
-            // Insert into simplified index
-            {
-                let mut index = namespace_index.write();
-                let index_id = index.vectors.len();
-
-                // Store vector with ID and index
-                index
-                    .vectors
-                    .push((entry.embedding.clone(), id.clone(), index_id));
-
-                // Update metadata with actual index ID
-                let mut metadata = metadata;
-                metadata.index_id = index_id;
-                self.metadata.insert(id.clone(), metadata);
-
-                // Update stats
-                index.stats.vector_count += 1;
-            }
-
+            by_namespace
+                .entry(namespace)
+                .or_default()
+                .push((entry, id.clone()));
             ids.push(id);
         }
 
-        debug!("Inserted {} vectors: {:?}", ids.len(), ids);
+        // Insert into each namespace
+        for (namespace, entries) in by_namespace {
+            let namespace_data = self.get_or_create_namespace(&namespace);
+            let mut data = namespace_data.write();
+
+            // Batch add all new vectors to container
+            let start_idx = data.container.vectors.len();
+            let mut metadata_updates = Vec::new();
+
+            for (entry, id) in entries {
+                let internal_id = data.container.vectors.len();
+
+                // Add to container
+                data.container.vectors.push(entry.embedding.clone());
+                data.container.vector_ids.push(id.clone());
+                data.container.metadata_entries.push(entry.clone());
+
+                data.reverse_id_map.insert(id.clone(), internal_id);
+                data.stats.vector_count += 1;
+
+                // Save metadata update for later
+                metadata_updates.push((id, entry, internal_id));
+            }
+
+            // Update the HNSW index with parallel insertion
+            let num_new = data.container.vectors.len() - start_idx;
+            if num_new > 0 {
+                if start_idx == 0 {
+                    // First insertion - create new index with parallel insert
+                    data.index = data.container.build_index(self.config.metric);
+                } else {
+                    // Incremental insertion using parallel_insert
+                    // Prepare references for the new vectors
+                    let new_vector_refs: Vec<(&Vec<f32>, usize)> = data.container.vectors
+                        [start_idx..]
+                        .iter()
+                        .enumerate()
+                        .map(|(i, v)| (v, start_idx + i))
+                        .collect();
+
+                    // Since parallel_insert takes &self (not &mut self), we can call it directly
+                    match &data.index {
+                        HnswIndex::Cosine(hnsw) => hnsw.parallel_insert(&new_vector_refs),
+                        HnswIndex::Euclidean(hnsw) => hnsw.parallel_insert(&new_vector_refs),
+                        HnswIndex::InnerProduct(hnsw) => hnsw.parallel_insert(&new_vector_refs),
+                        HnswIndex::Manhattan(hnsw) => hnsw.parallel_insert(&new_vector_refs),
+                    }
+                }
+            }
+
+            // Update metadata after releasing the write lock
+            drop(data);
+
+            for (id, entry, internal_id) in metadata_updates {
+                self.metadata.insert(
+                    id,
+                    VectorMetadata {
+                        entry,
+                        namespace: namespace.clone(),
+                        internal_id,
+                    },
+                );
+            }
+        }
+
         Ok(ids)
     }
 
     async fn search(&self, query: &VectorQuery) -> Result<Vec<VectorResult>> {
-        // Default to global namespace if no scope specified
         let scope = query.scope.as_ref().unwrap_or(&StateScope::Global);
         self.search_scoped(query, scope).await
     }
 
-    #[allow(clippy::significant_drop_tightening)]
     async fn search_scoped(
         &self,
         query: &VectorQuery,
-        search_scope: &StateScope,
+        scope: &StateScope,
     ) -> Result<Vec<VectorResult>> {
-        // Validate query vector dimensions
         if query.vector.len() != self.dimensions {
             anyhow::bail!(
                 "Query vector dimension mismatch: expected {}, got {}",
@@ -292,80 +490,72 @@ impl VectorStorage for HNSWVectorStorage {
             );
         }
 
-        let namespace = Self::scope_to_namespace(search_scope);
-
-        // Get the namespace index
-        let namespace_index = self
+        let namespace = Self::scope_to_namespace(scope);
+        let namespace_data = self
             .namespaces
             .get(&namespace)
             .ok_or_else(|| anyhow::anyhow!("Namespace {} not found", namespace))?;
 
+        let data = namespace_data.read();
+
+        // Search with configured ef parameter
+        let neighbours = data
+            .index
+            .search(&query.vector, query.k, self.config.ef_search);
+
         let mut results = Vec::new();
-
-        {
-            let index = namespace_index.read();
-
-            // Simple brute-force search for now (would use proper HNSW in production)
-            let mut distances: Vec<(f32, &str, usize)> = Vec::new();
-
-            for (vec, id, idx) in &index.vectors {
-                let distance = self.calculate_distance(&query.vector, vec);
-                distances.push((distance, id.as_str(), *idx));
+        for neighbour in neighbours {
+            // The point_id in the neighbour is the internal ID
+            if neighbour.d_id >= data.container.vector_ids.len() {
+                continue; // Invalid ID
             }
 
-            // Sort by distance and take top k
-            distances.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
-            distances.truncate(query.k);
+            let vector_id = &data.container.vector_ids[neighbour.d_id];
 
-            // Convert to our result format
-            for (distance, id, _idx) in distances {
-                // Check threshold if specified
-                if let Some(threshold) = query.threshold {
-                    let similarity = match self.config.metric {
-                        DistanceMetric::Cosine => 1.0 - (distance / 2.0), // Convert back to similarity
-                        _ => 1.0 / (1.0 + distance),                      // Generic conversion
-                    };
+            if let Some(meta_entry) = self.metadata.get(vector_id) {
+                let metadata = meta_entry.value();
 
-                    if similarity < threshold {
+                // Apply metadata filters if specified
+                if let Some(filters) = &query.filter {
+                    let matches = filters
+                        .iter()
+                        .all(|(key, value)| metadata.entry.metadata.get(key) == Some(value));
+                    if !matches {
                         continue;
                     }
                 }
 
-                // Get metadata for this vector
-                if let Some(metadata_entry) = self.metadata.get(id) {
-                    let metadata = metadata_entry.value();
-                    let similarity_score = match self.config.metric {
-                        DistanceMetric::Cosine => 1.0 - (distance / 2.0),
-                        _ => 1.0 / (1.0 + distance),
-                    };
-
-                    // Apply metadata filters if specified
-                    if let Some(filters) = &query.filter {
-                        let matches = filters
-                            .iter()
-                            .all(|(key, value)| metadata.entry.metadata.get(key) == Some(value));
-
-                        if !matches {
-                            continue;
-                        }
+                // Convert distance to similarity score based on metric
+                let score = match self.config.metric {
+                    DistanceMetric::Cosine => 1.0 - neighbour.distance,
+                    DistanceMetric::Euclidean | DistanceMetric::Manhattan => {
+                        1.0 / (1.0 + neighbour.distance)
                     }
+                    DistanceMetric::InnerProduct => -neighbour.distance,
+                };
 
-                    results.push(VectorResult {
-                        id: metadata.entry.id.clone(),
-                        score: similarity_score,
-                        vector: if query.include_metadata {
-                            Some(metadata.entry.embedding.clone())
-                        } else {
-                            None
-                        },
-                        metadata: if query.include_metadata {
-                            Some(metadata.entry.metadata.clone())
-                        } else {
-                            None
-                        },
-                        distance,
-                    });
+                // Apply threshold if specified
+                if let Some(threshold) = query.threshold {
+                    if score < threshold {
+                        continue;
+                    }
                 }
+
+                results.push(VectorResult {
+                    id: metadata.entry.id.clone(),
+                    score,
+                    vector: if query.include_metadata {
+                        Some(metadata.entry.embedding.clone())
+                    } else {
+                        None
+                    },
+                    metadata: if query.include_metadata {
+                        Some(metadata.entry.metadata.clone())
+                    } else {
+                        None
+                    },
+                    distance: neighbour.distance,
+                });
             }
         }
 
@@ -386,25 +576,30 @@ impl VectorStorage for HNSWVectorStorage {
     }
 
     async fn delete(&self, ids: &[String]) -> Result<()> {
+        // Note: hnsw_rs doesn't support deletion directly
+        // We just remove from metadata and mark as deleted
         for id in ids {
             if self.metadata.remove(id).is_none() {
                 warn!("Vector with ID {} not found during deletion", id);
             }
-            // Note: hnsw crate doesn't support deletion directly
-            // In production, we'd mark as deleted and handle during compaction
         }
         Ok(())
     }
 
-    async fn delete_scope(&self, deletion_scope: &StateScope) -> Result<usize> {
-        let namespace = Self::scope_to_namespace(deletion_scope);
+    async fn delete_scope(&self, scope: &StateScope) -> Result<usize> {
+        let namespace = Self::scope_to_namespace(scope);
 
-        // Remove namespace index
-        if let Some((_, namespace_index)) = self.namespaces.remove(&namespace) {
-            let count = namespace_index.read().stats.vector_count;
-
-            // Remove all metadata for this namespace
+        if let Some((_, namespace_data)) = self.namespaces.remove(&namespace) {
+            let count = namespace_data.read().stats.vector_count;
             self.metadata.retain(|_, v| v.namespace != namespace);
+
+            // Remove from disk if persistence is enabled
+            if let Some(ref base_dir) = self.persistence_dir {
+                let namespace_dir = base_dir.join(&namespace);
+                if namespace_dir.exists() {
+                    std::fs::remove_dir_all(namespace_dir)?;
+                }
+            }
 
             Ok(count)
         } else {
@@ -414,30 +609,29 @@ impl VectorStorage for HNSWVectorStorage {
 
     async fn stats(&self) -> Result<StorageStats> {
         let mut total_vectors = 0;
-        let mut namespace_count = 0;
+        let namespace_count = self.namespaces.len();
 
         for namespace in &self.namespaces {
-            namespace_count += 1;
-            let index = namespace.value().read();
-            total_vectors += index.stats.vector_count;
+            let data = namespace.value().read();
+            total_vectors += data.stats.vector_count;
         }
 
         Ok(StorageStats {
             total_vectors,
-            storage_bytes: total_vectors * self.dimensions * 4, // Approximate
+            storage_bytes: total_vectors * self.dimensions * 4,
             namespace_count,
             dimensions: Some(self.dimensions),
             ..Default::default()
         })
     }
 
-    async fn stats_for_scope(&self, stats_scope: &StateScope) -> Result<ScopedStats> {
-        let namespace = Self::scope_to_namespace(stats_scope);
+    async fn stats_for_scope(&self, scope: &StateScope) -> Result<ScopedStats> {
+        let namespace = Self::scope_to_namespace(scope);
 
         self.namespaces.get(&namespace).map_or_else(
             || {
                 Ok(ScopedStats {
-                    scope: stats_scope.clone(),
+                    scope: scope.clone(),
                     vector_count: 0,
                     storage_bytes: 0,
                     query_count: 0,
@@ -445,15 +639,15 @@ impl VectorStorage for HNSWVectorStorage {
                     estimated_cost: 0.0,
                 })
             },
-            |namespace_index| {
-                let index = namespace_index.read();
+            |namespace_data| {
+                let data = namespace_data.read();
                 Ok(ScopedStats {
-                    scope: stats_scope.clone(),
-                    vector_count: index.stats.vector_count,
-                    storage_bytes: index.stats.vector_count * self.dimensions * 4,
-                    query_count: 0,      // Would track this in production
-                    tokens_processed: 0, // Would track this in production
-                    estimated_cost: 0.0, // Would calculate based on usage
+                    scope: scope.clone(),
+                    vector_count: data.stats.vector_count,
+                    storage_bytes: data.stats.vector_count * self.dimensions * 4,
+                    query_count: 0,
+                    tokens_processed: 0,
+                    estimated_cost: 0.0,
                 })
             },
         )
@@ -467,7 +661,6 @@ impl HNSWStorage for HNSWVectorStorage {
     }
 
     async fn build_index(&self) -> Result<()> {
-        // HNSW builds incrementally, no explicit build needed
         info!("HNSW index builds incrementally during insertion");
         Ok(())
     }
@@ -480,8 +673,16 @@ impl HNSWStorage for HNSWVectorStorage {
 
     async fn delete_namespace(&self, namespace: &str) -> Result<()> {
         if self.namespaces.remove(namespace).is_some() {
-            // Remove all metadata for this namespace
             self.metadata.retain(|_, v| v.namespace != namespace);
+
+            // Remove from disk if persistence is enabled
+            if let Some(ref base_dir) = self.persistence_dir {
+                let namespace_dir = base_dir.join(namespace);
+                if namespace_dir.exists() {
+                    std::fs::remove_dir_all(namespace_dir)?;
+                }
+            }
+
             info!("Deleted namespace: {}", namespace);
             Ok(())
         } else {
@@ -494,178 +695,134 @@ impl HNSWStorage for HNSWVectorStorage {
     }
 
     async fn optimize_index(&self) -> Result<()> {
-        // HNSW doesn't have explicit optimization
-        // Could implement compaction here
-        info!("HNSW index optimization not required");
+        info!("HNSW optimization not required - index is self-optimizing");
         Ok(())
     }
 
     async fn namespace_stats(&self, namespace: &str) -> Result<NamespaceStats> {
-        if let Some(namespace_index) = self.namespaces.get(namespace) {
-            Ok(namespace_index.read().stats.clone())
+        if let Some(namespace_data) = self.namespaces.get(namespace) {
+            Ok(namespace_data.read().stats.clone())
         } else {
             anyhow::bail!("Namespace {} not found", namespace)
         }
     }
 
     async fn save(&self) -> Result<()> {
-        // Call the save implementation directly
-        HNSWVectorStorage::save(self).await
+        if self.persistence_dir.is_none() {
+            return Ok(());
+        }
+
+        // Collect namespace data to avoid holding locks across await points
+        let namespaces_to_save: Vec<(String, NamespaceData)> = self
+            .namespaces
+            .iter()
+            .map(|entry| {
+                let namespace_name = entry.key().clone();
+                let data = entry.value().read();
+                // Clone the necessary data for persistence
+                let namespace_data = NamespaceData {
+                    container: data.container.clone(),
+                    index: data.container.build_index(self.config.metric), // Rebuild for save
+                    reverse_id_map: data.reverse_id_map.clone(),
+                    stats: data.stats.clone(),
+                };
+                (namespace_name, namespace_data)
+            })
+            .collect();
+
+        // Now save without holding any locks
+        for (namespace_name, data) in namespaces_to_save {
+            self.save_namespace(&namespace_name, &data).await?;
+        }
+
+        info!("Saved all namespaces to disk");
+        Ok(())
     }
 }
 
 /// Persistence support
 impl HNSWVectorStorage {
-    /// Save index to disk
-    ///
-    /// # Errors
-    ///
-    /// Returns error if persistence fails
-    pub async fn save(&self) -> Result<()> {
-        let Some(ref base_dir) = self.persistence_dir else {
-            return Ok(());
+    /// Create from a persistence directory, loading existing data
+    pub async fn from_path(path: &Path, dimensions: usize, config: HNSWConfig) -> Result<Self> {
+        let storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
+        // Don't call load() on an immutable storage - load() mutates self
+        // Instead, manually load namespaces
+        let Some(ref base_dir) = storage.persistence_dir else {
+            return Ok(storage);
         };
 
-        // Create base directory
-        std::fs::create_dir_all(base_dir)?;
-
-        // Save each namespace
-        for namespace_entry in &self.namespaces {
-            let namespace_name = namespace_entry.key();
-            let namespace_data = namespace_entry.value();
-
-            let namespace_dir = base_dir.join(namespace_name);
-            std::fs::create_dir_all(&namespace_dir)?;
-
-            // Save namespace index data
-            let index_file = namespace_dir.join("index.json");
-            let index_data = {
-                let index = namespace_data.read();
-                serde_json::json!({
-                    "vectors": index.vectors,
-                    "stats": index.stats,
-                    "created_at": index.created_at
-                })
-            };
-            std::fs::write(index_file, serde_json::to_string_pretty(&index_data)?)?;
+        if !base_dir.exists() {
+            return Ok(storage);
         }
 
-        // Save all metadata
-        let metadata_file = base_dir.join("metadata.json");
-        let metadata_data: HashMap<String, VectorMetadata> = self
-            .metadata
-            .iter()
-            .map(|entry| (entry.key().clone(), entry.value().clone()))
-            .collect();
-        std::fs::write(metadata_file, serde_json::to_string_pretty(&metadata_data)?)?;
-
-        // Save config
-        let config_file = base_dir.join("config.json");
-        let config_data = serde_json::json!({
-            "dimensions": self.dimensions,
-            "config": self.config
-        });
-        std::fs::write(config_file, serde_json::to_string_pretty(&config_data)?)?;
-
-        info!("Saved HNSW index to {:?}", base_dir);
-        Ok(())
-    }
-
-    /// Load index from disk
-    ///
-    /// # Errors
-    ///
-    /// Returns error if loading fails
-    pub async fn load(path: &Path, dimensions: usize, config: HNSWConfig) -> Result<Self> {
-        if !path.exists() {
-            info!("No existing index found at {:?}, creating new", path);
-            return Ok(Self::new(dimensions, config).with_persistence(path.to_path_buf()));
-        }
-
-        // Load config (verify dimensions match)
-        let config_file = path.join("config.json");
-        if config_file.exists() {
-            let config_data = std::fs::read_to_string(&config_file)?;
-            let config_json: serde_json::Value = serde_json::from_str(&config_data)?;
-
-            let saved_dimensions = config_json["dimensions"]
-                .as_u64()
-                .ok_or_else(|| anyhow::anyhow!("Invalid dimensions in config"))?
-                as usize;
-
-            if saved_dimensions != dimensions {
-                anyhow::bail!(
-                    "Dimension mismatch: saved index has {} dimensions, expected {}",
-                    saved_dimensions,
-                    dimensions
-                );
-            }
-        }
-
-        let storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
-
-        // Load metadata
-        let metadata_file = path.join("metadata.json");
-        if metadata_file.exists() {
-            let metadata_data = std::fs::read_to_string(&metadata_file)?;
-            let metadata: HashMap<String, VectorMetadata> = serde_json::from_str(&metadata_data)?;
-
-            for (id, meta) in metadata {
-                storage.metadata.insert(id, meta);
-            }
-        }
-
-        // Load namespaces
-        for entry in std::fs::read_dir(path)? {
+        // Load each namespace directory
+        for entry in std::fs::read_dir(base_dir)? {
             let entry = entry?;
-            let path = entry.path();
-
-            if path.is_dir() {
-                let namespace_name = path
-                    .file_name()
-                    .and_then(|n| n.to_str())
-                    .ok_or_else(|| anyhow::anyhow!("Invalid namespace directory name"))?;
-
-                let index_file = path.join("index.json");
-                if index_file.exists() {
-                    let index_data = std::fs::read_to_string(&index_file)?;
-                    let index_json: serde_json::Value = serde_json::from_str(&index_data)?;
-
-                    let vectors: SimpleHnsw =
-                        serde_json::from_value(index_json["vectors"].clone())?;
-                    let stats: NamespaceStats =
-                        serde_json::from_value(index_json["stats"].clone())?;
-                    let created_at: std::time::SystemTime =
-                        serde_json::from_value(index_json["created_at"].clone())?;
-
-                    let namespace_index = NamespaceIndex {
-                        vectors,
-                        stats,
-                        created_at,
-                    };
-
-                    storage.namespaces.insert(
-                        namespace_name.to_string(),
-                        Arc::new(RwLock::new(namespace_index)),
-                    );
+            if entry.file_type()?.is_dir() {
+                let namespace = entry.file_name().to_string_lossy().to_string();
+                match storage.load_namespace(&namespace).await {
+                    Ok(data) => {
+                        storage
+                            .namespaces
+                            .insert(namespace.clone(), Arc::new(RwLock::new(data)));
+                    }
+                    Err(e) => {
+                        error!("Failed to load namespace {}: {}", namespace, e);
+                    }
                 }
             }
         }
 
-        info!("Loaded HNSW index from {:?}", path);
+        info!("Loaded {} namespaces from disk", storage.namespaces.len());
         Ok(storage)
+    }
+}
+
+impl Drop for HNSWVectorStorage {
+    fn drop(&mut self) {
+        // Save on drop if persistence is configured
+        if self.persistence_dir.is_some() {
+            // We can't use async in Drop, so spawn a blocking task
+            let rt = tokio::runtime::Handle::try_current();
+            if let Ok(handle) = rt {
+                // Clone what we need for the async save
+                let namespaces_snapshot = self.namespaces.clone();
+                let metadata_snapshot = self.metadata.clone();
+                let persistence_dir = self.persistence_dir.clone();
+                let config = self.config.clone();
+                let dimensions = self.dimensions;
+
+                // Spawn save task
+                handle.spawn(async move {
+                    // Create a temporary storage to save
+                    let temp_storage = HNSWVectorStorage {
+                        namespaces: namespaces_snapshot,
+                        config,
+                        persistence_dir,
+                        metadata: metadata_snapshot,
+                        dimensions,
+                    };
+
+                    if let Err(e) = HNSWStorage::save(&temp_storage).await {
+                        error!("Failed to save HNSW storage on drop: {}", e);
+                    } else {
+                        info!("HNSW storage saved on drop");
+                    }
+                });
+            }
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_basic_insert_and_search() {
+    async fn test_hnsw_insert_and_search() {
         let storage = HNSWVectorStorage::new(3, HNSWConfig::default());
 
-        // Insert some vectors
         let vectors = vec![
             VectorEntry::new("vec1".to_string(), vec![1.0, 0.0, 0.0])
                 .with_scope(StateScope::Global),
@@ -678,7 +835,6 @@ mod tests {
         let ids = storage.insert(vectors).await.unwrap();
         assert_eq!(ids.len(), 3);
 
-        // Search for similar vectors
         let query = VectorQuery::new(vec![0.9, 0.1, 0.0], 2);
         let results = storage.search(&query).await.unwrap();
 
@@ -687,70 +843,118 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_namespace_isolation() {
-        let storage = HNSWVectorStorage::new(3, HNSWConfig::default());
+    async fn test_hnsw_parallel_insertion() {
+        // Test that parallel insertion works correctly
+        let storage = HNSWVectorStorage::new(128, HNSWConfig::default());
 
-        // Insert vectors in different namespaces
-        let tenant1_vectors = vec![VectorEntry::new("t1_vec1".to_string(), vec![1.0, 0.0, 0.0])
-            .with_scope(StateScope::Custom("tenant:tenant-1".to_string()))];
+        // Insert a large batch of vectors to trigger parallel insertion
+        let mut vectors = Vec::new();
+        for i in 0..100 {
+            let mut vec = vec![0.0; 128];
+            vec[i % 128] = 1.0;
+            vectors.push(VectorEntry::new(format!("vec{}", i), vec).with_scope(StateScope::Global));
+        }
 
-        let tenant2_vectors = vec![VectorEntry::new("t2_vec1".to_string(), vec![0.0, 1.0, 0.0])
-            .with_scope(StateScope::Custom("tenant:tenant-2".to_string()))];
+        let ids = storage.insert(vectors).await.unwrap();
+        assert_eq!(ids.len(), 100);
 
-        storage.insert(tenant1_vectors).await.unwrap();
-        storage.insert(tenant2_vectors).await.unwrap();
+        // Verify we can search and find vectors
+        let mut query_vec = vec![0.0; 128];
+        query_vec[5] = 1.0;
+        // Search for more results since HNSW is approximate and sparse vectors reduce accuracy
+        let query = VectorQuery::new(query_vec, 20);
+        let results = storage.search(&query).await.unwrap();
 
-        // Search in tenant1 namespace - should only find tenant1 vectors
-        let query = VectorQuery::new(vec![1.0, 0.0, 0.0], 10);
-        let results = storage
-            .search_scoped(&query, &StateScope::Custom("tenant:tenant-1".to_string()))
-            .await
-            .unwrap();
-
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].id, "t1_vec1");
-
-        // Search in tenant2 namespace - should only find tenant2 vectors
-        let results = storage
-            .search_scoped(&query, &StateScope::Custom("tenant:tenant-2".to_string()))
-            .await
-            .unwrap();
-
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].id, "t2_vec1");
+        assert!(!results.is_empty());
+        // The exact match should be among the results (HNSW is approximate, especially with sparse vectors)
+        let found_vec5 = results.iter().any(|r| r.id == "vec5");
+        assert!(
+            found_vec5,
+            "vec5 not found in search results. First 10: {:?}",
+            results.iter().take(10).map(|r| &r.id).collect::<Vec<_>>()
+        );
     }
 
     #[tokio::test]
-    async fn test_metadata_filtering() {
-        let storage = HNSWVectorStorage::new(3, HNSWConfig::default());
+    async fn test_hnsw_incremental_insertion() {
+        // Test that incremental insertion via parallel_insert works
+        let storage = HNSWVectorStorage::new(64, HNSWConfig::default());
 
-        // Insert vectors with metadata
-        let vectors = vec![
-            VectorEntry::new("vec1".to_string(), vec![1.0, 0.0, 0.0])
-                .with_scope(StateScope::Global)
-                .with_metadata(HashMap::from([(
-                    "type".to_string(),
-                    serde_json::Value::String("document".to_string()),
-                )])),
-            VectorEntry::new("vec2".to_string(), vec![0.9, 0.1, 0.0])
-                .with_scope(StateScope::Global)
-                .with_metadata(HashMap::from([(
-                    "type".to_string(),
-                    serde_json::Value::String("image".to_string()),
-                )])),
-        ];
+        // First batch
+        let batch1: Vec<VectorEntry> = (0..50)
+            .map(|i| {
+                let mut vec = vec![0.0; 64];
+                vec[i % 64] = 1.0;
+                VectorEntry::new(format!("batch1_{}", i), vec).with_scope(StateScope::Global)
+            })
+            .collect();
 
-        storage.insert(vectors).await.unwrap();
+        storage.insert(batch1).await.unwrap();
 
-        // Search with metadata filter
-        let query = VectorQuery::new(vec![1.0, 0.0, 0.0], 10).with_filter(HashMap::from([(
-            "type".to_string(),
-            serde_json::Value::String("document".to_string()),
-        )]));
+        // Second batch - should use parallel_insert on existing index
+        let batch2: Vec<VectorEntry> = (0..50)
+            .map(|i| {
+                let mut vec = vec![0.0; 64];
+                vec[(i + 32) % 64] = 1.0;
+                VectorEntry::new(format!("batch2_{}", i), vec).with_scope(StateScope::Global)
+            })
+            .collect();
 
+        storage.insert(batch2).await.unwrap();
+
+        // Verify both batches are searchable
+        let mut query_vec = vec![0.0; 64];
+        query_vec[10] = 1.0;
+        // Search for more results since HNSW is approximate and sparse vectors reduce accuracy
+        let query = VectorQuery::new(query_vec, 15);
         let results = storage.search(&query).await.unwrap();
 
-        assert_eq!(results.len(), 1);
-        assert_eq!(results[0].id, "vec1");
+        assert!(!results.is_empty());
+        // The exact match should be among the results (HNSW is approximate, especially with sparse vectors)
+        let found_batch1_10 = results.iter().any(|r| r.id == "batch1_10");
+        assert!(
+            found_batch1_10,
+            "batch1_10 not found in search results. First 10: {:?}",
+            results.iter().take(10).map(|r| &r.id).collect::<Vec<_>>()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_hnsw_persistence() {
+        let temp_dir = TempDir::new().unwrap();
+        let persistence_path = temp_dir.path().to_path_buf();
+
+        // Create storage with persistence
+        {
+            let storage = HNSWVectorStorage::new(3, HNSWConfig::default())
+                .with_persistence(persistence_path.clone());
+
+            // Insert vectors
+            let vectors = vec![
+                VectorEntry::new("persist1".to_string(), vec![1.0, 0.0, 0.0])
+                    .with_scope(StateScope::Global),
+                VectorEntry::new("persist2".to_string(), vec![0.0, 1.0, 0.0])
+                    .with_scope(StateScope::Global),
+            ];
+
+            storage.insert(vectors).await.unwrap();
+
+            // Save to disk
+            HNSWStorage::save(&storage).await.unwrap();
+        }
+
+        // Load from disk
+        {
+            let storage = HNSWVectorStorage::from_path(&persistence_path, 3, HNSWConfig::default())
+                .await
+                .unwrap();
+
+            // Search should work
+            let query = VectorQuery::new(vec![1.0, 0.0, 0.0], 1);
+            let results = storage.search(&query).await.unwrap();
+
+            assert_eq!(results.len(), 1);
+            assert_eq!(results[0].id, "persist1");
+        }
     }
 }

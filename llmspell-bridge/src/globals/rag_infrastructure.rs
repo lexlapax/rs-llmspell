@@ -207,14 +207,14 @@ async fn try_load_hnsw_from_path(
     path: &std::path::Path,
     dimensions: usize,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
-) -> Option<llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage> {
-    use llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage;
+) -> Option<llmspell_storage::backends::vector::hnsw::HNSWVectorStorage> {
+    use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
 
     if !path.exists() {
         return None;
     }
 
-    match RealHNSWVectorStorage::from_path(path, dimensions, hnsw_config).await {
+    match HNSWVectorStorage::from_path(path, dimensions, hnsw_config).await {
         Ok(storage) => {
             info!("Successfully loaded existing HNSW index from {:?}", path);
             Some(storage)
@@ -231,10 +231,10 @@ fn create_new_hnsw_storage(
     dimensions: usize,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
     persistence_path: Option<&std::path::Path>,
-) -> llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage {
-    use llmspell_storage::backends::vector::hnsw_real::RealHNSWVectorStorage;
+) -> llmspell_storage::backends::vector::hnsw::HNSWVectorStorage {
+    use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
 
-    let storage = RealHNSWVectorStorage::new(dimensions, hnsw_config);
+    let storage = HNSWVectorStorage::new(dimensions, hnsw_config);
 
     if let Some(path) = persistence_path {
         storage.with_persistence(path.to_path_buf())
