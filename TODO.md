@@ -2534,31 +2534,59 @@ Check the `docs/user-guide/api/lua/README.md` to actually see what API calls to 
 
 **Rationale**: Graph storage preparation belongs in Phase 9 where the `llmspell-graph` crate for temporal knowledge graphs will be created. This is pure Phase 9 work.
 
-### Task 8.11.4: Performance Baseline
+### Task 8.11.4: Performance Baseline ✅ COMPLETE
 **Priority**: HIGH  
-**Estimated Time**: 2 hours  
+**Estimated Time**: 2 hours (Actual: 1.5 hours)
 **Assignee**: Performance Team
+**Status**: ✅ **COMPLETE** (2025-08-29)
 
 **Description**: Establish performance baselines for Phase 9 comparison.
 
 **Acceptance Criteria:**
-- [ ] Baseline metrics captured
-- [ ] Test scenarios documented
-- [ ] Regression tests created
-- [ ] Report generated
+- [x] Baseline metrics captured ✅
+- [x] Test scenarios documented ✅
+- [x] Regression tests created ✅
+- [x] Report generated ✅
 
 **Implementation Steps:**
-1. Run comprehensive benchmarks
-2. Document test scenarios
-3. Create regression suite
-4. Generate baseline report
-5. Archive results
+1. [x] Run comprehensive benchmarks ✅
+2. [x] Document test scenarios ✅
+3. [x] Create regression suite ✅
+4. [x] Generate baseline report ✅
+5. [x] Archive results ✅
+
+**Deliverables Created:**
+- `docs/performance/phase-8-baselines/phase-8.10.6-baseline-report.md` - Comprehensive baseline report
+- `scripts/phase-9-regression-check.sh` - Automated regression detection (CI/CD ready)
+- `scripts/phase-8-baseline-critical.sh` - Fast critical metrics capture
+- `docs/performance/phase-8-baselines/README.md` - Complete usage guide
+
+**Key Learnings & Findings:**
+1. **Critical Performance Baselines Established:**
+   - Core System: ComponentId generation ~85ns (excellent for graph structures)
+   - Bridge System: RAG vector search <10ms (must preserve in Phase 9)
+   - Session System: State persistence patterns documented
+
+2. **Phase 9 Impact Areas Identified:**
+   - Bridge system (`llmspell-bridge`) is THE critical component
+   - Graph globals will be 18th global injected through bridge
+   - Multi-tenant isolation must extend to graph namespaces
+   - Session persistence can leverage existing state management
+
+3. **Performance Thresholds Defined:**
+   - RED LINE (Must Not Exceed): RAG >10%, Bridge >25%, Session >15%, Memory >25%
+   - GREEN LINE (Phase 9 Targets): Graph traversal <20ms, Combined RAG+Graph <30ms
+
+4. **Automation Achievement:**
+   - Full regression testing automated with pass/fail CI integration
+   - Performance gates established to prevent degradation
+   - Benchmark infrastructure validated across all critical crates
 
 **Definition of Done:**
-- [ ] Baselines captured
-- [ ] Tests repeatable
-- [ ] Report complete
-- [ ] Archived properly
+- [x] Baselines captured ✅
+- [x] Tests repeatable ✅
+- [x] Report complete ✅
+- [x] Archived properly ✅
 
 ### Task 8.11.5: Handoff Package
 **Priority**: CRITICAL  
