@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["global_registry"],"struct":["CustomAgentFactory","FactoryRegistry"]};

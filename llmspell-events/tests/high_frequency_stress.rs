@@ -29,7 +29,6 @@ mod stress_tests {
         )
     }
     #[tokio::test]
-    #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_10k_events_per_second_sustained() {
         let bus = EventBus::new();
         let mut receiver = bus.subscribe("stress.*").await.unwrap();
@@ -123,7 +122,6 @@ mod stress_tests {
         );
     }
     #[tokio::test]
-    #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_concurrent_publishers_stress() {
         let bus = Arc::new(EventBus::new());
         let mut receiver = bus.subscribe("concurrent.*").await.unwrap();
@@ -242,7 +240,6 @@ mod stress_tests {
         );
     }
     #[tokio::test]
-    #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_memory_stability_under_load() {
         let bus = EventBus::new();
         let mut receiver = bus.subscribe("memory.*").await.unwrap();
@@ -320,7 +317,9 @@ mod stress_tests {
         }
 
         // Wait for all processing to complete
-        tokio::time::sleep(Duration::from_millis(500)).await;
+        // With 10,000 events and 10µs processing delay each, we need at least 100ms
+        // Adding buffer for actual processing overhead
+        tokio::time::sleep(Duration::from_secs(2)).await;
 
         let final_received = received_count.load(Ordering::Relaxed);
         let total_events = waves * events_per_wave;
@@ -353,7 +352,6 @@ mod stress_tests {
         );
     }
     #[tokio::test]
-    #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_backpressure_handling() {
         // Create EventBus with limited flow control
         let flow_config = FlowControllerConfig {
@@ -444,7 +442,6 @@ mod stress_tests {
         );
     }
     #[tokio::test]
-    #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_stream_processing_performance() {
         use llmspell_events::stream::{HighThroughputProcessor, StreamUtils};
 

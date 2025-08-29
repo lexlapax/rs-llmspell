@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["append_file","copy_file","ensure_dir","expand_path","file_exists","get_metadata","is_absolute_path","join_paths","list_dir","move_file","normalize_path","parent_dir","read_file","remove_dir_all_if_exists","remove_file_if_exists","write_file","write_file_atomic"],"struct":["DirEntry","FileMetadata"]};

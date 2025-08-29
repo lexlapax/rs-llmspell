@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["GraphQLOperation"],"struct":["ErrorLocation","GraphQLConfig","GraphQLError","GraphQLQueryTool","GraphQLRequest","GraphQLResponse","SchemaCacheEntry"]};

@@ -1,0 +1,88 @@
+# Development RAG Configuration
+# Optimized for local development and testing
+# Fast iteration, debugging features, minimal resources
+
+# Provider configuration for agents
+[providers]
+default_provider = "openai"
+
+# This is the correct nested structure - providers.providers.name
+# The first "providers" is the config section, the second is the HashMap field
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+default_model = "gpt-3.5-turbo"
+temperature = 0.7
+max_tokens = 2000
+
+[providers.providers.anthropic]
+provider_type = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+default_model = "claude-3-haiku-20240307"
+temperature = 0.7
+max_tokens = 2000
+
+[rag]
+enabled = true
+multi_tenant = false  # Simple single-tenant for dev
+
+[rag.vector_storage]
+# Small dimensions for fast testing
+dimensions = 384  # all-MiniLM-L6-v2 or similar small model
+
+# Use hnsw backend for testing
+backend = "hnsw"  # Real vector storage backend
+
+# Local development path
+# persistence_path = "./dev-data/rag"  # Uncomment for persistence
+
+# Limited memory for local dev
+max_memory_mb = 512  # 512MB limit
+
+# HNSW settings for development (when using real backend)
+[rag.vector_storage.hnsw]
+m = 8                      # Minimal connections
+ef_construction = 50       # Fast construction
+ef_search = 25            # Quick search
+max_elements = 10000      # Small dataset
+metric = "cosine"
+allow_replace_deleted = true
+num_threads = 2           # Don't hog CPU
+
+[rag.embedding]
+# Mock provider for testing (or use real with API key)
+default_provider = "openai"  # Set OPENAI_API_KEY env var
+
+# Minimal caching for development
+cache_enabled = false     # Disable to always test fresh
+cache_size = 100         # Small cache
+cache_ttl_seconds = 60   # Short TTL
+
+# Small batches for debugging
+batch_size = 4           # Easy to debug
+timeout_seconds = 10     # Fail fast
+max_retries = 1         # Don't retry much
+
+[rag.chunking]
+# Simple chunking for testing
+strategy = "sliding_window"
+chunk_size = 256         # Small chunks
+overlap = 32             # Minimal overlap
+max_chunk_size = 1024
+min_chunk_size = 50
+
+[rag.cache]
+# Disable caching for fresh results
+search_cache_enabled = false
+search_cache_size = 10
+search_cache_ttl_seconds = 30
+
+document_cache_enabled = false
+document_cache_size_mb = 10
+
+# Development helpers
+[rag.debug]
+enable_debug_logging = true
+log_all_operations = true
+save_debug_dumps = true
+debug_dump_path = "./debug/rag"

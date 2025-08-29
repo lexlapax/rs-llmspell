@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["FileEventType"],"fn":["debounce_events","should_watch_path"],"struct":["FileEvent","WatchConfig"]};

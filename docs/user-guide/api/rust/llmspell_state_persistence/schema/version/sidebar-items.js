@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["VersionError"],"struct":["SchemaVersion","SemanticVersion"]};

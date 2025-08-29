@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["BackoffStrategy","JitterStrategy"],"struct":["RetryConfig","RetryHook","RetryMetrics"]};

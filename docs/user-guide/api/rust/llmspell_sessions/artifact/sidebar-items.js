@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["access","metadata","search","session_artifact","storage","types","versioning"]};

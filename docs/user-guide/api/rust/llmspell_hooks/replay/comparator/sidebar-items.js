@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["DifferenceSeverity","DifferenceType"],"struct":["ComparatorConfig","ComparisonResult","Difference","HookResultComparator"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["Language"],"struct":["EventMetadata","UniversalEvent","UniversalEventBuilder"]};

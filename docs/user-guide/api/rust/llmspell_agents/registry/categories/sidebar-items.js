@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["TagType"],"struct":["AgentCategory","AgentTag","CategoryBuilder","CategoryManager","StandardCategories"]};

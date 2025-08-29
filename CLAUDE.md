@@ -6,7 +6,7 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 ## Critical References
 - **Architecture**: `/docs/technical/master-architecture-vision.md`
 - **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (16-phase roadmap)
-- **Current Status**: Phase 7 (check `/TODO.md` for active tasks)
+- **Current Status**: Phase 8 (check `/TODO.md` for active tasks)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
 ## Project-Specific Behavior Controls
@@ -34,9 +34,9 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 ./scripts/quality-check.sh             # 5+ min - full validation
 ```
 
-## Testing System (Phase 7 Feature-Based)
+## Testing System
 - Use **llmspell-testing** crate helpers ONLY
-- **Feature-based testing** via Cargo features (NOT cfg_attr)
+- **Feature-based testing** via Cargo features
 - **>90% test coverage, >95% API documentation coverage**
 
 ## Performance Targets
@@ -78,3 +78,4 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 - Leaving TODO comments in code
 - Using unwrap() in production code
 - Skipping tests to meet deadlines
+- when writing lua scripts use  the `docs/user-guide/api/lua/README.md` to actually see what API/function calls to make in lua. do not guess.

@@ -1,6 +1,12 @@
 # LLMSpell Cookbook - Production Patterns
 
+**Status**: 🚀 **Phase 8.10.6** - RAG patterns enhanced with multi-tenancy, sessions, and cost optimization
+
 Enterprise-grade patterns for building production LLMSpell applications. Each pattern demonstrates battle-tested solutions to common production challenges.
+
+## 📊 Pattern Collection
+
+**11 Production Patterns**: 8 core patterns (v0.7.0) + 3 RAG patterns (v0.8.0)
 
 ## 📚 Pattern Categories
 
@@ -19,6 +25,11 @@ Enterprise-grade patterns for building production LLMSpell applications. Each pa
 ### 🔒 Security & State
 - **[07 - Security Patterns](security-patterns.lua)** - Input validation and secure handling
 - **[08 - State Management](state-management.lua)** - Versioning and persistence
+
+### 🔍 RAG & Knowledge Management (Phase 8 - NEW)
+- **[RAG-01 - Multi-Tenant RAG](rag-multi-tenant.lua)** - Isolated vector stores per tenant
+- **[RAG-02 - Session RAG](rag-session.lua)** - Conversational memory with context
+- **[RAG-03 - RAG Cost Optimization](rag-cost-optimization.lua)** - Efficient embedding strategies
 
 ## 🚀 Quick Start
 
@@ -51,18 +62,36 @@ Enterprise-grade patterns for building production LLMSpell applications. Each pa
 ./target/debug/llmspell run examples/script-users/cookbook/state-management.lua
 ```
 
+### RAG Patterns (Phase 8 - Requires RAG Config)
+```bash
+# RAG-01: Multi-tenant RAG system
+./target/debug/llmspell -c examples/script-users/configs/rag-production.toml \
+  run examples/script-users/cookbook/rag-multi-tenant.lua
+
+# RAG-02: Session-based RAG
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/cookbook/rag-session.lua
+
+# RAG-03: Cost optimization patterns
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/cookbook/rag-cost-optimization.lua
+```
+
 ## 📊 Pattern Overview
 
-| Pattern | Complexity | Prerequisites | Time | Key Features |
-|---------|------------|---------------|------|--------------|
-| Error Handling | PRODUCTION | None | <3s | Safe invocation, retry, circuit breaker, aggregation |
-| Rate Limiting | PRODUCTION | None | <2s | Token bucket, sliding window, adaptive limiting |
-| Caching | PRODUCTION | None | <3s | LRU, TTL-based, write-through, statistics |
-| Multi-Agent | PRODUCTION | API Key | <30s | Delegation, pipelines, consensus building |
-| Webhooks | PRODUCTION | Network | <5s | Retry logic, signatures, batching, circuit breaker |
-| Performance | PRODUCTION | None | <3s | Timing, memory tracking, percentiles, reports |
-| Security | PRODUCTION | None | <2s | Validation, injection prevention, audit logging |
-| State Mgmt | PRODUCTION | Optional | <3s | Versioning, migration, conflict resolution |
+| Pattern | Version | Complexity | Prerequisites | Time | Key Features |
+|---------|---------|------------|---------------|------|--------------|
+| 01 - Error Handling | v0.7.0 | PRODUCTION | None | <3s | Safe invocation, retry, circuit breaker, aggregation |
+| 02 - Rate Limiting | v0.7.0 | PRODUCTION | None | <2s | Token bucket, sliding window, adaptive limiting |
+| 03 - Caching | v0.7.0 | PRODUCTION | None | <3s | LRU, TTL-based, write-through, statistics |
+| 04 - Multi-Agent | v0.7.0 | PRODUCTION | API Key | <30s | Delegation, pipelines, consensus building |
+| 05 - Webhooks | v0.7.0 | PRODUCTION | Network | <5s | Retry logic, signatures, batching, circuit breaker |
+| 06 - Performance | v0.7.0 | PRODUCTION | None | <3s | Timing, memory tracking, percentiles, reports |
+| 07 - Security | v0.7.0 | PRODUCTION | None | <2s | Validation, injection prevention, audit logging |
+| 08 - State Mgmt | v0.7.0 | PRODUCTION | Optional | <3s | Versioning, migration, conflict resolution |
+| RAG-01 - Multi-Tenant | v0.8.0 | PRODUCTION | RAG Config | <20s | Tenant isolation, quota management, admin ops |
+| RAG-02 - Session RAG | v0.8.0 | INTERMEDIATE | RAG Config | <15s | Conversational memory, context windows, replay |
+| RAG-03 - Cost Opt | v0.8.0 | INTERMEDIATE | RAG Config | <20s | Caching, batching, tiered processing, budgets |
 
 ## 🎯 When to Use Each Pattern
 
@@ -122,6 +151,41 @@ Use when you need:
 - Distributed state handling
 - Schema migration support
 
+### Multi-Tenant RAG (RAG-01)
+Use when you need:
+- Isolated vector stores per customer
+- Tenant-specific knowledge bases
+- Usage tracking and quotas
+- Cross-tenant admin operations
+- Enterprise SaaS with strict data isolation
+
+### Session RAG (RAG-02)
+Use when you need:
+- Conversational memory in chat apps
+- Context-aware responses
+- Session replay capabilities
+- Temporary knowledge stores
+- Research assistants with contextual memory
+
+### RAG Cost Optimization (RAG-03)
+Use when you need:
+- Reduced embedding API costs (up to 70% savings)
+- Efficient document processing
+- Smart caching strategies
+- Budget enforcement
+- High-volume document ingestion
+
+## 🆕 Phase 8 RAG Enhancements
+
+The three RAG patterns (RAG-01, RAG-02, RAG-03) introduce production-ready vector storage patterns:
+
+- **Multi-Tenancy**: Complete isolation between customer knowledge bases
+- **Session Management**: Conversational memory with automatic cleanup
+- **Cost Optimization**: Reduce embedding costs by up to 70% with smart caching
+- **HNSW Algorithm**: High-performance approximate nearest neighbor search
+- **Bi-temporal Metadata**: Track both event time and ingestion time
+- **TTL Support**: Automatic document expiration for compliance
+
 ## 🏗️ Production Architecture
 
 ### Layered Defense Strategy
@@ -178,10 +242,10 @@ Coordinator Agent
 
 ## 🔗 Learning Path
 
-1. **Start Here**: [Getting Started](../getting-started/) - Learn basics
+1. **Start Here**: [Getting Started](../getting-started/) - Learn basics (6 examples)
 2. **Then Here**: [Features](../features/) - Explore capabilities
-3. **You Are Here**: Cookbook - Production patterns
-4. **Next**: [Applications](../applications/) - Complete systems
+3. **You Are Here**: Cookbook - Production patterns (11 patterns including Phase 8 RAG)
+4. **Next**: [Applications](../applications/) - Complete systems (9 applications)
 
 ## 📚 Additional Resources
 

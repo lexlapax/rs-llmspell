@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ConfigChangeType"],"struct":["ConfigAuditEntry","ConfigBridge","ConfigPermissions","ImmutableSettings"]};

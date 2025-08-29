@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["StateClass"],"struct":["StateClassConfig"]};

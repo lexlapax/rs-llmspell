@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["inject_session_global"]};

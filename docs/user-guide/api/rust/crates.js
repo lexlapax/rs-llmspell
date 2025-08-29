@@ -1,2 +1,0 @@
-window.ALL_CRATES = ["llmspell","llmspell_agents","llmspell_bridge","llmspell_cli","llmspell_config","llmspell_core","llmspell_events","llmspell_hooks","llmspell_providers","llmspell_security","llmspell_sessions","llmspell_state_persistence","llmspell_state_traits","llmspell_storage","llmspell_test","llmspell_testing","llmspell_tools","llmspell_utils","llmspell_workflows"];
-//{"start":21,"fragment_lengths":[10,18,18,15,18,16,18,17,21,20,20,29,24,19,16,19,17,17,21]}

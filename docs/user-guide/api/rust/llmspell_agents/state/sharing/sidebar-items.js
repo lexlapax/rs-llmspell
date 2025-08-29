@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SharingPattern"],"struct":["SharedStateAccessor","SharedStateChannel","StateMessage","StateSharingManager"],"trait":["SharedStateAgent"]};

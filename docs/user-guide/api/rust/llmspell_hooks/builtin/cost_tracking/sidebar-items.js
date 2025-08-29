@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["AlertLevel"],"struct":["BudgetAlert","CostBreakdown","CostTrackingConfig","CostTrackingHook","CostTrackingMetrics","ModelPricing","ProviderPricing","TokenUsage"]};

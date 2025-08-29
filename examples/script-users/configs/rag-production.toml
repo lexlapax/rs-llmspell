@@ -1,0 +1,84 @@
+# Production RAG Configuration
+# Battle-tested settings for production deployments
+# Focuses on reliability, monitoring, and security
+
+[rag]
+enabled = true
+multi_tenant = true  # Usually want tenant isolation in production
+
+[rag.vector_storage]
+# Standard production dimensions
+dimensions = 768  # Good balance of accuracy and performance
+
+backend = "hnsw"  # Always use real backend in production
+
+# Persistent storage with backups
+persistence_path = "/var/lib/llmspell/rag/vectors"
+
+# Conservative memory limits
+max_memory_mb = 4096  # 4GB, adjust based on your server
+
+# Balanced HNSW settings
+[rag.vector_storage.hnsw]
+m = 16                     # Balanced
+ef_construction = 200      # Good quality
+ef_search = 50            # Balanced speed/accuracy
+max_elements = 5000000    # 5M vectors
+metric = "cosine"
+allow_replace_deleted = true
+num_threads = 4           # Conservative threading
+
+[rag.embedding]
+# Production provider with fallback
+default_provider = "openai"
+
+# Production caching strategy
+cache_enabled = true
+cache_size = 20000        # Moderate cache
+cache_ttl_seconds = 1800  # 30 minutes
+
+# Reliable batch processing
+batch_size = 32          # Standard batching
+timeout_seconds = 45      # Reasonable timeout
+max_retries = 3          # Standard retries
+
+[rag.chunking]
+# Production-tested chunking
+strategy = "sliding_window"
+chunk_size = 512
+overlap = 64
+max_chunk_size = 2048
+min_chunk_size = 100
+
+[rag.cache]
+# Conservative caching
+search_cache_enabled = true
+search_cache_size = 5000
+search_cache_ttl_seconds = 600  # 10 minutes
+
+document_cache_enabled = true
+document_cache_size_mb = 256
+
+# Production monitoring
+[rag.monitoring]
+enable_metrics = true
+metrics_export_interval = 60
+enable_health_checks = true
+alert_on_errors = true
+error_threshold_per_minute = 10
+
+# Security settings
+[rag.security]
+enable_audit_logging = true
+audit_log_path = "/var/log/llmspell/rag-audit.log"
+enable_rate_limiting = true
+rate_limit_per_user = 100  # Per minute
+enable_input_validation = true
+max_input_size_kb = 100
+
+# Backup and recovery
+[rag.backup]
+enable_auto_backup = true
+backup_interval_hours = 24
+backup_retention_days = 30
+backup_path = "/backup/llmspell/rag"

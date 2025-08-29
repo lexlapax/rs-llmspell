@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["web_scraper"],"struct":["ApiTesterTool","SitemapCrawlerTool","UrlAnalyzerTool","WebhookCallerTool","WebpageMonitorTool"]};

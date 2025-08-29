@@ -112,6 +112,26 @@ pub enum Commands {
         #[arg(long)]
         stream: bool,
 
+        /// Enable RAG functionality (overrides config)
+        #[arg(long)]
+        rag: bool,
+
+        /// Disable RAG functionality (overrides config)
+        #[arg(long)]
+        no_rag: bool,
+
+        /// Custom RAG configuration file
+        #[arg(long, value_name = "FILE")]
+        rag_config: Option<PathBuf>,
+
+        /// Override vector storage dimensions
+        #[arg(long, value_name = "SIZE")]
+        rag_dims: Option<usize>,
+
+        /// Override vector storage backend (hnsw, mock)
+        #[arg(long, value_name = "BACKEND")]
+        rag_backend: Option<String>,
+
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
@@ -126,6 +146,26 @@ pub enum Commands {
         /// Enable streaming output
         #[arg(long)]
         stream: bool,
+
+        /// Enable RAG functionality (overrides config)
+        #[arg(long)]
+        rag: bool,
+
+        /// Disable RAG functionality (overrides config)
+        #[arg(long)]
+        no_rag: bool,
+
+        /// Custom RAG configuration file
+        #[arg(long, value_name = "FILE")]
+        rag_config: Option<PathBuf>,
+
+        /// Override vector storage dimensions
+        #[arg(long, value_name = "SIZE")]
+        rag_dims: Option<usize>,
+
+        /// Override vector storage backend (hnsw, mock)
+        #[arg(long, value_name = "BACKEND")]
+        rag_backend: Option<String>,
     },
 
     /// Start interactive REPL
@@ -239,6 +279,20 @@ pub enum AppsSubcommand {
 
     /// Create complete web applications
     WebappCreator {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// Personal knowledge management with semantic search
+    KnowledgeBase {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// AI-powered personal productivity assistant
+    PersonalAssistant {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,

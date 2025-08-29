@@ -24,6 +24,8 @@ llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-sessions = { path = "../llmspell-sessions" }
+llmspell-rag = { path = "../llmspell-rag" }
+llmspell-tenancy = { path = "../llmspell-tenancy" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true
@@ -45,8 +47,10 @@ boa_engine = { workspace = true, optional = true }
 
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
-criterion = { version = "0.5", features = ["html_reports"] }
+llmspell-tenancy = { path = "../llmspell-tenancy" }
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 tempfile = "3.0"
+rand = "0.8"
 
 [features]
 default = ["lua"]
@@ -64,6 +68,10 @@ harness = false
 
 [[bench]]
 name = "session_bench"
+harness = false
+
+[[bench]]
+name = "rag_bench"
 harness = false
 
 [[test]]

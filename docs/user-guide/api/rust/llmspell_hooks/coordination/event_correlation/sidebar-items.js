@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["EventType","TraceStatus"],"struct":["CorrelationId","CorrelatorConfig","EventCorrelator","EventMetrics","EventTrace","TraceAnalysis","TraceEvent"]};

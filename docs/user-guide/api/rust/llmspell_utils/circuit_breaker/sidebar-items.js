@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["CircuitBreakerError","CircuitState"],"struct":["CircuitBreaker","CircuitBreakerConfig","CircuitBreakerManager","CircuitMetrics","CircuitMetricsCollector","ServicePresets","StateTransition","ThresholdConfig"],"type":["CircuitBreakerResult"]};

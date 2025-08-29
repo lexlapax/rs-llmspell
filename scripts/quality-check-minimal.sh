@@ -31,11 +31,11 @@ fi
 # 2. Run clippy
 echo ""
 echo "2. Running clippy lints..."
-if cargo clippy --workspace --all-features -- -D warnings > /dev/null 2>&1; then
+if cargo clippy --workspace --all-features --all-targets -- -D warnings > /dev/null 2>&1; then
     echo -e "${GREEN}✅ Clippy lints passed${NC}"
 else
     echo -e "${RED}❌ Clippy lints failed${NC}"
-    echo "   Run: cargo clippy --workspace --all-features"
+    echo "   Run: cargo clippy --workspace --all-features --all-targets -- -D warnings"
     OVERALL_SUCCESS=1
 fi
 

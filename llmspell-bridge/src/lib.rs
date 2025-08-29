@@ -267,6 +267,9 @@ pub mod agent_bridge;
 pub mod agents;
 pub mod monitoring;
 
+// RAG bridge module
+pub mod rag_bridge;
+
 // Workflow modules (consolidated)
 pub mod orchestration;
 pub mod workflow_performance;

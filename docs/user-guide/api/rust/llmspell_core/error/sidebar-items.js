@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ErrorCategory","ErrorSeverity","LLMSpellError"],"type":["Result"]};

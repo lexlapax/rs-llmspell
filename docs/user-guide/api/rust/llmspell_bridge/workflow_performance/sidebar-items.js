@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["get_workflow_info_cached"],"struct":["ExecutionCache","OptimizedConverter","PerformanceMetrics","WorkflowTypeInfo"]};

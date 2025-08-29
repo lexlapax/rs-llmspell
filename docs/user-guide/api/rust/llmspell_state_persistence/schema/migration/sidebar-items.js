@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["FieldMapping","MigrationPlannerError"],"struct":["DataTransformation","MigrationPlan","MigrationPlanner","MigrationStats"]};

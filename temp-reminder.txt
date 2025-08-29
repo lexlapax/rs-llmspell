@@ -7,3 +7,6 @@
 - agent, workflow, tool - BaseAgent, should probably have a save output, save output stream function at the rust level.
 - in phase 7 we redid state 
 - remove invoke and just use execute in agent.
+- debug for scripts not working
+- remove custom steps or document it properly
+- agent templates 

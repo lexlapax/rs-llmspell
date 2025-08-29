@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["FileFormat"],"struct":["BufferOutput","FileOutput","MultiOutput","NullOutput","StdoutOutput"],"trait":["DebugOutput"]};

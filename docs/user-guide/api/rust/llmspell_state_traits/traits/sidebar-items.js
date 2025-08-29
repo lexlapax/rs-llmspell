@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["ComponentStateBackup","ComponentStateMetadata","TransactionId"],"trait":["ComponentStatePersistence","StateManager","StateMigration","StateObserver","StateObserverRegistry","StatePersistence","StateTransaction","TypedStatePersistence"]};

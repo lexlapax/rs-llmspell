@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AgentAssertions","LifecycleEventRecorder","ResourceUsage","TestConfig","TestFeatureFlags","TestHarness","TestInteraction","TestMetrics","TestResult","TestScenarioBuilder"]};

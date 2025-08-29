@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["agent_execution_data","error_data","tool_execution_data","workflow_step_data"]};

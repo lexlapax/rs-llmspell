@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ValidationError","ValidationRuleType","ValidationSeverity"],"struct":["MigrationValidator","ValidationIssue","ValidationResult","ValidationRule","ValidationRules"]};

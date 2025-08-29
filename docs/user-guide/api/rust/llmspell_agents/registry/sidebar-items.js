@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["categories","discovery","metadata","persistence","registration","types"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["LoopIterator","ResultAggregation"],"struct":["BreakCondition","LoopConfig","LoopConfigBuilder","LoopWorkflow","LoopWorkflowBuilder","LoopWorkflowResult"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ServiceCheckType"],"struct":["ServiceCheckResult","ServiceCheckerConfig","ServiceCheckerTool"]};

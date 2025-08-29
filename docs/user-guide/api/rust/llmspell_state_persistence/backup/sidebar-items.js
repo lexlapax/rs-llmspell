@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["atomic","cleanup","compression","events","manager","recovery","retention"],"struct":["BackupValidation","RestoreOptions"],"type":["BackupId","BackupResult"]};

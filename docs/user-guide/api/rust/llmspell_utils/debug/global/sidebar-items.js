@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["debug","error","info","set_level","timer","trace","warn"]};

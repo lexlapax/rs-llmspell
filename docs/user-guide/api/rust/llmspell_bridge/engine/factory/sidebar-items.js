@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ModuleResolution","StdlibLevel"],"fn":["register_engine_plugin","unregister_engine_plugin"],"struct":["EngineFactory","EngineInfo","JSConfig","JSConfigBuilder","LuaConfig","LuaConfigBuilder"],"trait":["ScriptEnginePlugin"]};

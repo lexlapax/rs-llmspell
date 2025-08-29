@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["BreakerState"],"struct":["BreakerConfig","BreakerConfigBuilder","CircuitBreaker","CircuitBreakerManager","CircuitBreakerStats"]};

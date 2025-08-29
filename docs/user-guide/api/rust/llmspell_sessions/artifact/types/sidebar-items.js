@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"constant":["MAX_ARTIFACT_NAME_LENGTH","MAX_ARTIFACT_SIZE","MAX_TAG_LENGTH"],"enum":["ArtifactType"],"struct":["ArtifactId","ArtifactMetadata","ArtifactVersion"],"type":["ContentHash"]};

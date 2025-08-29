@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["LifecyclePhase"],"struct":["LifecycleMiddlewareChain","LoggingMiddleware","MetricsMiddleware","MiddlewareBehaviorFlags","MiddlewareConfig","MiddlewareContext","MiddlewareExecutionResult","SecurityMiddleware"],"trait":["LifecycleMiddleware"]};

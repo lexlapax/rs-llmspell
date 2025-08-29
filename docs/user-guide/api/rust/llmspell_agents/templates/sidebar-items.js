@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["create_builtin_templates"],"mod":["base","customization","monitor_agent","orchestrator_agent","prelude","schema","tool_agent","validation"]};

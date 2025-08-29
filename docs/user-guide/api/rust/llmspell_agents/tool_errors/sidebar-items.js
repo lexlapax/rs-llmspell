@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ErrorRecoveryStrategy","ErrorSeverity","RecoveryAction","ToolIntegrationError"],"struct":["ErrorContext","ErrorRecord","StepError","ToolErrorHandler"],"type":["ErrorCallback","RecoveryCallback"]};

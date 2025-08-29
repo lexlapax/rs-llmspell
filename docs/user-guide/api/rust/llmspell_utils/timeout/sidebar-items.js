@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["TimeoutError"],"fn":["with_timeout","with_timeout_config"],"struct":["CancellableTimeout","TimeoutBuilder","TimeoutConfig","TimeoutManager"],"trait":["TimeoutExt"]};

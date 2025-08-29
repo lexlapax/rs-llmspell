@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["graphql_query","http_request"]};

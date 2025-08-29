@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ExpectedOutput"],"struct":["ScenarioConfig","ScenarioResult","ScenarioRunner","TestResult","TestScenarios"]};

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["AccessType","Permission"],"struct":["AccessAuditEntry","AccessControlConfig","AccessControlEntry","AccessControlList","AccessControlManager"]};

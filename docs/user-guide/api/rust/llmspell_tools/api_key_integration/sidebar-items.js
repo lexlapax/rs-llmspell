@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["add_api_key","get_api_key","get_api_key_manager"],"struct":["ApiKeyConfig"],"trait":["RequiresApiKey"]};

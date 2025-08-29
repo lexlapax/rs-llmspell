@@ -19,16 +19,17 @@ members = [
     "llmspell-state-persistence",
     "llmspell-state-traits",
     "llmspell-sessions",
+    "llmspell-rag",
     "examples/rust-developers/extension-pattern-example",
     "examples/rust-developers/builder-pattern-example", 
     "examples/rust-developers/custom-tool-example",
     "examples/rust-developers/custom-agent-example",
     "examples/rust-developers/async-patterns-example",
     "examples/rust-developers/integration-test-example"
-]
+, "llmspell-tenancy"]
 
 [workspace.package]
-version = "0.7.0"
+version = "0.8.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
 repository = "https://github.com/lexlapax/rs-llmspell"

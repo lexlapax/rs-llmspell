@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ComplexityLevel","ParameterConstraint","ParameterType","SchemaVersion","TemplateCategory"],"struct":["CapabilityRequirement","ParameterDefinition","ResourceRequirements","TemplateMetadata","TemplateSchema","ToolDependency"]};

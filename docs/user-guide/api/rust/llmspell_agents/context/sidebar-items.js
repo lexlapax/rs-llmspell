@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["distributed","event_integration","hierarchy","inheritance","shared_memory"]};

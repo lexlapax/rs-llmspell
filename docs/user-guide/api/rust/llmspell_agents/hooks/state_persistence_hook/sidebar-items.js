@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["EventPersistenceSettings","PersistenceConfig","PersistenceMetrics","StatePersistenceHook"]};

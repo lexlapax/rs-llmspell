@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["DelegationStrategy"],"struct":["DelegatingAgent","DelegatingAgentBuilder","DelegationConfig","DelegationMetrics","DelegationRequest","DelegationResult"]};

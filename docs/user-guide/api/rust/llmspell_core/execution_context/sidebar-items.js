@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ContextScope","InheritancePolicy"],"struct":["ExecutionContext","ExecutionContextBuilder","SecurityContext","SharedMemory"]};

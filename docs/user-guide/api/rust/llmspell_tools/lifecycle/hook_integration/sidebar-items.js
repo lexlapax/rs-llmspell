@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ToolExecutionPhase"],"struct":["AuditConfig","AuditLogEntry","ExecutionMetrics","HookFeatures","ToolExecutor","ToolHookContext","ToolLifecycleConfig"],"trait":["HookableToolExecution"]};

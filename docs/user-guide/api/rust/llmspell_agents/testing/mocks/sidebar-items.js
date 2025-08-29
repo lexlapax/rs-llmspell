@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["MockAgent","MockAgentBuilder","MockAgentConfig","MockResponse","MockTool","TestDoubles"]};

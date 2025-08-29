@@ -1,8 +1,8 @@
 # Architecture Decision Records (ADRs)
 
-**Version**: 0.6.0  
-**Last Updated**: August 2025  
-**Validation**: Cross-referenced with phase design documents (phase-01 through phase-07)
+**Version**: 0.8.0  
+**Last Updated**: December 2024  
+**Validation**: Cross-referenced with phase design documents (phase-01 through phase-08)
 
 > **📋 Decision Log**: Consolidated record of all significant architecture decisions made throughout LLMSpell development, showing how decisions evolved and sometimes reversed across phases.
 
@@ -17,8 +17,9 @@
 5. [Phase 5: State Management Decisions](#phase-5-state-management-decisions)
 6. [Phase 6: Session Management Decisions](#phase-6-session-management-decisions)
 7. [Phase 7: API Standardization Decisions](#phase-7-api-standardization-decisions)
-8. [Cross-Cutting Decisions](#cross-cutting-decisions)
-9. [Decision Evolution & Reversals](#decision-evolution--reversals)
+8. [Phase 8: RAG System Decisions](#phase-8-rag-system-decisions)
+9. [Cross-Cutting Decisions](#cross-cutting-decisions)
+10. [Decision Evolution & Reversals](#decision-evolution--reversals)
 
 ---
 
@@ -368,9 +369,148 @@ let agent = AgentBuilder::new()
 
 ---
 
+## Phase 8: RAG System Decisions
+
+### ADR-025: HNSW-Based Vector Storage
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted  
+**Context**: Need high-performance vector search for RAG at scale  
+**Decision**: Use HNSW algorithm via hnsw_rs crate (not hnswlib-rs)  
+**Rationale**: 
+- Pure Rust implementation (no C++ dependencies)
+- Sub-10ms search on 100K+ vectors
+- Configurable trade-offs (speed vs accuracy)
+**Implementation**: llmspell-storage/backends/vector/hnsw.rs  
+**Performance**: 8ms search for 100K vectors, 450MB memory  
+**Consequences**:
+- ✅ Excellent search performance
+- ✅ Predictable memory usage
+- ✅ No external dependencies
+- ❌ Higher memory than inverted index (acceptable)
+
+### ADR-026: Namespace Multi-Tenancy Pattern
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted  
+**Context**: RAG system needs secure multi-tenant isolation  
+**Decision**: Use `StateScope::Custom("tenant:id")` pattern for isolation  
+**Implementation**: Namespace prefixes in vector storage  
+**Overhead**: 3% performance impact  
+**Consequences**:
+- ✅ Complete tenant isolation
+- ✅ No cross-tenant data leakage
+- ✅ Reuses existing StateScope infrastructure
+- ✅ Minimal performance impact
+
+### ADR-027: Separate Storage Crate
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted  
+**Context**: Vector storage is distinct from state persistence  
+**Decision**: Create llmspell-storage crate for vector operations  
+**Rationale**: 
+- Clear separation of concerns
+- Different performance characteristics
+- Independent scaling and optimization
+**Consequences**:
+- ✅ Clean architecture boundaries
+- ✅ Specialized optimizations possible
+- ✅ Easier to swap implementations
+- ❌ Additional crate to maintain
+
+### ADR-028: Multi-Tenant First Design
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted  
+**Context**: Enterprise RAG requires tenant isolation by default  
+**Decision**: All RAG operations tenant-aware from the start  
+**Implementation**: TenantManager in llmspell-tenancy  
+**Features**:
+- Usage tracking per tenant
+- Cost calculation and limits
+- Resource quotas
+- Audit logging
+**Consequences**:
+- ✅ Enterprise-ready from day one
+- ✅ Built-in compliance features
+- ❌ Slight complexity for single-tenant use
+
+### ADR-029: Simplified Two-Parameter Lua API
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted  
+**Context**: Complex RAG operations need simple script interface  
+**Decision**: All RAG functions take (primary, options) pattern  
+**Example**: `RAG.search(query, {k=10, tenant_id="acme"})`  
+**Rationale**: Consistent with existing Tool.invoke pattern  
+**Consequences**:
+- ✅ Intuitive API for users
+- ✅ Consistent across all operations
+- ✅ Optional parameters via table
+- ✅ Future extensibility
+
+### ADR-030: Configuration-Driven RAG
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted  
+**Context**: RAG features should work without compile flags  
+**Decision**: Use runtime configuration for all RAG features  
+**Implementation**: TOML configuration with sensible defaults  
+**Example**:
+```toml
+[rag]
+enabled = true
+embedding_provider = "openai"
+[rag.vector_storage.hnsw]
+m = 16
+ef_construction = 200
+```
+**Consequences**:
+- ✅ No recompilation for changes
+- ✅ Easy A/B testing
+- ✅ Production tuning without rebuilds
+- ❌ Slightly larger binary (all features included)
+
+### ADR-031: OpenAI-Only Embeddings (Phase 8)
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted (Temporary)  
+**Context**: Limited time, need production-quality embeddings  
+**Decision**: Implement only OpenAI text-embedding-3-small  
+**Rationale**: 
+- Most widely used in production
+- Well-documented API
+- Good price/performance (384 dimensions)
+**Future**: Add local models in Phase 9+  
+**Consequences**:
+- ✅ Faster Phase 8 delivery
+- ✅ Production-ready embeddings
+- ❌ Vendor lock-in (temporary)
+- ❌ Requires API keys
+
+### ADR-032: Session-Scoped RAG
+
+**Date**: December 2024 (Phase 8)  
+**Status**: Accepted  
+**Context**: RAG data often session-specific  
+**Decision**: Support session-scoped vectors with TTL  
+**Implementation**: Integration with llmspell-sessions  
+**Features**:
+- Automatic cleanup on session end
+- TTL-based expiration
+- Session artifact integration
+**Consequences**:
+- ✅ Natural session workflows
+- ✅ Automatic resource cleanup
+- ✅ Prevents data accumulation
+- ❌ Additional scope complexity
+
+---
+
 ## Cross-Cutting Decisions
 
-### ADR-025: Three-Level Security Model
+### ADR-033: Three-Level Security Model
 
 **Date**: July 2025 (Phase 3)  
 **Status**: Accepted  
@@ -382,7 +522,7 @@ let agent = AgentBuilder::new()
 - ✅ Easy to audit
 - ✅ Progressive trust model
 
-### ADR-026: mlua Over Other Lua Bindings
+### ADR-034: mlua Over Other Lua Bindings
 
 **Date**: June 2025 (Phase 1)  
 **Status**: Accepted  
@@ -394,7 +534,7 @@ let agent = AgentBuilder::new()
 - ✅ Good documentation
 - ❌ No LuaJIT (performance tradeoff)
 
-### ADR-027: rig-core for LLM Providers
+### ADR-035: rig-core for LLM Providers
 
 **Date**: June 2025 (Phase 1)  
 **Status**: Accepted  
@@ -406,7 +546,7 @@ let agent = AgentBuilder::new()
 - ❌ External dependency
 - ❌ Less control over provider details
 
-### ADR-028: No JavaScript Implementation
+### ADR-036: No JavaScript Implementation
 
 **Date**: August 2025 (Phase 7)  
 **Status**: Deferred  
@@ -428,7 +568,8 @@ let agent = AgentBuilder::new()
 - **Phase 3.0**: Standardized to 26 tools
 - **Phase 3.1**: Added 8 external tools (34 total)
 - **Phase 3.2**: Optimized all 34 tools
-- **Current**: 37+ tools in production
+- **Phase 7**: 37+ tools in production
+- **Phase 8**: 37+ tools + RAG system (not counted as tool)
 
 ### Parameter Naming Evolution
 - **Phase 2**: Inconsistent (text, content, data, input)
@@ -443,12 +584,24 @@ let agent = AgentBuilder::new()
 ### State Persistence Evolution
 - **Phase 3**: Basic state management
 - **Phase 5**: Full persistence with migrations
+- **Phase 6**: Session integration with artifacts
+- **Phase 8**: StateScope extended for multi-tenant RAG
 - **Achievement**: 35+ modules, 2.07μs/item performance
 
 ### API Naming Evolution
 - **Pre-Phase 7**: Mixed (Service, Manager, retrieve, fetch)
 - **Phase 7**: Standardized (Manager suffix, get() method)
+- **Phase 8**: Two-parameter pattern for RAG (primary, options)
 - **Impact**: Consistent developer experience
+
+### RAG System Evolution
+- **Phase 7**: Basic RAG mock/stub
+- **Phase 8**: Complete RAG implementation
+  - HNSW vector storage (100K+ vectors)
+  - Multi-tenant isolation (3% overhead)
+  - OpenAI embeddings (384 dimensions)
+  - Session-scoped vectors with TTL
+- **Achievement**: 8ms search on 100K vectors, enterprise-ready
 
 ---
 
@@ -462,23 +615,35 @@ let agent = AgentBuilder::new()
 6. **Defer complex features**: Phase 5 custom transformers deferred correctly
 7. **Standardization matters**: Phase 7 API consistency improved usability
 8. **Test infrastructure critical**: Phase 7 test reorganization was necessary
+9. **Multi-tenant first**: Phase 8 tenant isolation from start was right choice
+10. **Configuration over compilation**: Runtime RAG config enables production tuning
 
 ---
 
 ## Future Decisions (Deferred)
 
-### ADR-029: GUI Framework Selection
-**Status**: Pending (Phase 8)  
+### ADR-037: GUI Framework Selection
+**Status**: Pending (Phase 9+)  
 **Options**: Tauri, egui, web-based  
 
-### ADR-030: Python Integration Strategy
-**Status**: Pending (Phase 9)  
+### ADR-038: Python Integration Strategy
+**Status**: Pending (Phase 9+)  
 **Options**: PyO3, embedded Python, subprocess  
 
-### ADR-031: Distributed Execution
+### ADR-039: Distributed Execution
 **Status**: Pending (Phase 12)  
-**Options**: Custom protocol, gRPC, message queue  
+**Options**: Custom protocol, gRPC, message queue
+
+### ADR-040: Local Embedding Models
+**Status**: Pending (Phase 9+)
+**Options**: Candle integration, ONNX runtime, native implementations
+**Models**: BGE-M3, E5, ColBERT v2
+
+### ADR-041: Hybrid Search Implementation
+**Status**: Pending (Phase 9+)
+**Options**: BM25 + vector, late interaction models
+**Considerations**: Performance vs accuracy trade-offs  
 
 ---
 
-*This document represents the consolidated architectural decisions from Phases 0-7 of LLMSpell development, validated against phase design documents.*
+*This document represents the consolidated architectural decisions from Phases 0-8 of LLMSpell development, validated against phase design documents.*

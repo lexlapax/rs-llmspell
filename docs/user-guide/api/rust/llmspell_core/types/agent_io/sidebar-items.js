@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["AgentInput","AgentInputBuilder","AgentOutput","AgentOutputBuilder","OutputMetadata","ToolCall","ToolOutput"]};

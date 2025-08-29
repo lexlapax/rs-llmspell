@@ -11,6 +11,8 @@ pub mod hook_global;
 pub mod injection;
 pub mod json_global;
 pub mod provider_global;
+pub mod rag_global;
+pub mod rag_infrastructure;
 pub mod registry;
 pub mod replay_global;
 pub mod session_global;
@@ -31,68 +33,23 @@ pub use types::{GlobalContext, GlobalMetadata, GlobalObject};
 use llmspell_core::Result;
 use std::sync::Arc;
 
-/// Initialize the standard global registry with all core globals
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Global registration fails
-/// - Registry building fails
-pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalRegistry> {
-    let mut builder = GlobalRegistryBuilder::new();
-
-    // Register core globals in dependency order
+/// Register core globals (json, logger, config, debug)
+fn register_core_globals(builder: &mut GlobalRegistryBuilder) {
     builder.register(Arc::new(json_global::JsonGlobal::new()));
     builder.register(Arc::new(core::LoggerGlobal::new()));
     builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
-
-    // Register Debug global for unified debugging infrastructure
     builder.register(Arc::new(debug_global::DebugGlobal::new()));
+}
 
-    // Create StateGlobal with migration support if configured
-    let state_global = if let Some(runtime_config) =
-        context.get_bridge::<llmspell_config::LLMSpellConfig>("runtime_config")
-    {
-        if runtime_config.runtime.state_persistence.enabled {
-            // Initialize state infrastructure
-            use crate::globals::state_infrastructure::get_or_create_state_infrastructure;
-            match get_or_create_state_infrastructure(
-                &context,
-                &runtime_config.runtime.state_persistence,
-            )
-            .await
-            {
-                Ok(infrastructure) => Arc::new(state_global::StateGlobal::with_full_support(
-                    infrastructure.state_manager,
-                    infrastructure.migration_engine,
-                    infrastructure.schema_registry,
-                    infrastructure.backup_manager,
-                )),
-                Err(e) => {
-                    tracing::warn!(
-                        "Failed to initialize state infrastructure: {}, falling back to in-memory",
-                        e
-                    );
-                    Arc::new(state_global::StateGlobal::new())
-                }
-            }
-        } else {
-            Arc::new(state_global::StateGlobal::new())
-        }
-    } else {
-        Arc::new(state_global::StateGlobal::new())
-    };
+/// Register session and artifact globals if `SessionManager` is available
+fn register_session_artifacts(
+    builder: &mut GlobalRegistryBuilder,
+    context: &Arc<GlobalContext>,
+) -> Option<Arc<llmspell_sessions::manager::SessionManager>> {
+    let session_manager_opt =
+        context.get_bridge::<llmspell_sessions::manager::SessionManager>("session_manager");
 
-    builder.register(state_global);
-    builder.register(Arc::new(core::UtilsGlobal::new()));
-    // TODO: Add Security global when implemented
-    builder.register(Arc::new(event_global::EventGlobal::new()));
-
-    // Register Session and Artifact globals if SessionManager is available
-    if let Some(session_manager) =
-        context.get_bridge::<llmspell_sessions::manager::SessionManager>("session_manager")
-    {
-        // Create bridges externally for consistency with HookBridge pattern
+    if let Some(session_manager) = session_manager_opt.clone() {
         let session_bridge = Arc::new(crate::session_bridge::SessionBridge::new(
             session_manager.clone(),
         ));
@@ -105,22 +62,69 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
         )));
     }
 
-    // Create HookBridge for hook system integration
+    session_manager_opt
+}
+
+/// Register RAG global if all dependencies are available
+async fn register_rag_global(
+    builder: &mut GlobalRegistryBuilder,
+    context: &Arc<GlobalContext>,
+    session_manager_opt: Option<Arc<llmspell_sessions::manager::SessionManager>>,
+) {
+    // Try to get vector storage from infrastructure
+    let vector_storage = context
+        .get_bridge::<crate::globals::rag_infrastructure::RAGInfrastructure>("rag_infrastructure")
+        .and_then(|infra| infra.vector_storage.clone());
+
+    if let (Some(state_manager), Some(session_manager), Some(multi_tenant_rag)) = (
+        context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager"),
+        session_manager_opt,
+        context.get_bridge::<llmspell_rag::multi_tenant_integration::MultiTenantRAG>(
+            "multi_tenant_rag",
+        ),
+    ) {
+        match rag_global::RAGGlobal::with_managers(
+            context.registry.clone(),
+            context.providers.clone(),
+            state_manager,
+            session_manager,
+            multi_tenant_rag,
+            vector_storage,
+        )
+        .await
+        {
+            Ok(rag_global) => {
+                builder.register(Arc::new(rag_global));
+            }
+            Err(e) => {
+                tracing::warn!("Failed to initialize RAG global: {}", e);
+            }
+        }
+    }
+}
+
+/// Register hook and tool related globals
+fn register_hook_and_tools(
+    builder: &mut GlobalRegistryBuilder,
+    context: &Arc<GlobalContext>,
+) -> Result<()> {
     let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone())?);
-    builder.register(Arc::new(hook_global::HookGlobal::new(hook_bridge.clone())));
-
-    // Register replay global for hook debugging
+    builder.register(Arc::new(hook_global::HookGlobal::new(hook_bridge)));
     builder.register(Arc::new(replay_global::ReplayGlobal::new()));
-
     builder.register(Arc::new(tool_global::ToolGlobal::new(
         context.registry.clone(),
     )));
-
-    // Register Provider global for LLM provider information
     builder.register(Arc::new(provider_global::ProviderGlobal::new(
         context.providers.clone(),
     )));
+    Ok(())
+}
 
+/// Register agent and workflow globals
+async fn register_agent_workflow(
+    builder: &mut GlobalRegistryBuilder,
+    context: &Arc<GlobalContext>,
+) -> Result<()> {
     // Create agent global with state manager if available
     let agent_global = if let Some(state_manager) =
         context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
@@ -149,6 +153,74 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
             },
         );
     builder.register(Arc::new(workflow_global));
+
+    Ok(())
+}
+
+/// Create `StateGlobal` with migration support if configured
+async fn create_state_global(context: &Arc<GlobalContext>) -> Arc<state_global::StateGlobal> {
+    if let Some(runtime_config) =
+        context.get_bridge::<llmspell_config::LLMSpellConfig>("runtime_config")
+    {
+        if runtime_config.runtime.state_persistence.enabled {
+            use crate::globals::state_infrastructure::get_or_create_state_infrastructure;
+            match get_or_create_state_infrastructure(
+                context,
+                &runtime_config.runtime.state_persistence,
+            )
+            .await
+            {
+                Ok(infrastructure) => {
+                    return Arc::new(state_global::StateGlobal::with_full_support(
+                        infrastructure.state_manager,
+                        infrastructure.migration_engine,
+                        infrastructure.schema_registry,
+                        infrastructure.backup_manager,
+                    ));
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to initialize state infrastructure: {}, falling back to in-memory",
+                        e
+                    );
+                }
+            }
+        }
+    }
+    Arc::new(state_global::StateGlobal::new())
+}
+
+/// Initialize the standard global registry with all core globals
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Global registration fails
+/// - Registry building fails
+pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalRegistry> {
+    let mut builder = GlobalRegistryBuilder::new();
+
+    // Register core globals
+    register_core_globals(&mut builder);
+
+    // Create and register StateGlobal
+    let state_global = create_state_global(&context).await;
+
+    builder.register(state_global);
+    builder.register(Arc::new(core::UtilsGlobal::new()));
+    builder.register(Arc::new(event_global::EventGlobal::new()));
+
+    // Register session and artifact globals
+    let session_manager_opt = register_session_artifacts(&mut builder, &context);
+
+    // Register RAG global if dependencies available
+    register_rag_global(&mut builder, &context, session_manager_opt).await;
+
+    // Register hook and tool globals
+    register_hook_and_tools(&mut builder, &context)?;
+
+    // Register agent and workflow globals
+    register_agent_workflow(&mut builder, &context).await?;
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 

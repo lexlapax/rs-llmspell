@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["SecurityAction","SecurityEventType","SecuritySeverity"],"struct":["SecurityConfig","SecurityEvent","SecurityHook","SecurityRule","SecurityStorage"]};

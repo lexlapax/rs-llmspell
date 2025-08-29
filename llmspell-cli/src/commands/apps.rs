@@ -89,6 +89,26 @@ pub async fn execute_apps_command(
             )
             .await
         }
+        Some(AppsSubcommand::KnowledgeBase { args }) => {
+            run_embedded_app(
+                "knowledge-base",
+                engine,
+                runtime_config,
+                args,
+                output_format,
+            )
+            .await
+        }
+        Some(AppsSubcommand::PersonalAssistant { args }) => {
+            run_embedded_app(
+                "personal-assistant",
+                engine,
+                runtime_config,
+                args,
+                output_format,
+            )
+            .await
+        }
     }
 }
 

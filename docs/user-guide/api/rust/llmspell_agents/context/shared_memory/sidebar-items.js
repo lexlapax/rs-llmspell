@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["ChangeType","MemoryPermission"],"struct":["AccessStats","MemoryChange","MemoryLimits","MemoryRegion","MemoryStats","RegionMetadata","SharedMemoryManager"]};

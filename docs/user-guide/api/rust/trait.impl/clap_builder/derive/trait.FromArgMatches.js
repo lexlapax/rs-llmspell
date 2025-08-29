@@ -1,9 +1,0 @@
-(function() {
-    var implementors = Object.fromEntries([["llmspell_cli",[["impl FromArgMatches for <a class=\"enum\" href=\"llmspell_cli/cli/enum.Commands.html\" title=\"enum llmspell_cli::cli::Commands\">Commands</a>"],["impl FromArgMatches for <a class=\"enum\" href=\"llmspell_cli/commands/backup/enum.BackupSubcommand.html\" title=\"enum llmspell_cli::commands::backup::BackupSubcommand\">BackupSubcommand</a>"],["impl FromArgMatches for <a class=\"enum\" href=\"llmspell_cli/commands/keys/enum.KeysSubcommand.html\" title=\"enum llmspell_cli::commands::keys::KeysSubcommand\">KeysSubcommand</a>"],["impl FromArgMatches for <a class=\"struct\" href=\"llmspell_cli/cli/struct.Cli.html\" title=\"struct llmspell_cli::cli::Cli\">Cli</a>"],["impl FromArgMatches for <a class=\"struct\" href=\"llmspell_cli/commands/backup/struct.BackupCommand.html\" title=\"struct llmspell_cli::commands::backup::BackupCommand\">BackupCommand</a>"],["impl FromArgMatches for <a class=\"struct\" href=\"llmspell_cli/commands/keys/struct.KeysCommand.html\" title=\"struct llmspell_cli::commands::keys::KeysCommand\">KeysCommand</a>"]]],["llmspell_test",[["impl FromArgMatches for <a class=\"enum\" href=\"llmspell_test/enum.Commands.html\" title=\"enum llmspell_test::Commands\">Commands</a>"],["impl FromArgMatches for <a class=\"struct\" href=\"llmspell_test/struct.Cli.html\" title=\"struct llmspell_test::Cli\">Cli</a>"]]]]);
-    if (window.register_implementors) {
-        window.register_implementors(implementors);
-    } else {
-        window.pending_implementors = implementors;
-    }
-})()
-//{"start":57,"fragment_lengths":[1061,291]}

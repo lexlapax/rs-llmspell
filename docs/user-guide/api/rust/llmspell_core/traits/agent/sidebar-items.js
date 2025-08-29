@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["MessageRole"],"struct":["AgentConfig","ConversationMessage"],"trait":["Agent"]};

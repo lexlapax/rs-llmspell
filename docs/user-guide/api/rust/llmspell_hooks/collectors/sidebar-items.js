@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"fn":["is_size_acceptable","should_sample"],"mod":["agent_output","tool_result"],"struct":["ArtifactData","CollectionConfig"],"trait":["ArtifactCollector"]};

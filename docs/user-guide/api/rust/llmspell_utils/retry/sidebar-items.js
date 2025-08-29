@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["RetryError"],"fn":["retry","retry_default"],"struct":["AlwaysRetry","HttpStatusRetryPolicy","RetryBuilder","RetryConfig"],"trait":["RetryPolicy"]};

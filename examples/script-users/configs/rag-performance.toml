@@ -1,0 +1,67 @@
+# Performance-Optimized RAG Configuration
+# This configuration is tuned for maximum performance
+# Trade-offs: Higher memory usage, more CPU cores required
+
+[rag]
+enabled = true
+multi_tenant = false  # Single-tenant for maximum performance
+
+[rag.vector_storage]
+# Use high-dimensional embeddings for accuracy
+dimensions = 1536  # OpenAI ada-002 or similar
+
+backend = "hnsw"
+
+# Fast SSD storage recommended
+persistence_path = "/mnt/fast-ssd/rag/vectors"
+
+# Maximum memory allocation
+max_memory_mb = 8192  # 8GB for vector storage
+
+# HNSW tuned for speed
+[rag.vector_storage.hnsw]
+m = 48                      # More connections for faster search
+ef_construction = 500       # High quality index
+ef_search = 200            # Fast, accurate search
+max_elements = 50000000    # Support 50M vectors
+metric = "cosine"
+allow_replace_deleted = false  # Avoid cleanup overhead
+num_threads = 16           # Use all available cores
+
+[rag.embedding]
+# Use fastest available provider
+default_provider = "openai"  # Or local GPU model
+
+# Maximum caching for speed
+cache_enabled = true
+cache_size = 100oonai  # 100K embeddings cached
+cache_ttl_seconds = 86400  # 24 hour cache
+
+# Optimize for throughput
+batch_size = 128          # Large batches
+timeout_seconds = 120      # Allow time for large batches
+max_retries = 2           # Fewer retries, fail fast
+
+[rag.chunking]
+# Optimize chunk size for your use case
+strategy = "sliding_window"
+chunk_size = 1024         # Larger chunks for context
+overlap = 256             # Good overlap for continuity
+max_chunk_size = 4096     # Support longer documents
+min_chunk_size = 200
+
+[rag.cache]
+# Aggressive caching for performance
+search_cache_enabled = true
+search_cache_size = 50000       # Cache many searches
+search_cache_ttl_seconds = 3600 # 1 hour cache
+
+document_cache_enabled = true
+document_cache_size_mb = 2048   # 2GB document cache
+
+# Performance monitoring (optional)
+[rag.performance]
+enable_metrics = true
+metrics_interval_seconds = 60
+log_slow_operations = true
+slow_operation_threshold_ms = 100

@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"enum":["Format"],"fn":["convert_format","from_json","from_json_or_default","from_toml","from_yaml","merge_json","merge_toml","to_json","to_json_pretty","to_json_with_indent","to_toml","to_toml_pretty","to_yaml","validate_json_fields"],"macro":["json"]};

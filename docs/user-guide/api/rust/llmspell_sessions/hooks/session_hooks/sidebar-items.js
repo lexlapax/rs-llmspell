@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["SessionCheckpointHook","SessionEndHook","SessionHookRegistry","SessionRestoreHook","SessionSaveHook","SessionStartHook"]};

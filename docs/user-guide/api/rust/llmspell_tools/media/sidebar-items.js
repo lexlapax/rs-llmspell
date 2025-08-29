@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"mod":["audio_processor","image_processor","video_processor"]};

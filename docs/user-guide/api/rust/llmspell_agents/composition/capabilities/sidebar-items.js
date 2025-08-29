@@ -1,1 +1,0 @@
-window.SIDEBAR_ITEMS = {"struct":["CapabilityAggregator","CapabilityEntry","CapabilityMatch","CapabilityRequirement","CapabilityRequirementBuilder","CapabilityStatistics","CapabilityUsageStats","DefaultCapabilityScorer"],"trait":["CapabilityScorer"]};

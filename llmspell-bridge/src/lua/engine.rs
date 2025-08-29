@@ -324,6 +324,28 @@ impl ScriptEngineBridge for LuaEngine {
                         }
                     }
                 }
+
+                // Initialize RAG infrastructure if enabled
+                if runtime_config.rag.enabled {
+                    use crate::globals::rag_infrastructure::get_or_create_rag_infrastructure;
+                    match futures::executor::block_on(get_or_create_rag_infrastructure(
+                        &global_context,
+                        &runtime_config.rag,
+                    )) {
+                        Ok(infrastructure) => {
+                            // Store the infrastructure for RAGGlobal to use
+                            global_context
+                                .set_bridge("rag_infrastructure", Arc::new(infrastructure));
+                            tracing::debug!("RAG infrastructure initialized successfully");
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to initialize RAG infrastructure: {}, RAG global will not be available",
+                                e
+                            );
+                        }
+                    }
+                }
             }
 
             let global_registry =
