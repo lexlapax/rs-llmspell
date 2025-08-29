@@ -4,17 +4,18 @@
 
 **🔗 Navigation**: [← Project Home](../README.md) | [Examples](../examples/) | [Contributing](../CONTRIBUTING.md)
 
-> **📖 Documentation Hub**: All documentation for rs-llmspell v0.8.0 (Phase 8 Complete). Consolidated, validated, and organized for clarity. **Phase 8 adds complete RAG system with multi-tenant vector storage.**
+> **📖 Documentation Hub**: All documentation for rs-llmspell v0.8.0 (Phase 8 Complete). Fully consolidated, validated, and organized for clarity. **Phase 8 adds complete RAG system with HNSW vector storage and multi-tenant isolation.**
 
 ---
 
-## Documentation Structure (Post-Consolidation)
+## Documentation Structure (Phase 8 Complete)
 
 ### 📘 [User Guide](user-guide/) - *For Script Writers*
 **Purpose**: Practical guides for using rs-llmspell to build LLM-driven scripts and workflows.
 
-**Status**: ✅ Consolidated from 38→7 essential files  
-**Contents**: Getting started, concepts, configuration, API reference (Lua/Rust), troubleshooting  
+**Status**: ✅ Consolidated with comprehensive API documentation  
+**Contents**: Getting started, concepts, configuration, complete API reference (Lua + 20 Rust crates), troubleshooting  
+**Key Files**: `getting-started.md`, `concepts.md`, `configuration.md`, `api/lua/README.md`  
 **Start here if**: You want to write Lua scripts that use LLMs and tools
 
 ---
@@ -22,9 +23,11 @@
 ### 🔧 [Developer Guide](developer-guide/) - *For Contributors*  
 **Purpose**: Technical guides for developers contributing to or extending rs-llmspell.
 
-**Status**: ✅ Complete and current  
-**Contents**: Tool development, security implementation, testing strategies, contribution workflows  
-**Start here if**: You want to create custom tools, contribute code, or understand development
+**Status**: ✅ Consolidated from 10+ files → 4 comprehensive guides  
+**Contents**: Onboarding guide, extension patterns, production deployment, examples reference  
+**Key Files**: `developer-guide.md`, `extending-llmspell.md`, `production-guide.md`, `examples-reference.md`  
+**Phase 8 Additions**: RAG pipeline builder, llmspell-utils patterns, multi-tenant implementation  
+**Start here if**: You want to create custom tools, contribute code, or deploy to production
 
 ---
 
@@ -32,8 +35,9 @@
 **Purpose**: Core architectural documentation and implementation decisions.
 
 **Status**: ✅ Updated for Phase 8 with RAG architecture  
-**Contents**: Current architecture, RAG architecture, performance tuning, security model, API standards  
-**Phase 8 Additions**: RAG architecture documentation, HNSW performance guide, multi-tenant patterns  
+**Contents**: Current architecture, master vision, RAG system guide, operational guide, architecture decisions  
+**Key Files**: `current-architecture.md`, `rag-system-guide.md`, `master-architecture-vision.md`  
+**Phase 8 Additions**: RAG system documentation, HNSW performance guide, multi-tenant patterns  
 **Start here if**: You need to understand system architecture, security, or performance
 
 ---
@@ -41,8 +45,8 @@
 ### 📚 [Archives](archives/) - *Historical Reference*
 **Purpose**: Preserve historical documents for reference.
 
-**Status**: 📦 50+ documents archived  
-**Contents**: Superseded technical docs (18), consolidated user guides (32), research notes  
+**Status**: 📦 100+ documents archived  
+**Contents**: Phase handoff packages, superseded technical docs, consolidated guides, research notes  
 **Note**: These documents may be outdated but provide historical context
 
 ---
@@ -50,8 +54,9 @@
 ### 🚧 [In-Progress](in-progress/) - *Development Tracking*
 **Purpose**: Track planning and implementation toward version 1.0.
 
-**Status**: 📋 Active development  
-**Contents**: Phase completion documents, implementation roadmaps, design documents  
+**Status**: 📋 Phase 8 Complete, Phase 9 Planning  
+**Contents**: Phase completion documents (PHASE00-08 DONE), implementation roadmaps, design documents  
+**Key Files**: `implementation-phases.md` (16-phase roadmap), `PHASE09-TODO.md`  
 **For**: Core team tracking progress
 
 ---
@@ -60,15 +65,16 @@
 
 **Production-Ready Features** (v0.8.0):
 - ✅ **37+ tools** across 9 categories (file, web, data, media, system)
+- ✅ **20 crates** with modular architecture
 - ✅ **Lua scripting** with 16 zero-import globals (including RAG)
-- ✅ **Agent infrastructure** with builder patterns and templates
+- ✅ **Agent infrastructure** with BaseAgent trait and builder patterns
 - ✅ **4 workflow patterns** (Sequential, Parallel, Conditional, Loop)
-- ✅ **RAG system** with HNSW vector search (<10ms on 1M vectors)
-- ✅ **Multi-tenant architecture** with namespace isolation (<5% overhead)
+- ✅ **RAG system** with HNSW vector search (<8ms @ 100K vectors)
+- ✅ **Multi-tenant architecture** with StateScope::Custom isolation (3% overhead)
 - ✅ **State persistence** with 3 backends (Memory, Sled, RocksDB)
 - ✅ **Hook system** with 40+ points and circuit breakers
 - ✅ **Event bus** with 90K+ events/sec throughput
-- ✅ **Enhanced security** with access control policies and sandbox
+- ✅ **60+ production examples** across 6 categories
 
 **What it doesn't do**:
 - ❌ GUI or web interface (CLI and library only)
@@ -81,40 +87,41 @@
 ## Quick Start Paths
 
 ### 🚀 **I want to use rs-llmspell**
-1. **[Getting Started](user-guide/getting-started.md)** - 5-minute setup
-2. **[Core Concepts](user-guide/concepts.md)** - Understand the basics
-3. **[Lua API Reference](user-guide/api/lua/)** - Complete API docs
-4. **[Examples](../examples/)** - Working code examples
+1. **[Getting Started](user-guide/getting-started.md)** - 5-minute setup with first script
+2. **[Core Concepts](user-guide/concepts.md)** - Understand tools, agents, workflows, RAG
+3. **[Lua API Reference](user-guide/api/lua/README.md)** - Complete API documentation
+4. **[Examples](../examples/script-users/)** - 60+ working examples
 
 ### 🔨 **I want to extend rs-llmspell**
-1. **[Developer Setup](developer-guide/README.md)** - Development environment
-2. **[Tool Development](developer-guide/tool-development-guide.md)** - Create tools
-3. **[API Style Guide](technical/api-style-guide.md)** - Coding standards
-4. **[Testing Guide](developer-guide/test-organization.md)** - Test your code
+1. **[Developer Guide](developer-guide/developer-guide.md)** - Complete onboarding
+2. **[Extending LLMSpell](developer-guide/extending-llmspell.md)** - Build tools, agents, RAG
+3. **[Production Guide](developer-guide/production-guide.md)** - Deploy to production
+4. **[Examples Reference](developer-guide/examples-reference.md)** - Learn from patterns
 
 ### 🏛️ **I need architectural understanding**
-1. **[Current Architecture](technical/current-architecture.md)** - What exists now
-2. **[Architecture Decisions](technical/architecture-decisions.md)** - Why it exists
-3. **[Security Model](technical/security-model.md)** - Security implementation
-4. **[Performance Benchmarks](technical/performance-benchmarks.md)** - Actual metrics
+1. **[Current Architecture](technical/current-architecture.md)** - 20 crates, Phase 8 complete
+2. **[RAG System Guide](technical/rag-system-guide.md)** - Vector storage, embeddings
+3. **[Master Vision](technical/master-architecture-vision.md)** - 16-phase roadmap
+4. **[Operational Guide](technical/operational-guide.md)** - Production operations
 
 ---
 
-## Phase 7 Documentation Achievements
+## Phase 8 Documentation Achievements
 
 ### Consolidation Results
-- **User Guide**: 38 files → 7 essential files (82% reduction)
-- **Technical Docs**: 35 files → 7 essential files (80% reduction)
-- **Total Archives**: 50+ documents moved to archives
-- **Validation**: All content verified against actual implementation
+- **Developer Guide**: 10+ files → 4 comprehensive guides (60% reduction)
+- **User Guide**: Complete API documentation for all 20 crates
+- **Technical Docs**: Added RAG system guide with HNSW and multi-tenant patterns
+- **Examples**: 60+ production examples with learning paths
+- **Total Archives**: 100+ documents preserved for historical reference
 
 ### Key Improvements
-1. ✅ **Single source of truth** for architecture (current-architecture.md)
-2. ✅ **Consolidated ADRs** from all phases (architecture-decisions.md)
-3. ✅ **Unified security documentation** (security-model.md)
-4. ✅ **Actual performance metrics** (performance-benchmarks.md)
-5. ✅ **Official API standards** (api-style-guide.md)
-6. ✅ **Clean navigation** with clear purpose for each document
+1. ✅ **RAG documentation** complete with pipeline builder patterns
+2. ✅ **llmspell-utils patterns** documented for first time
+3. ✅ **Multi-tenant implementation** with StateScope::Custom
+4. ✅ **BaseAgent trait hierarchy** fully documented
+5. ✅ **Sync bridge patterns** for Lua/JS integration
+6. ✅ **Performance targets** met (<8ms vector search @ 100K)
 
 ---
 
@@ -122,7 +129,7 @@
 
 ### Accuracy ✅
 - All code examples tested and working
-- API documentation matches v0.6.0 implementation
+- API documentation matches v0.8.0 implementation
 - Performance metrics from actual measurements
 - Architecture validated against codebase
 
@@ -133,10 +140,30 @@
 - Cross-references validated
 
 ### Maintenance 📋
-- Version tracking (v0.6.0)
-- Phase status clearly marked
+- Version tracking (v0.8.0)
+- Phase status clearly marked (Phase 8 Complete)
 - Update dates on all documents
 - Clear deprecation notices
+
+---
+
+## Examples Structure
+
+### 📚 [Script Users](../examples/script-users/) - 50+ Lua Examples
+- **Getting Started**: 6 progressive tutorials (hello world → RAG)
+- **Features**: Agent, tool, workflow, state, provider examples
+- **Cookbook**: 11 patterns (caching, RAG multi-tenant, error handling)
+- **Advanced Patterns**: Complex workflows, multi-agent orchestration
+- **Applications**: 9 full applications (webapp creator, knowledge base, etc.)
+- **Configs**: 15+ configuration examples for different scenarios
+
+### 🦀 [Rust Developers](../examples/rust-developers/) - 6 Reference Projects
+- Custom tool implementation
+- Custom agent creation
+- Builder patterns
+- Async patterns
+- Extension patterns
+- Integration testing
 
 ---
 
@@ -150,4 +177,4 @@
 
 ---
 
-**Last Updated**: August 2025 | **Version**: 0.6.0 (Phase 7 Complete) | **Next**: Phase 8 (GUI)
+**Last Updated**: December 2024 | **Version**: 0.8.0 (Phase 8 Complete) | **Next**: Phase 9 (Enhanced Observability)

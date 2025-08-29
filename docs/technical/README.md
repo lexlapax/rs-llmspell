@@ -1,6 +1,6 @@
-# Technical Documentation
+# Technical Documentation - LLMSpell v0.8.0
 
-**Deep technical reference for LLMSpell architecture and implementation**
+**Phase 8 Complete** - Consolidated Documentation Structure
 
 **🔗 Navigation**: [← Docs Hub](../) | [Project Home](../../) | [User Guide](../user-guide/) | [Developer Guide](../developer-guide/)
 
@@ -8,106 +8,84 @@
 
 ## Overview
 
-> **📊 Technical Reference**: Consolidated technical documentation for LLMSpell's architecture. All content validated against actual implementation with 35→7 files consolidation achieved.
+> **📊 Technical Reference**: Streamlined technical documentation for LLMSpell v0.8.0. Documentation consolidated from 9+ files to 4 comprehensive guides, all aligned with Phase 8 implementation including complete RAG system.
 
-**Version**: v0.8.0 (Phase 8 Complete) | **Status**: Production Architecture with RAG | **Last Updated**: December 2024
-
----
-
-## Core Documentation (10 Essential Files)
-
-### 📊 What We Built
-- **[current-architecture.md](current-architecture.md)** - **SINGLE SOURCE OF TRUTH** - The actual implementation architecture (20+ crates, 80K+ LOC, Phase 0-8 evolution)
-
-### 🧠 **NEW** RAG System Architecture (Phase 8)
-- **[rag-architecture.md](rag-architecture.md)** - **RAG SYSTEM ARCHITECTURE** - Complete RAG implementation with HNSW vector storage, multi-tenant isolation, and security policies
-- **[phase-8-performance-guide.md](phase-8-performance-guide.md)** - RAG performance optimization guide (<10ms search on 1M vectors, multi-tenant tuning)
-- **[hnsw-performance-tuning.md](hnsw-performance-tuning.md)** - HNSW algorithm parameter optimization for different use cases
-
-### 🎯 Why We Built It
-- **[architecture-decisions.md](architecture-decisions.md)** - All architectural decisions (30+ ADRs) showing evolution and reversals across phases
-
-### 🛡️ How It's Secured
-- **[security-model.md](security-model.md)** - Enhanced security architecture (RLS policies, access control, sandbox integration)
-
-### ⚡ How It Performs
-- **[performance-benchmarks.md](performance-benchmarks.md)** - Actual measured performance (all targets met/exceeded, validated metrics)
-
-### 📐 How to Build It
-- **[api-style-guide.md](api-style-guide.md)** - Official API standards (Phase 7-8 - naming, patterns, documentation requirements)
-
-### 🔮 Historical Reference
-- **[master-architecture-vision.md](master-architecture-vision.md)** - Original aspirational architecture (historical reference only, NOT current state)
-
-## Component Architecture References
-
-### 🐛 Debug Infrastructure
-- **[debug-infrastructure-architecture.md](debug-infrastructure-architecture.md)** - Complete debug system architecture (global manager, thread safety, performance optimization)
+**Version**: v0.8.0 | **Status**: Production with RAG | **Last Updated**: December 2024
 
 ---
 
-## Quick Navigation Guide
+## Core Documentation (4 Essential Guides)
+
+### 1. 📊 [Current Architecture](current-architecture.md)
+**Purpose**: Overview and navigation hub  
+**Coverage**: Complete system architecture from Phase 0-8  
+**Key Content**:
+- Component architecture (20 crates)
+- Performance characteristics
+- API surface (17+ globals including RAG)
+- Implementation reality vs vision
+
+### 2. 🎯 [Architecture Decisions](architecture-decisions.md)
+**Purpose**: All architectural decisions and rationale  
+**Coverage**: 36+ ADRs from Phase 0-8  
+**Key Content**:
+- Foundation decisions (BaseAgent, async-first)
+- Phase evolution and reversals
+- RAG system decisions (Phase 8)
+- Future decisions (deferred)
+
+### 3. ⚡ [Operational Guide](operational-guide.md)
+**Purpose**: Performance and security unified  
+**Coverage**: Complete operational reference  
+**Key Content**:
+- Performance benchmarks (all targets exceeded)
+- Security implementation (multi-tenant)
+- Monitoring and observability
+- Operational checklists
+
+### 4. 🚀 [RAG System Guide](rag-system-guide.md)
+**Purpose**: Complete RAG documentation  
+**Coverage**: Phase 8 RAG implementation  
+**Key Content**:
+- HNSW vector storage configuration
+- Multi-tenant architecture
+- Performance tuning (8ms @ 100K vectors)
+- Integration patterns
+
+---
+
+## Quick Start Navigation
 
 ### Understanding the System
-1. **Start**: [current-architecture.md](current-architecture.md) - What exists
-2. **Learn**: [architecture-decisions.md](architecture-decisions.md) - Why it exists
-3. **Secure**: [security-model.md](security-model.md) - How it's protected
-4. **Measure**: [performance-benchmarks.md](performance-benchmarks.md) - How fast it runs
-5. **Build**: [api-style-guide.md](api-style-guide.md) - How to extend it
+1. **Start**: [Current Architecture](current-architecture.md) - What we built
+2. **Learn**: [Architecture Decisions](architecture-decisions.md) - Why we built it
+3. **Operate**: [Operational Guide](operational-guide.md) - How to run it
+4. **RAG**: [RAG System Guide](rag-system-guide.md) - Vector search system
 
 ---
 
-## Key Architecture Facts
+## Phase 8 Achievements
 
-### System Scale (Validated)
-- **17 crates** in Cargo workspace
-- **71,000+ lines** of production Rust
-- **37+ tools** (evolved from 26→33→37)
-- **15 Lua globals** with zero-import pattern
-- **40+ hook points** with circuit breakers
-- **4 workflow types** (Sequential/Parallel/Conditional/Loop)
+### System Scale
+- **20 crates** in workspace (added llmspell-storage, llmspell-rag, llmspell-tenancy)
+- **~85K+ lines** of Rust code
+- **37+ tools** + complete RAG system
+- **17+ Lua globals** (including RAG)
+- **100K+ vectors** supported per tenant
 
-### Performance Achievements
-| Metric | Target | Actual | Status |
-|--------|--------|--------|--------|
-| Tool Init | <10ms | <10ms | ✅ |
-| Agent Creation | <50ms | ~10ms | ✅ 5x better |
-| Hook Overhead | <5% | <2% | ✅ |
-| Event Throughput | 50K/sec | 90K/sec | ✅ 1.8x |
-| State Migration | - | 2.07μs/item | ✅ |
+### Performance Highlights
+| Metric | Target | Phase 8 Actual | Status |
+|--------|--------|----------------|--------|
+| Vector Search (100K) | <10ms | 8ms | ✅ |
+| Embedding Generation | <100ms | ~80ms | ✅ |
+| Multi-tenant Overhead | <5% | 3% | ✅ |
+| Memory/100K vectors | <500MB | 450MB | ✅ |
 
-### Architecture Highlights
-- **BaseAgent Foundation**: Universal trait for all components
-- **Sync Bridge Pattern**: block_on() for Lua/JS integration  
-- **Global Injection**: 2-4ms for all 15 globals
-- **3-Level Security**: Safe/Restricted/Privileged
-- **Multi-Backend State**: Memory/Sled/RocksDB
-- **Builder Pattern**: Universal object creation
-
----
-
-## Phase 7 Documentation Achievements
-
-### Consolidation Complete ✅
-- **Before**: 35 scattered technical files
-- **After**: 7 organized essential files
-- **Reduction**: 80% file count reduction
-- **Archives**: 18 files archived (13 technical + 5 API planning)
-
-### What Was Done
-1. ✅ Created `current-architecture.md` - validated against all phase docs
-2. ✅ Created `architecture-decisions.md` - 28 ADRs from 7 phases
-3. ✅ Created `security-model.md` - merged 2 security docs
-4. ✅ Created `performance-benchmarks.md` - actual measured metrics
-5. ✅ Kept `api-style-guide.md` - Phase 7 official standards
-6. ✅ Archived 18 redundant/outdated files
-7. ✅ Updated all cross-references
-
-### Content Validation
-- All architecture validated against phase design docs
-- All performance metrics from actual measurements
-- All security features verified in implementation
-- All API patterns confirmed in codebase
+### Documentation Consolidation
+- **Before**: 9+ scattered files, mixed versions
+- **After**: 4 comprehensive guides, all v0.8.0
+- **Result**: 55% file reduction (9 → 4)
+- **Benefits**: Clearer navigation, no duplication, Phase 8 aligned
 
 ---
 
@@ -115,32 +93,29 @@
 
 ### For Users
 - **[User Guide](../user-guide/)** - How to use LLMSpell
-- **[Getting Started](../user-guide/getting-started.md)** - 5-minute quickstart
-- **[API Reference](../user-guide/api/)** - Lua and Rust APIs
+- **[Lua API](../user-guide/api/lua/)** - Script reference
+- **[Examples](../../examples/)** - Working examples
 
 ### For Developers
 - **[Developer Guide](../developer-guide/)** - Contributing guide
-- **[Tool Development](../developer-guide/tool-development-guide.md)** - Create tools
-- **[Test Organization](../developer-guide/test-organization.md)** - Testing strategy
+- **[Implementation Phases](../in-progress/implementation-phases.md)** - 16-phase roadmap
+- **[Phase 8 Design](../in-progress/phase-08-design-doc.md)** - RAG implementation
 
-### Archives
-- **[Technical Archives](../archives/technical/)** - 18 historical documents
-- **[User Guide Archives](../archives/user-guide/)** - 32 consolidated files
-
----
-
-## Document Status Table
-
-| File | Lines | Purpose | Validation |
-|------|-------|---------|------------|
-| current-architecture.md | 362 | Actual implementation | ✅ Code + Phases |
-| architecture-decisions.md | 484 | Design rationale (28 ADRs) | ✅ Phase docs |
-| security-model.md | 334 | Security implementation | ✅ Security crates |
-| performance-benchmarks.md | 257 | Measured performance | ✅ Test outputs |
-| api-style-guide.md | 529 | API standards | ✅ Phase 7 work |
-| master-architecture-vision.md | 20K+ | Original vision | 📚 Historical |
-| **README.md** | This file | Navigation hub | ✅ Current |
+### Reference
+- **[Master Vision](master-architecture-vision.md)** - Original aspirational architecture (historical)
 
 ---
 
-*Documentation reflects LLMSpell v0.6.0 after Phase 7 completion. Reduced from 35→7 files with full validation.*
+## Document Status
+
+| Document | Version | Lines | Last Updated | Status |
+|----------|---------|-------|--------------|--------|
+| current-architecture.md | v0.8.0 | 545 | Dec 2024 | ✅ Current |
+| architecture-decisions.md | v0.8.0 | 634 | Dec 2024 | ✅ Updated |
+| operational-guide.md | v0.8.0 | 550+ | Dec 2024 | ✅ New |
+| rag-system-guide.md | v0.8.0 | 650+ | Dec 2024 | ✅ New |
+| **Total** | **v0.8.0** | **~2400** | **Dec 2024** | **Production** |
+
+---
+
+*Technical documentation for LLMSpell v0.8.0 after Phase 8 RAG implementation. Consolidated from 9 files to 4 comprehensive guides.*

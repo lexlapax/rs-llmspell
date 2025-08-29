@@ -1,18 +1,29 @@
 # rs-llmspell
 
-**Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination at scale
+**Production-Ready AI Workflow Orchestration Platform** - Script-driven LLM coordination with RAG at scale
 
-**🎉 Version 0.7.0 - First MVP Release**
+**🚀 Version 0.8.0 - RAG & Multi-Tenant Vector Storage Complete**
 
-**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🚀 Get Started](#-quick-start)
+**🔗 Quick Links**: [📘 User Guide](docs/user-guide/) | [🔧 Developer Guide](docs/developer-guide/) | [📚 Examples](examples/) | [🚀 Get Started](#-quick-start) | [📖 Release Notes](RELEASE_NOTES_v0.8.0.md)
 
 ---
 
-## 🌟 Production Ready
+> **📝 Note**: rs-llmspell builds upon concepts from numerous open-source projects and owes special acknowledgment to [go-llms](https://github.com/lexlapax/go-llms), which was instrumental in rapidly prototyping early ideas. This Rust implementation supersedes go-llms, leveraging Rust's native compilation and zero-cost abstractions for production-grade performance and safety.
 
-rs-llmspell v0.7.0 is our **first production-ready MVP**, capable of orchestrating complex AI workflows with enterprise-grade reliability. Successfully validated through WebApp Creator - orchestrating **20 AI agents** to generate complete applications in **4.5 minutes**.
+---
+
+## 🌟 Production Ready with Enterprise RAG
+
+rs-llmspell v0.8.0 delivers **complete RAG infrastructure** with enterprise-grade vector storage, multi-tenant isolation, and high-performance search. Build knowledge-aware AI applications with persistent memory, <8ms vector search across 100K+ vectors, and 80% embedding cache hit rates.
 
 ## ✨ Key Features
+
+### 🧠 Complete RAG System (v0.8.0)
+- **HNSW Vector Storage**: <8ms search @ 100K vectors, <35ms @ 1M vectors
+- **Multi-Tenant Isolation**: StateScope::Custom("tenant:id") with 3% overhead
+- **Embedding Pipeline**: OpenAI, Cohere, HuggingFace with 80% cache hit rate
+- **RAGPipelineBuilder**: Fluent API for constructing RAG pipelines
+- **Hybrid Search**: Vector + keyword with configurable weights
 
 ### 🤖 Multi-Agent Orchestration
 - Coordinate 2-20+ AI agents in complex workflows
@@ -20,52 +31,46 @@ rs-llmspell v0.7.0 is our **first production-ready MVP**, capable of orchestrati
 - Real-time state sharing between agents
 - Automatic error recovery and retry logic
 
-### 🧠 RAG & Vector Search (Phase 8)
-- **Production HNSW**: <10ms vector search across 1M+ vectors with >95% recall
-- **Multi-Tenant RAG**: Complete data isolation with tenant-scoped operations
-- **Intelligent Chunking**: Semantic, fixed-size, and recursive document processing
-- **Hybrid Retrieval**: Vector similarity + keyword search with reranking
-- **Session-Aware**: Conversation memory and cross-session context retention
-
-### 🛠️ 34+ Built-in Tools
+### 🛠️ 37+ Built-in Tools (v0.8.0)
 - File operations, web search, data processing
+- **NEW**: pdf-processor, document-chunker, embedding-generator
+- **NEW**: vector-search, similarity-calculator, web-scraper
 - JSON/YAML manipulation, text transformation
-- API testing, webhook calling, database connectivity
 - All tools run in secure sandboxes
 
-### 📦 7 Production Applications (RAG-Enhanced)
-Progressive complexity from Universal to Expert:
-- **file-organizer** (2 agents): Smart file organization with content analysis
-- **content-creator** (4 agents): Multi-format content generation  
-- **communication-manager** (5 agents): Business communication with template knowledge
-- **code-review-assistant** (8 agents): Code review with codebase RAG knowledge
-- **webapp-creator** (20 agents): AI-driven development with pattern library knowledge
+### 📦 9 Production Applications
+Progressive complexity with RAG capabilities:
+- **file-organizer** (2 agents): Smart organization with content analysis
+- **knowledge-base** (NEW): RAG-powered knowledge management
+- **research-assistant** (NEW): Document analysis with citations
+- **webapp-creator** (20 agents): Full-stack generation with pattern library
 
 ### 🔒 Enterprise Security & Multi-Tenancy
-- **Multi-Tenant Isolation**: Complete data separation with zero cross-tenant access
-- **Advanced Access Control**: Policy-based authorization with row-level security
-- **Mandatory Sandboxing**: All tool executions in isolated environments
-- **Resource Boundaries**: Configurable CPU, memory, and I/O limits per tenant
-- **Audit Compliance**: Complete audit trails with security event correlation
+- **Complete Tenant Isolation**: Zero cross-tenant data leakage
+- **Row-Level Security**: Policy-based access control
+- **Mandatory Sandboxing**: All tool executions isolated
+- **Resource Boundaries**: Per-tenant CPU, memory, I/O limits
+- **Audit Compliance**: Complete trails with event correlation
 
-### ⚡ Blazing Performance
-- Agent creation: **2-3ms** (94% faster than target)
-- Tool initialization: **1-2ms**
-- State operations: **<1ms**
-- **Vector search: <10ms** across 1M+ vectors (Phase 8)
-- **RAG retrieval: <5ms** with context assembly (Phase 8)
-- **Multi-tenant overhead: <3%** per tenant (Phase 8)
-- WebApp generation: **4.5 minutes** for 20 agents
+### ⚡ Blazing Performance (v0.8.0)
+- **Vector search**: <8ms @ 100K vectors, <35ms @ 1M vectors
+- **Embedding generation**: 45ms with caching (80% hit rate)
+- **Multi-tenant overhead**: 3% (40% better than target)
+- **Ingestion throughput**: 1.8K vectors/sec
+- Agent creation: 2-3ms
+- Tool initialization: 1-2ms
+- State operations: <1ms
+- WebApp generation: 4.5 minutes (20 agents)
 
 ## Platform Support
 
 | Platform | Status | Notes |
 |----------|--------|-------|
-| macOS 15.7 (ARM64) | ✅ Fully Tested | All features working on Apple Silicon |
+| macOS 15.7 (ARM64) | ✅ Fully Tested | All features including RAG working |
 | Linux | ⏳ Testing Pending | Expected to work, formal testing in progress |
 | Windows | ⏳ Testing Pending | Expected to work, formal testing in progress |
 
-> **Note**: v0.7.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64). Linux and Windows testing is in progress. Please report any platform-specific issues.
+> **Note**: v0.8.0 has been thoroughly tested on macOS 15.7 (Darwin 24.6.0, ARM64) with complete RAG functionality. Linux and Windows testing is in progress.
 
 ## Quick Example
 
@@ -159,6 +164,34 @@ Session.resume(session.id)
 local artifacts = Artifact.list(session.id)
 ```
 
+### RAG Example (v0.8.0)
+
+```lua
+-- Ingest documents into RAG
+RAG.ingest({
+    content = "LLMSpell is a production-ready AI orchestration platform",
+    metadata = {source = "documentation", category = "overview"}
+})
+
+-- Search with hybrid retrieval
+local results = RAG.search("What is LLMSpell?", {
+    max_results = 5,
+    hybrid_weights = {vector = 0.7, keyword = 0.3}
+})
+
+-- Multi-tenant RAG
+local tenant_scope = "tenant:customer_123"
+RAG.ingest({
+    content = "Customer-specific knowledge",
+    metadata = {tenant = "customer_123"}
+}, tenant_scope)
+
+-- Only returns tenant's data
+local tenant_results = RAG.search("knowledge", {
+    scope = tenant_scope
+})
+```
+
 ## 🚀 Quick Start
 
 ### Easy Installation (Recommended)
@@ -228,36 +261,38 @@ cargo build --release
 
 ### Current: v0.8.0 - RAG & Multi-Tenancy ✅
 - **Phase 8 Completed**: Production RAG with HNSW vector search
-- Multi-tenant isolation with complete data separation
-- Advanced access control and security policies
-- 7 RAG-enhanced applications
-- <10ms vector search across 1M+ vectors
+- Multi-tenant isolation with StateScope::Custom
+- 3 new crates: llmspell-rag, llmspell-storage, llmspell-tenancy
+- 37+ tools with 11 new RAG/data tools
+- <8ms vector search @ 100K vectors achieved
 
-### Upcoming Feature Additions (Phases 9-16)
+### Next: Phase 9 - Enhanced Observability (Q1 2025)
+- **OpenTelemetry Integration**: Distributed tracing and metrics
+- **Performance Analytics**: Cost tracking and optimization
+- **Advanced Debugging**: Profilers and diagnostic tools
+- **Developer Experience**: Enhanced error messages and documentation
 
-#### Near Term (Q4 2025)
-- **Phase 9**: Visual Workflow Designer - Drag-and-drop UI for complex workflows
-- **Phase 10**: Distributed Execution - Multi-node orchestration with load balancing
-- **Phase 11**: LLM Router - Intelligent model selection and cost optimization
+### Upcoming Feature Additions (Phases 10-16)
 
-#### Medium Term (Q4 2025)
-- **Phase 11**: Fine-tuning Integration - Custom model training
+#### Near Term (2025)
+- **Phase 10**: Advanced Workflow Patterns - Complex orchestration
+- **Phase 11**: LLM Router - Intelligent model selection
 - **Phase 12**: JavaScript Bridge - Full JS/TypeScript support
-- **Phase 13**: IDE Plugins - VSCode and IntelliJ integration
 
-#### Long Term (2026)
+#### Medium Term (2025-2026)
+- **Phase 13**: IDE Plugins - VSCode and IntelliJ integration
 - **Phase 14**: Cloud Platform - Managed service offering
 - **Phase 15**: Mobile SDKs - iOS and Android libraries
 - **Phase 16**: Python Bridge - Complete Python integration
 
-*Note: From v0.7.0 onwards, updates will primarily add features rather than breaking existing functionality.*
+*Note: From v0.8.0 onwards, infrastructure is stable. Updates will add features without breaking existing functionality.*
 
 ## Documentation
 
 - **[Quick Start Guide](docs/user-guide/getting-started.md)** - Get started in 5 minutes
 - **[Documentation Hub](docs/README.md)** - Complete documentation index
-- **[Tool Reference](docs/user-guide/tool-reference.md)** - All 34 tools documented
-- **[Examples](examples/)** - Working code examples for all features
+- **[RAG System Guide](docs/technical/rag-system-guide.md)** - Complete RAG documentation
+- **[Examples](examples/)** - 60+ working examples with RAG patterns
 
 ## Development
 
@@ -288,4 +323,4 @@ This project is licensed under the Apache License, Version 2.0. See [LICENSE-APA
 
 ---
 
-**🎉 v0.8.0 Released**: Production RAG & Multi-Tenancy with HNSW vector search, complete tenant isolation, and 7 enhanced applications. See [Release Notes](RELEASE_NOTES_v0.8.0.md) for details.
+**🚀 v0.8.0 Released**: Complete RAG & Multi-Tenant Vector Storage with <8ms search @ 100K vectors, 80% embedding cache hit rate, and 9 production applications. See [Release Notes](RELEASE_NOTES_v0.8.0.md) for details.

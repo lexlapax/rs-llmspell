@@ -7,6 +7,13 @@
 
 > **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 8 development phases, validated against phase design documents (phase-01 through phase-08) and current codebase. **Phase 8 adds complete RAG system with multi-tenant vector storage.**
 
+## Related Documentation
+
+This overview document is supported by detailed guides:
+- **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-8
+- **[Operational Guide](./operational-guide.md)**: Performance benchmarks and security model  
+- **[RAG System Guide](./rag-system-guide.md)**: Complete RAG documentation including HNSW tuning
+
 ---
 
 ## Table of Contents
@@ -510,6 +517,20 @@ This architecture has been validated by:
 - Confirming performance measurements (including 8ms vector search)
 - Verifying API completeness (17+ globals with RAG)
 - Validating multi-tenant isolation and session integration
+
+---
+
+## Documentation Structure
+
+As of Phase 8 completion, technical documentation has been consolidated into 4 comprehensive guides:
+
+### Core Documents
+1. **current-architecture.md** (this file) - Overview and navigation
+2. **architecture-decisions.md** - All ADRs from Phase 0-8  
+3. **operational-guide.md** - Performance and security unified
+4. **rag-system-guide.md** - Complete RAG system documentation
+
+This consolidation reduces documentation from 9+ files to 4 comprehensive guides, all aligned with Phase 8 implementation.
 
 ---
 
