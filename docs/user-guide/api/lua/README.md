@@ -1094,7 +1094,7 @@ local point = handle:hook_point()
 
 ## RAG
 
-The `RAG` global provides Retrieval-Augmented Generation with vector storage.
+The `RAG` global provides Retrieval-Augmented Generation with vector storage, including temporal metadata support for Phase 9's Adaptive Memory System.
 
 ### Vector Search
 
@@ -1103,30 +1103,70 @@ Searches for similar vectors.
 
 ```lua
 local results = RAG.search("How do I create an agent?", {
-    limit = 5,
-    threshold = 0.7,
-    collection = "documentation"
+    limit = 5,            -- Number of results (also accepts 'k' or 'top_k')
+    threshold = 0.7,      -- Similarity threshold (0-1)
+    collection = "documentation",
+    scope = "tenant",     -- Scope type: "global", "tenant", "session", etc.
+    scope_id = "org-123", -- Scope identifier
+    tenant_id = "org-123" -- Alternative to scope/scope_id for tenant isolation
 })
 ```
+
+**Note**: Temporal query filters (`event_time_range`, `exclude_expired`) are implemented in the storage layer but not yet exposed through the Lua API. This functionality will be available in a future update.
 
 ### Data Ingestion
 
 #### RAG.ingest(data, options)
-Ingests data into vector storage.
+Ingests data into vector storage with support for temporal metadata.
 
 ```lua
+-- Single document with temporal metadata
 local success = RAG.ingest({
     content = "Agent creation guide...",
     metadata = {
         source = "docs/agents.md",
-        type = "documentation"
+        type = "documentation",
+        -- Temporal metadata (Phase 8.11.2)
+        timestamp = 1699564800,        -- Unix timestamp for event_time
+        created_at = "2024-11-09T12:00:00Z", -- ISO 8601 timestamp (alternative)
+        event_time = 1699564800,       -- When the event actually occurred
+        ttl = 86400,                   -- Time-to-live in seconds (24 hours)
+        ttl_seconds = 86400,           -- Alternative TTL field
+        expires_in = 3600              -- Expire in 1 hour (alternative)
     }
 }, {
     collection = "documentation",
     chunk_size = 500,
-    chunk_overlap = 50
+    chunk_overlap = 50,
+    tenant_id = "org-123"  -- For multi-tenant isolation
+})
+
+-- Multiple documents
+local success = RAG.ingest({
+    {
+        content = "First document",
+        metadata = { 
+            timestamp = os.time() - 3600,  -- Event from 1 hour ago
+            ttl = 7200                     -- Expires in 2 hours
+        }
+    },
+    {
+        content = "Second document",
+        metadata = {
+            event_time = os.time() - 86400, -- Event from yesterday
+            ttl_seconds = 604800            -- Expires in 1 week
+        }
+    }
 })
 ```
+
+**Temporal Metadata Fields**:
+- **`timestamp`**, **`created_at`**, or **`event_time`**: When the actual event occurred (Unix timestamp or ISO 8601 string)
+- **`ttl`**, **`ttl_seconds`**, or **`expires_in`**: Time-to-live in seconds before the vector expires
+- The system automatically tracks:
+  - `created_at`: When the vector was ingested (set automatically)
+  - `updated_at`: When the vector was last modified (set automatically)
+  - `expires_at`: Calculated from TTL if provided
 
 ### Configuration
 
@@ -1170,6 +1210,36 @@ RAG.configure_session("session-123", {
 })
 ```
 
+### Temporal Queries (Future)
+
+The storage layer supports bi-temporal queries for Phase 9's Adaptive Memory System. These will be exposed through the Lua API in a future update:
+
+```lua
+-- Future API - not yet available in Lua
+local results = RAG.search("query", {
+    -- Filter by when events actually occurred
+    event_time_range = {
+        from = os.time() - 86400,  -- Yesterday
+        to = os.time()              -- Now
+    },
+    
+    -- Filter by when we learned about the events
+    ingestion_time_range = {
+        from = os.time() - 3600,    -- Last hour
+        to = os.time()              -- Now
+    },
+    
+    -- Exclude expired vectors
+    exclude_expired = true
+})
+```
+
+**Bi-temporal Model Benefits**:
+- Query "What did we know last week about events from last month?"
+- Find recent events that were just discovered
+- Implement memory consolidation based on age and relevance
+- Automatic cleanup of expired memories
+
 ### Management
 
 #### RAG.cleanup_scope(scope)
@@ -1179,13 +1249,24 @@ Cleans up vectors in a scope.
 RAG.cleanup_scope("session:123")
 ```
 
-#### RAG.get_stats()
-Gets RAG statistics.
+#### RAG.get_stats(scope, scope_id)
+Gets RAG statistics for a specific scope.
 
 ```lua
-local stats = RAG.get_stats()
-print(stats.total_vectors)
-print(stats.collections)
+-- Global stats
+local stats = RAG.get_stats("global", nil)
+
+-- Tenant-specific stats
+local tenant_stats = RAG.get_stats("tenant", "org-123")
+
+-- Session-specific stats
+local session_stats = RAG.get_stats("session", "session-uuid")
+
+if stats then
+    print(stats.total_vectors)
+    print(stats.storage_bytes)
+    print(stats.namespace_count)
+end
 ```
 
 #### RAG.save()

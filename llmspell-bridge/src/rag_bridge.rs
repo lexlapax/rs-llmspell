@@ -374,9 +374,34 @@ impl RAGBridge {
                 ),
             );
 
-            let entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
+            // Check for timestamp in metadata to set event_time
+            let mut entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
                 .with_scope(state_scope.clone())
-                .with_metadata(metadata);
+                .with_metadata(metadata.clone());
+
+            // If document has a timestamp, use it as event_time
+            if let Some(timestamp_val) = metadata.get("timestamp") {
+                if let Some(timestamp_num) = timestamp_val.as_u64() {
+                    // Convert Unix timestamp to SystemTime
+                    let duration = std::time::Duration::from_secs(timestamp_num);
+                    if let Some(event_time) = std::time::UNIX_EPOCH.checked_add(duration) {
+                        entry = entry.with_event_time(event_time);
+                    }
+                } else if let Some(timestamp_str) = timestamp_val.as_str() {
+                    // Try to parse ISO 8601 timestamp
+                    if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(timestamp_str) {
+                        let event_time = std::time::SystemTime::from(parsed);
+                        entry = entry.with_event_time(event_time);
+                    }
+                }
+            }
+
+            // Check for TTL in metadata
+            if let Some(ttl_val) = metadata.get("ttl_seconds") {
+                if let Some(ttl_seconds) = ttl_val.as_u64() {
+                    entry = entry.with_ttl(ttl_seconds);
+                }
+            }
 
             vectors.push(entry);
         }
@@ -413,9 +438,34 @@ impl RAGBridge {
                 serde_json::Value::String(doc.text.clone()),
             );
 
-            let entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
+            // Check for timestamp in metadata to set event_time
+            let mut entry = llmspell_storage::VectorEntry::new(doc.id.clone(), embedding)
                 .with_scope(state_scope.clone())
-                .with_metadata(metadata);
+                .with_metadata(metadata.clone());
+
+            // If document has a timestamp, use it as event_time
+            if let Some(timestamp_val) = metadata.get("timestamp") {
+                if let Some(timestamp_num) = timestamp_val.as_u64() {
+                    // Convert Unix timestamp to SystemTime
+                    let duration = std::time::Duration::from_secs(timestamp_num);
+                    if let Some(event_time) = std::time::UNIX_EPOCH.checked_add(duration) {
+                        entry = entry.with_event_time(event_time);
+                    }
+                } else if let Some(timestamp_str) = timestamp_val.as_str() {
+                    // Try to parse ISO 8601 timestamp
+                    if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(timestamp_str) {
+                        let event_time = std::time::SystemTime::from(parsed);
+                        entry = entry.with_event_time(event_time);
+                    }
+                }
+            }
+
+            // Check for TTL in metadata
+            if let Some(ttl_val) = metadata.get("ttl_seconds") {
+                if let Some(ttl_seconds) = ttl_val.as_u64() {
+                    entry = entry.with_ttl(ttl_seconds);
+                }
+            }
 
             vectors.push(entry);
         }

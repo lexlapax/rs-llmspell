@@ -1,7 +1,7 @@
 # Configuration Guide
 
-**Version**: 0.6.0  
-**Last Updated**: August 2025
+**Version**: 0.8.10  
+**Last Updated**: December 2024
 
 > **📋 Quick Reference**: Complete configuration guide for LLMSpell including providers, security, resources, and external APIs.
 
@@ -14,13 +14,15 @@
 1. [Quick Start](#quick-start)
 2. [Configuration Files](#configuration-files)
 3. [LLM Providers](#llm-providers)
-4. [Security Settings](#security-settings)
-5. [Resource Limits](#resource-limits)
-6. [Tool Configuration](#tool-configuration)
-7. [External API Setup](#external-api-setup)
-8. [Deployment Profiles](#deployment-profiles)
-9. [Environment Variables](#environment-variables)
-10. [Troubleshooting](#troubleshooting)
+4. [RAG Configuration](#rag-configuration) ⭐ **Phase 8.10.6**
+5. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8.10.6**
+6. [State & Sessions](#state--sessions)
+7. [Security Settings](#security-settings)
+8. [Tool Configuration](#tool-configuration)
+9. [External API Setup](#external-api-setup)
+10. [Deployment Profiles](#deployment-profiles)
+11. [Environment Variables](#environment-variables)
+12. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -55,36 +57,60 @@ Using a configuration file:
 ```toml
 # config.toml - Complete configuration example
 
-[global]
-debug = false
-log_level = "info"
-working_directory = "/workspace"
+# Main runtime configuration
+[runtime]
+max_concurrent_scripts = 10
+script_timeout_seconds = 300
+enable_streaming = true
 
+# Provider configuration
 [providers]
-default = "openai/gpt-4o-mini"
+default_provider = "openai"
 
-[security]
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+default_model = "gpt-4o-mini"
+temperature = 0.7
+max_tokens = 2000
+
+# RAG (Retrieval-Augmented Generation) - Phase 8.10.6
+[rag]
+enabled = false  # Enable for RAG functionality
+multi_tenant = false
+
+[rag.vector_storage]
+dimensions = 384  # 384, 768, 1536, 3072
+backend = "hnsw"
+persistence_path = "./data/rag/vectors"
+max_memory_mb = 500
+
+[rag.vector_storage.hnsw]
+m = 16
+ef_construction = 200
+ef_search = 50
+max_elements = 1000000
+metric = "cosine"
+
+# Security configuration
+[runtime.security]
+allow_file_access = false
+allow_network_access = true
+allow_process_spawn = false
+max_memory_bytes = 50000000
+
+# State persistence
+[runtime.state_persistence]
 enabled = true
-mode = "enforce"  # enforce, permissive, disabled
+backend_type = "memory"
+migration_enabled = false
+backup_enabled = false
 
-[resources]
-default_limits = "default"  # strict, default, relaxed, unlimited
-
-[tools]
-enabled = ["*"]  # Enable all tools
-disabled = []    # Disable specific tools
-
-[state]
-backend = "memory"  # memory, sled, rocksdb
-persistence_enabled = false
-
-[hooks]
-enabled = true
-builtin = ["rate_limit", "security"]
-
+# Events system
 [events]
 enabled = true
 buffer_size = 10000
+emit_timing_events = true
 ```
 
 ### Configuration Hierarchy
@@ -204,6 +230,222 @@ default_model = "your-model"
 [providers.custom.headers]
 "X-Custom-Header" = "value"
 "X-API-Version" = "2024-01"
+```
+
+---
+
+## RAG Configuration ⭐ **Phase 8.10.6**
+
+LLMSpell includes comprehensive RAG (Retrieval-Augmented Generation) capabilities with HNSW vector storage, multi-tenant isolation, and cost optimization.
+
+### Basic RAG Setup
+
+```toml
+[rag]
+enabled = true
+multi_tenant = false  # Enable for tenant isolation
+
+# Vector storage configuration
+[rag.vector_storage]
+dimensions = 768      # 384, 768, 1536, 3072 supported
+backend = "hnsw"      # Only HNSW supported currently
+persistence_path = "./data/rag/vectors"
+max_memory_mb = 1024
+
+# HNSW algorithm parameters
+[rag.vector_storage.hnsw]
+m = 16                      # Connections per node
+ef_construction = 200       # Build-time search width
+ef_search = 100            # Query-time search width
+max_elements = 1000000     # Maximum vectors
+metric = "cosine"          # cosine, euclidean, inner_product
+allow_replace_deleted = true
+num_threads = 4
+```
+
+### Embedding Configuration
+
+```toml
+[rag.embedding]
+default_provider = "openai"  # Provider for embeddings
+cache_enabled = true         # 70% cost reduction
+cache_size = 20000          # Cached embeddings
+cache_ttl_seconds = 3600    # 1 hour cache
+batch_size = 32             # Batch processing
+timeout_seconds = 30
+max_retries = 3
+```
+
+### Document Chunking
+
+```toml
+[rag.chunking]
+strategy = "sliding_window"  # sliding_window, semantic, sentence
+chunk_size = 512            # Tokens per chunk
+overlap = 64               # Overlap between chunks
+max_chunk_size = 2048      # Hard limit
+min_chunk_size = 100       # Quality threshold
+```
+
+### RAG Caching (70% Cost Reduction)
+
+```toml
+[rag.cache]
+# Search result caching
+search_cache_enabled = true
+search_cache_size = 5000
+search_cache_ttl_seconds = 600
+
+# Document caching
+document_cache_enabled = true
+document_cache_size_mb = 200
+```
+
+### HNSW Optimization Profiles
+
+**Small Dataset (<10K vectors):**
+```toml
+[rag.vector_storage.hnsw]
+m = 12
+ef_construction = 100
+ef_search = 50
+max_elements = 10000
+```
+
+**Large Dataset (100K-1M vectors):**
+```toml
+[rag.vector_storage.hnsw]
+m = 32
+ef_construction = 400
+ef_search = 200
+max_elements = 1000000
+num_threads = 4
+```
+
+**Speed Optimized:**
+```toml
+[rag.vector_storage.hnsw]
+m = 8
+ef_construction = 50
+ef_search = 25
+```
+
+**Accuracy Optimized:**
+```toml
+[rag.vector_storage.hnsw]
+m = 48
+ef_construction = 500
+ef_search = 300
+```
+
+### Session Collections
+
+For conversational memory:
+
+```toml
+[rag.sessions]
+enable_session_collections = true
+session_collection_ttl = 3600  # 1 hour
+max_session_vectors = 1000
+auto_cleanup = true
+```
+
+### Supported Vector Dimensions
+
+| Dimensions | Model Example | Use Case |
+|------------|---------------|----------|
+| 384 | all-MiniLM-L6-v2 | Fast, small memory |
+| 768 | all-mpnet-base-v2 | Balanced |
+| 1536 | text-embedding-3-small | OpenAI standard |
+| 3072 | text-embedding-3-large | Maximum accuracy |
+
+---
+
+## Multi-Tenancy ⭐ **Phase 8.10.6**
+
+Complete tenant isolation for RAG and state data.
+
+### Basic Multi-Tenant Setup
+
+```toml
+[rag]
+enabled = true
+multi_tenant = true  # IMPORTANT: Enable tenant isolation
+
+[rag.multi_tenant_settings]
+max_vectors_per_tenant = 100000
+tenant_ttl_hours = 168        # 7 days retention
+auto_cleanup = true
+strict_isolation = true       # No cross-tenant access
+max_concurrent_operations = 10
+rate_limit_per_minute = 100
+```
+
+### Tenant Resource Quotas
+
+```toml
+[tenancy.quotas]
+# Storage limits per tenant
+max_storage_mb = 1000
+max_vectors = 50000
+max_collections = 10
+
+# Compute limits
+max_queries_per_minute = 100
+max_ingestion_rate = 50      # documents per minute
+max_concurrent_operations = 5
+
+# Cost control
+max_embedding_tokens_per_day = 100000
+billing_enabled = true
+```
+
+### Tenant Lifecycle
+
+```toml
+[tenancy.lifecycle]
+default_retention_days = 30
+auto_suspend_inactive_days = 7
+purge_deleted_after_days = 90
+backup_before_deletion = true
+```
+
+---
+
+## State & Sessions
+
+### State Persistence
+
+```toml
+[runtime.state_persistence]
+enabled = true
+backend_type = "sled"        # memory, sled, file
+migration_enabled = true
+backup_enabled = true
+backup_on_migration = true
+schema_directory = "./schemas"
+max_state_size_bytes = 10000000
+
+[runtime.state_persistence.backup]
+backup_dir = "./backups"
+compression_enabled = true
+compression_type = "zstd"
+compression_level = 3
+incremental_enabled = true
+max_backups = 10
+max_backup_age = 2592000     # 30 days
+```
+
+### Session Management
+
+```toml
+[runtime.sessions]
+enabled = true
+max_sessions = 100
+max_artifacts_per_session = 1000
+artifact_compression_threshold = 10240  # 10KB
+session_timeout_seconds = 3600
+storage_backend = "memory"   # memory, sled
 ```
 
 ---
@@ -458,62 +700,109 @@ from_email = "noreply@example.com"
 ### Development
 
 ```toml
-# config.dev.toml
-[global]
-debug = true
-log_level = "debug"
-
-[security]
-mode = "permissive"
-
-[resources]
-default_limits = "relaxed"
-```
-
-### Staging
-
-```toml
-# config.staging.toml
-[global]
-debug = false
-log_level = "info"
-
-[security]
-mode = "enforce"
-
-[resources]
-default_limits = "default"
-
-[monitoring]
+# rag-development.toml
+[rag]
 enabled = true
-metrics_port = 9090
+multi_tenant = false
+
+[rag.vector_storage]
+dimensions = 384
+backend = "hnsw" 
+max_memory_mb = 512
+
+[rag.vector_storage.hnsw]
+m = 8
+ef_construction = 50
+ef_search = 25
+max_elements = 10000
+num_threads = 2
+
+[rag.embedding]
+default_provider = "openai"
+cache_enabled = false      # Test fresh each time
+batch_size = 4            # Small batches for debugging
+timeout_seconds = 10
+
+[rag.cache]
+search_cache_enabled = false
+document_cache_enabled = false
 ```
 
 ### Production
 
 ```toml
-# config.prod.toml
-[global]
-debug = false
-log_level = "warn"
-
-[security]
-mode = "enforce"
-audit_level = "verbose"
-
-[resources]
-default_limits = "strict"
-enforce_limits = true
-
-[monitoring]
+# rag-production.toml
+[rag]
 enabled = true
-metrics_port = 9090
-alerts_enabled = true
+multi_tenant = true       # Enable tenant isolation
 
-[backup]
+[rag.vector_storage]
+dimensions = 768          # Better accuracy
+backend = "hnsw"
+persistence_path = "/var/lib/llmspell/rag/vectors"
+max_memory_mb = 4096
+
+[rag.vector_storage.hnsw]
+m = 16                    # Balanced performance
+ef_construction = 200
+ef_search = 50
+max_elements = 5000000    # 5M vectors
+num_threads = 4
+
+[rag.embedding]
+default_provider = "openai"
+cache_enabled = true      # 70% cost reduction
+cache_size = 20000
+cache_ttl_seconds = 1800  # 30 minutes
+batch_size = 32
+timeout_seconds = 45
+max_retries = 3
+
+[rag.cache]
+search_cache_enabled = true
+search_cache_size = 5000
+search_cache_ttl_seconds = 600
+
+# Multi-tenant quotas
+[rag.multi_tenant_settings]
+max_vectors_per_tenant = 100000
+tenant_ttl_hours = 168
+strict_isolation = true
+max_concurrent_operations = 10
+```
+
+### Multi-Tenant SaaS
+
+```toml
+# rag-multi-tenant.toml
+[rag]
 enabled = true
-interval = "1h"
-retention_days = 30
+multi_tenant = true
+
+[rag.vector_storage]
+dimensions = 768
+backend = "hnsw"
+persistence_path = "./data/rag/vectors"
+
+[rag.vector_storage.hnsw]
+m = 32                    # More connections for better recall
+ef_construction = 400     # High quality
+ef_search = 100
+max_elements = 10000000   # 10M vectors for many tenants
+num_threads = 8
+
+[rag.embedding]
+cache_enabled = true
+cache_size = 50000        # Large cache for multiple tenants
+cache_ttl_seconds = 7200  # 2 hours
+batch_size = 64
+max_retries = 5
+
+[tenancy.quotas]
+max_vectors = 50000
+max_queries_per_minute = 100
+max_embedding_tokens_per_day = 100000
+billing_enabled = true
 ```
 
 ---
@@ -533,17 +822,38 @@ LLMSPELL_CONFIG="/path/to/config.toml"
 LLMSPELL_LOG_LEVEL="info"
 LLMSPELL_DEBUG="false"
 
-# Security
-LLMSPELL_SECURITY_MODE="enforce"
-LLMSPELL_API_KEY="your-api-key"
+# RAG Configuration (Phase 8.10.6)
+LLMSPELL_RAG_ENABLED="true"
+LLMSPELL_RAG_MULTI_TENANT="false"
+LLMSPELL_RAG_DIMENSIONS="768"
+LLMSPELL_RAG_BACKEND="hnsw"
+LLMSPELL_RAG_PERSISTENCE_PATH="/var/lib/llmspell/rag"
+LLMSPELL_RAG_MAX_MEMORY_MB="1024"
 
-# Resources
-LLMSPELL_RESOURCE_LIMITS="default"
-LLMSPELL_MAX_MEMORY="512MB"
+# HNSW Configuration
+LLMSPELL_HNSW_M="16"
+LLMSPELL_HNSW_EF_CONSTRUCTION="200"
+LLMSPELL_HNSW_EF_SEARCH="50"
+LLMSPELL_HNSW_MAX_ELEMENTS="1000000"
+LLMSPELL_HNSW_METRIC="cosine"
 
-# State
+# Embedding Configuration
+LLMSPELL_EMBEDDING_PROVIDER="openai"
+LLMSPELL_EMBEDDING_CACHE_ENABLED="true"
+LLMSPELL_EMBEDDING_CACHE_SIZE="20000"
+LLMSPELL_EMBEDDING_BATCH_SIZE="32"
+
+# Multi-Tenancy (Phase 8.10.6)
+LLMSPELL_TENANT_MAX_VECTORS="50000"
+LLMSPELL_TENANT_RATE_LIMIT="100"
+LLMSPELL_TENANT_TTL_HOURS="168"
+
+# State & Sessions
+LLMSPELL_STATE_ENABLED="true"
 LLMSPELL_STATE_BACKEND="sled"
 LLMSPELL_STATE_PATH="/var/lib/llmspell"
+LLMSPELL_SESSIONS_ENABLED="false"
+LLMSPELL_SESSIONS_BACKEND="memory"
 ```
 
 ### Provider-Specific
@@ -625,11 +935,59 @@ memory_limit = "1GB"  # Increase from 512MB
 #### "Connection timeout"
 ```toml
 # Increase timeouts
-[providers.openai]
-timeout = 60  # Seconds
+[providers.providers.openai]
+timeout_seconds = 60
 
-[tools.web]
-timeout = 45
+[rag.embedding]
+timeout_seconds = 45
+```
+
+#### "RAG not enabled"
+```bash
+# Check RAG configuration
+export LLMSPELL_RAG_ENABLED="true"
+
+# Or in config file
+[rag]
+enabled = true
+```
+
+#### "Vector storage error"
+```toml
+# Check storage path permissions
+[rag.vector_storage]
+persistence_path = "./data/rag/vectors"  # Ensure writable
+
+# Reduce memory if needed
+max_memory_mb = 256  # Lower limit
+```
+
+#### "HNSW index build failed"
+```toml
+# Use smaller parameters for limited memory
+[rag.vector_storage.hnsw]
+m = 8                    # Reduce connections
+ef_construction = 50     # Lower quality
+max_elements = 10000     # Smaller dataset
+```
+
+#### "Multi-tenant isolation error"
+```toml
+# Ensure proper tenant configuration
+[rag]
+multi_tenant = true      # Must be enabled
+
+[rag.multi_tenant_settings]
+strict_isolation = true  # Enforce separation
+```
+
+#### "Embedding cache miss"
+```bash
+# Check cache status
+[rag.embedding]
+cache_enabled = true
+cache_size = 20000      # Increase if needed
+cache_ttl_seconds = 3600 # Extend TTL
 ```
 
 ### Debug Mode
@@ -661,11 +1019,20 @@ Check configuration:
 # Test provider connection
 ./llmspell test-provider openai
 
+# Test RAG functionality
+./llmspell test-rag --config rag-development.toml
+
+# Check vector storage status
+./llmspell exec 'local stats = RAG.get_stats("default", nil); print(JSON.stringify(stats))'
+
 # List available tools
 ./llmspell list-tools
 
-# Check resource usage
+# Check resource usage and tenant quotas
 ./llmspell stats
+
+# Validate RAG configuration
+./scripts/validate-rag-configs.sh
 ```
 
 ---
@@ -676,31 +1043,42 @@ Check configuration:
    - Never commit API keys to version control
    - Use `.env` files with `.gitignore`
 
-2. **Start with Strict Limits**
-   - Begin with `strict` resource profile
-   - Increase limits as needed
+2. **Start with RAG Development Profile**
+   - Use `rag-development.toml` for testing
+   - Small datasets and fast iteration
+   - Disable caching for fresh results
 
-3. **Enable Security in Production**
-   - Always use `mode = "enforce"`
-   - Enable audit logging
-   - Rotate API keys regularly
+3. **Enable Multi-Tenancy in Production**
+   - Always set `multi_tenant = true` in production
+   - Configure proper tenant quotas
+   - Enable strict isolation
 
-4. **Monitor Resource Usage**
-   - Track memory and CPU usage
-   - Set up alerts for limits
-   - Review logs regularly
+4. **Optimize HNSW for Your Use Case**
+   - Small datasets: Use `speed_optimized` profile
+   - Large datasets: Use `accuracy_optimized` profile
+   - Monitor memory usage and vector counts
 
-5. **Use Deployment Profiles**
-   - Separate configs for dev/staging/prod
-   - Test configuration changes in staging
-   - Keep production config minimal
+5. **Enable RAG Caching (70% Cost Reduction)**
+   - Set `cache_enabled = true` for embeddings
+   - Use appropriate cache sizes and TTL
+   - Monitor cache hit rates
+
+6. **Monitor Resource Usage**
+   - Track vector storage growth
+   - Monitor tenant quotas and usage
+   - Set up alerts for HNSW memory limits
+
+7. **Use Configuration Profiles**
+   - `rag-development.toml` for development
+   - `rag-production.toml` for production
+   - `rag-multi-tenant.toml` for SaaS deployments
 
 ---
 
 ## See Also
 
-- [Core Concepts](concepts.md) - Understanding configuration context
-- [Getting Started](getting-started.md) - Quick setup guide
-- [Security Guide](advanced/security.md) - Detailed security configuration
-- [API Documentation](api/README.md) - Provider-specific APIs
-- [Examples](../../examples/) - Configuration examples
+- [Core Concepts](concepts.md) - Understanding RAG and multi-tenancy
+- [Getting Started](getting-started.md) - Quick setup with RAG
+- [API Documentation](api/README.md) - RAG and provider APIs
+- [Configuration Examples](../../examples/script-users/configs/) - 15+ config files
+- [RAG Examples](../../examples/script-users/applications/) - RAG-powered applications

@@ -14,6 +14,8 @@ Storage abstraction layer providing unified interface for data persistence with 
 - **Persistence Options**: In-memory for testing, Sled for embedded, vector storage for RAG
 - **Async-First Design**: All operations are async for non-blocking IO
 - **Collection Management**: Organize vectors into named collections
+- **Bi-temporal Support**: Track both event time and ingestion time for sophisticated temporal queries
+- **TTL Mechanism**: Automatic expiration of vectors based on time-to-live settings
 
 ## Primary Traits/Structs
 
@@ -140,20 +142,48 @@ pub trait VectorStorage: Send + Sync {
     async fn collection_stats(&self, name: &str) -> StorageResult<CollectionStats>;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VectorEntry {
+    /// Unique identifier
     pub id: String,
-    pub vector: Vec<f32>,
+    /// Embedding vector
+    pub embedding: Vec<f32>,
+    /// Metadata for filtering and context
     pub metadata: HashMap<String, Value>,
-    pub payload: Option<Vec<u8>>,
+    /// Tenant/user/session binding
+    pub scope: StateScope,
+    /// Creation timestamp (ingestion time)
+    pub created_at: SystemTime,
+    /// Last update timestamp
+    pub updated_at: SystemTime,
+    /// Event time - when the event actually occurred (optional)
+    pub event_time: Option<SystemTime>,
+    /// Expiration time (optional)
+    pub expires_at: Option<SystemTime>,
+    /// Time-to-live in seconds (optional)
+    pub ttl_seconds: Option<u64>,
 }
 
 #[derive(Debug, Clone)]
-pub struct VectorSearchOptions {
-    pub limit: usize,
+pub struct VectorQuery {
+    /// Query vector
+    pub vector: Vec<f32>,
+    /// Number of results to return
+    pub k: usize,
+    /// Optional metadata filters
+    pub filter: Option<HashMap<String, Value>>,
+    /// Optional scope restriction
+    pub scope: Option<StateScope>,
+    /// Similarity threshold (0.0 to 1.0)
     pub threshold: Option<f32>,
-    pub metadata_filter: Option<MetadataFilter>,
-    pub include_vectors: bool,
+    /// Include metadata in results
+    pub include_metadata: bool,
+    /// Filter by event time range (bi-temporal query)
+    pub event_time_range: Option<(SystemTime, SystemTime)>,
+    /// Filter by ingestion time range (bi-temporal query)
+    pub ingestion_time_range: Option<(SystemTime, SystemTime)>,
+    /// Exclude expired entries
+    pub exclude_expired: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -401,19 +431,28 @@ async fn ingest_document(
     content: &str,
     embedding: Vec<f32>,
     tenant_id: &str,
+    event_time: Option<SystemTime>,
+    ttl_hours: Option<u64>,
 ) -> Result<String, Error> {
-    let entry = VectorEntry {
-        id: doc_id.to_string(),
-        vector: embedding,
-        metadata: hashmap! {
+    // Create entry with temporal metadata
+    let mut entry = VectorEntry::new(doc_id.to_string(), embedding)
+        .with_scope(StateScope::Custom(format!("tenant:{}", tenant_id)))
+        .with_metadata(hashmap! {
             "content" => json!(content),
             "tenant_id" => json!(tenant_id),
-            "timestamp" => json!(SystemTime::now()),
-        },
-        payload: Some(content.as_bytes().to_vec()),
-    };
+        });
     
-    storage.store("documents", entry).await
+    // Set event time if provided (when the document was created)
+    if let Some(event_time) = event_time {
+        entry = entry.with_event_time(event_time);
+    }
+    
+    // Set TTL if provided (auto-expire old documents)
+    if let Some(hours) = ttl_hours {
+        entry = entry.with_ttl(hours * 3600); // Convert hours to seconds
+    }
+    
+    storage.insert(vec![entry]).await?.into_iter().next().ok_or(Error::NotFound)
 }
 
 async fn search_documents(
@@ -421,16 +460,14 @@ async fn search_documents(
     query_embedding: Vec<f32>,
     tenant_id: &str,
     limit: usize,
+    exclude_expired: bool,
 ) -> Result<Vec<SearchResult>, Error> {
-    let options = VectorSearchOptions {
-        limit,
-        threshold: Some(0.7), // Minimum similarity
-        metadata_filter: Some(MetadataFilter::new()
-            .add_condition("tenant_id", FilterOp::Eq, json!(tenant_id))),
-        include_vectors: false, // Don't return vectors to save bandwidth
-    };
+    let query = VectorQuery::new(query_embedding, limit)
+        .with_scope(StateScope::Custom(format!("tenant:{}", tenant_id)))
+        .with_threshold(0.7) // Minimum similarity
+        .exclude_expired(exclude_expired); // Filter out expired documents
     
-    let results = storage.search("documents", &query_embedding, options).await?;
+    let results = storage.search(&query).await?;
     
     Ok(results.into_iter().map(|r| SearchResult {
         id: r.id,
@@ -494,6 +531,93 @@ impl MultiTenantStorage {
 }
 ```
 
+### Temporal Support and Bi-temporal Queries
+
+**When to use**: Time-based retrieval, memory systems, event sourcing, audit trails.
+
+**Benefits**: Distinguish between when events occurred vs when discovered, automatic expiration, temporal analytics.
+
+**Example**:
+```rust
+use llmspell_storage::{VectorEntry, VectorQuery};
+use std::time::{SystemTime, Duration};
+
+// Create entry with temporal metadata
+async fn ingest_with_temporal_metadata(
+    storage: &HNSWVectorStorage,
+    content: &str,
+    embedding: Vec<f32>,
+    event_time: SystemTime,  // When the event actually happened
+    ttl_hours: u64,          // How long to keep this data
+) -> Result<String, Error> {
+    let entry = VectorEntry::new(uuid::Uuid::new_v4().to_string(), embedding)
+        .with_event_time(event_time)      // Set when event occurred
+        .with_ttl(ttl_hours * 3600)       // Auto-expire after N hours
+        .with_metadata(hashmap! {
+            "content" => json!(content),
+        });
+    
+    // created_at and updated_at are set automatically
+    // expires_at is calculated from TTL
+    
+    storage.insert(vec![entry]).await?.into_iter().next().ok_or(Error::NotFound)
+}
+
+// Bi-temporal query example
+async fn temporal_search(
+    storage: &HNSWVectorStorage,
+    query_embedding: Vec<f32>,
+) -> Result<Vec<VectorResult>, Error> {
+    let now = SystemTime::now();
+    let yesterday = now - Duration::from_secs(86400);
+    let last_week = now - Duration::from_secs(7 * 86400);
+    let last_hour = now - Duration::from_secs(3600);
+    
+    // "What did we know last hour about events from yesterday?"
+    let query = VectorQuery::new(query_embedding, 10)
+        .with_event_time_range((yesterday, now))        // Events that happened yesterday
+        .with_ingestion_time_range((last_hour, now))    // That we learned about in the last hour
+        .exclude_expired(true);                         // Don't return expired entries
+    
+    storage.search(&query).await
+}
+
+// Check and update temporal fields
+async fn manage_temporal_data(
+    storage: &HNSWVectorStorage,
+    entry_id: &str,
+) -> Result<(), Error> {
+    // Get entry
+    if let Some(mut entry) = storage.get(entry_id).await? {
+        // Check if expired
+        if entry.is_expired() {
+            println!("Entry {} has expired", entry_id);
+            storage.delete(&[entry_id.to_string()]).await?;
+        } else {
+            // Update entry (automatically updates updated_at)
+            entry.update();
+            entry.metadata.insert("last_accessed".to_string(), json!(SystemTime::now()));
+            storage.update_metadata(entry_id, entry.metadata).await?;
+        }
+    }
+    Ok(())
+}
+```
+
+**Temporal Fields Reference**:
+- `created_at`: When the vector was ingested (set automatically)
+- `updated_at`: When the vector was last modified (updated automatically)
+- `event_time`: When the real-world event occurred (optional, set by user)
+- `expires_at`: When the vector expires (calculated from TTL)
+- `ttl_seconds`: Time-to-live duration in seconds
+
+**Bi-temporal Query Use Cases**:
+1. **Audit Trail**: "Show all changes made last week to documents from last month"
+2. **Knowledge Evolution**: "What did we know at time X about topic Y?"
+3. **Memory Consolidation**: Find old memories to compress or archive
+4. **Compliance**: Track when sensitive data was learned vs when it occurred
+5. **Debugging**: Understand system state at specific points in time
+
 ## Integration Examples
 
 ### With RAG System
@@ -522,20 +646,19 @@ impl DocumentRAG {
         // Generate embeddings
         let embeddings = self.embedder.embed_batch(&chunks).await?;
         
-        // Store in vector storage
+        // Store in vector storage with temporal metadata
         for (chunk, embedding) in chunks.iter().zip(embeddings) {
-            let entry = VectorEntry {
-                id: Uuid::new_v4().to_string(),
-                vector: embedding,
-                metadata: hashmap! {
+            let entry = VectorEntry::new(Uuid::new_v4().to_string(), embedding)
+                .with_scope(StateScope::Custom(format!("tenant:{}", tenant_id)))
+                .with_event_time(document.created_at) // When document was created
+                .with_ttl(30 * 24 * 3600) // Keep for 30 days
+                .with_metadata(hashmap! {
                     "document_id" => json!(document.id),
                     "tenant_id" => json!(tenant_id),
                     "chunk_index" => json!(chunk.index),
-                },
-                payload: Some(chunk.text.as_bytes().to_vec()),
-            };
+                });
             
-            self.vector_storage.store("documents", entry).await?;
+            self.vector_storage.insert(vec![entry]).await?;
         }
         
         Ok(())
@@ -645,15 +768,44 @@ New features:
 - Metadata filtering on vector search
 - Multi-tenant collection support
 - Batch operations for efficiency
+- **Bi-temporal support** with event time and ingestion time tracking
+- **TTL mechanism** for automatic vector expiration
+- **Temporal queries** for sophisticated time-based retrieval
 
 Breaking changes:
 - `VectorStorage` trait methods now async
-- `CollectionConfig` required for collection creation
+- `VectorEntry` structure completely redesigned:
+  - Renamed `vector` field to `embedding`
+  - Added `scope: StateScope` for tenant isolation
+  - Added temporal fields: `created_at`, `updated_at`, `event_time`, `expires_at`, `ttl_seconds`
+  - Now created with `VectorEntry::new()` builder pattern
+- `VectorQuery` replaces `VectorSearchOptions`:
+  - New temporal filter fields: `event_time_range`, `ingestion_time_range`, `exclude_expired`
+  - Created with `VectorQuery::new()` builder pattern
 - Metadata must be JSON-serializable Values
 
 Migration steps:
 1. Update vector storage initialization to use HNSWConfig
-2. Add collection configuration for all collections
-3. Convert metadata to JSON Value types
-4. Update search calls to use VectorSearchOptions
-5. Add tenant_id to metadata for multi-tenant apps
+2. Replace `VectorEntry { ... }` with `VectorEntry::new(id, embedding).with_scope(...)`
+3. Replace `VectorSearchOptions` with `VectorQuery::new(vector, k)`
+4. Add temporal metadata where applicable (event_time, TTL)
+5. Update search calls to handle temporal filters
+6. Add tenant_id to scope for multi-tenant apps
+
+Example migration:
+```rust
+// Old (v0.7.x)
+let entry = VectorEntry {
+    id: "doc-1".to_string(),
+    vector: vec![1.0, 2.0, 3.0],
+    metadata: metadata,
+    payload: None,
+};
+
+// New (v0.8.x)
+let entry = VectorEntry::new("doc-1".to_string(), vec![1.0, 2.0, 3.0])
+    .with_scope(StateScope::Global)
+    .with_event_time(SystemTime::now())
+    .with_ttl(86400) // 24 hours
+    .with_metadata(metadata);
+```

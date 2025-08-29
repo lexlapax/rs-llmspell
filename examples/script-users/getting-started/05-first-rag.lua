@@ -1,7 +1,7 @@
 -- ============================================================
 -- LLMSPELL GETTING STARTED SHOWCASE
 -- ============================================================
--- Example ID: 06 - First RAG (Retrieval-Augmented Generation) v0.8.0
+-- Example ID: 05 - First RAG (Retrieval-Augmented Generation) v0.8.0
 -- Complexity Level: BEGINNER
 -- Real-World Use Case: Building knowledge bases and semantic search systems
 --
@@ -27,7 +27,7 @@
 --
 -- HOW TO RUN:
 -- ./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
---   run examples/script-users/getting-started/06-first-rag.lua
+--   run examples/script-users/getting-started/05-first-rag.lua
 --
 -- EXPECTED OUTPUT:
 -- RAG system initialized
@@ -39,7 +39,7 @@
 -- ============================================================
 
 print("=== LLMSpell: Your First RAG System ===")
-print("Example 06: BEGINNER - Retrieval-Augmented Generation")
+print("Example 05: BEGINNER - Retrieval-Augmented Generation")
 print("Showcasing: Document ingestion and semantic search\n")
 
 -- ============================================================

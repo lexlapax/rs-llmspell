@@ -14,6 +14,8 @@ Retrieval-Augmented Generation system providing document ingestion, chunking, em
 - **Hybrid Search**: Combine vector similarity with keyword and metadata filtering
 - **Context Window Management**: Optimize retrieved context for LLM token limits
 - **Incremental Indexing**: Add documents without rebuilding entire index
+- **Bi-temporal Support**: Track both event time and ingestion time for temporal queries
+- **TTL Management**: Automatic expiration of documents based on time-to-live settings
 
 ## Primary Traits/Structs
 
@@ -64,20 +66,23 @@ impl RAGPipeline {
             &chunks.iter().map(|c| c.text.as_str()).collect::<Vec<_>>()
         ).await?;
         
-        // Store in vector database
+        // Store in vector database with temporal metadata
         let mut stored_ids = Vec::new();
         for (chunk, embedding) in chunks.iter().zip(embeddings) {
             let metadata = self.build_metadata(&document, chunk, tenant_id);
             
-            let entry = VectorEntry {
-                id: Uuid::new_v4().to_string(),
-                vector: embedding,
-                metadata,
-                payload: Some(chunk.text.as_bytes().to_vec()),
-            };
+            // Create entry with temporal support
+            let entry = VectorEntry::new(Uuid::new_v4().to_string(), embedding)
+                .with_scope(match tenant_id {
+                    Some(id) => StateScope::Custom(format!("tenant:{}", id)),
+                    None => StateScope::Global,
+                })
+                .with_event_time(document.created_at) // When document was created
+                .with_ttl(self.config.document_ttl_seconds) // Auto-expire old docs
+                .with_metadata(metadata);
             
-            let id = self.storage.store(&self.config.collection, entry).await?;
-            stored_ids.push(id);
+            let ids = self.storage.insert(vec![entry.clone()]).await?;
+            stored_ids.extend(ids);
             
             // Update metadata index
             self.metadata_index.index(&entry).await?;
@@ -497,6 +502,166 @@ impl ChatWithRAG {
         Ok(response)
     }
 }
+```
+
+### Temporal RAG with Bi-temporal Support
+
+**When to use**: Time-sensitive knowledge bases, event logs, compliance tracking, memory systems.
+
+**Benefits**: Distinguish when events occurred vs when discovered, automatic document expiration, temporal analytics.
+
+**Example**:
+```rust
+use llmspell_rag::{RAGPipeline, Document, TemporalRetrievalOptions};
+use std::time::{SystemTime, Duration};
+
+pub struct TemporalRAG {
+    pipeline: Arc<RAGPipeline>,
+}
+
+impl TemporalRAG {
+    /// Ingest document with temporal metadata
+    pub async fn ingest_temporal_document(
+        &self,
+        content: &str,
+        event_time: SystemTime,    // When the event/document occurred
+        ttl_hours: u64,            // How long to keep this document
+        tenant_id: Option<&str>,
+    ) -> Result<()> {
+        let document = Document {
+            id: Uuid::new_v4().to_string(),
+            content: content.to_string(),
+            created_at: event_time,    // Set event time
+            metadata: hashmap! {
+                "ttl" => json!(ttl_hours * 3600),
+                "importance" => json!("high"),
+            },
+        };
+        
+        self.pipeline.ingest(document, tenant_id).await?;
+        Ok(())
+    }
+    
+    /// Temporal query - "What did we know at time X about topic Y?"
+    pub async fn temporal_search(
+        &self,
+        query: &str,
+        as_of_time: SystemTime,     // Point-in-time query
+        event_window: Duration,      // How far back to look for events
+    ) -> Result<Vec<RetrievedContext>> {
+        let event_start = as_of_time - event_window;
+        
+        // Build temporal query
+        let query_embedding = self.pipeline.embedder.embed(query).await?;
+        let temporal_query = VectorQuery::new(query_embedding, 10)
+            .with_event_time_range((event_start, as_of_time))
+            .with_ingestion_time_range((SystemTime::UNIX_EPOCH, as_of_time))
+            .exclude_expired(true);
+        
+        let results = self.pipeline.storage.search(&temporal_query).await?;
+        
+        // Convert to retrieved contexts
+        Ok(results.into_iter().map(|r| RetrievedContext {
+            content: String::from_utf8_lossy(&r.metadata.get("content")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .as_bytes()).to_string(),
+            score: r.score,
+            metadata: r.metadata,
+            source: None,
+        }).collect())
+    }
+    
+    /// Find recently discovered information about old events
+    pub async fn find_recent_discoveries(
+        &self,
+        topic: &str,
+        discovery_window: Duration,  // How recently we learned about it
+        event_age: Duration,         // How old the events are
+    ) -> Result<Vec<RetrievedContext>> {
+        let now = SystemTime::now();
+        
+        let query_embedding = self.pipeline.embedder.embed(topic).await?;
+        let query = VectorQuery::new(query_embedding, 20)
+            .with_event_time_range((now - event_age, now - event_age + Duration::from_secs(86400)))
+            .with_ingestion_time_range((now - discovery_window, now))
+            .exclude_expired(true);
+        
+        let results = self.pipeline.storage.search(&query).await?;
+        
+        Ok(self.process_temporal_results(results))
+    }
+    
+    /// Clean up expired documents
+    pub async fn cleanup_expired(&self) -> Result<usize> {
+        // This happens automatically during searches with exclude_expired=true
+        // But can be triggered manually for maintenance
+        let now = SystemTime::now();
+        let all_vectors = self.pipeline.storage.list_all().await?;
+        
+        let mut deleted = 0;
+        for entry in all_vectors {
+            if entry.is_expired() {
+                self.pipeline.storage.delete(&[entry.id]).await?;
+                deleted += 1;
+            }
+        }
+        
+        Ok(deleted)
+    }
+}
+
+// Example usage for compliance/audit
+async fn audit_knowledge_evolution(rag: &TemporalRAG) -> Result<()> {
+    // "What did we know last month about the security incident?"
+    let last_month = SystemTime::now() - Duration::from_secs(30 * 86400);
+    let contexts = rag.temporal_search(
+        "security incident analysis",
+        last_month,
+        Duration::from_secs(7 * 86400), // Look back 7 days from that point
+    ).await?;
+    
+    println!("Knowledge as of last month:");
+    for context in contexts {
+        println!("- {}", context.content);
+    }
+    
+    // "What new information have we discovered this week about old incidents?"
+    let recent_discoveries = rag.find_recent_discoveries(
+        "security vulnerabilities",
+        Duration::from_secs(7 * 86400),  // Discovered this week
+        Duration::from_secs(90 * 86400), // About incidents from 3 months ago
+    ).await?;
+    
+    println!("\nRecent discoveries about old incidents:");
+    for discovery in recent_discoveries {
+        println!("- {}", discovery.content);
+    }
+    
+    Ok(())
+}
+```
+
+**Temporal Configuration**:
+```toml
+[rag.temporal]
+# Default TTL for documents (in seconds)
+default_ttl = 2592000  # 30 days
+
+# Enable automatic expiration during searches
+auto_expire = true
+
+# Cleanup interval for expired documents
+cleanup_interval_hours = 24
+
+# Preserve important documents regardless of TTL
+preserve_tags = ["critical", "compliance", "legal"]
+
+# Temporal index optimization
+[rag.temporal.indexing]
+# Partition by time ranges for faster temporal queries
+time_partitions = "daily"  # or "hourly", "weekly", "monthly"
+partition_retention_days = 90
 ```
 
 ## Integration Examples

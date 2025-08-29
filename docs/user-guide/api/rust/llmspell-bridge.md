@@ -143,6 +143,114 @@ match result {
 - **Type Caching**: Cache converted types
 - **Minimal Overhead**: <1% vs native Rust
 
+## RAG Bridge with Temporal Support
+
+The RAG bridge enables vector storage operations from Lua with full temporal metadata support:
+
+```rust
+use llmspell_bridge::rag_bridge::{RAGBridge, RAGSearchParams, RAGIngestParams};
+
+// Initialize RAG bridge
+let rag_bridge = RAGBridge::new(
+    state_manager,
+    session_manager,
+    multi_tenant_rag,
+    provider_manager,
+    vector_storage, // HNSWVectorStorage with temporal support
+);
+
+// Search with temporal awareness (from Rust)
+let params = RAGSearchParams {
+    query: "recent updates".to_string(),
+    k: Some(10),
+    scope: Some("tenant".to_string()),
+    scope_id: Some("org-123".to_string()),
+    filters: None,
+    threshold: Some(0.8),
+    context: None,
+};
+
+let results = rag_bridge.search(params).await?;
+
+// Ingest with temporal metadata
+let ingest_params = RAGIngestParams {
+    documents: vec![
+        Document {
+            content: "Important update".to_string(),
+            metadata: hashmap! {
+                "timestamp" => json!(1699564800), // Unix timestamp for event_time
+                "ttl" => json!(86400),            // Expire after 24 hours
+                "source" => json!("api"),
+            },
+        }
+    ],
+    options: IngestOptions {
+        chunk_size: 500,
+        chunk_overlap: 50,
+        tenant_id: Some("org-123".to_string()),
+    },
+};
+
+rag_bridge.ingest(ingest_params).await?;
+```
+
+### Temporal Metadata Extraction
+
+The RAG bridge automatically extracts temporal metadata from documents:
+
+```rust
+// In rag_bridge.rs - temporal field extraction
+if let Some(timestamp_val) = metadata.get("timestamp") {
+    if let Some(timestamp_num) = timestamp_val.as_u64() {
+        // Convert Unix timestamp to SystemTime
+        let duration = std::time::Duration::from_secs(timestamp_num);
+        if let Some(event_time) = std::time::UNIX_EPOCH.checked_add(duration) {
+            entry = entry.with_event_time(event_time);
+        }
+    } else if let Some(timestamp_str) = timestamp_val.as_str() {
+        // Parse ISO 8601 timestamp
+        if let Ok(parsed) = chrono::DateTime::parse_from_rfc3339(timestamp_str) {
+            let event_time = std::time::SystemTime::from(parsed);
+            entry = entry.with_event_time(event_time);
+        }
+    }
+}
+
+// TTL extraction from multiple possible fields
+if let Some(ttl_val) = metadata.get("ttl")
+    .or_else(|| metadata.get("ttl_seconds"))
+    .or_else(|| metadata.get("expires_in")) 
+{
+    if let Some(ttl_seconds) = ttl_val.as_u64() {
+        entry = entry.with_ttl(ttl_seconds);
+    }
+}
+```
+
+### Lua RAG Global with Temporal Support
+
+From Lua scripts, temporal metadata is transparently handled:
+
+```lua
+-- Ingest with temporal metadata
+RAG.ingest({
+    content = "System update notification",
+    metadata = {
+        timestamp = os.time() - 3600,  -- Event from 1 hour ago
+        ttl = 7200,                    -- Expires in 2 hours
+        source = "monitoring"
+    }
+})
+
+-- Search (temporal queries coming in future update)
+local results = RAG.search("recent updates", {
+    limit = 5,
+    scope = "tenant",
+    scope_id = "org-123",
+    -- Future: event_time_range, exclude_expired
+})
+```
+
 ## Sandboxing
 
 ```rust

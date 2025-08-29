@@ -23,7 +23,7 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 
 # 6. Build a RAG system (requires RAG config)
 ./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
-  run examples/script-users/getting-started/06-first-rag.lua
+  run examples/script-users/getting-started/05-first-rag.lua
 ```
 
 ## 🎯 Learning Path
@@ -87,13 +87,13 @@ Progressive examples to learn LLMSpell from scratch. Each example builds on the 
 ```
 
 ### Step 6: Your First RAG System (15 seconds)
-**File**: `06-first-rag.lua`  
+**File**: `05-first-rag.lua`  
 **Learn**: Document ingestion, vector embeddings, semantic search, RAG with agents  
 **Prerequisites**: RAG-enabled configuration file  
 **Key Concepts**: RAG.ingest(), RAG.search(), vector similarity, context augmentation
 
 ```bash
-./target/debug/llmspell -c ../configs/rag-basic.toml run 06-first-rag.lua
+./target/debug/llmspell -c ../configs/rag-basic.toml run 05-first-rag.lua
 # Ingests documents, performs semantic searches, and uses RAG with agents
 ```
 

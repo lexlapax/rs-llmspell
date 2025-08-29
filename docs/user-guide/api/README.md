@@ -10,7 +10,7 @@
 
 > **🔍 API Hub**: Comprehensive documentation for both Lua scripting APIs and Rust extension APIs. Choose your path based on whether you're writing scripts or building components.
 
-**Version**: 0.8.0 | **Status**: Phase 8 Complete | **Last Updated**: December 2024
+**Version**: 0.8.10 | **Status**: Phase 8.10.6 Complete | **Last Updated**: December 2024
 
 ## Documentation Structure
 
@@ -49,10 +49,10 @@
 
 **Key Crates by Phase:**
 
-**Phase 8 - RAG & Multi-Tenancy:**
-- `llmspell-storage` - HNSW vector storage for RAG
-- `llmspell-rag` - Retrieval-Augmented Generation pipeline
-- `llmspell-tenancy` - Multi-tenant isolation and quotas
+**Phase 8.10.6 - Enhanced RAG & Multi-Tenancy:**
+- `llmspell-storage` - HNSW vector storage with 70% cost optimization
+- `llmspell-rag` - RAG pipeline with session collections and bi-temporal queries
+- `llmspell-tenancy` - Multi-tenant isolation with resource quotas and billing
 
 **Core Infrastructure:**
 - `llmspell-core` - Foundation traits and types
@@ -256,9 +256,10 @@ Both API documentations include extensive code examples for every function and p
 
 | LLMSpell Version | Rust Edition | Lua Version | API Stability |
 |-----------------|--------------|-------------|---------------|
+| 0.8.10 | 2021 | 5.1+ / LuaJIT | Stable |
+| 0.8.x | 2021 | 5.1+ / LuaJIT | Beta |
+| 0.7.x | 2021 | 5.1+ | Beta |
 | 0.6.x | 2021 | 5.1+ / LuaJIT | Beta |
-| 0.5.x | 2021 | 5.1+ | Alpha |
-| 0.4.x | 2021 | 5.1+ | Alpha |
 
 ## License
 

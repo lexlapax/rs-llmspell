@@ -1,8 +1,35 @@
 # LLMSpell Application Examples - Progressive Learning Architecture
 
-**Status**: 🚧 **Under Active Development** - This README reflects our current planning and will be updated as we implement the versioned inheritance architecture described below.
+**Status**: 🚀 **Phase 8.10.6** - RAG enhancements implemented, 9 applications available (7 base + 2 RAG-enhanced)
 
 > **📦 Single Binary Distribution**: These applications are embedded in the `llmspell` binary! Users can run them with `llmspell apps <app-name>` without any path configuration. The embedded versions are compiled from `llmspell-cli/resources/applications/` into the binary using `include_str!` and extract to temp directories at runtime.
+
+## Quick Reference
+
+### Available Applications
+| Application | Layer | Status | Description | Agents |
+|------------|-------|--------|-------------|--------|
+| **file-organizer** | Universal | ✅ Working | Organize messy files and folders | 3 |
+| **research-collector** | Universal | ✅ v2.0 + RAG | Research with knowledge persistence | 2 + RAG |
+| **content-creator** | Power User | ✅ Working | Generate various content types | 4 |
+| **communication-manager** | Business | ✅ Working | Manage business communications | 5 |
+| **process-orchestrator** | Professional | ✅ Working | Orchestrate complex processes | 8 |
+| **code-review-assistant** | Professional | ✅ Working | Automated code quality reviews | 7 |
+| **webapp-creator** | Expert | ✅ Working | Generate full web applications | 20 |
+| **knowledge-base** | Phase 8 RAG | 🆕 New | Personal knowledge management | 3 + RAG |
+| **personal-assistant** | Phase 8 RAG | 🆕 New | AI productivity companion | 4 + RAG |
+
+### Running Applications
+```bash
+# With configuration file (RECOMMENDED)
+./target/debug/llmspell -c examples/script-users/applications/<app-name>/config.toml run examples/script-users/applications/<app-name>/main.lua
+
+# Basic execution (uses default config)
+./target/debug/llmspell run examples/script-users/applications/<app-name>/main.lua
+
+# Debug mode
+./target/debug/llmspell --debug run examples/script-users/applications/<app-name>/main.lua
+```
 
 **Universal → Professional Progression**: Applications start with problems every computer user faces, then evolve naturally toward professional automation. No "hello world" examples - every application addresses genuine problems that progress from universal user pain points to sophisticated professional automation.
 
@@ -103,20 +130,43 @@ Our application examples follow research-backed progressive learning principles:
     └── 🚀 Expert Appeal: Senior developers, architects, CTO-level automation experts
 ```
 
-### **Phase 8+ Enhancements: Versioned Inheritance**
+### **Phase 8 Enhancements: RAG Integration (IMPLEMENTED)**
+
+The Phase 8 RAG enhancements have been implemented through both application upgrades and new applications:
+
+#### **Application Upgrades**
+```
+research-collector/                  # Phase 7 base → v2.0 with RAG
+├── 📋 Version: 2.0.0               # Upgraded from 1.0.0
+├── 🔄 Retains: All original search and synthesis capabilities
+├── ➕ Adds: RAG knowledge persistence for research continuity
+├── 📦 Showcases: llmspell-rag integration, semantic search
+└── 📚 Benefits: Research history preserved, knowledge accumulation
+```
+
+#### **New RAG Applications**
+```
+knowledge-base/                      # Phase 8: Personal knowledge management
+├── 📋 Version: 1.0.0               # New Phase 8 application
+├── 🤖 Agents: ingestion_agent, query_agent, synthesis_agent
+├── 🔧 Features: Semantic search, knowledge categorization, RAG persistence
+├── 📦 Showcases: Full RAG pipeline, vector storage, semantic retrieval
+└── 🎯 Use Case: "I need to organize and retrieve my knowledge efficiently"
+
+personal-assistant/                  # Phase 8: AI productivity companion
+├── 📋 Version: 1.0.0               # New Phase 8 application  
+├── 🤖 Agents: task_agent, schedule_agent, knowledge_agent, communication_agent
+├── 🔧 Features: Task management, scheduling, RAG memory, context awareness
+├── 📦 Showcases: Multi-agent RAG coordination, persistent memory
+└── 🎯 Use Case: "I need help managing my daily tasks and information"
+```
+
+### **Phase 8+ Future Enhancements: Versioned Inheritance**
 
 **Pattern**: `base-app/` → `base-app-enhanced/` with clear inheritance documentation
 
-#### **Phase 8-9 Example: Vector Storage + Advanced Workflows**
+#### **Phase 9 Example: Advanced Workflows**
 ```
-research-assistant/                  # Phase 7 base application
-└── research-assistant-rag/          # Phase 8: + RAG for academic paper search
-    ├── 📋 INHERITANCE.md            # Documents exactly what's inherited vs. added
-    ├── 🔄 Inherits: All Phase 7 agents and workflows  
-    ├── ➕ Adds: Vector storage for academic papers, semantic similarity search
-    ├── 📦 New Showcases: llmspell-rag, vector storage backends
-    └── 📚 README: Clear diff showing RAG additions and performance improvements
-
 code-review-assistant/               # Phase 7 base application
 └── code-review-assistant-parallel/  # Phase 9: + Parallel execution
     ├── 📋 INHERITANCE.md            # Shows transformation from sequential to parallel
@@ -148,40 +198,65 @@ All Phase 7 Applications/            # Complete foundation set
     └── 📚 README: Lua vs JavaScript comparison, migration patterns
 ```
 
-## Directory Structure
+## Directory Structure (Current)
 
 ```
 examples/script-users/applications/
 ├── README.md                        # This file - progressive learning overview
 │
-├── 01-expense-tracker/              # Phase 7 foundation
+├── file-organizer/                  # Universal Layer - File organization ✅
 │   ├── main.lua
-│   ├── README.md                    # Complete application documentation
-│   └── config.toml
-│
-├── 01-expense-tracker-ai/           # Phase 22 enhancement
-│   ├── main.lua                     # Enhanced with AI/ML capabilities
-│   ├── README.md                    # Documents AI/ML additions
-│   ├── INHERITANCE.md               # Explicit inheritance documentation
-│   └── config.toml
-│
-├── 03-code-review-assistant/        # Phase 7 base ✅ WORKING
-│   ├── main.lua
-│   ├── code-input.lua
 │   ├── README.md
 │   └── config.toml
 │
-├── 03-code-review-assistant-parallel/ # Phase 9 enhancement
-│   ├── main.lua                     # Parallel workflow implementation
-│   ├── code-input.lua              # Inherited from base
-│   ├── README.md                    # Performance comparison documentation
-│   ├── INHERITANCE.md               # Sequential → Parallel transformation
+├── research-collector/              # Universal Layer - Research v2.0 with RAG ✅ ENHANCED
+│   ├── main.lua                     # Now includes RAG knowledge persistence
+│   ├── README.md
+│   ├── config.toml                  # Updated with RAG configuration
+│   └── attention-paper.pdf          # Sample document for testing
+│
+├── content-creator/                 # Power User Layer - Content generation ✅
+│   ├── main.lua
+│   ├── README.md
+│   ├── config.toml
+│   └── content-input.lua
+│
+├── communication-manager/           # Business Layer - Communication automation ✅
+│   ├── main.lua
+│   ├── README.md
 │   └── config.toml
 │
-└── 08-webapp-creator/               # Phase 7 base ✅ WORKING
-    ├── main.lua
-    ├── user-input-ecommerce.lua
-    ├── README.md
+├── process-orchestrator/            # Professional Layer - Process automation ✅
+│   ├── main.lua
+│   ├── README.md
+│   └── config.toml
+│
+├── code-review-assistant/           # Professional - Code quality ✅
+│   ├── main.lua
+│   ├── README.md
+│   ├── config.toml
+│   └── code-input.lua
+│
+├── webapp-creator/                  # Expert - Application generation ✅
+│   ├── main.lua
+│   ├── README.md
+│   ├── CONFIG.md                    # Detailed configuration guide
+│   ├── OUTPUT-STRUCTURE.md          # Generated project structure
+│   ├── PERFORMANCE.md               # Performance optimization guide
+│   ├── config.toml
+│   ├── user-input-ecommerce.lua    # Sample e-commerce spec
+│   ├── user-input.lua              # Basic input template
+│   ├── minimal-input.lua           # Minimal example
+│   └── generated/                   # Output directory
+│
+├── knowledge-base/                  # Phase 8 RAG - Personal knowledge management 🆕
+│   ├── main.lua                     # RAG-powered semantic search
+│   ├── README.md                    # Complete documentation ✅
+│   └── config.toml
+│
+└── personal-assistant/              # Phase 8 RAG - AI productivity assistant 🆕
+    ├── main.lua                     # Multi-agent assistant with memory
+    ├── README.md                    # Complete documentation ✅
     └── config.toml
 ```
 
@@ -302,18 +377,20 @@ Users familiar with base application can upgrade by:
 - **Real Comparisons**: Diff between versions to understand changes
 - **Professional Growth**: Applications become more sophisticated over time
 
-## Current Status (Phase 7) - ✅ VALIDATED 7.4.5.6
+## Current Status (Phase 8.10.6) - 🚀 WITH RAG ENHANCEMENTS
 
-### ✅ **Universal → Professional Progression VALIDATED (5/5)**
-- `file-organizer/` - Universal file organization (3 agents, 35-line config) ✅ TESTED & WORKING
-- `research-collector/` - Universal research automation (2 agents, 39-line config) ✅ TESTED & WORKING  
-- `content-creator/` - Power User content generation (4 agents, 69-line config) ✅ TESTED & WORKING
-- `communication-manager/` - Business communication automation (5 agents, 109-line config) ✅ TESTED & WORKING
-- `process-orchestrator/` - Professional process orchestration (8 agents, 164-line config) ✅ TESTED & WORKING
+### ✅ **Phase 7 Foundation Applications (7/7)**
+- `file-organizer/` - Universal file organization (3 agents, 35-line config) ✅ WORKING
+- `research-collector/` - **v2.0 with RAG** - Universal research with knowledge persistence (2 agents + RAG) ✅ ENHANCED
+- `content-creator/` - Power User content generation (4 agents, 69-line config) ✅ WORKING
+- `communication-manager/` - Business communication automation (5 agents, 109-line config) ✅ WORKING
+- `process-orchestrator/` - Professional process orchestration (8 agents, 164-line config) ✅ WORKING
+- `code-review-assistant/` - Professional code quality automation (7 agents) ✅ WORKING
+- `webapp-creator/` - Expert application generation (20 agents) ✅ WORKING
 
-### ✅ **Professional Applications (2/2 - Already Positioned)**
-- `code-review-assistant/` - Professional code quality automation (7 agents) ✅ TESTED & WORKING
-- `webapp-creator/` - Expert application generation (20 agents) ✅ TESTED & WORKING
+### 🆕 **Phase 8 RAG-Enhanced Applications (2/2)**
+- `knowledge-base/` - Personal knowledge management with semantic search (3 agents + RAG) 🆕 PHASE 8
+- `personal-assistant/` - AI-powered productivity companion with memory (4 agents + RAG) 🆕 PHASE 8
 
 ### 🎯 **Transformation Results VALIDATED**
 - **Universal Foundation**: ✅ File chaos & research - problems everyone recognizes
@@ -400,7 +477,7 @@ Each transformation **renames existing applications** and **adjusts complexity**
 
 #### **Phase 7 Foundation (COMPLETED ✅)**
 ```
-Status: 100% Complete - All 5 universal → professional applications functional + 2 professional apps standardized
+Status: 100% Complete - All 7 foundation applications functional
 Target: ✅ ACHIEVED - Complete Universal → Professional progression implemented
 
 ✅ COMPLETED:
@@ -412,19 +489,35 @@ Target: ✅ ACHIEVED - Complete Universal → Professional progression implement
 - [x] Application transformation strategy validated
 
 ✅ UNIVERSAL FOUNDATION (Layers 1-2) - COMPLETED:
-- [x] file-organizer/ - TRANSFORMED from document-intelligence/ (3 agents, universal file organization)
-- [x] research-collector/ - TRANSFORMED from research-assistant/ (2 agents, universal research automation)
+- [x] file-organizer/ - Universal file organization (3 agents)
+- [x] research-collector/ - Universal research automation (2 agents)
 
 ✅ POWER USER & BUSINESS (Layers 3-4) - COMPLETED:
-- [x] content-creator/ - TRANSFORMED from content-generation-platform/ (4 agents, power user content creation)
-- [x] communication-manager/ - TRANSFORMED from customer-support-bot/ (5 agents, business communication automation)
+- [x] content-creator/ - Power user content creation (4 agents)
+- [x] communication-manager/ - Business communication automation (5 agents)
 
 ✅ PROFESSIONAL ORCHESTRATION (Layer 5) - COMPLETED:
-- [x] process-orchestrator/ - CREATED from data-pipeline/ + workflow-hub/ concepts (8 agents, professional process automation)
+- [x] process-orchestrator/ - Professional process automation (8 agents)
 
-✅ PROFESSIONAL APPLICATIONS (Already Positioned) - VALIDATED:
-- [x] code-review-assistant/ - Professional code quality automation (3 agents)
+✅ PROFESSIONAL APPLICATIONS - VALIDATED:
+- [x] code-review-assistant/ - Professional code quality automation (7 agents)
 - [x] webapp-creator/ - Expert application generation (20 agents)
+```
+
+#### **Phase 8 RAG Integration (IN PROGRESS 🚀)**
+```
+Status: 60% Complete - RAG integration partially implemented
+Target: Full RAG support across applicable applications
+
+✅ COMPLETED:
+- [x] research-collector/ - UPGRADED to v2.0 with RAG knowledge persistence
+- [x] knowledge-base/ - NEW application for personal knowledge management (README ✅)
+- [x] personal-assistant/ - NEW AI productivity companion with memory (README ✅)
+
+⏳ PLANNED:
+- [ ] content-creator-rag/ - Content generation with knowledge retrieval
+- [ ] code-review-assistant-rag/ - Code reviews with codebase knowledge
+- [ ] webapp-creator-rag/ - Application generation with pattern library
 ```
 
 #### **Phase 8+ Enhancement Pipeline (Future Sprints)**

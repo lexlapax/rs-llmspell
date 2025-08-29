@@ -8,38 +8,41 @@
 
 ## Overview
 
-> **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 7 essential documents.
+> **📚 Central Hub**: Your starting point for all LLMSpell documentation. Everything you need is organized into 6 essential documents, plus comprehensive API references for both Lua and Rust.
 
-**Version**: 0.6.0 | **Status**: Phase 7 Complete | **Last Updated**: August 2025
+**Version**: 0.8.10 | **Status**: Phase 8.10.6 Complete | **Last Updated**: December 2024
 
-## 📖 Essential Documentation (7 Files)
+## 📖 Essential Documentation (6 Files)
 
 ### 1. [Getting Started](getting-started.md)
-**Quick start in under 5 minutes**
+**Quick start in under 10 minutes**
 - Installation and setup
-- Your first script
-- Quick examples
+- Progressive learning path (6 examples)
+- RAG setup and first knowledge base
 
 ### 2. [Core Concepts](concepts.md)
-**Understand LLMSpell architecture**
+**Understand LLMSpell architecture including Phase 8.10.6 features**
 - Component model (BaseAgent trait)
 - Agents, Tools, Workflows
-- State management
-- Execution context
-- Security model
+- RAG (Retrieval-Augmented Generation) ⭐
+- Vector Storage & HNSW algorithm ⭐
+- Multi-Tenancy with resource quotas ⭐
+- State management and sessions
+- Hooks, Events, and Security model
 
 ### 3. [Configuration](configuration.md)
-**Complete configuration guide**
+**Complete configuration guide including RAG setup**
 - LLM providers (OpenAI, Anthropic, Ollama, Groq)
-- Security settings
-- Resource limits
-- External API setup
+- RAG Configuration (HNSW, embeddings, chunking) ⭐
+- Multi-Tenancy (isolation, quotas, billing) ⭐
+- State & Sessions persistence
+- Security settings and deployment profiles
 - Environment variables
 
 ### 4. [API Documentation](api/README.md)
 **Comprehensive API reference**
-- **[Lua API](api/lua/README.md)** - All 15 globals with 100+ methods
-- **[Rust API](api/rust/README.md)** - Traits, builders, and extension guide
+- **[Lua API](api/lua/README.md)** - All 17+ globals with 200+ methods
+- **[Rust API](api/rust/README.md)** - 19 crates with traits, builders, and extension guide
 
 ### 5. [Troubleshooting](troubleshooting.md)
 **Solutions to common problems**
@@ -48,14 +51,14 @@
 - Performance optimization
 - Error messages explained
 
-### 6. [Examples](../../examples/EXAMPLE-INDEX.md)
+### 5. [Examples](../../examples/EXAMPLE-INDEX.md)
 **Learn by doing**
-- 50+ working examples
-- Universal → Professional progression
-- Real-world applications
+- 60+ working examples
+- 6 Getting Started → 9 Applications progression
+- RAG-powered applications and patterns
 - Best practices demonstrated
 
-### 7. This README
+### 6. This README
 **Navigation hub** - You are here!
 
 ## 🚀 Quick Start

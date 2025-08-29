@@ -2458,83 +2458,81 @@ Check the `docs/user-guide/api/lua/README.md` to actually see what API calls to 
 
 ## Phase 8.11: Phase 9 Preparation (Day 10-11)
 
-### Task 8.11.1: Memory System Interfaces
-**Priority**: HIGH  
-**Estimated Time**: 3 hours  
-**Assignee**: Architecture Team
+### Task 8.11.1: Memory System Interfaces [TRANSFERRED TO PHASE 9]
+**Status**: ⚠️ **MOVED TO PHASE 9** (See `docs/in-progress/PHASE09-TODO.md` Task 9.1.1)
 
-**Description**: Define interfaces for Phase 9 memory system integration.
+**Rationale**: Memory system interfaces belong in Phase 9 where the `llmspell-memory` crate will be created. No need for placeholder interfaces in Phase 8.
 
-**Acceptance Criteria:**
-- [ ] Memory trait placeholders created
-- [ ] Integration points identified
-- [ ] Migration path defined
-- [ ] No breaking changes
-
-**Implementation Steps:**
-1. Create `src/memory/traits.rs` with placeholders
-2. Define `MemoryConsolidator` interface
-3. Define `EpisodicMemory` interface
-4. Document integration points
-5. Test compatibility
-
-**Definition of Done:**
-- [ ] Interfaces defined
-- [ ] No breaking changes
-- [ ] Documentation complete
-- [ ] Tests pass
-
-### Task 8.11.2: Temporal Metadata Support
+### Task 8.11.2: Temporal Metadata Support ✅
 **Priority**: HIGH  
 **Estimated Time**: 2 hours  
 **Assignee**: Storage Team
+**Status**: ✅ COMPLETED
 
 **Description**: Ensure temporal metadata support for Phase 9.
 
 **Acceptance Criteria:**
-- [ ] Timestamps in all vectors
-- [ ] Bi-temporal fields supported
-- [ ] TTL mechanism works
-- [ ] Migration path clear
+- [x] Timestamps in all vectors
+- [x] Bi-temporal fields supported
+- [x] TTL mechanism works
+- [x] Migration path clear
 
 **Implementation Steps:**
-1. Add temporal fields to `VectorEntry`
-2. Support event time vs ingestion time
-3. Test TTL expiration
-4. Document temporal model
-5. Verify persistence
+1. [x] Add temporal fields to `VectorEntry`
+2. [x] Support event time vs ingestion time
+3. [x] Test TTL expiration
+4. [x] Document temporal model
+5. [x] Verify persistence
 
 **Definition of Done:**
-- [ ] Temporal fields work
-- [ ] TTL tested
-- [ ] Documentation complete
-- [ ] No regressions
+- [x] Temporal fields work
+- [x] TTL tested
+- [x] Documentation complete
+- [x] No regressions
 
-### Task 8.11.3: Graph Storage Preparation
-**Priority**: MEDIUM  
-**Estimated Time**: 2 hours  
-**Assignee**: Architecture Team
+**Implementation Insights:**
+1. **Bi-temporal Model**: Successfully implemented dual time tracking:
+   - `created_at`: Ingestion time (when vector added to system)
+   - `event_time`: Optional event occurrence time (when real event happened)
+   - Enables queries like "What did we know at time X about events at time Y?"
 
-**Description**: Prepare for Phase 9 graph storage integration.
+2. **TTL Implementation**: 
+   - `ttl_seconds` field with automatic `expires_at` calculation
+   - `is_expired()` helper method for checking expiration
+   - HNSW backend filters expired entries during search when `exclude_expired` flag set
 
-**Acceptance Criteria:**
-- [ ] Graph traits outlined
-- [ ] Storage abstraction ready
-- [ ] Integration design documented
-- [ ] Dependencies identified
+3. **Comprehensive Field Set**:
+   - `created_at`: SystemTime - ingestion timestamp
+   - `updated_at`: SystemTime - last modification timestamp  
+   - `event_time`: Option<SystemTime> - when event occurred
+   - `expires_at`: Option<SystemTime> - calculated from TTL
+   - `ttl_seconds`: Option<u64> - time-to-live duration
 
-**Implementation Steps:**
-1. Design graph storage traits
-2. Identify integration points
-3. Document architecture
-4. List dependencies
-5. Create placeholder module
+4. **Query Enhancements**:
+   - `event_time_range`: Filter by event occurrence time
+   - `ingestion_time_range`: Filter by when we learned about events
+   - `exclude_expired`: Boolean flag to filter expired entries
+   - Supports sophisticated temporal queries for memory consolidation
 
-**Definition of Done:**
-- [ ] Design documented
-- [ ] Placeholders created
-- [ ] Dependencies clear
-- [ ] No conflicts
+5. **Serialization Verified**:
+   - All temporal fields properly serialize/deserialize with serde
+   - VectorMetadata struct in HNSW preserves full VectorEntry including temporal fields
+   - Dimension router passes through entries unchanged (no temporal field loss)
+
+6. **RAG Bridge Integration**:
+   - Extracts timestamps from document metadata (Unix timestamp or ISO 8601)
+   - Sets event_time from "timestamp", "created_at", or "event_time" metadata
+   - Extracts TTL from "ttl" or "expires_in" metadata fields
+
+7. **Test Coverage**:
+   - Created comprehensive tests for temporal fields
+   - TTL mechanism tested with expiration checks
+   - All storage tests pass including temporal functionality
+
+### Task 8.11.3: Graph Storage Preparation [TRANSFERRED TO PHASE 9]
+**Status**: ⚠️ **MOVED TO PHASE 9** (See `docs/in-progress/PHASE09-TODO.md` Task 9.1.2)
+
+**Rationale**: Graph storage preparation belongs in Phase 9 where the `llmspell-graph` crate for temporal knowledge graphs will be created. This is pure Phase 9 work.
 
 ### Task 8.11.4: Performance Baseline
 **Priority**: HIGH  

@@ -303,7 +303,7 @@ pub trait VectorStorage: Send + Sync {
     }
 }
 
-/// Multi-tenant aware vector entry
+/// Multi-tenant aware vector entry with bi-temporal support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VectorEntry {
     /// Unique identifier
@@ -318,11 +318,22 @@ pub struct VectorEntry {
     /// Tenant/user/session binding
     pub scope: StateScope,
 
-    /// Creation timestamp
+    /// Creation timestamp (ingestion time)
     pub created_at: SystemTime,
+
+    /// Last update timestamp
+    pub updated_at: SystemTime,
+
+    /// Event time - when the event actually occurred (bi-temporal support)
+    /// Different from created_at which is when it was ingested
+    pub event_time: Option<SystemTime>,
 
     /// Optional expiration time for session vectors
     pub expires_at: Option<SystemTime>,
+
+    /// TTL duration in seconds (alternative to expires_at)
+    /// If set, expires_at will be calculated as created_at + ttl
+    pub ttl_seconds: Option<u64>,
 
     /// Explicit tenant ID for billing
     pub tenant_id: Option<String>,
@@ -332,13 +343,17 @@ impl VectorEntry {
     /// Create a new vector entry with default values
     #[must_use]
     pub fn new(id: String, embedding: Vec<f32>) -> Self {
+        let now = SystemTime::now();
         Self {
             id,
             embedding,
             metadata: HashMap::new(),
             scope: StateScope::Global,
-            created_at: SystemTime::now(),
+            created_at: now,
+            updated_at: now,
+            event_time: None,
             expires_at: None,
+            ttl_seconds: None,
             tenant_id: None,
         }
     }
@@ -363,9 +378,41 @@ impl VectorEntry {
         self.expires_at = Some(expires_at);
         self
     }
+
+    /// Set event time (when the event actually occurred)
+    #[must_use]
+    pub const fn with_event_time(mut self, event_time: SystemTime) -> Self {
+        self.event_time = Some(event_time);
+        self
+    }
+
+    /// Set TTL in seconds
+    #[must_use]
+    pub fn with_ttl(mut self, ttl_seconds: u64) -> Self {
+        self.ttl_seconds = Some(ttl_seconds);
+        // Calculate expires_at from TTL
+        let duration = std::time::Duration::from_secs(ttl_seconds);
+        self.expires_at = Some(self.created_at + duration);
+        self
+    }
+
+    /// Check if the entry has expired
+    #[must_use]
+    pub fn is_expired(&self) -> bool {
+        if let Some(expires_at) = self.expires_at {
+            SystemTime::now() > expires_at
+        } else {
+            false
+        }
+    }
+
+    /// Update the entry (updates the updated_at timestamp)
+    pub fn update(&mut self) {
+        self.updated_at = SystemTime::now();
+    }
 }
 
-/// Query parameters for vector search
+/// Query parameters for vector search with temporal support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VectorQuery {
     /// Query vector
@@ -385,6 +432,15 @@ pub struct VectorQuery {
 
     /// Include metadata in results
     pub include_metadata: bool,
+
+    /// Filter by event time range (bi-temporal query)
+    pub event_time_range: Option<(SystemTime, SystemTime)>,
+
+    /// Filter by ingestion time range (bi-temporal query)
+    pub ingestion_time_range: Option<(SystemTime, SystemTime)>,
+
+    /// Exclude expired entries
+    pub exclude_expired: bool,
 }
 
 impl VectorQuery {
@@ -398,6 +454,9 @@ impl VectorQuery {
             scope: None,
             threshold: None,
             include_metadata: true,
+            event_time_range: None,
+            ingestion_time_range: None,
+            exclude_expired: true,
         }
     }
 
@@ -405,6 +464,27 @@ impl VectorQuery {
     #[must_use]
     pub fn with_scope(mut self, scope: StateScope) -> Self {
         self.scope = Some(scope);
+        self
+    }
+
+    /// Filter by event time range
+    #[must_use]
+    pub const fn with_event_time_range(mut self, start: SystemTime, end: SystemTime) -> Self {
+        self.event_time_range = Some((start, end));
+        self
+    }
+
+    /// Filter by ingestion time range
+    #[must_use]
+    pub const fn with_ingestion_time_range(mut self, start: SystemTime, end: SystemTime) -> Self {
+        self.ingestion_time_range = Some((start, end));
+        self
+    }
+
+    /// Set whether to exclude expired entries
+    #[must_use]
+    pub const fn exclude_expired(mut self, exclude: bool) -> Self {
+        self.exclude_expired = exclude;
         self
     }
 
@@ -706,5 +786,101 @@ mod tests {
     #[test]
     fn test_distance_metric_default() {
         assert_eq!(DistanceMetric::default(), DistanceMetric::Cosine);
+    }
+
+    #[test]
+    fn test_temporal_fields() {
+        let entry = VectorEntry::new("test".to_string(), vec![1.0, 2.0, 3.0]);
+
+        // Check that created_at and updated_at are initialized to the same time
+        assert_eq!(entry.created_at, entry.updated_at);
+        assert!(entry.event_time.is_none());
+        assert!(entry.expires_at.is_none());
+        assert!(entry.ttl_seconds.is_none());
+    }
+
+    #[test]
+    fn test_event_time_setting() {
+        let event_time = SystemTime::now() - std::time::Duration::from_secs(3600); // 1 hour ago
+        let entry =
+            VectorEntry::new("test".to_string(), vec![1.0, 2.0, 3.0]).with_event_time(event_time);
+
+        assert_eq!(entry.event_time, Some(event_time));
+        // Event time should be different from created_at (ingestion time)
+        assert_ne!(entry.event_time, Some(entry.created_at));
+    }
+
+    #[test]
+    fn test_ttl_mechanism() {
+        let entry_with_ttl = VectorEntry::new("test".to_string(), vec![1.0, 2.0, 3.0]).with_ttl(60); // 60 seconds TTL
+
+        assert_eq!(entry_with_ttl.ttl_seconds, Some(60));
+        assert!(entry_with_ttl.expires_at.is_some());
+
+        // Check that expires_at is correctly calculated
+        let expected_expiry = entry_with_ttl.created_at + std::time::Duration::from_secs(60);
+        assert_eq!(entry_with_ttl.expires_at, Some(expected_expiry));
+
+        // Entry should not be expired yet
+        assert!(!entry_with_ttl.is_expired());
+    }
+
+    #[test]
+    fn test_expired_entry() {
+        // Create an entry that expired 1 second ago
+        let past_time = SystemTime::now() - std::time::Duration::from_secs(1);
+        let entry =
+            VectorEntry::new("test".to_string(), vec![1.0, 2.0, 3.0]).with_expiration(past_time);
+
+        assert!(entry.is_expired());
+    }
+
+    #[test]
+    fn test_entry_update() {
+        let mut entry = VectorEntry::new("test".to_string(), vec![1.0, 2.0, 3.0]);
+        let original_updated_at = entry.updated_at;
+
+        // Sleep a tiny bit to ensure time difference
+        std::thread::sleep(std::time::Duration::from_millis(10));
+
+        entry.update();
+
+        // updated_at should be different after update
+        assert_ne!(entry.updated_at, original_updated_at);
+        // created_at should remain the same
+        assert_eq!(entry.created_at, original_updated_at);
+    }
+
+    #[test]
+    fn test_temporal_query_filters() {
+        let now = SystemTime::now();
+        let hour_ago = now - std::time::Duration::from_secs(3600);
+        let hour_later = now + std::time::Duration::from_secs(3600);
+
+        let query = VectorQuery::new(vec![1.0, 2.0, 3.0], 10)
+            .with_event_time_range(hour_ago, hour_later)
+            .with_ingestion_time_range(hour_ago, now)
+            .exclude_expired(true);
+
+        assert_eq!(query.event_time_range, Some((hour_ago, hour_later)));
+        assert_eq!(query.ingestion_time_range, Some((hour_ago, now)));
+        assert!(query.exclude_expired);
+    }
+
+    #[test]
+    fn test_bi_temporal_support() {
+        // Test that we can track both event time and ingestion time independently
+        let event_time = SystemTime::now() - std::time::Duration::from_secs(7200); // 2 hours ago
+        let entry =
+            VectorEntry::new("test".to_string(), vec![1.0, 2.0, 3.0]).with_event_time(event_time);
+
+        // Event time is when the event occurred
+        assert_eq!(entry.event_time, Some(event_time));
+
+        // created_at is ingestion time (when added to the system)
+        assert!(entry.created_at > event_time);
+
+        // This supports bi-temporal queries where we can ask:
+        // "What did we know at time X about events that occurred at time Y?"
     }
 }

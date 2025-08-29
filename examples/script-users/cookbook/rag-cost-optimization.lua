@@ -1,9 +1,10 @@
 -- ============================================================
--- LLMSPELL RAG COST OPTIMIZATION PATTERNS
+-- LLMSPELL COOKBOOK SHOWCASE
 -- ============================================================
--- Example ID: RAG Cost Optimization v0.8.0
+-- Pattern ID: RAG-03 - RAG Cost Optimization v0.8.0
 -- Complexity Level: INTERMEDIATE
 -- Real-World Use Case: Reducing embedding and API costs in production RAG systems
+-- Pattern Category: RAG & Cost Management
 --
 -- Purpose: Demonstrate cost-effective RAG strategies for production deployments.
 --          Shows caching, batching, selective updates, and budget management.
@@ -38,8 +39,8 @@
 -- Time to Complete: <20 seconds
 -- ============================================================
 
-print("=== LLMSpell: RAG Cost Optimization Patterns ===")
-print("Example: INTERMEDIATE - Production cost management strategies")
+print("=== RAG Cost Optimization Patterns ===")
+print("Pattern RAG-03: INTERMEDIATE - Production cost management strategies")
 print("Showcasing: Caching, batching, and budget control\n")
 
 -- ============================================================

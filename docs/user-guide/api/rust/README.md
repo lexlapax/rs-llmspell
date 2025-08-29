@@ -246,6 +246,27 @@ async fn setup_rag() -> Result<RAGPipeline> {
 }
 ```
 
+## 🆕 What's New in Phase 8.10.6
+
+### Enhanced RAG Capabilities
+- **Cost Optimization**: 70% reduction in embedding costs through intelligent caching
+- **Multi-Dimensional Support**: HNSW indices for 384, 768, 1536, and 3072 dimensions
+- **Session Collections**: Temporary RAG collections for conversational memory
+- **Bi-temporal Queries**: Support for both event time and ingestion time
+- **TTL Management**: Automatic document expiration for compliance
+
+### Multi-Tenancy Improvements
+- **Complete Isolation**: Guaranteed data separation between tenants
+- **Resource Quotas**: Per-tenant limits on storage, compute, and API calls
+- **Billing Integration**: Usage tracking for tenant-based billing
+- **Cross-Tenant Admin**: Secure operations across tenant boundaries
+
+### Storage Enhancements
+- **HNSW Optimization**: Faster similarity search for millions of vectors
+- **Collection Management**: Named collections with metadata
+- **Hybrid Search**: Combine vector similarity with keyword filtering
+- **Incremental Indexing**: Add documents without rebuilding
+
 ## 📊 Architecture Overview
 
 ```mermaid
@@ -265,6 +286,9 @@ graph TD
     
     F --> M[llmspell-cli]
     N[llmspell-config] --> M
+    
+    H --> L[Multi-tenant RAG]
+    G --> L[Tenant Storage]
 ```
 
 ## 🔧 Development Guidelines
@@ -293,6 +317,22 @@ graph TD
 - Never expose sensitive data in errors
 - Follow multi-tenant isolation patterns
 
+## 📦 Crate Organization Summary
+
+### By Layer
+- **Core**: llmspell-core, llmspell-utils, llmspell-testing
+- **Storage**: llmspell-storage, llmspell-state-persistence, llmspell-state-traits, llmspell-sessions
+- **Security**: llmspell-security, llmspell-tenancy
+- **AI/RAG**: llmspell-rag, llmspell-agents, llmspell-providers
+- **Execution**: llmspell-workflows, llmspell-tools, llmspell-hooks, llmspell-events
+- **Integration**: llmspell-bridge, llmspell-config, llmspell-cli
+
+### By Phase
+- **Phase 8 (RAG)**: llmspell-rag, llmspell-storage, llmspell-tenancy
+- **Phase 7 (Hooks/Events)**: llmspell-hooks, llmspell-events, llmspell-sessions
+- **Phase 6 (Workflows)**: llmspell-workflows, llmspell-tools
+- **Phase 5 (State)**: llmspell-state-persistence, llmspell-state-traits
+
 ## 📚 Related Resources
 
 - [Lua API Reference](../lua/) - Script-level API documentation
@@ -314,6 +354,7 @@ When extending LLMSpell with Rust:
 
 | LLMSpell Version | Rust Version | Key Features |
 |-----------------|--------------|--------------|
+| 0.8.10 | 1.75+ | Phase 8.10.6: Enhanced RAG with cost optimization |
 | 0.8.x | 1.75+ | Phase 8: RAG, HNSW, Multi-tenancy |
 | 0.7.x | 1.70+ | Phase 7: Hooks, Events, Sessions |
 | 0.6.x | 1.70+ | Phase 6: Workflows, Tools |

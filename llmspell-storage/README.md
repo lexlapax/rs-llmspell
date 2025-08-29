@@ -100,6 +100,73 @@ let storage_large = router.get_storage(&EmbeddingModel::OpenAI_Embedding3Large)?
 let auto_storage = router.auto_detect_storage(&embedding_vector)?;
 ```
 
+### Temporal Model (Bi-temporal Support)
+
+The vector storage system now supports comprehensive temporal metadata for Phase 9's memory system:
+
+```rust
+use llmspell_storage::{VectorEntry, VectorQuery};
+use std::time::{SystemTime, Duration};
+
+// Create vector with temporal metadata
+let event_time = SystemTime::now() - Duration::from_secs(3600); // Event occurred 1 hour ago
+let entry = VectorEntry::new("doc-1".to_string(), embedding)
+    .with_event_time(event_time)     // When the event actually occurred
+    .with_ttl(86400)                  // Expire after 24 hours
+    .with_metadata(metadata);
+
+// The system automatically tracks:
+// - created_at: When the vector was ingested (ingestion time)
+// - updated_at: When the vector was last modified
+// - event_time: When the real-world event occurred (optional)
+// - expires_at: When the vector will expire (calculated from TTL)
+
+// Bi-temporal queries
+let query = VectorQuery::new(query_embedding, 10)
+    .with_event_time_range(hour_ago, now)        // Filter by when events occurred
+    .with_ingestion_time_range(yesterday, now)   // Filter by when we learned about them
+    .exclude_expired(true);                      // Automatically exclude expired entries
+
+// Update tracking
+let mut entry = VectorEntry::new("doc-2".to_string(), embedding);
+entry.update(); // Automatically updates the updated_at timestamp
+
+// Check expiration
+if entry.is_expired() {
+    println!("Entry has expired and should be removed");
+}
+```
+
+#### Temporal Fields
+
+- **`created_at`**: Ingestion time - when the vector was added to the system
+- **`updated_at`**: Last modification time - tracks when the entry was last changed
+- **`event_time`**: Event occurrence time - when the actual event happened (optional)
+- **`expires_at`**: Expiration time - when the vector should be removed (optional)
+- **`ttl_seconds`**: Time-to-live duration - alternative to setting expires_at directly
+
+#### Bi-temporal Queries
+
+Bi-temporal support enables sophisticated time-based queries:
+
+```rust
+// "What did we know last week about events from last month?"
+let query = VectorQuery::new(embedding, 10)
+    .with_event_time_range(last_month_start, last_month_end)
+    .with_ingestion_time_range(last_week_start, last_week_end);
+
+// "Find recent events we just learned about"
+let query = VectorQuery::new(embedding, 10)
+    .with_event_time_range(yesterday, now)
+    .with_ingestion_time_range(last_hour, now);
+```
+
+This temporal model is essential for Phase 9's Adaptive Memory System, enabling:
+- Episodic memory with time-based retrieval
+- Temporal knowledge graphs with validity intervals
+- Memory consolidation based on age and relevance
+- Automatic cleanup of expired memories
+
 ## Performance Characteristics
 
 ### MemoryBackend

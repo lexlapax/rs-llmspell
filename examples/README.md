@@ -1,5 +1,7 @@
 # LLMSpell Examples
 
+**Status**: 🚀 **Phase 8.10.6** - Complete example set with RAG integration, multi-tenancy, and cost optimization
+
 **Learn by example - comprehensive demonstrations of LLMSpell capabilities**
 
 **🔗 Navigation**: [← Project Home](../) | [Docs Hub](../docs/) | [User Guide](../docs/user-guide/) | [Developer Guide](../docs/developer-guide/)
@@ -8,26 +10,28 @@
 
 ## Overview
 
-Welcome to the LLMSpell examples! This directory contains comprehensive examples organized by audience and learning path. All examples are tested and work with the current release, including persistent state management, comprehensive hook and event system integration, and session management.
+Welcome to the LLMSpell examples! This directory contains comprehensive examples organized by audience and learning path. All examples are tested and work with the current release, including RAG systems, persistent state management, comprehensive hook and event system integration, and session management.
 
 ## 📁 Directory Structure
 
 ```
 examples/
-├── script-users/               # Lua scripting examples
-│   ├── getting-started/       # 5 progressive learning scripts (00-04)
-│   ├── features/              # 5 core feature demonstrations
-│   ├── cookbook/              # 8 common patterns and recipes
-│   ├── advanced-patterns/     # 4 complex use cases
-│   ├── applications/          # 7 production-ready applications
-│   └── configs/               # Configuration examples
-└── rust-developers/           # Rust integration examples
-    ├── custom-tool-example/   # Tool creation fundamentals
-    ├── custom-agent-example/  # Agent implementation patterns
-    ├── async-patterns-example/ # Concurrent programming patterns
-    ├── extension-pattern-example/ # Plugin architecture
-    ├── builder-pattern-example/ # Configuration patterns
-    └── integration-test-example/ # Testing strategies
+├── script-users/                    # Lua scripting examples (50+ examples)
+│   ├── getting-started/            # 6 progressive learning scripts (00-05)
+│   ├── features/                   # 5 core feature demonstrations
+│   ├── cookbook/                   # 11 production patterns (8 core + 3 RAG)
+│   ├── advanced-patterns/          # 4 complex orchestration examples
+│   ├── applications/               # 9 production-ready applications (7 base + 2 RAG)
+│   ├── tests/                      # 3 RAG test suites
+│   ├── benchmarks/                 # 1 RAG performance benchmark
+│   └── configs/                    # 15 configuration templates
+└── rust-developers/                # Rust integration examples (6 examples)
+    ├── custom-tool-example/        # Tool creation fundamentals
+    ├── custom-agent-example/       # Agent implementation patterns
+    ├── async-patterns-example/     # Concurrent programming patterns
+    ├── extension-pattern-example/  # Plugin architecture
+    ├── builder-pattern-example/    # Configuration patterns
+    └── integration-test-example/   # Testing strategies
 ```
 
 ## 🚀 Quick Start
@@ -36,15 +40,25 @@ examples/
 
 ```bash
 # Start with basics
-llmspell run examples/script-users/getting-started/00-hello-world.lua
+./target/debug/llmspell run examples/script-users/getting-started/00-hello-world.lua
 
 # Try tools and agents
-llmspell run examples/script-users/getting-started/01-first-tool.lua
-llmspell run examples/script-users/getting-started/02-first-agent.lua
+./target/debug/llmspell run examples/script-users/getting-started/01-first-tool.lua
+./target/debug/llmspell run examples/script-users/getting-started/02-first-agent.lua
+
+# Build your first workflow
+./target/debug/llmspell run examples/script-users/getting-started/03-first-workflow.lua
+
+# Learn error handling
+./target/debug/llmspell run examples/script-users/getting-started/04-handle-errors.lua
+
+# Try RAG (Phase 8)
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/getting-started/05-first-rag.lua
 
 # Explore features
-llmspell run examples/script-users/features/tool-basics.lua
-llmspell run examples/script-users/features/agent-basics.lua
+./target/debug/llmspell run examples/script-users/features/tool-basics.lua
+./target/debug/llmspell run examples/script-users/features/agent-basics.lua
 ```
 
 ### Rust Developers
@@ -55,246 +69,218 @@ cd examples/rust-developers/custom-agent-example && cargo run
 cd examples/rust-developers/async-patterns-example && cargo run
 ```
 
-### Agent Examples (Requires API Keys)
+### Configuration Examples
 
 ```bash
-# Run all agent examples
-./examples/run-all-agent-examples.sh
+# Use minimal config (tools only)
+./target/debug/llmspell -c examples/script-users/configs/minimal.toml \
+  run examples/script-users/getting-started/01-first-tool.lua
 
-# Run specific agent example
-llmspell run examples/lua/agents/agent-simple.lua
-llmspell run examples/lua/agents/agent-orchestrator.lua
+# Use provider config (agents)
+./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
+  run examples/script-users/features/agent-basics.lua
+
+# Use state-enabled config
+./target/debug/llmspell -c examples/script-users/configs/state-enabled.toml \
+  run examples/script-users/features/state-persistence.lua
+
+# Use RAG config (Phase 8)
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/getting-started/05-first-rag.lua
 ```
 
-### Tool Examples
+### Production Patterns (Cookbook)
 
 ```bash
-# Run all tool examples
-./examples/run-all-tools-examples.sh
+# Error handling patterns
+./target/debug/llmspell run examples/script-users/cookbook/error-handling.lua
 
-# Run specific tool category
-llmspell run examples/lua/tools/tools-filesystem.lua
-llmspell run examples/lua/tools/tools-utility.lua
+# Rate limiting
+./target/debug/llmspell run examples/script-users/cookbook/rate-limiting.lua
+
+# Multi-agent coordination
+./target/debug/llmspell -c examples/script-users/configs/example-providers.toml \
+  run examples/script-users/cookbook/multi-agent-coordination.lua
+
+# RAG patterns (Phase 8)
+./target/debug/llmspell -c examples/script-users/configs/rag-multi-tenant.toml \
+  run examples/script-users/cookbook/rag-multi-tenant.lua
+
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/cookbook/rag-session.lua
+
+./target/debug/llmspell -c examples/script-users/configs/rag-basic.toml \
+  run examples/script-users/cookbook/rag-cost-optimization.lua
 ```
 
-### Workflow Examples
+### Complete Applications
 
 ```bash
-# Run workflow examples
-./examples/run-workflow-examples.sh
+# Run complete applications
+cd examples/script-users/applications
 
-# Run specific workflow pattern
-llmspell run examples/lua/workflows/workflow-sequential.lua
-llmspell run examples/lua/workflows/workflow-parallel.lua
-```
+# Web app creator
+./target/debug/llmspell -c webapp-creator/config.toml \
+  run webapp-creator/main.lua
 
-### Hook & Event Examples
+# Knowledge base (Phase 8)
+./target/debug/llmspell -c knowledge-base/config.toml \
+  run knowledge-base/main.lua
 
-```bash
-# Run all hook and event examples
-llmspell run examples/lua/run-all-examples.lua
-
-# Run specific hook examples
-llmspell run examples/lua/hooks/hook-basic.lua
-llmspell run examples/lua/hooks/hook-advanced-patterns.lua
-
-# Run specific event examples
-llmspell run examples/lua/events/event-basic.lua
-llmspell run examples/lua/events/event-cross-language.lua
-
-# Run integration demos
-llmspell run examples/lua/run-integration-demos.lua
-```
-
-### State Persistence Examples (Phase 5)
-
-```bash
-# Run quick start example
-cd examples/state_persistence && ./run_quick_start.sh
-
-# Run specific state examples
-llmspell run examples/lua/state/basic_persistence.lua
-llmspell run examples/lua/state/agent_state_persistence.lua
-llmspell run examples/lua/state/scope_isolation.lua
-
-# Run backup examples
-llmspell run examples/lua/backup/state_backup.lua
-llmspell run examples/lua/backup/retention_policy.lua
-
-# Run migration examples
-llmspell run examples/lua/migration/schema_migration.lua
-
-# Run performance benchmarks
-llmspell run examples/lua/run-performance-benchmarks.lua
-
-# Run AI-powered research assistant (requires API keys)
-export OPENAI_API_KEY="your-key-here"  # or ANTHROPIC_API_KEY
-llmspell run examples/lua/integration/ai-powered-research-assistant.lua
+# Personal assistant (Phase 8)
+./target/debug/llmspell -c personal-assistant/config.toml \
+  run personal-assistant/main.lua
 ```
 
 ## 📋 Example Categories
 
-### Root Examples
+### Script Users (`script-users/`)
 
-- **`hello.lua`** - Simplest possible script
-- **`llmspell-demo.lua`** - Shows core functionality
-- **`provider-info.lua`** - Display configured providers
-- **`streaming-demo.lua`** - Streaming LLM responses
-- **`multimodal-stub.lua`** - Multimodal input examples
+#### Getting Started (6 examples)
+Progressive learning path from basics to RAG:
+- **`00-hello-world.lua`** - Simplest possible script
+- **`01-first-tool.lua`** - File operations with tools
+- **`02-first-agent.lua`** - Creating LLM agents
+- **`03-first-workflow.lua`** - Workflow orchestration
+- **`04-handle-errors.lua`** - Error handling patterns
+- **`05-first-rag.lua`** - RAG system basics (Phase 8)
 
-### Agent Examples (`lua/agents/`)
+#### Features (5 demonstrations)
+Core capability demonstrations:
+- **`agent-basics.lua`** - Agent creation and management
+- **`tool-basics.lua`** - Using the 34+ built-in tools
+- **`workflow-basics.lua`** - Workflow patterns
+- **`state-persistence.lua`** - State management
+- **`provider-info.lua`** - Provider configuration
 
-Demonstrates agent creation, configuration, and usage patterns:
+#### Cookbook (11 production patterns)
+Battle-tested patterns for production:
 
-- **`agent-simple.lua`** - Basic agent creation and execution
-- **`agent-orchestrator.lua`** - Agent coordinating multiple tools
-- **`agent-coordinator.lua`** - Multi-agent coordination
-- **`agent-processor.lua`** - Data processing with agents
-- **`agent-monitor.lua`** - System monitoring agent
-- **`agent-composition.lua`** - Composing agents together
-- **`agent-async-example.lua`** - Async patterns (internal use)
-- **`agent-simple-demo.lua`** - Interactive demo
-- **`agent-simple-benchmark.lua`** - Performance testing
-- **`agent-api-comprehensive.lua`** - Full API demonstration
+**Core Patterns (8):**
+- **`error-handling.lua`** - Comprehensive error recovery
+- **`rate-limiting.lua`** - API quota management
+- **`caching.lua`** - Performance optimization
+- **`multi-agent-coordination.lua`** - Agent collaboration
+- **`webhook-integration.lua`** - External systems
+- **`performance-monitoring.lua`** - Observability
+- **`security-patterns.lua`** - Input validation
+- **`state-management.lua`** - Persistence patterns
 
-### Tool Examples (`lua/tools/`)
+**RAG Patterns (3 - Phase 8):**
+- **`rag-multi-tenant.lua`** - Tenant isolation
+- **`rag-session.lua`** - Conversational memory
+- **`rag-cost-optimization.lua`** - 70% cost reduction
 
-Shows all 34 available tools organized by category:
+#### Advanced Patterns (4 examples)
+Complex orchestration and integration:
+- **`multi-agent-orchestration.lua`** - Complex coordination
+- **`complex-workflows.lua`** - Advanced workflows
+- **`tool-integration-patterns.lua`** - Tool chaining
+- **`monitoring-security.lua`** - Production monitoring
 
-- **`tools-showcase.lua`** - Demonstrates all tools
-- **`tools-filesystem.lua`** - File operations (5 tools)
-- **`tools-data.lua`** - Data processing (4 tools)
-- **`tools-web.lua`** - Web & network tools (7 tools)
-- **`tools-system.lua`** - System integration (4 tools)
-- **`tools-utility.lua`** - Utility tools (10 tools)
-- **`tools-media.lua`** - Media processing (3 tools)
-- **`tools-security.lua`** - Security features demo
-- **`tools-integration.lua`** - External integrations
-- **`tools-workflow.lua`** - Tools in workflows
-- **`tools-performance.lua`** - Performance benchmarks
-- **`tools-utility-reference.lua`** - API reference example
+#### Applications (9 complete apps)
+Production-ready applications:
 
-### Workflow Examples (`lua/workflows/`)
+**Base Applications (7):**
+- **`webapp-creator/`** - Multi-agent web app generator
+- **`code-review-assistant/`** - Automated code review
+- **`content-creator/`** - Multi-format content
+- **`communication-manager/`** - Email orchestration
+- **`file-organizer/`** - Intelligent file organization
+- **`process-orchestrator/`** - Workflow automation
+- **`research-collector/`** - v2.0 with RAG integration
 
-Demonstrates all 4 workflow patterns:
+**RAG Applications (2 - Phase 8):**
+- **`knowledge-base/`** - Personal knowledge management
+- **`personal-assistant/`** - AI productivity companion
 
-- **`workflow-sequential.lua`** - Step-by-step execution
-- **`workflow-conditional.lua`** - Branching logic
-- **`workflow-loop.lua`** - Iteration patterns
-- **`workflow-parallel.lua`** - Concurrent execution
-- **`workflow-basics-*.lua`** - Basic pattern examples
-- **`workflow-agent-integration.lua`** - Agents in workflows
+### Rust Developers (`rust-developers/`)
 
-### Hook Examples (`lua/hooks/`)
+6 comprehensive Rust integration examples:
+- **`custom-tool-example/`** - Creating custom tools with Tool trait
+- **`custom-agent-example/`** - Agent implementation patterns
+- **`async-patterns-example/`** - Concurrent execution and streaming
+- **`extension-pattern-example/`** - Plugin architecture
+- **`builder-pattern-example/`** - Fluent API configuration
+- **`integration-test-example/`** - Testing strategies
 
-Demonstrates the complete hook system from basic registration to advanced patterns:
+### Tests and Benchmarks (`script-users/`)
 
-- **`hook-basic.lua`** - Basic hook registration and unregistration
-- **`hook-priorities.lua`** - All 5 priority levels (highest to lowest)
-- **`hook-lifecycle.lua`** - Complete agent lifecycle hooks
-- **`hook-tool-integration.lua`** - Tool execution hooks with validation
-- **`hook-workflow-integration.lua`** - Workflow stage hooks and coordination
-- **`hook-data-modification.lua`** - All hook result types (continue, modified, cancel, etc.)
-- **`hook-error-handling.lua`** - Comprehensive error handling patterns
-- **`hook-cross-language.lua`** - Cross-language hook coordination
-- **`hook-filtering-listing.lua`** - Hook listing and filtering capabilities
-- **`hook-advanced-patterns.lua`** - Complex patterns (retry, circuit breaker, etc.)
+#### Test Suites (3 RAG tests)
+- **`test-rag-basic.lua`** - Basic RAG operations
+- **`test-rag-e2e.lua`** - End-to-end testing
+- **`test-rag-errors.lua`** - Error handling
 
-### Event Examples (`lua/events/`)
+#### Benchmarks (1)
+- **`rag-benchmark.lua`** - RAG performance measurement
 
-Shows event system capabilities from basic pub/sub to advanced coordination:
+### Configuration Templates (`script-users/configs/`)
 
-- **`event-basic.lua`** - Basic publish/subscribe patterns
-- **`event-patterns.lua`** - Pattern matching with wildcards (`user.*`, `*.error`)
-- **`event-cross-language.lua`** - Cross-language event communication
-- **`event-data-structures.lua`** - Complex nested event data structures
-- **`event-subscription-management.lua`** - Subscription lifecycle management
-- **`event-performance.lua`** - High-throughput performance scenarios
-- **`event-timeout-handling.lua`** - Timeout patterns and error recovery
-- **`event-statistics.lua`** - System monitoring and metrics collection
-- **`event-workflow-coordination.lua`** - Workflow orchestration patterns
-- **`event-hook-integration.lua`** - Hook-event integration patterns
-
-### Integration Examples (`lua/integration/`)
-
-Real-world scenarios combining hooks, events, agents, tools, and workflows:
-
-- **`realtime-data-pipeline.lua`** - Complete data pipeline with end-to-end processing
-- **`user-workflow-automation.lua`** - Business workflow automation with intelligent routing
-- **`intelligent-monitoring-system.lua`** - AI-driven monitoring with predictive analytics
-- **`ai-powered-research-assistant.lua`** - Full LLM integration with agents, tools, workflows, hooks, and events (requires API keys)
-- **`ai-research-assistant-simple.lua`** - Simplified LLM agent example with hooks and events (simulation mode works, real agents require API keys)
-
-### Runner Scripts (`lua/`)
-
-Comprehensive test and demonstration runners:
-
-- **`run-all-examples.lua`** - Master runner executing all 23 examples in sequence
-- **`run-integration-demos.lua`** - Focused runner for integration examples with analysis
-- **`run-performance-benchmarks.lua`** - Performance testing with stress tests and metrics
+15 ready-to-use configuration files:
+- **Core configs**: minimal, basic, llmspell
+- **Provider configs**: example-providers, applications, cookbook
+- **State configs**: state-enabled, session-enabled, migration-enabled, backup-enabled
+- **RAG configs**: rag-basic, rag-development, rag-production, rag-performance, rag-multi-tenant
 
 ## 🔧 Configuration
 
-### Example Configuration Files
+### Available Configuration Files
 
-- **`llmspell.toml`** - Full configuration example
-- **`minimal.toml`** - Minimal required configuration
+**Location**: `script-users/configs/`
+
+- **`minimal.toml`** - Tools only, no providers
+- **`basic.toml`** - Basic state operations
+- **`example-providers.toml`** - OpenAI + Anthropic setup
+- **`state-enabled.toml`** - State persistence enabled
+- **`rag-basic.toml`** - Getting started with RAG
+- **`rag-production.toml`** - Production RAG deployment
+- **`applications.toml`** - Full application configuration
+
+See [Configuration Guide](script-users/configs/README.md) for detailed documentation.
 
 ### Setting API Keys
 
 ```bash
-# OpenAI
+# OpenAI (for GPT models and embeddings)
 export OPENAI_API_KEY="your-key-here"
 
-# Anthropic
+# Anthropic (for Claude models)
 export ANTHROPIC_API_KEY="your-key-here"
-
-# Other providers as needed
 ```
 
 ## 📚 Learning Path
 
 ### For Beginners
 
-1. Start with `hello.lua`
-2. Explore `tools-utility.lua` for basic tool usage
-3. Try `agent-simple.lua` for agent basics
-4. Move to `workflow-sequential.lua` for workflows
+1. Start with `script-users/getting-started/00-hello-world.lua`
+2. Progress through examples 01-05 in order
+3. Explore `script-users/features/` for specific capabilities
+4. Study `script-users/cookbook/` for production patterns
 
-### For Tool Users
+### For Rust Developers
 
-1. Browse `tools-showcase.lua` for overview
-2. Deep dive into category-specific examples
-3. Check `tools-security.lua` for security patterns
-4. Study `tools-workflow.lua` for integration
+1. Start with `rust-developers/custom-tool-example/`
+2. Progress to `custom-agent-example/`
+3. Explore `async-patterns-example/` for concurrency
+4. Study `builder-pattern-example/` for configuration
 
-### For Agent Developers
+### For RAG Users (Phase 8)
 
-1. Start with `agent-simple.lua`
-2. Progress to `agent-orchestrator.lua`
-3. Explore `agent-coordinator.lua` for multi-agent
-4. Review `agent-api-comprehensive.lua` for full API
+1. Start with `script-users/getting-started/05-first-rag.lua`
+2. Try RAG cookbook patterns:
+   - `rag-multi-tenant.lua` for SaaS applications
+   - `rag-session.lua` for conversational AI
+   - `rag-cost-optimization.lua` for cost reduction
+3. Build complete RAG applications:
+   - `applications/knowledge-base/` for knowledge management
+   - `applications/personal-assistant/` for AI companion
 
-### For Workflow Builders
+### For Production Deployment
 
-1. Learn patterns in `workflow-basics-*.lua`
-2. Study complete examples in main workflow files
-3. Check `workflow-agent-integration.lua` for AI workflows
-
-### For Hook & Event System Users
-
-1. Start with `hook-basic.lua` and `event-basic.lua`
-2. Explore priorities and patterns in dedicated examples
-3. Study cross-language coordination examples
-4. Review integration examples for real-world usage patterns
-5. Run performance benchmarks to understand system limits
-
-### For System Integrators
-
-1. Review all integration examples in `lua/integration/`
-2. Run `run-integration-demos.lua` for guided analysis
-3. Study performance characteristics with `run-performance-benchmarks.lua`
-4. Use `run-all-examples.lua` for comprehensive system validation
+1. Study all patterns in `script-users/cookbook/`
+2. Review `script-users/advanced-patterns/`
+3. Examine complete applications in `script-users/applications/`
+4. Use appropriate configs from `script-users/configs/`
 
 ## 🏃 Running Examples
 
@@ -422,124 +408,82 @@ For detailed documentation, see:
 
 To add new examples:
 
-1. Follow existing naming patterns
-2. Include clear comments explaining the example
-3. Test thoroughly before submitting
-4. Update this README if adding new categories
-5. Ensure examples work with current implementation
-6. For hook/event examples, include comprehensive error handling
-7. Add performance considerations for resource-intensive examples
-8. Update runner scripts if adding new example categories
+1. **Location**: Place in appropriate subdirectory under `script-users/` or `rust-developers/`
+2. **Documentation**: Include comprehensive header comments with:
+   - Purpose and use case
+   - Prerequisites (API keys, configs)
+   - Expected output
+   - Time to complete
+3. **Naming**: Follow existing patterns (e.g., `feature-name.lua`, `pattern-name-example/`)
+4. **Testing**: Ensure example works with current release
+5. **Configuration**: Provide or reference appropriate config files
+6. **Error Handling**: Include proper error handling patterns
+7. **Update README**: Add to this file and relevant subdirectory READMEs
 
-## 🪝 Hook & Event System Overview
+## 🆕 Phase 8 RAG Features
 
-Phase 5 (v0.5.0) includes persistent state management with multi-backend support, enabling enterprise-grade state persistence, migrations, and backup capabilities.
+Phase 8.10.6 introduces comprehensive RAG (Retrieval-Augmented Generation) support:
 
-### Hook System Architecture
+### RAG Capabilities
 
-The hook system provides 14 execution points across the component lifecycle:
+- **Vector Storage**: HNSW algorithm for fast similarity search
+- **Multi-Tenancy**: Complete isolation between tenant knowledge bases
+- **Session Management**: Conversational memory with automatic cleanup
+- **Cost Optimization**: Smart caching reduces embedding costs by 70%
+- **Bi-temporal Metadata**: Track both event time and ingestion time
+- **TTL Support**: Automatic document expiration for compliance
+- **Production Ready**: Battle-tested patterns for enterprise deployment
 
-**Agent Hooks:**
-- `BeforeAgentInit`, `AfterAgentInit` - Agent initialization
-- `BeforeAgentExecution`, `AfterAgentExecution` - Agent task execution
-- `BeforeAgentShutdown`, `AfterAgentShutdown` - Agent cleanup
+### RAG Examples
 
-**Tool Hooks:**
-- `BeforeToolExecution`, `AfterToolExecution` - Tool invocation
+**Getting Started:**
+- `script-users/getting-started/05-first-rag.lua` - Learn RAG basics
 
-**Workflow Hooks:**
-- `BeforeWorkflowStart`, `AfterWorkflowEnd` - Workflow lifecycle
-- `BeforeWorkflowStep`, `AfterWorkflowStep` - Individual step execution
+**Production Patterns:**
+- `script-users/cookbook/rag-multi-tenant.lua` - Tenant isolation
+- `script-users/cookbook/rag-session.lua` - Conversational memory
+- `script-users/cookbook/rag-cost-optimization.lua` - Cost reduction
 
-**General Hooks:**
-- `OnError` - Error handling and recovery
-- `OnPerformanceThreshold` - Performance monitoring
+**Complete Applications:**
+- `script-users/applications/knowledge-base/` - Knowledge management system
+- `script-users/applications/personal-assistant/` - AI productivity companion
+- `script-users/applications/research-collector/` - v2.0 with RAG integration
 
-### Hook Priority System
+### Performance Targets
 
-5 priority levels control execution order:
-- `highest` - Critical system hooks (security, validation)
-- `high` - Important business logic hooks
-- `normal` - Standard application hooks (default)
-- `low` - Logging and monitoring hooks
-- `lowest` - Debug and development hooks
+- Document ingestion: >100 docs/second
+- Vector search: <50ms for 1M vectors
+- Embedding cache hit rate: >80%
+- Memory usage: ~1GB per million vectors
+- Multi-tenant overhead: <5%
 
-### Hook Result Types
+## 📊 Summary
 
-Hooks can control execution flow:
-- `continue` - Normal execution continues
-- `modified` - Data was modified, continue with changes
-- `cancel` - Stop execution immediately
-- `redirect` - Change execution target
-- `replace` - Replace current operation with alternative
-- `retry` - Retry the operation
-- `skipped` - Mark operation as skipped
+### Total Examples: 60+
 
-### Event System Architecture
+**Script Users (Lua)**: 50+ examples
+- Getting Started: 6 progressive examples
+- Features: 5 capability demonstrations
+- Cookbook: 11 production patterns (including 3 RAG)
+- Advanced Patterns: 4 complex scenarios
+- Applications: 9 complete applications (including 2 RAG)
+- Tests: 3 RAG test suites
+- Benchmarks: 1 performance benchmark
+- Configs: 15 configuration templates
 
-Publish/subscribe event system with:
-- **Pattern Matching**: Wildcard patterns (`user.*`, `*.error`, `system.*.warning`)
-- **Cross-Language Communication**: Events cross Lua/Rust boundaries
-- **Correlation**: Event correlation for distributed tracing
-- **Timeout Handling**: Configurable receive timeouts
-- **Subscription Management**: Dynamic subscription lifecycle
+**Rust Developers**: 6 integration examples
+- Tool creation, agent implementation, async patterns
+- Extension architecture, builder patterns, testing
 
-### Integration Patterns
+### What's New in Phase 8
 
-The examples demonstrate these key integration patterns:
-
-1. **Event-Driven Architecture**: Loose coupling via events
-2. **Hook-Based Monitoring**: Comprehensive observability
-3. **Automated Recovery**: Error handling and retry mechanisms
-4. **Performance Optimization**: Real-time metrics and thresholds
-5. **Cross-Component Coordination**: Unified state management
-6. **Business Process Automation**: Intelligent routing and approval flows
-7. **Predictive Analytics**: AI-driven monitoring and remediation
-
-### Performance Characteristics
-
-System performance targets (measured in benchmarks):
-- Hook registration: <10ms per hook
-- Hook execution overhead: <1% of operation time
-- Event publishing: >1000 events/second
-- Event receiving: <10ms latency
-- Memory usage: Linear scaling with load
-- Concurrent operations: 100+ simultaneous hook/event operations
-
-### Use Cases
-
-**Data Processing**: Real-time ETL pipelines with event coordination
-**Business Workflows**: Approval chains with intelligent routing
-**System Monitoring**: Predictive analytics with automated remediation
-**DevOps Automation**: CI/CD pipeline coordination and monitoring
-**Security**: Event-driven security monitoring and response
-**Performance**: Real-time performance monitoring and optimization
+- RAG integration with multi-tenancy and sessions
+- Cost optimization patterns (70% reduction)
+- 2 new RAG applications (knowledge-base, personal-assistant)
+- 3 RAG cookbook patterns
+- Comprehensive RAG test suites
+- 5 specialized RAG configurations
 
 ---
 
-## 🆕 New Organized Structure (Phase 7 Complete)
-
-Phase 7 examples have been completely reorganized for better learning paths:
-
-### For Script Users (Lua)
-**Location**: [`script-users/`](script-users/)
-- **getting-started/** - Progressive learning path (5 Lua scripts: 00-04)
-- **features/** - Core feature demonstrations (5 focused examples)
-- **cookbook/** - Common patterns and recipes (8 practical patterns)
-- **advanced-patterns/** - Complex use cases (4 advanced scenarios) 
-- **applications/** - Production-ready applications (7 complete apps)
-
-### For Rust Developers
-**Location**: [`rust-developers/`](rust-developers/)
-- **custom-tool-example/** - BaseAgent + Tool trait fundamentals
-- **custom-agent-example/** - Agent personalities and specializations  
-- **async-patterns-example/** - Concurrent execution, streaming, pipelines
-- **extension-pattern-example/** - Plugin/extension architecture
-- **builder-pattern-example/** - Fluent APIs and configuration
-- **integration-test-example/** - Comprehensive testing strategies
-
-**All examples are working and tested** - Phase 7 consolidation complete!
-
----
-
-**Happy experimenting with rs-llmspell!** 🚀
+**Happy experimenting with LLMSpell!** 🚀

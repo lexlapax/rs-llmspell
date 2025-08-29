@@ -234,6 +234,9 @@ async fn test_multi_tenant_vector_manager_with_events() -> Result<()> {
         threshold: None,
         include_metadata: true,
         scope: None,
+        event_time_range: None,
+        ingestion_time_range: None,
+        exclude_expired: false,
     };
 
     manager.search_for_tenant("vector-tenant", query).await?;
@@ -359,6 +362,9 @@ async fn test_tenant_isolation() -> Result<()> {
         threshold: None,
         include_metadata: true,
         scope: None,
+        event_time_range: None,
+        ingestion_time_range: None,
+        exclude_expired: false,
     };
 
     let results1 = manager.search_for_tenant("tenant-1", query.clone()).await?;
@@ -411,6 +417,9 @@ async fn test_inactive_tenant_access() -> Result<()> {
         threshold: None,
         include_metadata: true,
         scope: None,
+        event_time_range: None,
+        ingestion_time_range: None,
+        exclude_expired: false,
     };
 
     let result = manager.search_for_tenant("inactive-tenant", query).await;
