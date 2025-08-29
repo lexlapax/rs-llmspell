@@ -283,6 +283,20 @@ pub enum AppsSubcommand {
         #[arg(last = true)]
         args: Vec<String>,
     },
+
+    /// Personal knowledge management with semantic search
+    KnowledgeBase {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
+
+    /// AI-powered personal productivity assistant
+    PersonalAssistant {
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
+    },
 }
 
 impl Cli {

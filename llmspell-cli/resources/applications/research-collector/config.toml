@@ -1,9 +1,9 @@
-# Universal Layer Configuration - Research Collector
-# Simple configuration for everyday research needs
+# Universal Layer Configuration - Research Collector with RAG
+# Simple configuration for everyday research needs with knowledge persistence
 
 [runtime]
 name = "research-collector"
-description = "Universal research automation"
+description = "Universal research automation with knowledge base"
 
 # Single provider with fallback for reliability
 [providers.openai]
@@ -37,3 +37,14 @@ enabled = false
 # No events tracking
 [events]
 enabled = false
+
+# RAG configuration for knowledge persistence
+[rag]
+enabled = true
+provider = "openai"
+embedding_model = "text-embedding-ada-002"
+vector_dimensions = 1536
+default_collection = "research_knowledge"
+chunk_size = 500
+chunk_overlap = 50
+persistence_path = "/tmp/research-rag-storage"

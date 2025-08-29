@@ -54,39 +54,39 @@ pub struct SandboxContext {
     /// Used for logging, debugging, and tracking sandbox sessions across
     /// the system. Should be unique within the application instance.
     pub id: String,
-    
+
     /// The security requirements that define what operations are allowed.
     ///
     /// This contains the high-level security policy that was used to create
     /// this sandbox context. Preserved for auditing and policy validation.
     pub security_requirements: SecurityRequirements,
-    
+
     /// Resource limits to prevent resource exhaustion attacks.
     ///
     /// Defines CPU time, memory usage, disk space, and network bandwidth
     /// limits to prevent sandboxed code from consuming excessive resources.
     pub resource_limits: ResourceLimits,
-    
+
     /// The working directory for sandboxed operations.
     ///
     /// All relative path operations will be resolved relative to this directory.
     /// Defaults to current directory or /tmp if current directory is inaccessible.
     pub working_directory: String,
-    
+
     /// List of file paths that sandboxed code is allowed to access.
     ///
     /// Can include exact paths or path prefixes. Use "*" for unrestricted
     /// file access (only for trusted code). Paths are checked using prefix
     /// matching, so "/tmp" allows access to "/tmp/anything".
     pub allowed_paths: Vec<String>,
-    
+
     /// List of network domains that sandboxed code can connect to.
     ///
     /// Can include exact domain names or domain suffixes (starting with ".").
     /// Use "*" for unrestricted network access (only for trusted code).
     /// Domain matching supports both exact matches and suffix matches.
     pub allowed_domains: Vec<String>,
-    
+
     /// List of environment variables that sandboxed code can access.
     ///
     /// Only the specified environment variables will be visible to the

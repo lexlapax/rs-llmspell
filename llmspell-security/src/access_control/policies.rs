@@ -23,7 +23,7 @@ pub enum AccessDecision {
     /// The operation can proceed normally with no additional constraints
     /// or filtering requirements.
     Allow,
-    
+
     /// Access is denied with an explanatory reason.
     ///
     /// The operation should be blocked and the provided reason should be
@@ -38,7 +38,7 @@ pub enum AccessDecision {
     /// let decision = AccessDecision::Deny("Insufficient permissions".to_string());
     /// ```
     Deny(String),
-    
+
     /// Access is allowed but additional security filters must be applied.
     ///
     /// The operation can proceed but the provided filters must be applied
@@ -97,14 +97,14 @@ pub struct SecurityFilter {
     /// This should correspond to a field in the data being queried,
     /// such as "tenant_id", "user_id", or "status".
     pub field: String,
-    
+
     /// The set of values that are allowed (or disallowed if `exclude` is true).
     ///
     /// When `exclude` is false, only records with field values in this set
     /// will be returned. When `exclude` is true, records with field values
     /// in this set will be filtered out.
     pub allowed_values: HashSet<String>,
-    
+
     /// Whether this is an inclusion filter (false) or exclusion filter (true).
     ///
     /// - `false`: Only include records where the field value is in `allowed_values`

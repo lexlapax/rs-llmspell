@@ -1,9 +1,9 @@
--- Application: Research Collector v1.0 (Universal Layer)
--- Purpose: Gather information for everyday research needs with AI assistance
+-- Application: Research Collector v2.0 (Universal Layer with RAG)
+-- Purpose: Gather information for everyday research needs with AI assistance and knowledge persistence
 -- Prerequisites: OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables
--- Expected Output: Organized research results with simple synthesis
--- Version: 1.0.0
--- Tags: application, research-collector, universal, parallel, information-gathering
+-- Expected Output: Organized research results with simple synthesis and knowledge retrieval
+-- Version: 2.0.0
+-- Tags: application, research-collector, universal, parallel, information-gathering, rag
 --
 -- HOW TO RUN:
 -- 1. Basic (no API keys): ./target/debug/llmspell run examples/script-users/applications/research-collector/main.lua
@@ -13,8 +13,8 @@
 -- ABOUTME: Universal appeal application - "I need to research this thoroughly"
 -- ABOUTME: Simple parallel search + sequential synthesis for everyday research needs
 
-print("=== Research Collector v1.0 ===")
-print("Universal research solution for everyday information gathering\n")
+print("=== Research Collector v2.0 with RAG ===")
+print("Universal research solution with knowledge persistence\n")
 
 -- ============================================================
 -- Configuration (Universal Simplicity)
@@ -36,6 +36,31 @@ local config = {
         research_topics = {"vacation planning", "health information", "product comparison", "educational research"}
     }
 }
+
+-- ============================================================
+-- Step 0: Initialize RAG for Knowledge Persistence
+-- ============================================================
+
+print("0. Initializing RAG system for knowledge persistence...")
+
+-- Configure RAG with OpenAI embeddings
+if RAG then
+    RAG.configure({
+        provider = "openai",
+        embedding_model = "text-embedding-ada-002",
+        vector_dimensions = 1536,
+        collection = "research_knowledge"
+    })
+    print("  ✅ RAG system configured")
+    
+    -- Check for existing knowledge
+    local stats = RAG.get_stats("research_knowledge", nil)
+    if stats and stats.total_vectors then
+        print("  📚 Existing knowledge base: " .. stats.total_vectors .. " vectors")
+    end
+else
+    print("  ⚠️ RAG not available, continuing without knowledge persistence")
+end
 
 -- ============================================================
 -- Step 1: Create 2 Simple Agents (Universal Layer)
@@ -100,6 +125,36 @@ Tool.invoke("file_operations", {
 print("  ✅ Sample research scenario: " .. current_research)
 
 -- ============================================================
+-- Step 2.5: Check Existing Knowledge
+-- ============================================================
+
+print("\n2.5. Checking existing knowledge base...")
+
+local existing_knowledge = nil
+if RAG then
+    -- Search for similar research in our knowledge base
+    local search_results = RAG.search(current_research, {
+        limit = 3,
+        threshold = 0.7,
+        collection = "research_knowledge"
+    })
+    
+    if search_results and #search_results > 0 then
+        print("  📖 Found " .. #search_results .. " related research entries")
+        existing_knowledge = search_results
+        
+        -- Display related knowledge
+        for i, result in ipairs(search_results) do
+            if result.metadata and result.metadata.research_query then
+                print("    - " .. result.metadata.research_query)
+            end
+        end
+    else
+        print("  📝 No existing knowledge found, will create new entry")
+    end
+end
+
+-- ============================================================
 -- Step 3: Parallel Research Workflows (Improved Performance)
 -- ============================================================
 
@@ -139,13 +194,26 @@ print("  ⚡ Both agents will search simultaneously for faster results")
 print("\n4. Collecting research on: \"" .. current_research .. "\"")
 print("=============================================================")
 
--- Simple execution context (no complex state management)
+-- Execution context with existing knowledge
 local execution_context = {
     text = current_research,
     search_query = current_research,
     research_type = "vacation planning",
-    timestamp = os.date("%Y-%m-%d %H:%M:%S")
+    timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+    existing_knowledge = existing_knowledge
 }
+
+-- If we have existing knowledge, provide it to the agents
+if existing_knowledge and #existing_knowledge > 0 then
+    local knowledge_context = "Related previous research:\n"
+    for _, result in ipairs(existing_knowledge) do
+        if result.content then
+            knowledge_context = knowledge_context .. "- " .. string.sub(result.content, 1, 100) .. "...\n"
+        end
+    end
+    execution_context.knowledge_context = knowledge_context
+    print("  💡 Leveraging existing knowledge for enhanced research")
+end
 
 -- Execute simple workflow
 local result = main_research_workflow:execute(execution_context)
@@ -161,10 +229,10 @@ print("  📝 Synthesis completed: Summary and recommendations generated")
 local execution_time_ms = (result and result._metadata and result._metadata.execution_time_ms) or 200
 
 -- ============================================================
--- Step 5: Create Research Summary
+-- Step 5: Create Research Summary and Store in RAG
 -- ============================================================
 
-print("\n5. Creating research summary...")
+print("\n5. Creating research summary and updating knowledge base...")
 
 -- Simple research summary (demo - real version would use actual search results)
 local research_summary = string.format([[
@@ -251,6 +319,34 @@ Tool.invoke("file_operations", {
     input = research_summary
 })
 
+-- Store research in RAG for future retrieval
+if RAG then
+    local success = RAG.ingest({
+        content = research_summary,
+        metadata = {
+            research_query = current_research,
+            research_type = "vacation planning",
+            timestamp = os.date("%Y-%m-%d %H:%M:%S"),
+            source = "research_collector_v2",
+            file_path = config.files.research_summary
+        }
+    }, {
+        collection = "research_knowledge",
+        chunk_size = 500,
+        chunk_overlap = 50
+    })
+    
+    if success then
+        print("  ✅ Research stored in knowledge base for future retrieval")
+        
+        -- Save RAG state for persistence
+        RAG.save()
+        print("  💾 Knowledge base saved")
+    else
+        print("  ⚠️ Could not store research in knowledge base")
+    end
+end
+
 -- Store search results summary
 local search_results_summary = string.format([[
 {
@@ -304,11 +400,12 @@ print("    • Agents: 2 (down from 11) - Universal complexity")
 print("    • Workflows: Parallel search + Sequential synthesis")
 print("    • Crates: Core + llmspell-tools (web_search integration)")
 print("    • Tools: web_search, http_request, file_operations")
-print("    • State Management: MINIMAL (immediate results only)")
+print("    • RAG: Knowledge persistence and retrieval")
+print("    • State Management: MINIMAL (immediate results + knowledge base)")
 print("")
 
 print("=============================================================")
-print("🎉 Universal Layer Research Collector Complete!")
+print("🎉 Universal Layer Research Collector with RAG Complete!")
 print("")
 print("Universal Appeal Validation:")
 print("  ✅ Solves universal problem (information gathering)")
@@ -317,4 +414,15 @@ print("  ✅ Parallel search for efficiency")
 print("  ✅ Sequential synthesis for clarity")
 print("  ✅ Practical recommendations anyone can use")
 print("  ✅ Works for vacation, health, shopping, education research")
+print("  ✅ Knowledge persistence with RAG for learning over time")
 print("  📈 Progression Ready: Natural bridge to Power User content creation")
+
+-- Display final RAG stats
+if RAG then
+    local final_stats = RAG.get_stats("research_knowledge", nil)
+    if final_stats and final_stats.total_vectors then
+        print("\n📊 Knowledge Base Stats:")
+        print("  • Total knowledge vectors: " .. (final_stats.total_vectors or 0))
+        print("  • Collections: " .. (final_stats.collections or 1))
+    end
+end

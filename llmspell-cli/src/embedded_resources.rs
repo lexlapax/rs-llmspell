@@ -110,6 +110,32 @@ pub static EMBEDDED_APPS: Lazy<HashMap<&'static str, EmbeddedApp>> = Lazy::new(|
         },
     );
 
+    // Knowledge Base - Universal Layer (3 agents)
+    apps.insert(
+        "knowledge-base",
+        EmbeddedApp {
+            name: "knowledge-base",
+            description: "Personal knowledge management with semantic search",
+            lua_script: include_str!("../resources/applications/knowledge-base/main.lua"),
+            config: include_str!("../resources/applications/knowledge-base/config.toml"),
+            complexity: "Universal",
+            agents: 3,
+        },
+    );
+
+    // Personal Assistant - Power User Layer (4 agents)
+    apps.insert(
+        "personal-assistant",
+        EmbeddedApp {
+            name: "personal-assistant",
+            description: "AI-powered personal productivity assistant",
+            lua_script: include_str!("../resources/applications/personal-assistant/main.lua"),
+            config: include_str!("../resources/applications/personal-assistant/config.toml"),
+            complexity: "Power User",
+            agents: 4,
+        },
+    );
+
     apps
 });
 
