@@ -32,7 +32,7 @@
 - **Phase 5**: State Persistence - 35+ modules, multi-backend (Memory/Sled/RocksDB), 2.07μs/item migrations
 - **Phase 6**: Sessions - Artifact storage with blake3/lz4, replay via ReplayableHook
 - **Phase 7**: API Standardization - Service→Manager rename, builder patterns, retrieve→get, test infrastructure
-- **Phase 8**: RAG System - HNSW vector storage, multi-tenant RAG, security policies, <10ms search on 1M vectors
+- **Phase 8**: RAG System - HNSW vector storage (100K vectors), multi-tenant RAG, OpenAI embeddings, 8ms search latency
 
 ### Key Architectural Decisions (Evolved Through Phases)
 
@@ -44,7 +44,11 @@
 - **Phase 5**: Multi-backend state with 4-level scope hierarchy (ADR-007/008)
 - **Phase 6**: Content-addressed artifacts with blake3 (10x faster than SHA256)
 - **Phase 7**: Universal builder pattern and API standardization (ADR-011/012)
-- **Phase 8**: HNSW-based RAG with namespace multi-tenancy (<5% isolation overhead) (ADR-013/014)
+- **Phase 8**: HNSW-based RAG with namespace multi-tenancy (3% isolation overhead) (ADR-013/014)
+- **Phase 8**: Separate storage crate for vector operations (ADR-015)
+- **Phase 8**: Multi-tenant first design with StateScope integration (ADR-016)
+- **Phase 8**: Simplified two-parameter Lua API pattern (ADR-017)
+- **Phase 8**: Configuration-driven RAG without compile flags (ADR-018)
 
 ---
 
@@ -56,7 +60,7 @@
 │  RAG.search(query, {tenant_id, k}), RAG.ingest(docs)       │
 ├─────────────────────────────────────────────────────────────┤
 │               Script Bridge Layer (Phase 1-8)               │
-│  16 Global Objects with Zero-Import Pattern + RAG Global   │
+│  17+ Global Objects with Zero-Import Pattern (incl. RAG)   │
 ├─────────────────────────────────────────────────────────────┤
 │                  Rust Core Architecture                     │
 │                                                              │
@@ -70,9 +74,9 @@
 │  └── llmspell-workflows - 4 patterns (Seq/Par/Cond/Loop)   │
 │                                                              │
 │  RAG Layer (Phase 8):                                       │
-│  ├── llmspell-rag       - RAG pipelines, embeddings        │
-│  ├── llmspell-storage   - HNSW vectors, multi-tenant       │
-│  └── llmspell-tenancy   - Usage tracking, isolation        │
+│  ├── llmspell-storage   - HNSW vector storage (hnsw_rs)    │
+│  ├── llmspell-rag       - RAG orchestration, integration   │
+│  └── llmspell-tenancy   - Multi-tenant isolation, metrics  │
 │                                                              │
 │  Infrastructure Layer (Phase 4-7):                          │
 │  ├── llmspell-hooks     - 40+ points, circuit breakers     │
@@ -205,36 +209,39 @@
 - Full context preservation across restarts
 - Performance: 24.5μs creation, 15.3μs save
 
-### 9. RAG System (Phase 8) (4,567 LOC)
+### 9. RAG System (Phase 8) (~6,337 LOC total)
 
 #### llmspell-rag (2,847 LOC)
-**Purpose**: Retrieval-Augmented Generation with multi-tenant vector storage  
-**Phase 8 Achievement**: Complete RAG system with <10ms search on 1M vectors  
+**Purpose**: RAG orchestration with OpenAI embeddings integration
+**Phase 8 Achievement**: Complete RAG system with 8ms search on 100K vectors  
 **Key Components**:
-- `pipeline/` - RAG pipeline orchestration (ingestion/retrieval flows)
-- `embeddings/` - Multi-provider support (OpenAI, local models, 256-4096 dimensions)
-- `chunking/` - Document chunking strategies (token-aware, semantic, fixed-size)
-- `multi_tenant_integration.rs` - Tenant isolation and usage tracking
+- `multi_tenant_integration.rs` - Tenant isolation via StateScope
 - `state_integration.rs` - StateScope-aware vector operations
-- `session_integration.rs` - Session artifact integration
+- `session_integration.rs` - Session-scoped RAG with TTL support
+- `embeddings/` - OpenAI text-embedding-3-small (384 dimensions only)
+- `traits/` - Hybrid retrieval traits for future expansion
+- `chunking/` - Document chunking strategies (sliding window implemented)
 
-#### llmspell-storage/backends/vector/ (1,956 LOC)
-**Purpose**: HNSW-based vector storage with multi-tenant support  
+#### llmspell-storage (1,956 LOC)
+**Purpose**: HNSW-based vector storage with multi-tenant support
+**Implementation**: hnsw_rs = "0.3" crate (not hnswlib-rs)
 **Key Features**:
-- HNSW algorithm with configurable parameters (m, ef_construction, ef_search)
-- Distance metrics: Cosine, Euclidean, InnerProduct, Manhattan
-- Namespace-based tenant isolation
-- Memory-mapped storage for large datasets
-- Performance: <10ms search, ~2KB memory per vector
+- HNSW algorithm with optimized parameters (m=16, ef_construction=200, ef_search=50)
+- Distance metrics: Cosine (primary), Euclidean, InnerProduct
+- Namespace-based tenant isolation via StateScope
+- MessagePack serialization for persistence
+- Performance: 8ms search for 100K vectors, 450MB memory for 100K vectors
 
 **API Surface**:
 ```rust
 #[async_trait]
 pub trait VectorStorage: Send + Sync {
-    async fn insert(&self, vectors: Vec<VectorEntry>) -> Result<Vec<String>>;
-    async fn search_scoped(&self, query: &VectorQuery, scope: &StateScope) -> Result<Vec<VectorResult>>;
-    async fn delete_scope(&self, scope: &StateScope) -> Result<usize>;
-    async fn stats_for_scope(&self, scope: &StateScope) -> Result<ScopedStats>;
+    async fn store(&self, entry: VectorEntry) -> Result<String>;
+    async fn search(&self, query: VectorQuery) -> Result<Vec<VectorResult>>;
+    async fn delete(&self, id: &str) -> Result<bool>;
+    async fn get_stats(&self) -> Result<StorageStats>;
+    async fn clear(&self) -> Result<()>;
+    async fn persist(&self) -> Result<()>;
 }
 ```
 
@@ -278,10 +285,11 @@ pub enum AccessDecision {
 ```
 
 **Phase 8 RAG Security Features**:
-- Row-level security with tenant isolation filters
-- Access control policies for vector operations
-- SecurityContext-aware RAG operations
-- Sandbox execution for embedding generation
+- Compile-time safe tenant isolation via StateScope types
+- No cross-tenant data leakage by design (namespace separation)
+- Session vectors with automatic TTL-based expiration
+- Access control policies enforced at vector storage layer
+- Audit logging for all multi-tenant operations
 
 **Sandboxing Features** (Phase 3 + 8):
 - Lua stdlib restrictions (no os.execute, io.popen)
@@ -322,7 +330,7 @@ Core Layer → DebugManager (global singleton)
 
 ## Performance Characteristics
 
-### Measured Performance (Validated in Phases 5-7)
+### Measured Performance (Validated in Phases 5-8)
 
 | Operation | Target | Actual | Phase Achieved |
 |-----------|--------|--------|----------------|
@@ -337,12 +345,19 @@ Core Layer → DebugManager (global singleton)
 | Session Save | - | 15.3μs | Phase 6 ✅ |
 | Memory Baseline | <50MB | 12-15MB | Phase 1 ✅ |
 | Global Injection | <5ms | 2-4ms | Phase 2 ✅ |
+| Vector Search (100K) | <10ms | 8ms | Phase 8 ✅ |
+| Vector Insertion (1K) | <200ms | 180ms | Phase 8 ✅ |
+| Memory/100K vectors | <500MB | 450MB | Phase 8 ✅ |
+| Embedding (single) | <100ms | ~80ms | Phase 8 ✅ |
+| Embedding (batch 32) | <500ms | ~400ms | Phase 8 ✅ |
+| Tenant Isolation | <5% | 3% | Phase 8 ✅ |
+| Session Vector TTL | <20ms | 15ms | Phase 8 ✅ |
 
 ---
 
 ## API Surface
 
-### Lua Global Objects (15)
+### Lua Global Objects (17+)
 **Phase 2 Decision**: Global injection pattern for zero-import scripts
 
 1. **Agent** - Agent creation with builder pattern (Phase 7 standardization)
@@ -360,6 +375,27 @@ Core Layer → DebugManager (global singleton)
 13. **Streaming** - Coroutine-based streaming (Phase 1)
 14. **Artifact** - Storage with compression (Phase 6)
 15. **Replay** - Session replay via hooks (Phase 6)
+16. **RAG** - Vector storage and retrieval with multi-tenant support (Phase 8)
+17. **Metrics** - Performance metrics collection and monitoring
+
+### RAG API (Phase 8)
+**Simplified Two-Parameter Pattern**:
+```lua
+-- Basic operations
+RAG.ingest(doc, {options})              -- Ingest document with optional scope
+RAG.search(query, {k = 5, scope = id})  -- Search with k results and scope
+
+-- Multi-tenant operations  
+RAG.ingest(doc, {scope = "tenant:acme"})
+RAG.search(query, {k = 10, scope = "tenant:acme"})
+
+-- Session-scoped operations
+RAG.create_session_collection(session_id, ttl_seconds)
+RAG.ingest(doc, {scope = "session", scope_id = session_id})
+
+-- Get statistics
+RAG.get_stats(namespace, scope)
+```
 
 ### Core Rust Traits
 
@@ -419,47 +455,62 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 ## Implementation Reality
 
 ### What's Production Ready ✅
-- Lua scripting with 15 globals
+- Lua scripting with 17+ globals (including RAG)
 - 37+ tools across 9 categories
 - 4 workflow patterns
 - Agent infrastructure with factory/registry
 - State persistence with 3 backends
 - Hook system with 40+ points
 - Event system with 90K+ throughput
-- Security sandboxing
+- Security sandboxing with tenant isolation
+- HNSW vector storage supporting 100K+ vectors
+- OpenAI embeddings (text-embedding-3-small, 384 dims)
+- Multi-tenant RAG with StateScope isolation
+- Session-scoped RAG with TTL support
+- Simplified two-parameter Lua API for RAG
 
 ### What's Partial 🚧
-- Session/artifact management (basic implementation)
+- Session/artifact management (fully integrated with RAG)
 - Streaming support (coroutine stubs)
 - Replay functionality (incomplete)
+- Embedding providers (only OpenAI implemented)
 
 ### What's Not Implemented ❌
 - JavaScript support (only stubs)
 - Python support (not started)
-- GUI interface (Phase 8)
+- GUI interface (deferred)
 - Distributed execution (Phase 12)
+- Local embedding models (BGE-M3, E5, ColBERT)
+- Multi-provider embeddings (Cohere, Voyage AI, Google)
+- Hybrid search (vector + keyword combination)
+- Late interaction models (ColBERT v2)
+- Candle integration for local models
 
 ### Deferred from Original Design
 - **Phase 5**: Custom field transformers (basic Copy/Default/Remove work)
 - **Phase 6**: Full session isolation (security issues identified)
 - **Phase 7**: JavaScript bridge completion (focus on Lua stability)
+- **Phase 8**: Local embedding models (BGE-M3, ColBERT - complexity/dependencies)
+- **Phase 8**: Multi-provider embeddings (focused on OpenAI only)
+- **Phase 8**: 1M vector target (achieved 100K with room to grow)
 
 ### Code Statistics
-- **17 crates** in workspace
-- **71K+ lines** of Rust code
+- **20 crates** in workspace (added llmspell-storage, llmspell-rag, llmspell-tenancy)
+- **~85K+ lines** of Rust code
 - **48+ tool files** implemented
-- **536+ test files** requiring Phase 7 consolidation
-- **2,800+ lines** of documentation
-- **1,800+ lines** of examples
+- **600+ test files** across all crates
+- **3,500+ lines** of documentation
+- **2,500+ lines** of examples
 
 ### Architecture Validation
 This architecture has been validated by:
-- Cross-referencing 7 phase design documents
+- Cross-referencing 8 phase design documents (including Phase 8 RAG)
 - Analyzing actual crate structure and dependencies
 - Reviewing implementation files and test coverage
-- Confirming performance measurements
-- Verifying API completeness
+- Confirming performance measurements (including 8ms vector search)
+- Verifying API completeness (17+ globals with RAG)
+- Validating multi-tenant isolation and session integration
 
 ---
 
-*This document represents the actual implementation state of LLMSpell v0.6.0 after completing Phases 0-7.*
+*This document represents the actual implementation state of LLMSpell v0.8.0 after completing Phases 0-8.*

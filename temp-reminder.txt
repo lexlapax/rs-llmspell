@@ -9,3 +9,4 @@
 - remove invoke and just use execute in agent.
 - debug for scripts not working
 - remove custom steps or document it properly
+- agent templates 
