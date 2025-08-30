@@ -4,6 +4,7 @@
 //! variable inspection, stepping, and execution control. This is distinct from
 //! diagnostics (logging/profiling) which is handled by `diagnostics_bridge`.
 
+use crate::lua::debug_cache::{DebugMode, DebugStateCache, StepMode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -191,6 +192,17 @@ pub trait ScriptDebugger: Send + Sync {
     async fn is_active(&self) -> bool;
 }
 
+/// Debug step type for API
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum DebugStepType {
+    /// Step into next line (enter functions)
+    StepIn,
+    /// Step over next line (skip function calls)
+    StepOver,
+    /// Step out of current function
+    StepOut,
+}
+
 /// Execution manager that coordinates debugging across engines
 pub struct ExecutionManager {
     /// Active breakpoints
@@ -201,6 +213,8 @@ pub struct ExecutionManager {
     stack_frames: Arc<RwLock<Vec<StackFrame>>>,
     /// Variables cache
     variables: Arc<RwLock<HashMap<String, Vec<Variable>>>>,
+    /// Debug state cache for fast operations
+    debug_cache: Arc<DebugStateCache>,
 }
 
 impl ExecutionManager {
@@ -212,7 +226,14 @@ impl ExecutionManager {
             state: Arc::new(RwLock::new(DebugState::Terminated)),
             stack_frames: Arc::new(RwLock::new(Vec::new())),
             variables: Arc::new(RwLock::new(HashMap::new())),
+            debug_cache: Arc::new(DebugStateCache::new()),
         }
+    }
+
+    /// Get the debug cache (for use by hooks)
+    #[must_use]
+    pub fn get_debug_cache(&self) -> Arc<DebugStateCache> {
+        self.debug_cache.clone()
     }
 
     /// Add a breakpoint
@@ -294,16 +315,14 @@ impl ExecutionManager {
             DebugCommand::Terminate => {
                 self.set_state(DebugState::Terminated).await;
             }
-            DebugCommand::StepInto | DebugCommand::StepOver | DebugCommand::StepOut => {
-                self.set_state(DebugState::Paused {
-                    reason: PauseReason::Step,
-                    location: ExecutionLocation {
-                        source: "unknown".to_string(),
-                        line: 0,
-                        column: None,
-                    },
-                })
-                .await;
+            DebugCommand::StepInto => {
+                self.start_step(DebugStepType::StepIn).await;
+            }
+            DebugCommand::StepOver => {
+                self.start_step(DebugStepType::StepOver).await;
+            }
+            DebugCommand::StepOut => {
+                self.start_step(DebugStepType::StepOut).await;
             }
         }
     }
@@ -450,6 +469,59 @@ impl ExecutionManager {
                 break;
             }
             tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        }
+    }
+
+    // ===== Mode Management Methods (for Task 9.2.6) =====
+
+    /// Get current debug mode
+    #[must_use]
+    pub fn get_debug_mode(&self) -> DebugMode {
+        self.debug_cache.get_debug_mode()
+    }
+
+    /// Set debug mode
+    pub fn set_debug_mode(&self, mode: DebugMode) {
+        self.debug_cache.set_debug_mode(mode);
+    }
+
+    /// Start step debugging with automatic mode management
+    pub async fn start_step(&self, step_type: DebugStepType) {
+        // Get current mode for restoration
+        let current_mode = self.get_debug_mode();
+
+        // Convert API step type to internal step mode
+        let step_mode = match step_type {
+            DebugStepType::StepIn => {
+                let depth = self.debug_cache.get_current_depth();
+                StepMode::StepIn { depth }
+            }
+            DebugStepType::StepOver => {
+                let target_depth = self.debug_cache.get_current_depth();
+                StepMode::StepOver { target_depth }
+            }
+            DebugStepType::StepOut => {
+                let target_depth = self.debug_cache.get_current_depth() - 1;
+                StepMode::StepOut { target_depth }
+            }
+        };
+
+        // Start stepping with mode save
+        self.debug_cache.start_stepping(step_mode, current_mode);
+
+        // Switch to Full mode for line-by-line execution
+        self.set_debug_mode(DebugMode::Full);
+
+        // Update state to indicate stepping
+        self.set_state(DebugState::Running).await;
+    }
+
+    /// Complete step and restore previous mode
+    pub fn complete_step(&self) {
+        // Stop stepping and get saved mode
+        if let Some(saved_mode) = self.debug_cache.stop_stepping() {
+            // Restore previous mode
+            self.set_debug_mode(saved_mode);
         }
     }
 }

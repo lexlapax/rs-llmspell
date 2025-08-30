@@ -24,6 +24,19 @@ pub enum DebugMode {
     Full,
 }
 
+/// Step debugging mode
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum StepMode {
+    /// Not stepping
+    None,
+    /// Step into next line (enter functions)
+    StepIn { depth: i32 },
+    /// Step over next line (skip function calls)
+    StepOver { target_depth: i32 },
+    /// Step out of current function
+    StepOut { target_depth: i32 },
+}
+
 /// Compiled condition for fast evaluation
 #[derive(Debug, Clone)]
 pub struct CompiledCondition {
@@ -51,6 +64,14 @@ pub struct DebugStateCache {
     hot_locations: Arc<RwLock<Vec<(String, u32, Instant)>>>,
     /// Maximum hot locations to track
     max_hot_locations: usize,
+    /// Whether we're currently stepping (fast atomic check)
+    is_stepping: AtomicBool,
+    /// Current step mode (slow path only)
+    step_mode: Arc<RwLock<StepMode>>,
+    /// Saved debug mode for restoration after stepping
+    saved_debug_mode: Arc<RwLock<Option<DebugMode>>>,
+    /// Current stack depth for step operations
+    current_depth: Arc<RwLock<i32>>,
 }
 
 impl DebugStateCache {
@@ -66,6 +87,10 @@ impl DebugStateCache {
             generation: AtomicU64::new(0),
             hot_locations: Arc::new(RwLock::new(Vec::with_capacity(100))),
             max_hot_locations: 100,
+            is_stepping: AtomicBool::new(false),
+            step_mode: Arc::new(RwLock::new(StepMode::None)),
+            saved_debug_mode: Arc::new(RwLock::new(None)),
+            current_depth: Arc::new(RwLock::new(0)),
         }
     }
 
@@ -183,6 +208,54 @@ impl DebugStateCache {
         self.debug_active.store(active, Ordering::Relaxed);
     }
 
+    // ===== Step Debugging Support =====
+
+    /// Check if we're currently stepping (fast path)
+    #[inline]
+    pub fn is_stepping(&self) -> bool {
+        self.is_stepping.load(Ordering::Relaxed)
+    }
+
+    /// Start stepping with mode save (slow path)
+    pub fn start_stepping(&self, mode: StepMode, current_mode: DebugMode) {
+        // Save current mode for restoration
+        *self.saved_debug_mode.write() = Some(current_mode);
+        // Set the step mode
+        *self.step_mode.write() = mode;
+        // Mark as stepping
+        self.is_stepping.store(true, Ordering::Release);
+    }
+
+    /// Stop stepping and get saved mode for restoration
+    pub fn stop_stepping(&self) -> Option<DebugMode> {
+        // Stop stepping
+        self.is_stepping.store(false, Ordering::Release);
+        // Reset step mode
+        *self.step_mode.write() = StepMode::None;
+        // Get and clear saved mode
+        self.saved_debug_mode.write().take()
+    }
+
+    /// Get the current step mode
+    pub fn get_step_mode(&self) -> StepMode {
+        self.step_mode.read().clone()
+    }
+
+    /// Get saved debug mode (for restoration)
+    pub fn get_saved_mode(&self) -> Option<DebugMode> {
+        *self.saved_debug_mode.read()
+    }
+
+    /// Update current stack depth for step operations
+    pub fn set_current_depth(&self, depth: i32) {
+        *self.current_depth.write() = depth;
+    }
+
+    /// Get current stack depth
+    pub fn get_current_depth(&self) -> i32 {
+        *self.current_depth.read()
+    }
+
     /// Clear all cached state
     pub fn clear(&self) {
         self.breakpoint_lines.write().clear();
@@ -192,6 +265,11 @@ impl DebugStateCache {
         self.debug_active.store(false, Ordering::Relaxed);
         *self.debug_mode.write() = DebugMode::Disabled;
         self.generation.fetch_add(1, Ordering::Relaxed);
+        // Clear stepping state
+        self.is_stepping.store(false, Ordering::Relaxed);
+        *self.step_mode.write() = StepMode::None;
+        *self.saved_debug_mode.write() = None;
+        *self.current_depth.write() = 0;
     }
 
     /// Get cache generation (for invalidation checks)

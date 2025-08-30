@@ -5,7 +5,9 @@
 //! diagnostics (logging/profiling) which is handled by the Console global.
 
 use crate::condition_evaluator::ConditionEvaluator;
-use crate::execution_bridge::{Breakpoint, ExecutionLocation, ExecutionManager, StackFrame};
+use crate::execution_bridge::{
+    Breakpoint, DebugState, ExecutionLocation, ExecutionManager, PauseReason, StackFrame,
+};
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
 use crate::lua::debug_cache::{ContextBatcher, ContextUpdate, DebugMode, DebugStateCache};
 use crate::lua::output::{capture_stack_trace, StackTraceOptions};
@@ -275,8 +277,11 @@ impl LuaExecutionHook {
                 self.current_line = line;
                 self.line_counter += 1;
 
-                // FAST PATH - synchronous check, no async operations
-                if !self.debug_cache.might_break_at(&source, line) {
+                // FAST PATH - synchronous checks, no async operations
+                // Check stepping first (atomic flag), then breakpoints
+                if !self.debug_cache.is_stepping()
+                    && !self.debug_cache.might_break_at(&source, line)
+                {
                     // Record location in batcher (lazy update)
                     self.context_batcher.record_location(source.clone(), line);
                     self.context_batcher
@@ -293,7 +298,14 @@ impl LuaExecutionHook {
                     return Ok(()); // EXIT FAST PATH - no async operations!
                 }
 
-                // SLOW PATH - only when breakpoint might hit
+                // SLOW PATH - handle stepping or breakpoints
+                // Check if we're stepping first
+                if self.debug_cache.is_stepping() {
+                    self.handle_step_slow_path(lua, ar, &source, line);
+                    return Ok(());
+                }
+
+                // Otherwise check for breakpoints
                 // Now we can afford async operations since we're potentially breaking anyway
                 if self.should_break_slow(&source, line, lua) {
                     // Flush any pending context updates before breaking
@@ -304,7 +316,7 @@ impl LuaExecutionHook {
                 }
             }
             DebugEvent::Call | DebugEvent::TailCall => {
-                // Function call - batch the stack push update
+                // Function call - track depth for stepping
                 let source = ar
                     .source()
                     .source
@@ -320,6 +332,12 @@ impl LuaExecutionHook {
                 #[allow(clippy::cast_sign_loss)]
                 let line = ar.curr_line() as u32;
 
+                // Update depth for step operations
+                if self.debug_cache.is_stepping() {
+                    let new_depth = self.debug_cache.get_current_depth() + 1;
+                    self.debug_cache.set_current_depth(new_depth);
+                }
+
                 // Only use async if we're in full debug mode
                 if matches!(self.debug_cache.get_debug_mode(), DebugMode::Full) {
                     // Batch the stack push
@@ -327,7 +345,13 @@ impl LuaExecutionHook {
                 }
             }
             DebugEvent::Ret => {
-                // Function return - batch the stack pop update
+                // Function return - track depth for stepping
+                if self.debug_cache.is_stepping() {
+                    let new_depth = self.debug_cache.get_current_depth() - 1;
+                    self.debug_cache.set_current_depth(new_depth);
+                }
+
+                // Batch the stack pop update
                 if matches!(self.debug_cache.get_debug_mode(), DebugMode::Full) {
                     self.context_batcher.record_stack_pop();
                 }
@@ -338,6 +362,101 @@ impl LuaExecutionHook {
             }
         }
         Ok(())
+    }
+
+    /// Handle step execution in slow path
+    fn handle_step_slow_path(&mut self, lua: &Lua, _ar: &mlua::Debug, source: &str, line: u32) {
+        use crate::lua::debug_cache::StepMode;
+
+        let current_depth = self.debug_cache.get_current_depth();
+        let step_mode = self.debug_cache.get_step_mode();
+
+        let should_pause = match step_mode {
+            StepMode::None => false, // Shouldn't happen
+            StepMode::StepIn { .. } => {
+                // Step into - pause on every line
+                true
+            }
+            StepMode::StepOver { target_depth } => {
+                // Step over - pause when at or below target depth
+                current_depth <= target_depth
+            }
+            StepMode::StepOut { target_depth } => {
+                // Step out - pause when we've returned to target depth
+                current_depth <= target_depth
+            }
+        };
+
+        if should_pause {
+            // Flush context updates
+            self.flush_batched_context_updates();
+
+            // Complete the step
+            self.execution_manager.complete_step();
+
+            // Pause with step reason
+            self.pause_for_step(lua, source.to_string(), line);
+        }
+    }
+
+    /// Pause execution for a step operation
+    fn pause_for_step(&self, lua: &Lua, source: String, line: u32) {
+        // Similar to pause_at_breakpoint_with_context but with Step reason
+        let location = ExecutionLocation {
+            source: source.clone(),
+            line,
+            column: None,
+        };
+
+        // Capture stack trace
+        let stack_options = StackTraceOptions {
+            max_depth: 20,
+            capture_locals: true,
+            capture_upvalues: false,
+            include_source: true,
+        };
+        let stack_trace = capture_stack_trace(lua, &stack_options);
+        let stack_frames = stack_trace.frames.clone();
+
+        // Extract variables
+        let mut variables = HashMap::new();
+        if let Some(first_frame) = stack_trace.frames.first() {
+            for local in &first_frame.locals {
+                let json_value = Self::lua_value_to_json(&local.value);
+                variables.insert(local.name.clone(), json_value);
+            }
+        }
+
+        // Update context and set paused state
+        let shared_ctx = self.shared_context.clone();
+        let exec_mgr = self.execution_manager.clone();
+
+        block_on_async::<_, (), std::io::Error>(
+            "pause_for_step",
+            async move {
+                let mut ctx = shared_ctx.write().await;
+                ctx.stack.clone_from(&stack_frames);
+                ctx.variables = variables;
+                ctx.set_location(SourceLocation {
+                    source: source.clone(),
+                    line,
+                    column: None,
+                });
+                drop(ctx);
+
+                // Set paused state with Step reason
+                exec_mgr
+                    .set_state(DebugState::Paused {
+                        reason: PauseReason::Step,
+                        location,
+                    })
+                    .await;
+
+                Ok(())
+            },
+            None,
+        )
+        .ok();
     }
 
     /// Pause execution at a breakpoint with enriched context
