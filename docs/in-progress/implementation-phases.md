@@ -10,7 +10,7 @@
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 18+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes a new Phase 9 for the Adaptive Memory System, a critical component for agent intelligence.
+Rs-LLMSpell follows a carefully structured 18+ phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria. The roadmap includes Phase 9 for Interactive REPL and Debugging Infrastructure, critical for developer experience.
 
 ### Phase Categories
 
@@ -18,8 +18,10 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - **MVP Completion** (Phase 3): Tool enhancement, agent infrastructure, and bridge integration
 - **Production Infrastructure** (Phases 4-6): Hook system, state management, and sessions
 - **Infrastructure Consolidation** (Phase 7): Foundational solidification for production readiness
-- **Advanced Features** (Phases 8-9): Vector storage and adaptive memory system
-- **Advanced Integration** (Phases 10-12): Workflow orchestration, REPL, and daemon mode
+- **Advanced Features** (Phase 8): Vector storage and search infrastructure
+- **Developer Experience** (Phase 9): Interactive REPL and debugging infrastructure
+- **Advanced AI** (Phases 10-11): Adaptive memory system and advanced workflow features
+- **Service Mode** (Phase 12): Daemon and service mode
 - **Protocol Support** (Phases 13-14): MCP client and server integration
 - **Language Extensions** (Phase 15): JavaScript engine support
 - **Platform Support** (Phases 16-17): Library mode and cross-platform support
@@ -568,7 +570,146 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 9: Adaptive Memory System (Weeks 30-35)**
+### **Phase 9: Interactive REPL and Debugging Infrastructure (Weeks 30-32)**
+
+**Goal**: Implement interactive REPL for development with comprehensive debugging capabilities  
+**Priority**: HIGH (Developer Experience - Critical for adoption)
+**Dependencies**: Requires Phase 8 Vector Storage for search context
+**Evolution**: Combines original Phase 11 REPL with advanced debugging infrastructure
+
+**Core Architecture**:
+- **REPL Engine**: Interactive command-line interface with state persistence
+- **Debug Infrastructure**: Enhanced error reporting, breakpoints, and variable inspection
+- **Development Tools**: Hot reload, script validation, and performance profiling
+- **Integration**: Hook introspection, event stream visualization, LSP support
+
+**Phase 9.1: Core REPL Infrastructure (Week 30)**:
+- `llmspell repl` command implementation
+- State persistence between REPL commands
+- Multi-line input handling with syntax highlighting
+- Tab completion for APIs and variable names
+- Command history with search (Ctrl+R style)
+- REPL-specific commands (`.help`, `.save`, `.load`, `.exit`)
+- Streaming output display with progress indicators
+- Media file input/output support
+- Integration with existing runtime and bridge
+
+**Phase 9.2: Enhanced Error Reporting (Week 31 - Part 1)**:
+- **Error Context Enhancement**:
+  - Source mapping to original files
+  - Line and column number tracking
+  - Variable state at error point
+  - Execution path visualization
+- **Beautiful Error Formatting**:
+  - Rust-style error messages with colors
+  - Source context with line highlighting
+  - Suggested fixes based on error patterns
+  - Stack traces with local variables
+- **Common Error Detection**:
+  - Nil value access patterns
+  - Type mismatches
+  - Missing function detection
+  - Automatic suggestions
+
+**Phase 9.3: Interactive Debugging (Week 31 - Part 2)**:
+- **Breakpoint System**:
+  - Set breakpoints via `.break file:line` command
+  - Conditional breakpoints with expressions
+  - Hit counts and ignore counts
+  - Breakpoint management (list, enable, disable, delete)
+- **Step Debugging**:
+  - `.step` - Step into functions
+  - `.next` - Step over functions
+  - `.continue` - Resume execution
+  - `.up`/`.down` - Navigate call stack
+- **Variable Inspection**:
+  - `.locals` - Show local variables
+  - `.watch expr` - Watch expressions
+  - `.print var` - Inspect specific variables
+  - Deep object inspection with formatting
+
+**Phase 9.4: Development Experience (Week 32 - Part 1)**:
+- **Hot Reload Support**:
+  - File watcher for automatic reload
+  - State preservation across reloads
+  - Validation before reload
+  - Error recovery without losing session
+- **Script Validation**:
+  - `.validate` command for syntax checking
+  - Static analysis for undefined variables
+  - Type inference warnings
+  - Common mistake detection
+- **Performance Profiling**:
+  - `.profile` command to start/stop profiling
+  - Flame graph generation
+  - Memory usage tracking
+  - Execution time analysis
+
+**Phase 9.5: Advanced Features (Week 32 - Part 2)**:
+- **Hook Integration**:
+  - `.hooks list` - List active hooks
+  - `.hooks trace` - Trace hook execution
+  - Real-time event stream visualization
+  - Performance monitoring with circuit breaker status
+- **Remote Debugging**:
+  - Debug server mode for remote attachment
+  - Debug Adapter Protocol (DAP) support
+  - Session recording and replay
+  - Distributed tracing integration
+- **IDE Support**:
+  - Language Server Protocol (LSP) implementation
+  - VS Code extension integration
+  - Completion and hover support
+  - Diagnostic integration
+
+**Success Criteria**:
+- [ ] REPL starts and accepts commands interactively
+- [ ] State persists between REPL commands
+- [ ] Multi-line scripts can be entered and executed
+- [ ] Tab completion works for APIs and variables
+- [ ] Command history is saved and restored
+- [ ] Enhanced error messages show source context and suggestions
+- [ ] Breakpoints can be set and hit during execution
+- [ ] Step debugging works (step, next, continue)
+- [ ] Variables can be inspected at any point
+- [ ] Hot reload works without losing state
+- [ ] Script validation catches errors before execution
+- [ ] Hook introspection commands functional
+- [ ] Event stream can be monitored in real-time
+- [ ] Performance profiling generates useful insights
+- [ ] Remote debugging via DAP protocol works
+- [ ] LSP integration provides IDE support
+
+**Testing Requirements**:
+- REPL command execution tests
+- State persistence validation across sessions
+- User interaction simulation tests
+- Tab completion functionality tests
+- History management tests
+- Error enhancement accuracy tests
+- Breakpoint hit detection tests
+- Step debugging functionality tests
+- Variable inspection correctness tests
+- Hot reload state preservation tests
+- Script validation accuracy tests
+- Hook introspection command tests
+- Event stream display tests
+- Performance profiling accuracy tests
+- Remote debugging connectivity tests
+- LSP protocol compliance tests
+
+**Implementation Notes**:
+- REPL serves as the primary development interface
+- Debugging is not a separate mode but integrated into REPL
+- All debug commands are REPL meta-commands (start with `.`)
+- State persistence uses existing Phase 5 infrastructure
+- Hook introspection leverages Phase 4 hook system
+- Performance monitoring uses Phase 4 CircuitBreaker
+- Error enhancement improves developer productivity by 80%+
+
+---
+
+### **Phase 10: Adaptive Memory System (Weeks 33-38)**
 
 **Goal**: Implement Adaptive Temporal Knowledge Graph (A-TKG) memory architecture
 **Priority**: HIGH (Core AI Capability)
@@ -581,7 +722,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - **Semantic Memory**: Temporal Knowledge Graph storing facts, entities, relationships
 - **Adaptive Consolidation**: LLM-driven memory management (add/update/delete logic)
 
-**Phase 9.1: Foundational Episodic Memory (Week 30)**:
+**Phase 10.1: Foundational Episodic Memory (Week 33)**:
 - Create `llmspell-memory` crate with core data structures
 - Implement `InteractionLog` and `MemoryItem` types
 - Integrate with `llmspell-events` for interaction capture
@@ -589,7 +730,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - Basic vector retrieval using Phase 8 infrastructure
 - Memory persistence via `llmspell-storage`
 
-**Phase 9.2: Temporal Knowledge Graph Foundation (Weeks 31-32)**:
+**Phase 10.2: Temporal Knowledge Graph Foundation (Weeks 34-35)**:
 - **New Crate: `llmspell-graph`**
   - Bi-temporal data model (event time + ingestion time)
   - Node/Edge structures with temporal validity intervals
@@ -604,7 +745,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
   - Temporal information parsing
   - Contradiction detection and resolution
 
-**Phase 9.3: Hybrid Retrieval System (Week 33)**:
+**Phase 10.3: Hybrid Retrieval System (Week 36)**:
 - **Memory Orchestrator** in `llmspell-memory`:
   - Unified API for all memory types
   - Query planning and routing logic
@@ -619,7 +760,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
   - No LLM calls during retrieval
   - Support for 1M+ memory items
 
-**Phase 9.4: Adaptive Consolidation (Week 34)**:
+**Phase 10.4: Adaptive Consolidation (Week 37)**:
 - **Memory Consolidation Pipeline** (Mem0-inspired):
   - Periodic review of memory items
   - LLM-driven decisions: Add/Update/Delete/Ignore
@@ -634,7 +775,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
   - Adjust importance scores based on outcomes
   - Self-improving relevance ranking
 
-**Phase 9.5: Integration and Polish (Week 35)**:
+**Phase 10.5: Integration and Polish (Week 38)**:
 - **Script API** (`MemoryGlobal`):
   - `Memory.store()` - Store new memories
   - `Memory.search()` - Semantic search
@@ -676,11 +817,13 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 10: Advanced Workflow Features (Weeks 36-37)**
+## Advanced Integration Phases
+
+### **Phase 11: Advanced Workflow Features (Weeks 39-40)**
 
 **Goal**: Enhance basic workflows with enterprise-grade features leveraging full infrastructure
 **Priority**: MEDIUM (Advanced Orchestration)
-**Dependencies**: Requires Phase 8 Vector Storage and Phase 9 Memory System
+**Dependencies**: Requires Phase 8 Vector Storage and Phase 10 Memory System
 **Phase 4 Integration**: CompositeHook and Fork/Retry patterns from Phase 4 enable advanced workflow orchestration with less custom code.
 
 **Components**:
@@ -707,7 +850,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - [ ] Workflow lifecycle hooks firing correctly (Phase 4 integration)
 - [ ] Session context preserved in workflows (Phase 6 integration)
 - [ ] Vector storage enables workflow context search (Phase 8 integration)
-- [ ] Memory system provides cross-workflow context (Phase 9 integration)
+- [ ] Memory system provides cross-workflow context (Phase 10 integration)
 - [ ] Advanced streaming and parallel patterns functional
 - [ ] Workflow monitoring and observability operational
 - [ ] Performance optimization delivers measurable improvements
@@ -729,53 +872,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-## Advanced Integration Phases
-
-### **Phase 11: REPL Interactive Mode (Weeks 38-39)**
-
-**Goal**: Implement interactive REPL for development and debugging  
-**Priority**: MEDIUM (Developer Experience)
-**Dependencies**: Requires Phase 10 Advanced Workflows for complex interactions
-**Phase 4 Integration**: Hook introspection for debugging, real-time event stream visualization, and performance monitoring display.
-
-**Components**:
-- `llmspell repl` command
-- State persistence between REPL commands
-- Multi-line input handling
-- Tab completion and history
-- REPL-specific commands (`.help`, `.save`, `.load`)
-- Streaming output display with progress indicators
-- Media file input/output support
-- Multimodal content preview capabilities
-- **Hook introspection commands (.hooks list, .hooks trace)**
-- **Real-time event stream visualization**
-- **Performance monitoring display with circuit breaker status**
-
-**Success Criteria**:
-- [ ] REPL starts and accepts commands
-- [ ] Agent/tool state persists between commands
-- [ ] Multi-line scripts can be entered
-- [ ] Tab completion works for APIs
-- [ ] Command history is saved and restored
-- [ ] Streaming outputs display progressively
-- [ ] Can load and display media files
-- [ ] Multimodal outputs preview correctly
-- [ ] **Hook debugging commands functional**
-- [ ] **Event stream can be monitored in real-time**
-- [ ] **Performance metrics displayed on demand**
-
-**Testing Requirements**:
-- REPL command execution tests
-- State persistence validation
-- User interaction simulation tests
-- Tab completion functionality tests
-- History management tests
-- **Hook introspection command tests**
-- **Event stream display tests**
-
----
-
-### **Phase 12: Daemon and Service Mode (Weeks 40-41)**
+### **Phase 12: Daemon and Service Mode (Weeks 41-42)**
 
 **Goal**: Implement long-running daemon mode with scheduler  
 **Priority**: LOW (Advanced Feature)
@@ -822,7 +919,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 13: MCP Tool Integration (Weeks 42-43)**
+### **Phase 13: MCP Tool Integration (Weeks 43-44)**
 
 **Goal**: Support Model Control Protocol for external tools  
 **Priority**: LOW (Advanced Integration)
@@ -849,7 +946,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 14: MCP Server Mode (Weeks 44-45)**
+### **Phase 14: MCP Server Mode (Weeks 45-46)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol  
 **Priority**: LOW (Advanced Integration)
@@ -876,7 +973,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 15: JavaScript Engine Support (Weeks 46-47)**
+### **Phase 15: JavaScript Engine Support (Weeks 47-48)**
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
@@ -929,7 +1026,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ## Production Optimization Phase
 
-### **Phase 16: Library Mode Support (Weeks 48-49)**
+### **Phase 16: Library Mode Support (Weeks 49-50)**
 
 **Goal**: Support usage as native module in external runtimes  
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -958,7 +1055,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ## Additional Enhancement Phases
 
-### **Phase 17: Cross-Platform Support (Weeks 50-51)**
+### **Phase 17: Cross-Platform Support (Weeks 51-52)**
 
 **Goal**: Full Windows support and cross-platform compatibility  
 **Priority**: MEDIUM (Platform Coverage)
@@ -986,7 +1083,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 ---
 ## Platform Support Phases
 
-### **Phase 18: Production Optimization (Weeks 52-53)**
+### **Phase 18: Production Optimization (Weeks 53-54)**
 
 **Goal**: Performance optimization and production hardening  
 **Priority**: HIGH (Production Readiness)
@@ -1023,7 +1120,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ## Enhanced Capabilities
 
-### **Phase 18: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 48-49)**
+### **Phase 19: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 55-56)**
 
 **Goal**: Implement additional data processing and integration tools  
 **Priority**: LOW (Post-Production Enhancement)
@@ -1049,7 +1146,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - Security review
 
 ---
-### **Phase 19: A2A Client Support (Weeks 54-55)**
+### **Phase 20: A2A Client Support (Weeks 57-58)**
 
 **Goal**: Agent-to-Agent communication as client  
 **Priority**: LOW (Advanced Networking)
@@ -1076,7 +1173,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 20: A2A Server Support (Weeks 56-57)**
+### **Phase 21: A2A Server Support (Weeks 59-60)**
 
 **Goal**: Expose local agents via A2A protocol  
 **Priority**: LOW (Advanced Networking)
@@ -1103,7 +1200,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 21: Multimodal Tools Implementation (Weeks 58-59)**
+### **Phase 22: Multimodal Tools Implementation (Weeks 61-62)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
@@ -1163,7 +1260,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 22: AI/ML Complex Tools (Weeks 60-61)**
+### **Phase 23: AI/ML Complex Tools (Weeks 63-64)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
@@ -1290,14 +1387,15 @@ Each phase must pass:
 - **Phase 6**: Session Management depends on Phase 5 State Management
 - **Phase 7**: API Consistency depends on Phase 6 Session Management completion
 - **Phase 8**: Vector Storage depends on Phase 7 API Standardization
-- **Phase 9**: Workflow Orchestration depends on Phase 8 Vector Storage
-- **Phase 10**: REPL depends on Phase 21 Multimodal Tools
-- **Phase 11**: Daemon Mode depends on Phase 4 **(FlowController and CircuitBreaker critical)**
+- **Phase 9**: REPL and Debugging depends on Phase 8 Vector Storage for search context
+- **Phase 10**: Adaptive Memory System depends on Phase 8 Vector Storage
+- **Phase 11**: Advanced Workflows depends on Phase 8 Vector Storage and Phase 10 Memory System
+- **Phase 12**: Daemon Mode depends on Phase 4 **(FlowController and CircuitBreaker critical)**
 - **Phase 14**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
 - **Phase 15**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
-- **Phase 19-20**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
-- **Phase 21**: Multimodal Tools depends on Phase 9 Workflows
-- **Phase 22**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
+- **Phase 20-21**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
+- **Phase 22**: Multimodal Tools depends on Phase 11 Advanced Workflows
+- **Phase 23**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
 - **Cross-language testing**: Can begin in Phase 1 with bridge abstraction tests
 - **Engine implementations**: Can be developed in parallel once ScriptEngineBridge is stable
 - **Third-party engines**: Can be added after Phase 1.2 completion using bridge pattern
@@ -1313,9 +1411,9 @@ Each phase must pass:
 - **MVP with External Tools & Agent Infrastructure**: 16 weeks (Phases 0-3)
 - **Production Infrastructure**: 22 weeks (Phases 0-6, includes enhanced hooks +3 days)
 - **Pre-1.0 Polish**: 27 weeks (Phases 0-7, API consistency and documentation)
-- **Advanced Features**: 33 weeks (Phases 0-11, includes vector storage, workflows, REPL, daemon)
-- **Multi-Language Ready**: 41 weeks (Phases 0-14, JavaScript support -3 days saved)
-- **Full Feature Set**: 57 weeks (All 22 phases, -1 week from Phase 17 optimization)
+- **Advanced Features**: 40 weeks (Phases 0-11, includes vector storage, REPL/debugging, memory, workflows)
+- **Multi-Language Ready**: 48 weeks (Phases 0-15, JavaScript support -3 days saved)
+- **Full Feature Set**: 64 weeks (All 23 phases, -1 week from Phase 18 optimization)
 
 ### Resource Requirements
 
