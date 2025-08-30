@@ -40,6 +40,7 @@ parking_lot.workspace = true
 uuid = { workspace = true }
 base64 = "0.22"
 lru = "0.12"
+dashmap = "6.1"
 
 # Script engine dependencies (feature-gated)
 mlua = { workspace = true, optional = true }

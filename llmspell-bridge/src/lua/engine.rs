@@ -146,7 +146,9 @@ impl LuaEngine {
     #[cfg(feature = "lua")]
     pub fn set_breakpoints(&mut self, breakpoints: &[crate::execution_bridge::Breakpoint]) {
         if let Some(ref execution_hook) = self.execution_hook {
-            execution_hook.lock().update_breakpoints(breakpoints);
+            execution_hook
+                .lock()
+                .update_breakpoints(breakpoints, &self.lua.lock());
         }
     }
 }

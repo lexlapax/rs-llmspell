@@ -3,6 +3,7 @@
 //! Provides zero-cost debugging abstractions by keeping hot path synchronous
 //! and only using async operations when breakpoints might actually hit.
 
+use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -23,6 +24,15 @@ pub enum DebugMode {
     Full,
 }
 
+/// Compiled condition for fast evaluation
+#[derive(Debug, Clone)]
+pub struct CompiledCondition {
+    /// Original condition expression
+    pub expression: String,
+    /// Pre-compiled Lua chunk (if using Lua for evaluation)
+    pub compiled_chunk: Option<Vec<u8>>,
+}
+
 /// Fast synchronous cache for debug state
 pub struct DebugStateCache {
     /// Whether any debugging is active (fast atomic check)
@@ -31,6 +41,10 @@ pub struct DebugStateCache {
     debug_mode: RwLock<DebugMode>,
     /// Breakpoint lines by source file (using `HashSet` for O(1) lookup)
     breakpoint_lines: Arc<RwLock<HashMap<String, HashSet<u32>>>>,
+    /// Breakpoint conditions (lockless concurrent access)
+    breakpoint_conditions: Arc<DashMap<(String, u32), Arc<CompiledCondition>>>,
+    /// Condition evaluation cache: (result, generation when cached)
+    condition_cache: Arc<DashMap<(String, u32), (bool, u64)>>,
     /// Cache generation for invalidation
     generation: AtomicU64,
     /// Recent hot locations (for performance monitoring)
@@ -47,6 +61,8 @@ impl DebugStateCache {
             debug_active: AtomicBool::new(false),
             debug_mode: RwLock::new(DebugMode::Disabled),
             breakpoint_lines: Arc::new(RwLock::new(HashMap::new())),
+            breakpoint_conditions: Arc::new(DashMap::new()),
+            condition_cache: Arc::new(DashMap::new()),
             generation: AtomicU64::new(0),
             hot_locations: Arc::new(RwLock::new(Vec::with_capacity(100))),
             max_hot_locations: 100,
@@ -103,6 +119,56 @@ impl DebugStateCache {
         locations.push((source, line, Instant::now()));
     }
 
+    /// Check if breakpoint has a condition (FAST PATH - lockless read)
+    #[inline]
+    pub fn has_condition(&self, source: &str, line: u32) -> bool {
+        self.breakpoint_conditions
+            .contains_key(&(source.to_string(), line))
+    }
+
+    /// Set a compiled condition for a breakpoint
+    pub fn set_condition(&self, source: String, line: u32, condition: CompiledCondition) {
+        self.breakpoint_conditions
+            .insert((source, line), Arc::new(condition));
+        // Invalidate cache when condition is set/changed
+        self.generation.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Remove condition for a breakpoint
+    pub fn remove_condition(&self, source: &str, line: u32) {
+        self.breakpoint_conditions
+            .remove(&(source.to_string(), line));
+        self.condition_cache.remove(&(source.to_string(), line));
+        self.generation.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Get cached condition result (SLOW PATH)
+    pub fn get_cached_condition(&self, source: &str, line: u32) -> Option<(bool, u64)> {
+        self.condition_cache
+            .get(&(source.to_string(), line))
+            .map(|entry| *entry)
+    }
+
+    /// Cache condition evaluation result (SLOW PATH)
+    pub fn cache_condition_result(&self, source: &str, line: u32, result: bool) {
+        let generation = self.generation.load(Ordering::Relaxed);
+        self.condition_cache
+            .insert((source.to_string(), line), (result, generation));
+    }
+
+    /// Get compiled condition for evaluation (SLOW PATH)
+    pub fn get_condition(&self, source: &str, line: u32) -> Option<Arc<CompiledCondition>> {
+        self.breakpoint_conditions
+            .get(&(source.to_string(), line))
+            .map(|entry| entry.clone())
+    }
+
+    /// Invalidate all condition caches (called on variable changes)
+    pub fn invalidate_condition_cache(&self) {
+        self.condition_cache.clear();
+        self.generation.fetch_add(1, Ordering::Relaxed);
+    }
+
     /// Get current debug mode
     pub fn get_debug_mode(&self) -> DebugMode {
         *self.debug_mode.read()
@@ -120,6 +186,8 @@ impl DebugStateCache {
     /// Clear all cached state
     pub fn clear(&self) {
         self.breakpoint_lines.write().clear();
+        self.breakpoint_conditions.clear();
+        self.condition_cache.clear();
         self.hot_locations.write().clear();
         self.debug_active.store(false, Ordering::Relaxed);
         *self.debug_mode.write() = DebugMode::Disabled;

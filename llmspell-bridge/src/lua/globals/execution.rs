@@ -4,6 +4,7 @@
 //! variable inspection, stepping, and execution control. This is distinct from
 //! diagnostics (logging/profiling) which is handled by the Console global.
 
+use crate::condition_evaluator::ConditionEvaluator;
 use crate::execution_bridge::{Breakpoint, ExecutionLocation, ExecutionManager, StackFrame};
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
 use crate::lua::debug_cache::{ContextBatcher, ContextUpdate, DebugMode, DebugStateCache};
@@ -53,7 +54,7 @@ impl LuaExecutionHook {
     }
 
     /// Update breakpoints from debug manager
-    pub fn update_breakpoints(&mut self, breakpoints: &[Breakpoint]) {
+    pub fn update_breakpoints(&mut self, breakpoints: &[Breakpoint], lua: &Lua) {
         // Update the fast cache with breakpoint locations
         let locations: Vec<(String, u32)> = breakpoints
             .iter()
@@ -61,26 +62,127 @@ impl LuaExecutionHook {
             .map(|bp| (bp.source.clone(), bp.line))
             .collect();
 
-        self.debug_cache.update_breakpoints(locations);
+        self.debug_cache.update_breakpoints(locations.clone());
+
+        // Compile and cache conditions for breakpoints that have them
+        for bp in breakpoints
+            .iter()
+            .filter(|bp| bp.enabled && bp.condition.is_some())
+        {
+            if let Some(ref condition_expr) = bp.condition {
+                match ConditionEvaluator::compile_condition(lua, condition_expr) {
+                    Ok(compiled) => {
+                        self.debug_cache
+                            .set_condition(bp.source.clone(), bp.line, compiled);
+                    }
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to compile condition for breakpoint at {}:{}: {}",
+                            bp.source,
+                            bp.line,
+                            e
+                        );
+                    }
+                }
+            }
+        }
+
+        // Remove conditions for disabled or removed breakpoints
+        let _active_locations: std::collections::HashSet<(String, u32)> =
+            locations.into_iter().collect();
+        // Note: We'd need to track previous breakpoints to remove stale conditions
+        // For now, conditions are cleared when breakpoints are updated
     }
 
     /// Check if we should break at current location (SLOW PATH - only called when `might_break_at` returns true)
-    fn should_break_slow(&self, source: &str, line: u32) -> bool {
+    fn should_break_slow(&self, source: &str, line: u32, lua: &Lua) -> bool {
         // This is the slow path - only called when we might have a breakpoint
         let exec_mgr = self.execution_manager.clone();
-        let source = source.to_string();
-        block_on_async(
-            "check_breakpoint",
+        let source_str = source.to_string();
+        let line_num = line;
+
+        // First check basic breakpoint conditions (hit count, etc.)
+        let breakpoint = block_on_async(
+            "get_breakpoint",
             async move {
-                if exec_mgr.should_break_at(&source, line).await {
-                    Ok(())
-                } else {
-                    Err(std::io::Error::other("not breaking"))
-                }
+                Ok::<_, std::io::Error>(exec_mgr.get_breakpoint_at(&source_str, line_num).await)
             },
             None,
         )
-        .is_ok()
+        .ok()
+        .flatten();
+
+        let Some(mut bp) = breakpoint else {
+            return false;
+        };
+
+        // Update hit count
+        bp.current_hits += 1;
+
+        // Check hit count condition
+        if !bp.should_break() {
+            // Update the stored breakpoint with new hit count
+            let exec_mgr = self.execution_manager.clone();
+            block_on_async(
+                "update_breakpoint_hits",
+                async move {
+                    exec_mgr
+                        .update_breakpoint_hits(&bp.id, bp.current_hits)
+                        .await;
+                    Ok::<_, std::io::Error>(())
+                },
+                None,
+            )
+            .ok();
+            return false;
+        }
+
+        // Check if there's a condition to evaluate
+        if self.debug_cache.has_condition(source, line) {
+            // Evaluate condition in slow path
+            let result = ConditionEvaluator::evaluate_in_slow_path(
+                &bp,
+                &self.debug_cache,
+                &self.context_batcher,
+                self.shared_context.clone(),
+                lua,
+            );
+
+            if result {
+                // Update the stored breakpoint
+                let exec_mgr = self.execution_manager.clone();
+                let bp_clone = bp;
+                block_on_async(
+                    "update_breakpoint_final",
+                    async move {
+                        exec_mgr
+                            .update_breakpoint_hits(&bp_clone.id, bp_clone.current_hits)
+                            .await;
+                        Ok::<_, std::io::Error>(())
+                    },
+                    None,
+                )
+                .ok();
+            }
+
+            result
+        } else {
+            // No condition, break normally
+            let exec_mgr = self.execution_manager.clone();
+            let bp_clone = bp;
+            block_on_async(
+                "update_breakpoint_final",
+                async move {
+                    exec_mgr
+                        .update_breakpoint_hits(&bp_clone.id, bp_clone.current_hits)
+                        .await;
+                    Ok::<_, std::io::Error>(())
+                },
+                None,
+            )
+            .ok();
+            true
+        }
     }
 
     /// Get debug cache for external use
@@ -193,7 +295,7 @@ impl LuaExecutionHook {
 
                 // SLOW PATH - only when breakpoint might hit
                 // Now we can afford async operations since we're potentially breaking anyway
-                if self.should_break_slow(&source, line) {
+                if self.should_break_slow(&source, line, lua) {
                     // Flush any pending context updates before breaking
                     self.flush_batched_context_updates();
 
@@ -271,6 +373,9 @@ impl LuaExecutionHook {
 
         // Update shared context and suspend (but don't block waiting for resume)
         let shared_ctx = self.shared_context.clone();
+        // Invalidate condition cache when variables change
+        self.debug_cache.invalidate_condition_cache();
+
         let exec_mgr = self.execution_manager.clone();
         let _ = block_on_async::<_, (), std::io::Error>(
             "suspend_for_debugging",

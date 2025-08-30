@@ -234,6 +234,7 @@
 //! ```
 
 // Core modules
+pub mod condition_evaluator;
 pub mod config_bridge;
 pub mod conversion;
 pub mod diagnostics_bridge;

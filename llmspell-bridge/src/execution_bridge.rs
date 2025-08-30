@@ -363,6 +363,13 @@ impl ExecutionManager {
             .cloned()
     }
 
+    /// Update breakpoint hit count
+    pub async fn update_breakpoint_hits(&self, id: &str, hits: u32) {
+        if let Some(bp) = self.breakpoints.write().await.get_mut(id) {
+            bp.current_hits = hits;
+        }
+    }
+
     /// Check if should break at location (considering conditions)
     pub async fn should_break_at(&self, source: &str, line: u32) -> bool {
         if let Some(mut breakpoint) = self.get_breakpoint_at(source, line).await {
