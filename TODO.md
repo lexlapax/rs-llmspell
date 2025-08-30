@@ -776,7 +776,7 @@ llmspell-debug = { path = "../llmspell-debug" }
 ✅ **All acceptance criteria met** and integration tests passing
 
 
-### Task 9.2.2: Debug Session Management with Multi-Client Integration
+### Task 9.2.2: Debug Session Management with Multi-Client Integration ✅
 **Priority**: CRITICAL  
 **Estimated Time**: 6 hours  
 **Assignee**: Debug Team
@@ -784,16 +784,37 @@ llmspell-debug = { path = "../llmspell-debug" }
 **Description**: Implement debug session management for handling multiple debug clients and session state, including comprehensive multi-client integration testing moved from Phase 9.1.
 
 **Acceptance Criteria:**
-- [ ] Debug sessions created per client
-- [ ] Session state maintained correctly
-- [ ] Debug commands routed to right session
-- [ ] Multiple clients can debug different scripts
-- [ ] Session cleanup on disconnect
-- [ ] Session persistence across reconnects
-- [ ] **Integration tests for multi-client debugging scenarios (moved from 9.1.8 foundation)**
-- [ ] **Concurrent session handling validated (moved from 9.1.8 foundation)**
-- [ ] **Multi-client resource isolation verified (moved from 9.1.8 foundation)**
-- [ ] **Session conflict resolution tested (moved from 9.1.8 foundation)**
+- [x] Debug sessions created per client
+- [x] Session state maintained correctly
+- [x] Debug commands routed to right session
+- [x] Multiple clients can debug different scripts
+- [x] Session cleanup on disconnect
+- [x] Session persistence across reconnects
+- [x] **Integration tests for multi-client debugging scenarios (moved from 9.1.8 foundation)**
+- [x] **Concurrent session handling validated (moved from 9.1.8 foundation)**
+- [x] **Multi-client resource isolation verified (moved from 9.1.8 foundation)**
+- [x] **Session conflict resolution tested (moved from 9.1.8 foundation)**
+
+**Completion Summary (Task 9.2.2):**
+✅ **Enhanced DebugSessionManager** with session persistence and script conflict resolution
+- Added `persistent_sessions` HashMap for client reconnection support
+- Added `script_locks` HashMap to prevent multiple sessions debugging same script
+- Implemented `set_session_script()` with conflict checking
+- Implemented `reconnect_session()` for persistent session recovery
+- Added helper methods: `is_script_locked()`, `get_script_session()`
+
+✅ **Comprehensive multi-client integration tests** (9 test cases)
+- Concurrent session creation by 10 clients
+- Session persistence and reconnection verification
+- Script conflict resolution testing
+- Resource isolation between sessions
+- Concurrent debug command handling
+- Session cleanup with active locks
+- Script path switching within sessions
+- Stress testing with 100 concurrent sessions
+- Session state synchronization
+
+✅ **All tests passing** with zero failures and zero clippy warnings
 
 **Implementation Steps:**
 **ARCHITECTURE ALIGNMENT with Phase 9.1:**
@@ -898,15 +919,15 @@ llmspell-debug = { path = "../llmspell-debug" }
 7. **Test with 10+ simultaneous clients** (moved from 9.1.8 criteria)
 
 **Definition of Done:**
-- [ ] Sessions created correctly
-- [ ] Commands routed properly
-- [ ] Multi-client debugging works
-- [ ] Session cleanup functional
-- [ ] Integration tests for multi-client scenarios pass
-- [ ] Concurrent debugging sessions validated
-- [ ] All unit and integration tests pass
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Sessions created correctly
+- [x] Commands routed properly
+- [x] Multi-client debugging works
+- [x] Session cleanup functional
+- [x] Integration tests for multi-client scenarios pass
+- [x] Concurrent debugging sessions validated
+- [x] All unit and integration tests pass
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 ### Task 9.2.3: Lua Debug Hooks Implementation
 **Priority**: CRITICAL  

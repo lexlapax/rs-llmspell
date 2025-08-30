@@ -18,6 +18,10 @@ pub struct DebugSessionManager {
     sessions: Arc<RwLock<HashMap<String, DebugSession>>>,
     /// `ExecutionManager` from `execution_bridge.rs` (not old "Debugger")
     execution_manager: Arc<ExecutionManager>,
+    /// Persistent sessions for reconnection (indexed by `client_id`)
+    persistent_sessions: Arc<RwLock<HashMap<String, String>>>, // client_id -> session_id
+    /// Script locks to prevent conflicting debug sessions
+    script_locks: Arc<RwLock<HashMap<std::path::PathBuf, String>>>, // script_path -> session_id
 }
 
 /// Individual debug session using unified types
@@ -49,6 +53,8 @@ impl DebugSessionManager {
         Self {
             sessions: Arc::new(RwLock::new(HashMap::new())),
             execution_manager,
+            persistent_sessions: Arc::new(RwLock::new(HashMap::new())),
+            script_locks: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -58,9 +64,16 @@ impl DebugSessionManager {
     ///
     /// Returns an error if session creation fails
     pub async fn create_session(&self, client_id: String) -> Result<String> {
+        // Check if client has a persistent session to reconnect to
+        if let Some(existing_session_id) = self.persistent_sessions.read().await.get(&client_id) {
+            if self.sessions.read().await.contains_key(existing_session_id) {
+                return Ok(existing_session_id.clone());
+            }
+        }
+
         let session = DebugSession {
             session_id: uuid::Uuid::new_v4().to_string(),
-            client_id,
+            client_id: client_id.clone(),
             script_path: None,
             debug_state: DebugState::Terminated, // Use unified DebugState
             current_frame: 0,
@@ -71,10 +84,19 @@ impl DebugSessionManager {
         };
 
         let session_id = session.session_id.clone();
+
+        // Store session
         self.sessions
             .write()
             .await
             .insert(session_id.clone(), session);
+
+        // Store persistent mapping for reconnection
+        self.persistent_sessions
+            .write()
+            .await
+            .insert(client_id, session_id.clone());
+
         Ok(session_id)
     }
 
@@ -266,6 +288,20 @@ impl DebugSessionManager {
     /// Returns an error if the session cannot be removed
     pub async fn remove_session(&self, session_id: &str) -> Result<bool> {
         let mut sessions = self.sessions.write().await;
+
+        // Clean up script locks
+        if let Some(session) = sessions.get(session_id) {
+            if let Some(script_path) = &session.script_path {
+                self.script_locks.write().await.remove(script_path);
+            }
+
+            // Clean up persistent session mapping
+            self.persistent_sessions
+                .write()
+                .await
+                .retain(|_, sid| sid != session_id);
+        }
+
         Ok(sessions.remove(session_id).is_some())
     }
 
@@ -273,6 +309,86 @@ impl DebugSessionManager {
     pub async fn list_sessions(&self) -> Vec<String> {
         let sessions = self.sessions.read().await;
         sessions.keys().cloned().collect()
+    }
+
+    /// Set script path for a session with conflict resolution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if another session is already debugging this script
+    pub async fn set_session_script(
+        &self,
+        session_id: &str,
+        script_path: std::path::PathBuf,
+    ) -> Result<()> {
+        // Check for conflicts
+        let script_locks = self.script_locks.read().await;
+        if let Some(existing_session_id) = script_locks.get(&script_path) {
+            if existing_session_id != session_id {
+                return Err(anyhow!(
+                    "Script {:?} is already being debugged by session {}",
+                    script_path,
+                    existing_session_id
+                ));
+            }
+        }
+        drop(script_locks);
+
+        // Update session
+        let mut sessions = self.sessions.write().await;
+        let session = sessions
+            .get_mut(session_id)
+            .ok_or_else(|| anyhow!("Session not found: {}", session_id))?;
+
+        // Clean up old script lock if changing scripts
+        if let Some(old_path) = &session.script_path {
+            if old_path != &script_path {
+                self.script_locks.write().await.remove(old_path);
+            }
+        }
+
+        session.script_path = Some(script_path.clone());
+        drop(sessions);
+
+        // Set new script lock
+        self.script_locks
+            .write()
+            .await
+            .insert(script_path, session_id.to_string());
+
+        Ok(())
+    }
+
+    /// Reconnect to an existing session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no session exists for the client
+    pub async fn reconnect_session(&self, client_id: &str) -> Result<String> {
+        let session_id = {
+            let persistent_sessions = self.persistent_sessions.read().await;
+            persistent_sessions
+                .get(client_id)
+                .ok_or_else(|| anyhow!("No persistent session found for client: {}", client_id))?
+                .clone()
+        };
+
+        // Verify session still exists
+        if !self.sessions.read().await.contains_key(&session_id) {
+            return Err(anyhow!("Session {} no longer exists", session_id));
+        }
+
+        Ok(session_id)
+    }
+
+    /// Check if a script is being debugged
+    pub async fn is_script_locked(&self, script_path: &std::path::Path) -> bool {
+        self.script_locks.read().await.contains_key(script_path)
+    }
+
+    /// Get the session ID debugging a specific script
+    pub async fn get_script_session(&self, script_path: &std::path::Path) -> Option<String> {
+        self.script_locks.read().await.get(script_path).cloned()
     }
 
     /// Clean up expired sessions (older than 1 hour with no activity)
