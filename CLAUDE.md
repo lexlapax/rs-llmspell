@@ -4,13 +4,14 @@
 rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems
 
 ## Critical References
-- **Architecture**: `/docs/technical/master-architecture-vision.md`
-- **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (16-phase roadmap)
+- **Architecture Vision**: `/docs/technical/master-architecture-vision.md`
+- **Current Architectur Overview**: `/docs/technical/current-architecture.md`
+- **Implementation Phases**: `/docs/in-progress/implementation-phases.md` (22-phase roadmap)
 - **Current Status**: Phase 8 (check `/TODO.md` for active tasks)
 - **Current Work**: ALWAYS read `/TODO.md` - hierarchical checkboxes with numbered tasks
 
 ## Project-Specific Behavior Controls
-- **Always Megathink**: analyze existing code, never guess
+- **Always Ultrathink**: analyze existing code, never guess
 - **Future-based thinking**: consider impact on phases 8-16 in implementation-phases.md
 - **Update TODO.md**: mark sub-tasks complete as you do them, not after entire tasks
 
