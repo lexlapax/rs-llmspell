@@ -343,6 +343,108 @@ impl ExecutionManager {
     pub async fn is_active(&self) -> bool {
         !matches!(self.get_state().await, DebugState::Terminated)
     }
+
+    /// Check if there's a breakpoint at a specific location
+    pub async fn has_breakpoint_at(&self, source: &str, line: u32) -> bool {
+        self.breakpoints
+            .read()
+            .await
+            .values()
+            .any(|bp| bp.source == source && bp.line == line && bp.enabled)
+    }
+
+    /// Get breakpoint at specific location
+    pub async fn get_breakpoint_at(&self, source: &str, line: u32) -> Option<Breakpoint> {
+        self.breakpoints
+            .read()
+            .await
+            .values()
+            .find(|bp| bp.source == source && bp.line == line && bp.enabled)
+            .cloned()
+    }
+
+    /// Check if should break at location (considering conditions)
+    pub async fn should_break_at(&self, source: &str, line: u32) -> bool {
+        if let Some(mut breakpoint) = self.get_breakpoint_at(source, line).await {
+            // Update hit count
+            breakpoint.current_hits += 1;
+
+            // Check if should break based on hit count
+            if !breakpoint.should_break() {
+                // Update the stored breakpoint with new hit count
+                if let Some(stored_bp) = self.breakpoints.write().await.get_mut(&breakpoint.id) {
+                    stored_bp.current_hits = breakpoint.current_hits;
+                }
+                return false;
+            }
+
+            // Update the stored breakpoint
+            if let Some(stored_bp) = self.breakpoints.write().await.get_mut(&breakpoint.id) {
+                stored_bp.current_hits = breakpoint.current_hits;
+            }
+
+            // TODO: Evaluate condition if present (requires Lua context)
+            // For now, just check basic should_break
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Suspend execution for debugging
+    pub async fn suspend_for_debugging(
+        &self,
+        location: ExecutionLocation,
+        context: crate::execution_context::SharedExecutionContext,
+    ) {
+        // Set paused state
+        self.set_state(DebugState::Paused {
+            reason: PauseReason::Breakpoint,
+            location,
+        })
+        .await;
+
+        // Cache the context variables as Variables
+        let mut frame_vars = Vec::new();
+        for (name, value) in &context.variables {
+            frame_vars.push(Variable {
+                name: name.clone(),
+                value: serde_json::to_string_pretty(value).unwrap_or_else(|_| "?".to_string()),
+                var_type: match value {
+                    serde_json::Value::Null => "null".to_string(),
+                    serde_json::Value::Bool(_) => "boolean".to_string(),
+                    serde_json::Value::Number(_) => "number".to_string(),
+                    serde_json::Value::String(_) => "string".to_string(),
+                    serde_json::Value::Array(_) => "array".to_string(),
+                    serde_json::Value::Object(_) => "object".to_string(),
+                },
+                has_children: matches!(
+                    value,
+                    serde_json::Value::Array(_) | serde_json::Value::Object(_)
+                ),
+                reference: None,
+            });
+        }
+
+        // Cache variables for current frame
+        if let Some(top_frame) = context.stack.first() {
+            self.cache_variables(top_frame.id.clone(), frame_vars).await;
+        }
+
+        // Update stack trace from context
+        self.set_stack_trace(context.stack.clone()).await;
+    }
+
+    /// Wait for debug state to change from paused
+    pub async fn wait_for_resume(&self) {
+        loop {
+            let state = self.get_state().await;
+            if !matches!(state, DebugState::Paused { .. }) {
+                break;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
+        }
+    }
 }
 
 impl Default for ExecutionManager {

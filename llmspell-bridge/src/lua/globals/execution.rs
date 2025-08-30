@@ -4,37 +4,41 @@
 //! variable inspection, stepping, and execution control. This is distinct from
 //! diagnostics (logging/profiling) which is handled by the Console global.
 
-use crate::execution_bridge::{
-    Breakpoint, DebugState, ExecutionLocation, ExecutionManager, PauseReason, StackFrame, Variable,
-};
+use crate::execution_bridge::{Breakpoint, ExecutionLocation, ExecutionManager, StackFrame};
+use crate::execution_context::{SharedExecutionContext, SourceLocation};
+use crate::lua::output::{capture_stack_trace, StackTraceOptions};
+use crate::lua::sync_utils::block_on_async;
 use mlua::{DebugEvent, Lua, Result as LuaResult};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::runtime::Handle;
+use tokio::sync::RwLock;
 
 /// Lua execution debug hook handler
 pub struct LuaExecutionHook {
     /// Reference to the execution manager
     execution_manager: Arc<ExecutionManager>,
-    /// Map of source to breakpoints
+    /// Shared execution context for enriched debugging
+    shared_context: Arc<RwLock<SharedExecutionContext>>,
+    /// Map of source to breakpoints (cached for performance)
     breakpoints: HashMap<String, Vec<Breakpoint>>,
     /// Current execution state
     current_line: u32,
     current_source: String,
-    /// Tokio runtime handle for async operations
-    runtime_handle: Handle,
 }
 
 impl LuaExecutionHook {
     /// Create a new Lua execution hook
     #[must_use]
-    pub fn new(execution_manager: Arc<ExecutionManager>) -> Self {
+    pub fn new(
+        execution_manager: Arc<ExecutionManager>,
+        shared_context: Arc<RwLock<SharedExecutionContext>>,
+    ) -> Self {
         Self {
             execution_manager,
+            shared_context,
             breakpoints: HashMap::new(),
             current_line: 0,
             current_source: String::new(),
-            runtime_handle: Handle::current(),
         }
     }
 
@@ -49,17 +53,23 @@ impl LuaExecutionHook {
         }
     }
 
-    /// Check if we should break at current location
-    fn should_break(&mut self, source: &str, line: u32) -> bool {
-        if let Some(breakpoints) = self.breakpoints.get_mut(source) {
-            for bp in breakpoints.iter_mut() {
-                if bp.line == line && bp.should_break() {
-                    bp.current_hits += 1;
-                    return true;
+    /// Check if we should break at current location (now uses `ExecutionManager`)
+    fn should_break(&self, source: &str, line: u32) -> bool {
+        // Use ExecutionManager's should_break_at for consistency
+        let exec_mgr = self.execution_manager.clone();
+        let source = source.to_string();
+        block_on_async(
+            "check_breakpoint",
+            async move {
+                if exec_mgr.should_break_at(&source, line).await {
+                    Ok(())
+                } else {
+                    Err(std::io::Error::other("not breaking"))
                 }
-            }
-        }
-        false
+            },
+            None,
+        )
+        .is_ok()
     }
 
     /// Handle a debug event
@@ -88,129 +98,170 @@ impl LuaExecutionHook {
                 self.current_source.clone_from(&source);
                 self.current_line = line;
 
+                // Update shared context location
+                let shared_ctx = self.shared_context.clone();
+                let source_clone = source.clone();
+                let _ = block_on_async::<_, (), std::io::Error>(
+                    "update_location",
+                    async move {
+                        {
+                            let mut ctx = shared_ctx.write().await;
+                            ctx.set_location(SourceLocation {
+                                source: source_clone,
+                                line,
+                                column: None,
+                            });
+                            ctx.performance_metrics.execution_count += 1;
+                        }
+                        Ok(())
+                    },
+                    None,
+                );
+
                 // Check for breakpoint
                 if self.should_break(&source, line) {
-                    // Pause execution
-                    self.pause_at_breakpoint(lua, source, line);
+                    // Pause execution with enriched context
+                    self.pause_at_breakpoint_with_context(lua, source, line);
                 }
             }
-            DebugEvent::Call
-            | DebugEvent::TailCall
-            | DebugEvent::Ret
-            | DebugEvent::Count
-            | DebugEvent::Unknown(_) => {
-                // These events are not used for breakpoint debugging
-                // Call/TailCall/Ret: Could be used for stack trace (not implemented)
-                // Count: For instruction counting
+            DebugEvent::Call | DebugEvent::TailCall => {
+                // Function call - push to stack in shared context
+                let source = ar
+                    .source()
+                    .source
+                    .as_deref()
+                    .unwrap_or("<unknown>")
+                    .to_string();
+                let name = ar
+                    .names()
+                    .name
+                    .as_deref()
+                    .unwrap_or("<anonymous>")
+                    .to_string();
+                #[allow(clippy::cast_sign_loss)]
+                let line = ar.curr_line() as u32;
+
+                let shared_ctx = self.shared_context.clone();
+                let _ = block_on_async::<_, (), std::io::Error>(
+                    "push_frame",
+                    async move {
+                        {
+                            let mut ctx = shared_ctx.write().await;
+                            let frame_id = format!("frame_{}", ctx.stack.len());
+                            ctx.push_frame(StackFrame {
+                                id: frame_id,
+                                name,
+                                source,
+                                line,
+                                column: None,
+                                locals: Vec::new(),
+                                is_user_code: true,
+                            });
+                        }
+                        Ok(())
+                    },
+                    None,
+                );
+            }
+            DebugEvent::Ret => {
+                // Function return - pop from stack in shared context
+                let shared_ctx = self.shared_context.clone();
+                let _ = block_on_async::<_, (), std::io::Error>(
+                    "pop_frame",
+                    async move {
+                        {
+                            let mut ctx = shared_ctx.write().await;
+                            ctx.pop_frame();
+                        }
+                        Ok(())
+                    },
+                    None,
+                );
+            }
+            DebugEvent::Count | DebugEvent::Unknown(_) => {
+                // Count: For instruction counting (not used)
                 // Unknown: Ignored
             }
         }
         Ok(())
     }
 
-    /// Pause execution at a breakpoint
-    fn pause_at_breakpoint(&self, lua: &Lua, source: String, line: u32) {
-        // Update debug state
+    /// Pause execution at a breakpoint with enriched context
+    fn pause_at_breakpoint_with_context(&self, lua: &Lua, source: String, line: u32) {
+        // Create execution location
         let location = ExecutionLocation {
-            source,
+            source: source.clone(),
             line,
             column: None,
         };
 
-        // Set paused state (blocking call to async)
-        self.runtime_handle.block_on(async {
-            self.execution_manager
-                .set_state(DebugState::Paused {
-                    reason: PauseReason::Breakpoint,
-                    location: location.clone(),
-                })
-                .await;
-        });
+        // Capture comprehensive stack trace using output.rs
+        let stack_options = StackTraceOptions {
+            max_depth: 20,
+            capture_locals: true,
+            capture_upvalues: false,
+            include_source: true,
+        };
+        let stack_trace = capture_stack_trace(lua, &stack_options);
 
-        // Extract stack trace
-        let stack_trace = Self::extract_stack_trace(lua);
-        self.runtime_handle.block_on(async {
-            self.execution_manager.set_stack_trace(stack_trace).await;
-        });
+        // Use stack frames directly from capture_stack_trace
+        let stack_frames = stack_trace.frames.clone();
 
-        // Extract variables for top frame
-        let variables = Self::extract_variables(lua, 0);
-        self.runtime_handle.block_on(async {
-            self.execution_manager
-                .cache_variables("frame_0".to_string(), variables)
-                .await;
-        });
-
-        // Wait for continue command
-        self.wait_for_continue();
-    }
-
-    /// Extract stack trace from Lua
-    fn extract_stack_trace(lua: &Lua) -> Vec<StackFrame> {
-        let mut frames = Vec::new();
-        let mut level = 0;
-
-        while let Some(debug) = lua.inspect_stack(level) {
-            let frame = StackFrame {
-                id: format!("frame_{level}"),
-                name: debug
-                    .names()
-                    .name
-                    .as_deref()
-                    .unwrap_or("<anonymous>")
-                    .to_string(),
-                source: debug
-                    .source()
-                    .source
-                    .as_deref()
-                    .unwrap_or("<unknown>")
-                    .to_string(),
-                #[allow(clippy::cast_sign_loss)]
-                line: debug.curr_line() as u32,
-                column: None,
-                locals: Vec::new(), // Will be populated on demand
-                is_user_code: !debug
-                    .source()
-                    .source
-                    .as_deref()
-                    .unwrap_or("")
-                    .starts_with('@'),
-            };
-            frames.push(frame);
-            level += 1;
-        }
-
-        frames
-    }
-
-    /// Extract local variables from a stack frame
-    fn extract_variables(lua: &Lua, frame_level: usize) -> Vec<Variable> {
-        let variables = Vec::new();
-
-        // Get debug info for the frame
-        if let Some(_debug) = lua.inspect_stack(frame_level) {
-            // Note: mlua doesn't provide direct access to locals and upvalues
-            // through the Debug interface. This would require using the Lua debug
-            // library directly or implementing a custom solution.
-            // TODO: Implement proper variable extraction using Lua debug library
-        }
-
-        variables
-    }
-
-    /// Wait for continue command from debug manager
-    fn wait_for_continue(&self) {
-        // Simple busy wait - in production, use proper synchronization
-        loop {
-            let state = self
-                .runtime_handle
-                .block_on(async { self.execution_manager.get_state().await });
-
-            if state == DebugState::Running {
-                break;
+        // Extract local variables for context
+        let mut variables = HashMap::new();
+        if let Some(first_frame) = stack_trace.frames.first() {
+            for local in &first_frame.locals {
+                // Convert Lua value string representation to JSON for SharedExecutionContext
+                let json_value = Self::lua_value_to_json(&local.value);
+                variables.insert(local.name.clone(), json_value);
             }
+        }
 
-            std::thread::sleep(std::time::Duration::from_millis(100));
+        // Update shared context and suspend (but don't block waiting for resume)
+        let shared_ctx = self.shared_context.clone();
+        let exec_mgr = self.execution_manager.clone();
+        let _ = block_on_async::<_, (), std::io::Error>(
+            "suspend_for_debugging",
+            async move {
+                let mut ctx = shared_ctx.write().await;
+                ctx.stack.clone_from(&stack_frames);
+                ctx.variables = variables;
+                ctx.set_location(SourceLocation {
+                    source,
+                    line,
+                    column: None,
+                });
+
+                let context_clone = ctx.clone();
+                drop(ctx); // Release the lock before suspension
+
+                // Suspend with enriched context (sets paused state but doesn't block)
+                exec_mgr
+                    .suspend_for_debugging(location, context_clone)
+                    .await;
+
+                // NOTE: We don't wait for resume here as that would block the Lua execution.
+                // The debugger client should handle resuming when ready.
+                Ok(())
+            },
+            None,
+        );
+    }
+
+    /// Convert Lua value representation to JSON
+    fn lua_value_to_json(value_str: &str) -> serde_json::Value {
+        // Try to parse as various JSON types
+        if value_str == "nil" {
+            serde_json::Value::Null
+        } else if let Ok(b) = value_str.parse::<bool>() {
+            serde_json::Value::Bool(b)
+        } else if let Ok(n) = value_str.parse::<f64>() {
+            serde_json::Value::Number(
+                serde_json::Number::from_f64(n).unwrap_or_else(|| serde_json::Number::from(0)),
+            )
+        } else {
+            // Default to string
+            serde_json::Value::String(value_str.to_string())
         }
     }
 }
@@ -224,8 +275,23 @@ pub fn install_debug_hooks(
     lua: &Lua,
     execution_manager: Arc<ExecutionManager>,
 ) -> LuaResult<Arc<parking_lot::Mutex<LuaExecutionHook>>> {
+    let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
+    install_interactive_debug_hooks(lua, execution_manager, shared_context)
+}
+
+/// Install interactive debug hooks with `SharedExecutionContext`
+///
+/// # Errors
+///
+/// Returns an error if debug hook installation fails
+pub fn install_interactive_debug_hooks(
+    lua: &Lua,
+    execution_manager: Arc<ExecutionManager>,
+    shared_context: Arc<RwLock<SharedExecutionContext>>,
+) -> LuaResult<Arc<parking_lot::Mutex<LuaExecutionHook>>> {
     let hook = Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new(
         execution_manager,
+        shared_context,
     )));
     let hook_clone = hook.clone();
 
