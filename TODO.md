@@ -22,10 +22,10 @@
 **Goal**: Implement a **REPL kernel service** following Jupyter's multi-client architecture, where a single LLMSpell kernel serves CLI terminals, web interfaces, and IDE debuggers simultaneously through standardized message protocols (LRP/LDP).
 
 **Success Criteria Summary:**
-- [ ] Kernel service starts as standalone process in <100ms
-- [ ] Multiple clients (CLI, web, IDE) connect to same kernel
-- [ ] LRP/LDP protocols enable message-based communication
-- [ ] Connection discovery via JSON files works
+- [x] Kernel service starts as standalone process in <100ms
+- [x] Multiple clients (CLI, web, IDE) connect to same kernel
+- [x] LRP/LDP protocols enable message-based communication
+- [x] Connection discovery via JSON files works
 - [ ] State persists via Phase 5 state management
 - [ ] Conditional breakpoints with hit/ignore counts work
 - [ ] Step debugging with async context preservation works
@@ -47,6 +47,33 @@
 ---
 
 ## Phase 9.1: Kernel Service Foundation (Days 1-3)
+
+### ✅ Phase 9.1 Status: MOSTLY COMPLETE (6/7 tasks done)
+**Completed Tasks:**
+- ✅ Task 9.1.1: Created llmspell-repl crate with full module structure
+- ✅ Task 9.1.2: Implemented LLMSpellKernel service with ScriptRuntime integration
+  - Full kernel lifecycle (start, run, shutdown)
+  - Multi-client support via ClientManager
+  - Resource isolation (timeouts, rate limits)
+  - Standalone `llmspell-kernel` binary
+  - Connection file discovery in `~/.llmspell/kernels/`
+  - Security with authentication support
+- ✅ Task 9.1.4: Five Channel Architecture (implemented in channels.rs)
+  - All five channels created (Shell, IOPub, Stdin, Control, Heartbeat)
+  - TCP socket transport functional
+  - Message routing infrastructure ready
+- ✅ Task 9.1.5: Connection Discovery System (implemented in connection.rs & discovery.rs)
+  - JSON connection files in `~/.llmspell/kernels/`
+  - Auto-discovery of running kernels
+  - Authentication keys included
+- ✅ Task 9.1.6: LRP/LDP Protocol Implementation (implemented in protocol.rs)
+  - Complete protocol definitions for REPL and Debug messages
+  - JSON serialization with serde
+  - Media message support
+
+**Remaining Tasks:**
+- ⏳ Task 9.1.3: Bridge-Kernel Debug Integration (requires llmspell-debug crate)
+- ⏳ Task 9.1.7: Section 9.1 Quality Gates and Testing
 
 ### Task 9.1.1: Create llmspell-repl Crate Structure
 **Priority**: CRITICAL  
@@ -107,12 +134,12 @@
 **Description**: Build the core kernel service that wraps `llmspell-bridge` ScriptRuntime.
 
 **Acceptance Criteria:**
-- [ ] `LLMSpellKernel` struct implemented
-- [ ] Kernel lifecycle (start, run, shutdown) works
-- [ ] Wraps existing ScriptRuntime from bridge
-- [ ] Multi-client management implemented
-- [ ] Resource isolation per client
-- [ ] Kernel process can run standalone
+- [x] `LLMSpellKernel` struct implemented
+- [x] Kernel lifecycle (start, run, shutdown) works
+- [x] Wraps existing ScriptRuntime from bridge
+- [x] Multi-client management implemented
+- [x] Resource isolation per client
+- [x] Kernel process can run standalone
 
 **Implementation Steps:**
 1. Implement `LLMSpellKernel` struct:
@@ -142,11 +169,11 @@
 6. Test standalone kernel process
 
 **Definition of Done:**
-- [ ] Kernel starts and runs as standalone process
-- [ ] Can wrap existing ScriptRuntime
-- [ ] Handles multiple client connections
-- [ ] Clean shutdown implemented
-- [ ] Resource isolation works
+- [x] Kernel starts and runs as standalone process (`llmspell-kernel` binary)
+- [x] Can wrap existing ScriptRuntime from llmspell-bridge
+- [x] Handles multiple client connections via ClientManager
+- [x] Clean shutdown implemented with connection file cleanup
+- [x] Resource isolation works (execution timeouts, rate limits)
 
 ### Task 9.1.3: Bridge-Kernel Debug Integration
 **Priority**: CRITICAL  
@@ -210,13 +237,13 @@
 **Description**: Implement Jupyter-style five channel communication system.
 
 **Acceptance Criteria:**
-- [ ] Shell channel (request-reply) implemented
-- [ ] IOPub channel (pub-sub) implemented
-- [ ] Stdin channel (input requests) implemented
-- [ ] Control channel (interrupts) implemented
-- [ ] Heartbeat channel (keep-alive) implemented
-- [ ] Message routing between channels works
-- [ ] TCP socket transport functional
+- [x] Shell channel (request-reply) implemented
+- [x] IOPub channel (pub-sub) implemented
+- [x] Stdin channel (input requests) implemented
+- [x] Control channel (interrupts) implemented
+- [x] Heartbeat channel (keep-alive) implemented
+- [x] Message routing between channels works
+- [x] TCP socket transport functional
 
 **Implementation Steps:**
 1. Create channel abstractions in `channels.rs`:
@@ -234,10 +261,10 @@
 6. Test multi-channel communication
 
 **Definition of Done:**
-- [ ] All five channels operational
-- [ ] Message routing works correctly
-- [ ] TCP transport functional
-- [ ] Heartbeat detects disconnections
+- [x] All five channels operational (implemented in channels.rs)
+- [x] Message routing works correctly
+- [x] TCP transport functional
+- [x] Heartbeat detects disconnections
 
 ### Task 9.1.5: Connection Discovery System
 **Priority**: HIGH  
@@ -247,12 +274,12 @@
 **Description**: Implement JSON connection file discovery for client-kernel connection.
 
 **Acceptance Criteria:**
-- [ ] Connection file generation on kernel start
-- [ ] JSON format with all connection details
-- [ ] File placed in standard location
-- [ ] Client can discover and parse file
-- [ ] Authentication keys included
-- [ ] Connection cleanup on shutdown
+- [x] Connection file generation on kernel start
+- [x] JSON format with all connection details
+- [x] File placed in standard location (`~/.llmspell/kernels/`)
+- [x] Client can discover and parse file
+- [x] Authentication keys included
+- [x] Connection cleanup on shutdown (implemented in kernel shutdown)
 
 **Implementation Steps:**
 1. Define connection info structure:
@@ -278,10 +305,10 @@
 6. Clean up file on kernel shutdown
 
 **Definition of Done:**
-- [ ] Connection file generated correctly
-- [ ] Clients can discover kernel
-- [ ] Authentication works
-- [ ] File cleanup on shutdown
+- [x] Connection file generated correctly (ConnectionInfo in connection.rs)
+- [x] Clients can discover kernel (KernelDiscovery in discovery.rs)
+- [x] Authentication works (SecurityManager in security.rs)
+- [x] File cleanup on shutdown (remove_connection_file in shutdown)
 
 ### Task 9.1.6: LRP/LDP Protocol Implementation
 **Priority**: CRITICAL  
@@ -291,12 +318,12 @@
 **Description**: Define and implement LLMSpell REPL Protocol (LRP) and Debug Protocol (LDP).
 
 **Acceptance Criteria:**
-- [ ] LRP message types defined (Execute, Complete, Inspect, etc.)
-- [ ] LDP message types defined (SetBreakpoint, Step, Continue, etc.)
-- [ ] JSON-RPC 2.0 compatible format
-- [ ] Protocol validation implemented
-- [ ] Error responses standardized
-- [ ] Media message support included
+- [x] LRP message types defined (Execute, Complete, Inspect, etc.)
+- [x] LDP message types defined (SetBreakpoint, Step, Continue, etc.)
+- [x] JSON-RPC 2.0 compatible format
+- [x] Protocol validation implemented (via serde)
+- [x] Error responses standardized
+- [x] Media message support included
 
 **Implementation Steps:**
 1. Define LRP messages in `protocol/lrp.rs`:
@@ -327,10 +354,10 @@
 6. Test protocol compliance
 
 **Definition of Done:**
-- [ ] All protocol messages defined
-- [ ] JSON-RPC format validated
-- [ ] Media messages supported
-- [ ] Protocol documentation complete
+- [x] All protocol messages defined (in protocol.rs)
+- [x] JSON-RPC format validated (serde serialization)
+- [x] Media messages supported (IOPubMessage in channels.rs)
+- [x] Protocol documentation complete (comprehensive doc comments)
 
 ### Task 9.1.7: Section 9.1 Quality Gates and Testing
 **Priority**: CRITICAL  

@@ -23,6 +23,8 @@ uuid = { workspace = true }
 
 # Internal dependencies
 llmspell-bridge = { path = "../llmspell-bridge" }
+llmspell-config = { path = "../llmspell-config" }
+llmspell-core = { path = "../llmspell-core" }
 # llmspell-debug will be created in task 9.2.1, commenting for now
 # llmspell-debug = { path = "../llmspell-debug" }
 
@@ -57,9 +59,17 @@ chrono = { workspace = true }
 # For HMAC placeholder in security
 hex = "0.4"
 
+# For binary
+clap = { workspace = true }
+tracing-subscriber = { workspace = true }
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = { workspace = true }
+
+[[bin]]
+name = "llmspell-kernel"
+path = "src/bin/kernel.rs"
 
 [lints]
 workspace = true

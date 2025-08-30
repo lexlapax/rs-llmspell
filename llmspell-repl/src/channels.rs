@@ -1,14 +1,14 @@
 //! Five-channel communication system following Jupyter's architecture
 //!
-//! Implements Shell, IOPub, Stdin, Control, and Heartbeat channels for
+//! Implements Shell, `IOPub`, Stdin, Control, and Heartbeat channels for
 //! multi-client kernel communication.
 
+use anyhow::Result;
+use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, mpsc};
-use anyhow::Result;
-use serde::{Deserialize, Serialize};
 
 /// Shell channel for request-reply execution
 pub struct ShellChannel {
@@ -20,32 +20,38 @@ pub struct ShellChannel {
 
 impl ShellChannel {
     /// Create a new shell channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if binding to the socket fails
     pub async fn new(ip: &str, port: u16) -> Result<Self> {
-        let addr = format!("{}:{}", ip, port);
+        let addr = format!("{ip}:{port}");
         let listener = TcpListener::bind(&addr).await?;
         let address = listener.local_addr()?;
-        
-        Ok(Self {
-            listener,
-            address,
-        })
+
+        Ok(Self { listener, address })
     }
-    
+
     /// Get the port this channel is listening on
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.address.port()
     }
-    
+
     /// Accept a new connection
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if accepting the connection fails
     pub async fn accept(&self) -> Result<TcpStream> {
         let (stream, _addr) = self.listener.accept().await?;
         Ok(stream)
     }
 }
 
-/// IOPub channel for broadcasting output to all clients
+/// `IOPub` channel for broadcasting output to all clients
 pub struct IOPubChannel {
     /// TCP listener for incoming connections
+    #[allow(dead_code)]
     listener: TcpListener,
     /// Address the channel is bound to
     address: SocketAddr,
@@ -53,15 +59,22 @@ pub struct IOPubChannel {
     sender: broadcast::Sender<IOPubMessage>,
 }
 
-/// Messages broadcast on the IOPub channel
+/// Messages broadcast on the `IOPub` channel
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum IOPubMessage {
     /// Stream output (stdout, stderr)
     StreamOutput { name: String, text: String },
     /// Execution result
-    ExecuteResult { execution_count: u32, data: serde_json::Value },
+    ExecuteResult {
+        execution_count: u32,
+        data: serde_json::Value,
+    },
     /// Error output
-    Error { ename: String, evalue: String, traceback: Vec<String> },
+    Error {
+        ename: String,
+        evalue: String,
+        traceback: Vec<String>,
+    },
     /// Status update
     Status { execution_state: String },
     /// Debug event (for Phase 9.2)
@@ -69,33 +82,43 @@ pub enum IOPubMessage {
 }
 
 impl IOPubChannel {
-    /// Create a new IOPub channel
+    /// Create a new `IOPub` channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if binding to the socket fails
     pub async fn new(ip: &str, port: u16) -> Result<Self> {
-        let addr = format!("{}:{}", ip, port);
+        let addr = format!("{ip}:{port}");
         let listener = TcpListener::bind(&addr).await?;
         let address = listener.local_addr()?;
         let (sender, _receiver) = broadcast::channel(1024);
-        
+
         Ok(Self {
             listener,
             address,
             sender,
         })
     }
-    
+
     /// Get the port this channel is listening on
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.address.port()
     }
-    
-    /// Subscribe to IOPub messages
+
+    /// Subscribe to `IOPub` messages
     pub fn subscribe(&self) -> broadcast::Receiver<IOPubMessage> {
         self.sender.subscribe()
     }
-    
+
     /// Publish a message to all subscribers
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if there are no subscribers
     pub fn publish(&self, message: IOPubMessage) -> Result<()> {
-        self.sender.send(message).map_err(|_| anyhow::anyhow!("No IOPub subscribers"))?;
+        self.sender
+            .send(message)
+            .map_err(|_| anyhow::anyhow!("No `IOPub` subscribers"))?;
         Ok(())
     }
 }
@@ -103,6 +126,7 @@ impl IOPubChannel {
 /// Stdin channel for input requests
 pub struct StdinChannel {
     /// TCP listener for incoming connections
+    #[allow(dead_code)]
     listener: TcpListener,
     /// Address the channel is bound to
     address: SocketAddr,
@@ -110,19 +134,20 @@ pub struct StdinChannel {
 
 impl StdinChannel {
     /// Create a new stdin channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if binding to the socket fails
     pub async fn new(ip: &str, port: u16) -> Result<Self> {
-        let addr = format!("{}:{}", ip, port);
+        let addr = format!("{ip}:{port}");
         let listener = TcpListener::bind(&addr).await?;
         let address = listener.local_addr()?;
-        
-        Ok(Self {
-            listener,
-            address,
-        })
+
+        Ok(Self { listener, address })
     }
-    
+
     /// Get the port this channel is listening on
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.address.port()
     }
 }
@@ -130,6 +155,7 @@ impl StdinChannel {
 /// Control channel for kernel control commands
 pub struct ControlChannel {
     /// TCP listener for incoming connections
+    #[allow(dead_code)]
     listener: TcpListener,
     /// Address the channel is bound to
     address: SocketAddr,
@@ -137,19 +163,20 @@ pub struct ControlChannel {
 
 impl ControlChannel {
     /// Create a new control channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if binding to the socket fails
     pub async fn new(ip: &str, port: u16) -> Result<Self> {
-        let addr = format!("{}:{}", ip, port);
+        let addr = format!("{ip}:{port}");
         let listener = TcpListener::bind(&addr).await?;
         let address = listener.local_addr()?;
-        
-        Ok(Self {
-            listener,
-            address,
-        })
+
+        Ok(Self { listener, address })
     }
-    
+
     /// Get the port this channel is listening on
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.address.port()
     }
 }
@@ -157,22 +184,29 @@ impl ControlChannel {
 /// Heartbeat channel for keep-alive monitoring
 pub struct HeartbeatChannel {
     /// TCP listener for incoming connections
+    #[allow(dead_code)]
     listener: TcpListener,
     /// Address the channel is bound to
     address: SocketAddr,
     /// Channel for heartbeat signals
+    #[allow(dead_code)]
     heartbeat_tx: mpsc::Sender<Vec<u8>>,
+    #[allow(dead_code)]
     heartbeat_rx: Arc<tokio::sync::Mutex<mpsc::Receiver<Vec<u8>>>>,
 }
 
 impl HeartbeatChannel {
     /// Create a new heartbeat channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if binding to the socket fails
     pub async fn new(ip: &str, port: u16) -> Result<Self> {
-        let addr = format!("{}:{}", ip, port);
+        let addr = format!("{ip}:{port}");
         let listener = TcpListener::bind(&addr).await?;
         let address = listener.local_addr()?;
         let (heartbeat_tx, heartbeat_rx) = mpsc::channel(10);
-        
+
         Ok(Self {
             listener,
             address,
@@ -180,14 +214,18 @@ impl HeartbeatChannel {
             heartbeat_rx: Arc::new(tokio::sync::Mutex::new(heartbeat_rx)),
         })
     }
-    
+
     /// Get the port this channel is listening on
-    pub fn port(&self) -> u16 {
+    pub const fn port(&self) -> u16 {
         self.address.port()
     }
-    
+
     /// Start the heartbeat echo loop
-    pub async fn start_heartbeat_loop(&self) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the heartbeat loop fails
+    pub const fn start_heartbeat_loop(&self) -> Result<()> {
         // This will echo heartbeat messages back to clients
         // Implementation will handle the actual heartbeat protocol
         Ok(())
@@ -198,7 +236,7 @@ impl HeartbeatChannel {
 pub struct KernelChannels {
     /// Shell channel for request-reply
     pub shell: ShellChannel,
-    /// IOPub channel for broadcasting
+    /// `IOPub` channel for broadcasting
     pub iopub: IOPubChannel,
     /// Stdin channel for input
     pub stdin: StdinChannel,
@@ -210,13 +248,17 @@ pub struct KernelChannels {
 
 impl KernelChannels {
     /// Create all five channels
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if creating any channel fails
     pub async fn new(ip: &str, port_start: u16) -> Result<Self> {
         let shell = ShellChannel::new(ip, port_start).await?;
         let iopub = IOPubChannel::new(ip, port_start + 1).await?;
         let stdin = StdinChannel::new(ip, port_start + 2).await?;
         let control = ControlChannel::new(ip, port_start + 3).await?;
         let heartbeat = HeartbeatChannel::new(ip, port_start + 4).await?;
-        
+
         Ok(Self {
             shell,
             iopub,
@@ -225,28 +267,36 @@ impl KernelChannels {
             heartbeat,
         })
     }
-    
+
     /// Start all channel listeners
-    pub async fn start_listeners(&self) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if starting any listener fails
+    pub fn start_listeners(&self) -> Result<()> {
         // Start heartbeat loop
-        self.heartbeat.start_heartbeat_loop().await?;
-        
+        self.heartbeat.start_heartbeat_loop()?;
+
         // Additional listener setup will be implemented
         // for handling incoming connections on each channel
-        
+
         tracing::info!("All kernel channels started");
         Ok(())
     }
-    
+
     /// Stop all channels
-    pub async fn stop(&self) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if stopping any channel fails
+    pub fn stop(&self) -> Result<()> {
         // Graceful shutdown of all channels
         tracing::info!("Stopping all kernel channels");
         Ok(())
     }
-    
+
     /// Get port information for all channels
-    pub fn get_ports(&self) -> ChannelPorts {
+    pub const fn get_ports(&self) -> ChannelPorts {
         ChannelPorts {
             shell_port: self.shell.port(),
             iopub_port: self.iopub.port(),

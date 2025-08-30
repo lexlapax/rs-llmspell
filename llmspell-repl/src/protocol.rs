@@ -1,11 +1,11 @@
 //! LRP/LDP Protocol definitions
 //!
-//! Defines the LLMSpell REPL Protocol (LRP) and LLMSpell Debug Protocol (LDP)
+//! Defines the `LLMSpell` REPL Protocol (LRP) and `LLMSpell` Debug Protocol (LDP)
 //! for communication between kernel and clients.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use chrono::{DateTime, Utc};
 
 /// Common message header for all protocol messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -37,7 +37,7 @@ impl Default for MessageHeader {
     }
 }
 
-/// LLMSpell REPL Protocol (LRP) request messages
+/// `LLMSpell` REPL Protocol (LRP) request messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "msg_type")]
 pub enum LRPRequest {
@@ -56,7 +56,7 @@ pub enum LRPRequest {
         /// Stop execution on error
         stop_on_error: bool,
     },
-    
+
     /// Code completion request
     CompleteRequest {
         /// Code context
@@ -64,7 +64,7 @@ pub enum LRPRequest {
         /// Cursor position in code
         cursor_pos: usize,
     },
-    
+
     /// Object inspection request
     InspectRequest {
         /// Code context
@@ -74,7 +74,7 @@ pub enum LRPRequest {
         /// Level of detail (0 or 1)
         detail_level: u8,
     },
-    
+
     /// History request
     HistoryRequest {
         /// Output format
@@ -96,21 +96,21 @@ pub enum LRPRequest {
         /// Unique history entries only
         unique: bool,
     },
-    
+
     /// Kernel info request
     KernelInfoRequest,
-    
+
     /// Shutdown request
     ShutdownRequest {
         /// Whether to restart after shutdown
         restart: bool,
     },
-    
+
     /// Interrupt request
     InterruptRequest,
 }
 
-/// LLMSpell REPL Protocol (LRP) response messages
+/// `LLMSpell` REPL Protocol (LRP) response messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "msg_type")]
 pub enum LRPResponse {
@@ -125,7 +125,7 @@ pub enum LRPResponse {
         /// Payload for special actions
         payload: Option<Vec<serde_json::Value>>,
     },
-    
+
     /// Completion reply
     CompleteReply {
         /// List of completions
@@ -139,7 +139,7 @@ pub enum LRPResponse {
         /// Completion status
         status: String,
     },
-    
+
     /// Inspection reply
     InspectReply {
         /// Inspection status
@@ -151,13 +151,13 @@ pub enum LRPResponse {
         /// Metadata
         metadata: Option<serde_json::Value>,
     },
-    
+
     /// History reply
     HistoryReply {
         /// History entries
         history: Vec<HistoryEntry>,
     },
-    
+
     /// Kernel info reply
     KernelInfoReply {
         /// Protocol version
@@ -175,13 +175,13 @@ pub enum LRPResponse {
         /// Available help links
         help_links: Vec<HelpLink>,
     },
-    
+
     /// Shutdown reply
     ShutdownReply {
         /// Whether kernel will restart
         restart: bool,
     },
-    
+
     /// Interrupt reply
     InterruptReply,
 }
@@ -227,7 +227,7 @@ pub struct HelpLink {
     pub url: String,
 }
 
-/// LLMSpell Debug Protocol (LDP) request messages
+/// `LLMSpell` Debug Protocol (LDP) request messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "msg_type")]
 pub enum LDPRequest {
@@ -244,25 +244,25 @@ pub enum LDPRequest {
         /// Ignore count
         ignore_count: Option<u32>,
     },
-    
+
     /// Remove breakpoint request
     RemoveBreakpointRequest {
         /// Breakpoint ID
         breakpoint_id: String,
     },
-    
+
     /// Step request (step into)
     StepRequest,
-    
+
     /// Next request (step over)
     NextRequest,
-    
+
     /// Continue request
     ContinueRequest,
-    
+
     /// Pause request
     PauseRequest,
-    
+
     /// Get variables request
     VariablesRequest {
         /// Stack frame ID
@@ -274,7 +274,7 @@ pub enum LDPRequest {
         /// Count
         count: Option<u32>,
     },
-    
+
     /// Get stack trace request
     StackTraceRequest {
         /// Thread ID
@@ -284,7 +284,7 @@ pub enum LDPRequest {
         /// Levels to retrieve
         levels: Option<u32>,
     },
-    
+
     /// Evaluate expression request
     EvaluateRequest {
         /// Expression to evaluate
@@ -296,7 +296,7 @@ pub enum LDPRequest {
     },
 }
 
-/// LLMSpell Debug Protocol (LDP) response messages
+/// `LLMSpell` Debug Protocol (LDP) response messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "msg_type")]
 pub enum LDPResponse {
@@ -309,40 +309,40 @@ pub enum LDPResponse {
         /// Actual line where breakpoint was set
         line: u32,
     },
-    
+
     /// Remove breakpoint reply
     RemoveBreakpointReply {
         /// Success status
         success: bool,
     },
-    
+
     /// Step reply
     StepReply {
         /// New location after step
         location: Location,
     },
-    
+
     /// Next reply
     NextReply {
         /// New location after next
         location: Location,
     },
-    
+
     /// Continue reply
     ContinueReply,
-    
+
     /// Pause reply
     PauseReply {
         /// Location where paused
         location: Location,
     },
-    
+
     /// Variables reply
     VariablesReply {
         /// List of variables
         variables: Vec<Variable>,
     },
-    
+
     /// Stack trace reply
     StackTraceReply {
         /// Stack frames
@@ -350,7 +350,7 @@ pub enum LDPResponse {
         /// Total frames available
         total_frames: Option<u32>,
     },
-    
+
     /// Evaluate reply
     EvaluateReply {
         /// Evaluation result

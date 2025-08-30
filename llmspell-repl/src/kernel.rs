@@ -1,16 +1,20 @@
 //! Core kernel service implementation
 //!
-//! The LLMSpellKernel wraps the ScriptRuntime from llmspell-bridge and provides
+//! The `LLMSpellKernel` wraps the `ScriptRuntime` from llmspell-bridge and provides
 //! multi-client debugging and REPL capabilities.
 
-use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use uuid::Uuid;
 use anyhow::Result;
+use llmspell_bridge::ScriptRuntime;
+use llmspell_config::LLMSpellConfig;
+use std::sync::Arc;
+use tokio::sync::{oneshot, Mutex, RwLock};
+use uuid::Uuid;
 
-use crate::channels::KernelChannels;
-use crate::client::ConnectedClient;
+use crate::channels::{IOPubMessage, KernelChannels};
+use crate::client::{ClientManager, ConnectedClient};
+use crate::connection::ConnectionInfo;
+use crate::protocol::LRPResponse;
+use crate::security::SecurityManager;
 
 /// Kernel execution state
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -38,6 +42,12 @@ pub struct KernelConfig {
     pub debug_enabled: bool,
     /// Maximum number of clients
     pub max_clients: usize,
+    /// Script engine to use (lua, javascript)
+    pub engine: String,
+    /// `LLMSpell` runtime configuration
+    pub runtime_config: LLMSpellConfig,
+    /// Enable authentication
+    pub auth_enabled: bool,
 }
 
 impl Default for KernelConfig {
@@ -48,6 +58,33 @@ impl Default for KernelConfig {
             port_range_start: 5555,
             debug_enabled: false,
             max_clients: 10,
+            engine: "lua".to_string(),
+            runtime_config: LLMSpellConfig::default(),
+            auth_enabled: false,
+        }
+    }
+}
+
+/// Resource limits per client
+#[derive(Debug, Clone)]
+pub struct ClientResourceLimits {
+    /// Maximum execution time in seconds
+    pub max_execution_time: u64,
+    /// Maximum memory usage in bytes
+    pub max_memory_bytes: usize,
+    /// Maximum concurrent executions
+    pub max_concurrent_executions: usize,
+    /// Rate limit (requests per minute)
+    pub rate_limit_per_minute: u32,
+}
+
+impl Default for ClientResourceLimits {
+    fn default() -> Self {
+        Self {
+            max_execution_time: 60,              // 1 minute
+            max_memory_bytes: 100 * 1024 * 1024, // 100MB
+            max_concurrent_executions: 5,
+            rate_limit_per_minute: 60,
         }
     }
 }
@@ -56,23 +93,36 @@ impl Default for KernelConfig {
 pub struct LLMSpellKernel {
     /// Unique kernel identifier
     pub kernel_id: String,
-    
-    // Script runtime will be integrated from llmspell-bridge
-    // For now, using placeholder to allow compilation
-    // pub runtime: Arc<llmspell_bridge::ScriptRuntime>,
-    
-    /// Connected clients
-    pub clients: Arc<RwLock<HashMap<String, ConnectedClient>>>,
-    
+
+    /// Script runtime from llmspell-bridge
+    pub runtime: Arc<Mutex<ScriptRuntime>>,
+
+    /// Client manager
+    pub client_manager: Arc<ClientManager>,
+
     /// Communication channels
-    pub channels: KernelChannels,
-    
+    pub channels: Arc<KernelChannels>,
+
     /// Current execution state
     pub execution_state: Arc<RwLock<KernelState>>,
-    
+
     /// Kernel configuration
     pub config: KernelConfig,
-    
+
+    /// Connection information
+    pub connection_info: ConnectionInfo,
+
+    /// Security manager
+    pub security_manager: Arc<SecurityManager>,
+
+    /// Resource limits per client
+    pub resource_limits: ClientResourceLimits,
+
+    /// Execution counter for tracking
+    pub execution_count: Arc<Mutex<u32>>,
+
+    /// Shutdown signal sender
+    shutdown_tx: Option<oneshot::Sender<()>>,
     // Debug components will be added in Phase 9.2
     // pub debugger: Arc<Debugger>,
     // pub profiler: Arc<PerformanceProfiler>,
@@ -81,105 +131,344 @@ pub struct LLMSpellKernel {
 
 impl LLMSpellKernel {
     /// Start a new kernel with the given configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kernel initialization fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if `kernel_id` is None after generation (should never happen)
     pub async fn start(mut config: KernelConfig) -> Result<Self> {
         // Generate kernel ID if not provided
         if config.kernel_id.is_none() {
             config.kernel_id = Some(Uuid::new_v4().to_string());
         }
         let kernel_id = config.kernel_id.clone().unwrap();
-        
-        tracing::info!("Starting LLMSpell kernel {}", kernel_id);
-        
-        // Script runtime will be created from llmspell-bridge
-        // let runtime = Arc::new(llmspell_bridge::ScriptRuntime::new().await?);
-        
+
+        tracing::info!(
+            "Starting LLMSpell kernel {} with engine {}",
+            kernel_id,
+            config.engine
+        );
+
+        // Create script runtime from llmspell-bridge
+        let runtime =
+            ScriptRuntime::new_with_engine_name(&config.engine, config.runtime_config.clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
+
         // Initialize channels
-        let channels = KernelChannels::new(&config.ip, config.port_range_start).await?;
-        
+        let channels = Arc::new(KernelChannels::new(&config.ip, config.port_range_start).await?);
+
+        // Create connection info
+        let connection_info = ConnectionInfo::new(
+            kernel_id.clone(),
+            config.ip.clone(),
+            config.port_range_start,
+        );
+
+        // Write connection file
+        connection_info.write_connection_file().await?;
+
+        // Create security manager
+        let security_manager = Arc::new(SecurityManager::new(
+            connection_info.key.clone(),
+            config.auth_enabled,
+        ));
+
+        // Create client manager
+        let client_manager = Arc::new(ClientManager::new(config.max_clients));
+
+        // Create shutdown channel
+        let (shutdown_tx, _shutdown_rx) = oneshot::channel();
+
         // Create kernel instance
         let kernel = Self {
             kernel_id: kernel_id.clone(),
-            // runtime will be added when integrating with llmspell-bridge
-            clients: Arc::new(RwLock::new(HashMap::new())),
+            runtime: Arc::new(Mutex::new(runtime)),
+            client_manager,
             channels,
             execution_state: Arc::new(RwLock::new(KernelState::Starting)),
-            config,
+            config: config.clone(),
+            connection_info,
+            security_manager,
+            resource_limits: ClientResourceLimits::default(),
+            execution_count: Arc::new(Mutex::new(0)),
+            shutdown_tx: Some(shutdown_tx),
         };
-        
+
         // Set state to idle
         *kernel.execution_state.write().await = KernelState::Idle;
-        
+
         tracing::info!("Kernel {} started successfully", kernel_id);
         Ok(kernel)
     }
-    
+
     /// Run the kernel event loop
-    pub async fn run(&mut self) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event loop fails
+    pub async fn run(mut self) -> Result<()> {
         tracing::info!("Kernel {} entering main event loop", self.kernel_id);
-        
+
         // Start channel listeners
-        self.channels.start_listeners().await?;
-        
-        // Main event loop will be implemented to handle:
-        // - Shell channel requests (execute, complete, inspect, etc.)
-        // - Control channel commands (interrupt, shutdown, etc.)
-        // - Stdin channel input requests
-        // - Heartbeat monitoring
-        // - Broadcasting to IOPub channel
-        
-        // For now, just wait for shutdown signal
-        tokio::signal::ctrl_c().await?;
-        
+        self.channels.start_listeners()?;
+
+        // Extract shutdown receiver
+        let (shutdown_tx, shutdown_rx) = oneshot::channel();
+        let old_tx = self.shutdown_tx.replace(shutdown_tx);
+        drop(old_tx); // Drop the old unused sender
+
+        // Create a ctrl-c handler
+        let ctrl_c = tokio::signal::ctrl_c();
+
+        // Main event loop
+        tokio::select! {
+            // Wait for shutdown signal
+            _ = shutdown_rx => {
+                tracing::info!("Kernel {} received shutdown signal", self.kernel_id);
+            }
+            // Wait for Ctrl+C
+            _ = ctrl_c => {
+                tracing::info!("Kernel {} received Ctrl+C signal", self.kernel_id);
+            }
+        }
+
+        // Shutdown the kernel
+        self.shutdown().await?;
         Ok(())
     }
-    
+
     /// Shutdown the kernel gracefully
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if shutdown fails
     pub async fn shutdown(self) -> Result<()> {
         tracing::info!("Shutting down kernel {}", self.kernel_id);
-        
+
         // Set state to stopping
         *self.execution_state.write().await = KernelState::Stopping;
-        
+
         // Disconnect all clients
-        let clients = self.clients.write().await;
-        for (client_id, _client) in clients.iter() {
-            tracing::info!("Disconnecting client {}", client_id);
+        let all_clients = self.client_manager.get_all_clients().await;
+        for client in all_clients {
+            tracing::info!("Disconnecting client {}", client.client_id);
+            self.client_manager.remove_client(&client.client_id).await;
         }
-        drop(clients);
-        
+
         // Stop channels
-        self.channels.stop().await?;
-        
-        // Clean up resources
-        // TODO: Remove connection file
-        
+        self.channels.stop()?;
+
+        // Remove connection file
+        self.connection_info.remove_connection_file().await?;
+
+        // Send shutdown signal if receiver exists
+        if let Some(tx) = self.shutdown_tx {
+            let _ = tx.send(());
+        }
+
         tracing::info!("Kernel {} shutdown complete", self.kernel_id);
         Ok(())
     }
-    
+
     /// Add a new client connection
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if adding the client fails
     pub async fn add_client(&self, client: ConnectedClient) -> Result<()> {
-        let mut clients = self.clients.write().await;
-        
-        if clients.len() >= self.config.max_clients {
-            anyhow::bail!("Maximum number of clients ({}) reached", self.config.max_clients);
+        // Check authentication if enabled
+        if self.config.auth_enabled {
+            // Client should have been authenticated before adding
+            // This is handled by the connection handler
         }
-        
-        let client_id = client.client_id.clone();
-        clients.insert(client_id.clone(), client);
-        
-        tracing::info!("Client {} connected to kernel {}", client_id, self.kernel_id);
+
+        self.client_manager.add_client(client.clone()).await?;
+
+        // Broadcast client connection to IOPub
+        self.channels.iopub.publish(IOPubMessage::Status {
+            execution_state: "idle".to_string(),
+        })?;
+
+        tracing::info!(
+            "Client {} connected to kernel {}",
+            client.client_id,
+            self.kernel_id
+        );
         Ok(())
     }
-    
+
     /// Remove a client connection
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if removing the client fails
     pub async fn remove_client(&self, client_id: &str) -> Result<()> {
-        let mut clients = self.clients.write().await;
-        
-        if clients.remove(client_id).is_some() {
-            tracing::info!("Client {} disconnected from kernel {}", client_id, self.kernel_id);
+        if let Some(client) = self.client_manager.remove_client(client_id).await {
+            tracing::info!(
+                "Client {} disconnected from kernel {}",
+                client.client_id,
+                self.kernel_id
+            );
         }
-        
         Ok(())
+    }
+
+    /// Execute code for a client with resource limits
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if code execution fails
+    pub async fn execute_code(
+        &self,
+        _client_id: &str,
+        code: String,
+        silent: bool,
+    ) -> Result<LRPResponse> {
+        // Update execution state
+        *self.execution_state.write().await = KernelState::Busy;
+
+        // Increment execution counter
+        let execution_count = {
+            let mut count = self.execution_count.lock().await;
+            *count += 1;
+            *count
+        };
+
+        // Broadcast busy status
+        if !silent {
+            self.channels.iopub.publish(IOPubMessage::Status {
+                execution_state: "busy".to_string(),
+            })?;
+        }
+
+        // Execute code with timeout
+        let timeout_duration =
+            tokio::time::Duration::from_secs(self.resource_limits.max_execution_time);
+
+        let runtime = self.runtime.lock().await;
+        let result = tokio::time::timeout(timeout_duration, runtime.execute_script(&code)).await;
+        drop(runtime);
+
+        // Handle result
+        let response = match result {
+            Ok(Ok(output)) => {
+                // Broadcast output if not silent
+                if !silent {
+                    self.channels.iopub.publish(IOPubMessage::ExecuteResult {
+                        execution_count,
+                        data: serde_json::json!({
+                            "text/plain": format!("{:?}", output.output)
+                        }),
+                    })?;
+                }
+
+                LRPResponse::ExecuteReply {
+                    status: "ok".to_string(),
+                    execution_count,
+                    user_expressions: None,
+                    payload: None,
+                }
+            }
+            Ok(Err(e)) => {
+                // Execution error
+                if !silent {
+                    self.channels.iopub.publish(IOPubMessage::Error {
+                        ename: "ExecutionError".to_string(),
+                        evalue: e.to_string(),
+                        traceback: vec![e.to_string()],
+                    })?;
+                }
+
+                LRPResponse::ExecuteReply {
+                    status: "error".to_string(),
+                    execution_count,
+                    user_expressions: None,
+                    payload: None,
+                }
+            }
+            Err(_) => {
+                // Timeout
+                if !silent {
+                    self.channels.iopub.publish(IOPubMessage::Error {
+                        ename: "TimeoutError".to_string(),
+                        evalue: format!(
+                            "Execution exceeded {} seconds",
+                            self.resource_limits.max_execution_time
+                        ),
+                        traceback: vec![],
+                    })?;
+                }
+
+                LRPResponse::ExecuteReply {
+                    status: "error".to_string(),
+                    execution_count,
+                    user_expressions: None,
+                    payload: None,
+                }
+            }
+        };
+
+        // Update execution state back to idle
+        *self.execution_state.write().await = KernelState::Idle;
+
+        // Broadcast idle status
+        if !silent {
+            self.channels.iopub.publish(IOPubMessage::Status {
+                execution_state: "idle".to_string(),
+            })?;
+        }
+
+        Ok(response)
+    }
+
+    /// Get kernel information
+    #[must_use]
+    pub fn get_kernel_info(&self) -> LRPResponse {
+        use crate::protocol::{HelpLink, LanguageInfo};
+
+        LRPResponse::KernelInfoReply {
+            protocol_version: "1.0".to_string(),
+            implementation: "llmspell".to_string(),
+            implementation_version: env!("CARGO_PKG_VERSION").to_string(),
+            language_info: LanguageInfo {
+                name: self.config.engine.clone(),
+                version: "1.0".to_string(),
+                mimetype: match self.config.engine.as_str() {
+                    "lua" => "text/x-lua",
+                    "javascript" => "text/javascript",
+                    _ => "text/plain",
+                }
+                .to_string(),
+                file_extension: match self.config.engine.as_str() {
+                    "lua" => ".lua",
+                    "javascript" => ".js",
+                    _ => ".txt",
+                }
+                .to_string(),
+                pygments_lexer: Some(self.config.engine.clone()),
+                codemirror_mode: Some(self.config.engine.clone()),
+                nbconvert_exporter: None,
+            },
+            banner: format!(
+                "LLMSpell Kernel v{} - {}",
+                env!("CARGO_PKG_VERSION"),
+                self.config.engine
+            ),
+            debugger: self.config.debug_enabled,
+            help_links: vec![HelpLink {
+                text: "LLMSpell Documentation".to_string(),
+                url: "https://github.com/lexlapax/rs-llmspell".to_string(),
+            }],
+        }
+    }
+
+    /// Check if kernel can accept more clients
+    pub async fn can_accept_client(&self) -> bool {
+        let current_clients = self.client_manager.get_all_clients().await;
+        current_clients.len() < self.config.max_clients
     }
 }
