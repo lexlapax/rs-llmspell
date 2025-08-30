@@ -8,7 +8,7 @@
 
 ---
 
-> **📝 Note**: rs-llmspell builds upon concepts from numerous open-source projects and owes special acknowledgment to [go-llms](https://github.com/lexlapax/go-llms), which was instrumental in rapidly prototyping early ideas. This Rust implementation supersedes go-llms, leveraging Rust's native compilation and zero-cost abstractions for production-grade performance and safety.
+> **📝 Note**: rs-llmspell builds upon concepts from numerous open-source projects and owes special acknowledgment to [go-llms](https://github.com/lexlapax/go-llms), which was instrumental in rapidly prototyping early ideas. This Rust implementation supersedes go-llms, leveraging Rust's native compilation and zero-cost abstractions for production-grade performance and safety. It stands on the shoulder of giants in the rust ecosystem.. callout to rig and candle (in the recent future. and tokio is your friend, rustlers.)
 
 ---
 
