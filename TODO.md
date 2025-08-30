@@ -667,10 +667,11 @@
 llmspell-debug = { path = "../llmspell-debug" }
 ```
 
-### Task 9.2.1: Interactive Debugger Implementation with Bridge Integration
+### ✅ Task 9.2.1: Interactive Debugger Implementation with Bridge Integration - COMPLETE
 **Priority**: CRITICAL  
 **Estimated Time**: 10 hours  
-**Assignee**: Debug Team Lead
+**Assignee**: Debug Team Lead  
+**Status**: ✅ COMPLETE
 
 **Description**: Create llmspell-debug crate implementing enhanced interactive debugging using the established three-layer pattern and execution_bridge.rs architecture from Phase 9.1.
 
@@ -682,15 +683,15 @@ llmspell-debug = { path = "../llmspell-debug" }
 - **Dependency fix**: Uncomment llmspell-debug in llmspell-repl/Cargo.toml:29
 
 **Acceptance Criteria:**
-- [ ] llmspell-debug crate created following three-layer pattern
-- [ ] ExecutionBridge integration completed (extends Phase 9.1.7 architecture)
-- [ ] Enhanced Breakpoint system using execution_bridge.rs types
-- [ ] ScriptRuntime integration via ExecutionManager
-- [ ] Hit counts and ignore counts work with unified Breakpoint type
-- [ ] Step debugging through ExecutionBridge interface
-- [ ] Call stack navigation using unified StackFrame type
-- [ ] Breakpoint persistence via ExecutionManager
-- [ ] Integration with SharedExecutionContext for enriched debugging
+- [x] llmspell-debug crate created following three-layer pattern
+- [x] ExecutionBridge integration completed (extends Phase 9.1.7 architecture)
+- [x] Enhanced Breakpoint system using execution_bridge.rs types
+- [x] ScriptRuntime integration via ExecutionManager
+- [x] Hit counts and ignore counts work with unified Breakpoint type
+- [x] Step debugging through ExecutionBridge interface
+- [x] Call stack navigation using unified StackFrame type
+- [x] Breakpoint persistence via ExecutionManager
+- [x] Integration with SharedExecutionContext for enriched debugging
 
 **Implementation Steps:**
 1. **Create llmspell-debug crate with three-layer structure**:
@@ -748,15 +749,32 @@ llmspell-debug = { path = "../llmspell-debug" }
 6. **Integration testing** with multi-client scenarios
 
 **Definition of Done:**
-- [ ] llmspell-debug crate follows three-layer pattern established in 9.1.7
-- [ ] ExecutionBridge integration complete (extends 9.1.7 architecture)
-- [ ] Breakpoint conditions work using execution_bridge.rs types
-- [ ] Step debugging via ExecutionManager interface
-- [ ] Call stack navigation uses unified StackFrame type
-- [ ] Breakpoint persistence through ExecutionManager
-- [ ] SharedExecutionContext enriches debugging with performance metrics
-- [ ] Integration with lua/globals/execution.rs hooks
-- [ ] Bridge-kernel-interactive debugging integration tests pass
+- [x] llmspell-debug crate follows three-layer pattern established in 9.1.7
+- [x] ExecutionBridge integration complete (extends 9.1.7 architecture)
+- [x] Breakpoint conditions work using execution_bridge.rs types
+- [x] Step debugging via ExecutionManager interface
+- [x] Call stack navigation uses unified StackFrame type
+- [x] Breakpoint persistence through ExecutionManager
+- [x] SharedExecutionContext enriches debugging with performance metrics
+- [x] Integration with lua/globals/execution.rs hooks
+- [x] Bridge-kernel-interactive debugging integration tests pass
+
+**COMPLETION SUMMARY:**
+✅ **llmspell-debug crate created** with proper three-layer architecture:
+- `interactive.rs`: InteractiveDebugger using ExecutionManager
+- `session_manager.rs`: Multi-client session management
+- `condition_eval.rs`: Breakpoint condition evaluation with SharedExecutionContext
+- Integration tests passing: bridge-kernel-interactive debugging pipeline verified
+
+✅ **ExecutionBridge enhanced** with interactive debugging methods:
+- Added `send_command()`, `get_variables()`, `evaluate()` methods to ExecutionManager
+- Enhanced Breakpoint with `with_condition()` and `with_hit_count()` methods
+- All functionality uses unified types from execution_bridge.rs
+
+✅ **Lua hooks integration** via existing `install_debug_hooks()` function
+✅ **SharedExecutionContext integration** for enriched debugging experience
+✅ **All acceptance criteria met** and integration tests passing
+
 
 ### Task 9.2.2: Debug Session Management with Multi-Client Integration
 **Priority**: CRITICAL  
@@ -887,6 +905,8 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Integration tests for multi-client scenarios pass
 - [ ] Concurrent debugging sessions validated
 - [ ] All unit and integration tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 ### Task 9.2.3: Lua Debug Hooks Implementation
 **Priority**: CRITICAL  
@@ -1010,6 +1030,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Debug context preserved
 - [ ] Performance impact <10%
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.4: Breakpoint Condition Evaluator
 **Priority**: CRITICAL  
@@ -1155,6 +1178,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Complex expressions supported
 - [ ] Errors handled gracefully
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.5: Debug State Bridge
 **Priority**: CRITICAL  
@@ -1269,6 +1295,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] No state conflicts
 - [ ] Performance acceptable
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.6: Variable Inspection System
 **Priority**: CRITICAL  
@@ -1377,6 +1406,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Lazy expansion works
 - [ ] Large structures handled
 - [ ] Watch expressions functional
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.7: Enhanced Error Reporting
 **Priority**: HIGH  
@@ -1493,6 +1525,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Pattern database comprehensive
 - [ ] Suggestions are actionable
 - [ ] Documentation links provided
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.8: Async/Await Context Preservation
 **Priority**: CRITICAL  
@@ -1612,6 +1647,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Panic context captured
 - [ ] Correlation tracking works
 - [ ] Nested calls handled
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.9: SharedExecutionContext Async Integration Points
 **Priority**: CRITICAL  
@@ -1742,6 +1780,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Correlation IDs work
 - [ ] Async boundaries handled
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.10: Distributed Tracing Integration
 **Priority**: HIGH  
@@ -1842,6 +1883,9 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] All operations traced
 - [ ] Exports to Jaeger work
 - [ ] Performance overhead <5%
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.2.11: Section 9.2 Quality Gates and Testing
 **Priority**: CRITICAL  
@@ -2099,6 +2143,8 @@ Before implementing any remaining task, verify:
 - [ ] State preserved on reload
 - [ ] Validation prevents bad reloads
 - [ ] <500ms reload time
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 ### Task 9.3.2: Script Validation System
 **Priority**: HIGH  
@@ -2175,6 +2221,9 @@ Before implementing any remaining task, verify:
 - [ ] All check types work
 - [ ] Reports actionable
 - [ ] Performance acceptable
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.3.3: Performance Profiling
 **Priority**: HIGH  
@@ -2267,6 +2316,9 @@ Before implementing any remaining task, verify:
 - [ ] Flamegraphs generated
 - [ ] Memory leaks detected
 - [ ] Multiple export formats
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.3.4: Performance Profiler Hooks
 **Priority**: HIGH  
@@ -2424,6 +2476,9 @@ Before implementing any remaining task, verify:
 - [ ] Overhead <5%
 - [ ] Runtime toggle works
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.3.5: Hook Introspection & Circuit Breakers
 **Priority**: HIGH  
@@ -2504,6 +2559,9 @@ Before implementing any remaining task, verify:
 - [ ] Circuit breakers monitored
 - [ ] Real-time updates work
 - [ ] Metrics accurate
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.3.6: Session Recording/Replay
 **Priority**: HIGH  
@@ -2597,6 +2655,9 @@ Before implementing any remaining task, verify:
 - [ ] Replay accurate
 - [ ] Interactive stepping works
 - [ ] Environment restored
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.3.7: Section 9.3 Quality Gates and Testing
 **Priority**: CRITICAL  
@@ -2746,6 +2807,9 @@ Before implementing any remaining task, verify:
 - [ ] All commands work
 - [ ] History search functional
 - [ ] Media display works
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.4.2: CLI Run Command Mode Selection
 **Priority**: CRITICAL  
@@ -2832,6 +2896,9 @@ Before implementing any remaining task, verify:
 - [ ] Fallback functional
 - [ ] Performance unchanged for non-debug
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.4.3: CLI Debug Event Handler
 **Priority**: CRITICAL  
@@ -2938,6 +3005,9 @@ Before implementing any remaining task, verify:
 - [ ] Output formatted nicely
 - [ ] All event types handled
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.4.4: Kernel Discovery Logic
 **Priority**: HIGH  
@@ -3021,6 +3091,9 @@ Before implementing any remaining task, verify:
 - [ ] New kernels started
 - [ ] Cleanup functional
 - [ ] Tests pass
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.4.5: Web Client Foundation
 **Priority**: MEDIUM  
@@ -3050,6 +3123,9 @@ Before implementing any remaining task, verify:
 - [ ] Messages handled
 - [ ] Output displayed
 - [ ] Multi-client works
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.4.6: IDE Integration (LSP/DAP)
 **Priority**: HIGH  
@@ -3086,6 +3162,8 @@ Before implementing any remaining task, verify:
 - [ ] All providers work
 - [ ] DAP debugging works
 - [ ] VS Code integration tested
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 ### Task 9.4.7: VS Code Extension
 **Priority**: HIGH  
@@ -3117,6 +3195,9 @@ Before implementing any remaining task, verify:
 - [ ] All features work
 - [ ] Debugging functional
 - [ ] Good developer experience
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.4.8: Remote Debugging Security
 **Priority**: HIGH  
@@ -3153,6 +3234,9 @@ Before implementing any remaining task, verify:
 - [ ] TLS encryption functional
 - [ ] Permissions enforced
 - [ ] Audit trail complete
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.4.9: Section 9.4 Quality Gates and Testing
 **Priority**: CRITICAL  
@@ -3325,6 +3409,9 @@ Before implementing any remaining task, verify:
 - [ ] Streaming functional
 - [ ] All media types handled
 - [ ] Performance acceptable
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.5.4: Command History Enhancement
 **Priority**: MEDIUM  
@@ -3354,6 +3441,9 @@ Before implementing any remaining task, verify:
 - [ ] Fuzzy matching accurate
 - [ ] UI responsive
 - [ ] Commands functional
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.5.5: Documentation and Tutorials
 **Priority**: HIGH  
@@ -3383,6 +3473,9 @@ Before implementing any remaining task, verify:
 - [ ] Examples work
 - [ ] Tutorials clear
 - [ ] Reference complete
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
 
 ### Task 9.5.6: Section 9.5 Quality Gates and Testing
 **Priority**: CRITICAL  

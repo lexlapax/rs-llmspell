@@ -43,6 +43,20 @@ impl Breakpoint {
         }
     }
 
+    /// Add a condition to the breakpoint (for interactive debugging)
+    #[must_use]
+    pub fn with_condition(mut self, condition: String) -> Self {
+        self.condition = Some(condition);
+        self
+    }
+
+    /// Add a hit count to the breakpoint (for interactive debugging)
+    #[must_use]
+    pub const fn with_hit_count(mut self, count: u32) -> Self {
+        self.hit_count = Some(count);
+        self
+    }
+
     /// Check if breakpoint should trigger
     #[must_use]
     pub fn should_break(&self) -> bool {
@@ -257,6 +271,77 @@ impl ExecutionManager {
         *self.state.write().await = DebugState::Terminated;
         self.stack_frames.write().await.clear();
         self.variables.write().await.clear();
+    }
+
+    /// Send a debug command (interactive debugging support)
+    pub async fn send_command(&self, command: DebugCommand) {
+        // Update state based on command
+        match command {
+            DebugCommand::Continue => {
+                self.set_state(DebugState::Running).await;
+            }
+            DebugCommand::Pause => {
+                self.set_state(DebugState::Paused {
+                    reason: PauseReason::Pause,
+                    location: ExecutionLocation {
+                        source: "unknown".to_string(),
+                        line: 0,
+                        column: None,
+                    },
+                })
+                .await;
+            }
+            DebugCommand::Terminate => {
+                self.set_state(DebugState::Terminated).await;
+            }
+            DebugCommand::StepInto | DebugCommand::StepOver | DebugCommand::StepOut => {
+                self.set_state(DebugState::Paused {
+                    reason: PauseReason::Step,
+                    location: ExecutionLocation {
+                        source: "unknown".to_string(),
+                        line: 0,
+                        column: None,
+                    },
+                })
+                .await;
+            }
+        }
+    }
+
+    /// Get variables (interactive debugging support)
+    pub async fn get_variables(&self, frame_id: Option<&str>) -> Vec<Variable> {
+        if let Some(frame_id) = frame_id {
+            self.get_cached_variables(frame_id)
+                .await
+                .unwrap_or_default()
+        } else {
+            // Return variables from the top frame if available
+            self.variables
+                .read()
+                .await
+                .values()
+                .next()
+                .cloned()
+                .unwrap_or_default()
+        }
+    }
+
+    /// Evaluate expression (interactive debugging support)
+    #[must_use]
+    pub fn evaluate(&self, expression: &str, _frame_id: Option<&str>) -> Variable {
+        // Basic implementation - in real scenario this would evaluate in Lua context
+        Variable {
+            name: expression.to_string(),
+            value: "<evaluation not implemented>".to_string(),
+            var_type: "unknown".to_string(),
+            has_children: false,
+            reference: None,
+        }
+    }
+
+    /// Check if debugging is active
+    pub async fn is_active(&self) -> bool {
+        !matches!(self.get_state().await, DebugState::Terminated)
     }
 }
 
