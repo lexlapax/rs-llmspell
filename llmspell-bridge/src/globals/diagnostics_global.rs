@@ -1,44 +1,44 @@
-//! Debug global object implementation for script engines
+//! Diagnostics global object implementation for script engines
 //!
-//! Provides unified debug infrastructure access across all script languages.
+//! Provides unified diagnostics infrastructure (logging, profiling, metrics) access across all script languages.
 
 use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
-use crate::debug_bridge::DebugBridge;
+use crate::diagnostics_bridge::DiagnosticsBridge;
 use llmspell_core::Result;
 use std::sync::Arc;
 
-/// Debug global object for script engines
-pub struct DebugGlobal {
-    bridge: Arc<DebugBridge>,
+/// Diagnostics global object for script engines
+pub struct DiagnosticsGlobal {
+    bridge: Arc<DiagnosticsBridge>,
 }
 
-impl DebugGlobal {
-    /// Create a new Debug global
+impl DiagnosticsGlobal {
+    /// Create a new Diagnostics global
     #[must_use]
     pub fn new() -> Self {
         Self {
-            bridge: Arc::new(DebugBridge::new()),
+            bridge: Arc::new(DiagnosticsBridge::new()),
         }
     }
 
-    /// Get the debug bridge
+    /// Get the diagnostics bridge
     #[must_use]
-    pub const fn bridge(&self) -> &Arc<DebugBridge> {
+    pub const fn bridge(&self) -> &Arc<DiagnosticsBridge> {
         &self.bridge
     }
 }
 
-impl Default for DebugGlobal {
+impl Default for DiagnosticsGlobal {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl GlobalObject for DebugGlobal {
+impl GlobalObject for DiagnosticsGlobal {
     fn metadata(&self) -> GlobalMetadata {
         GlobalMetadata {
-            name: "Debug".to_string(),
-            description: "Debug infrastructure for logging, profiling, and troubleshooting"
+            name: "Console".to_string(),
+            description: "Diagnostics infrastructure for logging, profiling, and troubleshooting"
                 .to_string(),
             dependencies: vec![],
             required: false, // Debug is optional
@@ -48,12 +48,11 @@ impl GlobalObject for DebugGlobal {
 
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
-        crate::lua::globals::debug::inject_debug_global(lua, context, &self.bridge).map_err(|e| {
-            llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Debug global: {e}"),
+        crate::lua::globals::diagnostics::inject_diagnostics_global(lua, context, &self.bridge)
+            .map_err(|e| llmspell_core::LLMSpellError::Component {
+                message: format!("Failed to inject Console global: {e}"),
                 source: None,
-            }
-        })
+            })
     }
 
     #[cfg(feature = "javascript")]

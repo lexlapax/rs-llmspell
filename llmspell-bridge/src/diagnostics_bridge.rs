@@ -1,7 +1,7 @@
-//! Debug bridge for script engines
+//! Diagnostics bridge for script engines
 //!
 //! Provides a unified interface for all script engines to access
-//! the centralized debug infrastructure.
+//! the centralized diagnostics infrastructure (logging, profiling, metrics).
 
 use llmspell_utils::debug::{global_debug_manager, DebugEntry, DebugLevel, PerformanceTracker};
 use parking_lot::Mutex;
@@ -11,17 +11,17 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
-/// Debug bridge that script engines interact with
+/// Diagnostics bridge that script engines interact with for logging and profiling
 #[derive(Clone)]
-pub struct DebugBridge {
+pub struct DiagnosticsBridge {
     /// Reference to the global debug manager
     manager: Arc<llmspell_utils::debug::DebugManager>,
     /// Active performance trackers by ID (using interior mutability)
     trackers: Arc<Mutex<HashMap<String, Arc<PerformanceTracker>>>>,
 }
 
-impl DebugBridge {
-    /// Create a new debug bridge
+impl DiagnosticsBridge {
+    /// Create a new diagnostics bridge
     #[must_use]
     pub fn new() -> Self {
         Self {
@@ -271,24 +271,24 @@ impl DebugBridge {
     pub fn stack_trace_options_for_level(
         &self,
         level: &str,
-    ) -> crate::lua::stacktrace::StackTraceOptions {
+    ) -> crate::lua::output::StackTraceOptions {
         match level {
-            "trace" => crate::lua::stacktrace::StackTraceOptions::for_trace(),
-            "error" => crate::lua::stacktrace::StackTraceOptions::for_error(),
-            _ => crate::lua::stacktrace::StackTraceOptions::default(),
+            "trace" => crate::lua::output::StackTraceOptions::for_trace(),
+            "error" => crate::lua::output::StackTraceOptions::for_error(),
+            _ => crate::lua::output::StackTraceOptions::default(),
         }
     }
 }
 
-impl Default for DebugBridge {
+impl Default for DiagnosticsBridge {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl fmt::Debug for DebugBridge {
+impl fmt::Debug for DiagnosticsBridge {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("DebugBridge")
+        f.debug_struct("DiagnosticsBridge")
             .field("enabled", &self.is_enabled())
             .field("level", &self.get_level())
             .field("tracker_count", &self.trackers.lock().len())
@@ -344,11 +344,11 @@ impl TimerHandle {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use super::DiagnosticsBridge;
 
     #[test]
     fn test_debug_bridge_logging() {
-        let bridge = DebugBridge::new();
+        let bridge = DiagnosticsBridge::new();
 
         // Test basic logging
         bridge.log("info", "Test message", Some("test_module"));
@@ -360,7 +360,7 @@ mod tests {
 
     #[test]
     fn test_debug_bridge_timer() {
-        let bridge = DebugBridge::new();
+        let bridge = DiagnosticsBridge::new();
 
         // Start a timer
         let timer_id = bridge.start_timer("test_timer");
@@ -383,7 +383,7 @@ mod tests {
 
     #[test]
     fn test_debug_bridge_configuration() {
-        let bridge = DebugBridge::new();
+        let bridge = DiagnosticsBridge::new();
 
         // Test level setting
         assert!(bridge.set_level("debug"));
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn test_module_filters() {
-        let bridge = DebugBridge::new();
+        let bridge = DiagnosticsBridge::new();
 
         // Add filters
         bridge.add_module_filter("workflow", true);
@@ -413,7 +413,7 @@ mod tests {
 
     #[test]
     fn test_value_dumping() {
-        let bridge = DebugBridge::new();
+        let bridge = DiagnosticsBridge::new();
 
         let value = serde_json::json!({
             "key": "value",

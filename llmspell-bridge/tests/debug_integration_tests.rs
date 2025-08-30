@@ -3,9 +3,9 @@
 //! Tests the complete debug system including Lua globals, bridge layer,
 //! and core Rust infrastructure.
 
-use llmspell_bridge::debug_bridge::DebugBridge;
+use llmspell_bridge::diagnostics_bridge::DiagnosticsBridge;
 use llmspell_bridge::globals::GlobalContext;
-use llmspell_bridge::lua::globals::debug::inject_debug_global;
+use llmspell_bridge::lua::globals::diagnostics::inject_diagnostics_global;
 use llmspell_bridge::{ComponentRegistry, ProviderManager};
 use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_utils::debug::{global_debug_manager, DebugLevel};
@@ -17,12 +17,12 @@ use tokio::sync::{Mutex, MutexGuard};
 static TEST_MUTEX: Mutex<()> = Mutex::const_new(());
 
 /// Helper to create a test Lua environment with debug globals
-async fn create_test_lua() -> LuaResult<(Lua, Arc<DebugBridge>, MutexGuard<'static, ()>)> {
+async fn create_test_lua() -> LuaResult<(Lua, Arc<DiagnosticsBridge>, MutexGuard<'static, ()>)> {
     // Acquire test mutex to ensure serial execution and state isolation
     let guard = TEST_MUTEX.lock().await;
 
     let lua = Lua::new();
-    let bridge = Arc::new(DebugBridge::new());
+    let bridge = Arc::new(DiagnosticsBridge::new());
 
     // AGGRESSIVE state reset - the global debug manager is shared across tests
     let global_manager = global_debug_manager();
@@ -49,7 +49,7 @@ async fn create_test_lua() -> LuaResult<(Lua, Arc<DebugBridge>, MutexGuard<'stat
     let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
     let context = GlobalContext::new(registry, providers);
 
-    inject_debug_global(&lua, &context, &bridge)?;
+    inject_diagnostics_global(&lua, &context, &bridge)?;
 
     Ok((lua, bridge, guard))
 }
@@ -61,11 +61,11 @@ async fn test_basic_debug_logging() -> LuaResult<()> {
     // Test basic logging from Lua
     lua.load(
         r#"
-        Debug.info("Test info message", "test.module")
-        Debug.warn("Test warning message", "test.module")
-        Debug.error("Test error message", "test.module")
-        Debug.debug("Test debug message", "test.module")
-        Debug.trace("Test trace message", "test.module")
+        Console.info("Test info message", "test.module")
+        Console.warn("Test warning message", "test.module")
+        Console.error("Test error message", "test.module")
+        Console.debug("Test debug message", "test.module")
+        Console.trace("Test trace message", "test.module")
     "#,
     )
     .exec()?;
@@ -97,7 +97,7 @@ async fn test_performance_timing() -> LuaResult<()> {
     let duration: f64 = lua
         .load(
             r#"
-        local timer = Debug.timer("test_operation")
+        local timer = Console.timer("test_operation")
         
         -- Simulate some work
         local sum = 0
@@ -127,7 +127,7 @@ async fn test_timer_laps() -> LuaResult<()> {
     let success: bool = lua
         .load(
             r#"
-        local timer = Debug.timer("lap_test")
+        local timer = Console.timer("lap_test")
         
         -- Record some laps
         timer:lap("stage1")
@@ -152,16 +152,16 @@ async fn test_module_filtering() -> LuaResult<()> {
     // Add filter to only allow workflow modules
     lua.load(
         r#"
-        Debug.clearModuleFilters()
-        Debug.addModuleFilter("workflow.*", true)
-        Debug.setDefaultFilterEnabled(false)  -- Deny all except workflow
+        Console.clearModuleFilters()
+        Console.addModuleFilter("workflow.*", true)
+        Console.setDefaultFilterEnabled(false)  -- Deny all except workflow
         
         -- These should be logged
-        Debug.info("Workflow message 1", "workflow.step1")
-        Debug.info("Workflow message 2", "workflow.step2")
+        Console.info("Workflow message 1", "workflow.step1")
+        Console.info("Workflow message 2", "workflow.step2")
         
         -- This should NOT be logged due to filtering
-        Debug.info("Agent message", "agent.executor")
+        Console.info("Agent message", "agent.executor")
     "#,
     )
     .exec()?;
@@ -200,7 +200,7 @@ async fn test_metadata_logging() -> LuaResult<()> {
     // Test logging with metadata
     lua.load(
         r#"
-        Debug.logWithData("info", "Operation completed", {
+        Console.logWithData("info", "Operation completed", {
             duration_ms = 150,
             items_processed = 42,
             success = true
@@ -240,7 +240,7 @@ async fn test_object_dumping() -> LuaResult<()> {
             }
         }
         
-        return Debug.dump(test_data, "test_object")
+        return Console.dump(test_data, "test_object")
     "#,
         )
         .eval()?;
@@ -273,7 +273,7 @@ async fn test_compact_dump() -> LuaResult<()> {
         .load(
             r"
         local data = {a = 1, b = 2, c = {d = 3}}
-        return Debug.dumpCompact(data)
+        return Console.dumpCompact(data)
     ",
         )
         .eval()?;
@@ -282,7 +282,7 @@ async fn test_compact_dump() -> LuaResult<()> {
         .load(
             r"
         local data = {a = 1, b = 2, c = {d = 3}}
-        return Debug.dumpVerbose(data)
+        return Console.dumpVerbose(data)
     ",
         )
         .eval()?;
@@ -304,7 +304,7 @@ async fn test_stack_trace_collection() -> LuaResult<()> {
         .load(
             r"
         local function level3()
-            return Debug.stackTrace()
+            return Console.stackTrace()
         end
         
         local function level2()
@@ -346,7 +346,7 @@ async fn test_stack_trace_with_options() -> LuaResult<()> {
         .load(
             r"
         local function test_function()
-            return Debug.stackTraceJson({
+            return Console.stackTraceJson({
                 max_depth = 5,
                 capture_locals = false,
                 include_source = true
@@ -374,17 +374,17 @@ async fn test_debug_level_control() -> LuaResult<()> {
     // Test level setting
     lua.load(
         r#"
-        Debug.setLevel("warn")
-        local level = Debug.getLevel()
+        Console.setLevel("warn")
+        local level = Console.getLevel()
         assert(level == "WARN", "Level should be WARN")
         
-        Debug.setEnabled(false)
-        local enabled = Debug.isEnabled()
-        assert(enabled == false, "Debug should be disabled")
+        Console.setEnabled(false)
+        local enabled = Console.isEnabled()
+        assert(enabled == false, "Console should be disabled")
         
-        Debug.setEnabled(true)
-        local enabled2 = Debug.isEnabled()
-        assert(enabled2 == true, "Debug should be enabled")
+        Console.setEnabled(true)
+        local enabled2 = Console.isEnabled()
+        assert(enabled2 == true, "Console should be enabled")
     "#,
     )
     .exec()?;
@@ -405,16 +405,16 @@ async fn test_performance_reports() -> LuaResult<()> {
         .load(
             r#"
         -- Create some timers to generate data
-        local timer1 = Debug.timer("operation1")
+        local timer1 = Console.timer("operation1")
         timer1:stop()
         
-        local timer2 = Debug.timer("operation2")
+        local timer2 = Console.timer("operation2")
         timer2:lap("checkpoint1")
         timer2:stop()
         
         -- Generate reports
-        local text_report = Debug.performanceReport()
-        local json_report = Debug.jsonReport()
+        local text_report = Console.performanceReport()
+        local json_report = Console.jsonReport()
         
         return text_report, json_report
     "#,
@@ -440,7 +440,7 @@ async fn test_memory_stats() -> LuaResult<()> {
     let stats_valid: bool = lua
         .load(
             r#"
-        local stats = Debug.memoryStats()
+        local stats = Console.memoryStats()
         
         -- Check that we get numeric values
         return type(stats.used_bytes) == "number" and
@@ -463,12 +463,12 @@ async fn test_event_recording() -> LuaResult<()> {
     let success: bool = lua
         .load(
             r#"
-        local timer = Debug.timer("event_test")
+        local timer = Console.timer("event_test")
         
         -- Record some events
-        local success1 = Debug.recordEvent(timer.id, "start", {step = 1})
-        local success2 = Debug.recordEvent(timer.id, "middle", {step = 2})
-        local success3 = Debug.recordEvent(timer.id, "end", {step = 3})
+        local success1 = Console.recordEvent(timer.id, "start", {step = 1})
+        local success2 = Console.recordEvent(timer.id, "middle", {step = 2})
+        local success3 = Console.recordEvent(timer.id, "end", {step = 3})
         
         timer:stop()
         
@@ -492,7 +492,7 @@ async fn test_captured_entries_management() -> LuaResult<()> {
     lua.load(
         r#"
         for i = 1, 10 do
-            Debug.info("Test message " .. i, "test.capture")
+            Console.info("Test message " .. i, "test.capture")
         end
     "#,
     )
@@ -502,7 +502,7 @@ async fn test_captured_entries_management() -> LuaResult<()> {
     let limited_entries: mlua::Table = lua
         .load(
             r"
-        return Debug.getCapturedEntries(5)
+        return Console.getCapturedEntries(5)
     ",
         )
         .eval()?;
@@ -513,7 +513,7 @@ async fn test_captured_entries_management() -> LuaResult<()> {
     // Test clearing entries
     lua.load(
         r"
-        Debug.clearCaptured()
+        Console.clearCaptured()
     ",
     )
     .exec()?;
@@ -536,13 +536,13 @@ async fn test_filter_summary() -> LuaResult<()> {
         .load(
             r#"
         -- Clear and add specific filters
-        Debug.clearModuleFilters()
-        Debug.clearModuleFilters()  -- Extra clear for safety
+        Console.clearModuleFilters()
+        Console.clearModuleFilters()  -- Extra clear for safety
         
-        Debug.addModuleFilter("test.*", true)
-        Debug.addModuleFilter("debug.*", false)
+        Console.addModuleFilter("test.*", true)
+        Console.addModuleFilter("debug.*", false)
         
-        local summary = Debug.getFilterSummary()
+        local summary = Console.getFilterSummary()
         return summary.default_enabled, summary.total_rules
     "#,
         )
@@ -567,12 +567,12 @@ async fn test_advanced_filter_patterns() -> LuaResult<()> {
     // Test advanced regex pattern
     lua.load(
         r#"
-        Debug.clearModuleFilters()
-        Debug.addAdvancedFilter("^test\\..*", "regex", true)
-        Debug.setDefaultFilterEnabled(false)
+        Console.clearModuleFilters()
+        Console.addAdvancedFilter("^test\\..*", "regex", true)
+        Console.setDefaultFilterEnabled(false)
         
-        Debug.info("Should be logged", "test.module")
-        Debug.info("Should NOT be logged", "other.module")
+        Console.info("Should be logged", "test.module")
+        Console.info("Should NOT be logged", "other.module")
     "#,
     )
     .exec()?;
@@ -599,8 +599,8 @@ async fn test_advanced_filter_patterns() -> LuaResult<()> {
 
 #[test]
 fn test_debug_bridge_integration() {
-    // Test that the bridge correctly interfaces with the Rust debug manager
-    let bridge = DebugBridge::new();
+    // Test that the bridge correctly interfaces with the Rust diagnostics manager
+    let bridge = DiagnosticsBridge::new();
 
     // Test level setting
     assert!(bridge.set_level("debug"));

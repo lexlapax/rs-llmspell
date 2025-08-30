@@ -1,19 +1,20 @@
-//! Lua-specific Debug global implementation
+//! Lua-specific Diagnostics global implementation (exposed as Console)
 //!
-//! Provides comprehensive debugging capabilities for Lua scripts including
+//! Provides comprehensive diagnostics capabilities for Lua scripts including
 //! logging, performance profiling, and diagnostic utilities.
 
-use crate::debug_bridge::DebugBridge;
+use crate::diagnostics_bridge::DiagnosticsBridge;
 use crate::globals::GlobalContext;
-use crate::lua::object_dump::{dump_labeled_value, dump_value, DumpOptions};
-use crate::lua::stacktrace::{capture_stack_trace, StackTraceOptions};
+use crate::lua::output::{
+    capture_stack_trace, dump_labeled_value, dump_value, DumpOptions, StackTraceOptions,
+};
 use llmspell_utils::debug::FilterPattern;
 use mlua::{Lua, UserData, UserDataFields, UserDataMethods, Value};
 use std::sync::Arc;
 
 /// Timer handle for Lua
 struct LuaTimer {
-    bridge: Arc<DebugBridge>,
+    bridge: Arc<DiagnosticsBridge>,
     id: String,
 }
 
@@ -39,7 +40,7 @@ impl UserData for LuaTimer {
     }
 }
 
-/// Inject Debug global into Lua environment
+/// Inject Console global into Lua environment (diagnostics)
 ///
 /// # Errors
 ///
@@ -47,14 +48,14 @@ impl UserData for LuaTimer {
 /// - Lua table creation fails
 /// - Function binding fails
 #[allow(clippy::too_many_lines)]
-pub fn inject_debug_global(
+pub fn inject_diagnostics_global(
     lua: &Lua,
     _context: &GlobalContext,
-    bridge: &Arc<DebugBridge>,
+    bridge: &Arc<DiagnosticsBridge>,
 ) -> mlua::Result<()> {
-    let debug_table = lua.create_table()?;
+    let console_table = lua.create_table()?;
 
-    // Debug.log(level, message, [module])
+    // Console.log(message) or Console.log(level, message, [module])
     let bridge_clone = bridge.clone();
     let log_fn = lua.create_function(
         move |_, (level, message, module): (String, String, Option<String>)| {
@@ -62,7 +63,7 @@ pub fn inject_debug_global(
             Ok(())
         },
     )?;
-    debug_table.set("log", log_fn)?;
+    console_table.set("log", log_fn)?;
 
     // Debug.trace(message, [module])
     let bridge_clone = bridge.clone();
@@ -70,7 +71,7 @@ pub fn inject_debug_global(
         bridge_clone.log("trace", &message, module.as_deref());
         Ok(())
     })?;
-    debug_table.set("trace", trace_fn)?;
+    console_table.set("trace", trace_fn)?;
 
     // Debug.debug(message, [module])
     let bridge_clone = bridge.clone();
@@ -78,7 +79,7 @@ pub fn inject_debug_global(
         bridge_clone.log("debug", &message, module.as_deref());
         Ok(())
     })?;
-    debug_table.set("debug", debug_fn)?;
+    console_table.set("debug", debug_fn)?;
 
     // Debug.info(message, [module])
     let bridge_clone = bridge.clone();
@@ -86,7 +87,7 @@ pub fn inject_debug_global(
         bridge_clone.log("info", &message, module.as_deref());
         Ok(())
     })?;
-    debug_table.set("info", info_fn)?;
+    console_table.set("info", info_fn)?;
 
     // Debug.warn(message, [module])
     let bridge_clone = bridge.clone();
@@ -94,7 +95,7 @@ pub fn inject_debug_global(
         bridge_clone.log("warn", &message, module.as_deref());
         Ok(())
     })?;
-    debug_table.set("warn", warn_fn)?;
+    console_table.set("warn", warn_fn)?;
 
     // Debug.error(message, [module])
     let bridge_clone = bridge.clone();
@@ -102,7 +103,7 @@ pub fn inject_debug_global(
         bridge_clone.log("error", &message, module.as_deref());
         Ok(())
     })?;
-    debug_table.set("error", error_fn)?;
+    console_table.set("error", error_fn)?;
 
     // Debug.logWithData(level, message, data, [module])
     let bridge_clone = bridge.clone();
@@ -114,7 +115,7 @@ pub fn inject_debug_global(
             Ok(())
         },
     )?;
-    debug_table.set("logWithData", log_with_data_fn)?;
+    console_table.set("logWithData", log_with_data_fn)?;
 
     // Debug.timer(name) - returns a timer object
     let bridge_clone = bridge.clone();
@@ -128,18 +129,18 @@ pub fn inject_debug_global(
 
         Ok(timer)
     })?;
-    debug_table.set("timer", timer_fn)?;
+    console_table.set("timer", timer_fn)?;
 
     // Debug.setLevel(level)
     let bridge_clone = bridge.clone();
     let set_level_fn =
         lua.create_function(move |_, level: String| Ok(bridge_clone.set_level(&level)))?;
-    debug_table.set("setLevel", set_level_fn)?;
+    console_table.set("setLevel", set_level_fn)?;
 
     // Debug.getLevel()
     let bridge_clone = bridge.clone();
     let get_level_fn = lua.create_function(move |_, ()| Ok(bridge_clone.get_level()))?;
-    debug_table.set("getLevel", get_level_fn)?;
+    console_table.set("getLevel", get_level_fn)?;
 
     // Debug.setEnabled(enabled)
     let bridge_clone = bridge.clone();
@@ -147,12 +148,12 @@ pub fn inject_debug_global(
         bridge_clone.set_enabled(enabled);
         Ok(())
     })?;
-    debug_table.set("setEnabled", set_enabled_fn)?;
+    console_table.set("setEnabled", set_enabled_fn)?;
 
     // Debug.isEnabled()
     let bridge_clone = bridge.clone();
     let is_enabled_fn = lua.create_function(move |_, ()| Ok(bridge_clone.is_enabled()))?;
-    debug_table.set("isEnabled", is_enabled_fn)?;
+    console_table.set("isEnabled", is_enabled_fn)?;
 
     // Debug.addModuleFilter(pattern, enabled)
     let bridge_clone = bridge.clone();
@@ -160,7 +161,7 @@ pub fn inject_debug_global(
         bridge_clone.add_module_filter(&pattern, enabled);
         Ok(())
     })?;
-    debug_table.set("addModuleFilter", add_filter_fn)?;
+    console_table.set("addModuleFilter", add_filter_fn)?;
 
     // Debug.clearModuleFilters()
     let bridge_clone = bridge.clone();
@@ -168,14 +169,14 @@ pub fn inject_debug_global(
         bridge_clone.clear_module_filters();
         Ok(())
     })?;
-    debug_table.set("clearModuleFilters", clear_filters_fn)?;
+    console_table.set("clearModuleFilters", clear_filters_fn)?;
 
     // Debug.removeModuleFilter(pattern)
     let bridge_clone = bridge.clone();
     let remove_filter_fn = lua.create_function(move |_, pattern: String| {
         Ok(bridge_clone.remove_module_filter(&pattern))
     })?;
-    debug_table.set("removeModuleFilter", remove_filter_fn)?;
+    console_table.set("removeModuleFilter", remove_filter_fn)?;
 
     // Debug.setDefaultFilterEnabled(enabled)
     let bridge_clone = bridge.clone();
@@ -183,7 +184,7 @@ pub fn inject_debug_global(
         bridge_clone.set_default_filter_enabled(enabled);
         Ok(())
     })?;
-    debug_table.set("setDefaultFilterEnabled", set_default_fn)?;
+    console_table.set("setDefaultFilterEnabled", set_default_fn)?;
 
     // Debug.addAdvancedFilter(pattern, pattern_type, enabled)
     let bridge_clone = bridge.clone();
@@ -192,7 +193,7 @@ pub fn inject_debug_global(
             Ok(bridge_clone.add_filter_rule(&pattern, &pattern_type, enabled))
         },
     )?;
-    debug_table.set("addAdvancedFilter", add_advanced_filter_fn)?;
+    console_table.set("addAdvancedFilter", add_advanced_filter_fn)?;
 
     // Debug.getFilterSummary()
     let bridge_clone = bridge.clone();
@@ -228,7 +229,7 @@ pub fn inject_debug_global(
 
         Ok(table)
     })?;
-    debug_table.set("getFilterSummary", filter_summary_fn)?;
+    console_table.set("getFilterSummary", filter_summary_fn)?;
 
     // Debug.getCapturedEntries([limit])
     let bridge_clone = bridge.clone();
@@ -252,7 +253,7 @@ pub fn inject_debug_global(
         }
         Ok(table)
     })?;
-    debug_table.set("getCapturedEntries", get_entries_fn)?;
+    console_table.set("getCapturedEntries", get_entries_fn)?;
 
     // Debug.clearCaptured()
     let bridge_clone = bridge.clone();
@@ -260,13 +261,13 @@ pub fn inject_debug_global(
         bridge_clone.clear_captured();
         Ok(())
     })?;
-    debug_table.set("clearCaptured", clear_captured_fn)?;
+    console_table.set("clearCaptured", clear_captured_fn)?;
 
     // Debug.performanceReport()
     let bridge_clone = bridge.clone();
     let perf_report_fn =
         lua.create_function(move |_, ()| Ok(bridge_clone.generate_performance_report()))?;
-    debug_table.set("performanceReport", perf_report_fn)?;
+    console_table.set("performanceReport", perf_report_fn)?;
 
     // Debug.dump(value, [label]) - Enhanced Lua-specific dumping
     let dump_fn = lua.create_function(move |_lua, (value, label): (Value, Option<String>)| {
@@ -276,7 +277,7 @@ pub fn inject_debug_global(
             |label_str| Ok(dump_labeled_value(&value, &label_str, &options)),
         )
     })?;
-    debug_table.set("dump", dump_fn)?;
+    console_table.set("dump", dump_fn)?;
 
     // Debug.dumpCompact(value, [label]) - Compact one-liner format
     let dump_compact_fn =
@@ -287,7 +288,7 @@ pub fn inject_debug_global(
                 |label_str| Ok(dump_labeled_value(&value, &label_str, &options)),
             )
         })?;
-    debug_table.set("dumpCompact", dump_compact_fn)?;
+    console_table.set("dumpCompact", dump_compact_fn)?;
 
     // Debug.dumpVerbose(value, [label]) - Detailed inspection format
     let dump_verbose_fn =
@@ -298,7 +299,7 @@ pub fn inject_debug_global(
                 |label_str| Ok(dump_labeled_value(&value, &label_str, &options)),
             )
         })?;
-    debug_table.set("dumpVerbose", dump_verbose_fn)?;
+    console_table.set("dumpVerbose", dump_verbose_fn)?;
 
     // Debug.dumpWithOptions(value, options, [label]) - Fully configurable
     let dump_with_options_fn = lua.create_function(
@@ -320,7 +321,7 @@ pub fn inject_debug_global(
             )
         },
     )?;
-    debug_table.set("dumpWithOptions", dump_with_options_fn)?;
+    console_table.set("dumpWithOptions", dump_with_options_fn)?;
 
     // Debug.memoryStats()
     let bridge_clone = bridge.clone();
@@ -334,7 +335,7 @@ pub fn inject_debug_global(
         table.set("collections", stats.collections)?;
         Ok(table)
     })?;
-    debug_table.set("memoryStats", mem_stats_fn)?;
+    console_table.set("memoryStats", mem_stats_fn)?;
 
     // Debug.jsonReport()
     let bridge_clone = bridge.clone();
@@ -343,13 +344,13 @@ pub fn inject_debug_global(
             Ok(json) => Ok(json),
             Err(e) => Err(mlua::Error::RuntimeError(e)),
         })?;
-    debug_table.set("jsonReport", json_report_fn)?;
+    console_table.set("jsonReport", json_report_fn)?;
 
     // Debug.flameGraph()
     let bridge_clone = bridge.clone();
     let flame_graph_fn =
         lua.create_function(move |_, ()| Ok(bridge_clone.generate_flame_graph()))?;
-    debug_table.set("flameGraph", flame_graph_fn)?;
+    console_table.set("flameGraph", flame_graph_fn)?;
 
     // Debug.memorySnapshot()
     let bridge_clone = bridge.clone();
@@ -382,7 +383,7 @@ pub fn inject_debug_global(
 
         Ok(table)
     })?;
-    debug_table.set("memorySnapshot", memory_snapshot_fn)?;
+    console_table.set("memorySnapshot", memory_snapshot_fn)?;
 
     // Debug.recordEvent(timer_id, event_name, [metadata])
     let bridge_clone = bridge.clone();
@@ -397,7 +398,7 @@ pub fn inject_debug_global(
             Ok(bridge_clone.record_event(&timer_id, &event_name, json_metadata))
         },
     )?;
-    debug_table.set("recordEvent", record_event_fn)?;
+    console_table.set("recordEvent", record_event_fn)?;
 
     // Debug.stackTrace([options])
     let bridge_clone = bridge.clone();
@@ -415,7 +416,7 @@ pub fn inject_debug_global(
         let trace = capture_stack_trace(lua, &trace_options);
         Ok(trace.format())
     })?;
-    debug_table.set("stackTrace", stack_trace_fn)?;
+    console_table.set("stackTrace", stack_trace_fn)?;
 
     // Debug.stackTraceJson([options])
     let bridge_clone = bridge.clone();
@@ -438,10 +439,10 @@ pub fn inject_debug_global(
             ))),
         }
     })?;
-    debug_table.set("stackTraceJson", stack_trace_json_fn)?;
+    console_table.set("stackTraceJson", stack_trace_json_fn)?;
 
-    // Set the Debug global
-    lua.globals().set("Debug", debug_table)?;
+    // Set the Console global (diagnostics)
+    lua.globals().set("Console", console_table)?;
 
     Ok(())
 }

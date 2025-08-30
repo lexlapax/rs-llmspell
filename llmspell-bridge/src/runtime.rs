@@ -3,6 +3,9 @@
 
 use crate::{
     engine::{EngineFactory, JSConfig, LuaConfig, ScriptEngineBridge, ScriptOutput, ScriptStream},
+    execution_bridge::{
+        Breakpoint, DebugCommand, DebugState, ExecutionManager, StackFrame, Variable,
+    },
     providers::ProviderManager,
     registry::ComponentRegistry,
     tools::register_all_tools,
@@ -98,6 +101,8 @@ pub struct ScriptRuntime {
     execution_context: Arc<RwLock<crate::engine::ExecutionContext>>,
     /// Runtime configuration
     _config: LLMSpellConfig,
+    /// Execution manager for debugging support
+    execution_manager: Option<Arc<ExecutionManager>>,
 }
 
 impl ScriptRuntime {
@@ -228,6 +233,7 @@ impl ScriptRuntime {
             provider_manager,
             execution_context,
             _config: config,
+            execution_manager: None,
         })
     }
 
@@ -342,6 +348,109 @@ impl ScriptRuntime {
             *ctx = context;
         } // Explicitly drop the lock here
         Ok(())
+    }
+
+    // Debug interface methods
+
+    /// Set a debugger instance for the runtime
+    pub fn set_debugger(&mut self, debugger: &Arc<ExecutionManager>) {
+        self.execution_manager = Some(debugger.clone());
+        // TODO: Propagate to engine when engine supports it
+    }
+
+    /// Get the debugger instance if available
+    #[must_use]
+    pub fn get_debugger(&self) -> Option<Arc<ExecutionManager>> {
+        self.execution_manager.clone()
+    }
+
+    /// Set breakpoints for debugging
+    pub async fn set_breakpoints(&mut self, breakpoints: Vec<Breakpoint>) -> Vec<Breakpoint> {
+        if let Some(ref execution_manager) = self.execution_manager {
+            // Clear existing breakpoints
+            execution_manager.clear().await;
+
+            // Add new breakpoints
+            let mut verified_breakpoints = Vec::new();
+            for bp in breakpoints {
+                let id = execution_manager.add_breakpoint(bp.clone()).await;
+                let mut verified = bp;
+                verified.id = id;
+                verified_breakpoints.push(verified);
+            }
+
+            // TODO: Propagate to engine when engine supports it
+            verified_breakpoints
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get current debug state
+    pub async fn get_debug_state(&self) -> DebugState {
+        if let Some(ref execution_manager) = self.execution_manager {
+            execution_manager.get_state().await
+        } else {
+            DebugState::Terminated
+        }
+    }
+
+    /// Get stack trace during debugging
+    pub async fn get_stack_trace(&self) -> Vec<StackFrame> {
+        if let Some(ref execution_manager) = self.execution_manager {
+            execution_manager.get_stack_trace().await
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Get variables in current or specified frame
+    pub async fn get_variables(&self, frame_id: Option<&str>) -> Vec<Variable> {
+        if let Some(ref execution_manager) = self.execution_manager {
+            if let Some(frame_id) = frame_id {
+                execution_manager
+                    .get_cached_variables(frame_id)
+                    .await
+                    .unwrap_or_default()
+            } else {
+                // Get variables from top frame
+                let frames = execution_manager.get_stack_trace().await;
+                if let Some(top_frame) = frames.first() {
+                    execution_manager
+                        .get_cached_variables(&top_frame.id)
+                        .await
+                        .unwrap_or_default()
+                } else {
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Send a debug command (continue, step, pause, etc.)
+    pub async fn send_debug_command(&self, command: DebugCommand) {
+        if let Some(ref execution_manager) = self.execution_manager {
+            match command {
+                DebugCommand::Continue => {
+                    execution_manager.set_state(DebugState::Running).await;
+                }
+                DebugCommand::Terminate => {
+                    execution_manager.set_state(DebugState::Terminated).await;
+                }
+                _ => {
+                    // Step commands and pause will be handled by the engine
+                }
+            }
+            // TODO: Propagate to engine when engine supports it
+        }
+    }
+
+    /// Check if debugging is supported and enabled
+    #[must_use]
+    pub fn supports_debugging(&self) -> bool {
+        self.engine.supported_features().debugging && self.execution_manager.is_some()
     }
 }
 

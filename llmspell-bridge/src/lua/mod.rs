@@ -5,9 +5,7 @@ pub mod conversion;
 pub mod engine;
 pub mod globals;
 pub mod hook_adapter;
-pub mod object_dump;
-pub mod output_capture;
-pub mod stacktrace;
+pub mod output;
 pub mod sync_utils;
 
 pub use engine::LuaEngine;

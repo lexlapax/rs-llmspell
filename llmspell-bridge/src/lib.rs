@@ -236,9 +236,11 @@
 // Core modules
 pub mod config_bridge;
 pub mod conversion;
-pub mod debug_bridge;
+pub mod diagnostics_bridge;
 pub mod discovery;
 pub mod engine;
+pub mod execution_bridge;
+pub mod execution_context;
 pub mod providers;
 pub mod providers_discovery;
 pub mod registry;

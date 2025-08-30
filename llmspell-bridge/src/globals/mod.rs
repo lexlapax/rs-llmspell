@@ -5,8 +5,9 @@ pub mod agent_global;
 pub mod artifact_global;
 pub mod config_global;
 pub mod core;
-pub mod debug_global;
+pub mod diagnostics_global;
 pub mod event_global;
+pub mod execution_global;
 pub mod hook_global;
 pub mod injection;
 pub mod json_global;
@@ -38,7 +39,7 @@ fn register_core_globals(builder: &mut GlobalRegistryBuilder) {
     builder.register(Arc::new(json_global::JsonGlobal::new()));
     builder.register(Arc::new(core::LoggerGlobal::new()));
     builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
-    builder.register(Arc::new(debug_global::DebugGlobal::new()));
+    builder.register(Arc::new(diagnostics_global::DiagnosticsGlobal::new()));
 }
 
 /// Register session and artifact globals if `SessionManager` is available

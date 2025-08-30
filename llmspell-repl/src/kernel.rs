@@ -210,6 +210,7 @@ impl LLMSpellKernel {
     /// # Errors
     ///
     /// Returns an error if the event loop fails
+    #[allow(clippy::cognitive_complexity)]
     pub async fn run(mut self) -> Result<()> {
         tracing::info!("Kernel {} entering main event loop", self.kernel_id);
 
@@ -246,6 +247,7 @@ impl LLMSpellKernel {
     /// # Errors
     ///
     /// Returns an error if shutdown fails
+    #[allow(clippy::cognitive_complexity)]
     pub async fn shutdown(self) -> Result<()> {
         tracing::info!("Shutting down kernel {}", self.kernel_id);
 

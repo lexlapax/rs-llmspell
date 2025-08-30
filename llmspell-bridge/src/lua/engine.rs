@@ -9,7 +9,7 @@ use crate::engine::{
     ScriptOutput, ScriptStream,
 };
 use crate::lua::globals::args::inject_args_global;
-use crate::lua::output_capture::{install_output_capture, ConsoleCapture};
+use crate::lua::output::{install_output_capture, ConsoleCapture};
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
@@ -35,6 +35,10 @@ pub struct LuaEngine {
     script_args: Option<std::collections::HashMap<String, String>>,
     #[cfg(feature = "lua")]
     console_capture: Option<Arc<ConsoleCapture>>,
+    #[cfg(feature = "lua")]
+    execution_hook:
+        Option<Arc<parking_lot::Mutex<crate::lua::globals::execution::LuaExecutionHook>>>,
+    execution_manager: Option<Arc<crate::execution_bridge::ExecutionManager>>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -70,14 +74,19 @@ impl LuaEngine {
                 runtime_config: None,
                 script_args: None,
                 console_capture,
+                execution_hook: None,
+                execution_manager: None,
             })
         }
 
         #[cfg(not(feature = "lua"))]
         {
-            Err(LLMSpellError::Component {
-                message: "Lua feature not enabled".to_string(),
-                source: None,
+            Ok(Self {
+                _config: config.clone(),
+                execution_context: ExecutionContext::default(),
+                runtime_config: None,
+                script_args: None,
+                debug_manager: None,
             })
         }
     }
@@ -89,7 +98,7 @@ impl LuaEngine {
             async_execution: true, // Via coroutines
             streaming: true,
             multimodal: true,
-            debugging: false, // Not implemented yet
+            debugging: true, // Now implemented!
             modules: true,
             max_script_size: Some(10_000_000),    // 10MB
             max_execution_time_ms: Some(300_000), // 5 minutes
@@ -99,6 +108,41 @@ impl LuaEngine {
     /// Set the runtime configuration
     pub fn set_runtime_config(&mut self, config: Arc<llmspell_config::LLMSpellConfig>) {
         self.runtime_config = Some(config);
+    }
+
+    /// Set a debugger for the engine
+    #[cfg(feature = "lua")]
+    pub fn set_debugger(
+        &mut self,
+        execution_manager: Arc<crate::execution_bridge::ExecutionManager>,
+    ) {
+        self.execution_manager = Some(execution_manager.clone());
+
+        // Install execution hooks in Lua
+        let lua_guard = self.lua.lock();
+        if let Ok(hook) =
+            crate::lua::globals::execution::install_debug_hooks(&lua_guard, execution_manager)
+        {
+            self.execution_hook = Some(hook);
+        }
+    }
+
+    /// Remove debugger from the engine
+    #[cfg(feature = "lua")]
+    pub fn remove_debugger(&mut self) {
+        self.execution_manager = None;
+        self.execution_hook = None;
+
+        // Remove execution hooks from Lua
+        crate::lua::globals::execution::remove_debug_hooks(&self.lua.lock());
+    }
+
+    /// Update breakpoints in the debugger
+    #[cfg(feature = "lua")]
+    pub fn set_breakpoints(&mut self, breakpoints: Vec<crate::execution_bridge::Breakpoint>) {
+        if let Some(ref execution_hook) = self.execution_hook {
+            execution_hook.lock().update_breakpoints(breakpoints);
+        }
     }
 }
 
