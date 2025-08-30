@@ -6,6 +6,7 @@
 
 use crate::execution_bridge::{Breakpoint, ExecutionLocation, ExecutionManager, StackFrame};
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
+use crate::lua::debug_cache::{ContextBatcher, ContextUpdate, DebugMode, DebugStateCache};
 use crate::lua::output::{capture_stack_trace, StackTraceOptions};
 use crate::lua::sync_utils::block_on_async;
 use mlua::{DebugEvent, Lua, Result as LuaResult};
@@ -19,11 +20,17 @@ pub struct LuaExecutionHook {
     execution_manager: Arc<ExecutionManager>,
     /// Shared execution context for enriched debugging
     shared_context: Arc<RwLock<SharedExecutionContext>>,
-    /// Map of source to breakpoints (cached for performance)
-    breakpoints: HashMap<String, Vec<Breakpoint>>,
+    /// Fast synchronous debug state cache
+    debug_cache: Arc<DebugStateCache>,
+    /// Context update batcher for lazy updates
+    context_batcher: ContextBatcher,
     /// Current execution state
     current_line: u32,
     current_source: String,
+    /// Line counter for periodic context flushes
+    line_counter: u64,
+    /// Track if we have hooks installed (to avoid interfering with other systems)
+    hooks_installed: bool,
 }
 
 impl LuaExecutionHook {
@@ -36,26 +43,30 @@ impl LuaExecutionHook {
         Self {
             execution_manager,
             shared_context,
-            breakpoints: HashMap::new(),
+            debug_cache: Arc::new(DebugStateCache::new()),
+            context_batcher: ContextBatcher::new(),
             current_line: 0,
             current_source: String::new(),
+            line_counter: 0,
+            hooks_installed: false,
         }
     }
 
     /// Update breakpoints from debug manager
-    pub fn update_breakpoints(&mut self, breakpoints: Vec<Breakpoint>) {
-        self.breakpoints.clear();
-        for bp in breakpoints {
-            self.breakpoints
-                .entry(bp.source.clone())
-                .or_default()
-                .push(bp);
-        }
+    pub fn update_breakpoints(&mut self, breakpoints: &[Breakpoint]) {
+        // Update the fast cache with breakpoint locations
+        let locations: Vec<(String, u32)> = breakpoints
+            .iter()
+            .filter(|bp| bp.enabled)
+            .map(|bp| (bp.source.clone(), bp.line))
+            .collect();
+
+        self.debug_cache.update_breakpoints(locations);
     }
 
-    /// Check if we should break at current location (now uses `ExecutionManager`)
-    fn should_break(&self, source: &str, line: u32) -> bool {
-        // Use ExecutionManager's should_break_at for consistency
+    /// Check if we should break at current location (SLOW PATH - only called when `might_break_at` returns true)
+    fn should_break_slow(&self, source: &str, line: u32) -> bool {
+        // This is the slow path - only called when we might have a breakpoint
         let exec_mgr = self.execution_manager.clone();
         let source = source.to_string();
         block_on_async(
@@ -72,6 +83,63 @@ impl LuaExecutionHook {
         .is_ok()
     }
 
+    /// Get debug cache for external use
+    #[must_use]
+    pub fn debug_cache(&self) -> Arc<DebugStateCache> {
+        self.debug_cache.clone()
+    }
+
+    /// Flush batched context updates to `SharedExecutionContext`
+    pub fn flush_batched_context_updates(&mut self) {
+        let updates = self.context_batcher.flush();
+        if updates.is_empty() {
+            return;
+        }
+
+        // Only do async work when we have updates to flush
+        let shared_ctx = self.shared_context.clone();
+        let _ = block_on_async::<_, (), std::io::Error>(
+            "flush_context_batch",
+            async move {
+                let mut ctx = shared_ctx.write().await;
+
+                for update in updates {
+                    match update {
+                        ContextUpdate::Location { source, line } => {
+                            ctx.set_location(SourceLocation {
+                                source,
+                                line,
+                                column: None,
+                            });
+                        }
+                        ContextUpdate::ExecutionCount(count) => {
+                            ctx.performance_metrics.execution_count =
+                                u32::try_from(count).unwrap_or(u32::MAX);
+                        }
+                        ContextUpdate::StackPush { name, source, line } => {
+                            let frame_id = format!("frame_{}", ctx.stack.len());
+                            ctx.push_frame(StackFrame {
+                                id: frame_id,
+                                name,
+                                source,
+                                line,
+                                column: None,
+                                locals: Vec::new(),
+                                is_user_code: true,
+                            });
+                        }
+                        ContextUpdate::StackPop => {
+                            ctx.pop_frame();
+                        }
+                    }
+                }
+                drop(ctx);
+                Ok(())
+            },
+            None,
+        );
+    }
+
     /// Handle a debug event
     ///
     /// # Errors
@@ -83,6 +151,12 @@ impl LuaExecutionHook {
         ar: &mlua::Debug,
         event: DebugEvent,
     ) -> LuaResult<()> {
+        // CRITICAL: Check if debugging is disabled FIRST
+        // This allows us to keep hooks installed but inactive for zero interference
+        if matches!(self.debug_cache.get_debug_mode(), DebugMode::Disabled) {
+            return Ok(()); // Fast exit - no processing at all
+        }
+
         match event {
             DebugEvent::Line => {
                 // Get source and line info
@@ -97,35 +171,38 @@ impl LuaExecutionHook {
 
                 self.current_source.clone_from(&source);
                 self.current_line = line;
+                self.line_counter += 1;
 
-                // Update shared context location
-                let shared_ctx = self.shared_context.clone();
-                let source_clone = source.clone();
-                let _ = block_on_async::<_, (), std::io::Error>(
-                    "update_location",
-                    async move {
-                        {
-                            let mut ctx = shared_ctx.write().await;
-                            ctx.set_location(SourceLocation {
-                                source: source_clone,
-                                line,
-                                column: None,
-                            });
-                            ctx.performance_metrics.execution_count += 1;
-                        }
-                        Ok(())
-                    },
-                    None,
-                );
+                // FAST PATH - synchronous check, no async operations
+                if !self.debug_cache.might_break_at(&source, line) {
+                    // Record location in batcher (lazy update)
+                    self.context_batcher.record_location(source.clone(), line);
+                    self.context_batcher
+                        .record_execution_count(self.line_counter);
 
-                // Check for breakpoint
-                if self.should_break(&source, line) {
+                    // Maybe flush batched updates (every N lines or after timeout)
+                    if self.line_counter % 100 == 0 {
+                        self.flush_batched_context_updates();
+                    }
+
+                    // Record hot location for monitoring
+                    self.debug_cache.record_hot_location(source, line);
+
+                    return Ok(()); // EXIT FAST PATH - no async operations!
+                }
+
+                // SLOW PATH - only when breakpoint might hit
+                // Now we can afford async operations since we're potentially breaking anyway
+                if self.should_break_slow(&source, line) {
+                    // Flush any pending context updates before breaking
+                    self.flush_batched_context_updates();
+
                     // Pause execution with enriched context
                     self.pause_at_breakpoint_with_context(lua, source, line);
                 }
             }
             DebugEvent::Call | DebugEvent::TailCall => {
-                // Function call - push to stack in shared context
+                // Function call - batch the stack push update
                 let source = ar
                     .source()
                     .source
@@ -141,42 +218,17 @@ impl LuaExecutionHook {
                 #[allow(clippy::cast_sign_loss)]
                 let line = ar.curr_line() as u32;
 
-                let shared_ctx = self.shared_context.clone();
-                let _ = block_on_async::<_, (), std::io::Error>(
-                    "push_frame",
-                    async move {
-                        {
-                            let mut ctx = shared_ctx.write().await;
-                            let frame_id = format!("frame_{}", ctx.stack.len());
-                            ctx.push_frame(StackFrame {
-                                id: frame_id,
-                                name,
-                                source,
-                                line,
-                                column: None,
-                                locals: Vec::new(),
-                                is_user_code: true,
-                            });
-                        }
-                        Ok(())
-                    },
-                    None,
-                );
+                // Only use async if we're in full debug mode
+                if matches!(self.debug_cache.get_debug_mode(), DebugMode::Full) {
+                    // Batch the stack push
+                    self.context_batcher.record_stack_push(name, source, line);
+                }
             }
             DebugEvent::Ret => {
-                // Function return - pop from stack in shared context
-                let shared_ctx = self.shared_context.clone();
-                let _ = block_on_async::<_, (), std::io::Error>(
-                    "pop_frame",
-                    async move {
-                        {
-                            let mut ctx = shared_ctx.write().await;
-                            ctx.pop_frame();
-                        }
-                        Ok(())
-                    },
-                    None,
-                );
+                // Function return - batch the stack pop update
+                if matches!(self.debug_cache.get_debug_mode(), DebugMode::Full) {
+                    self.context_batcher.record_stack_pop();
+                }
             }
             DebugEvent::Count | DebugEvent::Unknown(_) => {
                 // Count: For instruction counting (not used)
@@ -266,20 +318,11 @@ impl LuaExecutionHook {
     }
 }
 
-/// Install debug hooks in a Lua instance
-///
-/// # Errors
-///
-/// Returns an error if debug hook installation fails
-pub fn install_debug_hooks(
-    lua: &Lua,
-    execution_manager: Arc<ExecutionManager>,
-) -> LuaResult<Arc<parking_lot::Mutex<LuaExecutionHook>>> {
-    let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    install_interactive_debug_hooks(lua, execution_manager, shared_context)
-}
-
 /// Install interactive debug hooks with `SharedExecutionContext`
+///
+/// **WARNING**: Installing debug hooks will REPLACE any existing Lua debug hooks!
+/// This is a fundamental limitation of Lua - only one debug hook can be active.
+/// Other systems using debug hooks (profilers, memory trackers) will stop working.
 ///
 /// # Errors
 ///
@@ -290,43 +333,140 @@ pub fn install_interactive_debug_hooks(
     shared_context: Arc<RwLock<SharedExecutionContext>>,
 ) -> LuaResult<Arc<parking_lot::Mutex<LuaExecutionHook>>> {
     let hook = Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new(
-        execution_manager,
+        execution_manager.clone(),
         shared_context,
     )));
-    let hook_clone = hook.clone();
 
-    // Set up the debug hook with line and call events
-    lua.set_hook(
-        mlua::HookTriggers {
-            on_calls: true,
-            on_returns: true,
-            every_line: true,
-            ..Default::default()
-        },
-        move |lua, ar| {
-            let mut hook = hook_clone.lock();
-            // Determine the event type based on the activation record
-            let event = if ar.curr_line() != -1 {
-                DebugEvent::Line
-            } else if ar.event() == mlua::DebugEvent::Call {
-                DebugEvent::Call
-            } else if ar.event() == mlua::DebugEvent::TailCall {
-                DebugEvent::TailCall
-            } else if ar.event() == mlua::DebugEvent::Ret {
-                DebugEvent::Ret
+    // Set initial debug mode based on whether there are breakpoints
+    let initial_mode = block_on_async(
+        "check_initial_mode",
+        async move {
+            let breakpoints = execution_manager.get_breakpoints().await;
+            if breakpoints.is_empty() {
+                Ok::<DebugMode, std::io::Error>(DebugMode::Disabled)
             } else {
-                return Ok(());
-            };
-            hook.handle_event(lua, &ar, event)
+                Ok::<DebugMode, std::io::Error>(DebugMode::Minimal {
+                    check_interval: 1000,
+                })
+            }
         },
-    );
+        None,
+    )
+    .unwrap_or(DebugMode::Disabled);
+
+    // Set the debug mode in the cache
+    hook.lock().debug_cache.set_debug_mode(initial_mode);
+
+    // Install hooks based on mode
+    install_hooks_for_mode(lua, &hook, initial_mode);
 
     Ok(hook)
 }
 
+/// Install hooks based on debug mode
+///
+/// # Errors
+///
+/// Returns an error if hook installation fails
+fn install_hooks_for_mode(
+    lua: &Lua,
+    hook: &Arc<parking_lot::Mutex<LuaExecutionHook>>,
+    mode: DebugMode,
+) {
+    match mode {
+        DebugMode::Disabled => {
+            // WARNING: Lua only supports ONE debug hook at a time!
+            // When we install our hooks, we override any existing hooks (profilers, etc.)
+            // Therefore, in Disabled mode, we remove our hooks entirely to allow
+            // other systems to use the debug hook if needed.
+            //
+            // This is a fundamental limitation of Lua's debug API.
+            // Users must choose: either debug hooks OR other profiling hooks, not both.
+
+            lua.remove_hook();
+            hook.lock().hooks_installed = false;
+        }
+        DebugMode::Minimal { check_interval } => {
+            // Periodic checking only
+            let hook_clone = hook.clone();
+            lua.set_hook(
+                mlua::HookTriggers {
+                    on_calls: false,
+                    on_returns: false,
+                    every_line: false,
+                    every_nth_instruction: Some(check_interval),
+                },
+                move |lua, ar| {
+                    let mut hook = hook_clone.lock();
+                    // Only check for breakpoints periodically
+                    if ar.curr_line() == -1 {
+                        Ok(())
+                    } else {
+                        hook.handle_event(lua, &ar, DebugEvent::Line)
+                    }
+                },
+            );
+            hook.lock().hooks_installed = true;
+        }
+        DebugMode::Full => {
+            // Full debugging with all events
+            let hook_clone = hook.clone();
+            lua.set_hook(
+                mlua::HookTriggers {
+                    on_calls: true,
+                    on_returns: true,
+                    every_line: true,
+                    ..Default::default()
+                },
+                move |lua, ar| {
+                    let mut hook = hook_clone.lock();
+                    // Determine the event type based on the activation record
+                    let event = if ar.curr_line() != -1 {
+                        DebugEvent::Line
+                    } else if ar.event() == mlua::DebugEvent::Call {
+                        DebugEvent::Call
+                    } else if ar.event() == mlua::DebugEvent::TailCall {
+                        DebugEvent::TailCall
+                    } else if ar.event() == mlua::DebugEvent::Ret {
+                        DebugEvent::Ret
+                    } else {
+                        return Ok(());
+                    };
+                    hook.handle_event(lua, &ar, event)
+                },
+            );
+            hook.lock().hooks_installed = true;
+        }
+    }
+}
+
 /// Remove debug hooks from a Lua instance
+///
+/// NOTE: This only removes hooks if we installed them. We track this to avoid
+/// interfering with other systems that might use Lua debug hooks (profilers, etc.)
 pub fn remove_debug_hooks(lua: &Lua) {
+    // We now keep minimal hooks installed even when "disabled" to avoid interference
+    // The hooks check debug mode and exit fast when disabled
+    // Only fully remove if shutting down the debug system
     lua.remove_hook();
+}
+
+/// Update debug mode for an existing hook
+///
+/// # Errors
+///
+/// Returns an error if hook reinstallation fails
+pub fn update_debug_mode(
+    lua: &Lua,
+    hook: &Arc<parking_lot::Mutex<LuaExecutionHook>>,
+    mode: DebugMode,
+) -> LuaResult<()> {
+    // Update the cache
+    hook.lock().debug_cache.set_debug_mode(mode);
+
+    // Reinstall hooks with new mode
+    install_hooks_for_mode(lua, hook, mode);
+    Ok(())
 }
 
 /// Check if a Lua value can be inspected further

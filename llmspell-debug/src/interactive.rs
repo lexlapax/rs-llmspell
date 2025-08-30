@@ -41,11 +41,13 @@ impl InteractiveDebugger {
     /// Returns an error if installing debug hooks fails
     pub fn install_lua_hooks(&self, lua: &mlua::Lua) -> Result<()> {
         // Use existing execution hooks for interactive debugging
-        let _hook_handle = llmspell_bridge::lua::globals::execution::install_debug_hooks(
-            lua,
-            self.execution_manager.clone(),
-        )
-        .map_err(|e| anyhow::anyhow!("Failed to install debug hooks: {}", e))?;
+        let _hook_handle =
+            llmspell_bridge::lua::globals::execution::install_interactive_debug_hooks(
+                lua,
+                self.execution_manager.clone(),
+                self.shared_context.clone(),
+            )
+            .map_err(|e| anyhow::anyhow!("Failed to install debug hooks: {}", e))?;
 
         // Store the hook handle if needed for later cleanup
         // For now, just return success

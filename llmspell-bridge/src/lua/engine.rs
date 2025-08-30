@@ -120,9 +120,14 @@ impl LuaEngine {
 
         // Install execution hooks in Lua
         let lua_guard = self.lua.lock();
-        if let Ok(hook) =
-            crate::lua::globals::execution::install_debug_hooks(&lua_guard, execution_manager)
-        {
+        let shared_context = Arc::new(tokio::sync::RwLock::new(
+            crate::execution_context::SharedExecutionContext::new(),
+        ));
+        if let Ok(hook) = crate::lua::globals::execution::install_interactive_debug_hooks(
+            &lua_guard,
+            execution_manager,
+            shared_context,
+        ) {
             self.execution_hook = Some(hook);
         }
     }
@@ -139,7 +144,7 @@ impl LuaEngine {
 
     /// Update breakpoints in the debugger
     #[cfg(feature = "lua")]
-    pub fn set_breakpoints(&mut self, breakpoints: Vec<crate::execution_bridge::Breakpoint>) {
+    pub fn set_breakpoints(&mut self, breakpoints: &[crate::execution_bridge::Breakpoint]) {
         if let Some(ref execution_hook) = self.execution_hook {
             execution_hook.lock().update_breakpoints(breakpoints);
         }

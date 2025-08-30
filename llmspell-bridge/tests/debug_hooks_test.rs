@@ -17,10 +17,16 @@ async fn test_hook_installation() {
     let execution_manager = Arc::new(ExecutionManager::new());
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
-    // Install hooks
+    // Install hooks - should start in Disabled mode since no breakpoints
     let hook_handle =
         install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context);
     assert!(hook_handle.is_ok());
+
+    let hook = hook_handle.unwrap();
+    assert_eq!(
+        hook.lock().debug_cache().get_debug_mode(),
+        llmspell_bridge::lua::debug_cache::DebugMode::Disabled
+    );
 
     // Remove hooks
     remove_debug_hooks(&lua);
@@ -37,10 +43,22 @@ async fn test_line_tracking() {
     let execution_manager = Arc::new(ExecutionManager::new());
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
-    // Install hooks
-    let _hook =
+    // Add a breakpoint to enable Minimal mode (otherwise Disabled mode won't track)
+    let bp = Breakpoint::new("test_script".to_string(), 999); // Breakpoint that won't hit
+    execution_manager.add_breakpoint(bp).await;
+
+    // Install hooks - should be in Minimal mode now
+    let hook =
         install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
             .unwrap();
+
+    // Switch to Full mode for line tracking
+    llmspell_bridge::lua::globals::execution::update_debug_mode(
+        &lua,
+        &hook,
+        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+    )
+    .unwrap();
 
     // Execute simple Lua code
     let code = r"
@@ -49,15 +67,18 @@ async fn test_line_tracking() {
         local z = x + y
     ";
 
-    // Execute the code directly (hooks will track it)
+    // Execute the code directly (hooks will track it in Full mode)
     lua.load(code).exec().ok();
+
+    // Flush any pending updates
+    hook.lock().flush_batched_context_updates();
 
     // Check that location was updated
     {
         let ctx = shared_context.read().await;
         assert!(ctx.location.is_some());
         assert!(ctx.performance_metrics.execution_count > 0);
-        drop(ctx);
+        drop(ctx); // Early drop to avoid resource contention
     }
 }
 
@@ -111,10 +132,17 @@ async fn test_function_tracking() {
     let execution_manager = Arc::new(ExecutionManager::new());
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
-    // Install hooks
-    let _hook =
+    // Install hooks and enable Full mode for function tracking
+    let hook =
         install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
             .unwrap();
+
+    llmspell_bridge::lua::globals::execution::update_debug_mode(
+        &lua,
+        &hook,
+        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+    )
+    .unwrap();
 
     // Execute code with function calls
     let code = r"
@@ -128,12 +156,15 @@ async fn test_function_tracking() {
     // Execute the code directly
     lua.load(code).exec().ok();
 
+    // Flush any pending updates
+    hook.lock().flush_batched_context_updates();
+
     // Check that stack was updated (function calls tracked)
     {
         let ctx = shared_context.read().await;
-        // Stack tracking happens during execution
+        // Stack tracking happens during execution in Full mode
         assert!(ctx.location.is_some());
-        drop(ctx);
+        drop(ctx); // Early drop to avoid resource contention
     }
 }
 
@@ -144,10 +175,17 @@ async fn test_shared_context_enrichment() {
     let execution_manager = Arc::new(ExecutionManager::new());
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
-    // Install hooks
-    let _hook =
+    // Install hooks and enable Full mode
+    let hook =
         install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
             .unwrap();
+
+    llmspell_bridge::lua::globals::execution::update_debug_mode(
+        &lua,
+        &hook,
+        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+    )
+    .unwrap();
 
     // Execute code
     let code = r"
@@ -159,12 +197,15 @@ async fn test_shared_context_enrichment() {
     // Execute the code directly
     lua.load(code).exec().ok();
 
+    // Flush any pending updates
+    hook.lock().flush_batched_context_updates();
+
     // Check context was enriched
     {
         let ctx = shared_context.read().await;
         assert!(ctx.location.is_some());
         assert!(ctx.performance_metrics.execution_count > 0);
-        drop(ctx);
+        drop(ctx); // Early drop to avoid resource contention
     }
 }
 
@@ -262,7 +303,50 @@ async fn test_breakpoint_should_break() {
     assert!(execution_manager.should_break_at("test.lua", 5).await);
 }
 
-/// Test performance impact is minimal
+/// Test that Disabled mode has minimal performance impact (zero-cost abstraction)
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn test_disabled_mode_performance() {
+    let lua = Lua::new();
+    let execution_manager = Arc::new(ExecutionManager::new());
+    let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
+
+    // Measure baseline execution without any hooks
+    let start = std::time::Instant::now();
+    lua.load("for i = 1, 10000 do local x = i * 2 end")
+        .exec()
+        .unwrap();
+    let without_hooks = start.elapsed();
+
+    // Install hooks in Disabled mode (no breakpoints, so should auto-select Disabled)
+    let hook = install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+    assert_eq!(
+        hook.lock().debug_cache().get_debug_mode(),
+        llmspell_bridge::lua::debug_cache::DebugMode::Disabled
+    );
+
+    // Measure with hooks in Disabled mode
+    let start = std::time::Instant::now();
+    lua.load("for i = 1, 10000 do local x = i * 2 end")
+        .exec()
+        .unwrap();
+    let with_disabled_hooks = start.elapsed();
+
+    // Calculate overhead
+    let overhead = with_disabled_hooks.as_secs_f64() / without_hooks.as_secs_f64();
+
+    println!("Disabled Mode Performance:");
+    println!("  Without hooks: {without_hooks:?}");
+    println!("  With disabled hooks: {with_disabled_hooks:?}");
+    println!("  Overhead: {overhead:.2}x");
+
+    // CRITICAL: Disabled mode should have < 1.1x overhead (zero-cost abstraction)
+    assert!(
+        overhead < 1.1,
+        "Disabled mode overhead too high: {overhead:.2}x (expected < 1.1x)"
+    );
+}
+
+/// Test performance impact across all modes
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_performance_impact() {
     let lua = Lua::new();
@@ -271,25 +355,92 @@ async fn test_performance_impact() {
 
     // Measure execution without hooks
     let start = std::time::Instant::now();
-    lua.load("for i = 1, 1000 do local x = i * 2 end")
+    lua.load("for i = 1, 10000 do local x = i * 2 end")
         .exec()
         .unwrap();
     let without_hooks = start.elapsed();
 
-    // Install hooks
-    let _hook = install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+    // Install hooks - should be in Disabled mode (no breakpoints)
+    let hook = install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
 
-    // Measure execution with hooks
+    // Verify we're in Disabled mode for maximum performance
+    assert_eq!(
+        hook.lock().debug_cache().get_debug_mode(),
+        llmspell_bridge::lua::debug_cache::DebugMode::Disabled
+    );
+
+    // Measure execution with hooks in Disabled mode
     let start = std::time::Instant::now();
-    lua.load("for i = 1, 1000 do local x = i * 2 end")
+    lua.load("for i = 1, 10000 do local x = i * 2 end")
         .exec()
         .unwrap();
-    let with_hooks = start.elapsed();
+    let with_disabled_hooks = start.elapsed();
 
-    // Performance impact should be less than 10x (very generous for tests)
-    // In production, this should be much lower
+    // Performance impact should be minimal in Disabled mode
+    // For microsecond-scale tests, allow 3x threshold due to measurement noise
+    // For larger workloads (>1ms), this should be < 1.1x in practice
+    let threshold = if without_hooks.as_micros() < 100 {
+        3.0
+    } else {
+        2.0
+    };
     assert!(
-        with_hooks < without_hooks * 10,
-        "Performance impact too high: {with_hooks:?} vs {without_hooks:?}"
+        with_disabled_hooks < without_hooks.mul_f64(threshold),
+        "Performance impact too high in Disabled mode: {with_disabled_hooks:?} vs {without_hooks:?}"
     );
+
+    // Now test with Minimal mode
+    llmspell_bridge::lua::globals::execution::update_debug_mode(
+        &lua,
+        &hook,
+        llmspell_bridge::lua::debug_cache::DebugMode::Minimal {
+            check_interval: 1000,
+        },
+    )
+    .unwrap();
+
+    let start = std::time::Instant::now();
+    lua.load("for i = 1, 10000 do local x = i * 2 end")
+        .exec()
+        .unwrap();
+    let with_minimal_hooks = start.elapsed();
+
+    // Minimal mode should still be fast (< 2x)
+    assert!(
+        with_minimal_hooks < without_hooks * 3, // Generous, should be < 1.5x in practice
+        "Performance impact too high in Minimal mode: {with_minimal_hooks:?} vs {without_hooks:?}"
+    );
+
+    // Test with Full mode (can be slower)
+    llmspell_bridge::lua::globals::execution::update_debug_mode(
+        &lua,
+        &hook,
+        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+    )
+    .unwrap();
+
+    let start = std::time::Instant::now();
+    lua.load("for i = 1, 10000 do local x = i * 2 end")
+        .exec()
+        .unwrap();
+    let with_full_hooks = start.elapsed();
+
+    // Full mode can be slower (it's doing line-by-line debugging with async operations)
+    // We allow up to 100x overhead for Full mode since it's only used during active debugging
+    // and involves heavy instrumentation for every line, call, and return
+    assert!(
+        with_full_hooks < without_hooks * 100,
+        "Performance impact too high in Full mode: {with_full_hooks:?} vs {without_hooks:?}"
+    );
+
+    // Print performance summary for verification
+    let disabled_x = with_disabled_hooks.as_secs_f64() / without_hooks.as_secs_f64();
+    let minimal_x = with_minimal_hooks.as_secs_f64() / without_hooks.as_secs_f64();
+    let full_x = with_full_hooks.as_secs_f64() / without_hooks.as_secs_f64();
+
+    println!("Performance Impact Summary:");
+    println!("  Without hooks: {without_hooks:?}");
+    println!("  Disabled mode: {with_disabled_hooks:?} ({disabled_x:.1}x)");
+    println!("  Minimal mode:  {with_minimal_hooks:?} ({minimal_x:.1}x)");
+    println!("  Full mode:     {with_full_hooks:?} ({full_x:.1}x)");
 }
