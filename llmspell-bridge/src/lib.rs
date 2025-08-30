@@ -249,6 +249,7 @@ pub mod runtime;
 pub mod state_adapter;
 pub mod storage;
 pub mod tools;
+pub mod variable_inspector;
 
 // Event bridge modules
 pub mod event_bridge;

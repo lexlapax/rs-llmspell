@@ -12,6 +12,7 @@ use crate::execution_context::{SharedExecutionContext, SourceLocation};
 use crate::lua::debug_cache::{ContextBatcher, ContextUpdate, DebugMode, DebugStateCache};
 use crate::lua::output::{capture_stack_trace, StackTraceOptions};
 use crate::lua::sync_utils::block_on_async;
+use crate::variable_inspector::VariableInspector;
 use mlua::{DebugEvent, Lua, Result as LuaResult};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -27,6 +28,8 @@ pub struct LuaExecutionHook {
     debug_cache: Arc<DebugStateCache>,
     /// Context update batcher for lazy updates
     context_batcher: ContextBatcher,
+    /// Variable inspector for slow path variable operations
+    variable_inspector: Arc<VariableInspector>,
     /// Current execution state
     current_line: u32,
     current_source: String,
@@ -43,11 +46,18 @@ impl LuaExecutionHook {
         execution_manager: Arc<ExecutionManager>,
         shared_context: Arc<RwLock<SharedExecutionContext>>,
     ) -> Self {
+        let debug_cache = Arc::new(DebugStateCache::new());
+        let variable_inspector = Arc::new(VariableInspector::new(
+            debug_cache.clone(),
+            shared_context.clone(),
+        ));
+
         Self {
             execution_manager,
             shared_context,
-            debug_cache: Arc::new(DebugStateCache::new()),
+            debug_cache,
             context_batcher: ContextBatcher::new(),
+            variable_inspector,
             current_line: 0,
             current_source: String::new(),
             line_counter: 0,
@@ -200,6 +210,10 @@ impl LuaExecutionHook {
             return;
         }
 
+        // Process variable-related updates through the inspector
+        self.variable_inspector
+            .process_context_updates(updates.clone());
+
         // Only do async work when we have updates to flush
         let shared_ctx = self.shared_context.clone();
         let _ = block_on_async::<_, (), std::io::Error>(
@@ -234,6 +248,12 @@ impl LuaExecutionHook {
                         }
                         ContextUpdate::StackPop => {
                             ctx.pop_frame();
+                        }
+                        ContextUpdate::ReadVariables(_)
+                        | ContextUpdate::CacheVariable { .. }
+                        | ContextUpdate::WatchVariable(_)
+                        | ContextUpdate::UnwatchVariable(_) => {
+                            // Variables are handled by the inspector
                         }
                     }
                 }

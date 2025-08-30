@@ -5,6 +5,7 @@
 
 use dashmap::DashMap;
 use parking_lot::RwLock;
+use serde_json::Value as JsonValue;
 use std::collections::{HashMap, HashSet};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -46,6 +47,19 @@ pub struct CompiledCondition {
     pub compiled_chunk: Option<Vec<u8>>,
 }
 
+/// Variable entry in the cache
+#[derive(Debug, Clone)]
+pub struct CachedVariable {
+    /// Variable name
+    pub name: String,
+    /// Variable value as JSON
+    pub value: JsonValue,
+    /// Generation when cached
+    pub generation: u64,
+    /// Last access time (for LRU eviction)
+    pub last_access: Instant,
+}
+
 /// Fast synchronous cache for debug state
 pub struct DebugStateCache {
     /// Whether any debugging is active (fast atomic check)
@@ -72,6 +86,12 @@ pub struct DebugStateCache {
     saved_debug_mode: Arc<RwLock<Option<DebugMode>>>,
     /// Current stack depth for step operations
     current_depth: Arc<RwLock<i32>>,
+    /// Variable cache for frequently accessed variables (slow path only)
+    variable_cache: Arc<DashMap<String, CachedVariable>>,
+    /// Watch list - variables to always cache
+    watch_list: Arc<RwLock<HashSet<String>>>,
+    /// Maximum variables to cache
+    max_cached_variables: usize,
 }
 
 impl DebugStateCache {
@@ -91,6 +111,9 @@ impl DebugStateCache {
             step_mode: Arc::new(RwLock::new(StepMode::None)),
             saved_debug_mode: Arc::new(RwLock::new(None)),
             current_depth: Arc::new(RwLock::new(0)),
+            variable_cache: Arc::new(DashMap::new()),
+            watch_list: Arc::new(RwLock::new(HashSet::new())),
+            max_cached_variables: 1000,
         }
     }
 
@@ -270,6 +293,101 @@ impl DebugStateCache {
         *self.step_mode.write() = StepMode::None;
         *self.saved_debug_mode.write() = None;
         *self.current_depth.write() = 0;
+        // Clear variable cache
+        self.variable_cache.clear();
+        self.watch_list.write().clear();
+    }
+
+    // ===== Variable Cache Methods (Slow Path Only) =====
+
+    /// Cache a variable (slow path only)
+    pub fn cache_variable(&self, name: String, value: JsonValue) {
+        let generation = self.generation.load(Ordering::Relaxed);
+        let cached = CachedVariable {
+            name: name.clone(),
+            value,
+            generation,
+            last_access: Instant::now(),
+        };
+
+        // Check if we need to evict old entries
+        if self.variable_cache.len() >= self.max_cached_variables {
+            self.evict_lru_variables();
+        }
+
+        self.variable_cache.insert(name, cached);
+    }
+
+    /// Get a cached variable (slow path only)
+    pub fn get_cached_variable(&self, name: &str) -> Option<JsonValue> {
+        let generation = self.generation.load(Ordering::Relaxed);
+        self.variable_cache.get_mut(name).and_then(|mut entry| {
+            // Check if cache is still valid
+            if entry.generation == generation {
+                entry.last_access = Instant::now();
+                Some(entry.value.clone())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Get all cached variables that are still valid
+    pub fn get_cached_variables(&self) -> Vec<CachedVariable> {
+        let generation = self.generation.load(Ordering::Relaxed);
+        self.variable_cache
+            .iter()
+            .filter(|entry| entry.generation == generation)
+            .map(|entry| entry.value().clone())
+            .collect()
+    }
+
+    /// Add a variable to the watch list
+    pub fn add_to_watch_list(&self, name: String) {
+        self.watch_list.write().insert(name);
+    }
+
+    /// Remove a variable from the watch list
+    pub fn remove_from_watch_list(&self, name: &str) {
+        self.watch_list.write().remove(name);
+    }
+
+    /// Get the current watch list
+    pub fn get_watch_list(&self) -> Vec<String> {
+        self.watch_list.read().iter().cloned().collect()
+    }
+
+    /// Check if a variable is watched
+    pub fn is_watched(&self, name: &str) -> bool {
+        self.watch_list.read().contains(name)
+    }
+
+    /// Evict least recently used variables
+    fn evict_lru_variables(&self) {
+        // Get all entries with their last access times
+        let mut entries: Vec<_> = self
+            .variable_cache
+            .iter()
+            .map(|entry| (entry.key().clone(), entry.value().last_access))
+            .collect();
+
+        // Sort by last access time (oldest first)
+        entries.sort_by_key(|(_, time)| *time);
+
+        // Remove oldest entries (keep watch list variables)
+        let evict_count = self.max_cached_variables / 4; // Evict 25% at a time
+        let watch_list = self.watch_list.read();
+        for (name, _) in entries.iter().take(evict_count) {
+            if !watch_list.contains(name) {
+                self.variable_cache.remove(name);
+            }
+        }
+    }
+
+    /// Invalidate variable cache (called when context changes)
+    pub fn invalidate_variable_cache(&self) {
+        // Increment generation to invalidate all cached variables
+        self.generation.fetch_add(1, Ordering::Relaxed);
     }
 
     /// Get cache generation (for invalidation checks)
@@ -311,6 +429,17 @@ pub enum ContextUpdate {
     },
     /// Stack frame pop
     StackPop,
+    /// Read multiple variables (batched for efficiency)
+    ReadVariables(Vec<String>),
+    /// Cache a variable value
+    CacheVariable {
+        name: String,
+        value: serde_json::Value,
+    },
+    /// Add variable to watch list
+    WatchVariable(String),
+    /// Remove variable from watch list
+    UnwatchVariable(String),
 }
 
 impl ContextBatcher {
@@ -347,6 +476,33 @@ impl ContextBatcher {
     /// Record a stack pop
     pub fn record_stack_pop(&mut self) {
         self.updates.push(ContextUpdate::StackPop);
+        self.maybe_flush();
+    }
+
+    /// Batch read multiple variables (slow path only)
+    pub fn batch_read_variables(&mut self, names: Vec<String>) {
+        if !names.is_empty() {
+            self.updates.push(ContextUpdate::ReadVariables(names));
+            self.maybe_flush();
+        }
+    }
+
+    /// Cache a variable value for fast access
+    pub fn cache_variable(&mut self, name: String, value: serde_json::Value) {
+        self.updates
+            .push(ContextUpdate::CacheVariable { name, value });
+        self.maybe_flush();
+    }
+
+    /// Add a variable to the watch list
+    pub fn watch_variable(&mut self, name: String) {
+        self.updates.push(ContextUpdate::WatchVariable(name));
+        self.maybe_flush();
+    }
+
+    /// Remove a variable from the watch list
+    pub fn unwatch_variable(&mut self, name: String) {
+        self.updates.push(ContextUpdate::UnwatchVariable(name));
         self.maybe_flush();
     }
 

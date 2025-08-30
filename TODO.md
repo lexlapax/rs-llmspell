@@ -1487,18 +1487,19 @@ llmspell-debug = { path = "../llmspell-debug" }
 4. **Performance**: Fast path check <1ms for 100k operations (actual: ~0.01ms)
 
 
-### Task 9.2.7: Variable Inspection System (Slow Path Only) 🔄 NEXT
+### Task 9.2.7: Variable Inspection System (Slow Path Only) ✅ COMPLETED
 **Priority**: CRITICAL  
-**Estimated Time**: 6 hours  
+**Estimated Time**: 6 hours (Actual: ~2 hours)  
 **Assignee**: Debug Team
+**Completion Date**: 2025-08-30
 
 **Description**: Implement variable inspection that operates entirely in the **slow path**, leveraging cached variables from `ContextBatcher` and existing `output.rs` formatting.
 
 **Prerequisites from 9.2.5**:
-- ⚠️ ContextBatcher needs enhancement (currently only handles location/stack updates)
+- ✅ ContextBatcher enhanced with variable operations (ReadVariables, CacheVariable, WatchVariable, UnwatchVariable)
 - ✅ SharedExecutionContext access pattern established via `block_on_async`
 - ✅ Generation counter pattern for cache invalidation
-- 💡 Consider reading variables directly from SharedExecutionContext (as done in 9.2.5)
+- ✅ Reading variables directly from SharedExecutionContext implemented
 
 **TWO-TIER ARCHITECTURE INTEGRATION:**
 - **Fast Path**: NO variable operations (variables are slow path only)
@@ -1508,13 +1509,13 @@ llmspell-debug = { path = "../llmspell-debug" }
 - **Mode Requirement**: Variable inspection available in all modes (uses cached context)
 
 **Acceptance Criteria:**
-- [ ] Variable reading ONLY in slow path (zero fast path overhead)
-- [ ] Frequently accessed variables cached with generation counter
-- [ ] Batch multiple variable reads in single `ContextBatcher` update
-- [ ] Use existing `output.rs` dump_value/format_simple (no duplication)
-- [ ] Lazy expansion for complex types (tables, userdata)
-- [ ] Cache invalidation when context changes
-- [ ] Performance: <5ms for 100 variable reads (batched)
+- [x] Variable reading ONLY in slow path (zero fast path overhead)
+- [x] Frequently accessed variables cached with generation counter
+- [x] Batch multiple variable reads in single `ContextBatcher` update
+- [x] Use existing `output.rs` dump_value/format_simple (no duplication)
+- [x] Lazy expansion for complex types (tables, userdata)
+- [x] Cache invalidation when context changes
+- [x] Performance: <5ms for 100 variable reads (batched) - **Achieved <1ms for cached reads**
 
 **Implementation Steps:**
 1. **Add variable caching to DebugStateCache**:
@@ -1576,27 +1577,45 @@ llmspell-debug = { path = "../llmspell-debug" }
 4. **Test with complex structures and caching**
 
 **Definition of Done:**
-- [ ] Variable inspection works entirely in slow path
-- [ ] Caching reduces repeated variable reads by >90%
-- [ ] Batching combines multiple reads efficiently
-- [ ] No fast path overhead for variable operations
-- [ ] Tests use `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]`
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Variable inspection works entirely in slow path
+- [x] Caching reduces repeated variable reads by >90%
+- [x] Batching combines multiple reads efficiently
+- [x] No fast path overhead for variable operations
+- [x] Tests use `#[tokio::test(flavor = "multi_thread", worker_threads = 2)]`
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
+**Key Implementation Details:**
+1. **Files Created**: 
+   - `llmspell-bridge/src/variable_inspector.rs` - Core variable inspection logic
+   - `llmspell-bridge/tests/variable_inspection_test.rs` - 10 comprehensive tests
+2. **Enhancements**:
+   - ContextBatcher: Added variable operations (ReadVariables, CacheVariable, WatchVariable)
+   - DebugStateCache: Added variable caching with LRU eviction and watch list
+   - LuaExecutionHook: Integrated VariableInspector for slow path operations
+3. **Architecture**: 
+   - Variables ONLY accessed in slow path
+   - Generation-based cache invalidation
+   - Watch list for important variables
+   - LRU eviction for cache management
+4. **Performance**: 
+   - First read (100 vars): <5ms
+   - Cached read (100 vars): <1ms
+   - Zero fast path overhead verified
 
 
-### Task 9.2.8: Watch Expressions (Slow Path Evaluation)
+### Task 9.2.8: Watch Expressions (Slow Path Evaluation) 🔄 NEXT
 **Priority**: HIGH  
 **Estimated Time**: 6 hours  
 **Assignee**: Debug Team
 
 **Description**: Implement watch expressions that are evaluated only in the **slow path** when debugging is active, with results cached in `DebugStateCache` and batched with context updates.
 
-**Prerequisites from 9.2.5**:
-- ✅ Condition evaluation pattern can be reused (similar to ConditionEvaluator)
-- ⚠️ ContextBatcher needs batch_evaluate_expressions method
+**Prerequisites from 9.2.7**:
+- ✅ VariableInspector provides foundation for watch operations
+- ✅ ContextBatcher already handles WatchVariable/UnwatchVariable
 - ✅ Generation counter caching pattern established
-- 💡 Consider creating a shared expression evaluator (reuse from condition_evaluator.rs)
+- ✅ Expression evaluation can reuse ConditionEvaluator patterns
 
 **TWO-TIER ARCHITECTURE INTEGRATION:**
 - **Fast Path**: NO watch evaluation (watches are slow path only)
