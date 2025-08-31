@@ -6,7 +6,9 @@
 
 use crate::execution_context::{ExecutionContextBridge, SharedExecutionContext};
 use crate::tracing::{DefaultTraceEnricher, SpanHandle, TraceEnricher, TracingConfig};
+use llmspell_tools::util::ValidationResult;
 use llmspell_utils::debug::{global_debug_manager, DebugEntry, DebugLevel, PerformanceTracker};
+use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
 use opentelemetry::{
     global,
     trace::{SpanKind, Tracer},
@@ -19,7 +21,44 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
-use std::sync::Arc;
+use std::path::PathBuf;
+use std::sync::{mpsc, Arc};
+
+/// Hot reload event type
+#[derive(Debug, Clone)]
+pub enum HotReloadEvent {
+    /// File was modified
+    Modified { path: PathBuf, content: String },
+    /// File was created
+    Created { path: PathBuf, content: String },
+    /// File was deleted
+    Deleted { path: PathBuf },
+    /// Reload was successful
+    ReloadSuccess { path: PathBuf, duration_ms: u64 },
+    /// Reload failed with validation errors
+    ReloadFailed { path: PathBuf, errors: Vec<String> },
+}
+
+/// Hot reload configuration
+#[derive(Debug, Clone)]
+pub struct HotReloadConfig {
+    /// Debounce delay in milliseconds
+    pub debounce_ms: u64,
+    /// Enable validation before reload
+    pub validate_before_reload: bool,
+    /// Maximum reload attempts
+    pub max_reload_attempts: u32,
+}
+
+impl Default for HotReloadConfig {
+    fn default() -> Self {
+        Self {
+            debounce_ms: 100,
+            validate_before_reload: true,
+            max_reload_attempts: 3,
+        }
+    }
+}
 
 /// Diagnostics bridge that script engines interact with for logging, profiling, and tracing
 #[derive(Clone)]
@@ -36,6 +75,14 @@ pub struct DiagnosticsBridge {
     tracing_config: TracingConfig,
     /// Shared execution context for trace enrichment
     shared_context: Arc<Mutex<SharedExecutionContext>>,
+    /// Hot reload watcher (optional)
+    hot_reload_watcher: Arc<Mutex<Option<RecommendedWatcher>>>,
+    /// Hot reload event receiver
+    hot_reload_receiver: Arc<Mutex<Option<mpsc::Receiver<notify::Result<Event>>>>>,
+    /// Hot reload configuration
+    hot_reload_config: HotReloadConfig,
+    /// Watched file paths with their execution contexts
+    watched_files: Arc<Mutex<HashMap<PathBuf, Arc<Mutex<SharedExecutionContext>>>>>,
 }
 
 impl DiagnosticsBridge {
@@ -49,6 +96,10 @@ impl DiagnosticsBridge {
             trace_enricher: Arc::new(DefaultTraceEnricher),
             tracing_config: TracingConfig::default(),
             shared_context: Arc::new(Mutex::new(SharedExecutionContext::new())),
+            hot_reload_watcher: Arc::new(Mutex::new(None)),
+            hot_reload_receiver: Arc::new(Mutex::new(None)),
+            hot_reload_config: HotReloadConfig::default(),
+            watched_files: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -372,6 +423,246 @@ impl DiagnosticsBridge {
             "error" => crate::lua::output::StackTraceOptions::for_error(),
             _ => crate::lua::output::StackTraceOptions::default(),
         }
+    }
+
+    /// Basic script validation for hot reload
+    #[must_use]
+    pub fn validate_script(&self, content: &str, _script_type: &str) -> ValidationResult {
+        use llmspell_tools::util::ValidationError;
+
+        // Basic validation - check if content is not empty and has some structure
+        if content.trim().is_empty() {
+            ValidationResult {
+                valid: false,
+                errors: vec![ValidationError {
+                    field: "content".to_string(),
+                    value: serde_json::Value::String(content.to_string()),
+                    rule: "not_empty".to_string(),
+                    message: "Script content is empty".to_string(),
+                }],
+            }
+        } else if content.len() > 1_000_000 {
+            ValidationResult {
+                valid: false,
+                errors: vec![ValidationError {
+                    field: "content".to_string(),
+                    value: serde_json::Value::String("<<TRUNCATED>>".to_string()),
+                    rule: "max_size".to_string(),
+                    message: "Script content too large (>1MB)".to_string(),
+                }],
+            }
+        } else {
+            ValidationResult {
+                valid: true,
+                errors: vec![],
+            }
+        }
+    }
+
+    /// Enable hot reload for specified files
+    ///
+    /// # Errors
+    /// Returns error if file watcher cannot be created or files cannot be watched
+    #[tracing::instrument(skip(self))]
+    pub async fn enable_hot_reload(&self, files: Vec<PathBuf>) -> Result<(), anyhow::Error> {
+        let span = tracing::info_span!("hot_reload_enable", file_count = files.len());
+        let _enter = span.enter();
+
+        let (tx, rx) = mpsc::channel();
+        let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())?;
+
+        // Watch all specified files
+        let file_count = {
+            let mut watched_files = self.watched_files.lock();
+            for file in files {
+                if file.exists() {
+                    watcher.watch(&file, RecursiveMode::NonRecursive)?;
+                    watched_files.insert(
+                        file.clone(),
+                        Arc::new(Mutex::new(SharedExecutionContext::new())),
+                    );
+                    tracing::info!(file = %file.display(), "File added to hot reload watch");
+                } else {
+                    tracing::warn!(file = %file.display(), "File does not exist, skipping watch");
+                }
+            }
+            watched_files.len()
+        };
+
+        // Store watcher and receiver
+        *self.hot_reload_watcher.lock() = Some(watcher);
+        *self.hot_reload_receiver.lock() = Some(rx);
+
+        tracing::info!("Hot reload enabled for {} files", file_count);
+        Ok(())
+    }
+
+    /// Handle file change events with context preservation
+    ///
+    /// # Errors
+    /// Returns error if file content cannot be read or validation fails
+    #[tracing::instrument(skip(self, event))]
+    pub async fn handle_file_change(&self, event: notify::Event) -> Result<(), anyhow::Error> {
+        let span = tracing::info_span!("hot_reload_handle_change",
+            event_kind = ?event.kind,
+            paths = ?event.paths
+        );
+        let _enter = span.enter();
+
+        for path in &event.paths {
+            // Check if path is watched (without holding lock)
+            let context_ref = {
+                let watched = self.watched_files.lock();
+                watched.get(path).cloned()
+            };
+
+            if let Some(context_ref) = context_ref {
+                // Preserve context before async operations
+                let snapshot = {
+                    let context = context_ref.lock();
+                    context.preserve_across_async_boundary()
+                };
+
+                match event.kind {
+                    notify::EventKind::Modify(_) => {
+                        if let Ok(content) = tokio::fs::read_to_string(path).await {
+                            self.emit_hot_reload_event(HotReloadEvent::Modified {
+                                path: path.clone(),
+                                content,
+                            })
+                            .await?;
+                        }
+                    }
+                    notify::EventKind::Create(_) => {
+                        if let Ok(content) = tokio::fs::read_to_string(path).await {
+                            self.emit_hot_reload_event(HotReloadEvent::Created {
+                                path: path.clone(),
+                                content,
+                            })
+                            .await?;
+                        }
+                    }
+                    notify::EventKind::Remove(_) => {
+                        self.emit_hot_reload_event(HotReloadEvent::Deleted { path: path.clone() })
+                            .await?;
+                    }
+                    _ => {
+                        tracing::debug!(path = %path.display(), event_kind = ?event.kind, "Ignoring file event");
+                    }
+                }
+
+                // Restore context after handling
+                {
+                    let mut context = context_ref.lock();
+                    context.restore_from_async_boundary(snapshot);
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Emit hot reload event with distributed tracing
+    #[tracing::instrument(skip(self, event))]
+    async fn emit_hot_reload_event(&self, event: HotReloadEvent) -> Result<(), anyhow::Error> {
+        let start_time = std::time::Instant::now();
+
+        match &event {
+            HotReloadEvent::Modified { path, .. } | HotReloadEvent::Created { path, .. } => {
+                // Validate script content if configured to do so
+                if let Ok(content) = tokio::fs::read_to_string(path).await {
+                    let should_validate = self.hot_reload_config.validate_before_reload;
+                    let validation_result = if should_validate {
+                        self.validate_script(&content, "lua")
+                    } else {
+                        ValidationResult {
+                            valid: true,
+                            errors: vec![],
+                        }
+                    };
+
+                    if validation_result.valid {
+                        let duration_ms = u64::try_from(
+                            start_time.elapsed().as_millis().min(u128::from(u64::MAX)),
+                        )
+                        .unwrap_or(u64::MAX);
+
+                        tracing::info!(
+                            path = %path.display(),
+                            duration_ms = duration_ms,
+                            "Hot reload successful"
+                        );
+                    } else {
+                        tracing::error!(
+                            path = %path.display(),
+                            errors = ?validation_result.errors.iter().map(|e| &e.message).collect::<Vec<_>>(),
+                            "Hot reload failed validation"
+                        );
+                    }
+                }
+            }
+            HotReloadEvent::Deleted { path } => {
+                tracing::info!(path = %path.display(), "File deleted, removing from watch");
+                self.watched_files.lock().remove(path);
+            }
+            HotReloadEvent::ReloadSuccess { path, duration_ms } => {
+                tracing::info!(
+                    path = %path.display(),
+                    duration_ms = duration_ms,
+                    "Hot reload completed successfully"
+                );
+            }
+            HotReloadEvent::ReloadFailed { path, errors } => {
+                tracing::error!(
+                    path = %path.display(),
+                    errors = ?errors,
+                    "Hot reload failed"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Start hot reload event processing loop
+    ///
+    /// # Errors
+    /// Returns error if processing loop cannot be started
+    pub fn start_hot_reload_processing(&self) -> Result<(), anyhow::Error> {
+        let receiver = self.hot_reload_receiver.lock().take();
+
+        if let Some(receiver) = receiver {
+            let self_clone = self.clone();
+            tokio::spawn(async move {
+                loop {
+                    if let Ok(result) = receiver.recv() {
+                        match result {
+                            Ok(event) => {
+                                if let Err(e) = self_clone.handle_file_change(event).await {
+                                    tracing::error!(error = %e, "Failed to handle file change");
+                                }
+                            }
+                            Err(error) => {
+                                tracing::error!(error = %error, "File watcher error");
+                            }
+                        }
+                    } else {
+                        tracing::info!("Hot reload receiver closed");
+                        break;
+                    }
+                }
+            });
+        }
+
+        Ok(())
+    }
+
+    /// Disable hot reload and cleanup resources
+    pub fn disable_hot_reload(&self) {
+        *self.hot_reload_watcher.lock() = None;
+        *self.hot_reload_receiver.lock() = None;
+        self.watched_files.lock().clear();
+        tracing::info!("Hot reload disabled");
     }
 }
 

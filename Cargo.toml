@@ -90,6 +90,8 @@ serial_test = "3.1"
 # Storage backends
 sled = "0.34"
 rocksdb = "0.22"
+# File watching
+notify = "6.1"
 
 # Scripting engines
 mlua = { version = "0.9", features = ["lua54", "async", "serialize", "send", "parking_lot"] }
