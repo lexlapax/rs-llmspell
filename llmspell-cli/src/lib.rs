@@ -5,7 +5,7 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod embedded_resources;
-pub mod kernel_connection;
+pub mod kernel;
 pub mod output;
 pub mod repl_interface;
 

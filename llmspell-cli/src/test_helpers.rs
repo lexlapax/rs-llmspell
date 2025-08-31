@@ -2,9 +2,7 @@
 //!
 //! Provides helper functions for creating test instances with null implementations.
 
-use crate::kernel_connection::{
-    KernelConnectionBuilder, NullKernelConnection, NullKernelDiscovery,
-};
+use crate::kernel::{KernelConnectionBuilder, NullKernelConnection, NullKernelDiscovery};
 use crate::repl_interface::CLIReplInterface;
 use llmspell_bridge::{
     diagnostics_bridge::DiagnosticsBridge, null_circuit_breaker::NullCircuitBreaker,
@@ -52,7 +50,7 @@ pub fn create_test_config() -> LLMSpellConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kernel_connection::KernelConnectionTrait;
+    use crate::kernel::KernelConnectionTrait;
 
     #[tokio::test]
     async fn test_null_kernel_connection() {

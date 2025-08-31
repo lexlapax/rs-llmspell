@@ -314,6 +314,27 @@
 
 **Description**: Implement debug event handling using unified types and ExecutionManager, integrating with Phase 9.1 architecture.
 
+**ARCHITECTURAL DECISION**: Create `kernel/` module directory structure
+- **Rationale**: Kernel functionality will expand significantly (remote kernels, pooling, health monitoring, distributed debugging)
+- **Structure**: 
+  ```
+  src/kernel/
+    mod.rs              # Public API exports
+    connection.rs       # KernelConnectionTrait (moved from top-level)
+    debug_handler.rs    # Debug event handling (new)
+    discovery.rs        # Kernel discovery (Task 9.4.4)
+  ```
+- **Future Possibilities**: 
+  - Remote kernel connections (WebSocket/gRPC)
+  - Kernel pooling for parallel execution
+  - Health monitoring and auto-restart
+  - Distributed kernel orchestration
+  - Heterogeneous kernels (Python, Julia, R)
+- **Performance**: Parallel compilation, lazy loading, zero-cost when debug not used
+- **Scalability**: Clean namespace, supports kernel providers (Docker, K8s, Lambda)
+- **Modularity**: Single responsibility per file (~200-400 lines), independent testing, clear interfaces
+- **Precedent**: Mirrors Jupyter kernel management and VSCode debug adapter protocol architectures
+
 **ARCHITECTURE ALIGNMENT (Phase 9.1 + 9.3 Patterns):**
 - **Dependency Injection**: Use builder pattern for event handler
 - **Test Safety**: Create `NullDebugEventHandler` for testing
@@ -326,17 +347,17 @@
 - **Output formatting** uses output.rs functions
 
 **Acceptance Criteria:**
-- [ ] Event handler uses dependency injection
-- [ ] NullDebugEventHandler implemented for tests
-- [ ] IOPub events received using established protocol types
-- [ ] Event performance monitored with HookProfiler
-- [ ] Circuit breaker prevents event flooding
-- [ ] No hardcoded thresholds for event handling
-- [ ] Breakpoint hits trigger debug REPL via ExecutionManager
-- [ ] Output streams displayed using output.rs formatting
-- [ ] Error events formatted via diagnostics_bridge.rs patterns
-- [ ] Progress events shown with SharedExecutionContext metrics
-- [ ] State changes reflected using unified DebugState type
+- [x] Event handler uses dependency injection
+- [x] NullDebugEventHandler implemented for tests
+- [x] IOPub events received using established protocol types
+- [x] Event performance monitored with HookProfiler
+- [x] Circuit breaker prevents event flooding
+- [x] No hardcoded thresholds for event handling
+- [x] Breakpoint hits trigger debug REPL via ExecutionManager
+- [x] Output streams displayed using output.rs formatting
+- [x] Error events formatted via diagnostics_bridge.rs patterns
+- [x] Progress events shown with SharedExecutionContext metrics
+- [x] State changes reflected using unified DebugState type
 
 **Implementation Steps:**
 1. Create debug event handler:
@@ -417,13 +438,13 @@
 6. **Test debug event handling with multi-client session patterns**
 
 **Definition of Done:**
-- [ ] Events handled correctly
-- [ ] Debug REPL works
-- [ ] Output formatted nicely
-- [ ] All event types handled
-- [ ] Tests pass
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Events handled correctly
+- [x] Debug REPL works
+- [x] Output formatted nicely
+- [x] All event types handled
+- [x] Tests pass
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
 ### Task 9.4.4: Kernel Discovery Logic

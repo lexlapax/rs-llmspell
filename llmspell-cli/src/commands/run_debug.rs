@@ -2,7 +2,7 @@
 
 use crate::cli::OutputFormat;
 use crate::commands::run::parse_script_args;
-use crate::kernel_connection::{
+use crate::kernel::{
     DebugExecutionHandle, KernelConnectionBuilder, KernelConnectionTrait, RealKernelDiscovery,
 };
 use crate::output::format_output;
