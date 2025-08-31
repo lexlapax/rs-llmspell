@@ -5,7 +5,10 @@
 //! and distributed tracing via OpenTelemetry.
 
 use crate::condition_evaluator::ConditionEvaluator;
+use crate::execution_bridge::StackFrame;
 use crate::execution_context::{ExecutionContextBridge, SharedExecutionContext, SourceLocation};
+use crate::profiler::{PprofProfiler, Profiler};
+use crate::stack_navigator::StackNavigator;
 use crate::tracing::{DefaultTraceEnricher, SpanHandle, TraceEnricher, TracingConfig};
 use crate::variable_inspector::VariableInspector;
 use llmspell_tools::util::ValidationResult;
@@ -173,8 +176,61 @@ impl Default for ValidationReport {
     }
 }
 
+/// CPU sample data for profiling
+#[derive(Debug, Clone)]
+pub struct CpuSample {
+    /// Timestamp when sample was taken
+    pub timestamp: std::time::Instant,
+    /// Stack frames at the time of sampling
+    pub stack: Vec<StackFrame>,
+    /// Thread ID (optional)
+    pub thread_id: Option<u64>,
+}
+
+/// Flamegraph frame data enhanced with execution context
+#[derive(Debug, Clone)]
+pub struct FlameGraphFrame {
+    /// Function name
+    pub function: String,
+    /// Source file path
+    pub file: String,
+    /// Line number
+    pub line: u32,
+    /// Number of times this frame was executed
+    pub execution_count: u64,
+    /// Total time spent in this frame (microseconds)
+    pub total_time_us: u64,
+    /// Self time spent in this frame (microseconds)
+    pub self_time_us: u64,
+}
+
+/// Memory allocation sample
+#[derive(Debug, Clone)]
+pub struct MemorySample {
+    /// Timestamp when sample was taken
+    pub timestamp: std::time::Instant,
+    /// Memory usage in bytes
+    pub bytes_allocated: u64,
+    /// Stack trace at time of allocation (if available)
+    pub stack: Vec<StackFrame>,
+}
+
+/// Profiling session data
+#[derive(Debug)]
+pub struct ProfilingSession {
+    /// CPU samples collected during the session
+    pub cpu_samples: Vec<CpuSample>,
+    /// Memory samples collected during the session
+    pub memory_samples: Vec<MemorySample>,
+    /// Session start time
+    pub start_time: std::time::Instant,
+    /// Session end time (None if still active)
+    pub end_time: Option<std::time::Instant>,
+    /// Profiling configuration used
+    pub sample_rate_hz: u32,
+}
+
 /// Diagnostics bridge that script engines interact with for logging, profiling, and tracing
-#[derive(Clone)]
 pub struct DiagnosticsBridge {
     /// Reference to the global debug manager
     manager: Arc<llmspell_utils::debug::DebugManager>,
@@ -200,12 +256,26 @@ pub struct DiagnosticsBridge {
     condition_evaluator: Option<Arc<dyn ConditionEvaluator>>,
     /// Variable inspector for API validation
     variable_inspector: Option<Arc<dyn VariableInspector>>,
+    /// Stack navigator for enhanced flamegraph generation
+    stack_navigator: Option<Arc<dyn StackNavigator>>,
+    /// CPU profiler (trait-based for testability)
+    profiler: Box<dyn Profiler>,
+    /// Profiling session data
+    profiling_session: Arc<Mutex<Option<ProfilingSession>>>,
+    /// Shared execution context for profiling (separate from trace enrichment)
+    profiling_context: Option<Arc<tokio::sync::RwLock<SharedExecutionContext>>>,
 }
 
 impl DiagnosticsBridge {
     /// Create a new diagnostics bridge
     #[must_use]
     pub fn new() -> Self {
+        Self::with_profiler(Box::new(PprofProfiler::new()))
+    }
+
+    /// Create a new diagnostics bridge with custom profiler (for dependency injection)
+    #[must_use]
+    pub fn with_profiler(profiler: Box<dyn Profiler>) -> Self {
         Self {
             manager: global_debug_manager(),
             trackers: Arc::new(Mutex::new(HashMap::new())),
@@ -219,6 +289,10 @@ impl DiagnosticsBridge {
             watched_files: Arc::new(Mutex::new(HashMap::new())),
             condition_evaluator: None,
             variable_inspector: None,
+            stack_navigator: None,
+            profiler,
+            profiling_session: Arc::new(Mutex::new(None)),
+            profiling_context: None,
         }
     }
 
@@ -246,6 +320,13 @@ impl DiagnosticsBridge {
     #[must_use]
     pub fn with_variable_inspector(mut self, inspector: Arc<dyn VariableInspector>) -> Self {
         self.variable_inspector = Some(inspector);
+        self
+    }
+
+    /// Set the stack navigator for enhanced flamegraph generation
+    #[must_use]
+    pub fn with_stack_navigator(mut self, navigator: Arc<dyn StackNavigator>) -> Self {
+        self.stack_navigator = Some(navigator);
         self
     }
 
@@ -1006,6 +1087,401 @@ impl DiagnosticsBridge {
         *self.hot_reload_receiver.lock() = None;
         self.watched_files.lock().clear();
         tracing::info!("Hot reload disabled");
+    }
+
+    // === PROFILING METHODS ===
+
+    /// Start CPU profiling with distributed tracing integration
+    ///
+    /// # Arguments
+    /// * `context` - Shared execution context for profiling data coordination
+    /// * `sample_rate_hz` - CPU sampling rate (default 100Hz for <5% overhead)
+    ///
+    /// # Errors
+    /// Returns error if profiling cannot be started or is already active
+    pub fn start_profiling(
+        &mut self,
+        context: Arc<tokio::sync::RwLock<SharedExecutionContext>>,
+        sample_rate_hz: Option<u32>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        // Check if profiling is already active
+        if self.profiler.is_active() {
+            return Err("Profiling is already active".into());
+        }
+
+        let sample_rate = sample_rate_hz.unwrap_or(100);
+
+        // Create trace span for profiling session
+        let _span = tracing::info_span!(
+            "profiling_session_start",
+            sample_rate_hz = sample_rate,
+            "profiler.type" = "cpu"
+        );
+
+        // Start CPU profiler with specified sample rate
+        self.profiler
+            .start(i32::try_from(sample_rate).unwrap_or(100))?;
+
+        // Initialize profiling session
+        let session = ProfilingSession {
+            cpu_samples: Vec::new(),
+            memory_samples: Vec::new(),
+            start_time: std::time::Instant::now(),
+            end_time: None,
+            sample_rate_hz: sample_rate,
+        };
+
+        // Store session data
+        self.profiling_context = Some(context);
+        *self.profiling_session.lock() = Some(session);
+
+        tracing::info!(
+            sample_rate_hz = sample_rate,
+            "CPU profiling started with distributed tracing integration"
+        );
+
+        Ok(())
+    }
+
+    /// Stop CPU profiling and finalize session
+    ///
+    /// # Errors
+    /// Returns error if profiling is not active or cannot be stopped
+    ///
+    /// # Panics
+    /// Panics if profiling session end time is not set (should not happen in practice)
+    pub fn stop_profiling(&mut self) -> Result<(), Box<dyn std::error::Error>> {
+        // Check if profiling is active
+        if !self.profiler.is_active() {
+            return Err("Profiling is not active".into());
+        }
+
+        // Stop profiler and get report data
+        let _profiling_data = self.profiler.stop()?;
+
+        // Finalize profiling session
+        {
+            let mut session_guard = self.profiling_session.lock();
+            if let Some(mut session) = session_guard.take() {
+                session.end_time = Some(std::time::Instant::now());
+                let duration = session.end_time.unwrap() - session.start_time;
+
+                tracing::info!(
+                    duration_ms = duration.as_millis(),
+                    cpu_samples = session.cpu_samples.len(),
+                    memory_samples = session.memory_samples.len(),
+                    "CPU profiling session completed"
+                );
+
+                // Update SharedExecutionContext with profiling summary
+                if let Some(context_ref) = &self.profiling_context {
+                    let context = context_ref.clone();
+                    let duration_us = u64::try_from(duration.as_micros()).unwrap_or(u64::MAX);
+                    tokio::task::spawn(async move {
+                        let mut ctx = context.write().await;
+                        // Use existing fields - store profiling time in function_time_us
+                        ctx.performance_metrics.function_time_us += duration_us;
+                    });
+                }
+
+                // Store final session data
+                *session_guard = Some(session);
+            }
+        }
+
+        // Clean up profiling context
+        self.profiling_context = None;
+
+        tracing::info!("CPU profiling stopped and session finalized");
+        Ok(())
+    }
+
+    /// Generate flamegraph enhanced with `StackNavigator` trait
+    ///
+    /// # Returns
+    /// Flamegraph data as SVG bytes
+    ///
+    /// # Errors
+    /// Returns error if profiling data is not available or flamegraph generation fails
+    pub fn generate_flamegraph(&self) -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+        // Hold lock only as long as necessary to access session
+        let session_guard = self.profiling_session.lock();
+        let session = session_guard
+            .as_ref()
+            .ok_or("No profiling session available")?;
+
+        let cpu_samples_len = session.cpu_samples.len();
+
+        // Generate enhanced frames using StackNavigator if available
+        let enhanced_frames = self.stack_navigator.as_ref().map_or_else(
+            || Self::generate_basic_frames(session),
+            |stack_navigator| Self::generate_enhanced_frames(session, stack_navigator.as_ref()),
+        );
+
+        drop(session_guard); // Explicitly drop the lock
+
+        // Create trace span for flamegraph generation
+        let _span = tracing::info_span!(
+            "flamegraph_generation",
+            cpu_samples = cpu_samples_len,
+            "flamegraph.enhanced" = self.stack_navigator.is_some()
+        );
+
+        // Create flamegraph from enhanced data
+        let mut flamegraph_data = Vec::new();
+        Self::build_flamegraph(&enhanced_frames, &mut flamegraph_data)?;
+
+        tracing::info!(
+            flamegraph_size_bytes = flamegraph_data.len(),
+            enhanced_frames = enhanced_frames.len(),
+            "Flamegraph generated successfully"
+        );
+
+        Ok(flamegraph_data)
+    }
+
+    /// Sample stack for profiling (called from debug hooks)
+    pub fn sample_stack_for_profiling(&self, stack: Vec<StackFrame>) {
+        if let Some(session) = self.profiling_session.lock().as_mut() {
+            let sample = CpuSample {
+                timestamp: std::time::Instant::now(),
+                stack,
+                thread_id: None, // Skip thread ID for now since it requires unstable API
+            };
+
+            session.cpu_samples.push(sample);
+
+            // Update context with sample count periodically
+            if session.cpu_samples.len() % 100 == 0 {
+                if let Some(context_ref) = &self.profiling_context {
+                    let context = context_ref.clone();
+                    let sample_count = session.cpu_samples.len();
+                    tokio::task::spawn(async move {
+                        let mut ctx = context.write().await;
+                        // Use existing execution_count field to track samples
+                        ctx.performance_metrics.execution_count =
+                            u32::try_from(sample_count).unwrap_or(u32::MAX);
+                    });
+                }
+            }
+        }
+    }
+
+    /// Sample memory usage for profiling
+    ///
+    /// # Arguments
+    /// * `bytes_allocated` - Current memory allocation in bytes
+    /// * `stack` - Optional stack trace for the allocation
+    ///
+    /// # Errors
+    /// Returns error if memory sampling fails
+    pub fn sample_memory(
+        &self,
+        bytes_allocated: u64,
+        stack: Option<Vec<StackFrame>>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(session) = self.profiling_session.lock().as_mut() {
+            let sample = MemorySample {
+                timestamp: std::time::Instant::now(),
+                bytes_allocated,
+                stack: stack.unwrap_or_default(),
+            };
+
+            session.memory_samples.push(sample);
+
+            // Update SharedExecutionContext with memory data
+            if let Some(context_ref) = &self.profiling_context {
+                let context = context_ref.clone();
+                let memory_allocated = bytes_allocated.try_into().unwrap_or(usize::MAX);
+                tokio::task::spawn(async move {
+                    {
+                        let mut ctx = context.write().await;
+                        ctx.performance_metrics.memory_allocated = memory_allocated;
+                    } // Lock released here
+
+                    // Log potential memory leak warning (simplified heuristic)
+                    if bytes_allocated > 500_000_000 {
+                        // 500MB threshold
+                        tracing::warn!(
+                            memory_mb = bytes_allocated / 1_000_000,
+                            "High memory usage detected - potential leak"
+                        );
+                    }
+                });
+            }
+
+            tracing::trace!(
+                bytes_allocated = bytes_allocated,
+                total_memory_samples = session.memory_samples.len(),
+                "Memory sample collected"
+            );
+        }
+
+        Ok(())
+    }
+
+    /// Update performance metrics with profiling data
+    pub fn update_performance_metrics(&self, operation: &str, duration: std::time::Duration) {
+        if let Some(context_ref) = &self.profiling_context {
+            let context = context_ref.clone();
+            let op_name = operation.to_string();
+            let duration_us = u64::try_from(duration.as_micros()).unwrap_or(u64::MAX);
+
+            tokio::task::spawn(async move {
+                let mut ctx = context.write().await;
+
+                // Update execution metrics using existing fields
+                ctx.performance_metrics.execution_count += 1;
+                ctx.performance_metrics.function_time_us += duration_us;
+
+                tracing::trace!(
+                    operation = op_name,
+                    duration_us = duration_us,
+                    total_executions = ctx.performance_metrics.execution_count,
+                    cumulative_time_us = ctx.performance_metrics.function_time_us,
+                    "Performance metrics updated via profiling"
+                );
+            });
+        }
+    }
+
+    /// Generate enhanced frames using `StackNavigator` trait
+    fn generate_enhanced_frames(
+        session: &ProfilingSession,
+        stack_navigator: &dyn StackNavigator,
+    ) -> Vec<FlameGraphFrame> {
+        let mut frame_map: std::collections::HashMap<String, FlameGraphFrame> =
+            std::collections::HashMap::new();
+
+        for sample in &session.cpu_samples {
+            for frame in &sample.stack {
+                let formatted = stack_navigator.format_frame(frame);
+                let key = format!("{}:{}:{}", frame.source, frame.line, frame.name);
+
+                frame_map
+                    .entry(key)
+                    .and_modify(|f| {
+                        f.execution_count += 1;
+                        f.total_time_us += 1000; // Approximate time per sample
+                    })
+                    .or_insert_with(|| FlameGraphFrame {
+                        function: formatted,
+                        file: frame.source.clone(),
+                        line: frame.line,
+                        execution_count: 1,
+                        total_time_us: 1000,
+                        self_time_us: 1000,
+                    });
+            }
+        }
+
+        frame_map.into_values().collect()
+    }
+
+    /// Generate basic frames without `StackNavigator` enhancement
+    fn generate_basic_frames(session: &ProfilingSession) -> Vec<FlameGraphFrame> {
+        let mut frame_map: std::collections::HashMap<String, FlameGraphFrame> =
+            std::collections::HashMap::new();
+
+        for sample in &session.cpu_samples {
+            for frame in &sample.stack {
+                let key = format!("{}:{}:{}", frame.source, frame.line, frame.name);
+
+                frame_map
+                    .entry(key)
+                    .and_modify(|f| {
+                        f.execution_count += 1;
+                        f.total_time_us += 1000;
+                    })
+                    .or_insert_with(|| FlameGraphFrame {
+                        function: format!("{}:{} in {}", frame.source, frame.line, frame.name),
+                        file: frame.source.clone(),
+                        line: frame.line,
+                        execution_count: 1,
+                        total_time_us: 1000,
+                        self_time_us: 1000,
+                    });
+            }
+        }
+
+        frame_map.into_values().collect()
+    }
+
+    /// Build flamegraph from enhanced frames
+    fn build_flamegraph(
+        frames: &[FlameGraphFrame],
+        output: &mut Vec<u8>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        use std::fmt::Write;
+
+        // Simple SVG flamegraph generation (basic implementation)
+        let mut svg = String::new();
+        writeln!(&mut svg, r#"<?xml version="1.0" standalone="no"?>"#)?;
+        writeln!(
+            &mut svg,
+            r#"<svg version="1.1" width="1200" height="600" xmlns="http://www.w3.org/2000/svg">"#
+        )?;
+
+        let mut y = 50;
+        for frame in frames {
+            let width = (frame.execution_count * 10).min(1000); // Scale width
+            let color = format!("hsl({}, 60%, 60%)", (frame.line * 13) % 360); // Deterministic color
+
+            writeln!(
+                &mut svg,
+                r#"<rect x="50" y="{y}" width="{width}" height="20" fill="{color}" stroke="black"/>"#
+            )?;
+
+            writeln!(
+                &mut svg,
+                r#"<text x="{}" y="{}" font-family="monospace" font-size="12" fill="black">{}</text>"#,
+                55,
+                y + 15,
+                frame.function
+            )?;
+
+            y += 25;
+        }
+
+        writeln!(&mut svg, "</svg>")?;
+        *output = svg.into_bytes();
+
+        Ok(())
+    }
+
+    /// Get profiling session data for testing and inspection
+    pub fn get_profiling_session(&self) -> parking_lot::MutexGuard<'_, Option<ProfilingSession>> {
+        self.profiling_session.lock()
+    }
+
+    /// Check if profiling is currently active
+    #[must_use]
+    pub fn is_profiling_active(&self) -> bool {
+        self.profiler.is_active()
+    }
+}
+
+impl Clone for DiagnosticsBridge {
+    fn clone(&self) -> Self {
+        Self {
+            manager: self.manager.clone(),
+            trackers: self.trackers.clone(),
+            tracer: self.tracer.clone(),
+            trace_enricher: self.trace_enricher.clone(),
+            tracing_config: self.tracing_config.clone(),
+            shared_context: self.shared_context.clone(),
+            hot_reload_watcher: self.hot_reload_watcher.clone(),
+            hot_reload_receiver: self.hot_reload_receiver.clone(),
+            hot_reload_config: self.hot_reload_config.clone(),
+            watched_files: self.watched_files.clone(),
+            condition_evaluator: self.condition_evaluator.clone(),
+            variable_inspector: self.variable_inspector.clone(),
+            stack_navigator: self.stack_navigator.clone(),
+            // Profiling state is not cloned - each clone starts without active profiling
+            profiler: Box::new(PprofProfiler::new()),
+            profiling_session: Arc::new(Mutex::new(None)),
+            profiling_context: None,
+        }
     }
 }
 

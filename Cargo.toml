@@ -149,6 +149,9 @@ opentelemetry_sdk = { version = "0.27", features = ["trace", "rt-tokio"] }
 opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
 opentelemetry-semantic-conventions = "0.27"
 
+# CPU profiling for performance diagnostics
+pprof = { version = "0.13", features = ["flamegraph", "protobuf-codec"] }
+
 [profile.dev]
 opt-level = 0
 debug = true

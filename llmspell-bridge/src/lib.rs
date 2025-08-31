@@ -278,7 +278,10 @@ pub mod monitoring;
 pub mod rag_bridge;
 
 // Workflow modules (consolidated)
+pub mod null_profiler;
 pub mod orchestration;
+pub mod profiler;
+pub mod profiling_config;
 pub mod workflow_performance;
 pub mod workflows; // Includes WorkflowBridge, WorkflowRegistry, and StandardizedWorkflowFactory (consolidated)
 

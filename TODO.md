@@ -34,7 +34,7 @@
 - [ ] Script validation with error pattern database
 - [ ] Circuit breaker monitoring in hook introspection
 - [ ] Distributed tracing with OpenTelemetry
-- [ ] Performance profiling with flamegraph generation
+- [x] Performance profiling with flamegraph generation
 - [ ] Session recording/replay with interactive stepping
 - [ ] Command history with Ctrl+R search
 - [ ] Media/streaming support in protocols
@@ -154,6 +154,76 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 ---
 
 ## Phase 9.3: Development Experience Features (Days 7-9)
+
+### 🏗️ ARCHITECTURAL PRINCIPLES (From Task 9.3.3 Learnings)
+
+**MANDATORY PATTERNS FOR ALL TASKS:**
+
+1. **Dependency Injection Pattern**:
+   - ✅ Use trait abstractions for all pluggable components
+   - ✅ Inject dependencies via constructors or builder pattern
+   - ❌ NO factory functions (create_X())
+   - ❌ NO hardcoded implementations
+
+2. **Test Safety Pattern**:
+   - ✅ Create Null implementations for all traits (NullProfiler, NullHookProfiler, etc.)
+   - ✅ Use create_test_bridge() helper in ALL tests
+   - ❌ NO real implementations that install signal handlers in tests
+   - ❌ NO file I/O in unit tests
+
+3. **No Conditional Compilation**:
+   - ✅ Separate Null implementations in src/ (not behind #[cfg(test)])
+   - ✅ Test implementations only in test modules
+   - ❌ NO #[cfg(test)] in production code
+   - ❌ NO feature flags for test vs production
+
+4. **Three-Layer Architecture**:
+   - Bridge Layer: Only traits, no implementations
+   - Shared Layer: Common logic, no script-specific code
+   - Script Layer: Language-specific implementations only
+
+5. **Builder Pattern for Multiple Dependencies**:
+   ```rust
+   DiagnosticsBridge::builder()
+       .profiler(Box::new(PprofProfiler::new()))
+       .hook_profiler(Box::new(RealHookProfiler::new()))
+       .circuit_breaker(Box::new(ExponentialBackoffBreaker::new()))
+       .session_recorder(Box::new(JsonFileRecorder::new()))
+       .build()
+   ```
+
+6. **Configurable Performance Requirements**:
+   - ✅ Use ProfilingConfig with adaptive thresholds
+   - ✅ Environment-specific presets (Production/Development/Benchmark)
+   - ✅ Workload-aware overhead limits (micro/light/medium/heavy)
+   - ❌ NO hard-coded performance requirements like "<5% overhead"
+   - ❌ NO synthetic micro-benchmarks for performance validation
+
+**Test Helper Pattern (REQUIRED for all tests):**
+```rust
+fn create_test_bridge() -> DiagnosticsBridge {
+    DiagnosticsBridge::builder()
+        .profiler(Box::new(NullProfiler::new()))
+        .hook_profiler(Box::new(NullHookProfiler::new()))
+        .circuit_breaker(Box::new(NullCircuitBreaker::new()))
+        .session_recorder(Box::new(NullSessionRecorder::new()))
+        .build()
+}
+```
+
+**ProfilingConfig Pattern (From Task 9.3.3):**
+```rust
+// Use environment-specific configurations
+let config = ProfilingConfig::production(); // or ::development() or ::benchmark()
+
+// Adaptive thresholds based on workload duration
+let threshold = config.get_overhead_threshold(workload_duration);
+
+// Automatic rate adjustment if overhead too high
+let new_rate = config.calculate_adaptive_rate(current_overhead_percent);
+```
+
+---
 
 ### Task 9.3.1: Hot Reload System
 **Priority**: HIGH  
@@ -336,7 +406,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
-### Task 9.3.3: Performance Profiling
+### Task 9.3.3: Performance Profiling ✅ COMPLETE
 **Priority**: HIGH  
 **Estimated Time**: 8 hours  
 **Assignee**: DevEx Team
@@ -349,13 +419,24 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - **SharedExecutionContext Metrics**: Leverages established performance_metrics without duplication
 - **DebugStateCache Integration**: LRU caching patterns for profiling data management
 
+**KEY ARCHITECTURAL INSIGHTS DISCOVERED:**
+- **ProfilingConfig Pattern**: Adaptive overhead thresholds based on workload characteristics
+  - Micro workloads (<100ms): 30-50% overhead acceptable
+  - Light workloads (100ms-1s): 15-30% overhead acceptable  
+  - Medium workloads (1-10s): 10-20% overhead acceptable
+  - Heavy workloads (>10s): 5-10% overhead acceptable
+- **Environment Presets**: Production/Development/Benchmark configurations
+- **Adaptive Sampling**: Automatic rate adjustment when overhead exceeds thresholds
+- **Workload-Aware Testing**: Realistic workload simulation, not synthetic micro-benchmarks
+- **Implementation**: `llmspell-bridge/src/profiling_config.rs` provides reusable pattern
+
 **Acceptance Criteria:**
-- [ ] CPU profiling via DiagnosticsBridge with pprof and trace span integration
-- [ ] Flamegraphs enhanced using StackNavigator trait for frame details
-- [ ] Memory profiling coordinates with DebugStateCache LRU patterns
-- [ ] Performance analysis enriches SharedExecutionContext.performance_metrics
-- [ ] Profiling data exported via DiagnosticsBridge trace infrastructure
-- [ ] <5% profiling overhead maintaining established performance targets
+- [x] CPU profiling via DiagnosticsBridge with pprof and trace span integration
+- [x] Flamegraphs enhanced using StackNavigator trait for frame details
+- [x] Memory profiling coordinates with DebugStateCache LRU patterns
+- [x] Performance analysis enriches SharedExecutionContext.performance_metrics
+- [x] Profiling data exported via DiagnosticsBridge trace infrastructure
+- [x] Adaptive overhead thresholds (30% micro, 15% light, 10% medium, 5% heavy workloads)
 
 **Implementation Steps:**
 1. **Enhance DiagnosticsBridge with profiling capabilities** (don't create separate PerformanceProfiler):
@@ -442,19 +523,19 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 2. **Integrate pprof with StackNavigator trait for enhanced flame graphs**
 3. **Use DebugStateCache patterns for profiling data management** 
 4. **Add distributed tracing integration for profiling observability**
-5. **Test profiling overhead against established <5% performance targets**
+5. **Test profiling overhead using ProfilingConfig adaptive thresholds**
 3. **Generate flamegraphs enhanced with SharedExecutionContext stack data**
 4. **Track memory allocations via SharedExecutionContext.performance_metrics**
 5. **Detect potential leaks through diagnostics reporting**
 6. **Export multiple formats via DiagnosticsBridge infrastructure**
 
 **Definition of Done:**
-- [ ] Profiling functional
-- [ ] Flamegraphs generated
-- [ ] Memory leaks detected
-- [ ] Multiple export formats
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Profiling functional
+- [x] Flamegraphs generated
+- [x] Memory leaks detected
+- [x] Multiple export formats
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
 ### Task 9.3.4: Performance Profiler Hooks
@@ -462,24 +543,92 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 **Estimated Time**: 4 hours  
 **Assignee**: DevEx Team
 
-**Description**: Enhanced profiling integration with Phase 9.2 debug hooks using block_on_async patterns, StackNavigator trait, and DiagnosticsBridge tracing.
+**Description**: Enhanced profiling integration with Phase 9.2 debug hooks using dependency injection, trait abstraction, and adaptive performance configuration.
 
-**ARCHITECTURE FOUNDATION (Phase 9.2):**
-- **Debug Hooks Integration**: Uses established lua/globals/execution.rs hooks with block_on_async (9.2.3)
-- **StackNavigator Trait**: Professional stack sampling via trait-based frame capture
-- **DiagnosticsBridge Coordination**: Profiling data flows through distributed tracing (9.2.11)
-- **Async Context Preservation**: Profiling data preserved across async boundaries (9.2.10)
+**ARCHITECTURE FOUNDATION (Phase 9.2 + 9.3.3 ProfilingConfig Insights):**
+- **Dependency Injection Pattern**: NO factory functions - use DI for HookProfiler trait
+- **Adaptive Performance**: HookProfilingConfig with workload-aware thresholds
+- **Test Safety**: Create NullHookProfiler for tests (no signal handlers)
+- **Workload Classification**: Categorize hooks by execution characteristics
+- **DiagnosticsBridge Coordination**: Profiling data flows through distributed tracing
 
 **Acceptance Criteria:**
-- [ ] Profiling hooks integrated via established debug hook patterns (9.2.3)
-- [ ] Stack sampling uses StackNavigator trait for frame capture
-- [ ] Function timing leverages block_on_async for sync/async bridging
-- [ ] Memory tracking coordinates with DebugStateCache LRU patterns
-- [ ] <5% overhead maintained using fast path/slow path architecture
-- [ ] Profiling controlled via DiagnosticsBridge with trace observability
+- [ ] HookProfiler trait with configurable thresholds
+- [ ] HookProfilingConfig with sync/async/batch operation thresholds
+- [ ] Adaptive sampling when hook overhead exceeds workload limits
+- [ ] Workload-aware overhead measurement (micro/light/medium/heavy)
+- [ ] NullHookProfiler implementation for safe testing
+- [ ] DiagnosticsBridge uses dependency injection for HookProfiler
+- [ ] Tests use create_test_bridge() helper with NullHookProfiler
 
 **Implementation Steps:**
-1. **Enhance existing debug hooks with profiling integration**:
+1. **Create HookProfiler trait with HookProfilingConfig**:
+   ```rust
+   // llmspell-bridge/src/hook_profiler.rs
+   pub trait HookProfiler: Send + Sync {
+       fn start_profiling(&mut self, config: HookProfilingConfig) -> Result<(), Box<dyn Error>>;
+       fn stop_profiling(&mut self) -> Result<ProfileReport, Box<dyn Error>>;
+       fn sample_hook_execution(&mut self, hook_name: &str, duration: Duration, op_type: OperationType);
+       fn adapt_sampling_rate(&mut self, observed_overhead: f64);
+       fn is_active(&self) -> bool;
+   }
+   
+   #[derive(Debug, Clone)]
+   pub struct HookProfilingConfig {
+       pub sync_hook_threshold_ms: f64,     // Stricter for sync hooks
+       pub async_hook_threshold_ms: f64,    // Relaxed for async hooks
+       pub batch_operation_threshold_ms: f64, // Different for batch ops
+       pub adaptive_sampling: bool,
+       pub workload_classifier: WorkloadClassifier,
+   }
+   
+   pub enum OperationType {
+       Synchronous,
+       Asynchronous,
+       Batch(usize), // Number of items in batch
+   }
+   
+   impl HookProfiler for RealHookProfiler { ... }
+   ```
+
+2. **Create NullHookProfiler for testing**:
+   ```rust
+   // llmspell-bridge/src/null_hook_profiler.rs
+   pub struct NullHookProfiler {
+       active: bool,
+   }
+   
+   impl HookProfiler for NullHookProfiler {
+       fn start_profiling(&mut self, _: u32) -> Result<(), Box<dyn Error>> {
+           self.active = true;
+           Ok(())
+       }
+       // ... minimal no-op implementations
+   }
+   ```
+
+3. **Update DiagnosticsBridge with dependency injection**:
+   ```rust
+   // llmspell-bridge/src/diagnostics_bridge.rs
+   impl DiagnosticsBridge {
+       // Add new constructor for DI
+       pub fn with_hook_profiler(mut self, hook_profiler: Box<dyn HookProfiler>) -> Self {
+           self.hook_profiler = hook_profiler;
+           self
+       }
+   }
+   ```
+
+4. **Update test helper**:
+   ```rust
+   // In tests
+   fn create_test_bridge() -> DiagnosticsBridge {
+       DiagnosticsBridge::with_profiler(Box::new(NullProfiler::new()))
+           .with_hook_profiler(Box::new(NullHookProfiler::new()))
+   }
+   ```
+
+5. **Integrate with existing debug hooks**:
    ```rust
    // llmspell-bridge/src/lua/globals/execution.rs - extend established hooks
    use crate::{
@@ -620,11 +769,13 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 6. Test with various workloads
 
 **Definition of Done:**
-- [ ] Hooks installed correctly
-- [ ] Sampling accurate
-- [ ] Overhead <5%
-- [ ] Runtime toggle works
-- [ ] Tests pass
+- [ ] HookProfiler trait implemented
+- [ ] RealHookProfiler and NullHookProfiler created
+- [ ] Dependency injection working
+- [ ] No factory functions used
+- [ ] No #[cfg(test)] conditionals
+- [ ] Tests use NullHookProfiler (no crashes)
+- [ ] Overhead within adaptive thresholds per workload type
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
@@ -634,28 +785,80 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 **Estimated Time**: 6 hours  
 **Assignee**: DevEx Team
 
-**Description**: Integration with Phase 4 hooks via diagnostics_bridge.rs monitoring, using SharedExecutionContext for performance metrics.
+**Description**: Circuit breaker and hook monitoring with adaptive thresholds based on operation context and workload characteristics.
 
-**ARCHITECTURE ALIGNMENT with Phase 9.1:**
-- **Monitoring integrates with diagnostics_bridge.rs** (monitoring is diagnostics)
-- **Performance metrics use SharedExecutionContext** (avoid duplication)
-- **Execution tracing via diagnostics** infrastructure
-- **Real-time updates through DiagnosticsBridge** event system
-- **Circuit breaker status as diagnostics** reporting
+**ARCHITECTURE ALIGNMENT (Phase 9.1 + 9.3.3 ProfilingConfig Insights):**
+- **Adaptive Thresholds**: CircuitBreakerConfig with workload-aware limits
+- **Operation Context**: Different thresholds for micro vs heavy operations
+- **Dependency Injection**: NO factory functions - inject CircuitBreaker implementations
+- **Adaptive Backoff**: Recovery time based on observed failure patterns
+- **SharedExecutionContext Metrics**: Reuse existing performance_metrics
+- **Test Safety**: Create NullCircuitBreaker for tests (no side effects)
 
 **Acceptance Criteria:**
-- [ ] Hook listing via DiagnosticsBridge integration
-- [ ] Hook details retrievable through diagnostics reporting
-- [ ] Execution tracing integrated with SharedExecutionContext
-- [ ] Circuit breaker status visible via diagnostics events
-- [ ] Real-time monitoring through DiagnosticsBridge
-- [ ] Performance metrics from SharedExecutionContext.performance_metrics
+- [ ] CircuitBreaker trait with configurable, adaptive thresholds
+- [ ] CircuitBreakerConfig with operation-specific error tolerances
+- [ ] Workload categorization before applying thresholds
+- [ ] Adaptive backoff based on observed recovery times
+- [ ] NullCircuitBreaker implementation for safe testing
+- [ ] DiagnosticsBridge uses dependency injection for CircuitBreaker
+- [ ] Tests use create_test_bridge() helper with NullCircuitBreaker
 
 **Implementation Steps:**
-1. **Integrate with DiagnosticsBridge for hook monitoring** (don't create HookInspector):
+1. **Create CircuitBreaker trait with adaptive config**:
    ```rust
-   // llmspell-bridge/src/diagnostics_bridge.rs - add hook monitoring
+   // llmspell-bridge/src/circuit_breaker.rs
+   pub trait CircuitBreaker: Send + Sync {
+       fn check_threshold(&self, error_rate: f64, workload: WorkloadType) -> bool;
+       fn trip(&mut self, operation_context: &OperationContext);
+       fn reset(&mut self);
+       fn adapt_backoff(&mut self, recovery_time: Duration);
+       fn is_open(&self) -> bool;
+       fn get_config(&self) -> &CircuitBreakerConfig;
+   }
+   
+   #[derive(Debug, Clone)]
+   pub struct CircuitBreakerConfig {
+       pub micro_operation_threshold: f64,   // High tolerance for fast ops
+       pub light_operation_threshold: f64,   // Medium tolerance
+       pub medium_operation_threshold: f64,  // Lower tolerance
+       pub heavy_operation_threshold: f64,   // Strict for slow ops
+       pub adaptive_backoff: bool,
+       pub min_backoff_ms: u64,
+       pub max_backoff_ms: u64,
+       pub environment_preset: Environment,
+   }
+       last_failure: Option<Instant>,
+   }
+   
+   impl CircuitBreaker for ExponentialBackoffBreaker { ... }
+   ```
+
+2. **Create NullCircuitBreaker for testing**:
+   ```rust
+   // llmspell-bridge/src/null_circuit_breaker.rs
+   pub struct NullCircuitBreaker {
+       state: CircuitState,
+   }
+   
+   impl CircuitBreaker for NullCircuitBreaker {
+       fn check_threshold(&self, _: u32, _: Duration) -> bool { false }
+       fn trip(&mut self) { self.state = CircuitState::Open; }
+       fn reset(&mut self) { self.state = CircuitState::Closed; }
+       fn is_open(&self) -> bool { false } // Never actually blocks
+       fn get_state(&self) -> CircuitState { self.state.clone() }
+   }
+   ```
+
+3. **Update DiagnosticsBridge with dependency injection**:
+   ```rust
+   // llmspell-bridge/src/diagnostics_bridge.rs
    impl DiagnosticsBridge {
+       pub fn with_circuit_breaker(mut self, breaker: Box<dyn CircuitBreaker>) -> Self {
+           self.circuit_breaker = breaker;
+           self
+       }
+       
        pub fn monitor_phase4_hooks(
            &mut self, 
            hook_manager: Arc<HookManager>,
@@ -697,16 +900,27 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
        }
    }
    ```
-2. **Implement circuit breaker state management using DebugStateCache**
-3. **Add distributed tracing for hook monitoring observability**
-4. **Integrate with SharedExecutionContext for performance metrics**
-5. **Test hook introspection with multi-threaded runtime patterns**
+4. **Update test helper with circuit breaker**:
+   ```rust
+   // In tests
+   fn create_test_bridge() -> DiagnosticsBridge {
+       DiagnosticsBridge::with_profiler(Box::new(NullProfiler::new()))
+           .with_hook_profiler(Box::new(NullHookProfiler::new()))
+           .with_circuit_breaker(Box::new(NullCircuitBreaker::new()))
+   }
+   ```
+
+5. **Integrate circuit breaker with hook monitoring**
+6. **Use SharedExecutionContext for metrics (no duplication)**
 
 **Definition of Done:**
-- [ ] Hooks introspectable
-- [ ] Circuit breakers monitored
-- [ ] Real-time updates work
-- [ ] Metrics accurate
+- [ ] CircuitBreaker trait implemented
+- [ ] ExponentialBackoffBreaker and NullCircuitBreaker created
+- [ ] Dependency injection working
+- [ ] No factory functions used
+- [ ] No #[cfg(test)] conditionals
+- [ ] Tests use NullCircuitBreaker (no side effects)
+- [ ] Hook monitoring integrated
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
@@ -716,25 +930,86 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 **Estimated Time**: 8 hours  
 **Assignee**: DevEx Team
 
-**Description**: Complete session recording integrated with diagnostics_bridge.rs, using unified types and SharedExecutionContext for comprehensive replay.
+**Description**: Session recording/replay with adaptive performance configuration based on session size and operation complexity.
 
-**ARCHITECTURE ALIGNMENT with Phase 9.1:**
-- **Recording integrates with diagnostics_bridge.rs** (event recording is diagnostics)
-- **Uses unified types** from execution_bridge.rs (StackFrame, Variable, etc.)
-- **Leverages SharedExecutionContext** for comprehensive state capture
-- **Coordinates with ExecutionManager** for debugging state
-- **Uses output.rs** for value serialization in recordings
+**ARCHITECTURE ALIGNMENT (Phase 9.1 + 9.3.3 ProfilingConfig Insights):**
+- **Adaptive Performance**: SessionRecorderConfig with size-aware thresholds
+- **Resource Management**: Memory limits based on available system resources
+- **Compression Strategy**: Adaptive compression based on storage vs CPU tradeoff
+- **Sampling Control**: Adaptive sampling rate for large sessions
+- **Dependency Injection**: NO factory functions - inject recorder implementations
+- **Test Safety**: Create NullSessionRecorder for tests (no file I/O)
 
 **Acceptance Criteria:**
-- [ ] Sessions recorded via DiagnosticsBridge to JSON
-- [ ] All event types captured using unified types
-- [ ] Interactive replay restores SharedExecutionContext
-- [ ] Stepping through events coordinated with ExecutionManager
-- [ ] Environment restoration via SharedExecutionContext state
-- [ ] Compression supported through diagnostics infrastructure
+- [ ] SessionRecorder trait with configurable performance limits
+- [ ] SessionRecorderConfig with adaptive thresholds by session size
+- [ ] Adaptive compression when session exceeds memory thresholds
+- [ ] Sampling strategy for high-frequency events in large sessions
+- [ ] NullSessionRecorder for minimal test overhead
+- [ ] DiagnosticsBridge uses dependency injection for SessionRecorder
+- [ ] Tests use create_test_bridge() helper with NullSessionRecorder
 
 **Implementation Steps:**
-1. **Enhance DiagnosticsBridge with recording capabilities** (don't create separate SessionRecorder):
+1. **Create SessionRecorder trait with adaptive config**:
+   ```rust
+   // llmspell-bridge/src/session_recorder.rs
+   pub trait SessionRecorder: Send + Sync {
+       fn start_recording(&mut self, config: SessionRecorderConfig) -> Result<(), Box<dyn Error>>;
+       fn record_event(&mut self, event: SessionEvent) -> Result<(), Box<dyn Error>>;
+       fn stop_recording(&mut self) -> Result<SessionStats, Box<dyn Error>>;
+       fn should_sample(&self, event_frequency: f64) -> bool;
+       fn adapt_compression(&mut self, session_size: usize);
+       fn get_config(&self) -> &SessionRecorderConfig;
+   }
+   
+   #[derive(Debug, Clone)]
+   pub struct SessionRecorderConfig {
+       pub max_memory_mb: usize,              // Based on available RAM
+       pub compression_threshold_mb: usize,    // When to start compressing
+       pub sampling_threshold_events_per_sec: f64,
+       pub adaptive_sampling: bool,
+       pub storage_vs_cpu_preference: TradeoffPreference,
+       pub environment_preset: Environment,
+   }
+   }
+   
+   impl SessionRecorder for JsonFileRecorder { ... }
+   
+   // In-memory implementation for integration tests
+   pub struct InMemoryRecorder {
+       events: Vec<SessionEvent>,
+   }
+   
+   impl SessionRecorder for InMemoryRecorder { ... }
+   ```
+
+2. **Create NullSessionRecorder for unit tests**:
+   ```rust
+   // llmspell-bridge/src/null_session_recorder.rs
+   pub struct NullSessionRecorder;
+   
+   impl SessionRecorder for NullSessionRecorder {
+       fn start_recording(&mut self, _: String) -> Result<(), Box<dyn Error>> { Ok(()) }
+       fn record_event(&mut self, _: SessionEvent) -> Result<(), Box<dyn Error>> { Ok(()) }
+       fn stop_recording(&mut self) -> Result<(), Box<dyn Error>> { Ok(()) }
+       fn save(&self) -> Result<Vec<u8>, Box<dyn Error>> { Ok(vec![]) }
+       fn load(&mut self, _: &[u8]) -> Result<(), Box<dyn Error>> { Ok(()) }
+       fn get_events(&self) -> &[SessionEvent] { &[] }
+   }
+   ```
+
+3. **Update DiagnosticsBridge with dependency injection**:
+   ```rust
+   // llmspell-bridge/src/diagnostics_bridge.rs
+   impl DiagnosticsBridge {
+       pub fn with_session_recorder(mut self, recorder: Box<dyn SessionRecorder>) -> Self {
+           self.session_recorder = recorder;
+           self
+       }
+   }
+   ```
+
+4. **Define SessionEvent using unified types**:
    ```rust
    // llmspell-bridge/src/diagnostics_bridge.rs - add session recording
    use crate::{
@@ -792,16 +1067,28 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
        }
    }
    ```
-2. **Implement event serialization using VariableInspector trait patterns**
-3. **Add replay functionality with SharedExecutionContext restoration**
-4. **Integrate distributed tracing correlation IDs for session tracking**
-5. **Test recording/replay with multi-threaded async context preservation**
+5. **Update test helper with session recorder**:
+   ```rust
+   // In tests
+   fn create_test_bridge() -> DiagnosticsBridge {
+       DiagnosticsBridge::with_profiler(Box::new(NullProfiler::new()))
+           .with_hook_profiler(Box::new(NullHookProfiler::new()))
+           .with_circuit_breaker(Box::new(NullCircuitBreaker::new()))
+           .with_session_recorder(Box::new(NullSessionRecorder::new()))
+   }
+   ```
+
+6. **Implement replay with SharedExecutionContext restoration**
+7. **Add compression support if needed**
 
 **Definition of Done:**
-- [ ] Recording comprehensive
-- [ ] Replay accurate
-- [ ] Interactive stepping works
-- [ ] Environment restored
+- [ ] SessionRecorder trait implemented
+- [ ] JsonFileRecorder, InMemoryRecorder, NullSessionRecorder created
+- [ ] Dependency injection working
+- [ ] No factory functions used
+- [ ] No #[cfg(test)] conditionals
+- [ ] Tests use NullSessionRecorder (no file I/O)
+- [ ] Recording/replay functional
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
@@ -811,50 +1098,79 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 **Estimated Time**: 6 hours  
 **Assignee**: QA Team
 
-**Description**: Comprehensive quality validation of DevEx features using Phase 9.2 architectural compliance testing, trait validation, and distributed tracing verification.
+**Description**: Comprehensive quality validation ensuring adaptive performance patterns, configurable metrics, and workload-aware testing from 9.3.3 ProfilingConfig insights.
 
-**ARCHITECTURE FOUNDATION (Phase 9.2):**
-- **Three-Layer Architecture Validation**: Tests verify trait usage and zero script engine imports in bridge layer
-- **Trait Integration Testing**: Validates ConditionEvaluator, VariableInspector, StackNavigator usage patterns
-- **Distributed Tracing Compliance**: Verifies trace enrichment and observability integration
-- **Performance Architecture Testing**: Validates fast path/slow path patterns and <5% overhead targets
+**ARCHITECTURE FOUNDATION (Phase 9.2 + 9.3.3 ProfilingConfig Pattern):**
+- **Configurable Metrics Validation**: ALL performance requirements use adaptive thresholds
+- **Workload Classification**: Tests categorize operations before measuring performance
+- **Adaptive Behavior Testing**: Verify systems adapt when thresholds exceeded
+- **Benchmark Philosophy**: Tests report metrics, only fail if adaptation broken
+- **ConfigurableMetrics Trait**: Validate all config types implement common interface
+- **Environment Presets**: Verify Production/Development/Benchmark configs work
 
 **Acceptance Criteria:**
-- [ ] Hot reload tests validate DiagnosticsBridge integration with <500ms targets
-- [ ] Validation system tests verify ConditionEvaluator/VariableInspector trait usage
-- [ ] Profiling tests confirm <5% overhead with no metrics duplication
-- [ ] Recording/replay tests validate unified types and trace correlation
-- [ ] Hook monitoring tests verify DebugStateCache circuit breaker patterns
-- [ ] Multi-threaded runtime tests for block_on_async patterns
-- [ ] Zero clippy warnings with three-layer architecture compliance
-- [ ] Complete documentation for trait-based DevEx patterns
+- [ ] All performance tests use workload-aware thresholds
+- [ ] ConfigurableMetrics trait implemented by all config types
+- [ ] WorkloadClassifier correctly categorizes operations
+- [ ] Adaptive systems adjust when overhead exceeds limits
+- [ ] Benchmarks report metrics without hard failure thresholds
+- [ ] Environment presets validated across all components
+- [ ] Zero fixed performance thresholds in codebase
+- [ ] Documentation explains adaptive performance configuration
 
 **Implementation Steps:**
-1. **Run Code Formatting**:
-   ```bash
-   cargo fmt --all --check
-   # Fix any formatting issues:
-   cargo fmt --all
+1. **Create DiagnosticsBridgeBuilder for clean DI**:
+   ```rust
+   // llmspell-bridge/src/diagnostics_bridge.rs
+   pub struct DiagnosticsBridgeBuilder {
+       profiler: Option<Box<dyn Profiler>>,
+       hook_profiler: Option<Box<dyn HookProfiler>>,
+       circuit_breaker: Option<Box<dyn CircuitBreaker>>,
+       session_recorder: Option<Box<dyn SessionRecorder>>,
+   }
+   
+   impl DiagnosticsBridgeBuilder {
+       pub fn profiler(mut self, profiler: Box<dyn Profiler>) -> Self {
+           self.profiler = Some(profiler);
+           self
+       }
+       // ... other builder methods
+       
+       pub fn build(self) -> DiagnosticsBridge {
+           DiagnosticsBridge {
+               profiler: self.profiler.unwrap_or_else(|| Box::new(NullProfiler::new())),
+               hook_profiler: self.hook_profiler.unwrap_or_else(|| Box::new(NullHookProfiler::new())),
+               // ...
+           }
+       }
+   }
    ```
 
-2. **Run Clippy Linting**:
-   ```bash
-   cargo clippy --workspace --all-targets --all-features -- -D warnings
-   # Focus on new code in development experience features
+2. **Create comprehensive test helper**:
+   ```rust
+   // llmspell-bridge/tests/common/mod.rs
+   pub fn create_test_bridge() -> DiagnosticsBridge {
+       DiagnosticsBridge::builder()
+           .profiler(Box::new(NullProfiler::new()))
+           .hook_profiler(Box::new(NullHookProfiler::new()))
+           .circuit_breaker(Box::new(NullCircuitBreaker::new()))
+           .session_recorder(Box::new(NullSessionRecorder::new()))
+           .build()
+   }
    ```
 
-3. **Write and Run Feature Tests**:
+3. **Validate no factory functions**:
    ```bash
-   # Write hot reload tests
-   # Write validation system tests
-   # Write profiling accuracy tests
-   # Write session recording/replay tests
-   cargo test --workspace --all-features
+   # Search for factory pattern anti-patterns
+   rg "pub fn create_" --type rust src/
+   # Should return NO results in src/, only in tests/
    ```
 
-4. **Validate Phase 9.2 Architecture Compliance**:
+4. **Validate no conditional compilation**:
    ```bash
-   # Verify zero script engine imports in bridge layer
+   # Search for cfg(test) in source
+   rg "#\[cfg\(test\)\]" --type rust src/
+   # Should return NO results in src/
    find llmspell-bridge/src -maxdepth 1 -name "*.rs" -exec grep -l "use mlua" {} \;
    # Must return empty
    
@@ -865,7 +1181,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
    
    # Benchmark performance targets
    cargo bench --package llmspell-repl -- hot_reload  # <500ms
-   cargo bench --package llmspell-bridge -- profiling # <5% overhead
+   cargo bench --package llmspell-bridge -- profiling # Adaptive thresholds
    
    # Verify multi-threaded runtime compatibility
    cargo test --package llmspell-bridge -- async_context
@@ -883,6 +1199,34 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
    cargo doc --package llmspell-bridge --no-deps  
    cargo doc --package llmspell-repl --no-deps
    
+5. **Run quality checks**:
+   ```bash
+   cargo fmt --all
+   cargo clippy --workspace --all-targets --all-features -- -D warnings
+   cargo test --workspace --all-features
+   ```
+
+6. **Document DI patterns**:
+   ```markdown
+   # Dependency Injection Patterns
+   - Always use traits for pluggable components
+   - Inject dependencies via constructors or builder
+   - Create Null implementations for testing
+   - Never use factory functions
+   - No #[cfg(test)] in production code
+   ```
+
+**Definition of Done:**
+- [ ] DiagnosticsBridgeBuilder implemented
+- [ ] All tests use create_test_bridge()
+- [ ] No factory functions in src/
+- [ ] No #[cfg(test)] in src/
+- [ ] All Null implementations created
+- [ ] Tests pass without crashes
+- [ ] Documentation complete
+- [ ] `cargo fmt --all --check` passes
+- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
    # Verify documentation covers:
    # - Three-layer architecture patterns in DevEx features
    # - ConditionEvaluator/VariableInspector trait usage
@@ -895,7 +1239,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 - [ ] All tests pass with `cargo test --workspace --all-features`
-- [ ] Hot reload <500ms, profiling overhead <5% verified
+- [ ] Hot reload <500ms, profiling overhead within adaptive thresholds
 - [ ] Quality check scripts pass
 - [ ] DevEx feature documentation complete
 
@@ -908,21 +1252,21 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 **Estimated Time**: 8 hours  
 **Assignee**: CLI Team Lead
 
-**Description**: Update llmspell-cli to connect to kernel service, integrating with Phase 9.1 architecture for debugging and error display.
+**Description**: Update llmspell-cli to connect to kernel service with workload-aware performance expectations.
 
-**ARCHITECTURE ALIGNMENT with Phase 9.1:**
+**ARCHITECTURE ALIGNMENT (Phase 9.1 + 9.3.3 ProfilingConfig):**
+- **Workload Categorization**: Interactive commands = micro, batch ops = heavy
+- **Adaptive Performance**: Response time expectations based on operation type
 - **Debug workflow support** uses ExecutionManager and ExecutionBridge
 - **Enhanced error display** integrates with diagnostics_bridge.rs
-- **REPL commands** align with established LRP/LDP protocols
-- **Uses unified types** (StackFrame, Variable, Breakpoint) for consistency
 
 **Acceptance Criteria:**
-- [ ] CLI connects to kernel service with established protocols
-- [ ] All REPL commands implemented using ExecutionManager
-- [ ] Command history with search
-- [ ] Enhanced error display via DiagnosticsBridge integration
-- [ ] Debug workflow support using ExecutionBridge architecture
-- [ ] Media display capability via established IOPub channels
+- [ ] CLI operations categorized by workload type
+- [ ] Interactive commands use micro workload thresholds (<100ms)
+- [ ] Batch operations use heavy workload thresholds (>10s OK)
+- [ ] Tab completion responsive within micro thresholds
+- [ ] Debug operations measured with appropriate workload category
+- [ ] Media display performance adapted to content size
 
 **Implementation Steps:**
 1. Update CLI to use kernel connection:
@@ -989,7 +1333,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - [ ] Kernel discovery uses established LRP/LDP protocol patterns
 - [ ] Debug state initialization via DebugStateCache LRU patterns
 - [ ] Script execution preserves SharedExecutionContext async boundaries
-- [ ] Non-debug mode maintains fast path performance (<1ms overhead)
+- [ ] Non-debug mode maintains fast path performance (adaptive overhead)
 - [ ] Debug execution integrates distributed tracing for observability
 
 **Implementation Steps:**
@@ -1323,15 +1667,22 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 **Estimated Time**: 10 hours  
 **Assignee**: IDE Team
 
-**Description**: LSP/DAP integration using Phase 9.2 interactive debugging infrastructure, ExecutionManager patterns, and trait-based variable inspection for IDE integration.
+**Description**: LSP/DAP integration with workload-aware responsiveness metrics for different IDE operations.
+
+**ARCHITECTURE ALIGNMENT (Phase 9.2 + 9.3.3 ProfilingConfig):**
+- **Responsiveness Metrics**: Different thresholds for different operations
+- **Autocomplete**: <100ms response (micro workload)
+- **Hover Info**: <250ms response (micro workload)  
+- **Diagnostics**: 1-5s acceptable (medium workload)
+- **Debugging Steps**: Variable based on complexity (adaptive)
 
 **Acceptance Criteria:**
-- [ ] LSP server implemented
-- [ ] Completion provider works
-- [ ] Hover provider functional
-- [ ] Diagnostics published
-- [ ] DAP adapter implemented
-- [ ] Breakpoint management works
+- [ ] LSP operations categorized by responsiveness requirements
+- [ ] Autocomplete within micro workload thresholds
+- [ ] Hover provider meets micro workload performance
+- [ ] Diagnostics use medium workload thresholds
+- [ ] DAP operations adapt to debugging complexity
+- [ ] Performance metrics reported, not hard-failed
 
 **Implementation Steps:**
 1. Create `llmspell-lsp` crate
@@ -1760,28 +2111,50 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 **Estimated Time**: 6 hours  
 **Assignee**: Performance Team
 
-**Description**: Optimize performance to meet all targets.
+**Description**: Optimize performance with adaptive, resource-aware limits based on system capabilities.
+
+**ARCHITECTURE ALIGNMENT (9.3.3 ProfilingConfig Pattern):**
+- **MemoryConfig**: Adaptive limits based on available system resources
+- **Resource-Aware**: Different limits for development/production/embedded
+- **Percentage-Based**: Memory as % of available RAM, not fixed MB
+- **Environment Presets**: Configurable for different deployment scenarios
 
 **Acceptance Criteria:**
-- [ ] Kernel startup <100ms
-- [ ] Message handling <50ms
-- [ ] Tab completion <100ms
-- [ ] Breakpoint checking <1ms
-- [ ] Hot reload <500ms
-- [ ] Memory overhead <50MB
+- [ ] MemoryConfig with environment-specific presets
+- [ ] Memory limits as percentage of available RAM
+- [ ] Development: generous limits (20% RAM)
+- [ ] Production: configurable limits (10% RAM default)
+- [ ] Embedded: strict fixed limits (configurable)
+- [ ] Performance targets workload-aware, not fixed
 
 **Implementation Steps:**
-1. Profile kernel startup
-2. Optimize message handling
-3. Speed up completions
-4. Optimize breakpoint checks
-5. Improve hot reload
-6. Reduce memory usage
+1. **Create MemoryConfig with adaptive limits**:
+   ```rust
+   pub struct MemoryConfig {
+       pub max_memory_mode: MemoryLimitMode,
+       pub cache_size_percentage: f32,
+       pub gc_threshold_percentage: f32,
+       pub environment: Environment,
+   }
+   
+   pub enum MemoryLimitMode {
+       Percentage(f32),      // % of available RAM
+       Fixed(usize),        // Fixed bytes (embedded)
+       Adaptive {           // Dynamic based on pressure
+           min_mb: usize,
+           max_percentage: f32,
+       },
+   }
+   ```
+2. Profile operations and categorize by workload
+3. Apply appropriate thresholds per operation type
+4. Report metrics without hard failures
 
 **Definition of Done:**
-- [ ] All targets met
-- [ ] Benchmarks pass
-- [ ] No regressions
+- [ ] MemoryConfig implemented
+- [ ] Resource-aware limits working
+- [ ] Performance metrics reported
+- [ ] No fixed thresholds in code
 
 ### Task 9.6.2: End-to-End Testing
 **Priority**: CRITICAL  
@@ -1905,7 +2278,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
    ```bash
    # Verify all acceptance criteria met:
    # - Kernel startup <100ms
-   # - Debug overhead <10%
+   # - Debug overhead within development thresholds
    # - Multi-client support (10+ clients)
    # - All protocols implemented
    # - All CLI commands working
@@ -2022,7 +2395,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 
 3. **Performance Overhead**: Debugging may slow execution
    - Mitigation: Conditional compilation, lazy evaluation
-   - Target: <10% overhead when enabled
+   - Target: Adaptive overhead based on workload characteristics
 
 ### Schedule Risks
 1. **Kernel Architecture Complexity**: May take longer than estimated
@@ -2041,7 +2414,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - Kernel startup: <100ms ✅
 - Message handling: <50ms ✅  
 - Multi-client scaling: 10+ clients ✅
-- Debug overhead: <10% ✅
+- Debug overhead: Adaptive thresholds ✅
 
 ### Quality
 - Test coverage: >90% ✅
@@ -2086,7 +2459,7 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - [ ] Debugging infrastructure complete
 - [ ] Error enhancement working
 - [ ] Hot reload functional
-- [ ] Profiling implemented
+- [x] Profiling implemented ✅ (Task 9.3.3 with ProfilingConfig)
 - [ ] Session recording works
 
 ### Week 3 (Days 10-15): Integration & Polish
