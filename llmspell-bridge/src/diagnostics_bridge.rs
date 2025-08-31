@@ -10,6 +10,7 @@ use crate::execution_bridge::StackFrame;
 use crate::execution_context::{ExecutionContextBridge, SharedExecutionContext, SourceLocation};
 use crate::hook_profiler::{HookProfiler, RealHookProfiler};
 use crate::profiler::{PprofProfiler, Profiler};
+use crate::session_recorder::{JsonFileRecorder, SessionRecorder};
 use crate::stack_navigator::StackNavigator;
 use crate::tracing::{DefaultTraceEnricher, SpanHandle, TraceEnricher, TracingConfig};
 use crate::variable_inspector::VariableInspector;
@@ -266,6 +267,8 @@ pub struct DiagnosticsBridge {
     hook_profiler: Box<dyn HookProfiler>,
     /// Circuit breaker for hook fault tolerance (trait-based for testability)
     circuit_breaker: Box<dyn CircuitBreaker>,
+    /// Session recorder for debugging replay (trait-based for testability)
+    session_recorder: Box<dyn SessionRecorder>,
     /// Profiling session data
     profiling_session: Arc<Mutex<Option<ProfilingSession>>>,
     /// Shared execution context for profiling (separate from trace enrichment)
@@ -279,6 +282,7 @@ impl DiagnosticsBridge {
         Self::with_profiler(Box::new(PprofProfiler::new()))
             .with_hook_profiler(Box::new(RealHookProfiler::new()))
             .with_circuit_breaker(Box::new(ExponentialBackoffBreaker::default()))
+            .with_session_recorder(Box::new(JsonFileRecorder::new()))
     }
 
     /// Create a new diagnostics bridge with custom profiler (for dependency injection)
@@ -301,6 +305,7 @@ impl DiagnosticsBridge {
             profiler,
             hook_profiler: Box::new(RealHookProfiler::new()),
             circuit_breaker: Box::new(ExponentialBackoffBreaker::default()),
+            session_recorder: Box::new(JsonFileRecorder::new()),
             profiling_session: Arc::new(Mutex::new(None)),
             profiling_context: None,
         }
@@ -317,6 +322,13 @@ impl DiagnosticsBridge {
     #[must_use]
     pub fn with_circuit_breaker(mut self, circuit_breaker: Box<dyn CircuitBreaker>) -> Self {
         self.circuit_breaker = circuit_breaker;
+        self
+    }
+
+    /// Set the session recorder for dependency injection
+    #[must_use]
+    pub fn with_session_recorder(mut self, session_recorder: Box<dyn SessionRecorder>) -> Self {
+        self.session_recorder = session_recorder;
         self
     }
 
@@ -1505,6 +1517,7 @@ impl Clone for DiagnosticsBridge {
             profiler: Box::new(PprofProfiler::new()),
             hook_profiler: Box::new(RealHookProfiler::new()),
             circuit_breaker: Box::new(ExponentialBackoffBreaker::default()),
+            session_recorder: Box::new(JsonFileRecorder::new()),
             profiling_session: Arc::new(Mutex::new(None)),
             profiling_context: None,
         }
@@ -1521,10 +1534,12 @@ pub fn create_test_bridge() -> DiagnosticsBridge {
     use crate::null_circuit_breaker::NullCircuitBreaker;
     use crate::null_hook_profiler::NullHookProfiler;
     use crate::null_profiler::NullProfiler;
+    use crate::null_session_recorder::NullSessionRecorder;
 
     DiagnosticsBridge::with_profiler(Box::new(NullProfiler::new()))
         .with_hook_profiler(Box::new(NullHookProfiler::new()))
         .with_circuit_breaker(Box::new(NullCircuitBreaker::new()))
+        .with_session_recorder(Box::new(NullSessionRecorder::new()))
 }
 
 impl Default for DiagnosticsBridge {

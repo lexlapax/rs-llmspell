@@ -1255,13 +1255,13 @@ while tokio::time::Instant::now() < deadline {
 - **Test Safety**: Create NullSessionRecorder for tests (no file I/O)
 
 **Acceptance Criteria:**
-- [ ] SessionRecorder trait with configurable performance limits
-- [ ] SessionRecorderConfig with adaptive thresholds by session size
-- [ ] Adaptive compression when session exceeds memory thresholds
-- [ ] Sampling strategy for high-frequency events in large sessions
-- [ ] NullSessionRecorder for minimal test overhead
-- [ ] DiagnosticsBridge uses dependency injection for SessionRecorder
-- [ ] Tests use create_test_bridge() helper with NullSessionRecorder
+- [x] SessionRecorder trait with configurable performance limits
+- [x] SessionRecorderConfig with adaptive thresholds by session size
+- [x] Adaptive compression when session exceeds memory thresholds
+- [x] Sampling strategy for high-frequency events in large sessions
+- [x] NullSessionRecorder for minimal test overhead
+- [x] DiagnosticsBridge uses dependency injection for SessionRecorder
+- [x] Tests use create_test_bridge() helper with NullSessionRecorder
 
 **Implementation Steps:**
 1. **Create SessionRecorder trait with adaptive config**:
@@ -1396,13 +1396,13 @@ while tokio::time::Instant::now() < deadline {
 7. **Add compression support if needed**
 
 **Definition of Done:**
-- [ ] SessionRecorder trait implemented
-- [ ] JsonFileRecorder, InMemoryRecorder, NullSessionRecorder created
-- [ ] Dependency injection working
-- [ ] No factory functions used
-- [ ] No #[cfg(test)] conditionals
-- [ ] Tests use NullSessionRecorder (no file I/O)
-- [ ] Recording/replay functional
+- [x] SessionRecorder trait implemented
+- [x] JsonFileRecorder, InMemoryRecorder, NullSessionRecorder created
+- [x] Dependency injection working
+- [x] No factory functions used
+- [x] No #[cfg(test)] conditionals
+- [x] Tests use NullSessionRecorder (no file I/O)
+- [x] Recording/replay functional
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 

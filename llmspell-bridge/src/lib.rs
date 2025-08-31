@@ -283,9 +283,11 @@ pub mod hook_profiler;
 pub mod null_circuit_breaker;
 pub mod null_hook_profiler;
 pub mod null_profiler;
+pub mod null_session_recorder;
 pub mod orchestration;
 pub mod profiler;
 pub mod profiling_config;
+pub mod session_recorder;
 pub mod workflow_performance;
 pub mod workflows; // Includes WorkflowBridge, WorkflowRegistry, and StandardizedWorkflowFactory (consolidated)
 
