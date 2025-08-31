@@ -404,13 +404,10 @@ impl ExecutionContextBridge for DiagnosticsBridge {
 
     fn enrich_diagnostic(&self, message: &str) -> String {
         let context = self.get_context();
-        let enriched = context
-            .location
-            .as_ref()
-            .map_or_else(
-                || message.to_string(),
-                |location| format!("{} [{}:{}]", message, location.source, location.line),
-            );
+        let enriched = context.location.as_ref().map_or_else(
+            || message.to_string(),
+            |location| format!("{} [{}:{}]", message, location.source, location.line),
+        );
 
         // Create trace span for this diagnostic if tracing is enabled
         if let Some(span) = self.trace_execution("diagnostic", &context) {

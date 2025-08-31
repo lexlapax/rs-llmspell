@@ -121,7 +121,9 @@ fn test_tracing_config_defaults() {
     assert_eq!(config.otlp_endpoint, "http://localhost:4317");
     assert_eq!(config.service_name, "llmspell");
     #[allow(clippy::float_cmp)]
-    { assert_eq!(config.sampling_rate, 1.0); }
+    {
+        assert_eq!(config.sampling_rate, 1.0);
+    }
     assert_eq!(config.max_attributes_per_span, 128);
     assert_eq!(config.max_events_per_span, 128);
     assert!(config.auto_propagate);
