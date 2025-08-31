@@ -208,6 +208,7 @@ async fn run_embedded_app(
         false, // No streaming for embedded apps
         args,
         output_format,
+        false, // No debug mode for embedded apps
     )
     .await;
 

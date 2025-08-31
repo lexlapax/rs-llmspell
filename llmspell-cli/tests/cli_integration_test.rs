@@ -128,12 +128,15 @@ fn test_info_command() {
         .stdout(predicate::str::contains("lua - Available"));
 }
 #[test]
-fn test_repl_not_implemented() {
+fn test_repl_launches() {
+    // Test that REPL can launch (we can't test interactive mode in CI)
+    // We send immediate EOF to exit cleanly
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
     cmd.arg("repl")
+        .write_stdin("\x04") // Send Ctrl+D (EOF) immediately
         .assert()
-        .failure()
-        .stderr(predicate::str::contains("REPL mode not implemented"));
+        .success()
+        .stdout(predicate::str::contains("LLMSpell REPL"));
 }
 #[test]
 fn test_validate_missing_config() {

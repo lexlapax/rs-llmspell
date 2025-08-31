@@ -10,6 +10,7 @@ pub mod keys;
 pub mod providers;
 pub mod repl;
 pub mod run;
+pub mod run_debug;
 pub mod setup;
 pub mod validate;
 
@@ -94,8 +95,16 @@ pub async fn execute_command(
             };
             rag_options.apply_to_config(&mut runtime_config).await?;
 
-            run::execute_script_file(script, engine, runtime_config, stream, args, output_format)
-                .await
+            run::execute_script_file(
+                script,
+                engine,
+                runtime_config,
+                stream,
+                args,
+                output_format,
+                false,
+            )
+            .await
         }
         Commands::Exec {
             code,

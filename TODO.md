@@ -177,6 +177,15 @@
 
 **Description**: Debug mode CLI execution using Phase 9.2 interactive debugging infrastructure, session management patterns, and distributed tracing integration.
 
+**ARCHITECTURAL DECISION**: Extend KernelConnectionTrait with debug execution capabilities
+- **Rationale**: The kernel is already the execution mediator in debug scenarios, making it the natural place for debug execution logic
+- **Future Possibilities**: Supports evolution to remote debugging, session replay, distributed tracing, performance profiling
+- **Performance**: Zero-cost abstraction for non-debug path (direct runtime execution), debug path isolated with no hot path overhead
+- **Scalability**: Leverages kernel's existing multi-client session management (Phase 9.1 ClientManager)
+- **Modularity**: Follows established trait pattern with DI, single responsibility (kernel owns kernel-mediated execution)
+- **Implementation**: Add `execute_script_debug()` and `supports_debug()` methods to KernelConnectionTrait
+- **Testing**: Reuses NullKernelConnection for test isolation
+
 **ARCHITECTURE ALIGNMENT (Phase 9.2 + 9.3 Patterns):**
 - **Dependency Injection**: Use builder pattern for debug components
 - **Test Safety**: Create `NullDebugSession` for testing
@@ -188,16 +197,16 @@
 - **Circuit Breaker**: Use for kernel connection failures
 
 **Acceptance Criteria:**
-- [ ] Debug components use dependency injection
-- [ ] NullDebugSession implemented for tests
-- [ ] Debug mode initializes InteractiveDebugger with session management
-- [ ] Kernel discovery uses CircuitBreaker for retry logic
-- [ ] Debug state initialization via DebugStateCache LRU patterns
-- [ ] Script execution preserves SharedExecutionContext async boundaries
-- [ ] Non-debug mode maintains Light workload performance (adaptive)
-- [ ] Debug mode uses Medium workload thresholds
-- [ ] SessionRecorder captures debug session for replay
-- [ ] No hardcoded performance thresholds
+- [x] Debug components use dependency injection
+- [x] NullDebugSession implemented for tests
+- [x] Debug mode initializes InteractiveDebugger with session management
+- [x] Kernel discovery uses CircuitBreaker for retry logic
+- [x] Debug state initialization via DebugStateCache LRU patterns
+- [x] Script execution preserves SharedExecutionContext async boundaries
+- [x] Non-debug mode maintains Light workload performance (adaptive)
+- [x] Debug mode uses Medium workload thresholds
+- [x] SessionRecorder captures debug session for replay
+- [x] No hardcoded performance thresholds
 
 **Implementation Steps:**
 1. Modify run command handler:
@@ -289,13 +298,13 @@
 6. **Test debug/non-debug paths with performance validation**
 
 **Definition of Done:**
-- [ ] Debug mode detected correctly
-- [ ] Kernel execution works
-- [ ] Fallback functional
-- [ ] Performance unchanged for non-debug
-- [ ] Tests pass
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Debug mode detected correctly
+- [x] Kernel execution works
+- [x] Fallback functional
+- [x] Performance unchanged for non-debug
+- [x] Tests pass
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
 ### Task 9.4.3: CLI Debug Event Handler

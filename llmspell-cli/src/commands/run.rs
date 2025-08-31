@@ -2,7 +2,6 @@
 //! ABOUTME: Handles script execution with streaming and output formatting
 
 use crate::cli::{OutputFormat, ScriptEngine};
-use crate::output::{format_output, print_stream};
 use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
 use std::collections::HashMap;
@@ -14,7 +13,7 @@ use tokio::fs;
 /// - Positional: arg1 arg2 arg3 -> {"1": "arg1", "2": "arg2", "3": "arg3"}
 /// - Named: --key value --flag true -> {"key": "value", "flag": "true"}
 /// - Mixed: pos1 --named value pos2 -> {"1": "pos1", "named": "value", "2": "pos2"}
-fn parse_script_args(args: Vec<String>, script_path: &Path) -> HashMap<String, String> {
+pub fn parse_script_args(args: Vec<String>, script_path: &Path) -> HashMap<String, String> {
     let mut parsed = HashMap::new();
     let mut positional_index = 1;
     let mut i = 0;
@@ -60,6 +59,7 @@ pub async fn execute_script_file(
     stream: bool,
     args: Vec<String>,
     output_format: OutputFormat,
+    debug_mode: bool,
 ) -> Result<()> {
     // Validate script file exists
     if !script_path.exists() {
@@ -69,28 +69,27 @@ pub async fn execute_script_file(
     // Read script content
     let script_content = fs::read_to_string(&script_path).await?;
 
-    // Parse script arguments
-    let parsed_args = parse_script_args(args, &script_path);
-    if !parsed_args.is_empty() {
-        tracing::debug!("Parsed script arguments: {:?}", parsed_args);
-    }
-
-    // Create runtime for the selected engine
-    let mut runtime = super::create_runtime(engine, runtime_config).await?;
-
-    // Pass script arguments to the runtime
-    runtime.set_script_args(parsed_args).await?;
-
-    // Execute script
-    if stream && runtime.supports_streaming() {
-        // Execute with streaming
-        let mut stream = runtime.execute_script_streaming(&script_content).await?;
-        print_stream(&mut stream, output_format).await?;
+    if debug_mode {
+        // Debug execution path using kernel
+        super::run_debug::execute_script_debug(
+            script_content,
+            script_path,
+            runtime_config,
+            args,
+            output_format,
+        )
+        .await
     } else {
-        // Execute without streaming
-        let result = runtime.execute_script(&script_content).await?;
-        println!("{}", format_output(&result, output_format)?);
+        // Non-debug execution path (existing implementation)
+        super::run_debug::execute_script_nondebug(
+            script_content,
+            script_path,
+            engine,
+            runtime_config,
+            stream,
+            args,
+            output_format,
+        )
+        .await
     }
-
-    Ok(())
 }
