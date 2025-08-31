@@ -3,20 +3,17 @@
 //! Tests the CPU and memory profiling implementation with distributed tracing
 //! integration and verifies <5% overhead requirement from Task 9.3.3.
 
+mod common;
+
+use common::create_test_bridge;
 use llmspell_bridge::diagnostics_bridge::DiagnosticsBridge;
 use llmspell_bridge::execution_bridge::StackFrame;
 use llmspell_bridge::execution_context::SharedExecutionContext;
 use llmspell_bridge::lua::stack_navigator_impl::LuaStackNavigator;
-use llmspell_bridge::null_profiler::NullProfiler;
 use llmspell_bridge::profiling_config::{ProfilingConfig, ProfilingMetrics};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-
-/// Helper to create a test bridge with `NullProfiler`
-fn create_test_bridge() -> DiagnosticsBridge {
-    DiagnosticsBridge::with_profiler(Box::new(NullProfiler::new()))
-}
 
 /// Test profiling overhead with configurable thresholds
 #[tokio::test]

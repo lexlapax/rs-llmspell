@@ -275,14 +275,182 @@ pub struct DiagnosticsBridge {
     profiling_context: Option<Arc<tokio::sync::RwLock<SharedExecutionContext>>>,
 }
 
+/// Builder for `DiagnosticsBridge` with clean dependency injection
+pub struct DiagnosticsBridgeBuilder {
+    /// Optional profiler implementation
+    profiler: Option<Box<dyn Profiler>>,
+    /// Optional hook profiler implementation
+    hook_profiler: Option<Box<dyn HookProfiler>>,
+    /// Optional circuit breaker implementation
+    circuit_breaker: Option<Box<dyn CircuitBreaker>>,
+    /// Optional session recorder implementation
+    session_recorder: Option<Box<dyn SessionRecorder>>,
+    /// Optional condition evaluator
+    condition_evaluator: Option<Arc<dyn ConditionEvaluator>>,
+    /// Optional variable inspector
+    variable_inspector: Option<Arc<dyn VariableInspector>>,
+    /// Optional stack navigator
+    stack_navigator: Option<Arc<dyn StackNavigator>>,
+    /// Optional trace enricher
+    trace_enricher: Option<Arc<dyn TraceEnricher>>,
+    /// Optional tracing configuration
+    tracing_config: Option<TracingConfig>,
+    /// Optional hot reload configuration
+    hot_reload_config: Option<HotReloadConfig>,
+}
+
+#[allow(clippy::missing_const_for_fn)] // Builder methods cannot be const due to Box<dyn Trait> and Option
+impl DiagnosticsBridgeBuilder {
+    /// Create a new builder
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            profiler: None,
+            hook_profiler: None,
+            circuit_breaker: None,
+            session_recorder: None,
+            condition_evaluator: None,
+            variable_inspector: None,
+            stack_navigator: None,
+            trace_enricher: None,
+            tracing_config: None,
+            hot_reload_config: None,
+        }
+    }
+
+    /// Set the profiler implementation
+    #[must_use]
+    pub fn profiler(mut self, profiler: Box<dyn Profiler>) -> Self {
+        self.profiler = Some(profiler);
+        self
+    }
+
+    /// Set the hook profiler implementation
+    #[must_use]
+    pub fn hook_profiler(mut self, hook_profiler: Box<dyn HookProfiler>) -> Self {
+        self.hook_profiler = Some(hook_profiler);
+        self
+    }
+
+    /// Set the circuit breaker implementation
+    #[must_use]
+    pub fn circuit_breaker(mut self, circuit_breaker: Box<dyn CircuitBreaker>) -> Self {
+        self.circuit_breaker = Some(circuit_breaker);
+        self
+    }
+
+    /// Set the session recorder implementation
+    #[must_use]
+    pub fn session_recorder(mut self, session_recorder: Box<dyn SessionRecorder>) -> Self {
+        self.session_recorder = Some(session_recorder);
+        self
+    }
+
+    /// Set the condition evaluator
+    #[must_use]
+    pub fn condition_evaluator(mut self, evaluator: Arc<dyn ConditionEvaluator>) -> Self {
+        self.condition_evaluator = Some(evaluator);
+        self
+    }
+
+    /// Set the variable inspector
+    #[must_use]
+    pub fn variable_inspector(mut self, inspector: Arc<dyn VariableInspector>) -> Self {
+        self.variable_inspector = Some(inspector);
+        self
+    }
+
+    /// Set the stack navigator
+    #[must_use]
+    pub fn stack_navigator(mut self, navigator: Arc<dyn StackNavigator>) -> Self {
+        self.stack_navigator = Some(navigator);
+        self
+    }
+
+    /// Set the trace enricher
+    #[must_use]
+    pub fn trace_enricher(mut self, enricher: Arc<dyn TraceEnricher>) -> Self {
+        self.trace_enricher = Some(enricher);
+        self
+    }
+
+    /// Set the tracing configuration
+    #[must_use]
+    pub fn tracing_config(mut self, config: TracingConfig) -> Self {
+        self.tracing_config = Some(config);
+        self
+    }
+
+    /// Set the hot reload configuration
+    #[must_use]
+    pub fn hot_reload_config(mut self, config: HotReloadConfig) -> Self {
+        self.hot_reload_config = Some(config);
+        self
+    }
+
+    /// Build the `DiagnosticsBridge` with defaults for missing components
+    #[must_use]
+    pub fn build(self) -> DiagnosticsBridge {
+        let tracing_config = self.tracing_config.unwrap_or_default();
+        let tracer = if tracing_config.enabled {
+            DiagnosticsBridge::init_tracer(&tracing_config)
+                .ok()
+                .map(Arc::new)
+        } else {
+            None
+        };
+
+        DiagnosticsBridge {
+            manager: global_debug_manager(),
+            trackers: Arc::new(Mutex::new(HashMap::new())),
+            tracer,
+            trace_enricher: self
+                .trace_enricher
+                .unwrap_or_else(|| Arc::new(DefaultTraceEnricher)),
+            tracing_config,
+            shared_context: Arc::new(Mutex::new(SharedExecutionContext::new())),
+            hot_reload_watcher: Arc::new(Mutex::new(None)),
+            hot_reload_receiver: Arc::new(Mutex::new(None)),
+            hot_reload_config: self.hot_reload_config.unwrap_or_default(),
+            watched_files: Arc::new(Mutex::new(HashMap::new())),
+            condition_evaluator: self.condition_evaluator,
+            variable_inspector: self.variable_inspector,
+            stack_navigator: self.stack_navigator,
+            profiler: self
+                .profiler
+                .unwrap_or_else(|| Box::new(PprofProfiler::new())),
+            hook_profiler: self
+                .hook_profiler
+                .unwrap_or_else(|| Box::new(RealHookProfiler::new())),
+            circuit_breaker: self
+                .circuit_breaker
+                .unwrap_or_else(|| Box::new(ExponentialBackoffBreaker::default())),
+            session_recorder: self
+                .session_recorder
+                .unwrap_or_else(|| Box::new(JsonFileRecorder::new())),
+            profiling_session: Arc::new(Mutex::new(None)),
+            profiling_context: None,
+        }
+    }
+}
+
+impl Default for DiagnosticsBridgeBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl DiagnosticsBridge {
     /// Create a new diagnostics bridge
     #[must_use]
     pub fn new() -> Self {
         Self::with_profiler(Box::new(PprofProfiler::new()))
-            .with_hook_profiler(Box::new(RealHookProfiler::new()))
-            .with_circuit_breaker(Box::new(ExponentialBackoffBreaker::default()))
-            .with_session_recorder(Box::new(JsonFileRecorder::new()))
+    }
+
+    /// Create a builder for constructing a `DiagnosticsBridge` with custom components
+    #[must_use]
+    pub fn builder() -> DiagnosticsBridgeBuilder {
+        DiagnosticsBridgeBuilder::new()
     }
 
     /// Create a new diagnostics bridge with custom profiler (for dependency injection)
@@ -1522,24 +1690,6 @@ impl Clone for DiagnosticsBridge {
             profiling_context: None,
         }
     }
-}
-
-/// Create a test-safe `DiagnosticsBridge` with null profilers for testing
-///
-/// This helper creates a `DiagnosticsBridge` with `NullProfiler` and `NullHookProfiler`
-/// to avoid signal handler issues and other side effects during testing.
-#[cfg(test)]
-#[must_use]
-pub fn create_test_bridge() -> DiagnosticsBridge {
-    use crate::null_circuit_breaker::NullCircuitBreaker;
-    use crate::null_hook_profiler::NullHookProfiler;
-    use crate::null_profiler::NullProfiler;
-    use crate::null_session_recorder::NullSessionRecorder;
-
-    DiagnosticsBridge::with_profiler(Box::new(NullProfiler::new()))
-        .with_hook_profiler(Box::new(NullHookProfiler::new()))
-        .with_circuit_breaker(Box::new(NullCircuitBreaker::new()))
-        .with_session_recorder(Box::new(NullSessionRecorder::new()))
 }
 
 impl Default for DiagnosticsBridge {

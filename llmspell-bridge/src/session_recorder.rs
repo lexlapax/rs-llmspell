@@ -530,41 +530,47 @@ mod tests {
     fn test_session_recorder_config_presets() {
         let prod_config = SessionRecorderConfig::production();
         assert_eq!(prod_config.max_memory_mb, 50);
-        assert_eq!(prod_config.sampling_rate, 0.1);
+        #[allow(clippy::float_cmp)]
+        {
+            assert_eq!(prod_config.sampling_rate, 0.1);
+        }
 
         let test_config = SessionRecorderConfig::testing();
         assert_eq!(test_config.max_memory_mb, 200);
-        assert_eq!(test_config.sampling_rate, 0.5);
+        #[allow(clippy::float_cmp)]
+        {
+            assert_eq!(test_config.sampling_rate, 0.5);
+        }
     }
 
     #[test]
     fn test_json_file_recorder_lifecycle() {
         let mut recorder = JsonFileRecorder::new();
-        
+
         assert!(!recorder.is_recording());
-        
+
         // Start recording
         let config = SessionRecorderConfig::default();
         assert!(recorder.start_recording(config).is_ok());
         assert!(recorder.is_recording());
-        
+
         // Cannot start when already recording
         assert!(recorder
             .start_recording(SessionRecorderConfig::default())
             .is_err());
-        
+
         // Record some events
         let event = SessionEvent::ScriptStart {
             script_path: "test.lua".to_string(),
             context: SharedExecutionContext::new(),
         };
         assert!(recorder.record_event(event).is_ok());
-        
+
         // Stop recording
         let stats = recorder.stop_recording();
         assert!(stats.is_ok());
         assert!(!recorder.is_recording());
-        
+
         let stats = stats.unwrap();
         assert_eq!(stats.event_count, 1);
     }
@@ -572,16 +578,16 @@ mod tests {
     #[test]
     fn test_in_memory_recorder() {
         let mut recorder = InMemoryRecorder::new();
-        
+
         recorder
             .start_recording(SessionRecorderConfig::default())
             .unwrap();
-        
+
         let event1 = SessionEvent::ScriptStart {
             script_path: "test.lua".to_string(),
             context: SharedExecutionContext::new(),
         };
-        
+
         let event2 = SessionEvent::DebugStateChange {
             old_state: DebugState::Running,
             new_state: DebugState::Paused {
@@ -593,12 +599,12 @@ mod tests {
                 },
             },
         };
-        
+
         recorder.record_event(event1).unwrap();
         recorder.record_event(event2).unwrap();
-        
+
         assert_eq!(recorder.get_events().len(), 2);
-        
+
         let stats = recorder.stop_recording().unwrap();
         assert_eq!(stats.event_count, 2);
     }
@@ -606,23 +612,23 @@ mod tests {
     #[test]
     fn test_save_and_load() {
         let mut recorder = JsonFileRecorder::new();
-        
+
         recorder
             .start_recording(SessionRecorderConfig::default())
             .unwrap();
-        
+
         let event = SessionEvent::ScriptStart {
             script_path: "test.lua".to_string(),
             context: SharedExecutionContext::new(),
         };
-        
+
         recorder.record_event(event).unwrap();
         recorder.stop_recording().unwrap();
-        
+
         // Save
         let data = recorder.save().unwrap();
         assert!(!data.is_empty());
-        
+
         // Load into new recorder
         let mut new_recorder = JsonFileRecorder::new();
         assert!(new_recorder.load(&data).is_ok());
