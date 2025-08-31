@@ -217,7 +217,7 @@ impl HttpRequestTool {
         };
 
         let client = Client::builder()
-            .timeout(Duration::from_secs(config.timeout_seconds))
+            // Remove timeout here - will be handled by TimeoutBuilder for consistency
             .user_agent(&config.user_agent)
             .redirect(if config.follow_redirects {
                 reqwest::redirect::Policy::limited(config.max_redirects)

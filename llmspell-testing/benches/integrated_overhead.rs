@@ -295,8 +295,12 @@ fn bench_tool_system_overhead(c: &mut Criterion) {
                         "b": i + 1
                     });
                     let ctx = ExecutionContext::default();
-                    let text = serde_json::to_string(&input).unwrap();
-                    let _ = tool.execute(AgentInput::text(text), ctx).await;
+                    let _ = tool
+                        .execute(
+                            AgentInput::text("").with_parameter("parameters", input),
+                            ctx,
+                        )
+                        .await;
                 }
 
                 start.elapsed()
@@ -334,8 +338,13 @@ fn bench_tool_system_overhead(c: &mut Criterion) {
                         "b": i + 1
                     });
                     let ctx = ExecutionContext::default();
-                    let text = serde_json::to_string(&input).unwrap();
-                    let result = tool.execute(AgentInput::text(text), ctx).await.unwrap();
+                    let result = tool
+                        .execute(
+                            AgentInput::text("").with_parameter("parameters", input),
+                            ctx,
+                        )
+                        .await
+                        .unwrap();
 
                     // Save tool result
                     state_manager

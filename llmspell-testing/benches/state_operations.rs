@@ -289,19 +289,30 @@ fn bench_memory_usage_scaling(c: &mut Criterion) {
                     rt.block_on(async {
                         let state_manager = StateManager::new().await.unwrap();
 
-                        // Add entries
+                        // Add entries with rate limit handling
                         for i in 0..count {
-                            state_manager
-                                .set(
-                                    StateScope::Global,
-                                    &format!("entry_{}", i),
-                                    serde_json::json!({
-                                        "index": i,
-                                        "data": "x".repeat(100)
-                                    }),
-                                )
-                                .await
-                                .unwrap();
+                            loop {
+                                match state_manager
+                                    .set(
+                                        StateScope::Global,
+                                        &format!("entry_{}", i),
+                                        serde_json::json!({
+                                            "index": i,
+                                            "data": "x".repeat(100)
+                                        }),
+                                    )
+                                    .await
+                                {
+                                    Ok(_) => break,
+                                    Err(e) if e.to_string().contains("rate limited") => {
+                                        // Wait a small amount and retry
+                                        tokio::time::sleep(tokio::time::Duration::from_millis(1))
+                                            .await;
+                                        continue;
+                                    }
+                                    Err(e) => panic!("Unexpected error: {}", e),
+                                }
+                            }
                         }
 
                         // Force a read to ensure data is in memory

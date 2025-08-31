@@ -79,6 +79,9 @@ pub mod runner;
 // Unified test execution framework
 pub mod test_framework;
 
+// HTTP testing framework for resilient external service testing
+pub mod http_test_framework;
+
 // Re-export commonly used test utilities when available
 // TODO: Add load_fixture function in Task 5.7.5 (Test Fixtures and Data Management)
 // #[cfg(feature = "test-utilities")]

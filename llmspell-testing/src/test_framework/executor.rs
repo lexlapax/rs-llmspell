@@ -1,19 +1,19 @@
 //! Test executor trait and execution context
 
+use super::telemetry::TelemetryCollector;
+use super::workload::WorkloadClass;
 use async_trait::async_trait;
 use std::sync::Arc;
 use std::time::Duration;
-use super::telemetry::TelemetryCollector;
-use super::workload::WorkloadClass;
 
 /// Result type for test execution
 pub trait TestResult: Send + Sync {
     /// Check if the test passed
     fn is_success(&self) -> bool;
-    
+
     /// Get a summary of the result
     fn summary(&self) -> String;
-    
+
     /// Get detailed metrics if available
     fn metrics(&self) -> Option<serde_json::Value> {
         None
@@ -72,23 +72,23 @@ impl<C: Clone> ExecutionContext<C> {
             timeout: Some(workload.timeout()),
         }
     }
-    
+
     /// Create a test context with default configuration
     pub fn test_default(config: C) -> Self {
         Self::new(config, ExecutionMode::Test)
     }
-    
+
     /// Create a benchmark context with default configuration
     pub fn bench_default(config: C) -> Self {
         Self::new(config, ExecutionMode::Bench)
     }
-    
+
     /// Set a custom timeout
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
     }
-    
+
     /// Remove timeout
     pub fn without_timeout(mut self) -> Self {
         self.timeout = None;
@@ -103,18 +103,18 @@ pub trait TestExecutor: Send + Sync {
     type Config: Clone + Send + Sync;
     /// Result type for this executor
     type Result: TestResult;
-    
+
     /// Execute test with automatic workload adaptation
     async fn execute(&self, context: ExecutionContext<Self::Config>) -> Self::Result;
-    
+
     /// Get default configuration for this executor
     fn default_config(&self) -> Self::Config;
-    
+
     /// Adapt workload based on execution mode
     fn adapt_workload(&self, mode: ExecutionMode) -> WorkloadClass {
         WorkloadClass::from_mode(mode)
     }
-    
+
     /// Get a name for this executor
     fn name(&self) -> &str {
         std::any::type_name::<Self>()

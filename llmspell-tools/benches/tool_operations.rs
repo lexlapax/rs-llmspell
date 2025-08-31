@@ -358,7 +358,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
                     json!({
                         "operation": "hash",
                         "algorithm": "sha256",
-                        "data": "TEST VALUE"
+                        "input": "TEST VALUE"
                     }),
                 );
                 let hash_result = hash_tool

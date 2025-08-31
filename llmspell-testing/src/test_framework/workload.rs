@@ -1,7 +1,7 @@
 //! Workload classification and adaptation
 
-use std::time::Duration;
 use super::executor::ExecutionMode;
+use std::time::Duration;
 
 /// Workload classification for adaptive test execution
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,7 +38,7 @@ impl WorkloadClass {
             WorkloadClass::Small
         }
     }
-    
+
     /// Get workload class from execution mode
     pub fn from_mode(mode: ExecutionMode) -> Self {
         match mode {
@@ -48,7 +48,7 @@ impl WorkloadClass {
             ExecutionMode::CI => WorkloadClass::Medium,
         }
     }
-    
+
     /// Get the number of events/items for this workload
     pub fn event_count(&self) -> usize {
         match self {
@@ -59,7 +59,7 @@ impl WorkloadClass {
             Self::Stress => 1_000_000,
         }
     }
-    
+
     /// Get the timeout for this workload
     pub fn timeout(&self) -> Duration {
         match self {
@@ -70,18 +70,18 @@ impl WorkloadClass {
             Self::Stress => Duration::from_secs(300),
         }
     }
-    
+
     /// Get the maximum overhead percentage for this workload
     pub fn max_overhead_percent(&self) -> f64 {
         match self {
-            Self::Micro => 50.0,  // Allow high overhead for tiny workloads
+            Self::Micro => 50.0, // Allow high overhead for tiny workloads
             Self::Small => 30.0,
             Self::Medium => 15.0,
             Self::Large => 10.0,
-            Self::Stress => 5.0,   // Strict for stress tests
+            Self::Stress => 5.0, // Strict for stress tests
         }
     }
-    
+
     /// Get batch size for processing
     pub fn batch_size(&self) -> usize {
         match self {
@@ -92,12 +92,12 @@ impl WorkloadClass {
             Self::Stress => 100_000,
         }
     }
-    
+
     /// Check if this is a lightweight workload
     pub fn is_lightweight(&self) -> bool {
         matches!(self, Self::Micro | Self::Small)
     }
-    
+
     /// Check if this is a heavyweight workload
     pub fn is_heavyweight(&self) -> bool {
         matches!(self, Self::Large | Self::Stress)
@@ -108,7 +108,7 @@ impl WorkloadClass {
 pub trait WorkloadAdapter {
     /// Adapt the workload based on system capabilities
     fn adapt(&mut self, class: WorkloadClass);
-    
+
     /// Get the current workload class
     fn current_workload(&self) -> WorkloadClass;
 }
@@ -132,12 +132,12 @@ impl WorkloadConfig {
             timeout: class.timeout(),
         }
     }
-    
+
     /// Create from environment
     pub fn from_env() -> Self {
         Self::new(WorkloadClass::from_env())
     }
-    
+
     /// Scale the workload by a factor
     pub fn scale(mut self, factor: f64) -> Self {
         self.event_count = (self.event_count as f64 * factor) as usize;
@@ -153,7 +153,7 @@ impl WorkloadAdapter for WorkloadConfig {
         self.batch_size = class.batch_size();
         self.timeout = class.timeout();
     }
-    
+
     fn current_workload(&self) -> WorkloadClass {
         self.class
     }

@@ -640,22 +640,37 @@ pub fn install_interactive_debug_hooks(
         shared_context,
     )));
 
-    // Set initial debug mode based on whether there are breakpoints
-    let initial_mode = block_on_async(
-        "check_initial_mode",
-        async move {
-            let breakpoints = execution_manager.get_breakpoints().await;
-            if breakpoints.is_empty() {
-                Ok::<DebugMode, std::io::Error>(DebugMode::Disabled)
-            } else {
-                Ok::<DebugMode, std::io::Error>(DebugMode::Minimal {
-                    check_interval: 1000,
-                })
-            }
-        },
-        None,
-    )
-    .unwrap_or(DebugMode::Disabled);
+    // FAST PATH: Check if we can determine the mode without expensive async operations
+    // Most common case: no breakpoints = Disabled mode (zero-cost abstraction)
+    let initial_mode = {
+        // Try fast synchronous check first
+        let fast_mode = match execution_manager.try_get_breakpoint_count_sync() {
+            Some(0) => Some(DebugMode::Disabled), // No breakpoints - fast path
+            Some(_) => Some(DebugMode::Minimal {
+                check_interval: 1000,
+            }), // Has breakpoints
+            None => None,                         // Need async check
+        };
+
+        // Fall back to async check only if necessary
+        fast_mode.unwrap_or_else(|| {
+            block_on_async(
+                "check_initial_mode",
+                async move {
+                    let breakpoints = execution_manager.get_breakpoints().await;
+                    if breakpoints.is_empty() {
+                        Ok::<DebugMode, std::io::Error>(DebugMode::Disabled)
+                    } else {
+                        Ok::<DebugMode, std::io::Error>(DebugMode::Minimal {
+                            check_interval: 1000,
+                        })
+                    }
+                },
+                None,
+            )
+            .unwrap_or(DebugMode::Disabled)
+        })
+    };
 
     // Set the debug mode in the cache
     hook.lock().debug_cache.set_debug_mode(initial_mode);

@@ -127,6 +127,83 @@ open target/criterion/report/index.html
 
 Benchmark results are saved in `target/criterion` and can be compared across runs.
 
+## Unified Test Execution Framework
+
+The `test_framework` module provides a unified execution engine for tests and benchmarks with automatic workload adaptation:
+
+### TestExecutor Trait
+
+```rust
+use llmspell_testing::test_framework::{
+    TestExecutor, ExecutionContext, ExecutionMode, WorkloadClass
+};
+use async_trait::async_trait;
+
+#[async_trait]
+impl TestExecutor for MyTestExecutor {
+    type Config = MyConfig;
+    type Result = MyResult;
+    
+    async fn execute(&self, context: ExecutionContext<Self::Config>) -> Self::Result {
+        let workload = self.adapt_workload(context.mode);
+        let event_count = workload.event_count();
+        
+        // Test logic with automatic telemetry collection
+        context.telemetry.record_metric("events", event_count as f64);
+        
+        // Implementation adapts based on execution mode
+        MyResult::new(event_count)
+    }
+    
+    fn default_config(&self) -> Self::Config {
+        MyConfig::default()
+    }
+    
+    fn adapt_workload(&self, mode: ExecutionMode) -> WorkloadClass {
+        match mode {
+            ExecutionMode::Test => WorkloadClass::Small,    // 1K items
+            ExecutionMode::Bench => WorkloadClass::Large,   // 100K items  
+            ExecutionMode::Stress => WorkloadClass::Stress, // 1M items
+            ExecutionMode::CI => WorkloadClass::Medium,     // 10K items
+        }
+    }
+}
+```
+
+### Workload Classes
+
+- **Micro**: <100ms, 100 items
+- **Small**: <1s, 1K items  
+- **Medium**: <10s, 10K items
+- **Large**: <60s, 100K items
+- **Stress**: Unlimited, 1M+ items
+
+### Criterion Integration
+
+```rust
+use llmspell_testing::test_framework::adapters::CriterionAdapter;
+
+fn bench_my_test(c: &mut Criterion) {
+    let executor = MyTestExecutor::new();
+    CriterionAdapter::new(executor)
+        .with_workload(WorkloadClass::Large)
+        .bench(c, "my_test");
+}
+```
+
+### Built-in Telemetry
+
+All executions automatically collect metrics:
+
+```rust
+let context = ExecutionContext::test_default(config);
+let result = executor.execute(context).await;
+
+// Metrics are automatically collected
+let snapshot = context.telemetry.snapshot();
+println!("Metrics: {:?}", snapshot.values);
+```
+
 ## Test Utilities
 
 The crate provides several utilities for writing tests:

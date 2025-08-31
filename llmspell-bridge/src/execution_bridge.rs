@@ -256,6 +256,15 @@ impl ExecutionManager {
         self.breakpoints.read().await.values().cloned().collect()
     }
 
+    /// Try to get breakpoint count synchronously (for performance optimization)
+    /// Returns Some(count) if lock can be acquired immediately, None if would block
+    /// This enables zero-cost abstraction for disabled mode
+    #[must_use]
+    pub fn try_get_breakpoint_count_sync(&self) -> Option<usize> {
+        // Use try_read to avoid blocking - critical for performance
+        self.breakpoints.try_read().ok().map(|bp| bp.len())
+    }
+
     /// Update debug state
     pub async fn set_state(&self, state: DebugState) {
         *self.state.write().await = state;
