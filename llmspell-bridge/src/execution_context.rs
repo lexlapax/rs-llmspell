@@ -7,6 +7,7 @@
 use crate::execution_bridge::StackFrame;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use uuid::Uuid;
 
 /// Source location in a script
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -32,6 +33,8 @@ pub struct SharedExecutionContext {
     pub recent_logs: Vec<DiagnosticEntry>,
     /// Performance metrics at current location
     pub performance_metrics: PerformanceMetrics,
+    /// Correlation ID for async operation tracking
+    pub correlation_id: Option<Uuid>,
 }
 
 /// Simplified diagnostic entry for execution context
@@ -58,6 +61,21 @@ pub struct PerformanceMetrics {
     pub execution_count: u32,
 }
 
+/// Snapshot of context state for async boundary preservation
+#[derive(Debug, Clone)]
+pub struct ContextSnapshot {
+    /// Stack snapshot
+    pub stack: Vec<StackFrame>,
+    /// Location snapshot
+    pub location: Option<SourceLocation>,
+    /// Variables snapshot
+    pub variables: HashMap<String, serde_json::Value>,
+    /// Correlation ID
+    pub correlation_id: Option<Uuid>,
+    /// Performance metrics snapshot
+    pub performance_metrics: PerformanceMetrics,
+}
+
 impl SharedExecutionContext {
     /// Create a new shared execution context
     #[must_use]
@@ -68,7 +86,38 @@ impl SharedExecutionContext {
             variables: HashMap::new(),
             recent_logs: Vec::new(),
             performance_metrics: PerformanceMetrics::default(),
+            correlation_id: None,
         }
+    }
+
+    /// Create a context with async support
+    #[must_use]
+    pub fn with_async_support(mut self) -> Self {
+        if self.correlation_id.is_none() {
+            self.correlation_id = Some(Uuid::new_v4());
+        }
+        self
+    }
+
+    /// Preserve context state across async boundary
+    #[must_use]
+    pub fn preserve_across_async_boundary(&self) -> ContextSnapshot {
+        ContextSnapshot {
+            stack: self.stack.clone(),
+            location: self.location.clone(),
+            variables: self.variables.clone(),
+            correlation_id: self.correlation_id,
+            performance_metrics: self.performance_metrics.clone(),
+        }
+    }
+
+    /// Restore context state from async boundary
+    pub fn restore_from_async_boundary(&mut self, snapshot: ContextSnapshot) {
+        self.stack = snapshot.stack;
+        self.location = snapshot.location;
+        self.variables = snapshot.variables;
+        self.correlation_id = snapshot.correlation_id;
+        self.performance_metrics = snapshot.performance_metrics;
     }
 
     /// Update the current location

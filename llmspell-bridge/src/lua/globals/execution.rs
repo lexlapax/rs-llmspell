@@ -467,7 +467,20 @@ impl LuaExecutionHook {
         block_on_async::<_, (), std::io::Error>(
             "pause_for_step",
             async move {
+                // Preserve context across async boundary
+                let snapshot = {
+                    let ctx = shared_ctx.read().await;
+                    ctx.preserve_across_async_boundary()
+                };
+
                 let mut ctx = shared_ctx.write().await;
+
+                // Ensure we have async support with correlation ID
+                if ctx.correlation_id.is_none() {
+                    let enhanced = ctx.clone().with_async_support();
+                    *ctx = enhanced;
+                }
+
                 ctx.stack.clone_from(&stack_frames);
                 ctx.variables = variables;
                 ctx.set_location(SourceLocation {
@@ -484,6 +497,12 @@ impl LuaExecutionHook {
                         location,
                     })
                     .await;
+
+                // Restore context after async operation
+                {
+                    let mut ctx = shared_ctx.write().await;
+                    ctx.restore_from_async_boundary(snapshot);
+                }
 
                 Ok(())
             },
@@ -539,7 +558,21 @@ impl LuaExecutionHook {
         let _ = block_on_async::<_, (), std::io::Error>(
             "suspend_for_debugging",
             async move {
+                // Preserve context across async boundary for async-aware debugging
+                let snapshot = {
+                    let ctx = shared_ctx.read().await;
+                    ctx.preserve_across_async_boundary()
+                };
+
+                // Update context with debugging information
                 let mut ctx = shared_ctx.write().await;
+
+                // Ensure we have async support with correlation ID
+                if ctx.correlation_id.is_none() {
+                    let enhanced = ctx.clone().with_async_support();
+                    *ctx = enhanced;
+                }
+
                 ctx.stack.clone_from(&stack_frames);
                 ctx.variables = variables;
                 ctx.set_location(SourceLocation {
@@ -555,6 +588,12 @@ impl LuaExecutionHook {
                 exec_mgr
                     .suspend_for_debugging(location, context_clone)
                     .await;
+
+                // Restore context after async operation
+                {
+                    let mut ctx = shared_ctx.write().await;
+                    ctx.restore_from_async_boundary(snapshot);
+                }
 
                 // NOTE: We don't wait for resume here as that would block the Lua execution.
                 // The debugger client should handle resuming when ready.

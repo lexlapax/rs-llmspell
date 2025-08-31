@@ -3,6 +3,7 @@
 
 #![allow(clippy::significant_drop_tightening)]
 
+use crate::condition_evaluator::SharedDebugContext;
 use crate::engine::types::ScriptEngineError;
 use crate::engine::{
     factory::LuaConfig, EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata,
@@ -13,7 +14,6 @@ use crate::lua::output::{install_output_capture, ConsoleCapture};
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
-use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -151,6 +151,111 @@ impl LuaEngine {
                 .update_breakpoints(breakpoints, &self.lua.lock());
         }
     }
+
+    /// Execute script with enhanced debug context and async preservation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Script compilation fails
+    /// - Script execution fails
+    /// - Debug hook installation fails
+    #[cfg(feature = "lua")]
+    pub async fn execute_with_debug_context(
+        &self,
+        script: &str,
+        shared_context: Arc<tokio::sync::RwLock<crate::execution_context::SharedExecutionContext>>,
+    ) -> Result<ScriptOutput, LLMSpellError> {
+        use crate::condition_evaluator::SharedDebugContext;
+
+        // Prepare context for async debugging with trait-based evaluation
+        let _correlation_id = {
+            let mut context = shared_context.write().await;
+            let enhanced = context.clone().with_async_support();
+            *context = enhanced;
+            context.correlation_id
+        };
+
+        // Create SharedDebugContext for trait-based operations (9.2.7b pattern)
+        let debug_context = SharedDebugContext::new(shared_context.clone());
+
+        // Install enhanced debug hooks with trait-based evaluators if needed
+        if let Some(execution_manager) = &self.execution_manager {
+            let lua_guard = self.lua.lock();
+            if let Ok(_hook) = crate::lua::globals::execution::install_interactive_debug_hooks(
+                &lua_guard,
+                execution_manager.clone(),
+                shared_context.clone(),
+            ) {
+                // Store hook temporarily (note: this would need to be handled better in production)
+                drop(lua_guard); // Release lock before async operations
+            }
+        }
+
+        // Execute with async context preservation and trait-based debugging
+        self.execute_with_async_context_and_traits(script, shared_context, debug_context)
+            .await
+    }
+
+    /// Execute with async context preservation and trait-based debugging
+    #[cfg(feature = "lua")]
+    async fn execute_with_async_context_and_traits(
+        &self,
+        script: &str,
+        shared_context: Arc<tokio::sync::RwLock<crate::execution_context::SharedExecutionContext>>,
+        _debug_context: SharedDebugContext,
+    ) -> Result<ScriptOutput, LLMSpellError> {
+        // Context preservation with trait-based evaluation support
+        let snapshot = {
+            let ctx = shared_context.read().await;
+            ctx.preserve_across_async_boundary()
+        };
+
+        // Execute script (using sync execution for now, as mlua's async requires special handling)
+        let result = {
+            let lua_guard = self.lua.lock();
+            let lua_result: mlua::Result<mlua::Value> = lua_guard.load(script).eval();
+
+            match lua_result {
+                Ok(value) => {
+                    // Convert Lua value to JSON
+                    let json_value =
+                        crate::lua::conversion::lua_value_to_json(value).map_err(|e| {
+                            LLMSpellError::Script {
+                                message: e.to_string(),
+                                language: Some("lua".to_string()),
+                                line: None,
+                                source: None,
+                            }
+                        })?;
+                    Ok(ScriptOutput {
+                        output: json_value,
+                        console_output: Vec::new(),
+                        metadata: ScriptMetadata {
+                            engine: "lua".to_string(),
+                            execution_time_ms: 0, // TODO: Calculate actual execution time
+                            memory_usage_bytes: None,
+                            warnings: Vec::new(),
+                        },
+                    })
+                }
+                Err(e) => Err(LLMSpellError::Script {
+                    message: e.to_string(),
+                    language: Some("lua".to_string()),
+                    line: None,
+                    source: None,
+                }),
+            }
+        };
+
+        // Restore context after execution
+        {
+            let mut ctx = shared_context.write().await;
+            ctx.restore_from_async_boundary(snapshot);
+        }
+
+        result
+    }
 }
 
 #[async_trait]
@@ -189,7 +294,15 @@ impl ScriptEngineBridge for LuaEngine {
                 match lua_result {
                     Ok(value) => {
                         // Convert Lua value to JSON
-                        let output = lua_value_to_json(value)?;
+                        let output =
+                            crate::lua::conversion::lua_value_to_json(value).map_err(|e| {
+                                LLMSpellError::Script {
+                                    message: e.to_string(),
+                                    language: Some("lua".to_string()),
+                                    line: None,
+                                    source: None,
+                                }
+                            })?;
                         Ok(output)
                     }
                     Err(e) => Err(ScriptEngineError::ExecutionError {
@@ -250,7 +363,15 @@ impl ScriptEngineBridge for LuaEngine {
                 match lua_result {
                     Ok(value) => {
                         // Convert Lua value to JSON
-                        let output = lua_value_to_json(value)?;
+                        let output =
+                            crate::lua::conversion::lua_value_to_json(value).map_err(|e| {
+                                LLMSpellError::Script {
+                                    message: e.to_string(),
+                                    language: Some("lua".to_string()),
+                                    line: None,
+                                    source: None,
+                                }
+                            })?;
                         llmspell_core::types::AgentChunk {
                             stream_id: "lua-stream".to_string(),
                             chunk_index: 0,
@@ -445,84 +566,5 @@ impl ScriptEngineBridge for LuaEngine {
     }
 }
 
-#[cfg(feature = "lua")]
-/// Convert a Lua value to JSON
-fn lua_value_to_json(value: mlua::Value) -> Result<Value, LLMSpellError> {
-    use mlua::Value as LuaValue;
-
-    match value {
-        LuaValue::Nil => Ok(Value::Null),
-        LuaValue::Boolean(b) => Ok(Value::Bool(b)),
-        LuaValue::Integer(i) => Ok(Value::Number(i.into())),
-        LuaValue::Number(n) => Ok(Value::from(n)),
-        LuaValue::String(s) => {
-            let str = s.to_str().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to convert Lua string: {e}"),
-                source: None,
-            })?;
-            Ok(Value::String(str.to_string()))
-        }
-        LuaValue::Table(table) => {
-            // Check if it's an array
-            if is_lua_array(&table) {
-                let mut array = Vec::new();
-                for i in 1..=table.len().map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to get table length: {e}"),
-                    source: None,
-                })? {
-                    let value: LuaValue = table.get(i).map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to get table value: {e}"),
-                        source: None,
-                    })?;
-                    array.push(lua_value_to_json(value)?);
-                }
-                Ok(Value::Array(array))
-            } else {
-                // It's an object
-                let mut map = serde_json::Map::new();
-                for pair in table.pairs::<LuaValue, LuaValue>() {
-                    let (k, v) = pair.map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to iterate table: {e}"),
-                        source: None,
-                    })?;
-
-                    if let LuaValue::String(key_str) = k {
-                        let key = key_str.to_str().map_err(|e| LLMSpellError::Component {
-                            message: format!("Failed to convert table key: {e}"),
-                            source: None,
-                        })?;
-                        map.insert(key.to_string(), lua_value_to_json(v)?);
-                    }
-                }
-                Ok(Value::Object(map))
-            }
-        }
-        _ => Ok(Value::String(format!("<{value:?}>"))),
-    }
-}
-
-#[cfg(feature = "lua")]
-/// Check if a Lua table is an array (has sequential numeric keys starting at 1)
-fn is_lua_array(table: &mlua::Table) -> bool {
-    if let Ok(len) = table.len() {
-        if len == 0 {
-            return false;
-        }
-        // Check if all keys from 1 to len exist
-        for i in 1..=len {
-            if table.get::<_, mlua::Value>(i).is_err() {
-                return false;
-            }
-        }
-        // Check if there are any non-numeric keys
-        for (k, _) in table.clone().pairs::<mlua::Value, mlua::Value>().flatten() {
-            match k {
-                mlua::Value::Integer(i) if i >= 1 && i <= len => {}
-                _ => return false,
-            }
-        }
-        true
-    } else {
-        false
-    }
-}
+// Removed duplicate lua_value_to_json and is_lua_array functions
+// These are now imported from crate::lua::conversion
