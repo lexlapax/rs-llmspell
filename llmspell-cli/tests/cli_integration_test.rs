@@ -119,6 +119,52 @@ fn test_providers_command() {
         .success()
         .stdout(predicate::str::contains("Available Providers"));
 }
+
+#[test]
+fn test_run_with_debug_flag() {
+    let dir = tempdir().unwrap();
+    let script_path = dir.path().join("debug_test.lua");
+    fs::write(&script_path, "print('Debug test')").unwrap();
+
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("run")
+        .arg("--debug")
+        .arg(&script_path)
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_exec_with_debug_flag() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("exec")
+        .arg("--debug")
+        .arg("print('Debug inline')")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_debug_command() {
+    let dir = tempdir().unwrap();
+    let script_path = dir.path().join("debug_cmd_test.lua");
+    fs::write(&script_path, "print('Debug command test')").unwrap();
+
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("debug").arg(&script_path).assert().success();
+}
+
+#[test]
+fn test_debug_command_help() {
+    let mut cmd = Command::cargo_bin("llmspell").unwrap();
+    cmd.arg("debug")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Debug a script with interactive debugging",
+        ));
+}
 #[test]
 fn test_info_command() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();

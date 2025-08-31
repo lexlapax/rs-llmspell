@@ -112,6 +112,10 @@ pub enum Commands {
         #[arg(long)]
         stream: bool,
 
+        /// Enable debug mode for script execution
+        #[arg(long)]
+        debug: bool,
+
         /// Enable RAG functionality (overrides config)
         #[arg(long)]
         rag: bool,
@@ -146,6 +150,10 @@ pub enum Commands {
         /// Enable streaming output
         #[arg(long)]
         stream: bool,
+
+        /// Enable debug mode for script execution
+        #[arg(long)]
+        debug: bool,
 
         /// Enable RAG functionality (overrides config)
         #[arg(long)]
@@ -226,6 +234,16 @@ pub enum Commands {
         /// Force overwrite existing configuration
         #[arg(short, long)]
         force: bool,
+    },
+
+    /// Debug a script with interactive debugging
+    Debug {
+        /// Script to debug
+        script: PathBuf,
+
+        /// Script arguments
+        #[arg(last = true)]
+        args: Vec<String>,
     },
 }
 

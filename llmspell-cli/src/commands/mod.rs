@@ -77,6 +77,7 @@ pub async fn execute_command(
         Commands::Run {
             script,
             stream,
+            debug,
             rag,
             no_rag,
             rag_config,
@@ -102,13 +103,14 @@ pub async fn execute_command(
                 stream,
                 args,
                 output_format,
-                false,
+                debug,
             )
             .await
         }
         Commands::Exec {
             code,
             stream,
+            debug,
             rag,
             no_rag,
             rag_config,
@@ -126,7 +128,8 @@ pub async fn execute_command(
             };
             rag_options.apply_to_config(&mut runtime_config).await?;
 
-            exec::execute_inline_script(code, engine, runtime_config, stream, output_format).await
+            exec::execute_inline_script(code, engine, runtime_config, stream, debug, output_format)
+                .await
         }
         Commands::Repl { history } => repl::start_repl(engine, runtime_config, history).await,
         Commands::Providers { detailed } => {
@@ -143,6 +146,19 @@ pub async fn execute_command(
             apps::execute_apps_command(app, engine, runtime_config, output_format).await
         }
         Commands::Setup { force } => setup::run_interactive_setup(force).await,
+        Commands::Debug { script, args } => {
+            // Debug command implementation - always uses debug mode
+            run::execute_script_file(
+                script,
+                engine,
+                runtime_config,
+                false, // stream
+                args,
+                output_format,
+                true, // debug is always true for Debug command
+            )
+            .await
+        }
     }
 }
 
