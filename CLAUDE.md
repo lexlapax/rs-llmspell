@@ -80,3 +80,4 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 - Using unwrap() in production code
 - Skipping tests to meet deadlines
 - when writing lua scripts use  the `docs/user-guide/api/lua/README.md` to actually see what API/function calls to make in lua. do not guess.
+- fix clippy warnings properly with ultrathink rather than first resorting to clippy allow

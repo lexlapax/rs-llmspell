@@ -41,6 +41,25 @@ pub trait VariableInspector: Send + Sync {
 
     /// Process batched context updates
     fn process_context_updates(&self, updates: Vec<ContextUpdate>);
+
+    /// Validate API usage in script content
+    ///
+    /// Returns list of validation errors/warnings for script-specific APIs
+    ///
+    /// # Arguments
+    /// * `script` - The script content to validate
+    /// * `context` - Shared execution context for validation
+    ///
+    /// # Returns
+    /// * `Ok(Vec<String>)` - List of validation issues (empty if valid)
+    ///
+    /// # Errors
+    /// * Returns error if validation cannot be performed
+    fn validate_api_usage(
+        &self,
+        script: &str,
+        context: &crate::execution_context::SharedExecutionContext,
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>>;
 }
 
 /// Script-specific variable formatter trait
@@ -316,6 +335,37 @@ impl VariableInspector for SharedVariableInspector {
                 }
             }
         }
+    }
+
+    fn validate_api_usage(
+        &self,
+        script: &str,
+        _context: &crate::execution_context::SharedExecutionContext,
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let mut issues = Vec::new();
+
+        // Basic script-agnostic validation
+        // Check for common unsafe patterns
+        if script.contains("os.execute") || script.contains("io.popen") {
+            issues.push("Potentially unsafe system command execution detected".to_string());
+        }
+
+        if script.contains("loadstring") || script.contains("load(") {
+            issues.push("Dynamic code execution detected - review for security".to_string());
+        }
+
+        // Check for undefined variable patterns (basic heuristic)
+        let lines: Vec<&str> = script.lines().collect();
+        for (line_num, line) in lines.iter().enumerate() {
+            if line.trim_start().starts_with("local ") && line.contains(" = nil") {
+                issues.push(format!(
+                    "Line {}: Variable initialized to nil",
+                    line_num + 1
+                ));
+            }
+        }
+
+        Ok(issues)
     }
 }
 

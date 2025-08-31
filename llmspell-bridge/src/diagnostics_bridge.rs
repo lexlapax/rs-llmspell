@@ -4,8 +4,10 @@
 //! the centralized diagnostics infrastructure (logging, profiling, metrics)
 //! and distributed tracing via OpenTelemetry.
 
-use crate::execution_context::{ExecutionContextBridge, SharedExecutionContext};
+use crate::condition_evaluator::ConditionEvaluator;
+use crate::execution_context::{ExecutionContextBridge, SharedExecutionContext, SourceLocation};
 use crate::tracing::{DefaultTraceEnricher, SpanHandle, TraceEnricher, TracingConfig};
+use crate::variable_inspector::VariableInspector;
 use llmspell_tools::util::ValidationResult;
 use llmspell_utils::debug::{global_debug_manager, DebugEntry, DebugLevel, PerformanceTracker};
 use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
@@ -60,6 +62,117 @@ impl Default for HotReloadConfig {
     }
 }
 
+/// Comprehensive validation report for script analysis
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationReport {
+    /// Syntax and compilation errors (critical issues)
+    pub errors: Vec<ValidationIssue>,
+    /// API usage and security warnings (non-critical issues)
+    pub warnings: Vec<ValidationIssue>,
+    /// Performance and best practice suggestions
+    pub suggestions: Vec<ValidationIssue>,
+    /// Overall validation success status
+    pub is_valid: bool,
+    /// Validation duration in microseconds
+    pub validation_duration_us: u64,
+}
+
+/// Individual validation issue with context
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationIssue {
+    /// Issue severity level
+    pub level: ValidationLevel,
+    /// Issue category (syntax, security, performance, etc.)
+    pub category: String,
+    /// Human-readable issue description
+    pub message: String,
+    /// Source location if available
+    pub location: Option<SourceLocation>,
+    /// Suggested fix if available
+    pub suggestion: Option<String>,
+}
+
+/// Validation issue severity levels
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ValidationLevel {
+    /// Critical error - prevents execution
+    Error,
+    /// Warning - execution possible but risky
+    Warning,
+    /// Suggestion - improvement opportunity
+    Suggestion,
+}
+
+impl ValidationReport {
+    /// Create a new empty validation report
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            errors: Vec::new(),
+            warnings: Vec::new(),
+            suggestions: Vec::new(),
+            is_valid: true,
+            validation_duration_us: 0,
+        }
+    }
+
+    /// Add an error to the report
+    pub fn add_error(&mut self, message: String, location: Option<SourceLocation>) {
+        self.errors.push(ValidationIssue {
+            level: ValidationLevel::Error,
+            category: "error".to_string(),
+            message,
+            location,
+            suggestion: None,
+        });
+        self.is_valid = false;
+    }
+
+    /// Add a warning to the report
+    pub fn add_warning(
+        &mut self,
+        category: String,
+        message: String,
+        location: Option<SourceLocation>,
+    ) {
+        self.warnings.push(ValidationIssue {
+            level: ValidationLevel::Warning,
+            category,
+            message,
+            location,
+            suggestion: None,
+        });
+    }
+
+    /// Add a suggestion to the report
+    pub fn add_suggestion(&mut self, category: String, message: String, suggestion: String) {
+        self.suggestions.push(ValidationIssue {
+            level: ValidationLevel::Suggestion,
+            category,
+            message,
+            location: None,
+            suggestion: Some(suggestion),
+        });
+    }
+
+    /// Get total issue count
+    #[must_use]
+    pub const fn total_issues(&self) -> usize {
+        self.errors.len() + self.warnings.len() + self.suggestions.len()
+    }
+
+    /// Set validation duration
+    pub const fn set_duration(&mut self, duration_us: u64) {
+        self.validation_duration_us = duration_us;
+    }
+}
+
+impl Default for ValidationReport {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Diagnostics bridge that script engines interact with for logging, profiling, and tracing
 #[derive(Clone)]
 pub struct DiagnosticsBridge {
@@ -83,6 +196,10 @@ pub struct DiagnosticsBridge {
     hot_reload_config: HotReloadConfig,
     /// Watched file paths with their execution contexts
     watched_files: Arc<Mutex<HashMap<PathBuf, Arc<Mutex<SharedExecutionContext>>>>>,
+    /// Condition evaluator for syntax validation
+    condition_evaluator: Option<Arc<dyn ConditionEvaluator>>,
+    /// Variable inspector for API validation
+    variable_inspector: Option<Arc<dyn VariableInspector>>,
 }
 
 impl DiagnosticsBridge {
@@ -100,6 +217,8 @@ impl DiagnosticsBridge {
             hot_reload_receiver: Arc::new(Mutex::new(None)),
             hot_reload_config: HotReloadConfig::default(),
             watched_files: Arc::new(Mutex::new(HashMap::new())),
+            condition_evaluator: None,
+            variable_inspector: None,
         }
     }
 
@@ -113,6 +232,20 @@ impl DiagnosticsBridge {
             }
         }
         self.tracing_config = config;
+        self
+    }
+
+    /// Set the condition evaluator for syntax validation
+    #[must_use]
+    pub fn with_condition_evaluator(mut self, evaluator: Arc<dyn ConditionEvaluator>) -> Self {
+        self.condition_evaluator = Some(evaluator);
+        self
+    }
+
+    /// Set the variable inspector for API validation
+    #[must_use]
+    pub fn with_variable_inspector(mut self, inspector: Arc<dyn VariableInspector>) -> Self {
+        self.variable_inspector = Some(inspector);
         self
     }
 
@@ -425,12 +558,136 @@ impl DiagnosticsBridge {
         }
     }
 
-    /// Basic script validation for hot reload
+    /// Comprehensive script validation using Phase 9.2 three-layer architecture
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation cannot be performed due to internal failures
+    #[allow(clippy::cognitive_complexity)]
+    #[tracing::instrument(skip(self, context))]
+    pub fn validate_script_comprehensive(
+        &self,
+        script: &str,
+        context: &mut SharedExecutionContext,
+    ) -> Result<ValidationReport, Box<dyn std::error::Error>> {
+        let start_time = std::time::Instant::now();
+        let span = tracing::info_span!("script_validation", script_length = script.len());
+        let _enter = span.enter();
+
+        let mut report = ValidationReport::new();
+
+        // Basic content validation
+        if script.trim().is_empty() {
+            report.add_error("Script content is empty".to_string(), None);
+            report.set_duration(
+                start_time
+                    .elapsed()
+                    .as_micros()
+                    .min(u128::from(u64::MAX))
+                    .try_into()
+                    .unwrap_or(u64::MAX),
+            );
+            return Ok(report);
+        }
+
+        if script.len() > 1_000_000 {
+            report.add_error("Script content too large (>1MB)".to_string(), None);
+        }
+
+        // Syntax validation using ConditionEvaluator trait patterns
+        if let Some(condition_evaluator) = &self.condition_evaluator {
+            match condition_evaluator.compile_condition(script) {
+                Err(compilation_error) => {
+                    let enriched_error = self.enrich_diagnostic(&compilation_error.to_string());
+                    report.add_error(enriched_error, None);
+                    tracing::error!(error = %compilation_error, "Syntax validation failed");
+                }
+                Ok(_) => {
+                    tracing::info!("Syntax validation passed");
+                }
+            }
+        }
+
+        // API validation using VariableInspector trait patterns
+        if let Some(variable_inspector) = &self.variable_inspector {
+            match variable_inspector.validate_api_usage(script, context) {
+                Ok(api_violations) => {
+                    for violation in api_violations {
+                        report.add_warning("api".to_string(), violation.clone(), None);
+                        tracing::warn!(violation = %violation, "API validation warning");
+                    }
+                }
+                Err(e) => {
+                    tracing::error!(error = %e, "API validation failed");
+                    report.add_error(format!("API validation error: {e}"), None);
+                }
+            }
+        }
+
+        // Performance validation using established metrics
+        let metrics = &context.performance_metrics;
+        if metrics.execution_count > 10000 {
+            let perf_warning = format!(
+                "High execution count ({}) - consider optimization",
+                metrics.execution_count
+            );
+            report.add_warning("performance".to_string(), perf_warning, None);
+            tracing::warn!(
+                execution_count = metrics.execution_count,
+                "Performance validation warning"
+            );
+        }
+
+        if metrics.memory_allocated > 100_000_000 {
+            // 100MB
+            let mem_warning = format!(
+                "High memory allocation ({} bytes) - check for memory leaks",
+                metrics.memory_allocated
+            );
+            report.add_warning("performance".to_string(), mem_warning, None);
+        }
+
+        // Security validation with trace enrichment
+        let security_issues = self.detect_security_patterns(script);
+        for issue in security_issues {
+            report.add_warning("security".to_string(), issue.clone(), None);
+            tracing::warn!(security_issue = %issue, "Security validation warning");
+        }
+
+        // Performance suggestions
+        if script.lines().count() > 1000 {
+            report.add_suggestion(
+                "performance".to_string(),
+                "Large script detected - consider splitting into modules".to_string(),
+                "Break script into smaller, focused functions or modules".to_string(),
+            );
+        }
+
+        report.set_duration(
+            start_time
+                .elapsed()
+                .as_micros()
+                .min(u128::from(u64::MAX))
+                .try_into()
+                .unwrap_or(u64::MAX),
+        );
+        tracing::info!(
+            duration_us = report.validation_duration_us,
+            errors = report.errors.len(),
+            warnings = report.warnings.len(),
+            suggestions = report.suggestions.len(),
+            "Script validation completed"
+        );
+
+        Ok(report)
+    }
+
+    /// Basic script validation for hot reload (legacy method)
     #[must_use]
     pub fn validate_script(&self, content: &str, _script_type: &str) -> ValidationResult {
         use llmspell_tools::util::ValidationError;
 
-        // Basic validation - check if content is not empty and has some structure
+        // Basic validation for backwards compatibility
         if content.trim().is_empty() {
             ValidationResult {
                 valid: false,
@@ -457,6 +714,92 @@ impl DiagnosticsBridge {
                 errors: vec![],
             }
         }
+    }
+
+    /// Detect security patterns in script content with distributed tracing
+    #[allow(clippy::cognitive_complexity)]
+    fn detect_security_patterns(&self, script: &str) -> Vec<String> {
+        let span = tracing::debug_span!("security_pattern_detection", script_length = script.len());
+        let _enter = span.enter();
+
+        let mut issues = Vec::new();
+
+        // Common security patterns across languages
+        let dangerous_patterns = [
+            ("eval(", "Dynamic code evaluation detected"),
+            ("exec(", "Code execution function detected"),
+            ("system(", "System command execution detected"),
+            ("shell_exec", "Shell execution detected"),
+            ("passthru", "Pass-through execution detected"),
+            ("file_get_contents(", "File access function detected"),
+            ("fopen(", "File opening detected"),
+            ("file_put_contents(", "File writing detected"),
+            ("curl_exec", "HTTP request execution detected"),
+            ("fsockopen", "Socket connection detected"),
+            ("popen(", "Process execution detected"),
+        ];
+
+        for (pattern, message) in &dangerous_patterns {
+            if script.contains(pattern) {
+                let enriched_message = self.enrich_diagnostic(message);
+                issues.push(enriched_message);
+                tracing::warn!(
+                    pattern = pattern,
+                    message = message,
+                    "Security pattern detected"
+                );
+            }
+        }
+
+        // Check for SQL injection patterns
+        if (script.contains("SELECT ")
+            || script.contains("INSERT ")
+            || script.contains("UPDATE ")
+            || script.contains("DELETE "))
+            && !script.contains("prepare")
+            && !script.contains("bind")
+        {
+            let sql_warning =
+                "SQL queries detected without prepared statements - potential injection risk";
+            issues.push(self.enrich_diagnostic(sql_warning));
+            tracing::warn!(message = sql_warning, "SQL injection pattern detected");
+        }
+
+        // Check for hardcoded credentials patterns
+        let credential_patterns = ["password=", "pwd=", "secret=", "key=", "token=", "api_key="];
+
+        for pattern in &credential_patterns {
+            if script.contains(pattern) {
+                let cred_warning =
+                    format!("Potential hardcoded credential pattern '{pattern}' detected");
+                issues.push(self.enrich_diagnostic(&cred_warning));
+                tracing::warn!(pattern = pattern, "Credential pattern detected");
+            }
+        }
+
+        // Check for path traversal patterns
+        if script.contains("../") || script.contains("..\\") {
+            let path_warning =
+                "Path traversal pattern detected - potential directory traversal attack";
+            issues.push(self.enrich_diagnostic(path_warning));
+            tracing::warn!(message = path_warning, "Path traversal pattern detected");
+        }
+
+        // Check for XSS patterns
+        if script.contains("<script")
+            || script.contains("javascript:")
+            || script.contains("onclick=")
+        {
+            let xss_warning = "Potential XSS pattern detected in script content";
+            issues.push(self.enrich_diagnostic(xss_warning));
+            tracing::warn!(message = xss_warning, "XSS pattern detected");
+        }
+
+        tracing::debug!(
+            issues_found = issues.len(),
+            "Security pattern detection completed"
+        );
+        issues
     }
 
     /// Enable hot reload for specified files

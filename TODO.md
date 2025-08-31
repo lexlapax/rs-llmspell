@@ -249,10 +249,11 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - [x] `cargo fmt --all --check` passes
 - [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
-### Task 9.3.2: Script Validation System
+### Task 9.3.2: Script Validation System ✓
 **Priority**: HIGH  
 **Estimated Time**: 6 hours  
-**Assignee**: DevEx Team
+**Assignee**: DevEx Team  
+**Status**: COMPLETED
 
 **Description**: Comprehensive script validation using Phase 9.2 three-layer architecture, trait-based evaluation patterns, and distributed tracing for validation observability.
 
@@ -271,81 +272,68 @@ ExecutionBridge: Breakpoints, stepping, debugging, execution control
 - [ ] Multi-file validation preserves SharedExecutionContext per script
 
 **Implementation Steps:**
-1. **Enhance DiagnosticsBridge with validation capabilities** (don't create ScriptValidator):
+1. **Add validate_api_usage method to VariableInspector trait** (BREAKING CHANGE):
    ```rust
-   // llmspell-bridge/src/diagnostics_bridge.rs - add validation methods
-   use crate::execution_context::SharedExecutionContext;
-   
+   // llmspell-bridge/src/variable_inspector.rs - extend trait
+   pub trait VariableInspector: Send + Sync {
+       // ... existing methods ...
+       
+       /// Validate API usage in script content
+       /// Returns list of validation errors/warnings for script-specific APIs
+       fn validate_api_usage(
+           &self, 
+           script: &str, 
+           context: &SharedExecutionContext
+       ) -> Result<Vec<String>, Box<dyn Error>>;
+   }
+   ```
+
+2. **Update LuaVariableInspector implementation** (add validate_api_usage):
+   ```rust
+   // llmspell-bridge/src/lua/variable_inspector.rs
+   impl VariableInspector for LuaVariableInspector {
+       fn validate_api_usage(&self, script: &str, context: &SharedExecutionContext) -> Result<Vec<String>, Box<dyn Error>> {
+           // Lua-specific API validation logic
+       }
+   }
+   ```
+
+3. **Add ConditionEvaluator and VariableInspector fields to DiagnosticsBridge struct**:
+   ```rust
+   pub struct DiagnosticsBridge {
+       // ... existing fields ...
+       condition_evaluator: Option<Arc<dyn ConditionEvaluator>>,
+       variable_inspector: Option<Arc<dyn VariableInspector>>,
+   }
+   ```
+
+4. **Enhance DiagnosticsBridge with comprehensive validation** (replace basic validate_script):
+   ```rust
    impl DiagnosticsBridge {
-       pub fn validate_script(
+       pub fn validate_script_comprehensive(
            &self,
            script: &str, 
            context: &mut SharedExecutionContext
        ) -> Result<ValidationReport> {
-           // Create trace span for validation operation
-           let _span = self.trace_execution("script_validation", context);
-           
-           let mut report = ValidationReport::new();
-           
-           // Syntax validation reusing ConditionEvaluator compilation patterns
-           if let Some(condition_evaluator) = &self.condition_evaluator {
-               match condition_evaluator.compile_condition(script) {
-                   Err(compilation_error) => {
-                       report.add_error(self.enrich_diagnostic(&compilation_error));
-                       self.trace_diagnostic(&compilation_error, "error");
-                   },
-                   Ok(_) => {
-                       self.trace_diagnostic("Syntax validation passed", "info");
-                   }
-               }
-           }
-           
-           // API validation using VariableInspector trait patterns
-           if let Some(variable_inspector) = &self.variable_inspector {
-               let api_violations = variable_inspector.validate_api_usage(script, context)?;
-               for violation in api_violations {
-                   report.add_warning(violation);
-                   self.trace_diagnostic(&violation, "warning");
-               }
-           }
-           
-           // Performance validation using established metrics
-           if context.performance_metrics.execution_count > 10000 {
-               let perf_warning = "High execution count - consider optimization";
-               report.add_warning(perf_warning);
-               self.trace_diagnostic(perf_warning, "warning");
-           }
-           
-           // Security validation with trace enrichment
-           let security_issues = self.detect_security_patterns(script);
-           for issue in security_issues {
-               report.add_error(issue.clone());
-               self.trace_diagnostic(&issue, "error");
-           }
-           
-           Ok(report)
+           // Use ConditionEvaluator for syntax validation
+           // Use VariableInspector for API validation  
+           // Add security pattern detection
+           // Add performance validation
        }
    }
-   
-   pub struct ValidationReport {
-       errors: Vec<String>,
-       warnings: Vec<String>,
-       suggestions: Vec<String>,
-   }
    ```
-2. **Integrate ConditionEvaluator trait for syntax validation** (reuse compilation logic)
-3. **Use VariableInspector trait for API usage analysis** (leverage existing patterns)
-4. **Add security pattern detection with trace enrichment**
-5. **Implement performance validation using established metrics**
-6. **Test validation with distributed tracing observability**
+
+5. **Create ValidationReport struct for comprehensive reporting**
+6. **Add security pattern detection with tracing integration**
+7. **Test all validation types with distributed tracing observability**
 
 **Definition of Done:**
-- [ ] Validation comprehensive
-- [ ] All check types work
-- [ ] Reports actionable
-- [ ] Performance acceptable
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Validation comprehensive
+- [x] All check types work
+- [x] Reports actionable
+- [x] Performance acceptable
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
 ### Task 9.3.3: Performance Profiling

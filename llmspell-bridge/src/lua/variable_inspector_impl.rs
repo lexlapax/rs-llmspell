@@ -88,6 +88,75 @@ impl VariableInspector for LuaVariableInspector {
     fn process_context_updates(&self, updates: Vec<ContextUpdate>) {
         self.inner.process_context_updates(updates);
     }
+
+    fn validate_api_usage(
+        &self,
+        script: &str,
+        _context: &crate::execution_context::SharedExecutionContext,
+    ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+        let mut issues = Vec::new();
+
+        // Lua-specific API validation
+
+        // Check for dangerous Lua functions
+        let dangerous_functions = [
+            "os.execute",
+            "os.exit",
+            "io.popen",
+            "io.write",
+            "loadstring",
+            "load",
+            "dofile",
+            "loadfile",
+            "debug.debug",
+            "debug.getfenv",
+            "debug.setfenv",
+        ];
+
+        for func in &dangerous_functions {
+            if script.contains(func) {
+                issues.push(format!(
+                    "Potentially dangerous Lua function '{func}' detected"
+                ));
+            }
+        }
+
+        // Check for require() calls - could be security concern depending on context
+        if script.contains("require(")
+            && !script.contains("require('")
+            && !script.contains("require(\"")
+        {
+            issues.push("Dynamic require() call detected - ensure module path is safe".to_string());
+        }
+
+        // Check for global variable assignments without 'local'
+        let lines: Vec<&str> = script.lines().collect();
+        for (line_num, line) in lines.iter().enumerate() {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() && !trimmed.starts_with("--") {
+                // Simple heuristic: assignment without 'local' keyword
+                if trimmed.contains(" = ")
+                    && !trimmed.starts_with("local ")
+                    && !trimmed.contains('.')
+                {
+                    // Check if it looks like a global assignment
+                    let parts: Vec<&str> = trimmed.split(" = ").collect();
+                    if let Some(var_part) = parts.first() {
+                        if var_part.chars().all(|c| c.is_alphanumeric() || c == '_') {
+                            issues.push(format!("Line {}: Potential global variable assignment '{}' - consider using 'local'", line_num + 1, var_part.trim()));
+                        }
+                    }
+                }
+            }
+        }
+
+        // Check for infinite loop patterns
+        if script.contains("while true do") || script.contains("while 1 do") {
+            issues.push("Infinite loop detected - ensure there's a break condition".to_string());
+        }
+
+        Ok(issues)
+    }
 }
 
 // Removed VariableFormatter implementation since it can't store Lua reference
