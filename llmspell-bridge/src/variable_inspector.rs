@@ -1,28 +1,62 @@
 //! Variable inspection system for slow path debugging
 //!
-//! This module provides variable inspection that operates entirely in the slow path,
-//! leveraging cached variables from `ContextBatcher` and existing formatting from `output.rs`.
+//! This module provides script-agnostic trait definitions for variable inspection
+//! that operates entirely in the slow path, leveraging cached variables from
+//! `ContextBatcher`. Script-specific implementations are in the respective
+//! language modules (lua/, js/, python/, etc.).
 
 use crate::execution_context::SharedExecutionContext;
 use crate::lua::debug_cache::{CachedVariable, ContextBatcher, ContextUpdate, DebugStateCache};
-use crate::lua::output::{dump_value, format_simple, DumpOptions};
 use crate::lua::sync_utils::block_on_async;
-use mlua::{Lua, Value};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, trace, warn};
 
-/// Variable inspector for slow path operations
-pub struct VariableInspector {
+/// Script-agnostic variable inspector trait
+pub trait VariableInspector: Send + Sync {
+    /// Inspect variables (SLOW PATH ONLY)
+    ///
+    /// This method batches variable reads for efficiency and uses
+    /// cached values when available.
+    fn inspect_variables(
+        &self,
+        variable_names: &[String],
+        batcher: &mut ContextBatcher,
+    ) -> HashMap<String, JsonValue>;
+
+    /// Add a variable to the watch list
+    fn watch_variable(&self, name: String, batcher: &mut ContextBatcher);
+
+    /// Remove a variable from the watch list
+    fn unwatch_variable(&self, name: &str, batcher: &mut ContextBatcher);
+
+    /// Get all cached variables
+    fn get_all_cached_variables(&self) -> Vec<CachedVariable>;
+
+    /// Invalidate all cached variables (called when context changes)
+    fn invalidate_cache(&self);
+
+    /// Process batched context updates
+    fn process_context_updates(&self, updates: Vec<ContextUpdate>);
+}
+
+/// Script-specific variable formatter trait
+pub trait VariableFormatter {
+    /// Format a variable for display using script-specific formatting
+    fn format_variable(&self, name: &str, value: &JsonValue) -> String;
+}
+
+/// Concrete variable inspector implementation
+pub struct SharedVariableInspector {
     /// Debug state cache for variable caching
     cache: Arc<DebugStateCache>,
     /// Shared execution context for variable access
     context: Arc<RwLock<SharedExecutionContext>>,
 }
 
-impl VariableInspector {
+impl SharedVariableInspector {
     /// Create a new variable inspector
     #[must_use]
     pub const fn new(
@@ -165,34 +199,6 @@ impl VariableInspector {
         })
     }
 
-    /// Format a variable for display using output.rs functions
-    pub fn format_variable(&self, name: &str, value: &JsonValue, lua: &Lua) -> String {
-        // Convert JSON to Lua value for formatting
-        match json_to_lua_value(lua, value) {
-            Ok(lua_value) => {
-                // Use existing output.rs formatting
-                if Self::should_use_compact_format(value) {
-                    format!("{}: {}", name, format_simple(&lua_value))
-                } else {
-                    let options = DumpOptions::default();
-                    format!("{}:\n{}", name, dump_value(&lua_value, &options))
-                }
-            }
-            Err(e) => {
-                warn!("Failed to convert variable '{}' to Lua value: {}", name, e);
-                format!("{name}: <error: {e}>")
-            }
-        }
-    }
-
-    /// Determine if compact format should be used
-    const fn should_use_compact_format(value: &JsonValue) -> bool {
-        matches!(
-            value,
-            JsonValue::Null | JsonValue::Bool(_) | JsonValue::Number(_) | JsonValue::String(_)
-        )
-    }
-
     /// Add a variable to the watch list
     pub fn watch_variable(&self, name: String, batcher: &mut ContextBatcher) {
         self.cache.add_to_watch_list(name.clone());
@@ -242,30 +248,72 @@ impl VariableInspector {
     }
 }
 
-/// Convert JSON value to Lua value
-fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result<Value<'lua>> {
-    match json {
-        JsonValue::Null => Ok(Value::Nil),
-        JsonValue::Bool(b) => Ok(Value::Boolean(*b)),
-        JsonValue::Number(n) => Ok(n
-            .as_i64()
-            .map(Value::Integer)
-            .or_else(|| n.as_f64().map(Value::Number))
-            .unwrap_or(Value::Nil)),
-        JsonValue::String(s) => Ok(Value::String(lua.create_string(s)?)),
-        JsonValue::Array(arr) => {
-            let table = lua.create_table()?;
-            for (i, v) in arr.iter().enumerate() {
-                table.set(i + 1, json_to_lua_value(lua, v)?)?;
-            }
-            Ok(Value::Table(table))
+/// Implementation of `VariableInspector` trait for `SharedVariableInspector`
+impl VariableInspector for SharedVariableInspector {
+    fn inspect_variables(
+        &self,
+        variable_names: &[String],
+        batcher: &mut ContextBatcher,
+    ) -> HashMap<String, JsonValue> {
+        let mut result = HashMap::new();
+
+        // Check cache and collect uncached names
+        let uncached_names = self.check_cache_and_collect(variable_names, &mut result);
+
+        // If all variables were cached, we're done
+        if uncached_names.is_empty() {
+            debug!("All {} variables found in cache", variable_names.len());
+            return result;
         }
-        JsonValue::Object(obj) => {
-            let table = lua.create_table()?;
-            for (k, v) in obj {
-                table.set(k.as_str(), json_to_lua_value(lua, v)?)?;
+
+        // Read and cache uncached variables
+        self.read_and_cache_variables(&uncached_names, batcher, &mut result);
+
+        // Add watched variables
+        self.add_watched_variables(&mut result);
+
+        result
+    }
+
+    fn watch_variable(&self, name: String, batcher: &mut ContextBatcher) {
+        self.cache.add_to_watch_list(name.clone());
+        batcher.watch_variable(name);
+    }
+
+    fn unwatch_variable(&self, name: &str, batcher: &mut ContextBatcher) {
+        self.cache.remove_from_watch_list(name);
+        batcher.unwatch_variable(name.to_string());
+    }
+
+    fn get_all_cached_variables(&self) -> Vec<CachedVariable> {
+        self.cache.get_cached_variables()
+    }
+
+    fn invalidate_cache(&self) {
+        self.cache.invalidate_variable_cache();
+    }
+
+    fn process_context_updates(&self, updates: Vec<ContextUpdate>) {
+        for update in updates {
+            match update {
+                ContextUpdate::ReadVariables(names) => {
+                    // Variables are read and cached in inspect_variables
+                    debug!("Processing batch read for {} variables", names.len());
+                }
+                ContextUpdate::CacheVariable { name, value } => {
+                    // Cache the variable
+                    self.cache.cache_variable(name, value);
+                }
+                ContextUpdate::WatchVariable(name) => {
+                    self.cache.add_to_watch_list(name);
+                }
+                ContextUpdate::UnwatchVariable(name) => {
+                    self.cache.remove_from_watch_list(&name);
+                }
+                _ => {
+                    // Other updates handled elsewhere
+                }
             }
-            Ok(Value::Table(table))
         }
     }
 }
@@ -279,7 +327,7 @@ mod tests {
     fn test_variable_cache_operations() {
         let cache = Arc::new(DebugStateCache::new());
         let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-        let inspector = VariableInspector::new(cache.clone(), context);
+        let inspector = SharedVariableInspector::new(cache.clone(), context);
 
         // Test caching
         cache.cache_variable("test_var".to_string(), JsonValue::from(42));
@@ -300,30 +348,14 @@ mod tests {
     }
 
     #[test]
-    fn test_json_to_lua_conversion() {
-        let lua = Lua::new();
+    fn test_shared_variable_inspector_interface() {
+        let cache = Arc::new(DebugStateCache::new());
+        let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
+        let inspector = SharedVariableInspector::new(cache, context);
 
-        // Test null
-        let json = JsonValue::Null;
-        let lua_val = json_to_lua_value(&lua, &json).unwrap();
-        assert_eq!(lua_val, Value::Nil);
-
-        // Test boolean
-        let json = JsonValue::Bool(true);
-        let lua_val = json_to_lua_value(&lua, &json).unwrap();
-        assert_eq!(lua_val, Value::Boolean(true));
-
-        // Test number
-        let json = JsonValue::from(42);
-        let lua_val = json_to_lua_value(&lua, &json).unwrap();
-        assert_eq!(lua_val, Value::Integer(42));
-
-        // Test string
-        let json = JsonValue::String("hello".to_string());
-        let lua_val = json_to_lua_value(&lua, &json).unwrap();
-        match lua_val {
-            Value::String(s) => assert_eq!(s.to_str().unwrap(), "hello"),
-            _ => panic!("Expected string"),
-        }
+        // Test that trait implementation works
+        let mut batcher = ContextBatcher::new();
+        let vars = inspector.inspect_variables(&[], &mut batcher);
+        assert!(vars.is_empty()); // No variables to inspect
     }
 }

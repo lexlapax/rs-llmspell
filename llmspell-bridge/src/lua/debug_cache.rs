@@ -3,6 +3,7 @@
 //! Provides zero-cost debugging abstractions by keeping hot path synchronous
 //! and only using async operations when breakpoints might actually hit.
 
+use crate::condition_evaluator::CompiledCondition;
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use serde_json::Value as JsonValue;
@@ -36,15 +37,6 @@ pub enum StepMode {
     StepOver { target_depth: i32 },
     /// Step out of current function
     StepOut { target_depth: i32 },
-}
-
-/// Compiled condition for fast evaluation
-#[derive(Debug, Clone)]
-pub struct CompiledCondition {
-    /// Original condition expression
-    pub expression: String,
-    /// Pre-compiled Lua chunk (if using Lua for evaluation)
-    pub compiled_chunk: Option<Vec<u8>>,
 }
 
 /// Variable entry in the cache

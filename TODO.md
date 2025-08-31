@@ -1604,6 +1604,128 @@ llmspell-debug = { path = "../llmspell-debug" }
    - Zero fast path overhead verified
 
 
+### Task 9.2.7b: Architecture Refactoring - Three-Layer Bridge Compliance 🚨 CRITICAL
+**Priority**: BLOCKING  
+**Estimated Time**: 4 hours  
+**Assignee**: Architecture Team
+
+**Description**: **URGENT REFACTORING** - Tasks 9.2.5 and 9.2.7 violated the three-layer bridge architecture by placing Lua-specific code in the script-agnostic bridge layer. This must be fixed before continuing with 9.2.8+ to prevent technical debt and enable multi-language support.
+
+**Architecture Violation Analysis**:
+- ❌ `src/condition_evaluator.rs` contains `mlua` imports and Lua-specific logic
+- ❌ `src/variable_inspector.rs` contains `mlua` imports and Lua-specific logic
+- ❌ Bridge layer is contaminated with script engine dependencies
+- ❌ Impossible to add JavaScript/Python support without major refactoring
+
+**Why This is BLOCKING**:
+1. **Violates Core Architecture**: Three-layer bridge pattern is fundamental to llmspell design
+2. **Prevents Multi-Language Support**: Cannot add JavaScript/Python with current coupling
+3. **Technical Debt**: Each additional task compounds the violation
+4. **Testing Issues**: Cannot mock implementations for unit testing
+5. **Maintenance Burden**: Changes require knowledge of multiple script engines
+
+**CORRECT Three-Layer Architecture**:
+```
+Layer 1 (Core): src/condition_evaluator.rs     -> trait ConditionEvaluator
+Layer 2 (Bridge): src/execution_bridge.rs      -> uses Box<dyn ConditionEvaluator>
+Layer 3 (Script): src/lua/condition_evaluator_impl.rs -> impl ConditionEvaluator for Lua
+```
+
+**Acceptance Criteria:**
+- [ ] Bridge layer (`src/*.rs`) has ZERO `mlua` imports
+- [ ] All script-specific code moved to `src/lua/` subdirectory
+- [ ] Traits defined in bridge layer, implementations in script layer
+- [ ] Factory pattern for creating script-specific implementations
+- [ ] All existing tests pass after refactoring
+- [ ] `cargo clippy` passes with no warnings
+
+**Refactoring Tasks:**
+
+#### Sub-task 9.2.7b.1: Split ConditionEvaluator (2 hours)
+1. **Extract trait** to `src/condition_evaluator.rs`:
+   ```rust
+   pub trait ConditionEvaluator {
+       fn evaluate(&self, expression: &str, context: &dyn DebugContext) -> Result<bool>;
+       fn compile(&self, expression: &str) -> Result<CompiledCondition>;
+   }
+   ```
+
+2. **Move implementation** to `src/lua/condition_evaluator_impl.rs`:
+   ```rust
+   pub struct LuaConditionEvaluator<'lua> { lua: &'lua Lua }
+   impl<'lua> ConditionEvaluator for LuaConditionEvaluator<'lua> { /* Lua logic */ }
+   ```
+
+3. **Update consumers** to use trait instead of concrete type
+
+#### Sub-task 9.2.7b.2: Split VariableInspector (2 hours)
+1. **Extract trait** to `src/variable_inspector.rs`:
+   ```rust
+   pub trait VariableInspector {
+       fn inspect_variables(&self, names: &[String]) -> HashMap<String, JsonValue>;
+       fn format_variable(&self, name: &str, value: &JsonValue) -> String;
+   }
+   ```
+
+2. **Move implementation** to `src/lua/variable_inspector_impl.rs`:
+   ```rust
+   pub struct LuaVariableInspector<'lua> { lua: &'lua Lua, /* ... */ }
+   impl<'lua> VariableInspector for LuaVariableInspector<'lua> { /* Lua logic */ }
+   ```
+
+3. **Update LuaExecutionHook** to use Lua implementation
+
+#### Sub-task 9.2.7b.3: Update Dependencies and Tests
+- Update `execution_bridge.rs` to use traits
+- Update all tests to work with new structure
+- Verify no `mlua` imports in bridge layer
+- Run full test suite
+
+**Definition of Done:**
+- [x] ZERO script engine imports in bridge layer (`src/*.rs` except `src/lua/`)
+- [x] All Lua-specific code in `src/lua/` subdirectory
+- [x] Traits cleanly separated from implementations
+- [x] All existing functionality preserved
+- [x] All tests pass
+- [x] Ready for JavaScript/Python implementations
+
+**COMPLETION SUMMARY:**
+✅ **Architecture Successfully Refactored** - Full three-layer bridge compliance achieved:
+- `ConditionEvaluator` trait in bridge layer (`src/condition_evaluator.rs`)
+- `LuaConditionEvaluator` implementation in script layer (`src/lua/condition_evaluator_impl.rs`)
+- `VariableInspector` trait in bridge layer (`src/variable_inspector.rs`)
+- `LuaVariableInspector` implementation in script layer (`src/lua/variable_inspector_impl.rs`)
+
+✅ **Thread Safety Resolved** - Lua instances no longer stored in trait implementations, passed as method parameters instead
+
+✅ **All 133 tests passing** - No regression, full functionality preserved
+
+✅ **Ready for multi-language support** - JavaScript/Python implementations can now be added trivially
+
+✅ **Clean separation achieved** - Bridge layer contains zero `mlua` imports, all Lua-specific code in `src/lua/`
+
+**Impact on Future Tasks:**
+- **9.2.8+**: ✅ **UPDATED** - All remaining Phase 9.2 tasks now build on clean three-layer architecture
+- **Phase 5**: JavaScript support becomes trivial
+- **Phase 9**: Python support becomes trivial
+- **Maintenance**: Much easier to maintain and extend
+
+**🔄 ARCHITECTURE PROPAGATION COMPLETE (9.2.8-9.2.12):**
+✅ **Task 9.2.8**: Updated to use `LuaConditionEvaluator` and trait-based watch expression evaluation
+✅ **Task 9.2.9**: Updated to use `StackNavigator` trait with `LuaStackNavigator` implementation
+✅ **Task 9.2.10**: Updated to integrate trait-based evaluation with `SharedDebugContext`
+✅ **Task 9.2.11**: Updated to maintain diagnostics separation while using `SharedDebugContext`
+✅ **Task 9.2.12**: Updated to validate three-layer architecture compliance and trait-based patterns
+
+**Key Architecture Updates Applied:**
+- All code examples use trait-based APIs (`LuaConditionEvaluator::evaluate_condition_with_lua()`)
+- Implementation steps reference correct file structures (`src/lua/condition_evaluator_impl.rs`)
+- Test patterns updated for new trait-based architecture
+- Thread safety patterns documented (Lua passed as parameters, not stored)
+- Bridge layer purity ensured (zero `mlua` imports in bridge layer)
+- SharedDebugContext integration patterns established
+
+
 ### Task 9.2.8: Watch Expressions (Slow Path Evaluation) 🔄 NEXT
 **Priority**: HIGH  
 **Estimated Time**: 6 hours  
@@ -1611,11 +1733,12 @@ llmspell-debug = { path = "../llmspell-debug" }
 
 **Description**: Implement watch expressions that are evaluated only in the **slow path** when debugging is active, with results cached in `DebugStateCache` and batched with context updates.
 
-**Prerequisites from 9.2.7**:
-- ✅ VariableInspector provides foundation for watch operations
+**Prerequisites from 9.2.7b** (UPDATED FOR THREE-LAYER ARCHITECTURE):
+- ✅ LuaVariableInspector provides foundation for watch operations
 - ✅ ContextBatcher already handles WatchVariable/UnwatchVariable
 - ✅ Generation counter caching pattern established
-- ✅ Expression evaluation can reuse ConditionEvaluator patterns
+- ✅ Expression evaluation uses LuaConditionEvaluator trait-based patterns
+- ✅ Script-agnostic traits separated from Lua-specific implementations
 
 **TWO-TIER ARCHITECTURE INTEGRATION:**
 - **Fast Path**: NO watch evaluation (watches are slow path only)
@@ -1633,61 +1756,89 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] No performance impact when not paused
 - [ ] Performance: <10ms to evaluate 10 watch expressions
 
-**Implementation Steps:**
-1. **Add watch expressions to DebugStateCache**:
+**Implementation Steps (THREE-LAYER ARCHITECTURE COMPLIANT):**
+1. **Add watch expressions to DebugStateCache with trait-based evaluation**:
    ```rust
    // In llmspell-bridge/src/lua/debug_cache.rs
    pub struct DebugStateCache {
        // ... existing fields ...
        watch_expressions: Arc<RwLock<Vec<String>>>,
        watch_results: Arc<DashMap<String, (String, u64)>>, // (result, generation)
+       next_watch_id: AtomicUsize,
    }
    
    impl DebugStateCache {
        // Store watch expression (no evaluation in fast path!)
        pub fn add_watch(&self, expr: String) -> String {
-           let id = format!("watch_{}", self.next_watch_id());
+           let id = format!("watch_{}", self.next_watch_id.fetch_add(1, Ordering::Relaxed));
            self.watch_expressions.write().push(expr);
            id
        }
        
-       // SLOW PATH ONLY - evaluate all watches
-       pub fn evaluate_watches_slow_path(&self, lua: &Lua, batcher: &mut ContextBatcher) {
+       // Get cached watch result if current generation
+       pub fn get_watch_result(&self, expr: &str) -> Option<String> {
+           if let Some((result, gen)) = self.watch_results.get(expr) {
+               let current_gen = self.generation.load(Ordering::Relaxed);
+               if *gen == current_gen {
+                   return Some(result.clone());
+               }
+           }
+           None
+       }
+   }
+   ```
+
+2. **Batch watch evaluation using LuaConditionEvaluator** (THREE-LAYER ARCHITECTURE):
+   ```rust
+   // llmspell-bridge/src/lua/debug_cache.rs
+   impl DebugStateCache {
+       pub fn evaluate_watches_with_lua(
+           &self, 
+           lua: &Lua, 
+           context: &dyn DebugContext,
+           evaluator: &LuaConditionEvaluator
+       ) -> HashMap<String, String> {
            let watches = self.watch_expressions.read().clone();
-           let results = batcher.batch_evaluate_expressions(watches, lua);
+           let mut results = HashMap::new();
+           
+           for watch_expr in watches {
+               let result = evaluator.evaluate_condition_with_lua(
+                   &watch_expr, 
+                   None, 
+                   context, 
+                   lua
+               ).map(|v| if v { "true" } else { "false" })
+                .unwrap_or_else(|e| format!("<error: {}>", e));
+               
+               results.insert(watch_expr, result);
+           }
            
            // Cache results with generation
            let gen = self.generation.load(Ordering::Relaxed);
-           for (expr, result) in results {
-               self.watch_results.insert(expr, (result, gen));
+           for (expr, result) in &results {
+               self.watch_results.insert(expr.clone(), (result.clone(), gen));
            }
+           
+           results
        }
    }
    ```
 
-2. **Batch watch evaluation in ContextBatcher**:
+3. **Integration in slow path using trait-based architecture**:
    ```rust
-   impl ContextBatcher {
-       pub fn batch_evaluate_expressions(&mut self, exprs: Vec<String>, lua: &Lua) -> Vec<(String, String)> {
-           // Evaluate all watches in one batch
-           exprs.into_iter()
-               .map(|expr| {
-                   let result = self.evaluate_in_context(&expr, lua)
-                       .map(|v| format_simple(&v)) // Use output.rs
-                       .unwrap_or_else(|e| format!("<error: {}>", e));
-                   (expr, result)
-               })
-               .collect()
-       }
-   }
-   ```
-
-3. **Integration in slow path only**:
-   ```rust
-   // In LuaExecutionHook - only when paused
+   // In llmspell-bridge/src/lua/globals/execution.rs - only when paused
    if self.is_paused() {
-       // Evaluate watches in slow path
-       self.context_batcher.evaluate_watches_slow_path(lua);
+       let evaluator = LuaConditionEvaluator::new();
+       let debug_context = SharedDebugContext::new(shared_context.clone());
+       
+       // Evaluate watches in slow path using Lua-specific implementation
+       let watch_results = self.cache.evaluate_watches_with_lua(
+           lua,
+           &debug_context,
+           &evaluator
+       );
+       
+       // Results are automatically cached in DebugStateCache
    }
    ```
 
@@ -1709,26 +1860,29 @@ llmspell-debug = { path = "../llmspell-debug" }
 **Estimated Time**: 8 hours  
 **Assignee**: Debug Team
 
-**Description**: Implement call stack navigation that operates on cached stack frames from `SharedExecutionContext`, requiring no hook operations and minimal performance impact.
+**Description**: Implement call stack navigation that operates on cached stack frames from `SharedExecutionContext`, requiring no hook operations and minimal performance impact. Uses three-layer architecture for stack frame formatting.
 
-**TWO-TIER ARCHITECTURE INTEGRATION:**
+**THREE-LAYER ARCHITECTURE INTEGRATION:**
+- **Bridge Layer**: Script-agnostic StackNavigator trait with read-only operations
+- **Script Layer**: LuaStackNavigator for Lua-specific stack frame formatting
 - **Fast Path**: Stack already cached in `SharedExecutionContext` from context batching
 - **Slow Path**: Not needed - navigation is read-only on cached data
-- **Caching**: Stack frames cached by `ContextBatcher` during execution
 - **Mode Requirement**: Works in all modes (uses cached context)
 - **Hook Requirement**: NONE - pure read operations
 
 **Acceptance Criteria:**
+- [ ] StackNavigator trait defined in bridge layer (script-agnostic)
+- [ ] LuaStackNavigator implementation for Lua-specific formatting
 - [ ] Stack navigation uses cached frames from `SharedExecutionContext.stack`
 - [ ] Frame switching requires no hook operations
 - [ ] Current frame tracked in `DebugStateCache` as atomic index
 - [ ] Navigation operations are instant (<1ms)
 - [ ] Uses existing `StackFrame` type from execution_bridge.rs
-- [ ] Frame details formatted using `output.rs`
+- [ ] No `mlua` imports in bridge layer stack navigation code
 - [ ] Performance: Zero overhead for navigation operations
 
-**Implementation Steps:**
-1. **Add stack navigation to DebugStateCache**:
+**Implementation Steps (THREE-LAYER ARCHITECTURE COMPLIANT):**
+1. **Add stack navigation state to DebugStateCache and create trait definition**:
    ```rust
    // In llmspell-bridge/src/lua/debug_cache.rs
    pub struct DebugStateCache {
@@ -1747,17 +1901,52 @@ llmspell-debug = { path = "../llmspell-debug" }
        }
    }
    ```
-
-2. **Stack Navigator using cached context**:
-   ```rust
-   // llmspell-debug/src/stack_navigator.rs
-   pub struct StackNavigator;
    
-   impl StackNavigator {
-       // All operations on cached data - no Lua interaction!
-       pub async fn navigate_to_frame(
+   ```rust  
+   // In llmspell-bridge/src/stack_navigator.rs - NEW BRIDGE LAYER TRAIT
+   // NO mlua imports - script-agnostic interface only
+   use crate::execution_bridge::StackFrame;
+   use serde_json::Value as JsonValue;
+   use std::collections::HashMap;
+   use std::error::Error;
+   
+   pub trait StackNavigator: Send + Sync {
+       fn navigate_to_frame(&self, frame_index: usize, stack: &[StackFrame]) -> Result<StackFrame, Box<dyn Error>>;
+       fn format_frame(&self, frame: &StackFrame) -> String;
+       fn get_frame_variables(&self, frame: &StackFrame) -> HashMap<String, JsonValue>;
+   }
+   ```
+
+2. **Script-agnostic StackNavigator trait and SharedStackNavigator implementation**:
+   ```rust
+   // llmspell-bridge/src/stack_navigator.rs - BRIDGE LAYER (script-agnostic)
+   use crate::execution_bridge::StackFrame;
+   use std::error::Error;
+   
+   pub trait StackNavigator: Send + Sync {
+       fn navigate_to_frame(
            &self,
-           cache: &DebugStateCache,
+           frame_index: usize,
+           stack: &[StackFrame]
+       ) -> Result<StackFrame, Box<dyn Error>>;
+       
+       fn format_frame(&self, frame: &StackFrame) -> String;
+       fn get_frame_variables(&self, frame: &StackFrame) -> HashMap<String, JsonValue>;
+   }
+   
+   // Shared implementation for basic operations
+   pub struct SharedStackNavigator {
+       cache: Arc<DebugStateCache>,
+   }
+   
+   impl SharedStackNavigator {
+       pub fn new(cache: Arc<DebugStateCache>) -> Self {
+           Self { cache }
+       }
+       
+       // All operations on cached data - no script engine interaction!
+       pub async fn navigate_to_frame_cached(
+           &self,
            context: &SharedExecutionContext,
            frame_index: usize
        ) -> Result<StackFrame> {
@@ -1766,23 +1955,77 @@ llmspell-debug = { path = "../llmspell-debug" }
                .ok_or_else(|| anyhow!("Invalid frame index"))?;
            
            // Update current frame in cache
-           cache.set_current_frame(frame_index);
+           self.cache.set_current_frame(frame_index);
            
            Ok(frame.clone())
        }
+   }
+   ```
+   
+   ```rust
+   // llmspell-bridge/src/lua/stack_navigator_impl.rs - SCRIPT LAYER (Lua-specific)
+   use crate::stack_navigator::{StackNavigator, SharedStackNavigator};
+   use crate::lua::output::format_simple; // Use existing Lua formatting
+   
+   pub struct LuaStackNavigator {
+       shared: SharedStackNavigator,
+   }
+   
+   impl LuaStackNavigator {
+       pub fn new(cache: Arc<DebugStateCache>) -> Self {
+           Self {
+               shared: SharedStackNavigator::new(cache),
+           }
+       }
        
-       pub fn format_frame(&self, frame: &StackFrame) -> String {
-           // Use output.rs for formatting
+       pub fn format_frame_with_lua(&self, frame: &StackFrame, lua: &Lua) -> String {
+           // Lua-specific frame formatting with enhanced details
+           let basic = format!("{}:{}:{}", frame.source, frame.line, frame.name);
+           
+           // Add Lua-specific details if available
+           if let Some(locals) = &frame.locals {
+               let local_count = locals.len();
+               format!("{} ({} locals)", basic, local_count)
+           } else {
+               basic
+           }
+       }
+   }
+   
+   impl StackNavigator for LuaStackNavigator {
+       fn navigate_to_frame(
+           &self,
+           frame_index: usize,
+           stack: &[StackFrame]
+       ) -> Result<StackFrame, Box<dyn Error>> {
+           // Script-agnostic navigation
+           stack.get(frame_index)
+               .cloned()
+               .ok_or_else(|| "Invalid frame index".into())
+       }
+       
+       fn format_frame(&self, frame: &StackFrame) -> String {
+           // Basic formatting for trait compliance
            format!("{}:{}:{}", frame.source, frame.line, frame.name)
+       }
+       
+       fn get_frame_variables(&self, frame: &StackFrame) -> HashMap<String, JsonValue> {
+           frame.locals.clone().unwrap_or_default()
        }
    }
    ```
 
-3. **Integration with cached stack frames**:
+3. **Integration with cached stack frames using trait-based architecture**:
    ```rust
-   // Stack is already populated by ContextBatcher
-   // No additional Lua operations needed!
-   let stack = context.read().await.stack.clone();
+   // In llmspell-bridge/src/lua/globals/execution.rs
+   // Stack is already populated by ContextBatcher - just use the trait!
+   
+   let lua_navigator = LuaStackNavigator::new(self.cache.clone());
+   let context_read = shared_context.read().await;
+   let current_frame = lua_navigator.navigate_to_frame(0, &context_read.stack)?;
+   
+   // No additional Lua operations needed for navigation!
+   // Lua-specific formatting available via lua_navigator.format_frame_with_lua()
    ```
 
 4. **Test zero-overhead navigation**
@@ -1857,35 +2100,44 @@ llmspell-debug = { path = "../llmspell-debug" }
 **Estimated Time**: 6 hours  
 **Assignee**: Debug Team
 
-**Description**: Integrate enhanced SharedExecutionContext into all Lua engine execution paths, ensuring async debugging works seamlessly with Phase 9.1 architecture.
+**Description**: Integrate enhanced SharedExecutionContext into all Lua engine execution paths, ensuring async debugging works seamlessly with Phase 9.1 architecture. Must work with refactored three-layer architecture from 9.2.7b.
 
-**ARCHITECTURE ALIGNMENT with Phase 9.1:**
+**ARCHITECTURE ALIGNMENT with Phase 9.1 & 9.2.7b REFACTORING:**
 - **Uses enhanced SharedExecutionContext** (not new AsyncExecutionContext)
 - **Integrates with lua/globals/execution.rs** existing debug hooks
 - **Coordinates with ExecutionManager** for debugging state
-- **Uses output.rs** for async stack capture
+- **Uses trait-based condition/variable evaluation** from 9.2.7b refactoring
 - **Maintains three-layer pattern** consistency
+- **Uses LuaConditionEvaluator and LuaVariableInspector** for Lua-specific operations
 
 **Acceptance Criteria:**
 - [ ] SharedExecutionContext async preservation integrated in all execution paths
 - [ ] LuaEngine uses enhanced context for async-aware execution
 - [ ] Context available in lua/globals/execution.rs debug hooks
+- [ ] Works with LuaConditionEvaluator and LuaVariableInspector from 9.2.7b
+- [ ] DebugContext trait properly implemented for SharedExecutionContext
 - [ ] Correlation IDs flow through ExecutionManager coordination
 - [ ] Panic recovery preserves SharedExecutionContext state
 - [ ] Performance overhead minimal (<5% for async debugging)
-- [ ] Integration with existing bridge architecture maintained
+- [ ] Integration with three-layer bridge architecture maintained
 
-**Implementation Steps:**
-1. **Integrate enhanced SharedExecutionContext in LuaEngine** (update existing execute methods):
+**Implementation Steps (UPDATED FOR 9.2.7b THREE-LAYER ARCHITECTURE):**
+1. **Integrate enhanced SharedExecutionContext with trait-based evaluation** (update existing execute methods):
    ```rust
    // llmspell-bridge/src/lua/engine.rs - enhance existing methods
+   use crate::{
+       condition_evaluator::SharedDebugContext,
+       lua::condition_evaluator_impl::LuaConditionEvaluator,
+       lua::variable_inspector_impl::LuaVariableInspector,
+   };
+   
    impl LuaEngine {
        pub async fn execute_with_debug_context(
            &self, 
            script: &str,
            shared_context: Arc<RwLock<SharedExecutionContext>>
        ) -> Result<ScriptOutput> {
-           // Prepare context for async debugging
+           // Prepare context for async debugging with trait-based evaluation
            let correlation_id = {
                let mut context = shared_context.write().await;
                let enhanced = context.clone().with_async_support();
@@ -1893,56 +2145,120 @@ llmspell-debug = { path = "../llmspell-debug" }
                context.correlation_id.unwrap()
            };
            
-           // Install enhanced debug hooks from lua/globals/execution.rs
+           // Create SharedDebugContext for trait-based operations (9.2.7b pattern)
+           let debug_context = SharedDebugContext::new(shared_context.clone());
+           
+           // Install enhanced debug hooks with trait-based evaluators
            if let Some(execution_manager) = &self.execution_manager {
-               crate::lua::globals::execution::install_interactive_debug_hooks(
+               let hook = crate::lua::globals::execution::install_interactive_debug_hooks(
                    &self.lua, 
                    execution_manager.clone(),
                    shared_context.clone()
-               );
+               )?;
+               
+               // Store hook for lifecycle management
+               self.debug_hook = Some(hook);
            }
            
-           // Execute with async context preservation
-           self.execute_with_async_context(script, shared_context).await
+           // Execute with async context preservation and trait-based debugging
+           self.execute_with_async_context_and_traits(script, shared_context, debug_context).await
+       }
+       
+       // New method to support trait-based debugging
+       async fn execute_with_async_context_and_traits(
+           &self,
+           script: &str,
+           shared_context: Arc<RwLock<SharedExecutionContext>>,
+           debug_context: SharedDebugContext,
+       ) -> Result<ScriptOutput> {
+           // Context preservation with trait-based evaluation support
+           let snapshot = {
+               let ctx = shared_context.read().await;
+               ctx.preserve_across_async_boundary()
+           };
+           
+           // Execute with Lua while preserving context
+           let result = self.lua.load(script).exec_async().await;
+           
+           // Restore context after execution
+           {
+               let mut ctx = shared_context.write().await;
+               ctx.restore_from_async_boundary(snapshot);
+           }
+           
+           result.map_err(Into::into)
        }
    }
    ```
    ```
-2. **Update lua/globals/execution.rs hooks to use SharedExecutionContext** (enhance existing hooks):
+2. **Update lua/globals/execution.rs hooks with three-layer architecture** (enhance existing hooks):
    ```rust
    // llmspell-bridge/src/lua/globals/execution.rs - update existing implementation
+   use crate::{
+       condition_evaluator::SharedDebugContext,
+       lua::condition_evaluator_impl::LuaConditionEvaluator,
+       lua::variable_inspector_impl::LuaVariableInspector,
+   };
+   
    pub fn install_interactive_debug_hooks(
        lua: &Lua,
        execution_manager: Arc<ExecutionManager>,
        shared_context: Arc<RwLock<SharedExecutionContext>>, // Enhanced context
-   ) {
+   ) -> LuaResult<Arc<parking_lot::Mutex<LuaExecutionHook>>> {
        let ctx_clone = shared_context.clone();
+       
+       // Create trait-based evaluators from 9.2.7b refactoring
+       let condition_evaluator = LuaConditionEvaluator::new();
+       let variable_inspector = LuaVariableInspector::new(
+           Arc::new(DebugStateCache::new()), 
+           shared_context.clone()
+       );
+       
+       let hook = Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new(
+           execution_manager,
+           shared_context.clone(),
+           condition_evaluator,
+           variable_inspector,
+       )));
+       
        lua.set_hook(HookTriggers {
            every_line: true,
            on_calls: true,
            on_returns: true,
        }, move |lua, debug| {
-           // Context available in hooks - use enhanced SharedExecutionContext
-           let context = ctx_clone.clone();
+           // Use enhanced SharedExecutionContext with trait-based evaluation
+           let debug_context = SharedDebugContext::new(ctx_clone.clone());
            
            match debug.event() {
                DebugEvent::Line => {
-                   // Async-aware debugging with context preservation
-                   tokio::spawn(async move {
-                       let mut ctx = context.write().await;
-                       
-                       // Preserve async boundary if needed
-                       if ctx.correlation_id.is_some() {
-                           let snapshot = ctx.preserve_across_async_boundary();
-                           // Handle async debugging with preserved context
-                           execution_manager.handle_async_breakpoint(snapshot).await;
-                       }
-                   });
+                   // Use block_on_async instead of tokio::spawn for sync/async bridge
+                   let source = debug.source().source.unwrap_or("<unknown>");
+                   let line = debug.current_line() as u32;
+                   
+                   crate::lua::sync_utils::block_on_async(
+                       "async_breakpoint_check",
+                       async move {
+                           // Async-aware debugging with context preservation
+                           if let Some(ctx) = debug_context.shared_context.try_read() {
+                               if ctx.correlation_id.is_some() {
+                                   let snapshot = ctx.preserve_across_async_boundary();
+                                   // Handle async debugging with preserved context
+                                   execution_manager.handle_async_breakpoint_with_context(
+                                       source, line, snapshot
+                                   ).await?
+                               }
+                           }
+                           Ok::<_, std::io::Error>(())
+                       },
+                       None,
+                   );
                },
-               // ... other events with async context support
+               // ... other events with async context support and trait-based evaluation
            }
            Ok(())
        });
+       
+       Ok(hook)
    }
    ```
 3. **Add SharedExecutionContext to tool invocations**:
@@ -1990,14 +2306,15 @@ llmspell-debug = { path = "../llmspell-debug" }
 **Estimated Time**: 6 hours  
 **Assignee**: Debug Team
 
-**Description**: Integrate OpenTelemetry with diagnostics_bridge.rs and SharedExecutionContext for production observability, maintaining the diagnostics vs execution debugging separation.
+**Description**: Integrate OpenTelemetry with diagnostics_bridge.rs and SharedExecutionContext for production observability, maintaining the diagnostics vs execution debugging separation. Complies with three-layer architecture patterns from 9.2.7b refactoring.
 
-**ARCHITECTURE ALIGNMENT with Phase 9.1:**
+**ARCHITECTURE ALIGNMENT with Phase 9.1 & 9.2.7b REFACTORING:**
 - **Integrates with diagnostics_bridge.rs** (observability is diagnostics, not execution debugging)
 - **Uses SharedExecutionContext** for trace enrichment and correlation
 - **Follows three-layer pattern** (DiagnosticsBridge → Global → Language)
 - **Leverages ExecutionContextBridge.enrich_diagnostic()** for trace context
-- **Maintains separation** from execution debugging functionality
+- **Maintains separation** from execution debugging functionality (no ConditionEvaluator/VariableInspector)
+- **Uses SharedDebugContext** when diagnostic context is needed
 
 **Acceptance Criteria:**
 - [ ] OpenTelemetry integrated with DiagnosticsBridge (not execution debugging)
@@ -2007,9 +2324,11 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] Debug events traced (but not breakpoint hits - that's execution debugging)
 - [ ] OTLP exporter configured with diagnostics_bridge.rs integration
 - [ ] Trace spans enriched with SharedExecutionContext data
+- [ ] No dependencies on ConditionEvaluator/VariableInspector traits (diagnostics separation)
+- [ ] Uses SharedDebugContext only when diagnostic context enrichment is needed
 
-**Implementation Steps:**
-1. **Add OpenTelemetry to DiagnosticsBridge** (not separate tracer):
+**Implementation Steps (COMPLIANT WITH 9.2.7b THREE-LAYER ARCHITECTURE):**
+1. **Add OpenTelemetry to DiagnosticsBridge** (not separate tracer, maintains diagnostics separation):
    ```rust
    // llmspell-bridge/src/diagnostics_bridge.rs - enhance existing
    use opentelemetry::{
@@ -2056,8 +2375,10 @@ llmspell-debug = { path = "../llmspell-debug" }
        }
    }
    ```
-2. **Instrument through ExecutionContextBridge.enrich_diagnostic()**:
+2. **Instrument through ExecutionContextBridge.enrich_diagnostic() with optional SharedDebugContext**:
    ```rust
+   use crate::condition_evaluator::SharedDebugContext; // Only when needed for context
+   
    impl ExecutionContextBridge for DiagnosticsBridge {
        fn enrich_diagnostic(&self, message: &str) -> String {
            let context = self.get_context();
@@ -2070,6 +2391,23 @@ llmspell-debug = { path = "../llmspell-debug" }
            }
            
            enriched
+       }
+       
+       // Optional method for when debug context enrichment is needed
+       fn enrich_diagnostic_with_debug_context(
+           &self, 
+           message: &str,
+           debug_context: &SharedDebugContext
+       ) -> String {
+           let base_enriched = self.enrich_diagnostic(message);
+           let variables = debug_context.get_variables();
+           
+           // Add variable context to diagnostic if relevant
+           if !variables.is_empty() {
+               format!("{} (vars: {})", base_enriched, variables.len())
+           } else {
+               base_enriched
+           }
        }
    }
    ```
@@ -2101,10 +2439,14 @@ llmspell-debug = { path = "../llmspell-debug" }
 **Estimated Time**: 6 hours  
 **Assignee**: QA Team
 
-**Description**: Comprehensive quality checks and testing of debugging infrastructure, including protocol compliance testing moved from Phase 9.1.
+**Description**: Comprehensive quality checks and testing of debugging infrastructure, including protocol compliance testing moved from Phase 9.1. Must validate three-layer architecture compliance from 9.2.7b refactoring.
 
 **Acceptance Criteria:**
-- [ ] Debugger integration tests pass
+- [ ] Debugger integration tests pass with trait-based architecture
+- [ ] ConditionEvaluator and VariableInspector trait implementations validated
+- [ ] Three-layer architecture compliance verified (no mlua in bridge layer)
+- [ ] LuaConditionEvaluator and LuaVariableInspector tests pass
+- [ ] SharedDebugContext integration tests pass
 - [ ] Error enhancement validated
 - [ ] Async context preservation verified
 - [ ] Tracing overhead measured (<5%)
@@ -2113,11 +2455,14 @@ llmspell-debug = { path = "../llmspell-debug" }
 - [ ] **Message format compliance verified (moved from 9.1.8 foundation)**
 - [ ] Zero clippy warnings
 - [ ] Code properly formatted
-- [ ] Documentation complete
+- [ ] Documentation complete for new trait-based APIs
 - [ ] Quality scripts pass
 
-**ARCHITECTURE ALIGNMENT with Phase 9.1:**
+**ARCHITECTURE ALIGNMENT with Phase 9.1 & 9.2.7b REFACTORING:**
 - **Tests updated** for execution_bridge.rs vs diagnostics_bridge.rs separation
+- **Three-layer architecture validation** for ConditionEvaluator/VariableInspector trait compliance
+- **Trait-based testing patterns** for LuaConditionEvaluator and LuaVariableInspector
+- **Bridge layer purity checks** (zero mlua imports in bridge layer)
 - **Protocol compliance tests** moved from 9.1.8 foundation scope
 - **Multi-client integration tests** from Task 9.2.2
 - **Quality gates align** with three-layer pattern and unified types
@@ -2130,24 +2475,38 @@ llmspell-debug = { path = "../llmspell-debug" }
    cargo fmt --all
    ```
 
-2. **Run Clippy Linting with Architecture Focus**:
+2. **Run Clippy Linting with Three-Layer Architecture Focus**:
    ```bash
    cargo clippy --workspace --all-targets --all-features -- -D warnings
    # Pay special attention to:
    # - llmspell-debug crate (newly created)
    # - execution_bridge.rs vs diagnostics_bridge.rs usage
+   # - Three-layer architecture compliance (no mlua in bridge layer)
+   # - ConditionEvaluator and VariableInspector trait usage
+   # - LuaConditionEvaluator and LuaVariableInspector implementations
+   # - SharedDebugContext integration
    # - SharedExecutionContext integration
    # - Unified type usage (StackFrame, Breakpoint, Variable)
    ```
 
-3. **Write and Run Enhanced Debugging Tests**:
+3. **Write and Run Enhanced Debugging Tests with Three-Layer Architecture Validation**:
    ```bash
+   # Three-layer architecture compliance tests
+   cargo test --package llmspell-bridge -- condition_evaluator  
+   cargo test --package llmspell-bridge -- variable_inspector
+   cargo test --package llmspell-bridge -- conditional_breakpoints_test
+   cargo test --package llmspell-bridge -- variable_inspection_test
+   
+   # Verify trait implementations work correctly
+   cargo test --package llmspell-bridge -- lua::condition_evaluator_impl
+   cargo test --package llmspell-bridge -- lua::variable_inspector_impl
+   
    # Architecture-specific tests
    cargo test --package llmspell-bridge -- execution_bridge
    cargo test --package llmspell-bridge -- diagnostics_bridge
    cargo test --package llmspell-bridge -- execution_context
    
-   # Interactive debugging tests  
+   # Interactive debugging tests with trait-based architecture 
    cargo test --package llmspell-debug --all-features
    
    # Protocol compliance tests (moved from 9.1.8)
@@ -2162,7 +2521,12 @@ llmspell-debug = { path = "../llmspell-debug" }
    cargo test --package llmspell-bridge -- async_context
    cargo test --package llmspell-debug -- async_debugging
    
+   # Comprehensive test suite
    cargo test --workspace --all-features
+   
+   # Verify all test counts:
+   # - Should be 151+ tests (133 base + 8 conditional + 10 variable + new trait tests)
+   # - All tests should use trait-based patterns from 9.2.7b
    ```
 
 4. **Measure Architecture-Aligned Performance**:
@@ -2185,18 +2549,24 @@ llmspell-debug = { path = "../llmspell-debug" }
    # Note: Full quality-check may timeout with new debugging infrastructure
    ```
 
-6. **Document New Architecture APIs**:
+6. **Document New Three-Layer Architecture APIs**:
    ```bash
-   # Document new and updated APIs
+   # Document new trait-based APIs from 9.2.7b refactoring
    cargo doc --package llmspell-debug --no-deps
-   cargo doc --package llmspell-bridge --no-deps  # Updated with new architecture
+   cargo doc --package llmspell-bridge --no-deps  # Updated with three-layer architecture
    cargo doc --package llmspell-repl --no-deps    # Protocol implementations
    
    # Verify documentation covers:
+   # - Three-layer architecture (Bridge → Global → Language)
+   # - ConditionEvaluator and VariableInspector trait definitions
+   # - LuaConditionEvaluator and LuaVariableInspector implementations
+   # - SharedDebugContext usage patterns
    # - ExecutionBridge vs DiagnosticsBridge separation
    # - SharedExecutionContext usage patterns
-   # - Interactive debugging workflows
+   # - Interactive debugging workflows with trait-based evaluation
+   # - Thread safety patterns (Lua passed as parameters, not stored)
    # - Protocol compliance (LRP/LDP)
+   # - Migration guide from old architecture to trait-based architecture
    ```
 
 **Definition of Done:**

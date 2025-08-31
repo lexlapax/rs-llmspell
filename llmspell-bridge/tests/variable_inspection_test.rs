@@ -5,7 +5,8 @@ use llmspell_bridge::{
     execution_context::SharedExecutionContext,
     lua::debug_cache::{ContextBatcher, ContextUpdate, DebugStateCache},
     lua::globals::execution::install_interactive_debug_hooks,
-    variable_inspector::VariableInspector,
+    lua::variable_inspector_impl::LuaVariableInspector,
+    variable_inspector::SharedVariableInspector,
 };
 use mlua::Lua;
 use serde_json::json;
@@ -18,7 +19,7 @@ use tokio::sync::RwLock;
 async fn test_variable_caching() {
     let cache = Arc::new(DebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    let inspector = VariableInspector::new(cache.clone(), context.clone());
+    let inspector = SharedVariableInspector::new(cache.clone(), context.clone());
 
     // Add some variables to context
     {
@@ -48,7 +49,7 @@ async fn test_variable_caching() {
 async fn test_watch_list() {
     let cache = Arc::new(DebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    let inspector = VariableInspector::new(cache.clone(), context.clone());
+    let inspector = SharedVariableInspector::new(cache.clone(), context.clone());
     let mut batcher = ContextBatcher::new();
 
     // Add variable to watch list
@@ -79,7 +80,7 @@ async fn test_watch_list() {
 async fn test_batch_variable_reading() {
     let cache = Arc::new(DebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    let _inspector = VariableInspector::new(cache, context);
+    let _inspector = SharedVariableInspector::new(cache, context);
     let mut batcher = ContextBatcher::new();
 
     // Batch read multiple variables
@@ -102,7 +103,7 @@ async fn test_batch_variable_reading() {
 async fn test_cache_invalidation() {
     let cache = Arc::new(DebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    let inspector = VariableInspector::new(cache.clone(), context);
+    let inspector = SharedVariableInspector::new(cache.clone(), context);
 
     // Cache a variable
     cache.cache_variable("test_var".to_string(), json!(42));
@@ -146,11 +147,11 @@ fn test_variable_formatting() {
     let lua = Lua::new();
     let cache = Arc::new(DebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    let inspector = VariableInspector::new(cache, context);
+    let inspector = LuaVariableInspector::new(cache, context);
 
     // Test simple value formatting
     let simple_value = json!(42);
-    let formatted = inspector.format_variable("test_int", &simple_value, &lua);
+    let formatted = inspector.format_variable_with_lua("test_int", &simple_value, &lua);
     assert!(formatted.contains("test_int"));
     assert!(formatted.contains("42"));
 
@@ -163,7 +164,7 @@ fn test_variable_formatting() {
             "b": 2
         }
     });
-    let formatted = inspector.format_variable("complex", &complex_value, &lua);
+    let formatted = inspector.format_variable_with_lua("complex", &complex_value, &lua);
     assert!(formatted.contains("complex"));
 }
 
@@ -172,7 +173,7 @@ fn test_variable_formatting() {
 async fn test_variable_cache_performance() {
     let cache = Arc::new(DebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    let inspector = VariableInspector::new(cache.clone(), context.clone());
+    let inspector = SharedVariableInspector::new(cache.clone(), context.clone());
     let mut batcher = ContextBatcher::new();
 
     // Prepare 100 variables in context
@@ -243,7 +244,7 @@ async fn test_execution_hook_integration() {
 fn test_context_update_processing() {
     let cache = Arc::new(DebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
-    let inspector = VariableInspector::new(cache.clone(), context);
+    let inspector = SharedVariableInspector::new(cache.clone(), context);
 
     // Create various context updates
     let updates = vec![

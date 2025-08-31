@@ -4,14 +4,16 @@
 //! variable inspection, stepping, and execution control. This is distinct from
 //! diagnostics (logging/profiling) which is handled by the Console global.
 
-use crate::condition_evaluator::ConditionEvaluator;
+use crate::condition_evaluator::{ConditionEvaluator, SharedDebugContext};
 use crate::execution_bridge::{
     Breakpoint, DebugState, ExecutionLocation, ExecutionManager, PauseReason, StackFrame,
 };
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
+use crate::lua::condition_evaluator_impl::LuaConditionEvaluator;
 use crate::lua::debug_cache::{ContextBatcher, ContextUpdate, DebugMode, DebugStateCache};
 use crate::lua::output::{capture_stack_trace, StackTraceOptions};
 use crate::lua::sync_utils::block_on_async;
+use crate::lua::variable_inspector_impl::LuaVariableInspector;
 use crate::variable_inspector::VariableInspector;
 use mlua::{DebugEvent, Lua, Result as LuaResult};
 use std::collections::HashMap;
@@ -29,7 +31,7 @@ pub struct LuaExecutionHook {
     /// Context update batcher for lazy updates
     context_batcher: ContextBatcher,
     /// Variable inspector for slow path variable operations
-    variable_inspector: Arc<VariableInspector>,
+    variable_inspector: Arc<LuaVariableInspector>,
     /// Current execution state
     current_line: u32,
     current_source: String,
@@ -47,7 +49,7 @@ impl LuaExecutionHook {
         shared_context: Arc<RwLock<SharedExecutionContext>>,
     ) -> Self {
         let debug_cache = Arc::new(DebugStateCache::new());
-        let variable_inspector = Arc::new(VariableInspector::new(
+        let variable_inspector = Arc::new(LuaVariableInspector::new(
             debug_cache.clone(),
             shared_context.clone(),
         ));
@@ -66,7 +68,7 @@ impl LuaExecutionHook {
     }
 
     /// Update breakpoints from debug manager
-    pub fn update_breakpoints(&mut self, breakpoints: &[Breakpoint], lua: &Lua) {
+    pub fn update_breakpoints(&mut self, breakpoints: &[Breakpoint], _lua: &Lua) {
         // Update the fast cache with breakpoint locations
         let locations: Vec<(String, u32)> = breakpoints
             .iter()
@@ -82,7 +84,8 @@ impl LuaExecutionHook {
             .filter(|bp| bp.enabled && bp.condition.is_some())
         {
             if let Some(ref condition_expr) = bp.condition {
-                match ConditionEvaluator::compile_condition(lua, condition_expr) {
+                let evaluator = LuaConditionEvaluator::new();
+                match evaluator.compile_condition(condition_expr) {
                     Ok(compiled) => {
                         self.debug_cache
                             .set_condition(bp.source.clone(), bp.line, compiled);
@@ -152,13 +155,13 @@ impl LuaExecutionHook {
         // Check if there's a condition to evaluate
         if self.debug_cache.has_condition(source, line) {
             // Evaluate condition in slow path
-            let result = ConditionEvaluator::evaluate_in_slow_path(
-                &bp,
-                &self.debug_cache,
-                &self.context_batcher,
-                self.shared_context.clone(),
-                lua,
-            );
+            let evaluator = LuaConditionEvaluator::new();
+            let debug_context = SharedDebugContext::new(self.shared_context.clone());
+            let result = bp.condition.as_ref().is_none_or(|condition| {
+                evaluator
+                    .evaluate_condition_with_lua(condition, None, &debug_context, lua)
+                    .unwrap_or(true)
+            });
 
             if result {
                 // Update the stored breakpoint

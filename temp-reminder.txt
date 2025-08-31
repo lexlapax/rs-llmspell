@@ -11,7 +11,3 @@
 - debug for scripts not working
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
-
- in all of 9.2, are you following the three layer bridge approache? there should be no lua/mlua addressing code in the  │
-│   rust bridge layer at all if possible.. those should go in the lua bridge layer. ultrathink.. analyze and report        │
-│   back.   
