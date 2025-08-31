@@ -278,6 +278,10 @@ pub mod monitoring;
 pub mod rag_bridge;
 
 // Workflow modules (consolidated)
+pub mod circuit_breaker;
+pub mod hook_profiler;
+pub mod null_circuit_breaker;
+pub mod null_hook_profiler;
 pub mod null_profiler;
 pub mod orchestration;
 pub mod profiler;

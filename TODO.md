@@ -839,6 +839,8 @@ while tokio::time::Instant::now() < deadline {
 
 **Framework Extraction Ready**: Clean trait-based design with dependency injection enables future extraction to standalone `llmspell-test-framework` crate for ecosystem use.
 
+**GLOBAL LEARNING APPLICATION**: Apply 9.3.5 patterns (minimal code, trait+null+DI, workload classification, test-early principle) to all remaining Phase 9 tasks for consistent architecture and reduced implementation time.
+
 
 ### Task 9.3.5: Performance Profiler Hooks
 **Priority**: HIGH  
@@ -855,13 +857,13 @@ while tokio::time::Instant::now() < deadline {
 - **DiagnosticsBridge Coordination**: Profiling data flows through distributed tracing
 
 **Acceptance Criteria:**
-- [ ] HookProfiler trait with configurable thresholds
-- [ ] HookProfilingConfig with sync/async/batch operation thresholds
-- [ ] Adaptive sampling when hook overhead exceeds workload limits
-- [ ] Workload-aware overhead measurement (micro/light/medium/heavy)
-- [ ] NullHookProfiler implementation for safe testing
-- [ ] DiagnosticsBridge uses dependency injection for HookProfiler
-- [ ] Tests use create_test_bridge() helper with NullHookProfiler
+- [x] HookProfiler trait with configurable thresholds
+- [x] HookProfilingConfig with sync/async/batch operation thresholds
+- [x] Adaptive sampling when hook overhead exceeds workload limits
+- [x] Workload-aware overhead measurement (micro/light/medium/heavy)
+- [x] NullHookProfiler implementation for safe testing
+- [x] DiagnosticsBridge uses dependency injection for HookProfiler
+- [x] Tests use create_test_bridge() helper with NullHookProfiler
 
 **Implementation Steps:**
 1. **Create HookProfiler trait with HookProfilingConfig**:
@@ -1071,40 +1073,50 @@ while tokio::time::Instant::now() < deadline {
 6. Test with various workloads
 
 **Definition of Done:**
-- [ ] HookProfiler trait implemented
-- [ ] RealHookProfiler and NullHookProfiler created
-- [ ] Dependency injection working
-- [ ] No factory functions used
-- [ ] No #[cfg(test)] conditionals
-- [ ] Tests use NullHookProfiler (no crashes)
-- [ ] Overhead within adaptive thresholds per workload type
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] HookProfiler trait implemented
+- [x] RealHookProfiler and NullHookProfiler created
+- [x] Dependency injection working
+- [x] No factory functions used
+- [x] No #[cfg(test)] conditionals
+- [x] Tests use NullHookProfiler (no crashes)
+- [x] Overhead within adaptive thresholds per workload type
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
+**LEARNINGS FROM TASK 9.3.5 - APPLIED TO FUTURE TASKS:**
+1. **Minimal Code Principle**: Focus only on core requirements, avoid proliferation patterns
+2. **Trait-Based DI Pattern**: `with_component(Box<dyn Trait>)` + `create_test_bridge()` is sufficient
+3. **Workload Classification**: micro/light/medium/heavy categories work across all components
+4. **Adaptive Sampling**: Overhead-based sampling reduces profiling impact effectively
+5. **Test Safety**: Null implementations prevent signal handlers and side effects in tests
+6. **Clone Implementation**: Must include all fields in struct Clone derives
+7. **Simple Random**: Built-in hash-based random avoids external dependencies
+8. **Batch Threshold Bug**: log10(1) = 0, use log10(size + 1) for proper scaling
+9. **Test Early**: Run tests immediately after trait implementation to catch edge cases
 
 
 ### Task 9.3.6: Hook Introspection & Circuit Breakers
 **Priority**: HIGH  
-**Estimated Time**: 6 hours  
+**Estimated Time**: 4 hours (reduced from learnings)  
 **Assignee**: DevEx Team
 
 **Description**: Circuit breaker and hook monitoring with adaptive thresholds based on operation context and workload characteristics.
 
-**ARCHITECTURE ALIGNMENT (Phase 9.1 + 9.3.3 ProfilingConfig Insights):**
-- **Adaptive Thresholds**: CircuitBreakerConfig with workload-aware limits
-- **Operation Context**: Different thresholds for micro vs heavy operations
-- **Dependency Injection**: NO factory functions - inject CircuitBreaker implementations
-- **Adaptive Backoff**: Recovery time based on observed failure patterns
-- **SharedExecutionContext Metrics**: Reuse existing performance_metrics
-- **Test Safety**: Create NullCircuitBreaker for tests (no side effects)
+**ARCHITECTURE ALIGNMENT (9.3.5 Patterns + Minimal Code Approach):**
+- **Reuse WorkloadClassifier**: Apply micro/light/medium/heavy from HookProfiler
+- **Minimal DI Pattern**: `with_circuit_breaker(Box<dyn CircuitBreaker>)` only
+- **Adaptive Thresholds**: Reuse threshold calculation patterns from HookProfilingConfig
+- **Test Safety**: NullCircuitBreaker following NullHookProfiler pattern
+- **No Integration Examples**: Focus on trait + null impl + DI integration only
 
 **Acceptance Criteria:**
-- [ ] CircuitBreaker trait with configurable, adaptive thresholds
-- [ ] CircuitBreakerConfig with operation-specific error tolerances
-- [ ] Workload categorization before applying thresholds
-- [ ] Adaptive backoff based on observed recovery times
-- [ ] NullCircuitBreaker implementation for safe testing
-- [ ] DiagnosticsBridge uses dependency injection for CircuitBreaker
-- [ ] Tests use create_test_bridge() helper with NullCircuitBreaker
+- [x] CircuitBreaker trait with configurable, adaptive thresholds
+- [x] CircuitBreakerConfig with operation-specific error tolerances
+- [x] Workload categorization before applying thresholds
+- [x] Adaptive backoff based on observed recovery times
+- [x] NullCircuitBreaker implementation for safe testing
+- [x] DiagnosticsBridge uses dependency injection for CircuitBreaker
+- [x] Tests use create_test_bridge() helper with NullCircuitBreaker
 
 **Implementation Steps:**
 1. **Create CircuitBreaker trait with adaptive config**:
@@ -1216,20 +1228,20 @@ while tokio::time::Instant::now() < deadline {
 6. **Use SharedExecutionContext for metrics (no duplication)**
 
 **Definition of Done:**
-- [ ] CircuitBreaker trait implemented
-- [ ] ExponentialBackoffBreaker and NullCircuitBreaker created
-- [ ] Dependency injection working
-- [ ] No factory functions used
-- [ ] No #[cfg(test)] conditionals
-- [ ] Tests use NullCircuitBreaker (no side effects)
-- [ ] Hook monitoring integrated
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] CircuitBreaker trait implemented
+- [x] ExponentialBackoffBreaker and NullCircuitBreaker created
+- [x] Dependency injection working
+- [x] No factory functions used
+- [x] No #[cfg(test)] conditionals
+- [x] Tests use NullCircuitBreaker (no side effects)
+- [x] Hook monitoring integrated
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
 ### Task 9.3.7: Session Recording/Replay
 **Priority**: HIGH  
-**Estimated Time**: 8 hours  
+**Estimated Time**: 5 hours (reduced from learnings)  
 **Assignee**: DevEx Team
 
 **Description**: Session recording/replay with adaptive performance configuration based on session size and operation complexity.

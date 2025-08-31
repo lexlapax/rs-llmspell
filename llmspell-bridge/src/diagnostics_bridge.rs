@@ -4,9 +4,11 @@
 //! the centralized diagnostics infrastructure (logging, profiling, metrics)
 //! and distributed tracing via OpenTelemetry.
 
+use crate::circuit_breaker::{CircuitBreaker, ExponentialBackoffBreaker};
 use crate::condition_evaluator::ConditionEvaluator;
 use crate::execution_bridge::StackFrame;
 use crate::execution_context::{ExecutionContextBridge, SharedExecutionContext, SourceLocation};
+use crate::hook_profiler::{HookProfiler, RealHookProfiler};
 use crate::profiler::{PprofProfiler, Profiler};
 use crate::stack_navigator::StackNavigator;
 use crate::tracing::{DefaultTraceEnricher, SpanHandle, TraceEnricher, TracingConfig};
@@ -260,6 +262,10 @@ pub struct DiagnosticsBridge {
     stack_navigator: Option<Arc<dyn StackNavigator>>,
     /// CPU profiler (trait-based for testability)
     profiler: Box<dyn Profiler>,
+    /// Hook profiler for monitoring hook execution performance (trait-based for testability)
+    hook_profiler: Box<dyn HookProfiler>,
+    /// Circuit breaker for hook fault tolerance (trait-based for testability)
+    circuit_breaker: Box<dyn CircuitBreaker>,
     /// Profiling session data
     profiling_session: Arc<Mutex<Option<ProfilingSession>>>,
     /// Shared execution context for profiling (separate from trace enrichment)
@@ -271,6 +277,8 @@ impl DiagnosticsBridge {
     #[must_use]
     pub fn new() -> Self {
         Self::with_profiler(Box::new(PprofProfiler::new()))
+            .with_hook_profiler(Box::new(RealHookProfiler::new()))
+            .with_circuit_breaker(Box::new(ExponentialBackoffBreaker::default()))
     }
 
     /// Create a new diagnostics bridge with custom profiler (for dependency injection)
@@ -291,9 +299,25 @@ impl DiagnosticsBridge {
             variable_inspector: None,
             stack_navigator: None,
             profiler,
+            hook_profiler: Box::new(RealHookProfiler::new()),
+            circuit_breaker: Box::new(ExponentialBackoffBreaker::default()),
             profiling_session: Arc::new(Mutex::new(None)),
             profiling_context: None,
         }
+    }
+
+    /// Set the hook profiler for dependency injection
+    #[must_use]
+    pub fn with_hook_profiler(mut self, hook_profiler: Box<dyn HookProfiler>) -> Self {
+        self.hook_profiler = hook_profiler;
+        self
+    }
+
+    /// Set the circuit breaker for dependency injection
+    #[must_use]
+    pub fn with_circuit_breaker(mut self, circuit_breaker: Box<dyn CircuitBreaker>) -> Self {
+        self.circuit_breaker = circuit_breaker;
+        self
     }
 
     /// Create a new diagnostics bridge with distributed tracing
@@ -1479,10 +1503,28 @@ impl Clone for DiagnosticsBridge {
             stack_navigator: self.stack_navigator.clone(),
             // Profiling state is not cloned - each clone starts without active profiling
             profiler: Box::new(PprofProfiler::new()),
+            hook_profiler: Box::new(RealHookProfiler::new()),
+            circuit_breaker: Box::new(ExponentialBackoffBreaker::default()),
             profiling_session: Arc::new(Mutex::new(None)),
             profiling_context: None,
         }
     }
+}
+
+/// Create a test-safe `DiagnosticsBridge` with null profilers for testing
+///
+/// This helper creates a `DiagnosticsBridge` with `NullProfiler` and `NullHookProfiler`
+/// to avoid signal handler issues and other side effects during testing.
+#[cfg(test)]
+#[must_use]
+pub fn create_test_bridge() -> DiagnosticsBridge {
+    use crate::null_circuit_breaker::NullCircuitBreaker;
+    use crate::null_hook_profiler::NullHookProfiler;
+    use crate::null_profiler::NullProfiler;
+
+    DiagnosticsBridge::with_profiler(Box::new(NullProfiler::new()))
+        .with_hook_profiler(Box::new(NullHookProfiler::new()))
+        .with_circuit_breaker(Box::new(NullCircuitBreaker::new()))
 }
 
 impl Default for DiagnosticsBridge {
