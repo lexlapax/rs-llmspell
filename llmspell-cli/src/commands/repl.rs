@@ -2,20 +2,48 @@
 //! ABOUTME: Provides an interactive read-eval-print loop
 
 use crate::cli::ScriptEngine;
+use crate::kernel_connection::{
+    KernelConnectionBuilder, KernelConnectionTrait, RealKernelDiscovery,
+};
+use crate::repl_interface::CLIReplInterface;
 use anyhow::Result;
+use llmspell_bridge::{
+    circuit_breaker::ExponentialBackoffBreaker, diagnostics_bridge::DiagnosticsBridge,
+};
 use llmspell_config::LLMSpellConfig;
 use std::path::PathBuf;
 
 /// Start an interactive REPL session
 pub async fn start_repl(
     engine: ScriptEngine,
-    _runtime_config: LLMSpellConfig,
-    _history_file: Option<PathBuf>,
+    runtime_config: LLMSpellConfig,
+    history_file: Option<PathBuf>,
 ) -> Result<()> {
     println!("LLMSpell REPL - {} engine", engine.as_str());
-    println!("Type 'exit' or press Ctrl+D to quit");
-    println!();
+    println!("Connecting to kernel...");
 
-    // TODO: Implement full REPL in Phase 2
-    anyhow::bail!("REPL mode not implemented yet (coming in Phase 2)")
+    // Build kernel connection with dependency injection
+    let mut kernel = KernelConnectionBuilder::new()
+        .discovery(Box::new(RealKernelDiscovery::new()))
+        .circuit_breaker(Box::new(ExponentialBackoffBreaker::default()))
+        .diagnostics(DiagnosticsBridge::builder().build())
+        .build();
+
+    // Connect to kernel or start new one
+    kernel.connect_or_start().await?;
+
+    // Build CLI REPL interface
+    let mut cli_client = CLIReplInterface::builder()
+        .kernel(Box::new(kernel))
+        .diagnostics(DiagnosticsBridge::builder().build())
+        .config(runtime_config)
+        .history_file(history_file.unwrap_or_else(|| {
+            dirs::home_dir()
+                .unwrap_or_else(|| PathBuf::from("."))
+                .join(".llmspell_history")
+        }))
+        .build()?;
+
+    // Run interactive loop
+    cli_client.run_interactive_loop().await
 }

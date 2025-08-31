@@ -19,6 +19,7 @@ llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-storage = { path = "../llmspell-storage" }
+llmspell-repl = { path = "../llmspell-repl" }
 tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 serde.workspace = true
@@ -35,6 +36,8 @@ toml = { workspace = true }
 once_cell = { workspace = true }
 uuid = { workspace = true }
 dialoguer = "0.11"
+async-trait = { workspace = true }
+rustyline = "14.0"
 
 [dev-dependencies]
 assert_cmd = "2.0"

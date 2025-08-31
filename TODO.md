@@ -103,15 +103,15 @@
 - **Enhanced error display**: Integrates with DiagnosticsBridge
 
 **Acceptance Criteria:**
-- [ ] CLI uses dependency injection (builder pattern)
-- [ ] NullKernelConnection implemented for tests
-- [ ] CLI operations categorized by WorkloadClassifier (Micro/Light/Medium/Heavy)
-- [ ] Interactive commands use Micro workload thresholds (adaptive, not fixed)
-- [ ] Batch operations use Heavy workload thresholds (adaptive)
-- [ ] Tab completion responsive within Micro thresholds
-- [ ] Debug operations measured with appropriate workload category
-- [ ] Media display performance adapted to content size
-- [ ] Test helpers use `create_test_cli()` pattern
+- [x] CLI uses dependency injection (builder pattern)
+- [x] NullKernelConnection implemented for tests
+- [x] CLI operations categorized by WorkloadClassifier (Micro/Light/Medium/Heavy)
+- [x] Interactive commands use Micro workload thresholds (adaptive, not fixed)
+- [x] Batch operations use Heavy workload thresholds (adaptive)
+- [x] Tab completion responsive within Micro thresholds
+- [x] Debug operations measured with appropriate workload category
+- [x] Media display performance adapted to content size
+- [x] Test helpers use `create_test_cli()` pattern
 
 **Implementation Steps:**
 1. Update CLI to use dependency injection:
@@ -162,12 +162,12 @@
 6. **Test CLI integration with established interactive debugging patterns**
 
 **Definition of Done:**
-- [ ] CLI fully integrated
-- [ ] All commands work
-- [ ] History search functional
-- [ ] Media display works
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] CLI fully integrated
+- [x] All commands work
+- [x] History search functional
+- [x] Media display works
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
 ### Task 9.4.2: CLI Run Command Mode Selection
