@@ -13,7 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{debug, trace, warn};
+use tracing::{debug, trace};
 
 /// Script-agnostic variable inspector trait
 pub trait VariableInspector: Send + Sync {
@@ -193,10 +193,7 @@ impl SharedVariableInspector {
             },
             None,
         )
-        .unwrap_or_else(|e| {
-            warn!("Failed to read variables from context: {}", e);
-            HashMap::new()
-        })
+        .unwrap_or_else(|_| HashMap::new())
     }
 
     /// Read a single variable from context
@@ -213,10 +210,7 @@ impl SharedVariableInspector {
             },
             None,
         )
-        .unwrap_or_else(|e| {
-            warn!("Failed to read variable '{}': {}", name, e);
-            None
-        })
+        .unwrap_or(None)
     }
 
     /// Add a variable to the watch list

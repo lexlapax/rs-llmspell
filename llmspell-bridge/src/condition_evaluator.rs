@@ -124,10 +124,7 @@ impl SharedDebugContext {
             },
             None,
         )
-        .unwrap_or_else(|e| {
-            tracing::warn!("Failed to read debug context variables: {}", e);
-            HashMap::new()
-        })
+        .unwrap_or_else(|_| HashMap::new())
     }
 }
 
@@ -156,10 +153,7 @@ impl DebugContext for SharedDebugContext {
             },
             None,
         )
-        .unwrap_or_else(|e| {
-            tracing::warn!("Failed to read debug context location: {}", e);
-            None
-        })
+        .unwrap_or(None)
     }
 }
 

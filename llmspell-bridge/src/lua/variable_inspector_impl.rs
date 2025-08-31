@@ -13,7 +13,6 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::warn;
 
 /// Lua-specific variable inspector
 pub struct LuaVariableInspector {
@@ -34,6 +33,7 @@ impl LuaVariableInspector {
     }
 
     /// Format a variable for display using Lua-specific formatting
+    #[must_use]
     pub fn format_variable_with_lua(&self, name: &str, value: &JsonValue, lua: &Lua) -> String {
         // Convert JSON to Lua value for formatting
         match json_to_lua_value(lua, value) {
@@ -47,7 +47,6 @@ impl LuaVariableInspector {
                 }
             }
             Err(e) => {
-                warn!("Failed to convert variable '{}' to Lua value: {}", name, e);
                 format!("{name}: <error: {e}>")
             }
         }
