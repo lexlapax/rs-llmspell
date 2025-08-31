@@ -538,7 +538,276 @@ let new_rate = config.calculate_adaptive_rate(current_overhead_percent);
 - [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
-### Task 9.3.4: Performance Profiler Hooks
+### Task 9.3.4: Unified Test Execution Framework
+**Priority**: HIGH  
+**Estimated Time**: 8 hours  
+**Assignee**: DevEx Team
+
+**Description**: Create a unified test execution framework that solves the benchmark/test mode incompatibility by providing a single execution engine with adaptive workloads, built-in telemetry, and clean separation between execution logic and runtime context.
+
+**ROOT CAUSE ANALYSIS:**
+- Benchmarks in `benches/` directory have `harness = false` (custom Criterion)
+- Same code being run as both test and benchmark causes hangs
+- No abstraction layer between test logic and execution mode
+- Duplicated implementations lead to divergent behavior
+- Missing workload adaptation based on execution context
+
+**ARCHITECTURAL SOLUTION:**
+Create `test_framework/` module providing:
+- **Unified Execution**: Single implementation for all modes
+- **Clean Separation**: Framework separate from CLI runner
+- **Adaptive Workloads**: Auto-adjust based on context
+- **Built-in Telemetry**: Metrics collected automatically
+- **Future-Ready**: Supports distributed execution, chaos testing
+
+**Acceptance Criteria:**
+- [ ] test_framework module created with clean API
+- [ ] TestExecutor trait supports test/bench/stress modes
+- [ ] Workload auto-adapts (test=Small, bench=Large)
+- [ ] Event throughput tests complete in <5s
+- [ ] Benchmarks use same executor via adapter
+- [ ] No mode detection or cfg(test) hacks
+- [ ] Telemetry collected for all executions
+- [ ] Framework extractable to separate crate
+
+**Implementation Steps:**
+1. **Create test_framework module structure**:
+   ```rust
+   // llmspell-testing/src/test_framework/mod.rs
+   pub mod executor;
+   pub mod workload;
+   pub mod telemetry;
+   pub mod adapters;
+   pub mod collectors;
+   
+   pub use executor::{TestExecutor, TestResult, ExecutionContext};
+   pub use workload::{WorkloadClass, WorkloadAdapter};
+   pub use telemetry::{TelemetryCollector, Metrics};
+   ```
+
+2. **Define TestExecutor trait with context awareness**:
+   ```rust
+   // llmspell-testing/src/test_framework/executor.rs
+   #[async_trait]
+   pub trait TestExecutor: Send + Sync {
+       type Config: Clone + Send + Sync;
+       type Result: TestResult;
+       
+       /// Execute test with automatic workload adaptation
+       async fn execute(&self, context: ExecutionContext<Self::Config>) -> Self::Result;
+       
+       /// Get default config for this executor
+       fn default_config(&self) -> Self::Config;
+       
+       /// Adapt workload based on execution mode
+       fn adapt_workload(&self, mode: ExecutionMode) -> WorkloadClass;
+   }
+   
+   pub enum ExecutionMode {
+       Test,       // cargo test - use Small workload
+       Bench,      // cargo bench - use Large workload  
+       Stress,     // stress test - use Stress workload
+       CI,         // CI environment - use Medium workload
+   }
+   
+   pub struct ExecutionContext<C> {
+       pub config: C,
+       pub mode: ExecutionMode,
+       pub telemetry: Arc<TelemetryCollector>,
+       pub timeout: Option<Duration>,
+   }
+   ```
+
+3. **Create WorkloadClass with smart defaults**:
+   ```rust
+   // llmspell-testing/src/test_framework/workload.rs
+   #[derive(Debug, Clone, Copy)]
+   pub enum WorkloadClass {
+       Micro,    // <100ms, 100 items
+       Small,    // <1s, 1K items
+       Medium,   // <10s, 10K items
+       Large,    // <60s, 100K items
+       Stress,   // Unlimited, 1M+ items
+   }
+   
+   impl WorkloadClass {
+       pub fn from_env() -> Self {
+           // Auto-detect based on environment
+           if std::env::var("CARGO_BENCH").is_ok() {
+               WorkloadClass::Large
+           } else if std::env::var("CI").is_ok() {
+               WorkloadClass::Medium
+           } else {
+               WorkloadClass::Small
+           }
+       }
+       
+       pub fn event_count(&self) -> usize {
+           match self {
+               Self::Micro => 100,
+               Self::Small => 1_000,
+               Self::Medium => 10_000,
+               Self::Large => 100_000,
+               Self::Stress => 1_000_000,
+           }
+       }
+       
+       pub fn timeout(&self) -> Duration {
+           match self {
+               Self::Micro => Duration::from_millis(100),
+               Self::Small => Duration::from_secs(1),
+               Self::Medium => Duration::from_secs(10),
+               Self::Large => Duration::from_secs(60),
+               Self::Stress => Duration::from_secs(300),
+           }
+       }
+   }
+   ```
+
+4. **Create adapters for different execution modes**:
+   ```rust
+   // llmspell-testing/src/test_framework/adapters/criterion.rs
+   pub struct CriterionAdapter<E: TestExecutor> {
+       executor: Arc<E>,
+       workload: Option<WorkloadClass>,
+   }
+   
+   impl<E: TestExecutor> CriterionAdapter<E> {
+       pub fn new(executor: E) -> Self {
+           Self {
+               executor: Arc::new(executor),
+               workload: None,
+           }
+       }
+       
+       pub fn with_workload(mut self, workload: WorkloadClass) -> Self {
+           self.workload = Some(workload);
+           self
+       }
+       
+       pub fn bench(self, c: &mut Criterion, name: &str) {
+           let context = ExecutionContext {
+               config: self.executor.default_config(),
+               mode: ExecutionMode::Bench,
+               telemetry: Arc::new(TelemetryCollector::new()),
+               timeout: self.workload.map(|w| w.timeout()),
+           };
+           
+           c.bench_function(name, |b| {
+               let executor = self.executor.clone();
+               let ctx = context.clone();
+               b.iter(|| {
+                   tokio::runtime::Runtime::new()
+                       .unwrap()
+                       .block_on(executor.execute(ctx.clone()))
+               });
+           });
+       }
+   }
+   ```
+
+5. **Implement EventThroughputExecutor**:
+   ```rust
+   // llmspell-testing/tests/performance/event_throughput_test.rs
+   use llmspell_testing::test_framework::{TestExecutor, ExecutionContext, WorkloadClass};
+   
+   pub struct EventThroughputExecutor {
+       event_bus: Arc<EventBus>,
+   }
+   
+   #[async_trait]
+   impl TestExecutor for EventThroughputExecutor {
+       type Config = EventConfig;
+       type Result = ThroughputResult;
+       
+       async fn execute(&self, context: ExecutionContext<Self::Config>) -> Self::Result {
+           let workload = self.adapt_workload(context.mode);
+           let event_count = workload.event_count();
+           
+           let start = Instant::now();
+           
+           // Publish events
+           for i in 0..event_count {
+               let event = UniversalEvent::new(
+                   format!("test.event.{}", i % 100),
+                   serde_json::json!({"id": i}),
+                   Language::Rust,
+               );
+               
+               // Use timeout from context
+               if let Some(timeout) = context.timeout {
+                   match tokio::time::timeout(timeout, self.event_bus.publish(event)).await {
+                       Ok(Ok(_)) => {},
+                       _ => break, // Timeout or error
+                   }
+               } else {
+                   self.event_bus.publish(event).await.ok();
+               }
+           }
+           
+           let duration = start.elapsed();
+           let events_per_second = event_count as f64 / duration.as_secs_f64();
+           
+           // Collect telemetry
+           context.telemetry.record_metric("events_published", event_count);
+           context.telemetry.record_metric("duration_ms", duration.as_millis());
+           
+           ThroughputResult {
+               events_per_second,
+               total_events: event_count,
+               duration,
+           }
+       }
+       
+       fn default_config(&self) -> Self::Config {
+           EventConfig::default()
+       }
+       
+       fn adapt_workload(&self, mode: ExecutionMode) -> WorkloadClass {
+           match mode {
+               ExecutionMode::Test => WorkloadClass::Small,
+               ExecutionMode::Bench => WorkloadClass::Large,
+               ExecutionMode::Stress => WorkloadClass::Stress,
+               ExecutionMode::CI => WorkloadClass::Medium,
+           }
+       }
+   }
+   ```
+
+6. **Use in both test and benchmark**:
+   ```rust
+   // tests/performance/event_throughput_test.rs
+   #[tokio::test]
+   async fn test_event_throughput() {
+       let executor = EventThroughputExecutor::new();
+       let context = ExecutionContext::test_default();
+       
+       let result = executor.execute(context).await;
+       assert!(result.events_per_second > 1000.0);
+   }
+   
+   // benches/event_throughput.rs
+   fn bench_event_throughput(c: &mut Criterion) {
+       let executor = EventThroughputExecutor::new();
+       CriterionAdapter::new(executor)
+           .bench(c, "event_throughput");
+   }
+   ```
+
+**Definition of Done:**
+- [ ] test_framework module created with clean separation
+- [ ] TestExecutor trait implemented with context awareness
+- [ ] WorkloadClass auto-adapts based on ExecutionMode
+- [ ] EventThroughputExecutor works in both test and bench
+- [ ] No hanging tests (proper timeouts)
+- [ ] Telemetry collected automatically
+- [ ] Criterion adapter working
+- [ ] All existing benchmarks migrated
+- [ ] Documentation explains framework usage
+- [ ] Zero clippy warnings
+
+
+### Task 9.3.5: Performance Profiler Hooks
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: DevEx Team
@@ -780,7 +1049,7 @@ let new_rate = config.calculate_adaptive_rate(current_overhead_percent);
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
-### Task 9.3.5: Hook Introspection & Circuit Breakers
+### Task 9.3.6: Hook Introspection & Circuit Breakers
 **Priority**: HIGH  
 **Estimated Time**: 6 hours  
 **Assignee**: DevEx Team
@@ -925,7 +1194,7 @@ let new_rate = config.calculate_adaptive_rate(current_overhead_percent);
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
-### Task 9.3.6: Session Recording/Replay
+### Task 9.3.7: Session Recording/Replay
 **Priority**: HIGH  
 **Estimated Time**: 8 hours  
 **Assignee**: DevEx Team
@@ -1093,7 +1362,7 @@ let new_rate = config.calculate_adaptive_rate(current_overhead_percent);
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
-### Task 9.3.7: Section 9.3 Quality Gates and Testing
+### Task 9.3.8: Section 9.3 Quality Gates and Testing
 **Priority**: CRITICAL  
 **Estimated Time**: 6 hours  
 **Assignee**: QA Team
