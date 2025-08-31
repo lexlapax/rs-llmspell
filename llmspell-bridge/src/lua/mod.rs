@@ -11,6 +11,7 @@ pub mod hook_multiplexer;
 pub mod output;
 pub mod stack_navigator_impl;
 pub mod sync_utils;
+pub mod tracing_impl;
 pub mod variable_inspector_impl;
 
 pub use engine::LuaEngine;

@@ -1,9 +1,19 @@
 //! Diagnostics bridge for script engines
 //!
 //! Provides a unified interface for all script engines to access
-//! the centralized diagnostics infrastructure (logging, profiling, metrics).
+//! the centralized diagnostics infrastructure (logging, profiling, metrics)
+//! and distributed tracing via OpenTelemetry.
 
+use crate::execution_context::{ExecutionContextBridge, SharedExecutionContext};
+use crate::tracing::{DefaultTraceEnricher, SpanHandle, TraceEnricher, TracingConfig};
 use llmspell_utils::debug::{global_debug_manager, DebugEntry, DebugLevel, PerformanceTracker};
+use opentelemetry::{
+    global,
+    trace::{SpanKind, Tracer},
+    Context, KeyValue,
+};
+use opentelemetry_otlp::WithExportConfig;
+use opentelemetry_sdk::trace::{self, TracerProvider as SdkTracerProvider};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -11,13 +21,21 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
-/// Diagnostics bridge that script engines interact with for logging and profiling
+/// Diagnostics bridge that script engines interact with for logging, profiling, and tracing
 #[derive(Clone)]
 pub struct DiagnosticsBridge {
     /// Reference to the global debug manager
     manager: Arc<llmspell_utils::debug::DebugManager>,
     /// Active performance trackers by ID (using interior mutability)
     trackers: Arc<Mutex<HashMap<String, Arc<PerformanceTracker>>>>,
+    /// OpenTelemetry tracer for distributed tracing
+    tracer: Option<Arc<opentelemetry::global::BoxedTracer>>,
+    /// Trace enricher for adding context to spans
+    trace_enricher: Arc<dyn TraceEnricher>,
+    /// Tracing configuration
+    tracing_config: TracingConfig,
+    /// Shared execution context for trace enrichment
+    shared_context: Arc<Mutex<SharedExecutionContext>>,
 }
 
 impl DiagnosticsBridge {
@@ -27,6 +45,80 @@ impl DiagnosticsBridge {
         Self {
             manager: global_debug_manager(),
             trackers: Arc::new(Mutex::new(HashMap::new())),
+            tracer: None,
+            trace_enricher: Arc::new(DefaultTraceEnricher),
+            tracing_config: TracingConfig::default(),
+            shared_context: Arc::new(Mutex::new(SharedExecutionContext::new())),
+        }
+    }
+
+    /// Create a new diagnostics bridge with distributed tracing
+    #[must_use]
+    pub fn with_distributed_tracing(mut self, config: TracingConfig) -> Self {
+        if config.enabled {
+            // Initialize OpenTelemetry tracer
+            if let Ok(tracer) = Self::init_tracer(&config) {
+                self.tracer = Some(Arc::new(tracer));
+            }
+        }
+        self.tracing_config = config;
+        self
+    }
+
+    /// Initialize OpenTelemetry tracer
+    fn init_tracer(config: &TracingConfig) -> Result<opentelemetry::global::BoxedTracer, String> {
+        let exporter = opentelemetry_otlp::SpanExporter::builder()
+            .with_tonic()
+            .with_endpoint(&config.otlp_endpoint)
+            .build()
+            .map_err(|e| format!("Failed to create OTLP exporter: {e}"))?;
+
+        let provider = SdkTracerProvider::builder()
+            .with_batch_exporter(exporter, opentelemetry_sdk::runtime::Tokio)
+            .with_sampler(trace::Sampler::TraceIdRatioBased(config.sampling_rate))
+            .with_resource(opentelemetry_sdk::Resource::new(vec![KeyValue::new(
+                "service.name",
+                config.service_name.clone(),
+            )]))
+            .build();
+
+        global::set_tracer_provider(provider);
+        Ok(global::tracer("llmspell-diagnostics"))
+    }
+
+    /// Start a trace span for script execution
+    #[must_use]
+    pub fn trace_execution(
+        &self,
+        operation: &str,
+        context: &SharedExecutionContext,
+    ) -> Option<Box<dyn SpanHandle>> {
+        self.tracer.as_ref().map(|tracer| {
+            let span = tracer
+                .span_builder(operation.to_string())
+                .with_kind(SpanKind::Internal)
+                .start(tracer.as_ref());
+
+            // Enrich span with context
+            let mut handle = OpenTelemetrySpanHandle { span };
+            self.trace_enricher.enrich_span(&mut handle, context);
+
+            Box::new(handle) as Box<dyn SpanHandle>
+        })
+    }
+
+    /// Trace a diagnostic event
+    pub fn trace_diagnostic(&self, message: &str, level: &str) {
+        if let Some(ref tracer) = self.tracer {
+            let span = tracer
+                .span_builder("diagnostic")
+                .with_kind(SpanKind::Internal)
+                .with_attributes(vec![
+                    KeyValue::new("diagnostic.message", message.to_string()),
+                    KeyValue::new("diagnostic.level", level.to_string()),
+                ])
+                .start(tracer.as_ref());
+            drop(span); // End span by dropping
         }
     }
 
@@ -38,7 +130,7 @@ impl DiagnosticsBridge {
         }
     }
 
-    /// Log with metadata
+    /// Log with metadata and trace the diagnostic
     pub fn log_with_metadata(
         &self,
         level: &str,
@@ -46,6 +138,9 @@ impl DiagnosticsBridge {
         module: Option<&str>,
         metadata: Value,
     ) {
+        // Trace the diagnostic event
+        self.trace_diagnostic(message, level);
+
         if let Ok(debug_level) = level.parse::<DebugLevel>() {
             self.manager.log_with_metadata(
                 debug_level,
@@ -292,7 +387,72 @@ impl fmt::Debug for DiagnosticsBridge {
             .field("enabled", &self.is_enabled())
             .field("level", &self.get_level())
             .field("tracker_count", &self.trackers.lock().len())
+            .field("tracing_enabled", &self.tracing_config.enabled)
             .finish_non_exhaustive()
+    }
+}
+
+/// Implementation of `ExecutionContextBridge` for `DiagnosticsBridge`
+impl ExecutionContextBridge for DiagnosticsBridge {
+    fn get_context(&self) -> SharedExecutionContext {
+        self.shared_context.lock().clone()
+    }
+
+    fn update_context(&self, context: SharedExecutionContext) {
+        *self.shared_context.lock() = context;
+    }
+
+    fn enrich_diagnostic(&self, message: &str) -> String {
+        let context = self.get_context();
+        let enriched = context
+            .location
+            .as_ref()
+            .map_or_else(
+                || message.to_string(),
+                |location| format!("{} [{}:{}]", message, location.source, location.line),
+            );
+
+        // Create trace span for this diagnostic if tracing is enabled
+        if let Some(span) = self.trace_execution("diagnostic", &context) {
+            // Span will be ended when dropped
+            drop(span);
+        }
+
+        enriched
+    }
+}
+
+/// OpenTelemetry span handle implementation
+struct OpenTelemetrySpanHandle {
+    span: opentelemetry::global::BoxedSpan,
+}
+
+impl SpanHandle for OpenTelemetrySpanHandle {
+    fn end(self: Box<Self>) {
+        drop(self.span); // Span ends when dropped
+    }
+
+    fn record_exception(&mut self, exception: &str, stacktrace: Option<&str>) {
+        // Record exception as an event instead of error
+        use opentelemetry::trace::Span;
+        self.span.add_event(
+            "exception",
+            vec![
+                KeyValue::new("exception.message", exception.to_string()),
+                KeyValue::new("exception.stacktrace", stacktrace.unwrap_or("").to_string()),
+            ],
+        );
+    }
+
+    fn set_attribute(&mut self, key: &str, value: String) {
+        use opentelemetry::trace::Span;
+        self.span
+            .set_attribute(KeyValue::new(key.to_string(), value));
+    }
+
+    fn context(&self) -> Context {
+        // Return current context - span is already active
+        Context::current()
     }
 }
 

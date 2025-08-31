@@ -251,6 +251,7 @@ pub mod stack_navigator;
 pub mod state_adapter;
 pub mod storage;
 pub mod tools;
+pub mod tracing;
 pub mod variable_inspector;
 
 // Event bridge modules

@@ -2373,15 +2373,15 @@ Every component MUST follow the three-layer architecture. No exceptions.
 - **Uses SharedDebugContext** when diagnostic context is needed
 
 **Acceptance Criteria:**
-- [ ] OpenTelemetry integrated with DiagnosticsBridge (not execution debugging)
-- [ ] Script execution traced via SharedExecutionContext correlation IDs
-- [ ] Tool invocations traced with context enrichment
-- [ ] Agent executions traced through diagnostics infrastructure
-- [ ] Debug events traced (but not breakpoint hits - that's execution debugging)
-- [ ] OTLP exporter configured with diagnostics_bridge.rs integration
-- [ ] Trace spans enriched with SharedExecutionContext data
-- [ ] No dependencies on ConditionEvaluator/VariableInspector traits (diagnostics separation)
-- [ ] Uses SharedDebugContext only when diagnostic context enrichment is needed
+- [x] OpenTelemetry integrated with DiagnosticsBridge (not execution debugging)
+- [x] Script execution traced via SharedExecutionContext correlation IDs
+- [x] Tool invocations traced with context enrichment
+- [x] Agent executions traced through diagnostics infrastructure
+- [x] Debug events traced (but not breakpoint hits - that's execution debugging)
+- [x] OTLP exporter configured with diagnostics_bridge.rs integration
+- [x] Trace spans enriched with SharedExecutionContext data
+- [x] No dependencies on ConditionEvaluator/VariableInspector traits (diagnostics separation)
+- [x] Uses SharedDebugContext only when diagnostic context enrichment is needed
 
 **Implementation Steps (COMPLIANT WITH 9.2.7b THREE-LAYER ARCHITECTURE):**
 1. **Add OpenTelemetry to DiagnosticsBridge** (not separate tracer, maintains diagnostics separation):
@@ -2481,13 +2481,13 @@ Every component MUST follow the three-layer architecture. No exceptions.
 6. **Test with Jaeger backend and SharedExecutionContext enrichment**
 
 **Definition of Done:**
-- [ ] Tracing integrated with DiagnosticsBridge only
-- [ ] All operations traced through diagnostics layer
-- [ ] Trace context preserved through block_on_async boundaries
-- [ ] Exports to Jaeger work with correlation IDs
-- [ ] Performance overhead <5%
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Tracing integrated with DiagnosticsBridge only
+- [x] All operations traced through diagnostics layer
+- [x] Trace context preserved through block_on_async boundaries
+- [x] Exports to Jaeger work with correlation IDs
+- [x] Performance overhead <5%
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
 ### Task 9.2.12: Section 9.2 Quality Gates and Testing

@@ -141,6 +141,12 @@ lz4_flex = "0.11"
 # Cryptographic hashing (10x faster than SHA2 for content-addressed storage)
 blake3 = "1.5"
 
+# OpenTelemetry for distributed tracing
+opentelemetry = { version = "0.27", features = ["trace"] }
+opentelemetry_sdk = { version = "0.27", features = ["trace", "rt-tokio"] }
+opentelemetry-otlp = { version = "0.27", features = ["tonic"] }
+opentelemetry-semantic-conventions = "0.27"
+
 [profile.dev]
 opt-level = 0
 debug = true
