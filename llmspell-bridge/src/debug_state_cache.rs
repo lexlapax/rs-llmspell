@@ -167,6 +167,14 @@ pub trait DebugStateCache: Send + Sync {
 
     /// Record a hot location (for performance monitoring)
     fn record_hot_location(&self, source: String, line: u32);
+
+    // ===== Stack Navigation =====
+
+    /// Get the current frame index
+    fn get_current_frame_index(&self) -> usize;
+
+    /// Set the current frame index
+    fn set_current_frame_index(&self, index: usize);
 }
 
 /// Factory for creating script-specific debug state caches
@@ -213,6 +221,8 @@ pub struct SharedDebugStateCache {
     watch_results: Arc<dashmap::DashMap<String, (String, u64)>>,
     /// Next watch ID counter
     next_watch_id: std::sync::atomic::AtomicUsize,
+    /// Current stack frame index for navigation
+    current_frame_index: std::sync::atomic::AtomicUsize,
 }
 
 impl SharedDebugStateCache {
@@ -238,6 +248,7 @@ impl SharedDebugStateCache {
             watch_expressions: Arc::new(parking_lot::RwLock::new(Vec::new())),
             watch_results: Arc::new(dashmap::DashMap::new()),
             next_watch_id: std::sync::atomic::AtomicUsize::new(0),
+            current_frame_index: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -557,6 +568,17 @@ impl DebugStateCache for SharedDebugStateCache {
         }
 
         locations.push((source, line, std::time::Instant::now()));
+    }
+
+    // Stack Navigation
+    fn get_current_frame_index(&self) -> usize {
+        self.current_frame_index
+            .load(std::sync::atomic::Ordering::Relaxed)
+    }
+
+    fn set_current_frame_index(&self, index: usize) {
+        self.current_frame_index
+            .store(index, std::sync::atomic::Ordering::Relaxed);
     }
 }
 

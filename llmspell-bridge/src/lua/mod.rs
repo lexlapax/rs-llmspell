@@ -9,6 +9,7 @@ pub mod globals;
 pub mod hook_adapter;
 pub mod hook_multiplexer;
 pub mod output;
+pub mod stack_navigator_impl;
 pub mod sync_utils;
 pub mod variable_inspector_impl;
 

@@ -250,4 +250,14 @@ impl DebugStateCache for LuaDebugStateCache {
     fn generation(&self) -> u64 {
         self.shared.generation()
     }
+
+    // ===== Stack Navigation =====
+
+    fn get_current_frame_index(&self) -> usize {
+        self.shared.get_current_frame_index()
+    }
+
+    fn set_current_frame_index(&self, index: usize) {
+        self.shared.set_current_frame_index(index);
+    }
 }

@@ -247,6 +247,7 @@ pub mod providers;
 pub mod providers_discovery;
 pub mod registry;
 pub mod runtime;
+pub mod stack_navigator;
 pub mod state_adapter;
 pub mod storage;
 pub mod tools;
