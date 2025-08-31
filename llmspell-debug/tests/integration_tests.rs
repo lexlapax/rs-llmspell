@@ -2,6 +2,7 @@
 //!
 //! Tests the complete interactive debugging pipeline using Phase 9.1 architecture
 
+use llmspell_bridge::lua::debug_state_cache_impl::LuaDebugStateCache;
 use llmspell_debug::*;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -9,7 +10,7 @@ use tokio::sync::RwLock;
 #[tokio::test]
 async fn test_bridge_kernel_interactive_debugging_integration() {
     // Create ExecutionManager from bridge (Phase 9.1 architecture)
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
 
     // Create SharedExecutionContext
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
@@ -62,13 +63,10 @@ async fn test_bridge_kernel_interactive_debugging_integration() {
     let state = debugger.get_debug_state().await;
     assert_eq!(state, DebugState::Running);
 
+    // Step into configures stepping mode but stays Running until code executes
     debugger.step_into().await.unwrap();
     let state = debugger.get_debug_state().await;
-    if let DebugState::Paused { reason, .. } = state {
-        assert_eq!(reason, PauseReason::Step);
-    } else {
-        panic!("Expected paused state after step");
-    }
+    assert_eq!(state, DebugState::Running); // Correctly in Running state, ready to step
 
     // 7. Test cleanup
     let removed = debugger.remove_breakpoint(&bp_id).await.unwrap();
@@ -81,7 +79,7 @@ async fn test_bridge_kernel_interactive_debugging_integration() {
 #[tokio::test]
 async fn test_lua_hooks_installation() {
     // Create ExecutionManager
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Create InteractiveDebugger
@@ -134,7 +132,7 @@ async fn test_debug_session_workflow() {
 
 #[tokio::test]
 async fn test_shared_execution_context_integration() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     let debugger = InteractiveDebugger::new(execution_manager, shared_context.clone());

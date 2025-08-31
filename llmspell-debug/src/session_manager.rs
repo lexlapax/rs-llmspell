@@ -436,10 +436,12 @@ impl Clone for DebugSession {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_bridge::lua::debug_state_cache_impl::LuaDebugStateCache;
 
     #[tokio::test]
     async fn test_session_creation() {
-        let execution_manager = Arc::new(ExecutionManager::new());
+        let execution_manager =
+            Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
         let session_manager = DebugSessionManager::new(execution_manager);
 
         let session_id = session_manager
@@ -455,7 +457,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_breakpoint_management() {
-        let execution_manager = Arc::new(ExecutionManager::new());
+        let execution_manager =
+            Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
         let session_manager = DebugSessionManager::new(execution_manager);
 
         let session_id = session_manager
@@ -479,7 +482,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_debug_commands() {
-        let execution_manager = Arc::new(ExecutionManager::new());
+        let execution_manager =
+            Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
         let session_manager = DebugSessionManager::new(execution_manager);
 
         let session_id = session_manager
@@ -504,7 +508,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_session_cleanup() {
-        let execution_manager = Arc::new(ExecutionManager::new());
+        let execution_manager =
+            Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
         let session_manager = DebugSessionManager::new(execution_manager);
 
         let session_id = session_manager

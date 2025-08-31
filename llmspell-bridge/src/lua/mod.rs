@@ -3,7 +3,7 @@
 
 pub mod condition_evaluator_impl;
 pub mod conversion;
-pub mod debug_cache;
+pub mod debug_state_cache_impl;
 pub mod engine;
 pub mod globals;
 pub mod hook_adapter;

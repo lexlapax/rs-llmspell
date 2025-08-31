@@ -3,6 +3,7 @@
 //! Since Lua only supports one debug hook at a time, this provides
 //! a multiplexing layer that allows multiple systems to register hooks.
 
+use crate::debug_state_cache::DebugStateCache;
 use mlua::{Debug, DebugEvent, HookTriggers, Lua, Result as LuaResult};
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -225,7 +226,7 @@ impl HookHandler for DebugHookAdapter {
     }
 
     fn interested_events(&self) -> HookTriggers {
-        use crate::lua::debug_cache::DebugMode;
+        use crate::debug_state_cache::DebugMode;
 
         let mode = self.inner.lock().debug_cache().get_debug_mode();
         match mode {
@@ -244,7 +245,7 @@ impl HookHandler for DebugHookAdapter {
     }
 
     fn is_active(&self) -> bool {
-        use crate::lua::debug_cache::DebugMode;
+        use crate::debug_state_cache::DebugMode;
         !matches!(
             self.inner.lock().debug_cache().get_debug_mode(),
             DebugMode::Disabled

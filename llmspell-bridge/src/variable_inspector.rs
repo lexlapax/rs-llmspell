@@ -5,12 +5,13 @@
 //! `ContextBatcher`. Script-specific implementations are in the respective
 //! language modules (lua/, js/, python/, etc.).
 
+use crate::debug_state_cache::{CachedVariable, DebugStateCache};
 use crate::execution_context::SharedExecutionContext;
-use crate::lua::debug_cache::{CachedVariable, ContextBatcher, ContextUpdate, DebugStateCache};
 use crate::lua::sync_utils::block_on_async;
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use tracing::{debug, trace, warn};
 
@@ -51,7 +52,7 @@ pub trait VariableFormatter {
 /// Concrete variable inspector implementation
 pub struct SharedVariableInspector {
     /// Debug state cache for variable caching
-    cache: Arc<DebugStateCache>,
+    cache: Arc<dyn DebugStateCache>,
     /// Shared execution context for variable access
     context: Arc<RwLock<SharedExecutionContext>>,
 }
@@ -60,7 +61,7 @@ impl SharedVariableInspector {
     /// Create a new variable inspector
     #[must_use]
     pub const fn new(
-        cache: Arc<DebugStateCache>,
+        cache: Arc<dyn DebugStateCache>,
         context: Arc<RwLock<SharedExecutionContext>>,
     ) -> Self {
         Self { cache, context }
@@ -318,14 +319,151 @@ impl VariableInspector for SharedVariableInspector {
     }
 }
 
+/// Context update batcher for lazy updates
+pub struct ContextBatcher {
+    /// Pending updates to batch
+    updates: Vec<ContextUpdate>,
+    /// Last flush time
+    last_flush: Instant,
+    /// How often to flush updates
+    flush_interval: Duration,
+    /// Maximum updates before forced flush
+    max_batch_size: usize,
+}
+
+/// Types of context updates
+#[derive(Debug, Clone)]
+pub enum ContextUpdate {
+    /// Location update
+    Location { source: String, line: u32 },
+    /// Performance metric
+    ExecutionCount(u64),
+    /// Stack frame push
+    StackPush {
+        name: String,
+        source: String,
+        line: u32,
+    },
+    /// Stack frame pop
+    StackPop,
+    /// Read multiple variables (batched for efficiency)
+    ReadVariables(Vec<String>),
+    /// Cache a variable value
+    CacheVariable {
+        name: String,
+        value: serde_json::Value,
+    },
+    /// Add variable to watch list
+    WatchVariable(String),
+    /// Remove variable from watch list
+    UnwatchVariable(String),
+}
+
+impl ContextBatcher {
+    /// Create a new context batcher
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            updates: Vec::with_capacity(100),
+            last_flush: Instant::now(),
+            flush_interval: Duration::from_millis(100),
+            max_batch_size: 100,
+        }
+    }
+
+    /// Record a location update (doesn't flush immediately)
+    pub fn record_location(&mut self, source: String, line: u32) {
+        self.updates.push(ContextUpdate::Location { source, line });
+        self.maybe_flush();
+    }
+
+    /// Record an execution count update
+    pub fn record_execution_count(&mut self, count: u64) {
+        self.updates.push(ContextUpdate::ExecutionCount(count));
+        self.maybe_flush();
+    }
+
+    /// Record a stack push
+    pub fn record_stack_push(&mut self, name: String, source: String, line: u32) {
+        self.updates
+            .push(ContextUpdate::StackPush { name, source, line });
+        self.maybe_flush();
+    }
+
+    /// Record a stack pop
+    pub fn record_stack_pop(&mut self) {
+        self.updates.push(ContextUpdate::StackPop);
+        self.maybe_flush();
+    }
+
+    /// Batch read multiple variables (slow path only)
+    pub fn batch_read_variables(&mut self, names: Vec<String>) {
+        if !names.is_empty() {
+            self.updates.push(ContextUpdate::ReadVariables(names));
+            self.maybe_flush();
+        }
+    }
+
+    /// Cache a variable value for fast access
+    pub fn cache_variable(&mut self, name: String, value: serde_json::Value) {
+        self.updates
+            .push(ContextUpdate::CacheVariable { name, value });
+        self.maybe_flush();
+    }
+
+    /// Add a variable to the watch list
+    pub fn watch_variable(&mut self, name: String) {
+        self.updates.push(ContextUpdate::WatchVariable(name));
+        self.maybe_flush();
+    }
+
+    /// Remove a variable from the watch list
+    pub fn unwatch_variable(&mut self, name: String) {
+        self.updates.push(ContextUpdate::UnwatchVariable(name));
+        self.maybe_flush();
+    }
+
+    /// Check if we should flush
+    fn should_flush(&self) -> bool {
+        self.updates.len() >= self.max_batch_size
+            || self.last_flush.elapsed() >= self.flush_interval
+    }
+
+    /// Maybe flush if conditions are met
+    fn maybe_flush(&mut self) {
+        if self.should_flush() {
+            self.flush();
+        }
+    }
+
+    /// Force flush all pending updates
+    pub fn flush(&mut self) -> Vec<ContextUpdate> {
+        self.last_flush = Instant::now();
+        std::mem::take(&mut self.updates)
+    }
+
+    /// Get pending update count
+    #[must_use]
+    pub const fn pending_count(&self) -> usize {
+        self.updates.len()
+    }
+}
+
+impl Default for ContextBatcher {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::execution_context::SharedExecutionContext;
+    use crate::lua::debug_state_cache_impl::LuaDebugStateCache;
 
     #[test]
     fn test_variable_cache_operations() {
-        let cache = Arc::new(DebugStateCache::new());
+        let cache = Arc::new(LuaDebugStateCache::new());
         let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
         let inspector = SharedVariableInspector::new(cache.clone(), context);
 
@@ -349,7 +487,7 @@ mod tests {
 
     #[test]
     fn test_shared_variable_inspector_interface() {
-        let cache = Arc::new(DebugStateCache::new());
+        let cache = Arc::new(LuaDebugStateCache::new());
         let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
         let inspector = SharedVariableInspector::new(cache, context);
 

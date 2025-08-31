@@ -2,6 +2,7 @@
 //!
 //! Tests concurrent session handling, resource isolation, and conflict resolution
 
+use llmspell_bridge::lua::debug_state_cache_impl::LuaDebugStateCache;
 use llmspell_debug::{
     Breakpoint, DebugCommand, DebugSessionManager, DebugState, ExecutionManager,
     InteractiveDebugger, SharedExecutionContext,
@@ -13,7 +14,7 @@ use tokio::sync::RwLock;
 /// Test concurrent session creation by multiple clients
 #[tokio::test]
 async fn test_concurrent_session_creation() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     // Create multiple sessions concurrently
@@ -50,7 +51,7 @@ async fn test_concurrent_session_creation() {
 /// Test session persistence and reconnection
 #[tokio::test]
 async fn test_session_persistence_and_reconnection() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     // Create initial session
@@ -91,7 +92,7 @@ async fn test_session_persistence_and_reconnection() {
 /// Test script conflict resolution
 #[tokio::test]
 async fn test_script_conflict_resolution() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     // Create two sessions
@@ -147,7 +148,7 @@ async fn test_script_conflict_resolution() {
 /// Test resource isolation between sessions
 #[tokio::test]
 async fn test_resource_isolation_between_sessions() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     // Create two independent sessions
@@ -211,7 +212,7 @@ async fn test_resource_isolation_between_sessions() {
 /// Test handling multiple debug commands concurrently
 #[tokio::test]
 async fn test_concurrent_debug_commands() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     // Create multiple sessions
@@ -258,7 +259,7 @@ async fn test_concurrent_debug_commands() {
 /// Test session cleanup with active locks
 #[tokio::test]
 async fn test_session_cleanup_with_locks() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     // Create session and lock a script
@@ -291,7 +292,7 @@ async fn test_session_cleanup_with_locks() {
 /// Test changing script path within a session
 #[tokio::test]
 async fn test_changing_script_path() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     let session_id = session_manager
@@ -323,7 +324,7 @@ async fn test_changing_script_path() {
 /// Test maximum concurrent sessions handling
 #[tokio::test]
 async fn test_maximum_concurrent_sessions() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let session_manager = Arc::new(DebugSessionManager::new(execution_manager));
 
     // Create many sessions concurrently (simulating heavy load)
@@ -367,7 +368,7 @@ async fn test_maximum_concurrent_sessions() {
 /// Test session state synchronization
 #[tokio::test]
 async fn test_session_state_synchronization() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let debugger = InteractiveDebugger::new(execution_manager.clone(), shared_context);
 

@@ -1,8 +1,10 @@
 //! Tests for enhanced Lua debug hooks (Task 9.2.3)
 
 use llmspell_bridge::{
+    debug_state_cache::DebugStateCache,
     execution_bridge::{Breakpoint, DebugState, ExecutionManager, PauseReason},
     execution_context::SharedExecutionContext,
+    lua::debug_state_cache_impl::LuaDebugStateCache,
     lua::globals::execution::{install_interactive_debug_hooks, remove_debug_hooks},
 };
 use mlua::Lua;
@@ -14,7 +16,7 @@ use tokio::sync::RwLock;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_hook_installation() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install hooks - should start in Disabled mode since no breakpoints
@@ -25,7 +27,7 @@ async fn test_hook_installation() {
     let hook = hook_handle.unwrap();
     assert_eq!(
         hook.lock().debug_cache().get_debug_mode(),
-        llmspell_bridge::lua::debug_cache::DebugMode::Disabled
+        llmspell_bridge::debug_state_cache::DebugMode::Disabled
     );
 
     // Remove hooks
@@ -40,7 +42,7 @@ async fn test_hook_installation() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_line_tracking() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Add a breakpoint to enable Minimal mode (otherwise Disabled mode won't track)
@@ -56,7 +58,7 @@ async fn test_line_tracking() {
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
         &hook,
-        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+        llmspell_bridge::debug_state_cache::DebugMode::Full,
     )
     .unwrap();
 
@@ -86,7 +88,7 @@ async fn test_line_tracking() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_breakpoint_hit() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Set a breakpoint
@@ -129,7 +131,7 @@ async fn test_breakpoint_hit() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_function_tracking() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install hooks and enable Full mode for function tracking
@@ -140,7 +142,7 @@ async fn test_function_tracking() {
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
         &hook,
-        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+        llmspell_bridge::debug_state_cache::DebugMode::Full,
     )
     .unwrap();
 
@@ -172,7 +174,7 @@ async fn test_function_tracking() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_shared_context_enrichment() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install hooks and enable Full mode
@@ -183,7 +185,7 @@ async fn test_shared_context_enrichment() {
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
         &hook,
-        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+        llmspell_bridge::debug_state_cache::DebugMode::Full,
     )
     .unwrap();
 
@@ -212,7 +214,7 @@ async fn test_shared_context_enrichment() {
 /// Test suspension mechanism
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_suspension_mechanism() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let mut context = SharedExecutionContext::new();
 
     // Set up context
@@ -252,7 +254,7 @@ async fn test_suspension_mechanism() {
 /// Test wait for resume functionality
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_wait_for_resume() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
 
     // Set paused state
     execution_manager
@@ -286,7 +288,7 @@ async fn test_wait_for_resume() {
 /// Test breakpoint condition evaluation preparation
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_breakpoint_should_break() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
 
     // Add breakpoint with hit count
     let bp = Breakpoint::new("test.lua".to_string(), 5).with_hit_count(3);
@@ -307,7 +309,7 @@ async fn test_breakpoint_should_break() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_disabled_mode_performance() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Measure baseline execution without any hooks
@@ -321,7 +323,7 @@ async fn test_disabled_mode_performance() {
     let hook = install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
     assert_eq!(
         hook.lock().debug_cache().get_debug_mode(),
-        llmspell_bridge::lua::debug_cache::DebugMode::Disabled
+        llmspell_bridge::debug_state_cache::DebugMode::Disabled
     );
 
     // Measure with hooks in Disabled mode
@@ -350,7 +352,7 @@ async fn test_disabled_mode_performance() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_performance_impact() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Measure execution without hooks
@@ -366,7 +368,7 @@ async fn test_performance_impact() {
     // Verify we're in Disabled mode for maximum performance
     assert_eq!(
         hook.lock().debug_cache().get_debug_mode(),
-        llmspell_bridge::lua::debug_cache::DebugMode::Disabled
+        llmspell_bridge::debug_state_cache::DebugMode::Disabled
     );
 
     // Measure execution with hooks in Disabled mode
@@ -393,7 +395,7 @@ async fn test_performance_impact() {
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
         &hook,
-        llmspell_bridge::lua::debug_cache::DebugMode::Minimal {
+        llmspell_bridge::debug_state_cache::DebugMode::Minimal {
             check_interval: 1000,
         },
     )
@@ -415,7 +417,7 @@ async fn test_performance_impact() {
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
         &hook,
-        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+        llmspell_bridge::debug_state_cache::DebugMode::Full,
     )
     .unwrap();
 

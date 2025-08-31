@@ -237,6 +237,7 @@
 pub mod condition_evaluator;
 pub mod config_bridge;
 pub mod conversion;
+pub mod debug_state_cache;
 pub mod diagnostics_bridge;
 pub mod discovery;
 pub mod engine;

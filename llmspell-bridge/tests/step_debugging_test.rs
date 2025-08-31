@@ -1,9 +1,10 @@
 //! Tests for step debugging with mode transitions (Task 9.2.6)
 
 use llmspell_bridge::{
+    debug_state_cache::{DebugMode, DebugStateCache, StepMode},
     execution_bridge::{DebugStepType, ExecutionManager},
     execution_context::SharedExecutionContext,
-    lua::debug_cache::{DebugMode, DebugStateCache, StepMode},
+    lua::debug_state_cache_impl::LuaDebugStateCache,
     lua::globals::execution::install_interactive_debug_hooks,
 };
 use mlua::Lua;
@@ -15,7 +16,7 @@ use tokio::sync::RwLock;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_step_debugging_mode_transitions() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install debug hooks
@@ -46,7 +47,7 @@ async fn test_step_debugging_mode_transitions() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_step_in() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install debug hooks
@@ -80,7 +81,7 @@ async fn test_step_in() {
 /// Test step-over functionality with depth tracking
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_step_over_depth_tracking() {
-    let cache = DebugStateCache::new();
+    let cache = LuaDebugStateCache::new();
 
     // Set initial depth
     cache.set_current_depth(5);
@@ -111,7 +112,7 @@ async fn test_step_over_depth_tracking() {
 /// Test step-out functionality
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_step_out() {
-    let cache = DebugStateCache::new();
+    let cache = LuaDebugStateCache::new();
 
     // Start at depth 3
     cache.set_current_depth(3);
@@ -134,7 +135,7 @@ async fn test_step_out() {
 /// Test that stepping state is cleared on cache clear
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_stepping_cleared_on_cache_clear() {
-    let cache = DebugStateCache::new();
+    let cache = LuaDebugStateCache::new();
 
     // Start stepping
     cache.start_stepping(
@@ -160,7 +161,7 @@ async fn test_stepping_cleared_on_cache_clear() {
 /// Test fast path performance with stepping check
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_fast_path_stepping_performance() {
-    let cache = DebugStateCache::new();
+    let cache = LuaDebugStateCache::new();
 
     // Measure fast path check performance
     let start = std::time::Instant::now();
@@ -182,7 +183,7 @@ async fn test_fast_path_stepping_performance() {
 /// Test mode restoration after stepping completes
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_mode_restoration() {
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
 
     // Set initial mode to Minimal
     let initial_mode = DebugMode::Minimal {
@@ -203,7 +204,7 @@ async fn test_mode_restoration() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_step_execution_flow() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install hooks
@@ -241,7 +242,7 @@ async fn test_step_execution_flow() {
 /// Test concurrent stepping operations
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_concurrent_stepping_safety() {
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
 
     // Spawn multiple tasks that try to modify stepping state
     let mut handles = vec![];

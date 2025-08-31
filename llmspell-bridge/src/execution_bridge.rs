@@ -4,7 +4,7 @@
 //! variable inspection, stepping, and execution control. This is distinct from
 //! diagnostics (logging/profiling) which is handled by `diagnostics_bridge`.
 
-use crate::lua::debug_cache::{DebugMode, DebugStateCache, StepMode};
+use crate::debug_state_cache::{DebugMode, DebugStateCache, StepMode};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -214,25 +214,25 @@ pub struct ExecutionManager {
     /// Variables cache
     variables: Arc<RwLock<HashMap<String, Vec<Variable>>>>,
     /// Debug state cache for fast operations
-    debug_cache: Arc<DebugStateCache>,
+    debug_cache: Arc<dyn DebugStateCache>,
 }
 
 impl ExecutionManager {
-    /// Create a new debug manager
+    /// Create a new debug manager with the specified debug cache
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(debug_cache: Arc<dyn DebugStateCache>) -> Self {
         Self {
             breakpoints: Arc::new(RwLock::new(HashMap::new())),
             state: Arc::new(RwLock::new(DebugState::Terminated)),
             stack_frames: Arc::new(RwLock::new(Vec::new())),
             variables: Arc::new(RwLock::new(HashMap::new())),
-            debug_cache: Arc::new(DebugStateCache::new()),
+            debug_cache,
         }
     }
 
     /// Get the debug cache (for use by hooks)
     #[must_use]
-    pub fn get_debug_cache(&self) -> Arc<DebugStateCache> {
+    pub fn get_debug_cache(&self) -> Arc<dyn DebugStateCache> {
         self.debug_cache.clone()
     }
 
@@ -526,12 +526,6 @@ impl ExecutionManager {
     }
 }
 
-impl Default for ExecutionManager {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -558,7 +552,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_execution_manager() {
-        let manager = ExecutionManager::new();
+        use crate::lua::debug_state_cache_impl::LuaDebugStateCache;
+        let manager = ExecutionManager::new(Arc::new(LuaDebugStateCache::new()));
 
         // Add breakpoint
         let bp = Breakpoint::new("test.lua".to_string(), 10);

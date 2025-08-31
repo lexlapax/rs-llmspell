@@ -3,9 +3,10 @@
 //! This module provides the Lua implementation of the `VariableInspector` trait,
 //! handling Lua-specific variable formatting and display logic.
 
+use crate::debug_state_cache::{CachedVariable, DebugStateCache};
 use crate::execution_context::SharedExecutionContext;
-use crate::lua::debug_cache::{CachedVariable, ContextBatcher, ContextUpdate, DebugStateCache};
 use crate::lua::output::{dump_value, format_simple, DumpOptions};
+use crate::variable_inspector::{ContextBatcher, ContextUpdate};
 use crate::variable_inspector::{SharedVariableInspector, VariableInspector};
 use mlua::{Lua, Value};
 use serde_json::Value as JsonValue;
@@ -24,7 +25,7 @@ impl LuaVariableInspector {
     /// Create a new Lua variable inspector
     #[must_use]
     pub const fn new(
-        cache: Arc<DebugStateCache>,
+        cache: Arc<dyn DebugStateCache>,
         context: Arc<RwLock<SharedExecutionContext>>,
     ) -> Self {
         Self {
@@ -132,11 +133,12 @@ fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result<Val
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lua::debug_state_cache_impl::LuaDebugStateCache;
     use serde_json::json;
 
     #[test]
     fn test_lua_variable_inspector_creation() {
-        let cache = Arc::new(DebugStateCache::new());
+        let cache = Arc::new(LuaDebugStateCache::new());
         let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
         let inspector = LuaVariableInspector::new(cache, context);
@@ -150,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_variable_formatting() {
-        let cache = Arc::new(DebugStateCache::new());
+        let cache = Arc::new(LuaDebugStateCache::new());
         let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
         let lua = Lua::new();
 

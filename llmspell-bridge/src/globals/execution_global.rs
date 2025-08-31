@@ -4,6 +4,7 @@
 //! access across all script languages. This is distinct from diagnostics (logging/profiling).
 
 use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
+use crate::debug_state_cache::DebugStateCache;
 use crate::execution_bridge::ExecutionManager;
 use llmspell_core::Result;
 use std::sync::Arc;
@@ -14,11 +15,11 @@ pub struct ExecutionGlobal {
 }
 
 impl ExecutionGlobal {
-    /// Create a new Execution global
+    /// Create a new Execution global with the specified debug cache
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(debug_cache: Arc<dyn DebugStateCache>) -> Self {
         Self {
-            manager: Arc::new(ExecutionManager::new()),
+            manager: Arc::new(ExecutionManager::new(debug_cache)),
         }
     }
 
@@ -26,12 +27,6 @@ impl ExecutionGlobal {
     #[must_use]
     pub const fn manager(&self) -> &Arc<ExecutionManager> {
         &self.manager
-    }
-}
-
-impl Default for ExecutionGlobal {
-    fn default() -> Self {
-        Self::new()
     }
 }
 

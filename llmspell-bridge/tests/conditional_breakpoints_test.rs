@@ -8,10 +8,11 @@
 
 use llmspell_bridge::{
     condition_evaluator::{ConditionEvaluator, SharedDebugContext},
+    debug_state_cache::DebugStateCache,
     execution_bridge::Breakpoint,
     execution_context::SharedExecutionContext,
     lua::condition_evaluator_impl::LuaConditionEvaluator,
-    lua::debug_cache::DebugStateCache,
+    lua::debug_state_cache_impl::LuaDebugStateCache,
 };
 use mlua::Lua;
 use std::sync::Arc;
@@ -21,7 +22,7 @@ use tokio::sync::RwLock;
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_condition_compilation() {
     let _lua = Lua::new();
-    let cache = DebugStateCache::new();
+    let cache = LuaDebugStateCache::new();
 
     // Compile a valid condition
     let evaluator = LuaConditionEvaluator::new();

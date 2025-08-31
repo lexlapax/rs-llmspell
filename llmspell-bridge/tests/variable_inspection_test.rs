@@ -1,12 +1,14 @@
 //! Tests for variable inspection system (Task 9.2.7)
 
 use llmspell_bridge::{
+    debug_state_cache::DebugStateCache,
     execution_bridge::ExecutionManager,
     execution_context::SharedExecutionContext,
-    lua::debug_cache::{ContextBatcher, ContextUpdate, DebugStateCache},
+    lua::debug_state_cache_impl::LuaDebugStateCache,
     lua::globals::execution::install_interactive_debug_hooks,
     lua::variable_inspector_impl::LuaVariableInspector,
     variable_inspector::SharedVariableInspector,
+    variable_inspector::{ContextBatcher, ContextUpdate},
 };
 use mlua::Lua;
 use serde_json::json;
@@ -17,7 +19,7 @@ use tokio::sync::RwLock;
 /// Test basic variable caching operations
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_variable_caching() {
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let inspector = SharedVariableInspector::new(cache.clone(), context.clone());
 
@@ -47,7 +49,7 @@ async fn test_variable_caching() {
 /// Test watch list functionality
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_watch_list() {
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let inspector = SharedVariableInspector::new(cache.clone(), context.clone());
     let mut batcher = ContextBatcher::new();
@@ -78,7 +80,7 @@ async fn test_watch_list() {
 /// Test batch variable reading
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_batch_variable_reading() {
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let _inspector = SharedVariableInspector::new(cache, context);
     let mut batcher = ContextBatcher::new();
@@ -101,7 +103,7 @@ async fn test_batch_variable_reading() {
 /// Test cache invalidation
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_cache_invalidation() {
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let inspector = SharedVariableInspector::new(cache.clone(), context);
 
@@ -119,7 +121,7 @@ async fn test_cache_invalidation() {
 /// Test LRU eviction
 #[test]
 fn test_lru_eviction() {
-    let cache = DebugStateCache::new();
+    let cache = LuaDebugStateCache::new();
 
     // Set max cached variables to a small number for testing
     // Note: In real implementation, max_cached_variables is 1000
@@ -145,7 +147,7 @@ fn test_lru_eviction() {
 #[test]
 fn test_variable_formatting() {
     let lua = Lua::new();
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let inspector = LuaVariableInspector::new(cache, context);
 
@@ -171,7 +173,7 @@ fn test_variable_formatting() {
 /// Test performance of variable caching
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_variable_cache_performance() {
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let inspector = SharedVariableInspector::new(cache.clone(), context.clone());
     let mut batcher = ContextBatcher::new();
@@ -209,7 +211,7 @@ async fn test_variable_cache_performance() {
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_execution_hook_integration() {
     let lua = Lua::new();
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install debug hooks
@@ -242,7 +244,7 @@ async fn test_execution_hook_integration() {
 /// Test context update processing
 #[test]
 fn test_context_update_processing() {
-    let cache = Arc::new(DebugStateCache::new());
+    let cache = Arc::new(LuaDebugStateCache::new());
     let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let inspector = SharedVariableInspector::new(cache.clone(), context);
 
@@ -269,7 +271,7 @@ fn test_context_update_processing() {
 /// Test variable caching with generation counter
 #[test]
 fn test_generation_based_caching() {
-    let cache = DebugStateCache::new();
+    let cache = LuaDebugStateCache::new();
 
     // Cache a variable
     let gen1 = cache.generation();

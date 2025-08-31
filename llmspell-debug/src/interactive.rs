@@ -5,6 +5,7 @@
 use crate::session_manager::DebugSessionManager;
 use crate::{Breakpoint, DebugCommand, DebugState, ExecutionManager, SharedExecutionContext};
 use anyhow::Result;
+use llmspell_bridge::lua::debug_state_cache_impl::LuaDebugStateCache;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
@@ -190,7 +191,8 @@ impl InteractiveDebugger {
 
 impl Default for InteractiveDebugger {
     fn default() -> Self {
-        let execution_manager = Arc::new(ExecutionManager::new());
+        let execution_manager =
+            Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
         let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
         Self::new(execution_manager, shared_context)
     }
@@ -202,7 +204,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_interactive_debugger_creation() {
-        let execution_manager = Arc::new(ExecutionManager::new());
+        let execution_manager =
+            Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
         let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
         let debugger = InteractiveDebugger::new(execution_manager, shared_context);

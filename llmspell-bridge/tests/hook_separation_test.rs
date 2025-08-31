@@ -8,6 +8,7 @@ use llmspell_bridge::{
     execution_context::SharedExecutionContext,
     globals::GlobalContext,
     hook_bridge::HookBridge,
+    lua::debug_state_cache_impl::LuaDebugStateCache,
     lua::globals::{execution::install_interactive_debug_hooks, hook::inject_hook_global},
     ComponentRegistry, ProviderManager,
 };
@@ -55,7 +56,7 @@ async fn test_llmspell_hooks_work_with_debug_hooks() {
     .unwrap();
 
     // Now install debug hooks
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     let _debug_hook =
@@ -98,7 +99,7 @@ async fn test_both_hook_systems_in_same_script() {
     inject_hook_global(&lua, &context, hook_bridge).unwrap();
 
     // Set up debug hooks
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Add a breakpoint for testing
@@ -113,7 +114,7 @@ async fn test_both_hook_systems_in_same_script() {
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
         &debug_hook,
-        llmspell_bridge::lua::debug_cache::DebugMode::Full,
+        llmspell_bridge::debug_state_cache::DebugMode::Full,
     )
     .unwrap();
 
@@ -186,7 +187,7 @@ async fn test_llmspell_hooks_performance() {
     let without_debug = start.elapsed();
 
     // Install debug hooks
-    let execution_manager = Arc::new(ExecutionManager::new());
+    let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let _debug_hook =
         install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();

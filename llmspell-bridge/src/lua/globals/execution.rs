@@ -5,16 +5,18 @@
 //! diagnostics (logging/profiling) which is handled by the Console global.
 
 use crate::condition_evaluator::{ConditionEvaluator, SharedDebugContext};
+use crate::debug_state_cache::{DebugMode, DebugStateCache};
 use crate::execution_bridge::{
     Breakpoint, DebugState, ExecutionLocation, ExecutionManager, PauseReason, StackFrame,
 };
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
 use crate::lua::condition_evaluator_impl::LuaConditionEvaluator;
-use crate::lua::debug_cache::{ContextBatcher, ContextUpdate, DebugMode, DebugStateCache};
+use crate::lua::debug_state_cache_impl::LuaDebugStateCache;
 use crate::lua::output::{capture_stack_trace, StackTraceOptions};
 use crate::lua::sync_utils::block_on_async;
 use crate::lua::variable_inspector_impl::LuaVariableInspector;
 use crate::variable_inspector::VariableInspector;
+use crate::variable_inspector::{ContextBatcher, ContextUpdate};
 use mlua::{DebugEvent, Lua, Result as LuaResult};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -27,7 +29,7 @@ pub struct LuaExecutionHook {
     /// Shared execution context for enriched debugging
     shared_context: Arc<RwLock<SharedExecutionContext>>,
     /// Fast synchronous debug state cache
-    debug_cache: Arc<DebugStateCache>,
+    debug_cache: Arc<LuaDebugStateCache>,
     /// Context update batcher for lazy updates
     context_batcher: ContextBatcher,
     /// Variable inspector for slow path variable operations
@@ -48,7 +50,7 @@ impl LuaExecutionHook {
         execution_manager: Arc<ExecutionManager>,
         shared_context: Arc<RwLock<SharedExecutionContext>>,
     ) -> Self {
-        let debug_cache = Arc::new(DebugStateCache::new());
+        let debug_cache = Arc::new(LuaDebugStateCache::new());
         let variable_inspector = Arc::new(LuaVariableInspector::new(
             debug_cache.clone(),
             shared_context.clone(),
@@ -202,7 +204,7 @@ impl LuaExecutionHook {
 
     /// Get debug cache for external use
     #[must_use]
-    pub fn debug_cache(&self) -> Arc<DebugStateCache> {
+    pub fn debug_cache(&self) -> Arc<LuaDebugStateCache> {
         self.debug_cache.clone()
     }
 
@@ -389,7 +391,7 @@ impl LuaExecutionHook {
 
     /// Handle step execution in slow path
     fn handle_step_slow_path(&mut self, lua: &Lua, _ar: &mlua::Debug, source: &str, line: u32) {
-        use crate::lua::debug_cache::StepMode;
+        use crate::debug_state_cache::StepMode;
 
         let current_depth = self.debug_cache.get_current_depth();
         let step_mode = self.debug_cache.get_step_mode();
@@ -452,6 +454,14 @@ impl LuaExecutionHook {
 
         // Update context and set paused state
         let shared_ctx = self.shared_context.clone();
+
+        // Evaluate watch expressions when paused (slow path only - Task 9.2.8)
+        let evaluator = LuaConditionEvaluator::new();
+        let debug_context = SharedDebugContext::new(shared_ctx.clone());
+        let _watch_results =
+            self.debug_cache
+                .evaluate_watches_with_lua(lua, &debug_context, &evaluator);
+
         let exec_mgr = self.execution_manager.clone();
 
         block_on_async::<_, (), std::io::Error>(
@@ -517,6 +527,13 @@ impl LuaExecutionHook {
         let shared_ctx = self.shared_context.clone();
         // Invalidate condition cache when variables change
         self.debug_cache.invalidate_condition_cache();
+
+        // Evaluate watch expressions when paused (slow path only - Task 9.2.8)
+        let evaluator = LuaConditionEvaluator::new();
+        let debug_context = SharedDebugContext::new(shared_ctx.clone());
+        let _watch_results =
+            self.debug_cache
+                .evaluate_watches_with_lua(lua, &debug_context, &evaluator);
 
         let exec_mgr = self.execution_manager.clone();
         let _ = block_on_async::<_, (), std::io::Error>(
