@@ -3,7 +3,7 @@
 use crate::cli::OutputFormat;
 use crate::commands::run::parse_script_args;
 use crate::kernel::{
-    DebugExecutionHandle, KernelConnectionBuilder, KernelConnectionTrait, RealKernelDiscovery,
+    CliKernelDiscovery, DebugExecutionHandle, KernelConnectionBuilder, KernelConnectionTrait,
 };
 use crate::output::format_output;
 use anyhow::Result;
@@ -54,7 +54,7 @@ async fn create_debug_kernel(
     _runtime_config: LLMSpellConfig,
 ) -> Result<Box<dyn KernelConnectionTrait>> {
     let mut kernel = KernelConnectionBuilder::new()
-        .discovery(Box::new(RealKernelDiscovery::new()))
+        .discovery(Box::new(CliKernelDiscovery::new()))
         .circuit_breaker(Box::new(ExponentialBackoffBreaker::default()))
         .diagnostics(DiagnosticsBridge::builder().build())
         .build();

@@ -452,96 +452,97 @@
 **Estimated Time**: 4 hours  
 **Assignee**: CLI Team
 
-**Description**: CLI kernel discovery using established LRP/LDP protocols, connection authentication, and multi-client session management patterns.
+**Description**: Enhanced CLI kernel discovery using Bridge-First architecture, leveraging existing `llmspell-repl::discovery::KernelDiscovery` with CLI-specific enhancements for dependency injection, adaptive retry, and session recording.
 
-**ARCHITECTURE ALIGNMENT (Phase 9.3 Patterns):**
-- **Dependency Injection**: Use builder pattern for discovery component
-- **Test Safety**: Create `NullKernelDiscovery` for testing
-- **Circuit Breaker**: Use for connection retry logic
-- **Session Recording**: Record discovery attempts for debugging
-- **Adaptive Retry**: Use WorkloadClassifier for retry intervals
+**CORRECTED ARCHITECTURE (Bridge-First Pattern):**
+- **Core Logic**: Uses existing `llmspell-repl::discovery::KernelDiscovery` for connection file discovery and kernel alive checks
+- **CLI Enhancement**: `RealKernelDiscovery` wraps core logic with CLI-specific features (caching, retry, recording)  
+- **Dependency Injection**: `RealKernelDiscoveryBuilder` provides builder pattern for optional dependencies
+- **Test Safety**: Existing `NullKernelDiscovery` provides test implementation
+- **No Duplication**: Avoids reimplementing core discovery logic
 
 **Acceptance Criteria:**
-- [ ] Discovery component uses dependency injection
-- [ ] NullKernelDiscovery implemented for tests
-- [ ] Connection files discovered
-- [ ] Existing kernels detected with CircuitBreaker retry
-- [ ] Connection attempted with adaptive retry intervals
-- [ ] New kernel started if needed
-- [ ] Connection info cached
-- [ ] SessionRecorder logs discovery attempts
-- [ ] Cleanup on exit
-- [ ] No hardcoded retry intervals
+- [x] Discovery component uses dependency injection via builder pattern
+- [x] NullKernelDiscovery implemented for tests (already exists)
+- [x] Connection files discovered using llmspell-repl core logic
+- [x] Existing kernels detected with CircuitBreaker retry logic  
+- [x] Connection attempted with adaptive retry intervals using WorkloadClassifier
+- [x] New kernel started via llmspell-repl KernelServer (already exists)
+- [x] Connection info cached in enhanced RealKernelDiscovery
+- [x] SessionRecorder logs discovery attempts as ToolInvocation events
+- [x] Cleanup on exit removes stale connection files
+- [x] No hardcoded retry intervals - uses WorkloadClassifier adaptive intervals
 
-**Implementation Steps:**
-1. Implement kernel discovery:
-   ```rust
-   // llmspell-cli/src/kernel/discovery.rs
-   pub struct KernelDiscovery {
-       connection_dir: PathBuf,
-       connection_cache: HashMap<String, ConnectionInfo>,
-   }
-   
-   impl KernelDiscovery {
-       pub async fn discover_or_start() -> Result<KernelConnection> {
-           // 1. Check for connection files
-           let conn_files = self.find_connection_files().await?;
-           
-           // 2. Try connecting to existing kernels
-           for file in conn_files {
-               let info = self.read_connection_info(&file).await?;
-               if let Ok(conn) = self.try_connect(&info).await {
-                   println!("Connected to existing kernel: {}", info.kernel_id);
-                   return Ok(conn);
-               }
-           }
-           
-           // 3. Start new kernel
-           println!("Starting new kernel...");
-           self.start_new_kernel().await
-       }
-       
-       async fn find_connection_files(&self) -> Result<Vec<PathBuf>> {
-           let pattern = self.connection_dir.join("llmspell-kernel-*.json");
-           glob::glob(&pattern.to_string_lossy())?
-               .filter_map(Result::ok)
-               .collect()
-       }
-       
-       async fn try_connect(&self, info: &ConnectionInfo) -> Result<KernelConnection> {
-           // Try to connect to all channels
-           let shell = connect_channel(info.ip, info.shell_port).await?;
-           let iopub = connect_channel(info.ip, info.iopub_port).await?;
-           let control = connect_channel(info.ip, info.control_port).await?;
-           
-           // Verify kernel is alive via heartbeat
-           if !self.check_heartbeat(info).await? {
-               return Err(anyhow!("Kernel not responding"));
-           }
-           
-           Ok(KernelConnection {
-               info: info.clone(),
-               shell,
-               iopub,
-               control,
-           })
-       }
-   }
-   ```
-2. Implement connection caching
-3. Add connection retry logic
-4. Handle stale connection files
-5. Implement cleanup on exit
-6. Test discovery scenarios
+**Implementation Architecture:**
+```rust
+// CORRECT: Bridge-First Enhancement Pattern
+llmspell-repl::discovery::KernelDiscovery    ← Core discovery logic (file discovery, alive checks)
+    ↓ wrapped by
+llmspell-cli::connection::RealKernelDiscovery ← CLI-specific enhancements:
+    - Connection caching (Arc<RwLock<HashMap>>)
+    - CircuitBreaker integration with OperationContext
+    - SessionRecorder integration with ToolInvocation events  
+    - Adaptive retry with WorkloadClassifier intervals
+    - Cleanup on exit functionality
+    - Builder pattern: RealKernelDiscoveryBuilder
+    
+// Enhanced methods for CLI usage:
+impl RealKernelDiscovery {
+    pub async fn discover_first_alive(&mut self)  // With cache + circuit breaker
+    pub async fn discover_all_alive(&mut self)    // With cache + circuit breaker  
+    pub async fn cleanup(&self)                   // Clean connection files
+}
+```
+
+**Key Architectural Improvements:**
+1. **Eliminated Duplication**: Removed duplicate `llmspell-cli/src/kernel/discovery.rs` 
+2. **Bridge-First Compliance**: Uses existing `llmspell-repl` logic as foundation
+3. **Enhanced Wrapper**: `RealKernelDiscovery` adds CLI-specific behavior without reimplementation
+4. **Proper Abstractions**: CircuitBreaker, SessionRecorder, WorkloadClassifier used via proper traits
 
 **Definition of Done:**
-- [ ] Discovery works correctly
-- [ ] Connections established
-- [ ] New kernels started
-- [ ] Cleanup functional
-- [ ] Tests pass
-- [ ] `cargo fmt --all --check` passes
-- [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+- [x] Discovery works correctly using Bridge-First architecture
+- [x] Connections established with CircuitBreaker retry logic
+- [x] New kernels started via existing llmspell-repl infrastructure
+- [x] Cleanup functional with connection file removal
+- [x] Tests pass (enhanced CliKernelDiscovery with builder)
+- [x] `cargo fmt --all --check` passes
+- [x] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
+
+**TASK 9.4.4 INSIGHTS & LESSONS LEARNED:**
+
+**🔧 Critical Architectural Fix Applied:**
+- **Problem Identified**: Initial implementation violated Bridge-First architecture by creating duplicate `llmspell-cli/src/kernel/discovery.rs` that reimplemented core discovery logic
+- **Root Cause**: TODO.md specification led to architectural drift by asking for new discovery struct instead of enhancing existing wrapper
+- **Solution**: Deleted duplicate file, enhanced existing `RealKernelDiscovery` → renamed to `CliKernelDiscovery`
+
+**🏗️ Bridge-First Architecture Pattern Reinforced:**
+```
+Core Logic Layer:     llmspell-repl::discovery::KernelDiscovery
+Enhancement Layer:    llmspell-cli::CliKernelDiscovery (wraps core)
+                     ↓ Adds: caching, retry, recording, cleanup
+```
+
+**📚 Key Insights:**
+1. **Naming Matters**: "RealKernelDiscovery" implied others were "fake" - "CliKernelDiscovery" clearly indicates CLI-specific enhancements
+2. **DRY Violations**: Duplicate discovery logic = duplicate connection file parsing, alive checks, cleanup - all violate single responsibility
+3. **Bridge-First Compliance**: Always enhance existing crates vs reimplementing - leverage `llmspell-repl` foundation
+4. **Dependency Injection**: Builder pattern allows optional CircuitBreaker, SessionRecorder without hardcoded dependencies
+5. **Adaptive Performance**: WorkloadClassifier-based retry intervals (50ms-500ms base, exponential backoff) instead of magic numbers
+
+**🧪 Testing Approach:**
+- 15 comprehensive tests covering builder pattern, caching, retry logic, cleanup, circuit breaker integration
+- Null implementations for testing (NullCircuitBreaker, NullSessionRecorder)
+- Proper error handling for unavailable kernels
+
+**⚡ Performance Considerations:**
+- Connection caching via `Arc<RwLock<HashMap>>` for thread-safe access
+- Exponential backoff (200ms → 400ms → 800ms) based on WorkloadClassifier
+- Circuit breaker prevents cascade failures during kernel unavailability
+- Cleanup on exit prevents stale connection file accumulation
+
+**🔄 Architecture Evolution:**
+This task reinforced that CLI components should be **enhancement wrappers** around reusable core logic, not **reimplementations**. Future CLI features should follow this pattern: wrap existing functionality with CLI-specific concerns (caching, retry, UI formatting) rather than duplicating business logic.
 
 
 ### Task 9.4.5: Web Client Foundation

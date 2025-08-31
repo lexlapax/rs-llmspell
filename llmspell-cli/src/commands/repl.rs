@@ -2,7 +2,7 @@
 //! ABOUTME: Provides an interactive read-eval-print loop
 
 use crate::cli::ScriptEngine;
-use crate::kernel::{KernelConnectionBuilder, KernelConnectionTrait, RealKernelDiscovery};
+use crate::kernel::{CliKernelDiscovery, KernelConnectionBuilder, KernelConnectionTrait};
 use crate::repl_interface::CLIReplInterface;
 use anyhow::Result;
 use llmspell_bridge::{
@@ -22,7 +22,7 @@ pub async fn start_repl(
 
     // Build kernel connection with dependency injection
     let mut kernel = KernelConnectionBuilder::new()
-        .discovery(Box::new(RealKernelDiscovery::new()))
+        .discovery(Box::new(CliKernelDiscovery::new()))
         .circuit_breaker(Box::new(ExponentialBackoffBreaker::default()))
         .diagnostics(DiagnosticsBridge::builder().build())
         .build();

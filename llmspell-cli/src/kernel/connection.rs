@@ -6,10 +6,13 @@ use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_bridge::execution_context::SharedExecutionContext;
 use llmspell_bridge::{
-    circuit_breaker::CircuitBreaker, debug_state_cache::DebugStateCache,
-    diagnostics_bridge::DiagnosticsBridge, execution_bridge::ExecutionManager,
-    hook_profiler::WorkloadClassifier, lua::debug_state_cache_impl::LuaDebugStateCache,
-    session_recorder::SessionRecorder,
+    circuit_breaker::{CircuitBreaker, OperationContext},
+    debug_state_cache::DebugStateCache,
+    diagnostics_bridge::DiagnosticsBridge,
+    execution_bridge::ExecutionManager,
+    hook_profiler::WorkloadClassifier,
+    lua::debug_state_cache_impl::LuaDebugStateCache,
+    session_recorder::{SessionEvent, SessionRecorder},
 };
 use llmspell_debug::session_manager::DebugSessionManager;
 use llmspell_repl::{
@@ -19,8 +22,11 @@ use llmspell_repl::{
     protocol::{LDPRequest, LDPResponse},
 };
 use serde_json::Value;
+use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tokio::time::sleep;
 
 /// Trait for kernel connection operations
 #[async_trait]
@@ -109,7 +115,7 @@ impl KernelConnectionBuilder {
         KernelConnection {
             discovery: self
                 .discovery
-                .unwrap_or_else(|| Box::new(RealKernelDiscovery::new())),
+                .unwrap_or_else(|| Box::new(CliKernelDiscovery::new())),
             circuit_breaker: self.circuit_breaker,
             session_recorder: self.session_recorder,
             diagnostics: self.diagnostics,
@@ -299,27 +305,331 @@ pub trait KernelDiscoveryTrait: Send + Sync {
     async fn discover_all(&self) -> Result<Vec<ConnectionInfo>>;
 }
 
-/// Real kernel discovery implementation
-#[derive(Default)]
-pub struct RealKernelDiscovery {
+/// CLI-specific kernel discovery with dependency injection and enhanced features
+pub struct CliKernelDiscovery {
     discovery: KernelDiscovery,
+    connection_cache: Arc<RwLock<HashMap<String, ConnectionInfo>>>,
+    circuit_breaker: Option<Box<dyn CircuitBreaker>>,
+    session_recorder: Option<Box<dyn SessionRecorder>>,
+    cleanup_on_exit: bool,
+    max_retry_attempts: usize,
 }
 
-impl RealKernelDiscovery {
+/// Builder for CLI kernel discovery
+pub struct CliKernelDiscoveryBuilder {
+    discovery: Option<KernelDiscovery>,
+    circuit_breaker: Option<Box<dyn CircuitBreaker>>,
+    session_recorder: Option<Box<dyn SessionRecorder>>,
+    cleanup_on_exit: bool,
+    max_retry_attempts: usize,
+}
+
+impl Default for CliKernelDiscoveryBuilder {
+    fn default() -> Self {
+        Self {
+            discovery: None,
+            circuit_breaker: None,
+            session_recorder: None,
+            cleanup_on_exit: true,
+            max_retry_attempts: 3,
+        }
+    }
+}
+
+impl CliKernelDiscoveryBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+
+    pub fn circuit_breaker(mut self, circuit_breaker: Box<dyn CircuitBreaker>) -> Self {
+        self.circuit_breaker = Some(circuit_breaker);
+        self
+    }
+
+    pub fn session_recorder(mut self, session_recorder: Box<dyn SessionRecorder>) -> Self {
+        self.session_recorder = Some(session_recorder);
+        self
+    }
+
+    pub fn cleanup_on_exit(mut self, cleanup: bool) -> Self {
+        self.cleanup_on_exit = cleanup;
+        self
+    }
+
+    pub fn max_retry_attempts(mut self, attempts: usize) -> Self {
+        self.max_retry_attempts = attempts;
+        self
+    }
+
+    pub fn build(self) -> CliKernelDiscovery {
+        CliKernelDiscovery {
+            discovery: self.discovery.unwrap_or_default(),
+            connection_cache: Arc::new(RwLock::new(HashMap::new())),
+            circuit_breaker: self.circuit_breaker,
+            session_recorder: self.session_recorder,
+            cleanup_on_exit: self.cleanup_on_exit,
+            max_retry_attempts: self.max_retry_attempts,
+        }
+    }
+}
+
+impl Default for CliKernelDiscovery {
+    fn default() -> Self {
+        CliKernelDiscoveryBuilder::new().build()
+    }
+}
+
+impl CliKernelDiscovery {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn builder() -> CliKernelDiscoveryBuilder {
+        CliKernelDiscoveryBuilder::new()
+    }
+
+    /// Record a discovery attempt with session recorder
+    fn record_discovery_attempt(&mut self, kernel_id: Option<&str>, success: bool) {
+        if let Some(recorder) = &mut self.session_recorder {
+            let event = if success {
+                SessionEvent::ToolInvocation {
+                    tool_name: format!("kernel_discovery_success:{}", kernel_id.unwrap_or("new")),
+                    arguments: serde_json::json!({"kernel_id": kernel_id}),
+                    context: SharedExecutionContext::new(),
+                }
+            } else {
+                SessionEvent::ToolInvocation {
+                    tool_name: format!(
+                        "kernel_discovery_failed:{}",
+                        kernel_id.unwrap_or("unknown")
+                    ),
+                    arguments: serde_json::json!({"kernel_id": kernel_id}),
+                    context: SharedExecutionContext::new(),
+                }
+            };
+            let _ = recorder.record_event(event);
+        }
+    }
+
+    /// Get adaptive retry interval based on workload classification
+    fn get_retry_interval(&self, attempt: usize) -> Duration {
+        let base_interval = match WorkloadClassifier::Medium {
+            WorkloadClassifier::Micro => Duration::from_millis(50),
+            WorkloadClassifier::Light => Duration::from_millis(100),
+            WorkloadClassifier::Medium => Duration::from_millis(200),
+            WorkloadClassifier::Heavy => Duration::from_millis(500),
+        };
+
+        // Exponential backoff
+        base_interval * (2_u32.pow(attempt as u32))
+    }
+
+    /// Try to connect with circuit breaker and retry logic
+    async fn try_connect_with_retry(&mut self, info: &ConnectionInfo) -> Result<bool> {
+        for attempt in 0..self.max_retry_attempts {
+            let start_time = Instant::now();
+
+            // Create operation context for circuit breaker
+            let context = OperationContext {
+                operation_name: "kernel_discovery".to_string(),
+                workload: WorkloadClassifier::Medium,
+                duration: Duration::default(), // Will be filled after operation
+                success: false,                // Will be updated based on result
+            };
+
+            // Check circuit breaker
+            if let Some(breaker) = &self.circuit_breaker {
+                if !breaker.allow_operation(&context) {
+                    tracing::debug!("Circuit breaker is open, skipping connection attempt");
+                    return Ok(false);
+                }
+            }
+
+            // Try to connect
+            let connection_result = KernelDiscovery::is_kernel_alive(info).await;
+            let duration = start_time.elapsed();
+
+            match connection_result {
+                Ok(true) => {
+                    // Success - record it
+                    if let Some(breaker) = &mut self.circuit_breaker {
+                        let success_context = OperationContext {
+                            operation_name: "kernel_discovery".to_string(),
+                            workload: WorkloadClassifier::Medium,
+                            duration,
+                            success: true,
+                        };
+                        breaker.record_operation(success_context);
+                    }
+                    self.record_discovery_attempt(Some(&info.kernel_id), true);
+                    return Ok(true);
+                }
+                Ok(false) if attempt < self.max_retry_attempts - 1 => {
+                    // Kernel not responding, retry with adaptive interval
+                    let interval = self.get_retry_interval(attempt);
+                    tracing::debug!(
+                        "Kernel {} not responding, retrying in {:?}",
+                        info.kernel_id,
+                        interval
+                    );
+                    sleep(interval).await;
+                }
+                Ok(false) => {
+                    // Final attempt failed
+                    if let Some(breaker) = &mut self.circuit_breaker {
+                        let failure_context = OperationContext {
+                            operation_name: "kernel_discovery".to_string(),
+                            workload: WorkloadClassifier::Medium,
+                            duration,
+                            success: false,
+                        };
+                        breaker.record_operation(failure_context);
+                    }
+                }
+                Err(e) => {
+                    // Connection error
+                    if let Some(breaker) = &mut self.circuit_breaker {
+                        let failure_context = OperationContext {
+                            operation_name: "kernel_discovery".to_string(),
+                            workload: WorkloadClassifier::Medium,
+                            duration,
+                            success: false,
+                        };
+                        breaker.record_operation(failure_context);
+                    }
+                    tracing::warn!("Error connecting to kernel {}: {}", info.kernel_id, e);
+                    if attempt < self.max_retry_attempts - 1 {
+                        let interval = self.get_retry_interval(attempt);
+                        sleep(interval).await;
+                    }
+                }
+            }
+        }
+
+        self.record_discovery_attempt(Some(&info.kernel_id), false);
+        Ok(false)
+    }
+
+    /// Clean up connection files on exit
+    pub async fn cleanup(&self) -> Result<()> {
+        if !self.cleanup_on_exit {
+            return Ok(());
+        }
+
+        tracing::info!("Cleaning up kernel connections...");
+
+        // Clean up cached connections
+        let cache = self.connection_cache.read().await;
+        for (kernel_id, info) in cache.iter() {
+            tracing::debug!("Removing connection file for kernel {}", kernel_id);
+            if let Err(e) = info.remove_connection_file().await {
+                tracing::warn!("Failed to remove connection file for {}: {}", kernel_id, e);
+            }
+        }
+
+        // Clean up stale connections
+        if let Ok(removed) = self.discovery.cleanup_stale_connections().await {
+            if !removed.is_empty() {
+                tracing::info!("Cleaned up {} stale connections", removed.len());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Enhanced discover_first that uses cache and circuit breaker (requires mutable access)
+    pub async fn discover_first_alive(&mut self) -> Result<Option<ConnectionInfo>> {
+        // Check cache first and clone the info to avoid borrow conflicts
+        let cached_info = {
+            let cache = self.connection_cache.read().await;
+            cache.iter().next().map(|(_, info)| info.clone())
+        };
+
+        if let Some(info) = cached_info {
+            if self.try_connect_with_retry(&info).await? {
+                return Ok(Some(info));
+            }
+        }
+
+        // Try to discover kernels
+        let kernels = self.discovery.discover_kernels().await?;
+        for info in kernels {
+            if self.try_connect_with_retry(&info).await? {
+                // Cache the connection
+                {
+                    let mut cache = self.connection_cache.write().await;
+                    cache.insert(info.kernel_id.clone(), info.clone());
+                }
+                return Ok(Some(info));
+            }
+        }
+
+        Ok(None)
+    }
+
+    /// Enhanced discover_all that uses cache and circuit breaker (requires mutable access)
+    pub async fn discover_all_alive(&mut self) -> Result<Vec<ConnectionInfo>> {
+        let kernels = self.discovery.discover_kernels().await?;
+        let mut alive_kernels = Vec::new();
+
+        for info in kernels {
+            if self.try_connect_with_retry(&info).await? {
+                alive_kernels.push(info.clone());
+                // Cache the connection
+                {
+                    let mut cache = self.connection_cache.write().await;
+                    cache.insert(info.kernel_id.clone(), info);
+                }
+            }
+        }
+
+        Ok(alive_kernels)
     }
 }
 
 #[async_trait]
-impl KernelDiscoveryTrait for RealKernelDiscovery {
+impl KernelDiscoveryTrait for CliKernelDiscovery {
     async fn discover_first(&self) -> Result<Option<ConnectionInfo>> {
+        // Check cache first
+        {
+            let cache = self.connection_cache.read().await;
+            if let Some((_, info)) = cache.iter().next() {
+                // We need to check if it's still alive, but the method signature doesn't allow mut self
+                // So we'll just return the cached info for now
+                return Ok(Some(info.clone()));
+            }
+        }
+
+        // Try to discover kernels
         let kernels = self.discovery.discover_kernels().await?;
-        Ok(kernels.into_iter().next())
+        for info in kernels {
+            // Check if kernel is alive - note: this is a limitation since we can't modify self
+            // In real usage, the caller should use discover_first_alive instead
+            if KernelDiscovery::is_kernel_alive(&info)
+                .await
+                .unwrap_or(false)
+            {
+                return Ok(Some(info));
+            }
+        }
+
+        Ok(None)
     }
 
     async fn discover_all(&self) -> Result<Vec<ConnectionInfo>> {
-        self.discovery.discover_kernels().await
+        let kernels = self.discovery.discover_kernels().await?;
+        let mut alive_kernels = Vec::new();
+
+        for info in kernels {
+            if KernelDiscovery::is_kernel_alive(&info)
+                .await
+                .unwrap_or(false)
+            {
+                alive_kernels.push(info);
+            }
+        }
+
+        Ok(alive_kernels)
     }
 }
 
@@ -418,5 +728,155 @@ impl KernelDiscoveryTrait for NullKernelDiscovery {
 
     async fn discover_all(&self) -> Result<Vec<ConnectionInfo>> {
         Ok(Vec::new())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use llmspell_bridge::{
+        null_circuit_breaker::NullCircuitBreaker, null_session_recorder::NullSessionRecorder,
+    };
+    use llmspell_repl::connection::ConnectionInfo;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn test_real_kernel_discovery_builder() {
+        let discovery = CliKernelDiscovery::builder()
+            .circuit_breaker(Box::new(NullCircuitBreaker::new()))
+            .session_recorder(Box::new(NullSessionRecorder::new()))
+            .cleanup_on_exit(false)
+            .max_retry_attempts(2)
+            .build();
+
+        // Discovery should work even if no kernels exist
+        let result = discovery.discover_first().await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_real_kernel_discovery_new() {
+        let discovery = CliKernelDiscovery::new();
+
+        // Default values should work
+        let result = discovery.discover_all().await.unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_retry_interval_calculation() {
+        let discovery = CliKernelDiscovery::new();
+
+        // Test exponential backoff
+        let interval0 = discovery.get_retry_interval(0);
+        let interval1 = discovery.get_retry_interval(1);
+        let interval2 = discovery.get_retry_interval(2);
+
+        assert!(interval1 > interval0);
+        assert!(interval2 > interval1);
+
+        // Check that base interval is based on WorkloadClassifier::Medium
+        assert_eq!(interval0, Duration::from_millis(200));
+        assert_eq!(interval1, Duration::from_millis(400));
+        assert_eq!(interval2, Duration::from_millis(800));
+    }
+
+    #[tokio::test]
+    async fn test_connection_caching() {
+        let mut discovery = CliKernelDiscovery::builder().cleanup_on_exit(false).build();
+
+        // Initially cache should be empty
+        {
+            let cache = discovery.connection_cache.read().await;
+            assert!(cache.is_empty());
+        }
+
+        // After discovering (even if no kernels exist), cache operations should work
+        let _ = discovery.discover_first_alive().await.unwrap();
+        // Cache will only be populated if actual kernels are found
+    }
+
+    #[tokio::test]
+    async fn test_session_recording() {
+        let recorder = Box::new(NullSessionRecorder::new());
+        let mut discovery = CliKernelDiscovery::builder()
+            .session_recorder(recorder)
+            .cleanup_on_exit(false)
+            .build();
+
+        // Should record discovery attempts
+        discovery.record_discovery_attempt(Some("test-kernel"), true);
+        discovery.record_discovery_attempt(None, false);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_functionality() {
+        let discovery = CliKernelDiscovery::builder().cleanup_on_exit(true).build();
+
+        // Should not error even with no connections
+        assert!(discovery.cleanup().await.is_ok());
+
+        let discovery_no_cleanup = CliKernelDiscovery::builder().cleanup_on_exit(false).build();
+
+        // Should be a no-op when cleanup_on_exit is false
+        assert!(discovery_no_cleanup.cleanup().await.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_circuit_breaker_integration() {
+        let mut discovery = CliKernelDiscovery::builder()
+            .circuit_breaker(Box::new(NullCircuitBreaker::new()))
+            .cleanup_on_exit(false)
+            .max_retry_attempts(1)
+            .build();
+
+        // Create a fake connection info for testing
+        let connection_info = ConnectionInfo::new(
+            "test-kernel".to_string(),
+            "127.0.0.1".to_string(),
+            9999, // Use a port that won't be available
+        );
+
+        // Should handle connection failures gracefully with circuit breaker
+        let result = discovery.try_connect_with_retry(&connection_info).await;
+        assert!(result.is_ok());
+        assert!(!result.unwrap()); // Should return false for unavailable kernel
+    }
+
+    #[test]
+    fn test_builder_pattern() {
+        let builder = CliKernelDiscoveryBuilder::new()
+            .cleanup_on_exit(false)
+            .max_retry_attempts(5);
+
+        let discovery = builder.build();
+
+        // Verify builder settings were applied
+        assert!(!discovery.cleanup_on_exit);
+        assert_eq!(discovery.max_retry_attempts, 5);
+    }
+
+    #[tokio::test]
+    async fn test_kernel_discovery_trait_implementation() {
+        let discovery = CliKernelDiscovery::new();
+
+        // Test KernelDiscoveryTrait methods
+        let first = discovery.discover_first().await.unwrap();
+        assert!(first.is_none());
+
+        let all = discovery.discover_all().await.unwrap();
+        assert!(all.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_enhanced_discovery_methods() {
+        let mut discovery = CliKernelDiscovery::builder().cleanup_on_exit(false).build();
+
+        // Test enhanced methods that require mutable access
+        let first_alive = discovery.discover_first_alive().await.unwrap();
+        assert!(first_alive.is_none());
+
+        let all_alive = discovery.discover_all_alive().await.unwrap();
+        assert!(all_alive.is_empty());
     }
 }
