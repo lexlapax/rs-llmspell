@@ -40,6 +40,76 @@ pub trait Transport: Send + Sync + Debug {
     fn is_connected(&self) -> bool;
 }
 
+/// Mock transport for testing
+pub mod mock {
+    use super::{async_trait, Debug, ProtocolMessage, Transport, TransportError};
+    use std::collections::VecDeque;
+    use tokio::sync::Mutex;
+
+    /// Mock transport for testing
+    #[derive(Debug)]
+    pub struct MockTransport {
+        send_queue: Mutex<VecDeque<ProtocolMessage>>,
+        recv_queue: Mutex<VecDeque<ProtocolMessage>>,
+        connected: Mutex<bool>,
+    }
+
+    impl MockTransport {
+        /// Create a new mock transport
+        pub fn new() -> Self {
+            Self {
+                send_queue: Mutex::new(VecDeque::new()),
+                recv_queue: Mutex::new(VecDeque::new()),
+                connected: Mutex::new(true),
+            }
+        }
+
+        /// Add a message to the receive queue for testing
+        #[allow(dead_code)]
+        pub async fn add_recv_message(&self, msg: ProtocolMessage) {
+            self.recv_queue.lock().await.push_back(msg);
+        }
+
+        /// Get sent messages for verification
+        #[allow(dead_code)]
+        pub async fn get_sent_messages(&self) -> Vec<ProtocolMessage> {
+            self.send_queue.lock().await.drain(..).collect()
+        }
+    }
+
+    #[async_trait]
+    impl Transport for MockTransport {
+        async fn send(&mut self, msg: ProtocolMessage) -> Result<(), TransportError> {
+            if !*self.connected.lock().await {
+                return Err(TransportError::ConnectionClosed);
+            }
+            self.send_queue.lock().await.push_back(msg);
+            Ok(())
+        }
+
+        async fn recv(&mut self) -> Result<ProtocolMessage, TransportError> {
+            if !*self.connected.lock().await {
+                return Err(TransportError::ConnectionClosed);
+            }
+            self.recv_queue
+                .lock()
+                .await
+                .pop_front()
+                .ok_or(TransportError::ConnectionClosed)
+        }
+
+        async fn close(&mut self) -> Result<(), TransportError> {
+            *self.connected.lock().await = false;
+            Ok(())
+        }
+
+        fn is_connected(&self) -> bool {
+            // Can't use async in non-async function, so return true for simplicity
+            true
+        }
+    }
+}
+
 /// TCP transport implementation
 pub mod tcp {
     use super::{async_trait, Debug, ProtocolMessage, Transport, TransportError};

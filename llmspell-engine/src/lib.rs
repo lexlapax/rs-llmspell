@@ -73,6 +73,7 @@ pub mod client;
 pub mod engine;
 pub mod protocol;
 pub mod server;
+pub mod sidecar;
 pub mod transport;
 
 // Re-export core types at crate root for convenience

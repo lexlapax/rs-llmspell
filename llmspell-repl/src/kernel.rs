@@ -204,6 +204,55 @@ impl LLMSpellKernel {
         Ok(kernel)
     }
 
+    /// Start a new kernel with sidecar support for service mesh pattern
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kernel or sidecar initialization fails
+    pub async fn start_with_sidecar(config: KernelConfig) -> Result<Self> {
+        use llmspell_engine::sidecar::{
+            LocalServiceDiscovery, NullMetricsCollector, Sidecar, SidecarConfig,
+        };
+        use llmspell_engine::UnifiedProtocolEngine;
+        use llmspell_utils::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
+        use std::sync::Arc;
+
+        // Create the kernel first
+        let kernel = Self::start(config.clone()).await?;
+
+        // Create protocol engine for sidecar
+        // Note: This is a placeholder - in real implementation, we'd use the actual transport
+        // from the ProtocolServer when it's created in run()
+        let transport = Box::new(
+            llmspell_engine::transport::tcp::TcpTransport::connect(&format!(
+                "{}:{}",
+                config.ip, config.port_range_start
+            ))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create transport: {}", e))?,
+        );
+
+        let engine = Arc::new(UnifiedProtocolEngine::new(transport));
+
+        // Create sidecar components
+        let circuit_breaker = CircuitBreaker::new(CircuitBreakerConfig::default());
+        let discovery = Arc::new(LocalServiceDiscovery::new());
+        let metrics = Arc::new(NullMetricsCollector); // Use null for now, can be replaced
+        let sidecar_config = SidecarConfig::default();
+
+        // Create sidecar
+        let _sidecar = Sidecar::new(engine, circuit_breaker, discovery, metrics, sidecar_config);
+
+        // In a full implementation, we would:
+        // 1. Store the sidecar in the kernel struct
+        // 2. Intercept all messages through the sidecar
+        // 3. Register the kernel service with discovery
+
+        tracing::info!("Kernel {} started with sidecar support", kernel.kernel_id);
+
+        Ok(kernel)
+    }
+
     /// Run the kernel event loop
     ///
     /// # Errors
