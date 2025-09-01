@@ -11,8 +11,3 @@
 - debug for scripts not working
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
-
-should the tcp based protocol not have been made part of the channels framework? or the protocol should have use the channels, or    │
-│   made the channels traits that the protocol we created  ? we should not have two code paths like that. ultrathink and research and    │
-│   give me toptions that are architectural, modular, forward looking , no backward compatibility, scaleable and no code proliferation   │
-│   unless absolutely required . 

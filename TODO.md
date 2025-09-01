@@ -888,9 +888,431 @@ Creating a new `llmspell-protocol` crate provides:
 
 ---
 
-## Phase 9.5: Configuration and CLI Commands (Days 12-13)
+## Phase 9.5: Unified Protocol Engine Architecture (Days 12-13)
 
-### Task 9.5.1: Configuration System
+**🏗️ ARCHITECTURAL REFACTOR**: Eliminate duplicate TCP implementations by unifying KernelChannels and ProtocolServer into a single ProtocolEngine with adapter pattern for future protocol support (MCP, LSP, DAP, A2A).
+
+### Task 9.5.1: Protocol Engine Core Implementation
+**Priority**: CRITICAL  
+**Estimated Time**: 6 hours  
+**Assignee**: Protocol Team
+
+**Description**: Create unified ProtocolEngine that replaces both KernelChannels and ProtocolServer, eliminating duplicate TCP implementations.
+
+**Architectural Goals:**
+- Single TCP binding point for all channels
+- Protocol adapters for future extensibility (MCP, LSP, DAP, A2A)
+- Zero-cost channel views instead of separate TCP listeners
+- Universal message format for cross-protocol bridging
+
+**Acceptance Criteria:**
+- [ ] ProtocolEngine trait defined with adapter support
+- [ ] UniversalMessage type for protocol-agnostic messaging
+- [ ] ProtocolAdapter trait for pluggable protocols
+- [ ] MessageRouter for intelligent routing
+- [ ] Channel views implemented as lightweight facades
+- [ ] All existing functionality preserved
+
+**Implementation Steps:**
+1. Create new module in `llmspell-protocol/src/engine.rs`:
+   ```rust
+   pub trait ProtocolEngine: Send + Sync {
+       type Transport: Transport;
+       type Router: MessageRouter;
+       
+       async fn register_adapter(&mut self, protocol: ProtocolType, adapter: Box<dyn ProtocolAdapter>);
+       async fn send(&self, channel: ChannelType, msg: UniversalMessage) -> Result<()>;
+       async fn recv(&self, channel: ChannelType) -> Result<UniversalMessage>;
+       fn channel_view(&self, channel: ChannelType) -> ChannelView<'_>;
+   }
+   
+   pub struct UnifiedProtocolEngine {
+       transport: Box<dyn Transport>,
+       adapters: HashMap<ProtocolType, Box<dyn ProtocolAdapter>>,
+       router: Arc<MessageRouter>,
+       handlers: Arc<RwLock<HandlerRegistry>>,
+   }
+   ```
+
+2. Define ProtocolAdapter trait for extensibility:
+   ```rust
+   pub trait ProtocolAdapter: Send + Sync {
+       fn protocol_type(&self) -> ProtocolType;
+       fn adapt_inbound(&self, raw: RawMessage) -> Result<UniversalMessage>;
+       fn adapt_outbound(&self, msg: UniversalMessage) -> Result<RawMessage>;
+       fn capabilities(&self) -> HashSet<Capability>;
+   }
+   ```
+
+3. Create UniversalMessage for cross-protocol compatibility:
+   ```rust
+   pub struct UniversalMessage {
+       pub id: String,
+       pub protocol: ProtocolType,
+       pub channel: ChannelType,
+       pub content: MessageContent,
+       pub metadata: HashMap<String, Value>,
+   }
+   ```
+
+4. Implement MessageRouter for intelligent routing:
+   ```rust
+   pub struct MessageRouter {
+       routes: Arc<RwLock<RouteTable>>,
+       strategies: HashMap<ChannelType, RoutingStrategy>,
+   }
+   ```
+
+**Definition of Done:**
+- [ ] ProtocolEngine compiles and passes tests
+- [ ] Adapters can be registered dynamically
+- [ ] Messages route correctly to handlers
+- [ ] Channel views provide same API as old channels
+- [ ] No performance regression vs dual implementation
+
+### Task 9.5.2: Channel View Implementation
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: Protocol Team
+
+**Description**: Convert existing KernelChannels to lightweight views over ProtocolEngine, eliminating separate TCP listeners.
+
+**Acceptance Criteria:**
+- [ ] ChannelView struct implemented
+- [ ] All five channel types supported (Shell, IOPub, Stdin, Control, Heartbeat)
+- [ ] Same API surface as existing channels
+- [ ] Zero-cost abstraction (no additional allocations)
+- [ ] Backward-compatible message handling
+
+**Implementation Steps:**
+1. Create ChannelView abstraction:
+   ```rust
+   pub struct ChannelView<'a> {
+       engine: &'a dyn ProtocolEngine,
+       channel_type: ChannelType,
+   }
+   
+   impl ChannelView<'_> {
+       pub async fn send(&self, msg: impl Into<Message>) -> Result<()> {
+           let universal = self.engine.adapt_message(msg.into());
+           self.engine.send(self.channel_type, universal).await
+       }
+       
+       pub async fn recv(&self) -> Result<Message> {
+           let universal = self.engine.recv(self.channel_type).await?;
+           Ok(self.engine.extract_message(universal))
+       }
+   }
+   ```
+
+2. Replace KernelChannels with ChannelSet views:
+   ```rust
+   pub struct ChannelSet<'a> {
+       pub shell: ChannelView<'a>,
+       pub iopub: ChannelView<'a>,
+       pub stdin: ChannelView<'a>,
+       pub control: ChannelView<'a>,
+       pub heartbeat: ChannelView<'a>,
+   }
+   
+   impl<'a> ChannelSet<'a> {
+       pub fn new(engine: &'a dyn ProtocolEngine) -> Self {
+           Self {
+               shell: engine.channel_view(ChannelType::Shell),
+               iopub: engine.channel_view(ChannelType::IOPub),
+               // ... etc
+           }
+       }
+   }
+   ```
+
+3. Remove old channel implementations from `llmspell-repl/src/channels.rs`
+
+**Definition of Done:**
+- [ ] ChannelView provides same functionality as old channels
+- [ ] All channel operations work through views
+- [ ] Old channel code removed
+- [ ] Tests updated to use new API
+
+### Task 9.5.3: Service Mesh Sidecar Pattern
+**Priority**: HIGH  
+**Estimated Time**: 5 hours  
+**Assignee**: Architecture Team
+
+**Description**: Implement service mesh pattern with sidecar for protocol complexity isolation, preparing for Phase 12 daemon mode and Phase 19-20 A2A protocols.
+
+**Future-Looking Goals:**
+- Sidecar handles all protocol negotiation
+- Services remain protocol-agnostic
+- Circuit breaker integration from Phase 4
+- Ready for distributed deployment
+
+**Acceptance Criteria:**
+- [ ] Sidecar struct implemented
+- [ ] Protocol negotiation handled by sidecar
+- [ ] Circuit breaker patterns integrated
+- [ ] Service discovery abstraction ready
+- [ ] Metrics and observability hooks
+
+**Implementation Steps:**
+1. Create Sidecar implementation:
+   ```rust
+   pub struct Sidecar {
+       engine: Arc<ProtocolEngine>,
+       protocols: Vec<Box<dyn Protocol>>,
+       circuit_breaker: CircuitBreaker,
+       discovery: Arc<ServiceDiscovery>,
+       metrics: MetricsCollector,
+   }
+   
+   impl Sidecar {
+       pub async fn intercept(&self, msg: RawMessage) -> Result<ProcessedMessage> {
+           // Handle protocol complexity
+           self.circuit_breaker.call(async {
+               let protocol = self.negotiate_protocol(&msg)?;
+               let adapted = protocol.adapt(msg)?;
+               self.metrics.record(&adapted);
+               Ok(adapted)
+           }).await
+       }
+   }
+   ```
+
+2. Create ServiceDiscovery abstraction:
+   ```rust
+   pub trait ServiceDiscovery: Send + Sync {
+       async fn register(&self, service: ServiceInfo) -> Result<()>;
+       async fn discover(&self, query: ServiceQuery) -> Result<Vec<ServiceInfo>>;
+       async fn health_check(&self, service_id: &str) -> Result<HealthStatus>;
+   }
+   ```
+
+3. Integrate with kernel:
+   ```rust
+   impl LLMSpellKernel {
+       pub async fn with_sidecar(config: KernelConfig) -> Result<Self> {
+           let engine = UnifiedProtocolEngine::new(config.transport);
+           let sidecar = Sidecar::new(engine.clone());
+           
+           // Kernel remains protocol-agnostic
+           let kernel = Self::new_with_engine(engine);
+           kernel.attach_sidecar(sidecar);
+           Ok(kernel)
+       }
+   }
+   ```
+
+**Definition of Done:**
+- [ ] Sidecar intercepting all protocol messages
+- [ ] Circuit breaker preventing cascade failures
+- [ ] Service discovery working for local services
+- [ ] Metrics being collected
+- [ ] Ready for distributed deployment
+
+### Task 9.5.4: LRP/LDP Adapter Implementation
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: Protocol Team
+
+**Description**: Create protocol adapters for existing LRP (REPL) and LDP (Debug) protocols using new adapter pattern.
+
+**Acceptance Criteria:**
+- [ ] LRPAdapter implements ProtocolAdapter trait
+- [ ] LDPAdapter implements ProtocolAdapter trait
+- [ ] All existing message types supported
+- [ ] Proper capability advertisement
+- [ ] Seamless migration from old system
+
+**Implementation Steps:**
+1. Implement LRP Adapter:
+   ```rust
+   pub struct LRPAdapter;
+   
+   impl ProtocolAdapter for LRPAdapter {
+       fn protocol_type(&self) -> ProtocolType {
+           ProtocolType::LRP
+       }
+       
+       fn adapt_inbound(&self, raw: RawMessage) -> Result<UniversalMessage> {
+           let lrp_msg: LRPRequest = serde_json::from_slice(&raw.data)?;
+           Ok(UniversalMessage {
+               protocol: ProtocolType::LRP,
+               channel: self.determine_channel(&lrp_msg),
+               content: MessageContent::Request(lrp_msg.into()),
+               // ...
+           })
+       }
+       
+       fn capabilities(&self) -> HashSet<Capability> {
+           hashset![
+               Capability::RequestResponse,
+               Capability::PubSub,
+               Capability::Streaming,
+           ]
+       }
+   }
+   ```
+
+2. Implement LDP Adapter similarly
+3. Register adapters with engine
+4. Update existing handlers to use UniversalMessage
+
+**Definition of Done:**
+- [ ] LRP messages work through adapter
+- [ ] LDP messages work through adapter
+- [ ] All existing tests pass with adapters
+- [ ] No functionality lost in migration
+
+### Task 9.5.5: Remove Duplicate Code
+**Priority**: CRITICAL  
+**Estimated Time**: 3 hours  
+**Assignee**: Cleanup Team
+
+**Description**: Remove all duplicate TCP implementation code, completing the unification.
+
+**Code to Remove:**
+- `llmspell-repl/src/channels.rs` - entire file (replaced by views)
+- `llmspell-protocol/src/server.rs` - ProtocolServer (replaced by engine)
+- `llmspell-repl/src/kernel.rs` - KernelChannels usage
+- Duplicate message routing logic
+- Redundant TCP binding code
+
+**Acceptance Criteria:**
+- [ ] All duplicate TCP code removed
+- [ ] Single source of truth for protocol handling
+- [ ] No dead code warnings
+- [ ] Reduced crate dependencies
+- [ ] Smaller binary size
+
+**Implementation Steps:**
+1. Remove `channels.rs` completely:
+   ```bash
+   git rm llmspell-repl/src/channels.rs
+   ```
+
+2. Update `kernel.rs` to use ProtocolEngine:
+   ```rust
+   // Old: self.channels = Arc::new(KernelChannels::new(...));
+   // New: self.engine = Arc::new(UnifiedProtocolEngine::new(...));
+   ```
+
+3. Remove ProtocolServer from `llmspell-protocol`:
+   - Delete old server implementation
+   - Update exports in lib.rs
+   - Remove unused dependencies
+
+4. Update all imports and usage sites
+
+**Definition of Done:**
+- [ ] channels.rs deleted
+- [ ] ProtocolServer removed
+- [ ] All references updated
+- [ ] Code compiles without warnings
+- [ ] Tests pass
+
+### Task 9.5.6: Integration Testing and Benchmarking
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: QA Team
+
+**Description**: Comprehensive testing of unified protocol engine, ensuring no regression and improved performance.
+
+**Acceptance Criteria:**
+- [ ] All existing integration tests pass
+- [ ] New engine-specific tests added
+- [ ] Performance benchmarks show improvement
+- [ ] Multi-protocol scenarios tested
+- [ ] Sidecar pattern validated
+
+**Implementation Steps:**
+1. Create protocol engine integration tests:
+   ```rust
+   #[tokio::test]
+   async fn test_unified_engine_routing() {
+       let engine = UnifiedProtocolEngine::new(config);
+       
+       // Test multiple protocols
+       engine.register_adapter(ProtocolType::LRP, Box::new(LRPAdapter));
+       engine.register_adapter(ProtocolType::LDP, Box::new(LDPAdapter));
+       
+       // Verify routing works
+       let msg = create_test_message();
+       engine.send(ChannelType::Shell, msg).await?;
+       
+       // Verify received correctly
+       let received = engine.recv(ChannelType::Shell).await?;
+       assert_eq!(received.content, expected);
+   }
+   ```
+
+2. Benchmark performance vs old dual system:
+   ```rust
+   #[bench]
+   fn bench_message_routing(b: &mut Bencher) {
+       // Compare old KernelChannels + ProtocolServer
+       // vs new UnifiedProtocolEngine
+   }
+   ```
+
+3. Test sidecar interception and circuit breaking
+4. Validate service discovery mechanisms
+5. Stress test with multiple concurrent protocols
+
+**Definition of Done:**
+- [ ] All tests green
+- [ ] Performance improved by >10%
+- [ ] Memory usage reduced
+- [ ] No race conditions
+- [ ] Documentation updated
+
+### Task 9.5.7: Documentation and Migration Guide
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: Documentation Team
+
+**Description**: Document new architecture and provide migration guide for future protocol additions.
+
+**Acceptance Criteria:**
+- [ ] Architecture documented with diagrams
+- [ ] Adapter creation guide written
+- [ ] Service mesh pattern explained
+- [ ] Performance improvements documented
+- [ ] Future extensibility roadmap
+
+**Implementation Steps:**
+1. Create architecture documentation:
+   ```markdown
+   # Unified Protocol Engine Architecture
+   
+   ## Overview
+   The ProtocolEngine provides a single point for all protocol handling...
+   
+   ## Adding New Protocols
+   1. Implement ProtocolAdapter trait
+   2. Register with engine
+   3. Define capability set
+   
+   ## Service Mesh Pattern
+   The sidecar handles protocol complexity...
+   ```
+
+2. Document migration from old system
+3. Create examples for common scenarios
+4. Update API documentation
+5. Add inline code documentation
+
+**Definition of Done:**
+- [ ] Architecture docs complete
+- [ ] Migration guide clear
+- [ ] Examples compile and run
+- [ ] API docs generated
+- [ ] README updated
+
+---
+
+## Phase 9.6: Configuration and CLI Commands (Days 14-15)
+
+### Task 9.6.1: Configuration System
 **Priority**: HIGH  
 **Estimated Time**: 6 hours  
 **Assignee**: Config Team
@@ -919,7 +1341,7 @@ Creating a new `llmspell-protocol` crate provides:
 - [ ] Validation comprehensive
 - [ ] Documentation complete
 
-### Task 9.5.2: CLI Debug System Integration
+### Task 9.6.2: CLI Debug System Integration
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: CLI Team
@@ -991,7 +1413,7 @@ Creating a new `llmspell-protocol` crate provides:
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
-### Task 9.5.3: Core REPL Enhancement
+### Task 9.6.3: Core REPL Enhancement
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: CLI Team
@@ -1034,7 +1456,7 @@ Creating a new `llmspell-protocol` crate provides:
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
-### Task 9.5.4: Core Documentation Update
+### Task 9.6.4: Core Documentation Update
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Assignee**: Documentation Team
@@ -1059,7 +1481,7 @@ Creating a new `llmspell-protocol` crate provides:
 - [ ] Quick start guide functional
 - [ ] API docs updated
 
-### Task 9.5.5: Section 9.5 Quality Gates and Testing
+### Task 9.6.5: Section 9.6 Quality Gates and Testing
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
@@ -1114,9 +1536,9 @@ Creating a new `llmspell-protocol` crate provides:
 
 ---
 
-## Phase 9.6: Final Integration and Polish (Days 14-15)
+## Phase 9.7: Final Integration and Polish (Days 16-17)
 
-### Task 9.6.1: Core Debug Integration Testing
+### Task 9.7.1: Core Debug Integration Testing
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Performance Team
@@ -1147,7 +1569,7 @@ Creating a new `llmspell-protocol` crate provides:
 - [ ] No performance regressions
 - [ ] Resource usage within limits
 
-### Task 9.6.2: End-to-End Debug Workflow Testing
+### Task 9.7.2: End-to-End Debug Workflow Testing
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
@@ -1181,9 +1603,7 @@ Creating a new `llmspell-protocol` crate provides:
 - [ ] Error handling robust
 - [ ] Session cleanup working
 
-## Phase 9.6: Final Integration and Polish (Days 14-15)
-
-### Task 9.6.1: Final Quality Assurance
+### Task 9.7.3: Final Quality Assurance
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
@@ -1229,7 +1649,7 @@ Creating a new `llmspell-protocol` crate provides:
 - [ ] Quality scripts pass
 - [ ] Performance targets met
 
-### Task 9.6.2: Phase 9 Completion
+### Task 9.7.4: Phase 9 Completion
 **Priority**: CRITICAL  
 **Estimated Time**: 2 hours  
 **Assignee**: Project Manager
