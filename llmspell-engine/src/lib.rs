@@ -71,6 +71,7 @@ pub mod adapters;
 pub mod channels;
 pub mod client;
 pub mod engine;
+pub mod processor;
 pub mod protocol;
 pub mod server;
 pub mod sidecar;
@@ -87,6 +88,7 @@ pub use engine::{
     Capability, ChannelType, ChannelView, EngineError, MessageContent, MessageRouter,
     ProtocolAdapter, ProtocolEngine, ProtocolType, UnifiedProtocolEngine, UniversalMessage,
 };
+pub use processor::{MessageProcessor, NullMessageProcessor, ProcessorError};
 pub use protocol::{
     HelpLink, HistoryEntry, LDPRequest, LDPResponse, LRPCodec, LRPRequest, LRPResponse,
     LanguageInfo, MessageHandler, MessageType, ProtocolMessage, Source,

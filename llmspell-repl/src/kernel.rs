@@ -570,3 +570,117 @@ impl LLMSpellKernel {
         current_clients.len() < self.config.max_clients
     }
 }
+
+// MessageProcessor implementation for clean separation between protocol and business logic
+#[async_trait::async_trait]
+impl llmspell_engine::MessageProcessor for LLMSpellKernel {
+    async fn process_lrp(
+        &self,
+        request: llmspell_engine::LRPRequest,
+    ) -> Result<llmspell_engine::LRPResponse, llmspell_engine::ProcessorError> {
+        use llmspell_engine::{LRPRequest, LRPResponse, ProcessorError};
+
+        let response = match request {
+            LRPRequest::KernelInfoRequest => self.get_kernel_info(),
+
+            LRPRequest::ExecuteRequest { code, silent, .. } => self
+                .execute_code("processor", code, silent)
+                .await
+                .map_err(|e| ProcessorError::ProcessingFailed(e.to_string()))?,
+
+            LRPRequest::CompleteRequest { cursor_pos, .. } => {
+                // TODO: Implement completion
+                LRPResponse::CompleteReply {
+                    matches: vec![],
+                    cursor_start: cursor_pos,
+                    cursor_end: cursor_pos,
+                    metadata: Some(serde_json::Value::Null),
+                    status: "ok".to_string(),
+                }
+            }
+
+            LRPRequest::InspectRequest { .. } => {
+                // TODO: Implement inspection
+                LRPResponse::InspectReply {
+                    status: "ok".to_string(),
+                    found: false,
+                    data: Some(serde_json::Value::Null),
+                    metadata: Some(serde_json::Value::Null),
+                }
+            }
+
+            LRPRequest::IsCompleteRequest { code } => LRPResponse::IsCompleteReply {
+                status: if code.trim().is_empty() {
+                    "incomplete"
+                } else {
+                    "complete"
+                }
+                .to_string(),
+                indent: String::new(),
+            },
+
+            LRPRequest::ShutdownRequest { restart } => LRPResponse::ShutdownReply { restart },
+
+            LRPRequest::InterruptRequest => LRPResponse::InterruptReply,
+
+            LRPRequest::HistoryRequest { .. } => LRPResponse::HistoryReply { history: vec![] },
+
+            LRPRequest::CommInfoRequest { .. } => LRPResponse::CommInfoReply {
+                comms: serde_json::Value::Object(serde_json::Map::new()),
+            },
+
+            LRPRequest::ConnectRequest => LRPResponse::ConnectReply {
+                shell_port: self.connection_info.shell_port,
+                iopub_port: self.connection_info.iopub_port,
+                stdin_port: self.connection_info.stdin_port,
+                control_port: self.connection_info.control_port,
+                hb_port: self.connection_info.hb_port,
+            },
+        };
+
+        Ok(response)
+    }
+
+    async fn process_ldp(
+        &self,
+        request: llmspell_engine::LDPRequest,
+    ) -> Result<llmspell_engine::LDPResponse, llmspell_engine::ProcessorError> {
+        use llmspell_engine::{LDPRequest, LDPResponse};
+
+        let response = match request {
+            LDPRequest::InitializeRequest { .. } => LDPResponse::InitializeResponse {
+                capabilities: serde_json::json!({
+                    "supportsConfigurationDoneRequest": true,
+                    "supportsFunctionBreakpoints": false,
+                    "supportsConditionalBreakpoints": true,
+                    "supportsEvaluateForHovers": true,
+                    "supportsStepBack": false,
+                    "supportsSetVariable": true,
+                    "supportsRestartFrame": false,
+                    "supportsStepInTargetsRequest": false,
+                    "supportsModulesRequest": false,
+                    "supportsTerminateThreadsRequest": false,
+                    "supportsDelayedStackTraceLoading": false,
+                }),
+            },
+            _ => {
+                // TODO: Implement other debug commands
+                return Err(llmspell_engine::ProcessorError::NotImplemented(
+                    "Debug command not yet implemented".to_string(),
+                ));
+            }
+        };
+
+        Ok(response)
+    }
+}
+
+// Add Debug impl for kernel to satisfy MessageProcessor trait
+impl std::fmt::Debug for LLMSpellKernel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LLMSpellKernel")
+            .field("kernel_id", &self.kernel_id)
+            .field("config", &self.config)
+            .finish()
+    }
+}

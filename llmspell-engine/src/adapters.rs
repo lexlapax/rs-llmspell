@@ -5,15 +5,21 @@
 use async_trait::async_trait;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 
 use crate::engine::{
-    Capability, EngineError, MessageContent, ProtocolAdapter, ProtocolType, UniversalMessage,
+    Capability, ChannelType, EngineError, MessageContent, ProtocolAdapter, ProtocolType,
+    UniversalMessage,
 };
-use crate::protocol::ldp::LDPRequest;
-use crate::protocol::lrp::LRPRequest;
+use crate::processor::MessageProcessor;
+use crate::protocol::ldp::{LDPRequest, LDPResponse};
+use crate::protocol::lrp::{LRPRequest, LRPResponse};
 
 /// LRP (`LLMSpell` REPL Protocol) adapter
-pub struct LRPAdapter;
+pub struct LRPAdapter {
+    /// Optional message processor for handling requests
+    processor: Option<Arc<dyn MessageProcessor>>,
+}
 
 impl Default for LRPAdapter {
     fn default() -> Self {
@@ -22,10 +28,18 @@ impl Default for LRPAdapter {
 }
 
 impl LRPAdapter {
-    /// Create a new LRP adapter
+    /// Create a new LRP adapter without a processor
     #[must_use]
-    pub const fn new() -> Self {
-        Self
+    pub fn new() -> Self {
+        Self { processor: None }
+    }
+
+    /// Create a new LRP adapter with a processor
+    #[must_use]
+    pub fn with_processor(processor: Arc<dyn MessageProcessor>) -> Self {
+        Self {
+            processor: Some(processor),
+        }
     }
 }
 
@@ -41,75 +55,101 @@ impl ProtocolAdapter for LRPAdapter {
             .map_err(|e| EngineError::Conversion(format!("Failed to parse JSON: {e}")))?;
 
         // Try to parse as LRP request
-        serde_json::from_value::<LRPRequest>(json.clone()).map_or_else(
-            |_| {
-                Err(EngineError::Conversion(
-                    "Failed to parse as LRP request".to_string(),
-                ))
-            },
-            |request| {
-                let (method, params) = match request {
-                    LRPRequest::KernelInfoRequest => ("kernel_info", Value::Null),
-                    LRPRequest::ExecuteRequest { code, silent, .. } => (
-                        "execute",
-                        serde_json::json!({ "code": code, "silent": silent }),
-                    ),
-                    LRPRequest::CompleteRequest { code, cursor_pos } => (
-                        "complete",
-                        serde_json::json!({ "code": code, "cursor_pos": cursor_pos }),
-                    ),
-                    LRPRequest::InspectRequest {
-                        code,
-                        cursor_pos,
-                        detail_level,
-                    } => (
-                        "inspect",
-                        serde_json::json!({
-                            "code": code,
-                            "cursor_pos": cursor_pos,
-                            "detail_level": detail_level
-                        }),
-                    ),
-                    LRPRequest::IsCompleteRequest { code } => {
-                        ("is_complete", serde_json::json!({ "code": code }))
-                    }
-                    LRPRequest::ShutdownRequest { restart } => {
-                        ("shutdown", serde_json::json!({ "restart": restart }))
-                    }
-                    LRPRequest::InterruptRequest => ("interrupt", Value::Null),
-                    LRPRequest::HistoryRequest { .. } => ("history", json),
-                    LRPRequest::CommInfoRequest { .. } => ("comm_info", json),
-                    LRPRequest::ConnectRequest => ("connect", Value::Null),
-                };
+        let request = serde_json::from_value::<LRPRequest>(json.clone())
+            .map_err(|_| EngineError::Conversion("Failed to parse as LRP request".to_string()))?;
 
-                Ok(UniversalMessage {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    protocol: ProtocolType::LRP,
-                    channel: crate::engine::ChannelType::Shell,
-                    content: MessageContent::Request {
-                        method: method.to_string(),
-                        params,
-                    },
-                    metadata: HashMap::default(),
-                })
+        // Determine channel based on request type
+        let channel = match &request {
+            LRPRequest::ExecuteRequest { .. }
+            | LRPRequest::CompleteRequest { .. }
+            | LRPRequest::InspectRequest { .. }
+            | LRPRequest::IsCompleteRequest { .. }
+            | LRPRequest::HistoryRequest { .. }
+            | LRPRequest::KernelInfoRequest => ChannelType::Shell,
+            LRPRequest::ShutdownRequest { .. } | LRPRequest::InterruptRequest => {
+                ChannelType::Control
+            }
+            LRPRequest::ConnectRequest | LRPRequest::CommInfoRequest { .. } => ChannelType::Shell,
+        };
+
+        // Convert to method and params for universal message
+        let (method, params) = match &request {
+            LRPRequest::KernelInfoRequest => ("kernel_info", Value::Null),
+            LRPRequest::ExecuteRequest { code, silent, .. } => (
+                "execute",
+                serde_json::json!({ "code": code, "silent": silent }),
+            ),
+            LRPRequest::CompleteRequest { code, cursor_pos } => (
+                "complete",
+                serde_json::json!({ "code": code, "cursor_pos": cursor_pos }),
+            ),
+            LRPRequest::InspectRequest {
+                code,
+                cursor_pos,
+                detail_level,
+            } => (
+                "inspect",
+                serde_json::json!({
+                    "code": code,
+                    "cursor_pos": cursor_pos,
+                    "detail_level": detail_level
+                }),
+            ),
+            LRPRequest::IsCompleteRequest { code } => {
+                ("is_complete", serde_json::json!({ "code": code }))
+            }
+            LRPRequest::ShutdownRequest { restart } => {
+                ("shutdown", serde_json::json!({ "restart": restart }))
+            }
+            LRPRequest::InterruptRequest => ("interrupt", Value::Null),
+            LRPRequest::HistoryRequest { .. } => ("history", json),
+            LRPRequest::CommInfoRequest { .. } => ("comm_info", json),
+            LRPRequest::ConnectRequest => ("connect", Value::Null),
+        };
+
+        // Store original request for potential processing
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "lrp_request".to_string(),
+            serde_json::to_value(&request).unwrap_or(Value::Null),
+        );
+
+        Ok(UniversalMessage {
+            id: uuid::Uuid::new_v4().to_string(),
+            protocol: ProtocolType::LRP,
+            channel,
+            content: MessageContent::Request {
+                method: method.to_string(),
+                params,
             },
-        )
+            metadata,
+        })
     }
 
     fn adapt_outbound(&self, msg: &UniversalMessage) -> Result<Vec<u8>, EngineError> {
-        // Convert universal message to LRP format
+        // Check if we have an LRP response in metadata (from processor)
+        if let Some(lrp_response_value) = msg.metadata.get("lrp_response") {
+            // Direct serialization of LRP response
+            return serde_json::to_vec(lrp_response_value).map_err(|e| {
+                EngineError::Conversion(format!("Failed to serialize LRP response: {e}"))
+            });
+        }
+
+        // Otherwise, convert universal message to LRP format
         let json = match &msg.content {
-            MessageContent::Response { result, error } => error.as_ref().map_or_else(
-                || {
-                    result
-                        .as_ref()
-                        .map_or(Ok(Value::Null), serde_json::to_value)
-                },
-                serde_json::to_value,
-            ),
+            MessageContent::Response { result, error } => {
+                // Try to extract LRP response from result
+                if let Some(result) = result {
+                    result.clone()
+                } else if let Some(error) = error {
+                    error.clone()
+                } else {
+                    Value::Null
+                }
+            }
             MessageContent::Request { method, params } => {
                 // Convert back to LRP request format
-                let request = match method.as_str() {
+                match method.as_str() {
                     "kernel_info" => serde_json::to_value(LRPRequest::KernelInfoRequest),
                     "execute" => {
                         if let Some(code) = params.get("code").and_then(|v| v.as_str()) {
@@ -132,20 +172,19 @@ impl ProtocolAdapter for LRPAdapter {
                         }
                     }
                     _ => Ok(Value::Null),
-                };
-                request
+                }
+                .map_err(|e| EngineError::Conversion(format!("Failed to serialize request: {e}")))?
             }
             MessageContent::Notification { event, data } => {
-                serde_json::to_value(serde_json::json!({
+                serde_json::json!({
                     "event": event,
                     "data": data
-                }))
+                })
             }
             MessageContent::Raw { data } => {
                 return Ok(data.clone());
             }
-        }
-        .map_err(|e| EngineError::Conversion(format!("Failed to serialize: {e}")))?;
+        };
 
         serde_json::to_vec(&json)
             .map_err(|e| EngineError::Conversion(format!("Failed to serialize to bytes: {e}")))
@@ -161,8 +200,22 @@ impl ProtocolAdapter for LRPAdapter {
     }
 }
 
+impl LRPAdapter {
+    /// Process an LRP request using the processor if available
+    pub async fn process_request(&self, request: LRPRequest) -> Option<LRPResponse> {
+        if let Some(processor) = &self.processor {
+            processor.process_lrp(request).await.ok()
+        } else {
+            None
+        }
+    }
+}
+
 /// LDP (`LLMSpell` Debug Protocol) adapter
-pub struct LDPAdapter;
+pub struct LDPAdapter {
+    /// Optional message processor for handling requests
+    processor: Option<Arc<dyn MessageProcessor>>,
+}
 
 impl Default for LDPAdapter {
     fn default() -> Self {
@@ -171,10 +224,18 @@ impl Default for LDPAdapter {
 }
 
 impl LDPAdapter {
-    /// Create a new LDP adapter
+    /// Create a new LDP adapter without a processor
     #[must_use]
-    pub const fn new() -> Self {
-        Self
+    pub fn new() -> Self {
+        Self { processor: None }
+    }
+
+    /// Create a new LDP adapter with a processor
+    #[must_use]
+    pub fn with_processor(processor: Arc<dyn MessageProcessor>) -> Self {
+        Self {
+            processor: Some(processor),
+        }
     }
 }
 
@@ -190,58 +251,67 @@ impl ProtocolAdapter for LDPAdapter {
             .map_err(|e| EngineError::Conversion(format!("Failed to parse JSON: {e}")))?;
 
         // Try to parse as LDP request
-        serde_json::from_value::<LDPRequest>(json.clone()).map_or_else(
-            |_| {
-                Err(EngineError::Conversion(
-                    "Failed to parse as LDP request".to_string(),
-                ))
-            },
-            |request| {
-                let (method, params) = match request {
-                    LDPRequest::InitializeRequest { client_id, .. } => {
-                        ("initialize", serde_json::json!({ "client_id": client_id }))
-                    }
-                    LDPRequest::SetBreakpointsRequest { .. } => ("setBreakpoints", json),
-                    LDPRequest::ContinueRequest { thread_id, .. } => {
-                        ("continue", serde_json::json!({ "thread_id": thread_id }))
-                    }
-                    LDPRequest::NextRequest { thread_id, .. } => {
-                        ("next", serde_json::json!({ "thread_id": thread_id }))
-                    }
-                    LDPRequest::StepInRequest { thread_id, .. } => {
-                        ("stepIn", serde_json::json!({ "thread_id": thread_id }))
-                    }
-                    LDPRequest::StepOutRequest { thread_id, .. } => {
-                        ("stepOut", serde_json::json!({ "thread_id": thread_id }))
-                    }
-                    LDPRequest::PauseRequest { thread_id } => {
-                        ("pause", serde_json::json!({ "thread_id": thread_id }))
-                    }
-                    LDPRequest::StackTraceRequest { thread_id, .. } => {
-                        ("stackTrace", serde_json::json!({ "thread_id": thread_id }))
-                    }
-                    LDPRequest::EvaluateRequest { expression, .. } => {
-                        ("evaluate", serde_json::json!({ "expression": expression }))
-                    }
-                    _ => ("unknown", json),
-                };
+        let request = serde_json::from_value::<LDPRequest>(json.clone())
+            .map_err(|_| EngineError::Conversion("Failed to parse as LDP request".to_string()))?;
 
-                Ok(UniversalMessage {
-                    id: uuid::Uuid::new_v4().to_string(),
-                    protocol: ProtocolType::LDP,
-                    channel: crate::engine::ChannelType::Control,
-                    content: MessageContent::Request {
-                        method: method.to_string(),
-                        params,
-                    },
-                    metadata: HashMap::default(),
-                })
+        let (method, params) = match &request {
+            LDPRequest::InitializeRequest { client_id, .. } => {
+                ("initialize", serde_json::json!({ "client_id": client_id }))
+            }
+            LDPRequest::SetBreakpointsRequest { .. } => ("setBreakpoints", json.clone()),
+            LDPRequest::ContinueRequest { thread_id, .. } => {
+                ("continue", serde_json::json!({ "thread_id": thread_id }))
+            }
+            LDPRequest::NextRequest { thread_id, .. } => {
+                ("next", serde_json::json!({ "thread_id": thread_id }))
+            }
+            LDPRequest::StepInRequest { thread_id, .. } => {
+                ("stepIn", serde_json::json!({ "thread_id": thread_id }))
+            }
+            LDPRequest::StepOutRequest { thread_id, .. } => {
+                ("stepOut", serde_json::json!({ "thread_id": thread_id }))
+            }
+            LDPRequest::PauseRequest { thread_id } => {
+                ("pause", serde_json::json!({ "thread_id": thread_id }))
+            }
+            LDPRequest::StackTraceRequest { thread_id, .. } => {
+                ("stackTrace", serde_json::json!({ "thread_id": thread_id }))
+            }
+            LDPRequest::EvaluateRequest { expression, .. } => {
+                ("evaluate", serde_json::json!({ "expression": expression }))
+            }
+            _ => ("unknown", json.clone()),
+        };
+
+        // Store original request for potential processing
+        let mut metadata = HashMap::new();
+        metadata.insert(
+            "ldp_request".to_string(),
+            serde_json::to_value(&request).unwrap_or(Value::Null),
+        );
+
+        Ok(UniversalMessage {
+            id: uuid::Uuid::new_v4().to_string(),
+            protocol: ProtocolType::LDP,
+            channel: ChannelType::Control,
+            content: MessageContent::Request {
+                method: method.to_string(),
+                params,
             },
-        )
+            metadata,
+        })
     }
 
     fn adapt_outbound(&self, msg: &UniversalMessage) -> Result<Vec<u8>, EngineError> {
-        // Convert universal message to LDP format
+        // Check if we have an LDP response in metadata (from processor)
+        if let Some(ldp_response_value) = msg.metadata.get("ldp_response") {
+            // Direct serialization of LDP response
+            return serde_json::to_vec(ldp_response_value).map_err(|e| {
+                EngineError::Conversion(format!("Failed to serialize LDP response: {e}"))
+            });
+        }
+
+        // Otherwise, convert universal message to LDP format
         let json = serde_json::to_value(&msg.content)
             .map_err(|e| EngineError::Conversion(format!("Failed to serialize: {e}")))?;
 
@@ -255,6 +325,17 @@ impl ProtocolAdapter for LDPAdapter {
         caps.insert(Capability::Control);
         caps.insert(Capability::Binary);
         caps
+    }
+}
+
+impl LDPAdapter {
+    /// Process an LDP request using the processor if available
+    pub async fn process_request(&self, request: LDPRequest) -> Option<LDPResponse> {
+        if let Some(processor) = &self.processor {
+            processor.process_ldp(request).await.ok()
+        } else {
+            None
+        }
     }
 }
 
