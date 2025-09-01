@@ -10,6 +10,7 @@ pub mod connection; // Connection management
 pub mod discovery; // Connection file discovery
 pub mod kernel; // Core kernel service
 pub mod protocol; // LRP/LDP protocol definitions
+pub mod protocol_handler; // TCP protocol message handler
 pub mod security; // Authentication and authorization
 
 // Re-export main types for convenience

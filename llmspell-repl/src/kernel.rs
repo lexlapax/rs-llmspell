@@ -158,8 +158,9 @@ impl LLMSpellKernel {
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
 
-        // Initialize channels
-        let channels = Arc::new(KernelChannels::new(&config.ip, config.port_range_start).await?);
+        // Initialize channels - DISABLED: Using ProtocolServer for TCP communication now
+        // The ProtocolServer will bind to these ports instead
+        let channels = Arc::new(KernelChannels::new_dummy().await?);
 
         // Create connection info
         let connection_info = ConnectionInfo::new(
@@ -217,28 +218,69 @@ impl LLMSpellKernel {
         // Start channel listeners
         self.channels.start_listeners()?;
 
-        // Extract shutdown receiver
-        let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        let old_tx = self.shutdown_tx.replace(shutdown_tx);
-        drop(old_tx); // Drop the old unused sender
+        // Create a new shutdown channel (the old one is dropped with self)
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+        // Drop the old shutdown sender if it exists
+        drop(self.shutdown_tx.take());
+
+        // Now we can move self into Arc
+        let kernel_arc = Arc::new(self);
+        let handler = Arc::new(crate::protocol_handler::KernelProtocolHandler::new(
+            kernel_arc.clone(),
+        ));
+
+        let server_config = llmspell_protocol::ServerConfig {
+            ip: kernel_arc.config.ip.clone(),
+            shell_port: kernel_arc.connection_info.shell_port,
+            iopub_port: kernel_arc.connection_info.iopub_port,
+            stdin_port: kernel_arc.connection_info.stdin_port,
+            control_port: kernel_arc.connection_info.control_port,
+            heartbeat_port: kernel_arc.connection_info.hb_port,
+            max_clients: kernel_arc.config.max_clients,
+        };
+
+        let mut protocol_server = llmspell_protocol::ProtocolServer::new(server_config, handler);
 
         // Create a ctrl-c handler
         let ctrl_c = tokio::signal::ctrl_c();
+
+        // Spawn protocol server task
+        let server_handle = tokio::spawn(async move {
+            if let Err(e) = protocol_server.start().await {
+                tracing::error!("Protocol server error: {}", e);
+            }
+        });
+        
+        // Keep shutdown_tx alive in a separate task
+        let _shutdown_guard = tokio::spawn(async move {
+            // This task will hold shutdown_tx until it's dropped
+            let _tx = shutdown_tx;
+            // Sleep forever (or until the task is cancelled)
+            tokio::time::sleep(std::time::Duration::from_secs(u64::MAX)).await;
+        });
 
         // Main event loop
         tokio::select! {
             // Wait for shutdown signal
             _ = shutdown_rx => {
-                tracing::info!("Kernel {} received shutdown signal", self.kernel_id);
+                tracing::info!("Kernel {} received shutdown signal", kernel_arc.kernel_id);
             }
             // Wait for Ctrl+C
             _ = ctrl_c => {
-                tracing::info!("Kernel {} received Ctrl+C signal", self.kernel_id);
+                tracing::info!("Kernel {} received Ctrl+C signal", kernel_arc.kernel_id);
+            }
+            // Wait for server task to complete (error case)
+            _ = server_handle => {
+                tracing::warn!("Protocol server task ended unexpectedly");
             }
         }
 
-        // Shutdown the kernel
-        self.shutdown().await?;
+        // Shutdown the kernel - need to extract from Arc
+        if let Ok(kernel) = Arc::try_unwrap(kernel_arc) {
+            kernel.shutdown().await?;
+        } else {
+            tracing::warn!("Could not cleanly shutdown kernel - Arc still has references");
+        }
         Ok(())
     }
 

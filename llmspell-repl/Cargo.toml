@@ -27,6 +27,7 @@ llmspell-config = { path = "../llmspell-config" }
 llmspell-core = { path = "../llmspell-core" }
 # llmspell-debug created in task 9.2.1
 llmspell-debug = { path = "../llmspell-debug" }
+llmspell-protocol = { path = "../llmspell-protocol" }
 
 # Error handling
 anyhow = { workspace = true }

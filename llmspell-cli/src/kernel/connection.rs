@@ -15,11 +15,9 @@ use llmspell_bridge::{
     session_recorder::{SessionEvent, SessionRecorder},
 };
 use llmspell_debug::session_manager::DebugSessionManager;
+use llmspell_protocol::{LDPRequest, LDPResponse, LRPRequest, LRPResponse, ProtocolClient};
 use llmspell_repl::{
-    client::ConnectedClient,
-    connection::ConnectionInfo,
-    discovery::KernelDiscovery,
-    protocol::{LDPRequest, LDPResponse},
+    client::ConnectedClient, connection::ConnectionInfo, discovery::KernelDiscovery,
 };
 use serde_json::Value;
 use std::collections::HashMap;
@@ -121,6 +119,7 @@ impl KernelConnectionBuilder {
             diagnostics: self.diagnostics,
             connection_info: None,
             client: None,
+            protocol_client: None,
             execution_manager: None,
             debug_session_manager: None,
             connected: false,
@@ -138,6 +137,7 @@ pub struct KernelConnection {
     diagnostics: Option<DiagnosticsBridge>,
     connection_info: Option<ConnectionInfo>,
     client: Option<ConnectedClient>,
+    protocol_client: Option<ProtocolClient>,
     execution_manager: Option<Arc<ExecutionManager>>,
     debug_session_manager: Option<Arc<RwLock<DebugSessionManager>>>,
     connected: bool,
@@ -148,20 +148,34 @@ impl KernelConnectionTrait for KernelConnection {
     async fn connect_or_start(&mut self) -> Result<()> {
         // Try to discover existing kernel
         if let Some(kernel) = self.discovery.discover_first().await? {
+            // Connect via TCP protocol
+            let addr = format!("{}:{}", kernel.ip, kernel.shell_port);
+            let protocol_client = ProtocolClient::connect(&addr)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to connect to kernel: {}", e))?;
+
             self.connection_info = Some(kernel);
             self.client = Some(ConnectedClient::new("cli-user".to_string()));
+            self.protocol_client = Some(protocol_client);
             self.connected = true;
-            tracing::info!("Connected to existing kernel");
+            tracing::info!("Connected to existing kernel via TCP");
         } else {
             // Start new kernel
             let kernel_id = uuid::Uuid::new_v4().to_string();
             let info = ConnectionInfo::new(kernel_id, "127.0.0.1".to_string(), 5555);
             info.write_connection_file().await?;
 
+            // Connect via TCP protocol
+            let addr = format!("{}:{}", info.ip, info.shell_port);
+            let protocol_client = ProtocolClient::connect(&addr)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to connect to kernel: {}", e))?;
+
             self.connection_info = Some(info);
             self.client = Some(ConnectedClient::new("cli-user".to_string()));
+            self.protocol_client = Some(protocol_client);
             self.connected = true;
-            tracing::info!("Started new kernel");
+            tracing::info!("Started new kernel and connected via TCP");
         }
 
         // Initialize execution manager
@@ -175,27 +189,70 @@ impl KernelConnectionTrait for KernelConnection {
         Ok(())
     }
 
-    async fn execute(&mut self, _code: &str) -> Result<Value> {
+    async fn execute(&mut self, code: &str) -> Result<Value> {
         if !self.connected {
             anyhow::bail!("Not connected to kernel");
         }
 
-        // Record execution if session recorder is available
-        // TODO: Implement proper session recording when SessionEvent is updated
+        let protocol_client = self
+            .protocol_client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Protocol client not initialized"))?;
 
-        // In a real implementation, this would send an execute request to the kernel
-        // For now, return a placeholder
-        Ok(Value::String("Execution placeholder".to_string()))
+        // Send execute request via TCP
+        let request = LRPRequest::ExecuteRequest {
+            code: code.to_string(),
+            silent: false,
+            store_history: true,
+            user_expressions: None,
+            allow_stdin: false,
+            stop_on_error: true,
+        };
+
+        let response = protocol_client
+            .send_lrp_request(request)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to execute code: {}", e))?;
+
+        match response {
+            LRPResponse::ExecuteReply {
+                status, payload, ..
+            } => {
+                if status == "ok" {
+                    // Extract result from payload if present
+                    if let Some(payload_vec) = payload {
+                        if let Some(first) = payload_vec.first() {
+                            Ok(first.clone())
+                        } else {
+                            Ok(Value::Null)
+                        }
+                    } else {
+                        Ok(Value::Null)
+                    }
+                } else {
+                    anyhow::bail!("Execution failed with status: {}", status)
+                }
+            }
+            _ => anyhow::bail!("Unexpected response type"),
+        }
     }
 
-    async fn send_debug_command(&mut self, _command: LDPRequest) -> Result<LDPResponse> {
+    async fn send_debug_command(&mut self, command: LDPRequest) -> Result<LDPResponse> {
         if !self.connected {
             anyhow::bail!("Not connected to kernel");
         }
 
-        // In a real implementation, this would send the debug command to the kernel
-        // For now, return a placeholder response
-        Ok(LDPResponse::ContinueReply)
+        let protocol_client = self
+            .protocol_client
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("Protocol client not initialized"))?;
+
+        // Send debug command via TCP
+        let response = protocol_client
+            .send_ldp_request(command)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send debug command: {}", e))?;
+        Ok(response)
     }
 
     fn execution_manager(&self) -> Option<Arc<ExecutionManager>> {
@@ -207,6 +264,11 @@ impl KernelConnectionTrait for KernelConnection {
     }
 
     async fn disconnect(&mut self) -> Result<()> {
+        // Shutdown TCP client
+        if let Some(client) = self.protocol_client.take() {
+            client.shutdown().await;
+        }
+
         if let Some(info) = &self.connection_info {
             info.remove_connection_file().await?;
         }

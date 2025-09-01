@@ -267,6 +267,26 @@ impl KernelChannels {
             heartbeat,
         })
     }
+    
+    /// Create dummy channels that don't bind to any ports
+    /// Used when ProtocolServer handles TCP communication
+    pub async fn new_dummy() -> Result<Self> {
+        // Create channels that bind to port 0 (ephemeral ports)
+        // They won't actually be used, but this avoids unsafe code
+        let shell = ShellChannel::new("127.0.0.1", 0).await?;
+        let iopub = IOPubChannel::new("127.0.0.1", 0).await?;
+        let stdin = StdinChannel::new("127.0.0.1", 0).await?;
+        let control = ControlChannel::new("127.0.0.1", 0).await?;
+        let heartbeat = HeartbeatChannel::new("127.0.0.1", 0).await?;
+
+        Ok(Self {
+            shell,
+            iopub,
+            stdin,
+            control,
+            heartbeat,
+        })
+    }
 
     /// Start all channel listeners
     ///
