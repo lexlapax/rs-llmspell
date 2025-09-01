@@ -190,7 +190,7 @@ impl AutoDiscovery {
         // 2. Wait for it to write connection file
         // 3. Read and return connection info
 
-        ConnectionInfo::new(kernel_id, "127.0.0.1".to_string(), 5555)
+        ConnectionInfo::new(kernel_id, "127.0.0.1".to_string(), 9555)
     }
 }
 

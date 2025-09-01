@@ -10,7 +10,7 @@ use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::{broadcast, RwLock};
 use tracing::{debug, error, info, warn};
 
-use crate::message::{MessageHandler, ProtocolMessage};
+use crate::protocol::message::{MessageHandler, ProtocolMessage};
 use crate::transport::tcp::TcpTransport;
 use crate::transport::{Transport, TransportError};
 
@@ -47,7 +47,7 @@ pub struct ServerConfig {
     /// Port for shell channel
     pub shell_port: u16,
 
-    /// Port for IOPub channel
+    /// Port for `IOPub` channel
     pub iopub_port: u16,
 
     /// Port for stdin channel
@@ -67,11 +67,11 @@ impl Default for ServerConfig {
     fn default() -> Self {
         Self {
             ip: "127.0.0.1".to_string(),
-            shell_port: 5555,
-            iopub_port: 5556,
-            stdin_port: 5557,
-            control_port: 5558,
-            heartbeat_port: 5559,
+            shell_port: 9555,
+            iopub_port: 9556,
+            stdin_port: 9557,
+            control_port: 9558,
+            heartbeat_port: 9559,
             max_clients: 10,
         }
     }
@@ -88,7 +88,7 @@ pub struct ProtocolServer {
     /// Connected clients
     clients: Arc<RwLock<HashMap<String, ConnectedClient>>>,
 
-    /// IOPub broadcast channel
+    /// `IOPub` broadcast channel
     iopub_tx: broadcast::Sender<ProtocolMessage>,
 
     /// Shutdown signal
@@ -111,17 +111,32 @@ impl ProtocolServer {
     }
 
     /// Start the server and accept connections
+    ///
+    /// # Errors
+    ///
+    /// Returns `ServerError::Io` if binding to ports fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if shutdown channel is not initialized
     pub async fn start(&mut self) -> Result<(), ServerError> {
         info!(
             "Starting protocol server on {}:{}",
             self.config.ip, self.config.shell_port
         );
 
-        // Bind to shell channel (main request/response channel)
+        // Set up listeners
+        let (shell_listener, iopub_listener) = self.bind_listeners().await?;
+
+        // Run the accept loop
+        self.run_accept_loop(shell_listener, iopub_listener).await
+    }
+
+    /// Bind TCP listeners for shell and `IOPub` channels
+    async fn bind_listeners(&self) -> Result<(TcpListener, TcpListener), ServerError> {
         let shell_addr = format!("{}:{}", self.config.ip, self.config.shell_port);
         let shell_listener = TcpListener::bind(&shell_addr).await?;
 
-        // Bind to IOPub channel (broadcast channel)
         let iopub_addr = format!("{}:{}", self.config.ip, self.config.iopub_port);
         let iopub_listener = TcpListener::bind(&iopub_addr).await?;
 
@@ -130,7 +145,15 @@ impl ProtocolServer {
             shell_addr, iopub_addr
         );
 
-        // Accept loop
+        Ok((shell_listener, iopub_listener))
+    }
+
+    /// Run the main accept loop for incoming connections
+    async fn run_accept_loop(
+        &self,
+        shell_listener: TcpListener,
+        iopub_listener: TcpListener,
+    ) -> Result<(), ServerError> {
         let mut shutdown_rx = self.shutdown_tx.as_ref().unwrap().subscribe();
 
         loop {
@@ -139,36 +162,45 @@ impl ProtocolServer {
                     info!("Protocol server shutting down");
                     break;
                 }
-
-                // Accept shell connections
                 result = shell_listener.accept() => {
-                    match result {
-                        Ok((stream, addr)) => {
-                            info!("New shell connection from {}", addr);
-                            self.handle_shell_connection(stream, addr).await;
-                        }
-                        Err(e) => {
-                            error!("Error accepting shell connection: {}", e);
-                        }
-                    }
+                    self.handle_accept_result(result, true).await;
                 }
-
-                // Accept IOPub connections
                 result = iopub_listener.accept() => {
-                    match result {
-                        Ok((stream, addr)) => {
-                            info!("New IOPub connection from {}", addr);
-                            self.handle_iopub_connection(stream, addr).await;
-                        }
-                        Err(e) => {
-                            error!("Error accepting IOPub connection: {}", e);
-                        }
-                    }
+                    self.handle_accept_result(result, false).await;
                 }
             }
         }
 
         Ok(())
+    }
+
+    /// Handle the result of accepting a connection
+    async fn handle_accept_result(
+        &self,
+        result: std::io::Result<(TcpStream, SocketAddr)>,
+        is_shell: bool,
+    ) {
+        match result {
+            Ok((stream, addr)) => self.handle_new_connection(stream, addr, is_shell).await,
+            Err(e) => Self::log_accept_error(&e, is_shell),
+        }
+    }
+
+    /// Handle a new connection
+    async fn handle_new_connection(&self, stream: TcpStream, addr: SocketAddr, is_shell: bool) {
+        if is_shell {
+            info!("New shell connection from {}", addr);
+            self.handle_shell_connection(stream, addr).await;
+        } else {
+            info!("New IOPub connection from {}", addr);
+            self.handle_iopub_connection(stream, addr);
+        }
+    }
+
+    /// Log an error accepting a connection
+    fn log_accept_error(error: &std::io::Error, is_shell: bool) {
+        let channel = if is_shell { "shell" } else { "IOPub" };
+        error!("Error accepting {} connection: {}", channel, error);
     }
 
     /// Handle a shell channel connection
@@ -202,14 +234,13 @@ impl ProtocolServer {
             }
 
             // Remove client on disconnect
-            let mut clients = clients.write().await;
-            clients.remove(&client_id);
+            clients.write().await.remove(&client_id);
             info!("Client {} disconnected", client_id);
         });
     }
 
-    /// Handle an IOPub channel connection
-    async fn handle_iopub_connection(&self, stream: TcpStream, addr: SocketAddr) {
+    /// Handle an `IOPub` channel connection
+    fn handle_iopub_connection(&self, stream: TcpStream, addr: SocketAddr) {
         let mut transport = TcpTransport::new(stream);
         let mut iopub_rx = self.iopub_tx.subscribe();
 
@@ -233,31 +264,20 @@ impl ProtocolServer {
     ) -> Result<(), ServerError> {
         loop {
             // Receive request
-            let request = match transport.recv().await {
-                Ok(msg) => msg,
-                Err(TransportError::ConnectionClosed) => {
-                    debug!("Client {} connection closed", client_id);
-                    break;
-                }
-                Err(e) => {
-                    error!("Error receiving from client {}: {}", client_id, e);
-                    break;
-                }
+            let request = match Self::receive_message(&mut transport, &client_id).await {
+                Ok(Some(msg)) => msg,
+                Ok(None) => break, // Connection closed or error
+                Err(e) => return Err(e),
             };
 
             debug!("Received request from {}: {:?}", client_id, request.msg_id);
 
-            // Handle request
+            // Handle request and send response
             if let Some(response) = handler.handle(request.clone()).await {
-                // Send response
-                if let Err(e) = transport.send(response.clone()).await {
-                    error!("Error sending response to {}: {}", client_id, e);
-                    break;
-                }
-
-                // Broadcast on IOPub if needed
-                if response.channel == "iopub" {
-                    let _ = iopub_tx.send(response);
+                if !Self::send_response(&mut transport, &client_id, response.clone(), &iopub_tx)
+                    .await
+                {
+                    break; // Error sending response
                 }
             }
         }
@@ -265,8 +285,47 @@ impl ProtocolServer {
         Ok(())
     }
 
+    /// Receive a message from the transport
+    async fn receive_message(
+        transport: &mut Box<dyn Transport>,
+        client_id: &str,
+    ) -> Result<Option<ProtocolMessage>, ServerError> {
+        match transport.recv().await {
+            Ok(msg) => Ok(Some(msg)),
+            Err(TransportError::ConnectionClosed) => {
+                debug!("Client {} connection closed", client_id);
+                Ok(None)
+            }
+            Err(e) => {
+                error!("Error receiving from client {}: {}", client_id, e);
+                Ok(None)
+            }
+        }
+    }
+
+    /// Send a response and broadcast to `IOPub` if needed
+    async fn send_response(
+        transport: &mut Box<dyn Transport>,
+        client_id: &str,
+        response: ProtocolMessage,
+        iopub_tx: &broadcast::Sender<ProtocolMessage>,
+    ) -> bool {
+        // Send response
+        if let Err(e) = transport.send(response.clone()).await {
+            error!("Error sending response to {}: {}", client_id, e);
+            return false;
+        }
+
+        // Broadcast on IOPub if needed
+        if response.channel == "iopub" {
+            let _ = iopub_tx.send(response);
+        }
+
+        true
+    }
+
     /// Shutdown the server
-    pub async fn shutdown(mut self) {
+    pub fn shutdown(mut self) {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
         }

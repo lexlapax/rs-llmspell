@@ -6,7 +6,7 @@ use async_trait::async_trait;
 use std::fmt::Debug;
 use thiserror::Error;
 
-use crate::message::ProtocolMessage;
+use crate::protocol::message::ProtocolMessage;
 
 /// Errors that can occur during transport operations
 #[derive(Error, Debug)]
@@ -42,8 +42,8 @@ pub trait Transport: Send + Sync + Debug {
 
 /// TCP transport implementation
 pub mod tcp {
-    use super::*;
-    use crate::codec::LRPCodec;
+    use super::{async_trait, Debug, ProtocolMessage, Transport, TransportError};
+    use crate::protocol::codec::LRPCodec;
     use futures::{SinkExt, StreamExt};
     use tokio::net::TcpStream;
     use tokio_util::codec::Framed;
@@ -64,6 +64,10 @@ pub mod tcp {
         }
 
         /// Connect to a TCP address
+        ///
+        /// # Errors
+        ///
+        /// Returns `TransportError::Io` if connection fails
         pub async fn connect(addr: &str) -> Result<Self, TransportError> {
             let stream = TcpStream::connect(addr).await?;
             Ok(Self::new(stream))
@@ -74,12 +78,10 @@ pub mod tcp {
     impl Transport for TcpTransport {
         async fn send(&mut self, msg: ProtocolMessage) -> Result<(), TransportError> {
             if let Some(stream) = &mut self.stream {
-                stream.send(msg).await.map_err(|e| {
-                    TransportError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))
-                })
+                stream
+                    .send(msg)
+                    .await
+                    .map_err(|e| TransportError::Io(std::io::Error::other(e.to_string())))
             } else {
                 Err(TransportError::ConnectionClosed)
             }
@@ -89,10 +91,7 @@ pub mod tcp {
             if let Some(stream) = &mut self.stream {
                 match stream.next().await {
                     Some(Ok(msg)) => Ok(msg),
-                    Some(Err(e)) => Err(TransportError::Io(std::io::Error::new(
-                        std::io::ErrorKind::Other,
-                        e.to_string(),
-                    ))),
+                    Some(Err(e)) => Err(TransportError::Io(std::io::Error::other(e.to_string()))),
                     None => Err(TransportError::ConnectionClosed),
                 }
             } else {

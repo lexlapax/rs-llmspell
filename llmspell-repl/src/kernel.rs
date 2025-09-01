@@ -55,7 +55,7 @@ impl Default for KernelConfig {
         Self {
             kernel_id: None,
             ip: "127.0.0.1".to_string(),
-            port_range_start: 5555,
+            port_range_start: 9555,
             debug_enabled: false,
             max_clients: 10,
             engine: "lua".to_string(),
@@ -229,7 +229,7 @@ impl LLMSpellKernel {
             kernel_arc.clone(),
         ));
 
-        let server_config = llmspell_protocol::ServerConfig {
+        let server_config = llmspell_engine::ServerConfig {
             ip: kernel_arc.config.ip.clone(),
             shell_port: kernel_arc.connection_info.shell_port,
             iopub_port: kernel_arc.connection_info.iopub_port,
@@ -239,7 +239,7 @@ impl LLMSpellKernel {
             max_clients: kernel_arc.config.max_clients,
         };
 
-        let mut protocol_server = llmspell_protocol::ProtocolServer::new(server_config, handler);
+        let mut protocol_server = llmspell_engine::ProtocolServer::new(server_config, handler);
 
         // Create a ctrl-c handler
         let ctrl_c = tokio::signal::ctrl_c();
@@ -250,7 +250,7 @@ impl LLMSpellKernel {
                 tracing::error!("Protocol server error: {}", e);
             }
         });
-        
+
         // Keep shutdown_tx alive in a separate task
         let _shutdown_guard = tokio::spawn(async move {
             // This task will hold shutdown_tx until it's dropped

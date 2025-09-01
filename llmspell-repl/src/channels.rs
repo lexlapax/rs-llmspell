@@ -267,9 +267,12 @@ impl KernelChannels {
             heartbeat,
         })
     }
-    
+
     /// Create dummy channels that don't bind to any ports
-    /// Used when ProtocolServer handles TCP communication
+    /// Used when `ProtocolServer` handles TCP communication
+    /// # Errors
+    ///
+    /// Returns error if channel creation fails
     pub async fn new_dummy() -> Result<Self> {
         // Create channels that bind to port 0 (ephemeral ports)
         // They won't actually be used, but this avoids unsafe code

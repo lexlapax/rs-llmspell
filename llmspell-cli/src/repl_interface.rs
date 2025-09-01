@@ -242,12 +242,22 @@ impl CLIReplInterface {
         let file = parts[1];
         let line: u32 = parts[2].parse()?;
 
-        let request = LDPRequest::SetBreakpointRequest {
-            file: file.to_string(),
-            line,
-            condition: None,
-            hit_count: None,
-            ignore_count: None,
+        // Create a proper SetBreakpointsRequest
+        let source = llmspell_engine::Source {
+            name: Some(file.to_string()),
+            path: Some(file.to_string()),
+            source_reference: None,
+            presentation_hint: None,
+            origin: None,
+            sources: None,
+            adapter_data: None,
+            checksums: None,
+        };
+        let request = LDPRequest::SetBreakpointsRequest {
+            source,
+            lines: vec![line],
+            breakpoints: None,
+            source_modified: None,
         };
 
         let response = self.kernel.send_debug_command(request).await?;
@@ -258,7 +268,11 @@ impl CLIReplInterface {
 
     /// Handle step command
     async fn handle_step_command(&mut self) -> Result<()> {
-        let request = LDPRequest::StepRequest;
+        let request = LDPRequest::StepInRequest {
+            thread_id: 1, // Default thread
+            target_id: None,
+            granularity: None,
+        };
 
         let response = self.kernel.send_debug_command(request).await?;
         println!("Step response: {:?}", response);
@@ -268,7 +282,10 @@ impl CLIReplInterface {
 
     /// Handle continue command
     async fn handle_continue_command(&mut self) -> Result<()> {
-        let request = LDPRequest::ContinueRequest;
+        let request = LDPRequest::ContinueRequest {
+            thread_id: 1, // Default thread
+            all_threads: None,
+        };
 
         let response = self.kernel.send_debug_command(request).await?;
         println!("Continue response: {:?}", response);
@@ -292,9 +309,10 @@ impl CLIReplInterface {
     /// Handle stack command
     async fn handle_stack_command(&mut self) -> Result<()> {
         let request = LDPRequest::StackTraceRequest {
-            thread_id: None,
+            thread_id: 1, // Default thread
             start_frame: Some(0),
             levels: Some(20),
+            format: None,
         };
 
         let response = self.kernel.send_debug_command(request).await?;

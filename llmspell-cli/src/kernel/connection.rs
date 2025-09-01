@@ -15,7 +15,7 @@ use llmspell_bridge::{
     session_recorder::{SessionEvent, SessionRecorder},
 };
 use llmspell_debug::session_manager::DebugSessionManager;
-use llmspell_protocol::{LDPRequest, LDPResponse, LRPRequest, LRPResponse, ProtocolClient};
+use llmspell_engine::{LDPRequest, LDPResponse, LRPRequest, LRPResponse, ProtocolClient};
 use llmspell_repl::{
     client::ConnectedClient, connection::ConnectionInfo, discovery::KernelDiscovery,
 };
@@ -162,7 +162,7 @@ impl KernelConnectionTrait for KernelConnection {
         } else {
             // Start new kernel
             let kernel_id = uuid::Uuid::new_v4().to_string();
-            let info = ConnectionInfo::new(kernel_id, "127.0.0.1".to_string(), 5555);
+            let info = ConnectionInfo::new(kernel_id, "127.0.0.1".to_string(), 9555);
             info.write_connection_file().await?;
 
             // Connect via TCP protocol
@@ -334,8 +334,9 @@ impl KernelConnectionTrait for KernelConnection {
         // Send debug execute request to kernel
         let request = LDPRequest::EvaluateRequest {
             expression: script.to_string(),
-            frame_id: Some(session_id.clone()),
+            frame_id: Some(0), // Use 0 as default frame
             context: Some("debug".to_string()),
+            format: None,
         };
 
         // Send the debug request
@@ -728,7 +729,9 @@ impl KernelConnectionTrait for NullKernelConnection {
     }
 
     async fn send_debug_command(&mut self, _command: LDPRequest) -> Result<LDPResponse> {
-        Ok(LDPResponse::ContinueReply)
+        Ok(LDPResponse::ContinueResponse {
+            all_threads_continued: Some(false),
+        })
     }
 
     fn execution_manager(&self) -> Option<Arc<ExecutionManager>> {

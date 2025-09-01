@@ -78,6 +78,7 @@ impl ProtocolMessage {
     }
 
     /// Try to extract an LRP request from the message
+    #[must_use]
     pub fn as_lrp_request(&self) -> Option<LRPRequest> {
         if self.msg_type == MessageType::Request {
             serde_json::from_value(self.content.clone()).ok()
@@ -87,6 +88,7 @@ impl ProtocolMessage {
     }
 
     /// Try to extract an LRP response from the message
+    #[must_use]
     pub fn as_lrp_response(&self) -> Option<LRPResponse> {
         if self.msg_type == MessageType::Response {
             serde_json::from_value(self.content.clone()).ok()
@@ -96,6 +98,7 @@ impl ProtocolMessage {
     }
 
     /// Try to extract an LDP request from the message
+    #[must_use]
     pub fn as_ldp_request(&self) -> Option<LDPRequest> {
         if self.msg_type == MessageType::Request {
             serde_json::from_value(self.content.clone()).ok()
@@ -105,6 +108,7 @@ impl ProtocolMessage {
     }
 
     /// Try to extract an LDP response from the message
+    #[must_use]
     pub fn as_ldp_response(&self) -> Option<LDPResponse> {
         if self.msg_type == MessageType::Response {
             serde_json::from_value(self.content.clone()).ok()

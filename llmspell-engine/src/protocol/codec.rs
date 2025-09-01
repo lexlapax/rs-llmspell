@@ -6,7 +6,7 @@ use bytes::BytesMut;
 use std::io;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
-use crate::message::ProtocolMessage;
+use crate::protocol::message::ProtocolMessage;
 
 /// Codec for LRP/LDP protocol messages
 ///
@@ -18,6 +18,7 @@ pub struct LRPCodec {
 
 impl LRPCodec {
     /// Create a new LRP codec with default settings
+    #[must_use]
     pub fn new() -> Self {
         Self {
             inner: LengthDelimitedCodec::builder()
@@ -69,7 +70,7 @@ impl Encoder<ProtocolMessage> for LRPCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::message::{MessageType, ProtocolMessage};
+    use crate::protocol::message::{MessageType, ProtocolMessage};
 
     #[test]
     fn test_codec_round_trip() {

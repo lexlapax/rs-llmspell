@@ -23,7 +23,7 @@ struct Args {
     ip: String,
 
     /// Starting port for channel allocation
-    #[arg(long, default_value = "5555")]
+    #[arg(long, default_value = "9555")]
     port: u16,
 
     /// Script engine to use (lua, javascript)

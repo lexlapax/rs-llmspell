@@ -9,9 +9,9 @@ use thiserror::Error;
 use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
 use tracing::{debug, error, warn};
 
-use crate::message::{MessageType, ProtocolMessage};
+use crate::protocol::message::{MessageType, ProtocolMessage};
+use crate::protocol::{LDPRequest, LDPResponse, LRPRequest, LRPResponse};
 use crate::transport::{Transport, TransportError};
-use crate::types::{LDPRequest, LDPResponse, LRPRequest, LRPResponse};
 
 /// Client-side protocol errors
 #[derive(Error, Debug)]
@@ -52,6 +52,7 @@ pub struct ProtocolClient {
 
 impl ProtocolClient {
     /// Create a new protocol client with the given transport
+    #[must_use]
     pub fn new(transport: Box<dyn Transport>) -> Self {
         let transport = Arc::new(Mutex::new(transport));
         let pending = Arc::new(RwLock::new(HashMap::new()));
@@ -87,6 +88,10 @@ impl ProtocolClient {
     }
 
     /// Connect to a server at the given address
+    ///
+    /// # Errors
+    ///
+    /// Returns `ClientError::Transport` if connection fails
     pub async fn connect(addr: &str) -> Result<Self, ClientError> {
         use crate::transport::tcp::TcpTransport;
 
@@ -95,6 +100,12 @@ impl ProtocolClient {
     }
 
     /// Send an LRP request and wait for response
+    ///
+    /// # Errors
+    ///
+    /// Returns `ClientError::InvalidResponse` if response type doesn't match
+    /// Returns `ClientError::Timeout` if request times out
+    /// Returns `ClientError::Transport` if sending fails
     pub async fn send_lrp_request(&self, request: LRPRequest) -> Result<LRPResponse, ClientError> {
         let msg_id = self.next_msg_id.fetch_add(1, Ordering::SeqCst).to_string();
         let msg = ProtocolMessage::request(&msg_id, request);
@@ -107,6 +118,12 @@ impl ProtocolClient {
     }
 
     /// Send an LDP request and wait for response
+    ///
+    /// # Errors
+    ///
+    /// Returns `ClientError::InvalidResponse` if response type doesn't match
+    /// Returns `ClientError::Timeout` if request times out
+    /// Returns `ClientError::Transport` if sending fails
     pub async fn send_ldp_request(&self, request: LDPRequest) -> Result<LDPResponse, ClientError> {
         let msg_id = self.next_msg_id.fetch_add(1, Ordering::SeqCst).to_string();
         let msg = ProtocolMessage::request(&msg_id, request);
@@ -132,10 +149,7 @@ impl ProtocolClient {
         }
 
         // Send request
-        {
-            let mut transport = self.transport.lock().await;
-            transport.send(msg).await?;
-        }
+        self.transport.lock().await.send(msg).await?;
 
         // Wait for response with timeout
         match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
@@ -195,8 +209,7 @@ impl ProtocolClient {
         }
 
         // Close transport
-        let mut transport = self.transport.lock().await;
-        let _ = transport.close().await;
+        let _ = self.transport.lock().await.close().await;
     }
 }
 
