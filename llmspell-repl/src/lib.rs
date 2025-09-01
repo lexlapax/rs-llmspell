@@ -4,7 +4,6 @@
 //! enabling interactive REPL sessions, debugging capabilities, and multi-client support
 //! for the `LLMSpell` scripting platform.
 
-pub mod channels; // Five communication channels (Shell, `IOPub`, Stdin, Control, Heartbeat)
 pub mod client; // Client connection handling
 pub mod connection; // Connection management
 pub mod discovery; // Connection file discovery

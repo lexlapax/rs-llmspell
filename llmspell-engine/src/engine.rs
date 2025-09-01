@@ -3,35 +3,35 @@
 //! Provides a unified engine for handling multiple protocols through adapters,
 //! enabling protocol bridging and intelligent message routing.
 
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::{HashMap, HashSet};
+use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
 
-use crate::transport::{Transport, TransportError};
 use crate::protocol::message::ProtocolMessage;
+use crate::transport::{Transport, TransportError};
 
 /// Protocol engine errors
 #[derive(Error, Debug)]
 pub enum EngineError {
     #[error("Transport error: {0}")]
     Transport(#[from] TransportError),
-    
+
     #[error("Adapter error: {0}")]
     Adapter(String),
-    
+
     #[error("Routing error: {0}")]
     Routing(String),
-    
+
     #[error("Channel not found: {0}")]
     ChannelNotFound(String),
-    
+
     #[error("Protocol not supported: {0:?}")]
     ProtocolNotSupported(ProtocolType),
-    
+
     #[error("Message conversion error: {0}")]
     Conversion(String),
 }
@@ -39,9 +39,9 @@ pub enum EngineError {
 /// Supported protocol types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ProtocolType {
-    /// LLMSpell REPL Protocol
+    /// `LLMSpell` REPL Protocol
     LRP,
-    /// LLMSpell Debug Protocol
+    /// `LLMSpell` Debug Protocol
     LDP,
     /// Model Context Protocol (future)
     MCP,
@@ -58,7 +58,7 @@ pub enum ProtocolType {
 pub enum ChannelType {
     /// Shell channel for request/reply
     Shell,
-    /// IOPub channel for broadcast messages
+    /// `IOPub` channel for broadcast messages
     IOPub,
     /// Stdin channel for input requests
     Stdin,
@@ -105,24 +105,16 @@ pub struct UniversalMessage {
 #[serde(tag = "type")]
 pub enum MessageContent {
     /// Request message
-    Request { 
-        method: String,
-        params: Value,
-    },
+    Request { method: String, params: Value },
     /// Response message
     Response {
         result: Option<Value>,
         error: Option<Value>,
     },
     /// Notification message
-    Notification {
-        event: String,
-        data: Value,
-    },
+    Notification { event: String, data: Value },
     /// Raw data message
-    Raw {
-        data: Vec<u8>,
-    },
+    Raw { data: Vec<u8> },
 }
 
 /// Protocol adapter trait for pluggable protocols
@@ -130,13 +122,21 @@ pub enum MessageContent {
 pub trait ProtocolAdapter: Send + Sync {
     /// Get the protocol type this adapter handles
     fn protocol_type(&self) -> ProtocolType;
-    
+
     /// Convert inbound raw message to universal format
+    ///
+    /// # Errors
+    ///
+    /// Returns `EngineError` if the message cannot be parsed or converted
     fn adapt_inbound(&self, raw: &[u8]) -> Result<UniversalMessage, EngineError>;
-    
+
     /// Convert universal message to outbound raw format
+    ///
+    /// # Errors
+    ///
+    /// Returns `EngineError` if the message cannot be serialized
     fn adapt_outbound(&self, msg: &UniversalMessage) -> Result<Vec<u8>, EngineError>;
-    
+
     /// Get capabilities supported by this protocol
     fn capabilities(&self) -> HashSet<Capability>;
 }
@@ -170,8 +170,15 @@ pub struct RouteTable {
     active_handlers: HashSet<String>,
 }
 
+impl Default for MessageRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MessageRouter {
     /// Create a new message router
+    #[must_use]
     pub fn new() -> Self {
         let mut strategies = HashMap::new();
         strategies.insert(ChannelType::Shell, RoutingStrategy::Direct);
@@ -179,7 +186,7 @@ impl MessageRouter {
         strategies.insert(ChannelType::Stdin, RoutingStrategy::Direct);
         strategies.insert(ChannelType::Control, RoutingStrategy::Direct);
         strategies.insert(ChannelType::Heartbeat, RoutingStrategy::Direct);
-        
+
         Self {
             routes: Arc::new(RwLock::new(RouteTable {
                 handlers: HashMap::new(),
@@ -188,20 +195,30 @@ impl MessageRouter {
             strategies,
         }
     }
-    
+
     /// Route a message to appropriate handlers
+    ///
+    /// # Errors
+    ///
+    /// Returns `EngineError::Routing` if no handlers are registered for the protocol/channel
     pub async fn route(&self, msg: &UniversalMessage) -> Result<Vec<String>, EngineError> {
-        let routes = self.routes.read().await;
         let key = (msg.protocol, msg.channel);
-        
-        let handlers = routes.handlers.get(&key)
-            .ok_or_else(|| EngineError::Routing(format!("No handlers for {:?}", key)))?;
-        
-        let strategy = self.strategies.get(&msg.channel)
+
+        let routes = self.routes.read().await;
+        let handlers = routes
+            .handlers
+            .get(&key)
+            .ok_or_else(|| EngineError::Routing(format!("No handlers for {key:?}")))?
+            .clone();
+        drop(routes);
+
+        let strategy = self
+            .strategies
+            .get(&msg.channel)
             .unwrap_or(&RoutingStrategy::Direct);
-        
+
         match strategy {
-            RoutingStrategy::Broadcast => Ok(handlers.clone()),
+            RoutingStrategy::Broadcast => Ok(handlers),
             RoutingStrategy::Direct => Ok(vec![handlers[0].clone()]),
             RoutingStrategy::RoundRobin => {
                 // TODO: Implement round-robin selection
@@ -213,8 +230,12 @@ impl MessageRouter {
             }
         }
     }
-    
+
     /// Register a handler for a protocol/channel combination
+    ///
+    /// # Errors
+    ///
+    /// Currently always succeeds, but returns Result for future error cases
     pub async fn register_handler(
         &self,
         protocol: ProtocolType,
@@ -223,13 +244,16 @@ impl MessageRouter {
     ) -> Result<(), EngineError> {
         let mut routes = self.routes.write().await;
         let key = (protocol, channel);
-        
-        routes.handlers.entry(key)
+
+        routes
+            .handlers
+            .entry(key)
             .or_insert_with(Vec::new)
             .push(handler_id.clone());
-        
+
         routes.active_handlers.insert(handler_id);
-        
+        drop(routes);
+
         Ok(())
     }
 }
@@ -245,13 +269,21 @@ impl<'a> ChannelView<'a> {
     pub fn new(engine: &'a dyn ProtocolEngine, channel: ChannelType) -> Self {
         Self { engine, channel }
     }
-    
+
     /// Send a message on this channel
+    ///
+    /// # Errors
+    ///
+    /// Returns `EngineError` if the protocol engine fails to send
     pub async fn send(&self, msg: UniversalMessage) -> Result<(), EngineError> {
         self.engine.send(self.channel, msg).await
     }
-    
+
     /// Receive a message from this channel
+    ///
+    /// # Errors
+    ///
+    /// Returns `EngineError` if the protocol engine fails to receive
     pub async fn recv(&self) -> Result<UniversalMessage, EngineError> {
         self.engine.recv(self.channel).await
     }
@@ -266,13 +298,13 @@ pub trait ProtocolEngine: Send + Sync {
         protocol: ProtocolType,
         adapter: Box<dyn ProtocolAdapter>,
     ) -> Result<(), EngineError>;
-    
+
     /// Send a message on a specific channel
     async fn send(&self, channel: ChannelType, msg: UniversalMessage) -> Result<(), EngineError>;
-    
+
     /// Receive a message from a specific channel
     async fn recv(&self, channel: ChannelType) -> Result<UniversalMessage, EngineError>;
-    
+
     /// Get a channel view for lightweight access
     fn channel_view(&self, channel: ChannelType) -> ChannelView<'_>;
 }
@@ -282,26 +314,34 @@ pub struct HandlerRegistry {
     handlers: HashMap<String, Box<dyn MessageHandler>>,
 }
 
+impl Default for HandlerRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl HandlerRegistry {
     /// Create a new handler registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             handlers: HashMap::new(),
         }
     }
-    
+
     /// Register a message handler
     pub fn register(&mut self, id: String, handler: Box<dyn MessageHandler>) {
         self.handlers.insert(id, handler);
     }
-    
+
     /// Get a handler by ID
+    #[must_use]
     pub fn get(&self, id: &str) -> Option<&dyn MessageHandler> {
-        self.handlers.get(id).map(|h| h.as_ref())
+        self.handlers.get(id).map(std::convert::AsRef::as_ref)
     }
 }
 
-/// Message handler trait (imported from protocol::message)
+/// Message handler trait (imported from `protocol::message`)
 pub use crate::protocol::message::MessageHandler;
 
 /// Unified protocol engine implementation
@@ -311,6 +351,7 @@ pub struct UnifiedProtocolEngine {
     /// Protocol adapters
     adapters: HashMap<ProtocolType, Box<dyn ProtocolAdapter>>,
     /// Message router
+    #[allow(dead_code)] // Will be used in future routing implementation
     router: Arc<MessageRouter>,
     /// Handler registry
     handlers: Arc<RwLock<HandlerRegistry>>,
@@ -318,6 +359,7 @@ pub struct UnifiedProtocolEngine {
 
 impl UnifiedProtocolEngine {
     /// Create a new unified protocol engine
+    #[must_use]
     pub fn new(transport: Box<dyn Transport>) -> Self {
         Self {
             transport: Arc::new(RwLock::new(transport)),
@@ -326,7 +368,7 @@ impl UnifiedProtocolEngine {
             handlers: Arc::new(RwLock::new(HandlerRegistry::new())),
         }
     }
-    
+
     /// Register a message handler
     pub async fn register_handler(&self, id: String, handler: Box<dyn MessageHandler>) {
         let mut handlers = self.handlers.write().await;
@@ -344,15 +386,17 @@ impl ProtocolEngine for UnifiedProtocolEngine {
         self.adapters.insert(protocol, adapter);
         Ok(())
     }
-    
+
     async fn send(&self, channel: ChannelType, msg: UniversalMessage) -> Result<(), EngineError> {
         // Get the appropriate adapter
-        let adapter = self.adapters.get(&msg.protocol)
+        let adapter = self
+            .adapters
+            .get(&msg.protocol)
             .ok_or(EngineError::ProtocolNotSupported(msg.protocol))?;
-        
+
         // Convert to raw format
         let _raw = adapter.adapt_outbound(&msg)?;
-        
+
         // Create a ProtocolMessage for transport
         let protocol_msg = ProtocolMessage {
             msg_id: msg.id.clone(),
@@ -361,22 +405,24 @@ impl ProtocolEngine for UnifiedProtocolEngine {
             content: serde_json::to_value(&msg.content)
                 .map_err(|e| EngineError::Conversion(e.to_string()))?,
         };
-        
+
         // Send via transport
         let mut transport = self.transport.write().await;
         transport.send(protocol_msg).await?;
-        
+        drop(transport);
+
         Ok(())
     }
-    
+
     async fn recv(&self, channel: ChannelType) -> Result<UniversalMessage, EngineError> {
         // Receive from transport
         let mut transport = self.transport.write().await;
         let protocol_msg = transport.recv().await?;
-        
+        drop(transport);
+
         // For now, assume LRP protocol (will be determined by message inspection later)
         let protocol = ProtocolType::LRP;
-        
+
         // Convert to universal message
         let msg = UniversalMessage {
             id: protocol_msg.msg_id,
@@ -388,49 +434,52 @@ impl ProtocolEngine for UnifiedProtocolEngine {
             },
             metadata: HashMap::new(),
         };
-        
+
         Ok(msg)
     }
-    
+
     fn channel_view(&self, channel: ChannelType) -> ChannelView<'_> {
         ChannelView::new(self, channel)
     }
 }
 
-impl ChannelType {
-    /// Convert to string representation
-    fn to_string(&self) -> String {
-        match self {
-            ChannelType::Shell => "shell".to_string(),
-            ChannelType::IOPub => "iopub".to_string(),
-            ChannelType::Stdin => "stdin".to_string(),
-            ChannelType::Control => "control".to_string(),
-            ChannelType::Heartbeat => "heartbeat".to_string(),
-        }
+impl std::fmt::Display for ChannelType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let s = match self {
+            Self::Shell => "shell",
+            Self::IOPub => "iopub",
+            Self::Stdin => "stdin",
+            Self::Control => "control",
+            Self::Heartbeat => "heartbeat",
+        };
+        write!(f, "{s}")
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
-    fn test_channel_type_conversion() {
+    fn test_channel_type_display() {
         assert_eq!(ChannelType::Shell.to_string(), "shell");
         assert_eq!(ChannelType::IOPub.to_string(), "iopub");
     }
-    
+
     #[tokio::test]
     async fn test_message_router() {
         let router = MessageRouter::new();
-        
+
         // Register a handler
-        router.register_handler(
-            ProtocolType::LRP,
-            ChannelType::Shell,
-            "test_handler".to_string(),
-        ).await.unwrap();
-        
+        router
+            .register_handler(
+                ProtocolType::LRP,
+                ChannelType::Shell,
+                "test_handler".to_string(),
+            )
+            .await
+            .unwrap();
+
         // Create a test message
         let msg = UniversalMessage {
             id: "test_msg".to_string(),
@@ -442,7 +491,7 @@ mod tests {
             },
             metadata: HashMap::new(),
         };
-        
+
         // Route the message
         let handlers = router.route(&msg).await.unwrap();
         assert_eq!(handlers.len(), 1);

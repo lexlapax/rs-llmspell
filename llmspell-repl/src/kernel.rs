@@ -10,7 +10,6 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
-use crate::channels::{IOPubMessage, KernelChannels};
 use crate::client::{ClientManager, ConnectedClient};
 use crate::connection::ConnectionInfo;
 use crate::protocol::LRPResponse;
@@ -100,8 +99,8 @@ pub struct LLMSpellKernel {
     /// Client manager
     pub client_manager: Arc<ClientManager>,
 
-    /// Communication channels
-    pub channels: Arc<KernelChannels>,
+    /// Protocol server (implements `ProtocolEngine`)
+    pub protocol_server: Option<Arc<llmspell_engine::ProtocolServer>>,
 
     /// Current execution state
     pub execution_state: Arc<RwLock<KernelState>>,
@@ -158,9 +157,8 @@ impl LLMSpellKernel {
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
 
-        // Initialize channels - DISABLED: Using ProtocolServer for TCP communication now
-        // The ProtocolServer will bind to these ports instead
-        let channels = Arc::new(KernelChannels::new_dummy().await?);
+        // Protocol server will be initialized in run() method
+        // We store it as Option to set it up after kernel creation
 
         // Create connection info
         let connection_info = ConnectionInfo::new(
@@ -189,7 +187,7 @@ impl LLMSpellKernel {
             kernel_id: kernel_id.clone(),
             runtime: Arc::new(Mutex::new(runtime)),
             client_manager,
-            channels,
+            protocol_server: None,
             execution_state: Arc::new(RwLock::new(KernelState::Starting)),
             config: config.clone(),
             connection_info,
@@ -216,7 +214,7 @@ impl LLMSpellKernel {
         tracing::info!("Kernel {} entering main event loop", self.kernel_id);
 
         // Start channel listeners
-        self.channels.start_listeners()?;
+        // Channels are now handled by ProtocolServer
 
         // Create a new shutdown channel (the old one is dropped with self)
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
@@ -239,6 +237,7 @@ impl LLMSpellKernel {
             max_clients: kernel_arc.config.max_clients,
         };
 
+        // Create the protocol server
         let mut protocol_server = llmspell_engine::ProtocolServer::new(server_config, handler);
 
         // Create a ctrl-c handler
@@ -304,7 +303,7 @@ impl LLMSpellKernel {
         }
 
         // Stop channels
-        self.channels.stop()?;
+        // Channels stopped when ProtocolServer shuts down
 
         // Remove connection file
         self.connection_info.remove_connection_file().await?;
@@ -333,9 +332,10 @@ impl LLMSpellKernel {
         self.client_manager.add_client(client.clone()).await?;
 
         // Broadcast client connection to IOPub
-        self.channels.iopub.publish(IOPubMessage::Status {
-            execution_state: "idle".to_string(),
-        })?;
+        // TODO: Use ChannelSet
+        // self.channels.iopub.publish(IOPubMessage::Status {
+        //     execution_state: "idle".to_string(),
+        // })?;
 
         tracing::info!(
             "Client {} connected to kernel {}",
@@ -384,9 +384,10 @@ impl LLMSpellKernel {
 
         // Broadcast busy status
         if !silent {
-            self.channels.iopub.publish(IOPubMessage::Status {
-                execution_state: "busy".to_string(),
-            })?;
+            // TODO: Use ChannelSet
+            // self.channels.iopub.publish(IOPubMessage::Status {
+            //     execution_state: "busy".to_string(),
+            // })?;
         }
 
         // Execute code with timeout
@@ -399,15 +400,16 @@ impl LLMSpellKernel {
 
         // Handle result
         let response = match result {
-            Ok(Ok(output)) => {
+            Ok(Ok(_output)) => {
                 // Broadcast output if not silent
                 if !silent {
-                    self.channels.iopub.publish(IOPubMessage::ExecuteResult {
-                        execution_count,
-                        data: serde_json::json!({
-                            "text/plain": format!("{:?}", output.output)
-                        }),
-                    })?;
+                    // TODO: Use ChannelSet
+                    // self.channels.iopub.publish(IOPubMessage::ExecuteResult {
+                    //     execution_count,
+                    //     data: serde_json::json!({
+                    //         "text/plain": format!("{:?}", output.output)
+                    //     }),
+                    // })?;
                 }
 
                 LRPResponse::ExecuteReply {
@@ -417,14 +419,15 @@ impl LLMSpellKernel {
                     payload: None,
                 }
             }
-            Ok(Err(e)) => {
+            Ok(Err(_e)) => {
                 // Execution error
                 if !silent {
-                    self.channels.iopub.publish(IOPubMessage::Error {
-                        ename: "ExecutionError".to_string(),
-                        evalue: e.to_string(),
-                        traceback: vec![e.to_string()],
-                    })?;
+                    // TODO: Use ChannelSet
+                    // self.channels.iopub.publish(IOPubMessage::Error {
+                    //     ename: "ExecutionError".to_string(),
+                    //     evalue: e.to_string(),
+                    //     traceback: vec![e.to_string()],
+                    // })?;
                 }
 
                 LRPResponse::ExecuteReply {
@@ -437,14 +440,15 @@ impl LLMSpellKernel {
             Err(_) => {
                 // Timeout
                 if !silent {
-                    self.channels.iopub.publish(IOPubMessage::Error {
-                        ename: "TimeoutError".to_string(),
-                        evalue: format!(
-                            "Execution exceeded {} seconds",
-                            self.resource_limits.max_execution_time
-                        ),
-                        traceback: vec![],
-                    })?;
+                    // TODO: Use ChannelSet
+                    // self.channels.iopub.publish(IOPubMessage::Error {
+                    //     ename: "TimeoutError".to_string(),
+                    //     evalue: format!(
+                    //         "Execution exceeded {} seconds",
+                    //         self.resource_limits.max_execution_time
+                    //     ),
+                    //     traceback: vec![],
+                    // })?;
                 }
 
                 LRPResponse::ExecuteReply {
@@ -461,9 +465,10 @@ impl LLMSpellKernel {
 
         // Broadcast idle status
         if !silent {
-            self.channels.iopub.publish(IOPubMessage::Status {
-                execution_state: "idle".to_string(),
-            })?;
+            // TODO: Use ChannelSet
+            // self.channels.iopub.publish(IOPubMessage::Status {
+            //     execution_state: "idle".to_string(),
+            // })?;
         }
 
         Ok(response)

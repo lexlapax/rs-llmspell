@@ -2,14 +2,19 @@
 //!
 //! Accepts connections and routes messages to handlers
 
+use async_trait::async_trait;
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::net::{TcpListener, TcpStream};
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{broadcast, mpsc, RwLock};
 use tracing::{debug, error, info, warn};
 
+use crate::engine::{
+    ChannelType, ChannelView, EngineError, ProtocolAdapter, ProtocolEngine, ProtocolType,
+    UniversalMessage,
+};
 use crate::protocol::message::{MessageHandler, ProtocolMessage};
 use crate::transport::tcp::TcpTransport;
 use crate::transport::{Transport, TransportError};
@@ -93,6 +98,13 @@ pub struct ProtocolServer {
 
     /// Shutdown signal
     shutdown_tx: Option<broadcast::Sender<()>>,
+
+    /// Channel message queues for `ProtocolEngine` implementation
+    channel_senders: Arc<RwLock<HashMap<ChannelType, mpsc::Sender<UniversalMessage>>>>,
+    channel_receivers: Arc<RwLock<HashMap<ChannelType, mpsc::Receiver<UniversalMessage>>>>,
+
+    /// Protocol adapters
+    adapters: Arc<RwLock<HashMap<ProtocolType, Box<dyn ProtocolAdapter>>>>,
 }
 
 impl ProtocolServer {
@@ -101,12 +113,31 @@ impl ProtocolServer {
         let (iopub_tx, _) = broadcast::channel(1024);
         let (shutdown_tx, _) = broadcast::channel(1);
 
+        // Create channel queues for each channel type
+        let mut channel_senders = HashMap::new();
+        let mut channel_receivers = HashMap::new();
+
+        for channel_type in &[
+            ChannelType::Shell,
+            ChannelType::IOPub,
+            ChannelType::Stdin,
+            ChannelType::Control,
+            ChannelType::Heartbeat,
+        ] {
+            let (tx, rx) = mpsc::channel(100);
+            channel_senders.insert(*channel_type, tx);
+            channel_receivers.insert(*channel_type, rx);
+        }
+
         Self {
             config,
             handler,
             clients: Arc::new(RwLock::new(HashMap::new())),
             iopub_tx,
             shutdown_tx: Some(shutdown_tx),
+            channel_senders: Arc::new(RwLock::new(channel_senders)),
+            channel_receivers: Arc::new(RwLock::new(channel_receivers)),
+            adapters: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -329,5 +360,71 @@ impl ProtocolServer {
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
         }
+    }
+}
+
+/// Implement `ProtocolEngine` trait for `ProtocolServer`
+/// This allows using `ChannelSet` with the existing server infrastructure
+#[async_trait]
+impl ProtocolEngine for ProtocolServer {
+    async fn register_adapter(
+        &mut self,
+        protocol: ProtocolType,
+        adapter: Box<dyn ProtocolAdapter>,
+    ) -> Result<(), EngineError> {
+        self.adapters.write().await.insert(protocol, adapter);
+        Ok(())
+    }
+
+    async fn send(&self, channel: ChannelType, msg: UniversalMessage) -> Result<(), EngineError> {
+        // Special handling for IOPub channel - broadcast
+        if channel == ChannelType::IOPub {
+            // Convert UniversalMessage to ProtocolMessage for IOPub
+            let protocol_msg = ProtocolMessage {
+                msg_id: msg.id.clone(),
+                msg_type: crate::protocol::message::MessageType::Request,
+                channel: format!("{channel:?}").to_lowercase(),
+                content: serde_json::to_value(&msg.content)
+                    .map_err(|e| EngineError::Conversion(e.to_string()))?,
+            };
+
+            // Broadcast to IOPub subscribers (ignore if no subscribers)
+            let _ = self.iopub_tx.send(protocol_msg);
+        }
+
+        // Queue the message for all channels (including IOPub for local delivery)
+        let senders = self.channel_senders.read().await;
+        if let Some(sender) = senders.get(&channel) {
+            sender
+                .send(msg)
+                .await
+                .map_err(|_| EngineError::ChannelNotFound(format!("Channel {channel:?} closed")))?;
+        } else {
+            return Err(EngineError::ChannelNotFound(format!(
+                "Channel {channel:?} not found"
+            )));
+        }
+        drop(senders);
+
+        Ok(())
+    }
+
+    async fn recv(&self, channel: ChannelType) -> Result<UniversalMessage, EngineError> {
+        // Receive from the channel queue
+        let mut receivers = self.channel_receivers.write().await;
+        if let Some(receiver) = receivers.get_mut(&channel) {
+            receiver
+                .recv()
+                .await
+                .ok_or_else(|| EngineError::ChannelNotFound(format!("Channel {channel:?} closed")))
+        } else {
+            Err(EngineError::ChannelNotFound(format!(
+                "Channel {channel:?} not found"
+            )))
+        }
+    }
+
+    fn channel_view(&self, channel: ChannelType) -> ChannelView<'_> {
+        ChannelView::new(self, channel)
     }
 }

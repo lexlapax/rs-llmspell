@@ -13,7 +13,7 @@ use llmspell_bridge::{
     variable_inspector::VariableInspector,
 };
 use llmspell_debug::session_manager::DebugSessionManager;
-use llmspell_repl::channels::IOPubMessage;
+use llmspell_engine::channels::IOPubMessage;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};

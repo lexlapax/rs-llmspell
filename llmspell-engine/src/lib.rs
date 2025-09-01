@@ -68,6 +68,7 @@
 //! ```
 
 pub mod adapters;
+pub mod channels;
 pub mod client;
 pub mod engine;
 pub mod protocol;
@@ -76,6 +77,10 @@ pub mod transport;
 
 // Re-export core types at crate root for convenience
 pub use adapters::{LDPAdapter, LRPAdapter};
+pub use channels::{
+    ChannelMessage, ChannelPorts, ChannelSet, ControlView, HeartbeatView, IOPubMessage, IOPubView,
+    MessageAdapter, ShellView, StdinView,
+};
 pub use client::{ClientError, ProtocolClient};
 pub use engine::{
     Capability, ChannelType, ChannelView, EngineError, MessageContent, MessageRouter,
