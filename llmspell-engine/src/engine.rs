@@ -309,40 +309,7 @@ pub trait ProtocolEngine: Send + Sync {
     fn channel_view(&self, channel: ChannelType) -> ChannelView<'_>;
 }
 
-/// Handler registry for protocol handlers
-pub struct HandlerRegistry {
-    handlers: HashMap<String, Box<dyn MessageHandler>>,
-}
-
-impl Default for HandlerRegistry {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl HandlerRegistry {
-    /// Create a new handler registry
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            handlers: HashMap::new(),
-        }
-    }
-
-    /// Register a message handler
-    pub fn register(&mut self, id: String, handler: Box<dyn MessageHandler>) {
-        self.handlers.insert(id, handler);
-    }
-
-    /// Get a handler by ID
-    #[must_use]
-    pub fn get(&self, id: &str) -> Option<&dyn MessageHandler> {
-        self.handlers.get(id).map(std::convert::AsRef::as_ref)
-    }
-}
-
-/// Message handler trait (imported from `protocol::message`)
-pub use crate::protocol::message::MessageHandler;
+// HandlerRegistry removed - use MessageProcessor pattern instead
 
 /// Unified protocol engine implementation
 pub struct UnifiedProtocolEngine {
@@ -353,8 +320,6 @@ pub struct UnifiedProtocolEngine {
     /// Message router
     #[allow(dead_code)] // Will be used in future routing implementation
     router: Arc<MessageRouter>,
-    /// Handler registry (deprecated - use processor instead)
-    handlers: Arc<RwLock<HandlerRegistry>>,
     /// Message processor for handling protocol messages
     processor: Option<Arc<dyn crate::processor::MessageProcessor>>,
 }
@@ -367,7 +332,6 @@ impl UnifiedProtocolEngine {
             transport: Arc::new(RwLock::new(transport)),
             adapters: Arc::new(RwLock::new(HashMap::new())),
             router: Arc::new(MessageRouter::new()),
-            handlers: Arc::new(RwLock::new(HandlerRegistry::new())),
             processor: None,
         }
     }
@@ -382,16 +346,11 @@ impl UnifiedProtocolEngine {
             transport: Arc::new(RwLock::new(transport)),
             adapters: Arc::new(RwLock::new(HashMap::new())),
             router: Arc::new(MessageRouter::new()),
-            handlers: Arc::new(RwLock::new(HandlerRegistry::new())),
             processor: Some(processor),
         }
     }
 
-    /// Register a message handler (deprecated - use processor instead)
-    pub async fn register_handler(&self, id: String, handler: Box<dyn MessageHandler>) {
-        let mut handlers = self.handlers.write().await;
-        handlers.register(id, handler);
-    }
+    // register_handler removed - use MessageProcessor pattern instead
 
     /// Serve TCP connections on the specified address
     /// This replaces `ProtocolServer`'s `start()` method
@@ -458,27 +417,89 @@ impl UnifiedProtocolEngine {
         addr: std::net::SocketAddr,
         channel: ChannelType,
     ) {
+        use crate::protocol::message::ProtocolMessage;
         use crate::transport::tcp::TcpTransport;
-        use tracing::debug;
+        use tracing::{debug, error, warn};
 
-        let _transport = Box::new(TcpTransport::new(stream));
-
-        // Spawn a task to handle this connection
-        let _processor = self.processor.clone();
+        let mut transport = Box::new(TcpTransport::new(stream));
+        let processor = self.processor.clone();
         let _adapters = self.adapters.clone();
 
         tokio::spawn(async move {
             debug!("Handling {} connection from {}", channel, addr);
 
-            // In a real implementation, we would:
-            // 1. Read messages from the transport
-            // 2. Determine the protocol type
-            // 3. Use the appropriate adapter to convert to UniversalMessage
-            // 4. Process the message using the processor
-            // 5. Send the response back
+            // Message processing loop
+            loop {
+                // 1. Read message from transport
+                let request = match transport.recv().await {
+                    Ok(msg) => msg,
+                    Err(crate::TransportError::ConnectionClosed) => {
+                        debug!("Connection closed from {}", addr);
+                        break;
+                    }
+                    Err(e) => {
+                        error!("Error receiving from {}: {}", addr, e);
+                        break;
+                    }
+                };
 
-            // For now, just log
-            debug!("Connection handler spawned for {}", addr);
+                debug!(
+                    "Received request from {}: msg_id={}, msg_type={:?}, channel={}",
+                    addr, request.msg_id, request.msg_type, request.channel
+                );
+                debug!("Request content: {:?}", request.content);
+
+                // 2. Process the message and get response
+                let response = if let Some(proc) = &processor {
+                    // Try to process as LRP first
+                    if let Some(lrp_request) = request.as_lrp_request() {
+                        debug!("Processing as LRP request: {:?}", lrp_request);
+                        match proc.process_lrp(lrp_request).await {
+                            Ok(lrp_response) => {
+                                ProtocolMessage::response(request.msg_id.clone(), lrp_response)
+                            }
+                            Err(e) => {
+                                warn!("LRP processing error: {}", e);
+                                ProtocolMessage::error(request.msg_id.clone(), e)
+                            }
+                        }
+                    }
+                    // Try to process as LDP
+                    else if let Some(ldp_request) = request.as_ldp_request() {
+                        debug!("Processing as LDP request: {:?}", ldp_request);
+                        match proc.process_ldp(ldp_request).await {
+                            Ok(ldp_response) => {
+                                ProtocolMessage::response(request.msg_id.clone(), ldp_response)
+                            }
+                            Err(e) => {
+                                warn!("LDP processing error: {}", e);
+                                ProtocolMessage::error(request.msg_id.clone(), e)
+                            }
+                        }
+                    }
+                    // Unknown protocol
+                    else {
+                        warn!("Unable to determine protocol type for message");
+                        ProtocolMessage::error(request.msg_id.clone(), "Unknown protocol type")
+                    }
+                } else {
+                    // No processor configured, return error
+                    error!("No message processor configured");
+                    ProtocolMessage::error(
+                        request.msg_id.clone(),
+                        "No message processor configured",
+                    )
+                };
+
+                // 3. Send response back
+                debug!("Sending response: msg_id={}", response.msg_id);
+                if let Err(e) = transport.send(response).await {
+                    error!("Error sending response to {}: {}", addr, e);
+                    break;
+                }
+            }
+
+            debug!("Connection handler for {} terminated", addr);
         });
     }
 }

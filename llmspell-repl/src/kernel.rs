@@ -281,7 +281,7 @@ impl LLMSpellKernel {
             stdin_port: kernel_arc.connection_info.stdin_port,
             control_port: kernel_arc.connection_info.control_port,
             heartbeat_port: kernel_arc.connection_info.hb_port,
-            max_clients: kernel_arc.config.max_clients,
+            max_connections: kernel_arc.config.max_clients,
         };
 
         // Create the unified protocol engine with the kernel as message processor
@@ -434,6 +434,72 @@ impl LLMSpellKernel {
         Ok(())
     }
 
+    /// Update execution state and return the new count
+    async fn prepare_execution(&self) -> u32 {
+        *self.execution_state.write().await = KernelState::Busy;
+        let mut count = self.execution_count.lock().await;
+        *count += 1;
+        *count
+    }
+
+    /// Execute script with timeout handling
+    async fn execute_with_timeout(
+        &self,
+        code: &str,
+    ) -> std::result::Result<
+        std::result::Result<
+            std::result::Result<llmspell_bridge::ScriptOutput, llmspell_core::LLMSpellError>,
+            tokio::task::JoinError,
+        >,
+        tokio::time::error::Elapsed,
+    > {
+        let timeout_duration =
+            tokio::time::Duration::from_secs(self.resource_limits.max_execution_time);
+        let runtime = self.runtime.clone();
+        let code_clone = code.to_string();
+
+        tracing::debug!("About to spawn_blocking for script execution");
+        tokio::time::timeout(
+            timeout_duration,
+            tokio::task::spawn_blocking(move || {
+                tracing::debug!("Inside spawn_blocking, about to execute script");
+                futures::executor::block_on(async {
+                    let runtime_guard = runtime.lock().await;
+                    runtime_guard.execute_script(&code_clone).await
+                })
+            }),
+        )
+        .await
+    }
+
+    /// Create execution response
+    fn create_execute_response(status: &str, execution_count: u32) -> LRPResponse {
+        LRPResponse::ExecuteReply {
+            status: status.to_string(),
+            execution_count,
+            user_expressions: None,
+            payload: None,
+        }
+    }
+
+    /// Handle execution success
+    fn handle_success(execution_count: u32, _silent: bool) -> LRPResponse {
+        // TODO: Broadcast output if not silent
+        Self::create_execute_response("ok", execution_count)
+    }
+
+    /// Handle execution error
+    fn handle_error(execution_count: u32, _silent: bool) -> LRPResponse {
+        // TODO: Broadcast error if not silent
+        Self::create_execute_response("error", execution_count)
+    }
+
+    /// Finish execution and update state
+    async fn finish_execution(&self, _silent: bool) {
+        *self.execution_state.write().await = KernelState::Idle;
+        // TODO: Broadcast idle status if not silent
+    }
+
     /// Execute code for a client with resource limits
     ///
     /// # Errors
@@ -445,104 +511,25 @@ impl LLMSpellKernel {
         code: String,
         silent: bool,
     ) -> Result<LRPResponse> {
-        // Update execution state
-        *self.execution_state.write().await = KernelState::Busy;
+        tracing::debug!("execute_code called with code: {}", code);
 
-        // Increment execution counter
-        let execution_count = {
-            let mut count = self.execution_count.lock().await;
-            *count += 1;
-            *count
-        };
+        // Prepare for execution
+        let execution_count = self.prepare_execution().await;
 
-        // Broadcast busy status
-        if !silent {
-            // TODO: Use ChannelSet
-            // self.channels.iopub.publish(IOPubMessage::Status {
-            //     execution_state: "busy".to_string(),
-            // })?;
-        }
+        // TODO: Broadcast busy status if not silent
 
         // Execute code with timeout
-        let timeout_duration =
-            tokio::time::Duration::from_secs(self.resource_limits.max_execution_time);
+        let result = self.execute_with_timeout(&code).await;
+        tracing::debug!("Script execution result: {:?}", result.is_ok());
 
-        let runtime = self.runtime.lock().await;
-        let result = tokio::time::timeout(timeout_duration, runtime.execute_script(&code)).await;
-        drop(runtime);
-
-        // Handle result
+        // Handle result based on execution outcome
         let response = match result {
-            Ok(Ok(_output)) => {
-                // Broadcast output if not silent
-                if !silent {
-                    // TODO: Use ChannelSet
-                    // self.channels.iopub.publish(IOPubMessage::ExecuteResult {
-                    //     execution_count,
-                    //     data: serde_json::json!({
-                    //         "text/plain": format!("{:?}", output.output)
-                    //     }),
-                    // })?;
-                }
-
-                LRPResponse::ExecuteReply {
-                    status: "ok".to_string(),
-                    execution_count,
-                    user_expressions: None,
-                    payload: None,
-                }
-            }
-            Ok(Err(_e)) => {
-                // Execution error
-                if !silent {
-                    // TODO: Use ChannelSet
-                    // self.channels.iopub.publish(IOPubMessage::Error {
-                    //     ename: "ExecutionError".to_string(),
-                    //     evalue: e.to_string(),
-                    //     traceback: vec![e.to_string()],
-                    // })?;
-                }
-
-                LRPResponse::ExecuteReply {
-                    status: "error".to_string(),
-                    execution_count,
-                    user_expressions: None,
-                    payload: None,
-                }
-            }
-            Err(_) => {
-                // Timeout
-                if !silent {
-                    // TODO: Use ChannelSet
-                    // self.channels.iopub.publish(IOPubMessage::Error {
-                    //     ename: "TimeoutError".to_string(),
-                    //     evalue: format!(
-                    //         "Execution exceeded {} seconds",
-                    //         self.resource_limits.max_execution_time
-                    //     ),
-                    //     traceback: vec![],
-                    // })?;
-                }
-
-                LRPResponse::ExecuteReply {
-                    status: "error".to_string(),
-                    execution_count,
-                    user_expressions: None,
-                    payload: None,
-                }
-            }
+            Ok(Ok(Ok(_))) => Self::handle_success(execution_count, silent),
+            Ok(Ok(Err(_)) | Err(_)) | Err(_) => Self::handle_error(execution_count, silent),
         };
 
-        // Update execution state back to idle
-        *self.execution_state.write().await = KernelState::Idle;
-
-        // Broadcast idle status
-        if !silent {
-            // TODO: Use ChannelSet
-            // self.channels.iopub.publish(IOPubMessage::Status {
-            //     execution_state: "idle".to_string(),
-            // })?;
-        }
+        // Finish execution
+        self.finish_execution(silent).await;
 
         Ok(response)
     }
@@ -604,6 +591,7 @@ impl llmspell_engine::MessageProcessor for LLMSpellKernel {
     ) -> Result<llmspell_engine::LRPResponse, llmspell_engine::ProcessorError> {
         use llmspell_engine::{LRPRequest, LRPResponse, ProcessorError};
 
+        tracing::info!("process_lrp called with request: {:?}", request);
         let response = match request {
             LRPRequest::KernelInfoRequest => self.get_kernel_info(),
 

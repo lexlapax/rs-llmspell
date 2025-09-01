@@ -62,6 +62,7 @@ impl ProtocolClient {
         let transport_clone = transport.clone();
         let pending_clone = pending.clone();
         let receiver_handle = tokio::spawn(async move {
+            debug!("Protocol client receiver task starting");
             loop {
                 tokio::select! {
                     _ = shutdown_rx.recv() => {
@@ -73,9 +74,11 @@ impl ProtocolClient {
                             error!("Error receiving message: {}", e);
                             break;
                         }
+                        debug!("Received and processed a message successfully");
                     }
                 }
             }
+            debug!("Protocol client receiver task exiting");
         });
 
         Self {
@@ -108,6 +111,7 @@ impl ProtocolClient {
     /// Returns `ClientError::Transport` if sending fails
     pub async fn send_lrp_request(&self, request: LRPRequest) -> Result<LRPResponse, ClientError> {
         let msg_id = self.next_msg_id.fetch_add(1, Ordering::SeqCst).to_string();
+        debug!("Sending LRP request with msg_id={}: {:?}", msg_id, request);
         let msg = ProtocolMessage::request(&msg_id, request);
 
         let response = self.send_and_wait(msg).await?;
@@ -135,36 +139,138 @@ impl ProtocolClient {
             .ok_or(ClientError::InvalidResponse)
     }
 
+    /// Register a pending request for response tracking
+    async fn register_pending(&self, msg_id: &str) -> oneshot::Receiver<ProtocolMessage> {
+        let (tx, rx) = oneshot::channel();
+        self.pending.write().await.insert(msg_id.to_string(), tx);
+        debug!("Registered pending request for msg_id={}", msg_id);
+        rx
+    }
+
+    /// Send a message through the transport
+    async fn send_message(&self, msg: ProtocolMessage) -> Result<(), ClientError> {
+        let msg_id = msg.msg_id.clone();
+        debug!("Sending message via transport: msg_id={}", msg_id);
+        self.transport.lock().await.send(msg).await?;
+        debug!("Message sent successfully: msg_id={}", msg_id);
+        Ok(())
+    }
+
+    /// Handle successful response
+    fn handle_response_success(msg_id: &str, response: &ProtocolMessage) -> ProtocolMessage {
+        debug!(
+            "Received response for msg_id={}: msg_type={:?}",
+            msg_id, response.msg_type
+        );
+        response.clone()
+    }
+
+    /// Handle response channel error
+    async fn handle_response_error(&self, msg_id: &str, is_timeout: bool) -> ClientError {
+        if is_timeout {
+            debug!("Timeout waiting for response to msg_id={}", msg_id);
+            self.cleanup_pending(msg_id).await;
+            ClientError::Timeout
+        } else {
+            debug!("Channel closed for msg_id={}", msg_id);
+            self.cleanup_pending(msg_id).await;
+            ClientError::RequestCancelled
+        }
+    }
+
+    /// Wait for a response with timeout
+    async fn wait_for_response(
+        &self,
+        msg_id: String,
+        rx: oneshot::Receiver<ProtocolMessage>,
+    ) -> Result<ProtocolMessage, ClientError> {
+        debug!("Waiting for response to msg_id={}", msg_id);
+
+        let timeout_duration = std::time::Duration::from_secs(30);
+        let result = tokio::time::timeout(timeout_duration, rx).await;
+
+        match result {
+            Ok(Ok(response)) => Ok(Self::handle_response_success(&msg_id, &response)),
+            Ok(Err(_)) => Err(self.handle_response_error(&msg_id, false).await),
+            Err(_) => Err(self.handle_response_error(&msg_id, true).await),
+        }
+    }
+
+    /// Remove a pending request from the tracking map
+    async fn cleanup_pending(&self, msg_id: &str) {
+        self.pending.write().await.remove(msg_id);
+    }
+
     /// Send a message and wait for response
     async fn send_and_wait(&self, msg: ProtocolMessage) -> Result<ProtocolMessage, ClientError> {
         let msg_id = msg.msg_id.clone();
-
-        // Create response channel
-        let (tx, rx) = oneshot::channel();
+        debug!(
+            "send_and_wait: msg_id={}, msg_type={:?}",
+            msg_id, msg.msg_type
+        );
 
         // Register pending request
-        {
-            let mut pending = self.pending.write().await;
-            pending.insert(msg_id.clone(), tx);
-        }
+        let rx = self.register_pending(&msg_id).await;
 
         // Send request
-        self.transport.lock().await.send(msg).await?;
+        self.send_message(msg).await?;
 
-        // Wait for response with timeout
-        match tokio::time::timeout(std::time::Duration::from_secs(30), rx).await {
-            Ok(Ok(response)) => Ok(response),
-            Ok(Err(_)) => {
-                // Channel closed without response
-                self.pending.write().await.remove(&msg_id);
-                Err(ClientError::RequestCancelled)
-            }
-            Err(_) => {
-                // Timeout
-                self.pending.write().await.remove(&msg_id);
-                Err(ClientError::Timeout)
-            }
+        // Wait for response
+        self.wait_for_response(msg_id, rx).await
+    }
+
+    /// Receive a single message from the transport
+    async fn recv_from_transport(
+        transport: Arc<Mutex<Box<dyn Transport>>>,
+    ) -> Result<ProtocolMessage, ClientError> {
+        debug!("Attempting to receive message from transport");
+
+        let result = {
+            let mut transport_guard = transport.lock().await;
+            debug!("Acquired transport lock, calling recv");
+            transport_guard.recv().await
+        };
+
+        debug!(
+            "Transport recv completed: {:?}",
+            result.as_ref().map(|m| &m.msg_id)
+        );
+        result.map_err(ClientError::from)
+    }
+
+    /// Send response to waiting request
+    fn send_to_pending(tx: oneshot::Sender<ProtocolMessage>, msg: ProtocolMessage, msg_id: &str) {
+        debug!(
+            "Found pending request for msg_id={}, sending response",
+            msg_id
+        );
+        let _ = tx.send(msg);
+        debug!("Response sent to pending request: msg_id={}", msg_id);
+    }
+
+    /// Route a response message to its waiting request
+    async fn route_response(
+        msg: ProtocolMessage,
+        pending: Arc<RwLock<HashMap<String, oneshot::Sender<ProtocolMessage>>>>,
+    ) {
+        debug!("Routing response to pending request: msg_id={}", msg.msg_id);
+        let msg_id = msg.msg_id.clone();
+
+        let tx_opt = pending.write().await.remove(&msg_id);
+
+        if let Some(tx) = tx_opt {
+            Self::send_to_pending(tx, msg, &msg_id);
+        } else {
+            warn!("Received response for unknown request: {}", msg_id);
         }
+    }
+
+    /// Handle a notification message
+    fn handle_notification(msg: &ProtocolMessage) {
+        debug!(
+            "Received notification on channel {}: {:?}",
+            msg.channel, msg.content
+        );
     }
 
     /// Receive messages from transport and route to pending requests
@@ -172,27 +278,30 @@ impl ProtocolClient {
         transport: Arc<Mutex<Box<dyn Transport>>>,
         pending: Arc<RwLock<HashMap<String, oneshot::Sender<ProtocolMessage>>>>,
     ) -> Result<(), ClientError> {
-        let msg = {
-            let mut transport = transport.lock().await;
-            transport.recv().await?
-        };
+        // Receive message from transport
+        let msg = Self::recv_from_transport(transport).await?;
+        debug!(
+            "Received message: msg_id={}, msg_type={:?}",
+            msg.msg_id, msg.msg_type
+        );
 
-        // Route response to waiting request
-        if msg.msg_type == MessageType::Response || msg.msg_type == MessageType::Error {
-            let mut pending = pending.write().await;
-            if let Some(tx) = pending.remove(&msg.msg_id) {
-                let _ = tx.send(msg);
-            } else {
-                warn!("Received response for unknown request: {}", msg.msg_id);
+        // Route based on message type
+        match msg.msg_type {
+            MessageType::Response | MessageType::Error => {
+                Self::route_response(msg, pending).await;
             }
-        } else if msg.msg_type == MessageType::Notification {
-            // Handle notifications (e.g., IOPub messages)
-            debug!(
-                "Received notification on channel {}: {:?}",
-                msg.channel, msg.content
-            );
+            MessageType::Notification => {
+                Self::handle_notification(&msg);
+            }
+            MessageType::Request => {
+                debug!(
+                    "Received unexpected request message type: {:?}",
+                    msg.msg_type
+                );
+            }
         }
 
+        debug!("receive_message completed successfully, continuing loop");
         Ok(())
     }
 

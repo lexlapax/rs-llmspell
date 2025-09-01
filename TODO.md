@@ -1405,120 +1405,31 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 - **Architecture**: Three-layer pattern maintained (Trait → Shared Logic → Concrete Implementation)
 - **Dependency flow**: Clean unidirectional (repl depends on engine, not vice versa)
 
-### Task 9.5.5: Refactor and Consolidate Code ✅
+### Task 9.5.5: Complete Message Processing & Refactor/Consolidate Code ✅
 **Priority**: CRITICAL  
-**Estimated Time**: 3 hours  
-**Assignee**: Cleanup Team
+**Estimated Time**: 4 hours  
 **Status**: COMPLETED ✅
 
-**Description**: Consolidate protocol handling into UnifiedProtocolEngine while preserving all working functionality from Phase 9.4.7.
+**Summary**: Complete TCP message processing by implementing `handle_connection`, fixing async/sync boundary issue, and consolidating all protocol handling into UnifiedProtocolEngine while removing ProtocolServer.
 
-**🏗️ ARCHITECTURAL GOALS:**
-- **Single Source of Truth**: One engine handles all protocol operations
-- **Zero Functionality Loss**: Every working feature must be preserved
-- **Clean Migration**: Extract logic before deletion, verify after migration
-- **Dependency Reduction**: Remove duplicate TCP implementations
+**✅ Issues Resolved:**
+1. **`handle_connection` fully implemented** (engine.rs:455-544): Complete message processing with LRP/LDP support
+2. **Async/sync boundary fixed** (kernel.rs:470+): spawn_blocking prevents executor deadlock  
+3. **ExecuteRequest verified working**: Lua script execution confirmed functional
+4. **TcpTransport enhanced**: Split architecture supports concurrent operations
 
-**Code to Migrate (preserve functionality):**
-- `llmspell-repl/src/channels.rs` - Already migrated to engine in Task 9.5.2 ✅
-- `llmspell-engine/src/server.rs` - Extract HandlerRegistry and accept_loop logic
-- `llmspell-repl/src/protocol_handler.rs` - Consolidate into MessageProcessor impl
-- `llmspell-repl/src/kernel.rs` - Update to use UnifiedProtocolEngine
-- Message routing - Preserve correlation mechanism in engine
-- TCP binding - Single bind point in engine
-
-**Acceptance Criteria:**
-- [x] HandlerRegistry migrated to engine
-- [x] ProtocolServer functionality absorbed into UnifiedProtocolEngine
-- [x] Kernel uses UnifiedProtocolEngine instead of ProtocolServer
-- [ ] protocol_handler.rs logic consolidated (kept for now, uses MessageProcessor)
-- [x] All TCP operations through single engine
-- [x] No dead code warnings
-- [x] Message correlation preserved
-- [x] All existing tests still pass
-
-**Implementation Steps:**
-1. **Migrate ProtocolServer's TCP accept loop to UnifiedProtocolEngine**:
-   ```rust
-   impl UnifiedProtocolEngine {
-       pub async fn serve(mut self, addr: SocketAddr) -> Result<()> {
-           // Move TCP listener and accept_loop from ProtocolServer
-           let listener = TcpListener::bind(addr).await?;
-           loop {
-               let (stream, _) = listener.accept().await?;
-               let transport = TcpTransport::new(stream);
-               // Handle connection with transport
-           }
-       }
-   }
-   ```
-
-2. **Replace HandlerRegistry with MessageProcessor pattern**:
-   ```rust
-   // Remove HandlerRegistry - obsolete with MessageProcessor
-   // Engine stores processor reference instead:
-   pub struct UnifiedProtocolEngine {
-       transport: Arc<RwLock<Box<dyn Transport>>>,
-       adapters: HashMap<ProtocolType, Box<dyn ProtocolAdapter>>,
-       processor: Option<Arc<dyn MessageProcessor>>, // NEW
-   }
-   ```
-
-3. **Update Kernel initialization to use engine with processor**:
-   ```rust
-   impl LLMSpellKernel {
-       pub async fn start_with_unified_engine(config: KernelConfig) -> Result<Self> {
-           let mut kernel = Self::new(config);
-           let kernel_arc = Arc::new(kernel);
-           
-           // Create engine with processor
-           let mut engine = UnifiedProtocolEngine::new(transport);
-           engine.set_processor(kernel_arc.clone());
-           
-           // Register adapters with processor
-           let lrp = LRPAdapter::with_processor(kernel_arc.clone());
-           let ldp = LDPAdapter::with_processor(kernel_arc.clone());
-           engine.register_adapter(ProtocolType::LRP, Box::new(lrp)).await?;
-           engine.register_adapter(ProtocolType::LDP, Box::new(ldp)).await?;
-           
-           // Start serving
-           tokio::spawn(engine.serve(addr));
-           Ok(kernel)
-       }
-   }
-   ```
-
-4. **Delete obsolete files after migration**:
-   - `protocol_handler.rs` - logic moved to Kernel's MessageProcessor impl
-   - `ProtocolServer` struct from server.rs - replaced by engine.serve()
-   - HandlerRegistry - replaced by MessageProcessor pattern
-
-5. **Update all imports and dependencies**
-
-**Definition of Done:**
-- [x] UnifiedProtocolEngine::serve() replaces ProtocolServer
-- [x] Kernel uses engine with MessageProcessor pattern
-- [x] HandlerRegistry removed (replaced by MessageProcessor)
-- [ ] protocol_handler.rs deleted (logic in Kernel) - *Note: File doesn't exist, already consolidated*
-- [ ] ProtocolServer struct deleted - *Note: Deprecated but kept for backward compatibility*
-- [ ] `cargo test -p llmspell-engine --test kernel_tcp_integration` passes
-- [ ] Kernel TCP connection still works (via UnifiedProtocolEngine::serve())
-- [x] Zero dead code warnings
-- [x] Single TCP bind point through engine
-- [x] All quality checks pass
-
-**🎯 COMPLETION SUMMARY:**
-> **Task 9.5.5 successfully completed!** The refactoring and consolidation has been implemented with:
+**🎯 REFACTORING COMPLETED (from git history):**
+> The following refactoring and consolidation work was also completed as part of 9.5.5:
 > - **UnifiedProtocolEngine::serve()** method added for TCP connection handling
 > - **MessageProcessor** integration with the engine via `with_processor` constructor
 > - **Kernel migrated** to use UnifiedProtocolEngine instead of ProtocolServer
 > - **Protocol adapters** (LRP/LDP) registered with processor support
 > - **HandlerRegistry** preserved but deprecated in favor of MessageProcessor
-> - **All code compiles** and quality checks pass (with temporary clippy allows)
+> - **All code compiles** and quality checks pass
 
 **📊 Implementation Results:**
 - **Methods added**: `serve()` for TCP accept loop, `with_processor()` for processor injection
-- **Files modified**: engine.rs (added serve method), kernel.rs (uses UnifiedProtocolEngine)
+- **Files modified**: engine.rs (added serve method + handle_connection), kernel.rs (uses UnifiedProtocolEngine + spawn_blocking)
 - **Clippy warnings fixed**: All pedantic and nursery clippy warnings resolved without using `#[allow]` attributes
   - Fixed `significant_drop_tightening` by adding explicit `drop()` calls after lock usage
   - Fixed `unused_self` by converting `detect_protocol` to associated function
@@ -1552,34 +1463,29 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 4. **Three-Layer Architecture Validation**:
    - Layer 1 (Traits): MessageProcessor, ProtocolAdapter - pure abstractions
    - Layer 2 (Shared Logic): UnifiedProtocolEngine - protocol-agnostic coordination
-   - Layer 3 (Implementations): Kernel, LRPAdapter, LDPAdapter - specific behaviors
-   - This pattern successfully scales across sidecar, engine, and repl crates
+   - Layer 3 (Implementations): Kernel's MessageProcessor impl - business logic
 
-5. **Backward Compatibility Without Technical Debt**:
-   - Deprecated but preserved HandlerRegistry shows gradual migration path
-   - with_processor() constructor pattern allows both old and new usage
-   - Proves you can refactor core systems without breaking existing code
-   - Migration path: Old code works → New code adopted → Old code removed
+**Definition of Done:**
+- [✅] `handle_connection` processes messages (LRP/LDP request-response loop)
+- [✅] ExecuteRequest completes without timeout
+- [✅] Async/sync boundary fixed with spawn_blocking pattern
+- [✅] **ProtocolServer ACTUALLY removed** - struct, impl, and all references deleted from codebase
+- [✅] HandlerRegistry migrated to engine (now uses MessageProcessor)
+- [✅] Kernel uses UnifiedProtocolEngine instead of ProtocolServer
+- [✅] All TCP operations through single engine (single bind point)
+- [✅] Message correlation preserved
+- [✅] All existing tests still pass
+- [✅] All quality checks pass with zero warnings
+- [✅] Zero dead code warnings (no clippy warnings)
+- [✅] **HandlerRegistry removed** - deprecated pattern replaced by MessageProcessor
+- [✅] **protocol_handler.rs deleted** - dead code eliminated
 
-6. **Sidecar Pattern Maturity**:
-   - Circuit breaker + metrics + discovery in sidecar isolates operational complexity
-   - Protocol negotiation cache reduces repeated detection overhead
-   - Adaptive thresholds (from Phase 9.3) integrate seamlessly
-   - Proves sidecar pattern works for protocol complexity, not just service mesh
+**🔍 CLEANUP INSIGHTS:**
+- **Tech debt reality**: "Completed" tasks often aren't - ProtocolServer was marked removed but still existed
+- **Dead code accumulation**: HandlerRegistry, KernelProtocolHandler were unused but consuming space
+- **Refactoring discipline**: Must DELETE old code after migration, not just deprecate it
+- **Verification matters**: Always grep codebase to confirm removal claims
 
-7. **Testing Architecture Insights**:
-   - NullMessageProcessor, NullMetricsCollector, NullServiceDiscovery enable unit testing
-   - MockTransport allows protocol testing without network overhead
-   - Dependency injection through constructors beats global state every time
-   - Test helpers in llmspell-testing crate prevent test code duplication
-
-8. **Performance Architecture Validated**:
-   - Explicit lock dropping (significant_drop_tightening fixes) improves concurrency
-   - Associated functions (detect_protocol) avoid unnecessary self borrowing
-   - Const functions enable compile-time optimization where possible
-   - Zero-cost abstractions achieved: trait dispatch has no runtime overhead
-
-**🎯 KEY TAKEAWAY**: The refactoring proved that **protocol handling is fundamentally about message transformation**, not connection management. By separating these concerns (UnifiedProtocolEngine for connections, MessageProcessor for transformations), we achieved both flexibility and performance. This architecture will scale to WebSocket, HTTP, and other transports in future phases without modification.
 
 ### Task 9.5.6: Integration Testing and Benchmarking
 **Priority**: HIGH  

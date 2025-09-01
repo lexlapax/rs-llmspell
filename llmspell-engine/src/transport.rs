@@ -125,18 +125,31 @@ pub mod tcp {
     use tokio::net::TcpStream;
     use tokio_util::codec::Framed;
 
-    /// TCP transport using framed codec
+    use futures::stream::{SplitSink, SplitStream};
+    use std::sync::Arc;
+    use tokio::sync::Mutex as TokioMutex;
+
+    /// Type alias for the send half of a framed TCP connection
+    type TcpSink = Arc<TokioMutex<SplitSink<Framed<TcpStream, LRPCodec>, ProtocolMessage>>>;
+
+    /// Type alias for the receive half of a framed TCP connection  
+    type TcpRecvStream = Arc<TokioMutex<SplitStream<Framed<TcpStream, LRPCodec>>>>;
+
+    /// TCP transport using framed codec with split send/receive
     #[derive(Debug)]
     pub struct TcpTransport {
-        stream: Option<Framed<TcpStream, LRPCodec>>,
+        sink: Option<TcpSink>,
+        stream: Option<TcpRecvStream>,
     }
 
     impl TcpTransport {
         /// Create a new TCP transport from a connected stream
         pub fn new(stream: TcpStream) -> Self {
             let framed = Framed::new(stream, LRPCodec::new());
+            let (sink, stream) = framed.split();
             Self {
-                stream: Some(framed),
+                sink: Some(Arc::new(TokioMutex::new(sink))),
+                stream: Some(Arc::new(TokioMutex::new(stream))),
             }
         }
 
@@ -154,9 +167,9 @@ pub mod tcp {
     #[async_trait]
     impl Transport for TcpTransport {
         async fn send(&mut self, msg: ProtocolMessage) -> Result<(), TransportError> {
-            if let Some(stream) = &mut self.stream {
-                stream
-                    .send(msg)
+            if let Some(sink_ref) = &self.sink {
+                let mut sink = sink_ref.lock().await;
+                sink.send(msg)
                     .await
                     .map_err(|e| TransportError::Io(std::io::Error::other(e.to_string())))
             } else {
@@ -165,7 +178,8 @@ pub mod tcp {
         }
 
         async fn recv(&mut self) -> Result<ProtocolMessage, TransportError> {
-            if let Some(stream) = &mut self.stream {
+            if let Some(stream_ref) = &self.stream {
+                let mut stream = stream_ref.lock().await;
                 match stream.next().await {
                     Some(Ok(msg)) => Ok(msg),
                     Some(Err(e)) => Err(TransportError::Io(std::io::Error::other(e.to_string()))),
@@ -177,12 +191,13 @@ pub mod tcp {
         }
 
         async fn close(&mut self) -> Result<(), TransportError> {
+            self.sink = None;
             self.stream = None;
             Ok(())
         }
 
         fn is_connected(&self) -> bool {
-            self.stream.is_some()
+            self.sink.is_some() && self.stream.is_some()
         }
     }
 }

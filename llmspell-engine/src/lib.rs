@@ -106,7 +106,7 @@ pub use protocol::{
     HelpLink, HistoryEntry, LDPRequest, LDPResponse, LRPCodec, LRPRequest, LRPResponse,
     LanguageInfo, MessageHandler, MessageType, ProtocolMessage, Source,
 };
-pub use server::{ServerConfig, ServerError}; // ProtocolServer deprecated, use UnifiedProtocolEngine
+pub use server::{ServerConfig, ServerError};
 pub use transport::{Transport, TransportError};
 
 // Re-export types module for temporary backward compatibility

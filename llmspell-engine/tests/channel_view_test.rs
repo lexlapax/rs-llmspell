@@ -7,7 +7,7 @@ use llmspell_engine::{
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Test implementation of MessageProcessor for testing
+/// Test implementation of `MessageProcessor` for testing
 #[derive(Debug)]
 struct TestMessageProcessor;
 
@@ -119,10 +119,19 @@ async fn test_protocol_engine_with_adapter() {
 
 #[tokio::test]
 async fn test_channel_view_operations() {
+    use llmspell_engine::adapters::LRPAdapter;
+
     // Create a unified protocol engine
     let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
     let processor = Arc::new(TestMessageProcessor);
-    let engine = UnifiedProtocolEngine::with_processor(transport, processor);
+    let mut engine = UnifiedProtocolEngine::with_processor(transport, processor.clone());
+
+    // Register LRP adapter so the protocol is supported
+    let lrp_adapter = LRPAdapter::with_processor(processor.clone());
+    engine
+        .register_adapter(ProtocolType::LRP, Box::new(lrp_adapter))
+        .await
+        .unwrap();
 
     // Get a channel view
     let shell_view = engine.channel_view(ChannelType::Shell);
@@ -145,12 +154,20 @@ async fn test_channel_view_operations() {
 
 #[tokio::test]
 async fn test_iopub_broadcast() {
+    use llmspell_engine::adapters::LRPAdapter;
     use llmspell_engine::IOPubView;
 
     // Create a unified protocol engine
     let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
     let processor = Arc::new(TestMessageProcessor);
-    let engine = UnifiedProtocolEngine::with_processor(transport, processor);
+    let mut engine = UnifiedProtocolEngine::with_processor(transport, processor.clone());
+
+    // Register LRP adapter so the protocol is supported
+    let lrp_adapter = LRPAdapter::with_processor(processor.clone());
+    engine
+        .register_adapter(ProtocolType::LRP, Box::new(lrp_adapter))
+        .await
+        .unwrap();
 
     // Create IOPub view
     let iopub_view = IOPubView::new(&engine);
