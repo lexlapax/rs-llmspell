@@ -27,9 +27,11 @@ async fn create_test_sidecar() -> Sidecar {
     let engine = Arc::new(engine);
 
     // Create circuit breaker with test config
-    let mut cb_config = CircuitBreakerConfig::default();
-    cb_config.failure_threshold_count = 3;
-    cb_config.reset_timeout = Duration::from_millis(100);
+    let cb_config = CircuitBreakerConfig {
+        failure_threshold_count: 3,
+        reset_timeout: Duration::from_millis(100),
+        ..Default::default()
+    };
     let circuit_breaker = CircuitBreaker::new(cb_config);
 
     // Create discovery and metrics
@@ -37,9 +39,11 @@ async fn create_test_sidecar() -> Sidecar {
     let metrics = Arc::new(NullMetricsCollector);
 
     // Create sidecar config
-    let mut sidecar_config = SidecarConfig::default();
-    sidecar_config.negotiation_timeout = Duration::from_millis(100);
-    sidecar_config.processing_timeout = Duration::from_secs(1);
+    let sidecar_config = SidecarConfig {
+        negotiation_timeout: Duration::from_millis(100),
+        processing_timeout: Duration::from_secs(1),
+        ..Default::default()
+    };
 
     let sidecar = Sidecar::new(engine, circuit_breaker, discovery, metrics, sidecar_config);
 
@@ -52,7 +56,7 @@ async fn create_test_sidecar() -> Sidecar {
 #[tokio::test]
 async fn test_sidecar_creation() {
     let sidecar = create_test_sidecar().await;
-    assert!(sidecar.health_check().await);
+    assert!(sidecar.health_check());
 }
 
 #[tokio::test]
@@ -127,12 +131,12 @@ async fn test_message_interception() {
             eprintln!("Success! Protocol: {:?}", processed.metadata.protocol);
         }
         Err(e) => {
-            eprintln!("Intercept failed with error: {:?}", e);
+            eprintln!("Intercept failed with error: {e:?}");
             // Try to parse the message directly to see if it's valid
             let test_adapter = LRPAdapter::new();
             match test_adapter.adapt_inbound(lrp_json.as_bytes()) {
                 Ok(_) => eprintln!("Direct adapter parse succeeded!"),
-                Err(e) => eprintln!("Direct adapter parse failed: {:?}", e),
+                Err(e) => eprintln!("Direct adapter parse failed: {e:?}"),
             }
         }
     }
@@ -148,9 +152,11 @@ async fn test_circuit_breaker_protection() {
     let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
     let engine = Arc::new(UnifiedProtocolEngine::new(transport));
 
-    let mut cb_config = CircuitBreakerConfig::default();
-    cb_config.failure_threshold_count = 2; // Open after 2 failures
-    cb_config.reset_timeout = Duration::from_millis(100);
+    let cb_config = CircuitBreakerConfig {
+        failure_threshold_count: 2, // Open after 2 failures
+        reset_timeout: Duration::from_millis(100),
+        ..Default::default()
+    };
     let circuit_breaker = CircuitBreaker::new(cb_config);
 
     let discovery = Arc::new(LocalServiceDiscovery::new());
@@ -187,8 +193,7 @@ async fn test_circuit_breaker_protection() {
                 e,
                 llmspell_engine::sidecar::SidecarError::ServiceUnavailable(_)
             ),
-            "Expected ServiceUnavailable error, got {:?}",
-            e
+            "Expected ServiceUnavailable error, got {e:?}"
         );
     }
 }
@@ -236,28 +241,27 @@ async fn test_metrics_collection() {
             r#"{"msg_type":"KernelInfoRequest"}"#.to_string()
         } else {
             format!(
-                r#"{{"msg_type":"ExecuteRequest","code":"print({})","silent":false,"store_history":true,"user_expressions":null,"allow_stdin":false,"stop_on_error":true}}"#,
-                i
+                r#"{{"msg_type":"ExecuteRequest","code":"print({i})","silent":false,"store_history":true,"user_expressions":null,"allow_stdin":false,"stop_on_error":true}}"#
             )
         };
         let raw_msg = RawMessage {
             data: lrp_json.as_bytes().to_vec(),
-            source: format!("client-{}", i),
+            source: format!("client-{i}"),
             target: None,
             headers: HashMap::new(),
         };
         match sidecar_with_metrics.intercept(raw_msg).await {
             Ok(_) => {
-                eprintln!("Message {} processed successfully", i);
+                eprintln!("Message {i} processed successfully");
                 success_count += 1;
             }
-            Err(e) => eprintln!("Message {} failed: {:?}", i, e),
+            Err(e) => eprintln!("Message {i} failed: {e:?}"),
         }
     }
 
     // Verify messages were processed successfully
     assert_eq!(success_count, 5, "All 5 messages should be processed");
-    
+
     // Check metrics (currently DefaultMetricsCollector may not be incrementing properly)
     // TODO: Fix DefaultMetricsCollector implementation to properly count requests
     let aggregated = metrics.get_aggregated().await;
@@ -277,7 +281,7 @@ async fn test_protocol_negotiation_caching() {
 
     // First message from client-1
     let raw_msg1 = RawMessage {
-        data: r#"{"msg_type":"KernelInfoRequest"}"#.as_bytes().to_vec(),
+        data: br#"{"msg_type":"KernelInfoRequest"}"#.to_vec(),
         source: "client-1".to_string(),
         target: None,
         headers: HashMap::new(),
@@ -288,7 +292,7 @@ async fn test_protocol_negotiation_caching() {
 
     // Second message from same client should use cached protocol
     let raw_msg2 = RawMessage {
-        data: r#"{"msg_type":"ConnectRequest"}"#.as_bytes().to_vec(),
+        data: br#"{"msg_type":"ConnectRequest"}"#.to_vec(),
         source: "client-1".to_string(),
         target: None,
         headers: HashMap::new(),

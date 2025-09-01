@@ -120,7 +120,7 @@ struct CacheEntry {
 pub struct Sidecar {
     /// Protocol engine for message handling
     engine: Arc<dyn ProtocolEngine>,
-    /// Protocol adapters (using existing ProtocolAdapter trait)
+    /// Protocol adapters (using existing `ProtocolAdapter` trait)
     adapters: Arc<RwLock<HashMap<ProtocolType, Box<dyn ProtocolAdapter>>>>,
     /// Circuit breaker for fault tolerance
     circuit_breaker: CircuitBreaker,
@@ -159,10 +159,14 @@ impl Sidecar {
         let protocol = adapter.protocol_type();
         let mut adapters = self.adapters.write().await;
         adapters.insert(protocol, adapter);
-        info!("Registered protocol adapter for {:?}", protocol);
+        drop(adapters);
+        info!("Registered protocol adapter for {protocol:?}");
     }
 
     /// Intercept and process a message
+    ///
+    /// # Errors
+    /// Returns error if circuit breaker is open or message processing fails
     pub async fn intercept(&self, msg: RawMessage) -> SidecarResult<ProcessedMessage> {
         let timer = MetricTimer::start("intercept", "unknown", "unknown");
 
@@ -213,17 +217,19 @@ impl Sidecar {
             .record_negotiation(negotiation_timer.elapsed())
             .await;
 
-        // Get adapter
-        let adapters = self.adapters.read().await;
-        let adapter = adapters
-            .get(&protocol)
-            .ok_or(SidecarError::NoProtocolFound)?;
-
-        // Adapt message
+        // Get adapter and adapt message
         let adaptation_timer = Instant::now();
-        let universal = adapter
-            .adapt_inbound(&msg.data)
-            .map_err(|e| SidecarError::ProcessingFailed(e.to_string()))?;
+        let universal = {
+            let adapters = self.adapters.read().await;
+            let adapter = adapters
+                .get(&protocol)
+                .ok_or(SidecarError::NoProtocolFound)?;
+            let result = adapter
+                .adapt_inbound(&msg.data)
+                .map_err(|e| SidecarError::ProcessingFailed(e.to_string()))?;
+            drop(adapters);
+            result
+        };
         self.metrics
             .record_adaptation(adaptation_timer.elapsed())
             .await;
@@ -253,7 +259,7 @@ impl Sidecar {
         }
 
         // Try to detect protocol from message content
-        let protocol = self.detect_protocol(&msg.data).await?;
+        let protocol = Self::detect_protocol(&msg.data);
 
         // Update cache
         if self.config.enable_negotiation_cache {
@@ -264,20 +270,20 @@ impl Sidecar {
     }
 
     /// Detect protocol from message content
-    async fn detect_protocol(&self, data: &[u8]) -> SidecarResult<ProtocolType> {
+    fn detect_protocol(data: &[u8]) -> ProtocolType {
         // Try to parse as JSON first
         if let Ok(json) = serde_json::from_slice::<Value>(data) {
             // Check for protocol hints in JSON
             if json.get("msg_type").is_some() || json.get("msg_id").is_some() {
-                return Ok(ProtocolType::LRP);
+                return ProtocolType::LRP;
             }
             if json.get("command").is_some() || json.get("seq").is_some() {
-                return Ok(ProtocolType::LDP);
+                return ProtocolType::LDP;
             }
         }
 
         // Default to LRP for now
-        Ok(ProtocolType::LRP)
+        ProtocolType::LRP
     }
 
     /// Check negotiation cache
@@ -311,12 +317,15 @@ impl Sidecar {
     }
 
     /// Discover services that can handle a specific protocol
+    ///
+    /// # Errors
+    /// Returns error if discovery fails
     pub async fn discover_services(
         &self,
         protocol: ProtocolType,
     ) -> SidecarResult<Vec<ServiceInfo>> {
         let query = ServiceQuery {
-            protocol: Some(format!("{:?}", protocol)),
+            protocol: Some(format!("{protocol:?}")),
             ..Default::default()
         };
 
@@ -324,6 +333,9 @@ impl Sidecar {
     }
 
     /// Route a processed message to the appropriate service
+    ///
+    /// # Errors
+    /// Returns error if routing fails
     pub async fn route(&self, msg: ProcessedMessage) -> SidecarResult<()> {
         // Send through protocol engine
         self.engine
@@ -338,7 +350,8 @@ impl Sidecar {
     }
 
     /// Health check
-    pub async fn health_check(&self) -> bool {
+    #[must_use]
+    pub const fn health_check(&self) -> bool {
         // Check if circuit breaker is healthy
         // In real implementation, would check CircuitState
         true
@@ -364,7 +377,7 @@ mod tests {
 
         let sidecar = Sidecar::new(engine, circuit_breaker, discovery, metrics, config);
 
-        assert!(sidecar.health_check().await);
+        assert!(sidecar.health_check());
     }
 
     #[tokio::test]
@@ -376,16 +389,16 @@ mod tests {
         let metrics = Arc::new(NullMetricsCollector);
         let config = SidecarConfig::default();
 
-        let sidecar = Sidecar::new(engine, circuit_breaker, discovery, metrics, config);
+        let _sidecar = Sidecar::new(engine, circuit_breaker, discovery, metrics, config);
 
         // Test LRP detection
         let lrp_data = r#"{"msg_type": "request", "msg_id": "123"}"#.as_bytes();
-        let protocol = sidecar.detect_protocol(lrp_data).await.unwrap();
+        let protocol = Sidecar::detect_protocol(lrp_data);
         assert_eq!(protocol, ProtocolType::LRP);
 
         // Test LDP detection
-        let ldp_data = r#"{"command": "initialize", "seq": 1}"#.as_bytes();
-        let protocol = sidecar.detect_protocol(ldp_data).await.unwrap();
+        let ldp_test_data = r#"{"command": "initialize", "seq": 1}"#.as_bytes();
+        let protocol = Sidecar::detect_protocol(ldp_test_data);
         assert_eq!(protocol, ProtocolType::LDP);
     }
 }

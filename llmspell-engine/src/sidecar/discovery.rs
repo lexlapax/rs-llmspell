@@ -151,6 +151,7 @@ impl ServiceDiscovery for LocalServiceDiscovery {
     async fn register(&self, service: ServiceInfo) -> DiscoveryResult<()> {
         let mut services = self.services.write().await;
         services.insert(service.id.clone(), service);
+        drop(services);
         Ok(())
     }
 
@@ -161,33 +162,40 @@ impl ServiceDiscovery for LocalServiceDiscovery {
             .filter(|s| Self::matches_query(s, &query))
             .cloned()
             .collect();
+        drop(services);
         Ok(matching)
     }
 
     async fn health_check(&self, service_id: &str) -> DiscoveryResult<HealthStatus> {
         let services = self.services.read().await;
-        services
+        let result = services
             .get(service_id)
             .map(|s| s.health)
-            .ok_or_else(|| DiscoveryError::ServiceNotFound(service_id.to_string()))
+            .ok_or_else(|| DiscoveryError::ServiceNotFound(service_id.to_string()));
+        drop(services);
+        result
     }
 
     async fn unregister(&self, service_id: &str) -> DiscoveryResult<()> {
         let mut services = self.services.write().await;
-        services
+        let result = services
             .remove(service_id)
             .map(|_| ())
-            .ok_or_else(|| DiscoveryError::ServiceNotFound(service_id.to_string()))
+            .ok_or_else(|| DiscoveryError::ServiceNotFound(service_id.to_string()));
+        drop(services);
+        result
     }
 
     async fn update(&self, service: ServiceInfo) -> DiscoveryResult<()> {
         let mut services = self.services.write().await;
-        if services.contains_key(&service.id) {
+        let result = if services.contains_key(&service.id) {
             services.insert(service.id.clone(), service);
             Ok(())
         } else {
             Err(DiscoveryError::ServiceNotFound(service.id.clone()))
-        }
+        };
+        drop(services);
+        result
     }
 }
 

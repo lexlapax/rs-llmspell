@@ -129,6 +129,11 @@ impl DefaultMetricsCollector {
         if durations.is_empty() {
             return 0.0;
         }
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
         let index = ((percentile / 100.0) * durations.len() as f64) as usize;
         let index = index.min(durations.len() - 1);
         durations[index]
@@ -161,14 +166,14 @@ impl MetricsCollector for DefaultMetricsCollector {
         let mut sidecar = self.sidecar_metrics.write().await;
         // Exponential moving average
         let new_time = duration.as_secs_f64() * 1000.0;
-        sidecar.negotiation_time_ms = sidecar.negotiation_time_ms * 0.9 + new_time * 0.1;
+        sidecar.negotiation_time_ms = sidecar.negotiation_time_ms.mul_add(0.9, new_time * 0.1);
     }
 
     async fn record_adaptation(&self, duration: Duration) {
         let mut sidecar = self.sidecar_metrics.write().await;
         // Exponential moving average
         let new_time = duration.as_secs_f64() * 1000.0;
-        sidecar.adaptation_time_ms = sidecar.adaptation_time_ms * 0.9 + new_time * 0.1;
+        sidecar.adaptation_time_ms = sidecar.adaptation_time_ms.mul_add(0.9, new_time * 0.1);
     }
 
     async fn record_circuit_breaker_trip(&self) {
@@ -190,10 +195,12 @@ impl MetricsCollector for DefaultMetricsCollector {
             .collect();
         durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
 
-        let avg_latency = if !durations.is_empty() {
-            durations.iter().sum::<f64>() / durations.len() as f64
-        } else {
+        let avg_latency = if durations.is_empty() {
             0.0
+        } else {
+            #[allow(clippy::cast_precision_loss)]
+            let result = durations.iter().sum::<f64>() / durations.len() as f64;
+            result
         };
 
         // Count by protocol and channel
@@ -204,6 +211,8 @@ impl MetricsCollector for DefaultMetricsCollector {
             *by_protocol.entry(metric.protocol.clone()).or_insert(0) += 1;
             *by_channel.entry(metric.channel.clone()).or_insert(0) += 1;
         }
+
+        drop(metrics);
 
         AggregatedMetrics {
             total_requests: total,
@@ -225,9 +234,11 @@ impl MetricsCollector for DefaultMetricsCollector {
     async fn reset(&self) {
         let mut metrics = self.metrics.write().await;
         metrics.clear();
+        drop(metrics);
 
         let mut sidecar = self.sidecar_metrics.write().await;
         *sidecar = SidecarMetrics::default();
+        drop(sidecar);
     }
 }
 
@@ -289,7 +300,9 @@ impl MetricTimer {
             timestamp_ms: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
-                .as_millis() as u64,
+                .as_millis()
+                .try_into()
+                .unwrap_or(u64::MAX),
             tags: HashMap::new(),
         }
     }
@@ -319,7 +332,9 @@ mod tests {
                 timestamp_ms: std::time::SystemTime::now()
                     .duration_since(std::time::UNIX_EPOCH)
                     .unwrap()
-                    .as_millis() as u64,
+                    .as_millis()
+                    .try_into()
+                    .unwrap_or(u64::MAX),
                 tags: HashMap::new(),
             };
             collector.record(metric).await;

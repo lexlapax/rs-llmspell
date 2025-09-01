@@ -1,38 +1,76 @@
 //! Integration tests for channel views
 
 use llmspell_engine::{
-    ChannelSet, ChannelType, LRPAdapter, MessageContent, ProtocolEngine, ProtocolServer,
-    ProtocolType, ServerConfig, UniversalMessage,
+    ChannelSet, ChannelType, LRPAdapter, MessageContent, ProtocolEngine, ProtocolType,
+    UnifiedProtocolEngine, UniversalMessage,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// Mock message handler for testing
-struct TestHandler;
+/// Test implementation of MessageProcessor for testing
+#[derive(Debug)]
+struct TestMessageProcessor;
 
 #[async_trait::async_trait]
-impl llmspell_engine::MessageHandler for TestHandler {
-    async fn handle(
+impl llmspell_engine::processor::MessageProcessor for TestMessageProcessor {
+    async fn process_lrp(
         &self,
-        msg: llmspell_engine::ProtocolMessage,
-    ) -> Option<llmspell_engine::ProtocolMessage> {
-        // Echo back the message
-        Some(llmspell_engine::ProtocolMessage::response(
-            msg.msg_id,
-            msg.content,
-        ))
+        request: llmspell_engine::protocol::lrp::LRPRequest,
+    ) -> Result<
+        llmspell_engine::protocol::lrp::LRPResponse,
+        llmspell_engine::processor::ProcessorError,
+    > {
+        use llmspell_engine::processor::ProcessorError;
+        use llmspell_engine::protocol::lrp::{LRPRequest, LRPResponse, LanguageInfo};
+
+        // Return minimal valid responses for testing
+        match request {
+            LRPRequest::KernelInfoRequest => Ok(LRPResponse::KernelInfoReply {
+                protocol_version: "5.3".to_string(),
+                implementation: "test".to_string(),
+                implementation_version: "0.0.0".to_string(),
+                language_info: LanguageInfo {
+                    name: "test".to_string(),
+                    version: "0.0.0".to_string(),
+                    mimetype: "text/plain".to_string(),
+                    file_extension: ".test".to_string(),
+                    pygments_lexer: None,
+                    codemirror_mode: None,
+                    nbconvert_exporter: None,
+                },
+                banner: "Test kernel".to_string(),
+                debugger: false,
+                help_links: vec![],
+            }),
+            _ => Err(ProcessorError::NotImplemented(
+                "Test processor only handles kernel info".to_string(),
+            )),
+        }
+    }
+
+    async fn process_ldp(
+        &self,
+        _request: llmspell_engine::protocol::ldp::LDPRequest,
+    ) -> Result<
+        llmspell_engine::protocol::ldp::LDPResponse,
+        llmspell_engine::processor::ProcessorError,
+    > {
+        use llmspell_engine::protocol::ldp::LDPResponse;
+
+        // Return a simple response for testing
+        Ok(LDPResponse::VariablesResponse { variables: vec![] })
     }
 }
 
 #[tokio::test]
 async fn test_channel_set_creation() {
-    // Create a protocol server
-    let config = ServerConfig::default();
-    let handler = Arc::new(TestHandler);
-    let server = ProtocolServer::new(config, handler);
+    // Create a unified protocol engine with mock transport
+    let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
+    let processor = Arc::new(TestMessageProcessor);
+    let engine = UnifiedProtocolEngine::with_processor(transport, processor);
 
-    // Create channel set from the server (which implements ProtocolEngine)
-    let channel_set = ChannelSet::new(&server);
+    // Create channel set from the engine (which implements ProtocolEngine)
+    let channel_set = ChannelSet::new(&engine);
 
     // Verify all channels are accessible
     let _shell = &channel_set.shell;
@@ -48,15 +86,15 @@ async fn test_channel_set_creation() {
 }
 
 #[tokio::test]
-async fn test_protocol_server_as_engine() {
-    // Create a protocol server
-    let config = ServerConfig::default();
-    let handler = Arc::new(TestHandler);
-    let mut server = ProtocolServer::new(config, handler);
+async fn test_protocol_engine_with_adapter() {
+    // Create a unified protocol engine
+    let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
+    let processor = Arc::new(TestMessageProcessor);
+    let mut engine = UnifiedProtocolEngine::with_processor(transport, processor);
 
     // Register an LRP adapter
     let adapter = Box::new(LRPAdapter::new());
-    server
+    engine
         .register_adapter(ProtocolType::LRP, adapter)
         .await
         .unwrap();
@@ -74,20 +112,20 @@ async fn test_protocol_server_as_engine() {
     };
 
     // Send message through the engine
-    server.send(ChannelType::Shell, msg.clone()).await.unwrap();
+    engine.send(ChannelType::Shell, msg.clone()).await.unwrap();
 
     // The message should be queued (though we can't receive it in this test without more setup)
 }
 
 #[tokio::test]
 async fn test_channel_view_operations() {
-    // Create a protocol server
-    let config = ServerConfig::default();
-    let handler = Arc::new(TestHandler);
-    let server = ProtocolServer::new(config, handler);
+    // Create a unified protocol engine
+    let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
+    let processor = Arc::new(TestMessageProcessor);
+    let engine = UnifiedProtocolEngine::with_processor(transport, processor);
 
     // Get a channel view
-    let shell_view = server.channel_view(ChannelType::Shell);
+    let shell_view = engine.channel_view(ChannelType::Shell);
 
     // Create a test message
     let msg = UniversalMessage {
@@ -109,13 +147,13 @@ async fn test_channel_view_operations() {
 async fn test_iopub_broadcast() {
     use llmspell_engine::IOPubView;
 
-    // Create a protocol server
-    let config = ServerConfig::default();
-    let handler = Arc::new(TestHandler);
-    let server = ProtocolServer::new(config, handler);
+    // Create a unified protocol engine
+    let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
+    let processor = Arc::new(TestMessageProcessor);
+    let engine = UnifiedProtocolEngine::with_processor(transport, processor);
 
     // Create IOPub view
-    let iopub_view = IOPubView::new(&server);
+    let iopub_view = IOPubView::new(&engine);
 
     // Subscribe to messages
     let mut subscriber = iopub_view.subscribe();

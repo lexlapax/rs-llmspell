@@ -2,6 +2,7 @@
 //!
 //! Central communication engine that unifies all protocol handling, transport management,
 //! and message routing for the `LLMSpell` system.
+
 //!
 //! # Architecture
 //!
@@ -40,28 +41,40 @@
 //! }
 //! ```
 //!
-//! ## Server Example
+//! ## Engine Example
 //! ```no_run
-//! use llmspell_engine::server::{ProtocolServer, ServerConfig};
-//! use llmspell_engine::protocol::message::{MessageHandler, ProtocolMessage};
+//! use llmspell_engine::{UnifiedProtocolEngine, MessageProcessor, ProtocolType, ChannelType};
 //! use std::sync::Arc;
 //!
-//! struct MyHandler;
+//! struct MyProcessor;
 //!
 //! #[async_trait::async_trait]
-//! impl MessageHandler for MyHandler {
-//!     async fn handle(&self, msg: ProtocolMessage) -> Option<ProtocolMessage> {
-//!         // Handle message and return response
-//!         None
+//! impl MessageProcessor for MyProcessor {
+//!     async fn process_message(
+//!         &self,
+//!         protocol: ProtocolType,
+//!         channel: ChannelType,
+//!         message: Vec<u8>,
+//!     ) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+//!         // Process message and return response
+//!         Ok(message)
+//!     }
+//!     
+//!     async fn handle_connection(
+//!         &self,
+//!         protocol: ProtocolType,
+//!         stream: tokio::net::TcpStream,
+//!     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+//!         Ok(())
 //!     }
 //! }
 //!
 //! async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//!     let config = ServerConfig::default();
-//!     let handler = Arc::new(MyHandler);
-//!     let mut server = ProtocolServer::new(config, handler);
+//!     let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
+//!     let processor = Arc::new(MyProcessor);
+//!     let engine = UnifiedProtocolEngine::with_processor(transport, processor);
 //!     
-//!     server.start().await?;
+//!     // Use engine.serve() to handle TCP connections
 //!     
 //!     Ok(())
 //! }
@@ -93,7 +106,7 @@ pub use protocol::{
     HelpLink, HistoryEntry, LDPRequest, LDPResponse, LRPCodec, LRPRequest, LRPResponse,
     LanguageInfo, MessageHandler, MessageType, ProtocolMessage, Source,
 };
-pub use server::{ProtocolServer, ServerConfig, ServerError};
+pub use server::{ServerConfig, ServerError}; // ProtocolServer deprecated, use UnifiedProtocolEngine
 pub use transport::{Transport, TransportError};
 
 // Re-export types module for temporary backward compatibility

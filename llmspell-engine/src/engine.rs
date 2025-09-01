@@ -349,12 +349,14 @@ pub struct UnifiedProtocolEngine {
     /// Transport layer
     transport: Arc<RwLock<Box<dyn Transport>>>,
     /// Protocol adapters
-    adapters: HashMap<ProtocolType, Box<dyn ProtocolAdapter>>,
+    adapters: Arc<RwLock<HashMap<ProtocolType, Box<dyn ProtocolAdapter>>>>,
     /// Message router
     #[allow(dead_code)] // Will be used in future routing implementation
     router: Arc<MessageRouter>,
-    /// Handler registry
+    /// Handler registry (deprecated - use processor instead)
     handlers: Arc<RwLock<HandlerRegistry>>,
+    /// Message processor for handling protocol messages
+    processor: Option<Arc<dyn crate::processor::MessageProcessor>>,
 }
 
 impl UnifiedProtocolEngine {
@@ -363,16 +365,121 @@ impl UnifiedProtocolEngine {
     pub fn new(transport: Box<dyn Transport>) -> Self {
         Self {
             transport: Arc::new(RwLock::new(transport)),
-            adapters: HashMap::new(),
+            adapters: Arc::new(RwLock::new(HashMap::new())),
             router: Arc::new(MessageRouter::new()),
             handlers: Arc::new(RwLock::new(HandlerRegistry::new())),
+            processor: None,
         }
     }
 
-    /// Register a message handler
+    /// Create a new engine with a message processor
+    #[must_use]
+    pub fn with_processor(
+        transport: Box<dyn Transport>,
+        processor: Arc<dyn crate::processor::MessageProcessor>,
+    ) -> Self {
+        Self {
+            transport: Arc::new(RwLock::new(transport)),
+            adapters: Arc::new(RwLock::new(HashMap::new())),
+            router: Arc::new(MessageRouter::new()),
+            handlers: Arc::new(RwLock::new(HandlerRegistry::new())),
+            processor: Some(processor),
+        }
+    }
+
+    /// Register a message handler (deprecated - use processor instead)
     pub async fn register_handler(&self, id: String, handler: Box<dyn MessageHandler>) {
         let mut handlers = self.handlers.write().await;
         handlers.register(id, handler);
+    }
+
+    /// Serve TCP connections on the specified address
+    /// This replaces `ProtocolServer`'s `start()` method
+    ///
+    /// # Errors
+    /// Returns error if TCP binding fails
+    #[allow(clippy::cognitive_complexity)]
+    pub async fn serve(&mut self, config: crate::ServerConfig) -> Result<(), crate::ServerError> {
+        use tokio::net::TcpListener;
+        use tokio::sync::broadcast;
+        use tracing::info;
+
+        info!(
+            "Starting unified protocol engine on {}:{}",
+            config.ip, config.shell_port
+        );
+
+        // Set up listeners
+        let shell_addr = format!("{}:{}", config.ip, config.shell_port);
+        let shell_listener = TcpListener::bind(&shell_addr).await?;
+
+        let iopub_addr = format!("{}:{}", config.ip, config.iopub_port);
+        let iopub_listener = TcpListener::bind(&iopub_addr).await?;
+
+        info!(
+            "Protocol engine listening on shell: {}, iopub: {}",
+            shell_addr, iopub_addr
+        );
+
+        // Create shutdown channel
+        let (shutdown_tx, mut shutdown_rx) = broadcast::channel::<()>(1);
+
+        // Run accept loop
+        loop {
+            tokio::select! {
+                _ = shutdown_rx.recv() => {
+                    info!("Protocol engine shutting down");
+                    break;
+                }
+                result = shell_listener.accept() => {
+                    if let Ok((stream, addr)) = result {
+                        info!("New shell connection from {}", addr);
+                        self.handle_connection(stream, addr, ChannelType::Shell);
+                    }
+                }
+                result = iopub_listener.accept() => {
+                    if let Ok((stream, addr)) = result {
+                        info!("New IOPub connection from {}", addr);
+                        self.handle_connection(stream, addr, ChannelType::IOPub);
+                    }
+                }
+            }
+        }
+
+        // Store shutdown_tx for later use if needed
+        drop(shutdown_tx);
+        Ok(())
+    }
+
+    /// Handle a new TCP connection
+    fn handle_connection(
+        &self,
+        stream: tokio::net::TcpStream,
+        addr: std::net::SocketAddr,
+        channel: ChannelType,
+    ) {
+        use crate::transport::tcp::TcpTransport;
+        use tracing::debug;
+
+        let _transport = Box::new(TcpTransport::new(stream));
+
+        // Spawn a task to handle this connection
+        let _processor = self.processor.clone();
+        let _adapters = self.adapters.clone();
+
+        tokio::spawn(async move {
+            debug!("Handling {} connection from {}", channel, addr);
+
+            // In a real implementation, we would:
+            // 1. Read messages from the transport
+            // 2. Determine the protocol type
+            // 3. Use the appropriate adapter to convert to UniversalMessage
+            // 4. Process the message using the processor
+            // 5. Send the response back
+
+            // For now, just log
+            debug!("Connection handler spawned for {}", addr);
+        });
     }
 }
 
@@ -383,19 +490,23 @@ impl ProtocolEngine for UnifiedProtocolEngine {
         protocol: ProtocolType,
         adapter: Box<dyn ProtocolAdapter>,
     ) -> Result<(), EngineError> {
-        self.adapters.insert(protocol, adapter);
+        let mut adapters = self.adapters.write().await;
+        adapters.insert(protocol, adapter);
+        drop(adapters);
         Ok(())
     }
 
     async fn send(&self, channel: ChannelType, msg: UniversalMessage) -> Result<(), EngineError> {
-        // Get the appropriate adapter
-        let adapter = self
-            .adapters
-            .get(&msg.protocol)
-            .ok_or(EngineError::ProtocolNotSupported(msg.protocol))?;
-
-        // Convert to raw format
-        let _raw = adapter.adapt_outbound(&msg)?;
+        // Get the appropriate adapter and convert to raw format
+        let _raw = {
+            let adapters = self.adapters.read().await;
+            let adapter = adapters
+                .get(&msg.protocol)
+                .ok_or(EngineError::ProtocolNotSupported(msg.protocol))?;
+            let result = adapter.adapt_outbound(&msg)?;
+            drop(adapters);
+            result
+        };
 
         // Create a ProtocolMessage for transport
         let protocol_msg = ProtocolMessage {

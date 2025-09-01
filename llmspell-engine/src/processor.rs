@@ -86,9 +86,9 @@ impl MessageProcessor for NullMessageProcessor {
                 control_port: 0,
                 hb_port: 0,
             }),
-            _ => Err(ProcessorError::NotImplemented(format!(
-                "LRP request type not implemented in null processor"
-            ))),
+            _ => Err(ProcessorError::NotImplemented(
+                "LRP request type not implemented in null processor".to_string(),
+            )),
         }
     }
 
@@ -102,9 +102,9 @@ impl MessageProcessor for NullMessageProcessor {
                     "supportsConditionalBreakpoints": false,
                 }),
             }),
-            _ => Err(ProcessorError::NotImplemented(format!(
-                "LDP request type not implemented in null processor"
-            ))),
+            _ => Err(ProcessorError::NotImplemented(
+                "LDP request type not implemented in null processor".to_string(),
+            )),
         }
     }
 }

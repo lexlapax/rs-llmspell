@@ -60,16 +60,10 @@ impl ProtocolAdapter for LRPAdapter {
 
         // Determine channel based on request type
         let channel = match &request {
-            LRPRequest::ExecuteRequest { .. }
-            | LRPRequest::CompleteRequest { .. }
-            | LRPRequest::InspectRequest { .. }
-            | LRPRequest::IsCompleteRequest { .. }
-            | LRPRequest::HistoryRequest { .. }
-            | LRPRequest::KernelInfoRequest => ChannelType::Shell,
             LRPRequest::ShutdownRequest { .. } | LRPRequest::InterruptRequest => {
                 ChannelType::Control
             }
-            LRPRequest::ConnectRequest | LRPRequest::CommInfoRequest { .. } => ChannelType::Shell,
+            _ => ChannelType::Shell, // All other requests use Shell channel
         };
 
         // Convert to method and params for universal message
@@ -139,13 +133,9 @@ impl ProtocolAdapter for LRPAdapter {
         let json = match &msg.content {
             MessageContent::Response { result, error } => {
                 // Try to extract LRP response from result
-                if let Some(result) = result {
-                    result.clone()
-                } else if let Some(error) = error {
-                    error.clone()
-                } else {
-                    Value::Null
-                }
+                result
+                    .as_ref()
+                    .map_or_else(|| error.clone().unwrap_or(Value::Null), Clone::clone)
             }
             MessageContent::Request { method, params } => {
                 // Convert back to LRP request format
@@ -258,7 +248,7 @@ impl ProtocolAdapter for LDPAdapter {
             LDPRequest::InitializeRequest { client_id, .. } => {
                 ("initialize", serde_json::json!({ "client_id": client_id }))
             }
-            LDPRequest::SetBreakpointsRequest { .. } => ("setBreakpoints", json.clone()),
+            LDPRequest::SetBreakpointsRequest { .. } => ("setBreakpoints", json),
             LDPRequest::ContinueRequest { thread_id, .. } => {
                 ("continue", serde_json::json!({ "thread_id": thread_id }))
             }
@@ -280,7 +270,7 @@ impl ProtocolAdapter for LDPAdapter {
             LDPRequest::EvaluateRequest { expression, .. } => {
                 ("evaluate", serde_json::json!({ "expression": expression }))
             }
-            _ => ("unknown", json.clone()),
+            _ => ("unknown", json),
         };
 
         // Store original request for potential processing

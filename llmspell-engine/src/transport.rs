@@ -54,8 +54,15 @@ pub mod mock {
         connected: Mutex<bool>,
     }
 
+    impl Default for MockTransport {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl MockTransport {
         /// Create a new mock transport
+        #[must_use]
         pub fn new() -> Self {
             Self {
                 send_queue: Mutex::new(VecDeque::new()),

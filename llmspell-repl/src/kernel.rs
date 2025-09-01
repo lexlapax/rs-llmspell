@@ -6,6 +6,7 @@
 use anyhow::Result;
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
+use llmspell_engine::ProtocolEngine; // Import the trait for register_adapter
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
@@ -99,8 +100,8 @@ pub struct LLMSpellKernel {
     /// Client manager
     pub client_manager: Arc<ClientManager>,
 
-    /// Protocol server (implements `ProtocolEngine`)
-    pub protocol_server: Option<Arc<llmspell_engine::ProtocolServer>>,
+    /// Protocol engine for handling protocol messages
+    pub protocol_engine: Option<Arc<llmspell_engine::UnifiedProtocolEngine>>,
 
     /// Current execution state
     pub execution_state: Arc<RwLock<KernelState>>,
@@ -157,7 +158,7 @@ impl LLMSpellKernel {
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
 
-        // Protocol server will be initialized in run() method
+        // Protocol engine will be initialized in run() method
         // We store it as Option to set it up after kernel creation
 
         // Create connection info
@@ -187,7 +188,7 @@ impl LLMSpellKernel {
             kernel_id: kernel_id.clone(),
             runtime: Arc::new(Mutex::new(runtime)),
             client_manager,
-            protocol_server: None,
+            protocol_engine: None,
             execution_state: Arc::new(RwLock::new(KernelState::Starting)),
             config: config.clone(),
             connection_info,
@@ -218,11 +219,11 @@ impl LLMSpellKernel {
         use std::sync::Arc;
 
         // Create the kernel first
-        let kernel = Self::start(config.clone()).await?;
+        let kernel = Box::pin(Self::start(config.clone())).await?;
 
         // Create protocol engine for sidecar
         // Note: This is a placeholder - in real implementation, we'd use the actual transport
-        // from the ProtocolServer when it's created in run()
+        // from the UnifiedProtocolEngine when it's created in run()
         let transport = Box::new(
             llmspell_engine::transport::tcp::TcpTransport::connect(&format!(
                 "{}:{}",
@@ -263,18 +264,15 @@ impl LLMSpellKernel {
         tracing::info!("Kernel {} entering main event loop", self.kernel_id);
 
         // Start channel listeners
-        // Channels are now handled by ProtocolServer
+        // Channels are now handled by UnifiedProtocolEngine
 
         // Create a new shutdown channel (the old one is dropped with self)
         let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
         // Drop the old shutdown sender if it exists
         drop(self.shutdown_tx.take());
 
-        // Now we can move self into Arc
+        // Now we can move self into Arc to be used as MessageProcessor
         let kernel_arc = Arc::new(self);
-        let handler = Arc::new(crate::protocol_handler::KernelProtocolHandler::new(
-            kernel_arc.clone(),
-        ));
 
         let server_config = llmspell_engine::ServerConfig {
             ip: kernel_arc.config.ip.clone(),
@@ -286,16 +284,42 @@ impl LLMSpellKernel {
             max_clients: kernel_arc.config.max_clients,
         };
 
-        // Create the protocol server
-        let mut protocol_server = llmspell_engine::ProtocolServer::new(server_config, handler);
+        // Create the unified protocol engine with the kernel as message processor
+        // Use mock transport for now - the serve() method will handle TCP connections
+        let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
+        let mut protocol_engine = llmspell_engine::UnifiedProtocolEngine::with_processor(
+            transport,
+            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>,
+        );
+
+        // Register LRP and LDP adapters with processor support
+        let repl_protocol_adapter = llmspell_engine::LRPAdapter::with_processor(
+            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>
+        );
+        let debug_protocol_adapter = llmspell_engine::LDPAdapter::with_processor(
+            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>,
+        );
+
+        protocol_engine
+            .register_adapter(
+                llmspell_engine::ProtocolType::LRP,
+                Box::new(repl_protocol_adapter),
+            )
+            .await?;
+        protocol_engine
+            .register_adapter(
+                llmspell_engine::ProtocolType::LDP,
+                Box::new(debug_protocol_adapter),
+            )
+            .await?;
 
         // Create a ctrl-c handler
         let ctrl_c = tokio::signal::ctrl_c();
 
-        // Spawn protocol server task
+        // Spawn protocol engine task
         let server_handle = tokio::spawn(async move {
-            if let Err(e) = protocol_server.start().await {
-                tracing::error!("Protocol server error: {}", e);
+            if let Err(e) = protocol_engine.serve(server_config).await {
+                tracing::error!("Protocol engine error: {}", e);
             }
         });
 
@@ -352,7 +376,7 @@ impl LLMSpellKernel {
         }
 
         // Stop channels
-        // Channels stopped when ProtocolServer shuts down
+        // Channels stopped when UnifiedProtocolEngine shuts down
 
         // Remove connection file
         self.connection_info.remove_connection_file().await?;
@@ -681,6 +705,9 @@ impl std::fmt::Debug for LLMSpellKernel {
         f.debug_struct("LLMSpellKernel")
             .field("kernel_id", &self.kernel_id)
             .field("config", &self.config)
-            .finish()
+            .field("execution_state", &self.execution_state)
+            .field("connection_info", &self.connection_info)
+            .field("execution_count", &self.execution_count)
+            .finish_non_exhaustive()
     }
 }
