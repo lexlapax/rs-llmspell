@@ -67,13 +67,20 @@
 //! }
 //! ```
 
+pub mod adapters;
 pub mod client;
+pub mod engine;
 pub mod protocol;
 pub mod server;
 pub mod transport;
 
 // Re-export core types at crate root for convenience
+pub use adapters::{LDPAdapter, LRPAdapter};
 pub use client::{ClientError, ProtocolClient};
+pub use engine::{
+    Capability, ChannelType, ChannelView, EngineError, MessageContent, MessageRouter,
+    ProtocolAdapter, ProtocolEngine, ProtocolType, UnifiedProtocolEngine, UniversalMessage,
+};
 pub use protocol::{
     HelpLink, HistoryEntry, LDPRequest, LDPResponse, LRPCodec, LRPRequest, LRPResponse,
     LanguageInfo, MessageHandler, MessageType, ProtocolMessage, Source,
