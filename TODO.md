@@ -1315,118 +1315,178 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 - **Tests**: 8 comprehensive integration tests covering all functionality
 - **Future-ready**: Prepared for Phase 12 daemon mode and Phase 19-20 A2A protocols
 
-### Task 9.5.4: LRP/LDP Adapter Implementation
+### Task 9.5.4: LRP/LDP Adapter Implementation with Message Processor Pattern
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Protocol Team
 
-**Description**: Wrap existing working LRP/LDP handlers from Phase 9.4.7 in adapter pattern rather than recreating them.
+**Description**: Implement adapters using Message Processor pattern with dependency injection to avoid circular dependencies and follow Phase 9.1-9.3 architectural patterns.
+
+**🏗️ ARCHITECTURAL RATIONALE:**
+- **Problem**: Original approach (wrapping KernelProtocolHandler) creates circular dependency between llmspell-engine and llmspell-repl
+- **Solution**: Message Processor pattern with dependency injection (following Phase 9.3.3 patterns)
+- **Benefits**: Clean dependency flow, trait abstraction, future-proof for MCP/LSP/DAP/A2A protocols
+- **Pattern**: Three-Layer Architecture (Trait → Shared Logic → Concrete Implementation)
 
 **Acceptance Criteria:**
-- [ ] LRPAdapter implements ProtocolAdapter trait
-- [ ] LDPAdapter implements ProtocolAdapter trait
+- [ ] MessageProcessor trait defined in llmspell-engine
+- [ ] LRPAdapter enhanced with optional processor injection
+- [ ] LDPAdapter enhanced with optional processor injection  
+- [ ] Kernel implements MessageProcessor trait
 - [ ] All existing message types supported
 - [ ] Unignore sidecar integration tests: test_message_interception, test_metrics_collection, test_protocol_negotiation_caching
 - [ ] Proper capability advertisement
-- [ ] Seamless migration from old system
+- [ ] No circular dependencies
 
 **Implementation Steps:**
-1. Wrap existing LRP handling in adapter:
+1. Create MessageProcessor trait in engine (Layer 1: Abstraction):
    ```rust
-   pub struct LRPAdapter {
-       // Reuse existing handler from protocol_handler.rs
-       handler: Arc<KernelProtocolHandler>,
+   // llmspell-engine/src/processor.rs
+   #[async_trait]
+   pub trait MessageProcessor: Send + Sync {
+       async fn process_lrp(&self, request: LRPRequest) -> Result<LRPResponse, ProcessorError>;
+       async fn process_ldp(&self, request: LDPRequest) -> Result<LDPResponse, ProcessorError>;
    }
    
-   impl ProtocolAdapter for LRPAdapter {
-       fn protocol_type(&self) -> ProtocolType {
-           ProtocolType::LRP
-       }
-       
-       fn adapt_inbound(&self, raw: RawMessage) -> Result<UniversalMessage> {
-           // Don't recreate - use existing deserialization from 9.4.7
-           let msg = self.handler.parse_lrp(raw)?;
-           Ok(UniversalMessage::from_existing(msg))
-       }
-       
-       fn capabilities(&self) -> HashSet<Capability> {
-           // Same capabilities we already support
-           hashset![
-               Capability::RequestResponse,
-               Capability::PubSub,
-               Capability::Streaming,
-           ]
+   // Null implementation for testing
+   pub struct NullMessageProcessor;
+   ```
+
+2. Enhance adapters with processor injection (Layer 2: Shared Logic):
+   ```rust
+   pub struct LRPAdapter {
+       processor: Option<Arc<dyn MessageProcessor>>,
+   }
+   
+   impl LRPAdapter {
+       pub fn with_processor(processor: Arc<dyn MessageProcessor>) -> Self {
+           Self { processor: Some(processor) }
        }
    }
    ```
 
-2. Wrap LDP handling similarly (preserve existing logic)
-3. Register adapters with engine
-4. Keep existing message correlation from ProtocolClient
+3. Implement MessageProcessor for Kernel (Layer 3: Concrete):
+   ```rust
+   // Move logic from protocol_handler.rs to kernel.rs
+   #[async_trait]
+   impl MessageProcessor for LLMSpellKernel {
+       async fn process_lrp(&self, request: LRPRequest) -> Result<LRPResponse> {
+           // Existing handler logic here
+       }
+   }
+   ```
+
+4. Wire up processor when creating adapters
+5. Unignore and fix sidecar integration tests 
 
 **Definition of Done:**
-- [ ] LRP messages work through adapter
-- [ ] LDP messages work through adapter
-- [ ] All existing tests pass with adapters
-- [ ] No functionality lost in migration
+- [ ] MessageProcessor trait implemented with Null variant
+- [ ] Adapters support optional processor injection
+- [ ] Kernel implements MessageProcessor
+- [ ] No circular dependencies
+- [ ] All sidecar tests passing
+- [ ] Protocol handler logic preserved
 
-### Task 9.5.5: Refactor and Consolidate Code
+### Task 9.5.5: Refactor and Consolidate Code  
 **Priority**: CRITICAL  
 **Estimated Time**: 3 hours  
 **Assignee**: Cleanup Team
 
-**Description**: Refactor duplicate code while preserving all working functionality from Phase 9.4.7.
+**Description**: Consolidate protocol handling into UnifiedProtocolEngine while preserving all working functionality from Phase 9.4.7.
 
-**Code to Refactor (NOT just delete!):**
-- `llmspell-repl/src/channels.rs` - Convert to channel views, preserve any unique logic
-- `llmspell-protocol/src/server.rs` - Extract logic into ProtocolEngine BEFORE removing
-- `llmspell-repl/src/kernel.rs` - Update to use ProtocolEngine while keeping functionality
-- Message routing - Consolidate but preserve correlation mechanism
-- TCP binding - Unify but keep working connection logic
+**🏗️ ARCHITECTURAL GOALS:**
+- **Single Source of Truth**: One engine handles all protocol operations
+- **Zero Functionality Loss**: Every working feature must be preserved
+- **Clean Migration**: Extract logic before deletion, verify after migration
+- **Dependency Reduction**: Remove duplicate TCP implementations
+
+**Code to Migrate (preserve functionality):**
+- `llmspell-repl/src/channels.rs` - Already migrated to engine in Task 9.5.2 ✅
+- `llmspell-engine/src/server.rs` - Extract HandlerRegistry and accept_loop logic
+- `llmspell-repl/src/protocol_handler.rs` - Consolidate into MessageProcessor impl
+- `llmspell-repl/src/kernel.rs` - Update to use UnifiedProtocolEngine
+- Message routing - Preserve correlation mechanism in engine
+- TCP binding - Single bind point in engine
 
 **Acceptance Criteria:**
-- [ ] All duplicate TCP code removed
-- [ ] Single source of truth for protocol handling
+- [ ] HandlerRegistry migrated to engine
+- [ ] ProtocolServer functionality absorbed into UnifiedProtocolEngine
+- [ ] Kernel uses UnifiedProtocolEngine instead of ProtocolServer
+- [ ] protocol_handler.rs logic consolidated
+- [ ] All TCP operations through single engine
 - [ ] No dead code warnings
-- [ ] Reduced crate dependencies
-- [ ] Smaller binary size
+- [ ] Message correlation preserved
+- [ ] All existing tests still pass
 
 **Implementation Steps:**
-1. Extract useful logic from `channels.rs` before removal:
-   ```rust
-   // Preserve IOPub broadcast logic
-   // Keep heartbeat mechanism if unique
-   // Convert to views THEN remove file
-   ```
-
-2. Migrate `ProtocolServer` logic to engine:
+1. **Migrate ProtocolServer's TCP accept loop to UnifiedProtocolEngine**:
    ```rust
    impl UnifiedProtocolEngine {
-       pub fn from_protocol_server(server: ProtocolServer) -> Self {
-           // Extract accept_loop
-           // Preserve handler registry
-           // Keep correlation logic
-           // THEN remove old server
+       pub async fn serve(mut self, addr: SocketAddr) -> Result<()> {
+           // Move TCP listener and accept_loop from ProtocolServer
+           let listener = TcpListener::bind(addr).await?;
+           loop {
+               let (stream, _) = listener.accept().await?;
+               let transport = TcpTransport::new(stream);
+               // Handle connection with transport
+           }
        }
    }
    ```
 
-3. Update `kernel.rs` carefully:
+2. **Replace HandlerRegistry with MessageProcessor pattern**:
    ```rust
-   // Preserve all working functionality
-   // self.channels = ChannelSet::new(&self.engine);
-   // Ensure TCP still works!
+   // Remove HandlerRegistry - obsolete with MessageProcessor
+   // Engine stores processor reference instead:
+   pub struct UnifiedProtocolEngine {
+       transport: Arc<RwLock<Box<dyn Transport>>>,
+       adapters: HashMap<ProtocolType, Box<dyn ProtocolAdapter>>,
+       processor: Option<Arc<dyn MessageProcessor>>, // NEW
+   }
    ```
 
-4. Verify everything still works BEFORE removing old code
+3. **Update Kernel initialization to use engine with processor**:
+   ```rust
+   impl LLMSpellKernel {
+       pub async fn start_with_unified_engine(config: KernelConfig) -> Result<Self> {
+           let mut kernel = Self::new(config);
+           let kernel_arc = Arc::new(kernel);
+           
+           // Create engine with processor
+           let mut engine = UnifiedProtocolEngine::new(transport);
+           engine.set_processor(kernel_arc.clone());
+           
+           // Register adapters with processor
+           let lrp = LRPAdapter::with_processor(kernel_arc.clone());
+           let ldp = LDPAdapter::with_processor(kernel_arc.clone());
+           engine.register_adapter(ProtocolType::LRP, Box::new(lrp)).await?;
+           engine.register_adapter(ProtocolType::LDP, Box::new(ldp)).await?;
+           
+           // Start serving
+           tokio::spawn(engine.serve(addr));
+           Ok(kernel)
+       }
+   }
+   ```
+
+4. **Delete obsolete files after migration**:
+   - `protocol_handler.rs` - logic moved to Kernel's MessageProcessor impl
+   - `ProtocolServer` struct from server.rs - replaced by engine.serve()
+   - HandlerRegistry - replaced by MessageProcessor pattern
+
+5. **Update all imports and dependencies**
 
 **Definition of Done:**
-- [ ] All functionality preserved from 9.4.7
-- [ ] channels.rs logic migrated then deleted
-- [ ] ProtocolServer logic extracted then removed
-- [ ] `cargo test -p llmspell-protocol --test kernel_tcp_integration` still passes
+- [ ] UnifiedProtocolEngine::serve() replaces ProtocolServer
+- [ ] Kernel uses engine with MessageProcessor pattern
+- [ ] HandlerRegistry removed (replaced by MessageProcessor)
+- [ ] protocol_handler.rs deleted (logic in Kernel)
+- [ ] ProtocolServer struct deleted
+- [ ] `cargo test -p llmspell-engine --test kernel_tcp_integration` passes
 - [ ] Kernel TCP connection still works
-- [ ] Code compiles without warnings
+- [ ] Zero dead code warnings
+- [ ] Single TCP bind point through engine
+- [ ] All quality checks pass
 
 ### Task 9.5.6: Integration Testing and Benchmarking
 **Priority**: HIGH  
@@ -1444,88 +1504,123 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 - [ ] Sidecar pattern validated
 
 **Implementation Steps:**
-1. Create protocol engine integration tests:
+1. Create protocol engine integration tests with MessageProcessor:
    ```rust
    #[tokio::test]
-   async fn test_unified_engine_routing() {
-       let engine = UnifiedProtocolEngine::new(config);
+   async fn test_unified_engine_with_processor() {
+       // Create test processor
+       let processor = Arc::new(TestMessageProcessor::new());
        
-       // Test multiple protocols
-       engine.register_adapter(ProtocolType::LRP, Box::new(LRPAdapter));
-       engine.register_adapter(ProtocolType::LDP, Box::new(LDPAdapter));
+       // Create engine
+       let mut engine = UnifiedProtocolEngine::new(mock_transport());
        
-       // Verify routing works
-       let msg = create_test_message();
-       engine.send(ChannelType::Shell, msg).await?;
+       // Register adapters WITH processor
+       let lrp = LRPAdapter::with_processor(processor.clone());
+       let ldp = LDPAdapter::with_processor(processor.clone());
+       engine.register_adapter(ProtocolType::LRP, Box::new(lrp)).await?;
+       engine.register_adapter(ProtocolType::LDP, Box::new(ldp)).await?;
        
-       // Verify received correctly
-       let received = engine.recv(ChannelType::Shell).await?;
-       assert_eq!(received.content, expected);
+       // Test message processing
+       let request = LRPRequest::KernelInfoRequest;
+       let response = processor.process_lrp(request).await?;
+       assert!(matches!(response, LRPResponse::KernelInfoReply { .. }));
    }
    ```
 
-2. Benchmark performance vs old dual system:
+2. Benchmark MessageProcessor pattern performance:
    ```rust
    #[bench]
-   fn bench_message_routing(b: &mut Bencher) {
-       // Compare old KernelChannels + ProtocolServer
-       // vs new UnifiedProtocolEngine
+   fn bench_message_processor_routing(b: &mut Bencher) {
+       // Benchmark direct processor calls vs adapter indirection
+       // Measure overhead of trait dispatch
+       // Compare with old HandlerRegistry approach
    }
    ```
 
-3. Test sidecar interception and circuit breaking
-4. Validate service discovery mechanisms
-5. Stress test with multiple concurrent protocols
+3. Test sidecar with MessageProcessor:
+   ```rust
+   #[tokio::test]
+   async fn test_sidecar_with_processor() {
+       let processor = Arc::new(kernel);
+       let sidecar = create_test_sidecar_with_processor(processor);
+       // Test message interception with processing
+   }
+   ```
+
+4. Validate service discovery with new architecture
+5. Stress test processor under concurrent load
 
 **Definition of Done:**
-- [ ] All tests green
-- [ ] Performance improved by >10%
-- [ ] Memory usage reduced
-- [ ] No race conditions
-- [ ] Documentation updated
+- [ ] All tests green including sidecar tests
+- [ ] MessageProcessor pattern benchmarked
+- [ ] Zero overhead for trait dispatch confirmed
+- [ ] Memory usage reduced (single TCP listener)
+- [ ] No race conditions in processor calls
+- [ ] Documentation reflects MessageProcessor architecture
 
 ### Task 9.5.7: Documentation and Migration Guide
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Documentation Team
 
-**Description**: Document new architecture and provide migration guide for future protocol additions.
+**Description**: Document MessageProcessor architecture and provide migration guide for future protocol additions.
 
 **Acceptance Criteria:**
-- [ ] Architecture documented with diagrams
-- [ ] Adapter creation guide written
-- [ ] Service mesh pattern explained
-- [ ] Performance improvements documented
+- [ ] MessageProcessor pattern documented
+- [ ] Dependency injection explained
+- [ ] Adapter creation guide with processor injection
+- [ ] Service mesh pattern with processors explained
+- [ ] Migration from HandlerRegistry documented
 - [ ] Future extensibility roadmap
 
 **Implementation Steps:**
-1. Create architecture documentation:
+1. Create MessageProcessor architecture documentation:
    ```markdown
-   # Unified Protocol Engine Architecture
+   # Unified Protocol Engine with MessageProcessor Pattern
    
-   ## Overview
-   The ProtocolEngine provides a single point for all protocol handling...
+   ## Core Architecture
+   The MessageProcessor pattern enables clean separation between protocol 
+   handling (engine/adapters) and business logic (kernel/services).
+   
+   ## MessageProcessor Trait
+   - Defines async methods for processing each protocol
+   - Implemented by services (Kernel, future daemons)
+   - Injected into adapters via dependency injection
    
    ## Adding New Protocols
-   1. Implement ProtocolAdapter trait
-   2. Register with engine
-   3. Define capability set
+   1. Define protocol types in engine
+   2. Create adapter with processor support:
+      ```rust
+      pub struct MCPAdapter {
+          processor: Option<Arc<dyn MessageProcessor>>,
+      }
+      ```
+   3. Extend MessageProcessor trait:
+      ```rust
+      trait MessageProcessor {
+          async fn process_mcp(&self, req: MCPRequest) -> Result<MCPResponse>;
+      }
+      ```
+   4. Implement in kernel/service
+   5. Wire up with dependency injection
    
-   ## Service Mesh Pattern
-   The sidecar handles protocol complexity...
+   ## Avoiding Circular Dependencies
+   - Engine defines traits and adapters
+   - Services implement MessageProcessor
+   - Clean dependency flow: services → engine
    ```
 
-2. Document migration from old system
-3. Create examples for common scenarios
-4. Update API documentation
-5. Add inline code documentation
+2. Document migration from HandlerRegistry to MessageProcessor
+3. Create examples showing processor injection
+4. Update sidecar documentation with processor pattern
+5. Add inline code documentation for trait methods
 
 **Definition of Done:**
-- [ ] Architecture docs complete
-- [ ] Migration guide clear
-- [ ] Examples compile and run
-- [ ] API docs generated
-- [ ] README updated
+- [ ] MessageProcessor pattern fully documented
+- [ ] Dependency injection examples clear
+- [ ] Migration guide from old system complete
+- [ ] API docs show trait relationships
+- [ ] README reflects new architecture
 
 ---
 
