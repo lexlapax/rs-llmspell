@@ -70,12 +70,13 @@ pub async fn execute_script_file(
     let script_content = fs::read_to_string(&script_path).await?;
 
     if debug_mode {
-        // Debug execution path using kernel
-        super::run_debug::execute_script_debug(
-            script_content,
-            script_path,
-            runtime_config,
+        // Debug execution path using DebugBridge (Bridge Pattern architecture)
+        // This provides hybrid local/protocol debugging with Task 9.7 readiness
+        super::debug::handle_debug_command(
+            script_path.clone(),
             args,
+            engine,
+            runtime_config,
             output_format,
         )
         .await

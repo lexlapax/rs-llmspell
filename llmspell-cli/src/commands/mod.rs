@@ -3,6 +3,7 @@
 
 pub mod apps;
 pub mod backup;
+pub mod debug;
 pub mod exec;
 pub mod info;
 pub mod init;
@@ -147,17 +148,8 @@ pub async fn execute_command(
         }
         Commands::Setup { force } => setup::run_interactive_setup(force).await,
         Commands::Debug { script, args } => {
-            // Debug command implementation - always uses debug mode
-            run::execute_script_file(
-                script,
-                engine,
-                runtime_config,
-                false, // stream
-                args,
-                output_format,
-                true, // debug is always true for Debug command
-            )
-            .await
+            // Use dedicated DebugBridge architecture for debug command
+            debug::handle_debug_command(script, args, engine, runtime_config, output_format).await
         }
     }
 }

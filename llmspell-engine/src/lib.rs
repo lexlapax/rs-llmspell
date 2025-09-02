@@ -83,6 +83,7 @@
 pub mod adapters;
 pub mod channels;
 pub mod client;
+pub mod debug_bridge;
 pub mod engine;
 pub mod processor;
 pub mod protocol;
@@ -97,6 +98,10 @@ pub use channels::{
     MessageAdapter, ShellView, StdinView,
 };
 pub use client::{ClientError, ProtocolClient};
+pub use debug_bridge::{
+    DebugBridge, DebugConfig, DebugMode, DebugPerformanceMonitor, DebugSession, DebugSessionState,
+    LocalDebugConfig, PerformanceConfig, ProtocolDebugConfig,
+};
 pub use engine::{
     Capability, ChannelType, ChannelView, EngineError, MessageContent, MessageRouter,
     ProtocolAdapter, ProtocolEngine, ProtocolType, UnifiedProtocolEngine, UniversalMessage,
