@@ -8,6 +8,9 @@ pub fn register_standard_vars(registry: &EnvRegistry) -> Result<(), String> {
     // Core Runtime Variables
     register_runtime_vars(registry)?;
 
+    // UnifiedProtocolEngine Variables
+    register_engine_vars(registry)?;
+
     // State Persistence Variables
     register_state_vars(registry)?;
 
@@ -135,6 +138,227 @@ fn register_runtime_vars(registry: &EnvRegistry) -> Result<(), String> {
                 v.parse::<u64>()
                     .map(|_| ())
                     .map_err(|e| format!("Invalid execution time: {}", e))
+            })
+            .build(),
+    )?;
+
+    Ok(())
+}
+
+/// Register UnifiedProtocolEngine environment variables
+fn register_engine_vars(registry: &EnvRegistry) -> Result<(), String> {
+    // Binding Configuration
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_IP")
+            .description("IP address for UnifiedProtocolEngine to bind to")
+            .category(EnvCategory::Engine)
+            .config_path("engine.binding.ip")
+            .default("127.0.0.1")
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_PORT_START")
+            .description("Starting port for UnifiedProtocolEngine port range")
+            .category(EnvCategory::Engine)
+            .config_path("engine.binding.port_range_start")
+            .default("9555")
+            .validator(|v| {
+                v.parse::<u16>()
+                    .map(|port| {
+                        if port == 0 {
+                            Err("Port must be greater than 0".to_string())
+                        } else {
+                            Ok(())
+                        }
+                    })
+                    .map_err(|e| format!("Invalid port: {}", e))?
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_MAX_CLIENTS")
+            .description("Maximum concurrent clients for UnifiedProtocolEngine")
+            .category(EnvCategory::Engine)
+            .config_path("engine.binding.max_clients")
+            .default("10")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|clients| {
+                        if clients == 0 {
+                            Err("Max clients must be greater than 0".to_string())
+                        } else {
+                            Ok(())
+                        }
+                    })
+                    .map_err(|e| format!("Invalid client count: {}", e))?
+            })
+            .build(),
+    )?;
+
+    // Routing Configuration
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_SHELL_STRATEGY")
+            .description(
+                "Routing strategy for Shell channel (Direct, Broadcast, RoundRobin, LoadBalanced)",
+            )
+            .category(EnvCategory::Engine)
+            .config_path("engine.routing.shell_strategy")
+            .default("Direct")
+            .validator(|v| match v {
+                "Direct" | "Broadcast" | "RoundRobin" | "LoadBalanced" => Ok(()),
+                _ => Err(format!("Invalid routing strategy: {}", v)),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_IOPUB_STRATEGY")
+            .description(
+                "Routing strategy for IOPub channel (Direct, Broadcast, RoundRobin, LoadBalanced)",
+            )
+            .category(EnvCategory::Engine)
+            .config_path("engine.routing.iopub_strategy")
+            .default("Broadcast")
+            .validator(|v| match v {
+                "Direct" | "Broadcast" | "RoundRobin" | "LoadBalanced" => Ok(()),
+                _ => Err(format!("Invalid routing strategy: {}", v)),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_CONTROL_STRATEGY")
+            .description("Routing strategy for Control channel (Direct, Broadcast, RoundRobin, LoadBalanced)")
+            .category(EnvCategory::Engine)
+            .config_path("engine.routing.control_strategy")
+            .default("RoundRobin")
+            .validator(|v| match v {
+                "Direct" | "Broadcast" | "RoundRobin" | "LoadBalanced" => Ok(()),
+                _ => Err(format!("Invalid routing strategy: {}", v)),
+            })
+            .build(),
+    )?;
+
+    // Debug Configuration
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_DEBUG_ENABLED")
+            .description("Enable debug mode in UnifiedProtocolEngine")
+            .category(EnvCategory::Engine)
+            .config_path("engine.debug.enabled")
+            .default("true")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_BREAKPOINTS_ENABLED")
+            .description("Enable breakpoint functionality in engine debug mode")
+            .category(EnvCategory::Engine)
+            .config_path("engine.debug.breakpoints_enabled")
+            .default("true")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_VARIABLE_INSPECTION_ENABLED")
+            .description("Enable variable inspection in engine debug mode")
+            .category(EnvCategory::Engine)
+            .config_path("engine.debug.variable_inspection_enabled")
+            .default("true")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
+            })
+            .build(),
+    )?;
+
+    // REPL Configuration
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_REPL_HISTORY_SIZE")
+            .description("REPL command history size")
+            .category(EnvCategory::Engine)
+            .config_path("engine.repl.history_size")
+            .default("1000")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|size| {
+                        if size == 0 {
+                            Err("History size must be greater than 0".to_string())
+                        } else {
+                            Ok(())
+                        }
+                    })
+                    .map_err(|e| format!("Invalid history size: {}", e))?
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_REPL_OUTPUT_FORMAT")
+            .description("REPL output formatting (Plain, Enhanced, Json, Compact)")
+            .category(EnvCategory::Engine)
+            .config_path("engine.repl.output_formatting")
+            .default("Enhanced")
+            .validator(|v| match v {
+                "Plain" | "Enhanced" | "Json" | "Compact" => Ok(()),
+                _ => Err(format!("Invalid output format: {}", v)),
+            })
+            .build(),
+    )?;
+
+    // Performance Configuration
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_MAX_CONCURRENT_MESSAGES")
+            .description("Maximum concurrent message processing in engine")
+            .category(EnvCategory::Engine)
+            .config_path("engine.performance.max_concurrent_messages")
+            .default("100")
+            .validator(|v| {
+                v.parse::<usize>()
+                    .map(|msgs| {
+                        if msgs == 0 {
+                            Err("Max concurrent messages must be greater than 0".to_string())
+                        } else {
+                            Ok(())
+                        }
+                    })
+                    .map_err(|e| format!("Invalid message count: {}", e))?
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_MESSAGE_TIMEOUT_MS")
+            .description("Message processing timeout in milliseconds")
+            .category(EnvCategory::Engine)
+            .config_path("engine.performance.message_timeout_ms")
+            .default("30000")
+            .validator(|v| {
+                v.parse::<u64>()
+                    .map(|_| ())
+                    .map_err(|e| format!("Invalid timeout: {}", e))
+            })
+            .build(),
+    )?;
+
+    registry.register_var(
+        EnvVarDefBuilder::new("LLMSPELL_ENGINE_ENABLE_BATCHING")
+            .description("Enable message batching for improved performance")
+            .category(EnvCategory::Engine)
+            .config_path("engine.performance.enable_batching")
+            .default("false")
+            .validator(|v| match v {
+                "true" | "false" => Ok(()),
+                _ => Err("Value must be 'true' or 'false'".to_string()),
             })
             .build(),
     )?;

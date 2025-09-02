@@ -1833,10 +1833,11 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 
 ## Phase 9.6: CLI Developer Experience (Days 14-15)
 
-### Task 9.6.1: UnifiedProtocolEngine Configuration System
+### Task 9.6.1: UnifiedProtocolEngine Configuration System ✅ **COMPLETED**
 **Priority**: HIGH  
 **Estimated Time**: 6 hours  
-**Assignee**: Config Team
+**Assignee**: Config Team  
+**Status**: COMPLETE
 
 **Description**: Implement configuration system for UnifiedProtocolEngine, debug settings, and REPL behavior to enable rich developer experience.
 
@@ -1848,13 +1849,13 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 - **REPL Behavior**: Configure history, completion, output formatting
 
 **Acceptance Criteria:**
-- [ ] TOML configuration parsing for UnifiedProtocolEngine settings
-- [ ] Debug mode configuration (breakpoints, stepping, variable inspection)  
-- [ ] REPL behavior configuration (history size, completion, output formatting)
-- [ ] MessageProcessor configuration (execution limits, hook integration)
-- [ ] MessageRouter strategy configuration (routing algorithms, handler registration)
-- [ ] Environment variable override support
-- [ ] Configuration validation with meaningful error messages
+- [x] TOML configuration parsing for UnifiedProtocolEngine settings
+- [x] Debug mode configuration (breakpoints, stepping, variable inspection)  
+- [x] REPL behavior configuration (history size, completion, output formatting)
+- [x] MessageProcessor configuration (execution limits, hook integration)
+- [x] MessageRouter strategy configuration (routing algorithms, handler registration)
+- [x] Environment variable override support
+- [x] Configuration validation with meaningful error messages
 
 **Implementation Steps:**
 1. Define UnifiedProtocolEngine configuration structure:
@@ -1917,12 +1918,12 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 5. Test configuration loading and validation
 
 **Definition of Done:**
-- [ ] Configuration loads from TOML, environment, and defaults
-- [ ] UnifiedProtocolEngine can be configured for debug/non-debug modes
-- [ ] REPL behavior fully configurable
-- [ ] Configuration validation prevents invalid combinations
-- [ ] Documentation complete with examples
-- [ ] Zero clippy warnings
+- [x] Configuration loads from TOML, environment, and defaults
+- [x] UnifiedProtocolEngine can be configured for debug/non-debug modes
+- [x] REPL behavior fully configurable
+- [x] Configuration validation prevents invalid combinations
+- [x] Documentation complete with examples
+- [x] Zero clippy warnings
 
 ### Task 9.6.2: CLI Debug Integration with UnifiedProtocolEngine
 **Priority**: HIGH  

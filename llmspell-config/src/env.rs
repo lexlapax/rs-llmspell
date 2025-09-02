@@ -11,6 +11,8 @@ use std::sync::{Arc, RwLock};
 pub enum EnvCategory {
     /// Core runtime configuration
     Runtime,
+    /// UnifiedProtocolEngine configuration
+    Engine,
     /// Provider-specific configuration
     Provider,
     /// Tool configuration

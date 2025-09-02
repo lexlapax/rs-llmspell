@@ -13,16 +13,17 @@
 
 1. [Quick Start](#quick-start)
 2. [Configuration Files](#configuration-files)
-3. [LLM Providers](#llm-providers)
-4. [RAG Configuration](#rag-configuration) ⭐ **Phase 8.10.6**
-5. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8.10.6**
-6. [State & Sessions](#state--sessions)
-7. [Security Settings](#security-settings)
-8. [Tool Configuration](#tool-configuration)
-9. [External API Setup](#external-api-setup)
-10. [Deployment Profiles](#deployment-profiles)
-11. [Environment Variables](#environment-variables)
-12. [Troubleshooting](#troubleshooting)
+3. [UnifiedProtocolEngine Configuration](#unifiedprotocolengine-configuration) ⭐ **Phase 9.6**
+4. [LLM Providers](#llm-providers)
+5. [RAG Configuration](#rag-configuration) ⭐ **Phase 8.10.6**
+6. [Multi-Tenancy](#multi-tenancy) ⭐ **Phase 8.10.6**
+7. [State & Sessions](#state--sessions)
+8. [Security Settings](#security-settings)
+9. [Tool Configuration](#tool-configuration)
+10. [External API Setup](#external-api-setup)
+11. [Deployment Profiles](#deployment-profiles)
+12. [Environment Variables](#environment-variables)
+13. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -123,6 +124,177 @@ Configuration is loaded in order (later overrides earlier):
 5. CLI specified: `-c custom.toml`
 6. Environment variables
 7. Command-line arguments
+
+---
+
+## UnifiedProtocolEngine Configuration ⭐ **Phase 9.6**
+
+The UnifiedProtocolEngine handles network binding, message routing, debug integration, REPL behavior, and performance settings for the LLMSpell protocol infrastructure.
+
+### Complete Engine Configuration
+
+```toml
+# Engine configuration - Full example with all options
+[engine]
+
+# Network binding configuration
+[engine.binding]
+ip = "127.0.0.1"                    # IP address to bind to
+port_range_start = 9555             # Starting port for port range  
+max_clients = 10                    # Maximum concurrent clients
+connection_timeout_seconds = 30     # Connection timeout
+keep_alive_timeout_seconds = 60     # Keep-alive timeout
+
+# Message routing strategies
+[engine.routing]
+shell_strategy = "Direct"           # Shell channel: Direct, Broadcast, RoundRobin, LoadBalanced
+iopub_strategy = "Broadcast"        # IOPub channel routing strategy
+control_strategy = "RoundRobin"     # Control channel routing strategy
+default_strategy = "Direct"         # Default for custom channels
+enable_metrics = false              # Enable routing metrics collection
+handler_registration_timeout_ms = 5000  # Handler registration timeout
+
+# Debug system integration
+[engine.debug]
+enabled = true                      # Enable debug mode globally
+breakpoints_enabled = true          # Enable breakpoint functionality
+step_debugging_enabled = true       # Enable step debugging
+variable_inspection_enabled = true  # Enable variable inspection
+hook_profiling_enabled = false      # Enable hook profiling for overhead measurement
+session_timeout_seconds = 1800      # Debug session timeout (30 minutes)
+max_debug_buffer_size = 10000      # Maximum debug messages to buffer
+protocol_tracing_enabled = false    # Enable debug protocol tracing
+
+# REPL behavior configuration
+[engine.repl]
+history_size = 1000                 # Command history size
+# history_file = "~/.llmspell/history"  # Path to history file (optional)
+tab_completion = true               # Enable tab completion
+ctrl_r_search = true                # Enable Ctrl+R reverse search
+output_formatting = "Enhanced"      # Output format: Plain, Enhanced, Json, Compact
+multiline_support = true            # Enable multiline input support
+prompt = "llmspell> "               # Prompt string for interactive mode
+continuation_prompt = "... "        # Continuation prompt for multiline input
+max_line_length = 120               # Maximum line length before wrapping
+syntax_highlighting = true          # Enable syntax highlighting
+
+# Performance configuration
+[engine.performance]
+max_concurrent_messages = 100       # Maximum message processing concurrency
+message_timeout_ms = 30000          # Message processing timeout (30 seconds)
+enable_batching = false             # Enable message batching for performance
+batch_size = 10                     # Batch size for message processing
+batch_timeout_ms = 100              # Batch timeout in milliseconds
+connection_pool_size = 10           # Connection pool size
+enable_connection_pooling = true    # Enable connection pooling
+memory_limit_per_connection_bytes = 10000000  # Memory limit per connection (10MB)
+enable_performance_metrics = false  # Enable performance metrics collection
+metrics_collection_interval_seconds = 60      # Metrics collection interval
+```
+
+### Environment Variables
+
+Override any engine configuration using environment variables:
+
+```bash
+# Binding configuration
+export LLMSPELL_ENGINE_IP="0.0.0.0"
+export LLMSPELL_ENGINE_PORT_START=8080
+export LLMSPELL_ENGINE_MAX_CLIENTS=50
+
+# Routing strategies
+export LLMSPELL_ENGINE_SHELL_STRATEGY="RoundRobin"
+export LLMSPELL_ENGINE_IOPUB_STRATEGY="Broadcast"
+export LLMSPELL_ENGINE_CONTROL_STRATEGY="LoadBalanced"
+
+# Debug configuration
+export LLMSPELL_ENGINE_DEBUG_ENABLED=true
+export LLMSPELL_ENGINE_BREAKPOINTS_ENABLED=true
+export LLMSPELL_ENGINE_VARIABLE_INSPECTION_ENABLED=true
+
+# REPL configuration
+export LLMSPELL_ENGINE_REPL_HISTORY_SIZE=2000
+export LLMSPELL_ENGINE_REPL_OUTPUT_FORMAT="Json"
+
+# Performance tuning
+export LLMSPELL_ENGINE_MAX_CONCURRENT_MESSAGES=200
+export LLMSPELL_ENGINE_MESSAGE_TIMEOUT_MS=60000
+export LLMSPELL_ENGINE_ENABLE_BATCHING=true
+```
+
+### Common Configuration Patterns
+
+**Development Configuration** (single developer):
+```toml
+[engine.binding]
+max_clients = 3
+[engine.debug]
+enabled = true
+protocol_tracing_enabled = true
+[engine.performance]
+max_concurrent_messages = 10
+```
+
+**Production Configuration** (multiple users):
+```toml
+[engine.binding]
+ip = "0.0.0.0"
+max_clients = 100
+connection_timeout_seconds = 60
+[engine.debug]
+enabled = false  # Disable debug in production
+[engine.performance]
+max_concurrent_messages = 500
+enable_batching = true
+enable_performance_metrics = true
+```
+
+**Debug-Focused Configuration** (development/testing):
+```toml
+[engine.debug]
+enabled = true
+breakpoints_enabled = true
+step_debugging_enabled = true
+variable_inspection_enabled = true
+protocol_tracing_enabled = true
+hook_profiling_enabled = true
+max_debug_buffer_size = 50000
+```
+
+**High-Performance Configuration** (load testing):
+```toml
+[engine.performance]
+max_concurrent_messages = 1000
+message_timeout_ms = 10000
+enable_batching = true
+batch_size = 50
+batch_timeout_ms = 50
+connection_pool_size = 50
+enable_performance_metrics = true
+```
+
+### Configuration Validation
+
+The engine validates configuration consistency:
+
+- **Port Requirements**: `port_range_start` must be > 0, warns if < 1024 (privileged ports)
+- **Resource Limits**: `max_clients` must be > 0, warns if > 10,000
+- **Debug Settings**: All timeout values must be > 0, warns if excessively long
+- **Performance Tuning**: Batching requires valid `batch_size` and `batch_timeout_ms`
+- **Memory Safety**: Calculates total potential memory usage and warns if excessive
+
+### Integration with CLI Commands
+
+The engine configuration directly affects CLI debug commands:
+
+```bash
+# These commands use engine.debug configuration
+llmspell debug script.lua           # Uses debug.enabled, breakpoints_enabled
+llmspell run script.lua --debug     # Uses debug.session_timeout_seconds
+
+# REPL behavior controlled by engine.repl
+llmspell repl                       # Uses repl.history_size, tab_completion, etc.
+```
 
 ---
 

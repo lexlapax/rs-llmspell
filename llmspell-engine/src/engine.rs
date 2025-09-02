@@ -143,7 +143,7 @@ pub trait ProtocolAdapter: Send + Sync {
 }
 
 /// Message routing strategy
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RoutingStrategy {
     /// Direct routing to specific handler
     Direct,
