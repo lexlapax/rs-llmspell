@@ -237,6 +237,8 @@
 pub mod condition_evaluator;
 pub mod config_bridge;
 pub mod conversion;
+pub mod debug_adapters;
+pub mod debug_runtime;
 pub mod debug_state_cache;
 pub mod diagnostics_bridge;
 pub mod discovery;
@@ -305,6 +307,7 @@ pub use engine::{
     ScriptStream, SecurityContext,
 };
 
+pub use debug_runtime::{DebugControl, DebugHook, DebugRuntime};
 pub use llmspell_config::LLMSpellConfig;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;

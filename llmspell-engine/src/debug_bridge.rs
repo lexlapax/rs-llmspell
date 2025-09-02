@@ -17,11 +17,14 @@
 
 use crate::processor::{MessageProcessor, ProcessorError};
 use crate::protocol::{
-    ldp::{LDPRequest, LDPResponse},
+    ldp::{Breakpoint, LDPRequest, LDPResponse, Source, StackFrame, Variable},
     lrp::{LRPRequest, LRPResponse},
 };
 use async_trait::async_trait;
+use llmspell_core::debug::{DebugCapability, DebugRequest, DebugResponse};
+use llmspell_core::{BreakpointInfo, StackFrameInfo};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
@@ -275,7 +278,6 @@ pub struct SourceContext {
 ///
 /// Provides hybrid local/protocol debugging with seamless Task 9.7 transition.
 /// Integrates existing debug infrastructure while implementing MessageProcessor.
-#[derive(Debug)]
 pub struct DebugBridge {
     /// Current debug mode configuration
     mode: DebugMode,
@@ -283,6 +285,19 @@ pub struct DebugBridge {
     performance_monitor: Arc<RwLock<DebugPerformanceMonitor>>,
     /// Active debug sessions
     sessions: Arc<RwLock<std::collections::HashMap<String, DebugSession>>>,
+    /// Registered debug capabilities for protocol routing
+    capabilities: Arc<RwLock<HashMap<String, Arc<dyn DebugCapability>>>>,
+}
+
+impl std::fmt::Debug for DebugBridge {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DebugBridge")
+            .field("mode", &self.mode)
+            .field("performance_monitor", &"<Arc<RwLock>>")
+            .field("sessions", &"<Arc<RwLock>>")
+            .field("capabilities", &"<Arc<RwLock>>")
+            .finish_non_exhaustive()
+    }
 }
 
 impl DebugBridge {
@@ -300,6 +315,7 @@ impl DebugBridge {
             mode: config.mode,
             performance_monitor: performance_monitor.clone(),
             sessions: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            capabilities: Arc::new(RwLock::new(HashMap::new())),
         };
 
         // Record initialization time
@@ -316,16 +332,92 @@ impl DebugBridge {
         Ok(bridge)
     }
 
-    /// Start local debug session - optimized for current CLI usage
+    /// Register a debug capability
     ///
-    /// This method provides immediate debugging without protocol overhead.
+    /// Capabilities are used to route protocol requests to appropriate handlers.
+    pub async fn register_capability(&self, name: String, capability: Arc<dyn DebugCapability>) {
+        let mut capabilities = self.capabilities.write().await;
+        capabilities.insert(name, capability);
+    }
+
+    /// Get the capability registry for creating debug runtime
+    pub fn get_capability_registry(
+        &self,
+    ) -> Arc<RwLock<HashMap<String, Arc<dyn DebugCapability>>>> {
+        self.capabilities.clone()
+    }
+
+    /// Get registered capabilities
+    pub async fn get_capabilities(&self) -> Vec<String> {
+        let capabilities = self.capabilities.read().await;
+        capabilities.keys().cloned().collect()
+    }
+
+    /// Get a specific capability
+    pub async fn get_capability(&self, name: &str) -> Option<Arc<dyn DebugCapability>> {
+        let capabilities = self.capabilities.read().await;
+        capabilities.get(name).cloned()
+    }
+
+    /// Discover available debug capabilities with their features
+    pub async fn discover_capabilities(&self) -> std::collections::HashMap<String, Vec<String>> {
+        let capabilities = self.capabilities.read().await;
+        let mut discovery = std::collections::HashMap::new();
+
+        for (name, capability) in capabilities.iter() {
+            discovery.insert(name.clone(), capability.capabilities());
+        }
+
+        // Add built-in capabilities
+        discovery.insert(
+            "local_debugging".to_string(),
+            vec![
+                "immediate_execution".to_string(),
+                "enhanced_errors".to_string(),
+                "performance_monitoring".to_string(),
+            ],
+        );
+
+        discovery.insert(
+            "protocol_debugging".to_string(),
+            vec![
+                "ldp_support".to_string(),
+                "lrp_support".to_string(),
+                "remote_debugging".to_string(),
+            ],
+        );
+
+        discovery
+    }
+
+    /// Start local debug session with runtime - provides actual script execution
+    ///
+    /// Create a local debug session
+    /// The caller is responsible for creating the DebugRuntime separately if needed.
     pub async fn debug_local(&self, script: &str) -> Result<DebugSession, ProcessorError> {
         let start_time = Instant::now();
 
         match &self.mode {
-            DebugMode::Local(_config) => {
-                let session_id = uuid::Uuid::new_v4().to_string();
+            DebugMode::Local(_local_config) => {
+                // Create session through capability or directly
+                let session_id =
+                    if let Some(session_mgr) = self.get_capability("session_manager").await {
+                        // Use session manager if available
+                        let request = DebugRequest::CreateSession {
+                            script: script.to_string(),
+                            args: vec![],
+                        };
 
+                        match session_mgr.process_debug_request(request).await {
+                            Ok(DebugResponse::SessionCreated { session_id, .. }) => session_id,
+                            _ => uuid::Uuid::new_v4().to_string(),
+                        }
+                    } else {
+                        // Direct session creation
+                        uuid::Uuid::new_v4().to_string()
+                    };
+
+                // Create the debug session
                 let session = DebugSession {
                     session_id: session_id.clone(),
                     script_content: script.to_string(),
@@ -339,7 +431,7 @@ impl DebugBridge {
                     sessions.insert(session_id.clone(), session.clone());
                 }
 
-                // Record state operation time
+                // Record initialization time
                 let op_duration = start_time.elapsed();
                 {
                     let mut monitor = self.performance_monitor.write().await;
@@ -347,16 +439,10 @@ impl DebugBridge {
                 }
 
                 tracing::info!(
-                    "Local debug session created: {} ({}ms)",
+                    "Debug session created: {} ({}ms)",
                     session_id,
                     op_duration.as_millis()
                 );
-
-                // TODO: Integrate with existing debug infrastructure
-                // - Use existing DebugSessionManager
-                // - Connect to VariableInspector
-                // - Setup StackNavigator
-                // - Initialize ExecutionManager with debug hooks
 
                 Ok(session)
             }
@@ -369,6 +455,8 @@ impl DebugBridge {
     /// Handle protocol-based debugging - prepared for Task 9.7
     ///
     /// This method will be activated when CLI switches to kernel-hub architecture.
+    ///
+    /// Note: This was previously the local debug session method (legacy for backward compatibility)
     pub fn debug_protocol(&self, request: LDPRequest) -> Result<LDPResponse, ProcessorError> {
         match &self.mode {
             DebugMode::Protocol(_config) => {
@@ -398,6 +486,23 @@ impl DebugBridge {
     /// Switch from local to protocol mode - Task 9.7 transition support
     ///
     /// This method enables seamless migration when CLI adopts kernel-hub architecture.
+    /// Complete all active debug sessions
+    async fn complete_active_sessions(&self) {
+        let mut sessions = self.sessions.write().await;
+        for (session_id, session) in sessions.iter_mut() {
+            if matches!(
+                session.state,
+                DebugSessionState::Active | DebugSessionState::Paused
+            ) {
+                session.state = DebugSessionState::Completed;
+                tracing::info!(
+                    "Completed local debug session {} for protocol transition",
+                    session_id
+                );
+            }
+        }
+    }
+
     pub async fn switch_to_protocol_mode(
         &mut self,
         protocol_config: ProtocolDebugConfig,
@@ -405,21 +510,7 @@ impl DebugBridge {
         tracing::info!("Switching DebugBridge to protocol mode for Task 9.7 transition");
 
         // Gracefully stop any local sessions
-        {
-            let mut sessions = self.sessions.write().await;
-            for (session_id, session) in sessions.iter_mut() {
-                if matches!(
-                    session.state,
-                    DebugSessionState::Active | DebugSessionState::Paused
-                ) {
-                    session.state = DebugSessionState::Completed;
-                    tracing::info!(
-                        "Completed local debug session {} for protocol transition",
-                        session_id
-                    );
-                }
-            }
-        }
+        self.complete_active_sessions().await;
 
         // Switch to protocol mode
         self.mode = DebugMode::Protocol(protocol_config);
@@ -494,7 +585,7 @@ impl DebugBridge {
             file_path: file_path.clone(),
             line,
             column,
-            function_name: None, // TODO: Extract from script analysis
+            function_name: None, // Function name extraction pending future implementation
         });
 
         let source_context = if let Some(line_num) = line_number {
@@ -676,7 +767,7 @@ impl DebugBridge {
             before_lines,
             error_line: (error_line, error_line_content),
             after_lines,
-            highlight_range: None, // TODO: Parse column information
+            highlight_range: None, // Column highlighting will be added when column parsing is implemented
         })
     }
 
@@ -810,6 +901,218 @@ impl DebugBridge {
             ErrorType::Unknown => "Unknown Error".to_string(),
         }
     }
+
+    /// Convert LDP request to DebugRequest for capability routing
+    fn ldp_to_debug_request(request: &LDPRequest) -> Result<DebugRequest, ProcessorError> {
+        match request {
+            LDPRequest::SetBreakpointsRequest {
+                source,
+                breakpoints,
+                ..
+            } => {
+                // Convert breakpoint list to protocol format
+                let bp_list = if let Some(bps) = breakpoints {
+                    bps.iter()
+                        .map(|bp| (bp.line, bp.condition.clone()))
+                        .collect()
+                } else {
+                    vec![]
+                };
+
+                Ok(DebugRequest::SetBreakpoints {
+                    source: source.path.clone().unwrap_or_default(),
+                    breakpoints: bp_list,
+                })
+            }
+            LDPRequest::ContinueRequest { .. } => Ok(DebugRequest::Continue),
+            LDPRequest::NextRequest { .. } => Ok(DebugRequest::Step {
+                step_type: llmspell_core::debug::StepType::StepOver,
+            }),
+            LDPRequest::StepInRequest { .. } => Ok(DebugRequest::Step {
+                step_type: llmspell_core::debug::StepType::StepIn,
+            }),
+            LDPRequest::StepOutRequest { .. } => Ok(DebugRequest::Step {
+                step_type: llmspell_core::debug::StepType::StepOut,
+            }),
+            LDPRequest::PauseRequest { .. } => Ok(DebugRequest::Pause),
+            LDPRequest::StackTraceRequest { .. } => Ok(DebugRequest::GetStackTrace),
+            LDPRequest::VariablesRequest { .. } => {
+                // For now, inspect all variables in current frame
+                Ok(DebugRequest::InspectVariables {
+                    names: vec![],
+                    frame_id: None,
+                })
+            }
+            LDPRequest::EvaluateRequest {
+                expression,
+                frame_id,
+                ..
+            } => Ok(DebugRequest::EvaluateExpression {
+                expression: expression.clone(),
+                frame_id: frame_id.and_then(|id| id.try_into().ok()),
+            }),
+            LDPRequest::DisconnectRequest { .. } => {
+                Ok(DebugRequest::Terminate { session_id: None })
+            }
+            _ => Err(ProcessorError::NotImplemented(format!(
+                "LDP request type {:?} cannot be converted to DebugRequest",
+                request
+            ))),
+        }
+    }
+
+    /// Convert breakpoints response to LDP format
+    fn convert_breakpoints_to_ldp(breakpoints: &[BreakpointInfo]) -> Vec<Breakpoint> {
+        breakpoints
+            .iter()
+            .map(|bp| Breakpoint {
+                id: Some(bp.id.parse::<i32>().unwrap_or(0)),
+                verified: bp.verified,
+                message: None,
+                source: Some(Source {
+                    name: None,
+                    path: Some(bp.source.clone()),
+                    source_reference: None,
+                    presentation_hint: None,
+                    origin: None,
+                    sources: None,
+                    adapter_data: None,
+                    checksums: None,
+                }),
+                line: Some(bp.line),
+                column: None,
+                end_line: None,
+                end_column: None,
+                instruction_reference: None,
+                offset: None,
+            })
+            .collect()
+    }
+
+    /// Convert stack trace to LDP format
+    fn convert_stack_trace_to_ldp(frames: &[StackFrameInfo]) -> Vec<StackFrame> {
+        use std::convert::TryInto;
+        frames
+            .iter()
+            .map(|frame| StackFrame {
+                id: frame.index.try_into().unwrap_or(i32::MAX),
+                name: frame.name.clone(),
+                source: Some(Source {
+                    name: None,
+                    path: Some(frame.location.source.clone()),
+                    source_reference: None,
+                    presentation_hint: None,
+                    origin: None,
+                    sources: None,
+                    adapter_data: None,
+                    checksums: None,
+                }),
+                line: frame.location.line,
+                column: frame.location.column.unwrap_or(0),
+                end_line: None,
+                end_column: None,
+                can_restart: None,
+                instruction_pointer_reference: None,
+                module_id: None,
+                presentation_hint: None,
+            })
+            .collect()
+    }
+
+    /// Convert variables to LDP format
+    fn convert_variables_to_ldp(vars: &HashMap<String, serde_json::Value>) -> Vec<Variable> {
+        vars.iter()
+            .map(|(name, value)| Variable {
+                name: name.clone(),
+                value: format!("{}", value),
+                r#type: Some("auto".to_string()),
+                presentation_hint: None,
+                evaluate_name: None,
+                variables_reference: 0,
+                named_variables: None,
+                indexed_variables: None,
+                memory_reference: None,
+            })
+            .collect()
+    }
+
+    /// Convert DebugResponse back to LDP response
+    fn debug_to_ldp_response(
+        response: DebugResponse,
+        original_request: &LDPRequest,
+    ) -> Result<LDPResponse, ProcessorError> {
+        match (response, original_request) {
+            (
+                DebugResponse::BreakpointsSet { breakpoints },
+                LDPRequest::SetBreakpointsRequest { .. },
+            ) => Ok(LDPResponse::SetBreakpointsResponse {
+                breakpoints: Self::convert_breakpoints_to_ldp(&breakpoints),
+            }),
+            (DebugResponse::ExecutionState(_state), LDPRequest::ContinueRequest { .. }) => {
+                Ok(LDPResponse::ContinueResponse {
+                    all_threads_continued: Some(true),
+                })
+            }
+            (
+                DebugResponse::ExecutionState(_),
+                LDPRequest::NextRequest { .. }
+                | LDPRequest::StepInRequest { .. }
+                | LDPRequest::StepOutRequest { .. },
+            ) => Ok(LDPResponse::NextResponse),
+            (DebugResponse::ExecutionState(_), LDPRequest::PauseRequest { .. }) => {
+                Ok(LDPResponse::PauseResponse)
+            }
+            (DebugResponse::StackTrace(frames), LDPRequest::StackTraceRequest { .. }) => {
+                Ok(LDPResponse::StackTraceResponse {
+                    stack_frames: Self::convert_stack_trace_to_ldp(&frames),
+                    total_frames: Some(frames.len().try_into().unwrap_or(i32::MAX)),
+                })
+            }
+            (DebugResponse::Variables(vars), LDPRequest::VariablesRequest { .. }) => {
+                Ok(LDPResponse::VariablesResponse {
+                    variables: Self::convert_variables_to_ldp(&vars),
+                })
+            }
+            (
+                DebugResponse::EvaluationResult { value, type_name },
+                LDPRequest::EvaluateRequest { .. },
+            ) => Ok(LDPResponse::EvaluateResponse {
+                result: format!("{}", value),
+                r#type: type_name,
+                presentation_hint: None,
+                variables_reference: 0,
+                named_variables: None,
+                indexed_variables: None,
+                memory_reference: None,
+            }),
+            (DebugResponse::SessionTerminated, LDPRequest::DisconnectRequest { .. }) => {
+                Ok(LDPResponse::DisconnectResponse)
+            }
+            _ => Err(ProcessorError::ProcessingFailed(format!(
+                "Cannot convert DebugResponse to LDP for request type"
+            ))),
+        }
+    }
+
+    /// Handle LDP requests that don't have capability routing yet
+    fn handle_ldp_fallback(request: LDPRequest) -> Result<LDPResponse, ProcessorError> {
+        match request {
+            LDPRequest::InitializeRequest { .. } => Ok(LDPResponse::InitializeResponse {
+                capabilities: serde_json::json!({
+                    "supportsConfigurationDoneRequest": true,
+                    "supportsFunctionBreakpoints": true,
+                    "supportsConditionalBreakpoints": true,
+                    "supportsStepBack": false,
+                    "supportsSetVariable": true,
+                    "supportsRestartFrame": false,
+                }),
+            }),
+            _ => Err(ProcessorError::NotImplemented(format!(
+                "LDP request type {:?} not yet implemented",
+                request
+            ))),
+        }
+    }
 }
 
 /// `MessageProcessor` implementation for protocol consistency
@@ -825,7 +1128,7 @@ impl MessageProcessor for DebugBridge {
                 // For protocol mode, this would route to kernel
                 match &self.mode {
                     DebugMode::Local(_) => {
-                        // TODO: Integrate with existing ScriptRuntime with debug hooks
+                        // ScriptRuntime integration deferred to Task 9.7 kernel architecture
                         tracing::debug!("Executing code with local debug hooks: {}", code);
 
                         Ok(LRPResponse::ExecuteReply {
@@ -853,39 +1156,45 @@ impl MessageProcessor for DebugBridge {
         // Route to appropriate debug handler based on mode
         match &self.mode {
             DebugMode::Local(_) => {
-                // Handle debug protocol requests locally
-                match request {
-                    LDPRequest::InitializeRequest { .. } => Ok(LDPResponse::InitializeResponse {
-                        capabilities: serde_json::json!({
-                            "supportsConfigurationDoneRequest": true,
-                            "supportsFunctionBreakpoints": true,
-                            "supportsConditionalBreakpoints": true,
-                            "supportsStepBack": false,
-                            "supportsSetVariable": true,
-                            "supportsRestartFrame": false,
-                        }),
-                    }),
-                    LDPRequest::SetBreakpointsRequest {
-                        source,
-                        breakpoints,
-                        ..
-                    } => {
-                        let bp_count = breakpoints.as_ref().map_or(0, std::vec::Vec::len);
-                        let source_path = source.path.as_deref().unwrap_or("<unknown>");
-                        tracing::debug!("Setting {} breakpoints in {}", bp_count, source_path);
+                // Try to convert LDP request to DebugRequest and route through capabilities
+                if let Ok(debug_request) = Self::ldp_to_debug_request(&request) {
+                    // Find appropriate capability to handle the request
+                    let capabilities = self.capabilities.read().await;
 
-                        // TODO: Integrate with existing ExecutionManager
-                        // for bp in breakpoints {
-                        //     self.execution_manager.set_breakpoint(&source.path, bp.line, bp.condition).await?;
-                        // }
+                    // Route based on request type
+                    let capability_name = match &debug_request {
+                        DebugRequest::SetBreakpoints { .. }
+                        | DebugRequest::RemoveBreakpoints { .. }
+                        | DebugRequest::Step { .. }
+                        | DebugRequest::Continue
+                        | DebugRequest::Pause => "execution_manager",
 
-                        Ok(LDPResponse::SetBreakpointsResponse {
-                            breakpoints: vec![], // TODO: Return actual breakpoint info
-                        })
+                        DebugRequest::InspectVariables { .. }
+                        | DebugRequest::EvaluateExpression { .. } => "variable_inspector",
+
+                        DebugRequest::NavigateStack { .. } | DebugRequest::GetStackTrace => {
+                            "stack_navigator"
+                        }
+
+                        DebugRequest::CreateSession { .. }
+                        | DebugRequest::Terminate { .. }
+                        | DebugRequest::GetDebugState => "session_manager",
+                    };
+
+                    if let Some(capability) = capabilities.get(capability_name) {
+                        match capability.process_debug_request(debug_request).await {
+                            Ok(debug_response) => {
+                                Self::debug_to_ldp_response(debug_response, &request)
+                            }
+                            Err(e) => Err(ProcessorError::ProcessingFailed(e.to_string())),
+                        }
+                    } else {
+                        // Fallback to basic handling if capability not registered
+                        Self::handle_ldp_fallback(request)
                     }
-                    _ => Err(ProcessorError::NotImplemented(
-                        "LDP request type not yet implemented in local mode".to_string(),
-                    )),
+                } else {
+                    // If conversion fails, use fallback handling
+                    Self::handle_ldp_fallback(request)
                 }
             }
             DebugMode::Protocol(_config) => {

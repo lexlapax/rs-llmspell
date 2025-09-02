@@ -284,6 +284,21 @@ impl ScriptRuntime {
         self.engine.set_script_args(args).await
     }
 
+    /// Install debug hooks for execution control
+    ///
+    /// This method allows installing debug hooks that can control script execution
+    /// for debugging purposes (breakpoints, stepping, etc.)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine doesn't support debugging or hook installation fails
+    pub fn install_debug_hooks(
+        &mut self,
+        hook: Arc<dyn crate::debug_runtime::DebugHook>,
+    ) -> Result<(), LLMSpellError> {
+        self.engine.install_debug_hooks(hook)
+    }
+
     /// Get the name of the current engine
     #[must_use]
     pub fn get_engine_name(&self) -> &'static str {

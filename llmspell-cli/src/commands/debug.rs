@@ -8,6 +8,7 @@ use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
 use llmspell_engine::{DebugBridge, DebugConfig, DebugMode, LocalDebugConfig, PerformanceConfig};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Handle the debug command using DebugBridge architecture
 ///
@@ -61,15 +62,82 @@ pub async fn handle_debug_command(
         .await
         .map_err(|e| anyhow::anyhow!("Failed to create DebugBridge: {}", e))?;
 
+    // Wire Protocol Adapters - Protocol-First Unification Architecture
+    // Create and register debug infrastructure adapters for protocol-based access
+    {
+        use llmspell_bridge::debug_adapters::*;
+        use llmspell_bridge::debug_state_cache::SharedDebugStateCache;
+        use llmspell_bridge::execution_bridge::ExecutionManager;
+        use llmspell_bridge::execution_context::SharedExecutionContext;
+        use llmspell_bridge::lua::stack_navigator_impl::LuaStackNavigator;
+        use llmspell_bridge::variable_inspector::SharedVariableInspector;
+
+        // Create shared state cache for debug infrastructure
+        let state_cache = Arc::new(SharedDebugStateCache::new());
+
+        // Create execution manager
+        let execution_manager = Arc::new(ExecutionManager::new(state_cache.clone()));
+
+        // Create execution context for variable inspector
+        let execution_context = Arc::new(tokio::sync::RwLock::new(SharedExecutionContext::new()));
+
+        // Create variable inspector
+        let variable_inspector = Arc::new(SharedVariableInspector::new(
+            state_cache.clone(),
+            execution_context,
+        ));
+
+        // Create stack navigator (using Lua implementation for now)
+        let stack_navigator = Arc::new(LuaStackNavigator::new());
+
+        // Create session manager (stub for now)
+        let session_adapter = Arc::new(DebugSessionManagerAdapter::new());
+
+        // Create protocol adapters wrapping the debug components
+        let exec_adapter = Arc::new(ExecutionManagerAdapter::new(
+            execution_manager,
+            String::from("cli-session"),
+        ));
+        let var_adapter = Arc::new(VariableInspectorAdapter::new(variable_inspector));
+        let stack_adapter = Arc::new(StackNavigatorAdapter::new(stack_navigator));
+
+        // Register adapters with DebugBridge
+        debug_bridge
+            .register_capability("execution_manager".to_string(), exec_adapter)
+            .await;
+        debug_bridge
+            .register_capability("variable_inspector".to_string(), var_adapter)
+            .await;
+        debug_bridge
+            .register_capability("stack_navigator".to_string(), stack_adapter)
+            .await;
+        debug_bridge
+            .register_capability("session_manager".to_string(), session_adapter)
+            .await;
+
+        tracing::debug!("Registered {} protocol adapters", 4);
+    }
+
     // Log Bridge capabilities
     let capabilities = debug_bridge.capabilities();
     tracing::debug!("DebugBridge capabilities: {:?}", capabilities);
+
+    // Discover registered capabilities
+    let discovered = debug_bridge.discover_capabilities().await;
+    tracing::debug!("Discovered capabilities: {:?}", discovered);
 
     // Start local debug session
     let debug_session = debug_bridge
         .debug_local(&script_content)
         .await
         .map_err(|e| anyhow::anyhow!("Failed to start debug session: {}", e))?;
+
+    // Create debug runtime with the session and capabilities
+    let capabilities = debug_bridge.get_capability_registry();
+    let debug_runtime =
+        llmspell_bridge::DebugRuntime::new(config.clone(), debug_session.clone(), capabilities)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create debug runtime: {}", e))?;
 
     println!("🔧 Debug session started: {}", debug_session.session_id);
     println!("📝 Available debug commands:");
@@ -85,8 +153,15 @@ pub async fn handle_debug_command(
     // Get performance stats before moving debug_bridge
     let (init_time, state_time) = debug_bridge.get_performance_stats().await;
 
-    // Start interactive debug REPL
-    start_debug_repl(debug_bridge, debug_session, args, output_format).await?;
+    // Start interactive debug REPL with session and runtime
+    start_debug_repl(
+        debug_bridge,
+        debug_session,
+        debug_runtime,
+        args,
+        output_format,
+    )
+    .await?;
 
     // Display performance statistics
     if let Some(init) = init_time {
@@ -100,13 +175,14 @@ pub async fn handle_debug_command(
     Ok(())
 }
 
-/// Start interactive debug REPL using DebugBridge
+/// Start interactive debug REPL using DebugBridge and Runtime
 ///
 /// Provides interactive debugging interface with commands like .break, .step, etc.
-/// Integrates with existing debug infrastructure through DebugBridge.
+/// Uses the DebugRuntime for actual script execution with debug hooks.
 async fn start_debug_repl(
     debug_bridge: DebugBridge,
     mut debug_session: llmspell_engine::DebugSession,
+    mut debug_runtime: llmspell_bridge::DebugRuntime,
     args: Vec<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
@@ -125,6 +201,7 @@ async fn start_debug_repl(
     }
 
     println!("Debug REPL started. Type .help for available commands.");
+    println!("Type .run to execute the script with debugging enabled.");
 
     // Mark session as active
     debug_session.state = llmspell_engine::DebugSessionState::Active;
@@ -146,6 +223,7 @@ async fn start_debug_repl(
                 match handle_debug_command_input(
                     &debug_bridge,
                     &mut debug_session,
+                    &mut debug_runtime,
                     line,
                     &args,
                     output_format,
@@ -199,11 +277,12 @@ async fn start_debug_repl(
 
 /// Handle individual debug command input
 ///
-/// Processes debug commands like .break, .step, .continue, etc.
+/// Processes debug commands like .break, .step, .continue, .run, etc.
 /// Returns Ok(true) to continue REPL, Ok(false) to exit.
 async fn handle_debug_command_input(
     debug_bridge: &DebugBridge,
     debug_session: &mut llmspell_engine::DebugSession,
+    debug_runtime: &mut llmspell_bridge::DebugRuntime,
     input: &str,
     _args: &[String],
     _output_format: OutputFormat,
@@ -222,6 +301,27 @@ async fn handle_debug_command_input(
                 println!("Exiting debug session...");
                 Ok(false)
             }
+            ".run" => {
+                println!("🚀 Executing script with debug hooks...");
+                match debug_runtime.execute().await {
+                    Ok(output) => {
+                        println!("✅ Script execution completed");
+                        if !output.output.is_null() {
+                            println!("Result: {:?}", output.output);
+                        }
+                        if !output.console_output.is_empty() {
+                            println!("Console output:");
+                            for line in &output.console_output {
+                                println!("  {}", line);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("❌ Execution failed: {}", e);
+                    }
+                }
+                Ok(true)
+            }
             ".break" => {
                 if parts.len() < 2 {
                     println!("Usage: .break <line_number>");
@@ -229,8 +329,19 @@ async fn handle_debug_command_input(
                     match parts[1].parse::<u32>() {
                         Ok(line) => {
                             println!("Setting breakpoint at line {}", line);
-                            // TODO: Integrate with ExecutionManager via DebugBridge
-                            // This will use the existing debug infrastructure
+                            // Send breakpoint request through the runtime
+                            let request = llmspell_core::debug::DebugRequest::SetBreakpoints {
+                                source: "<debug_script>".to_string(),
+                                breakpoints: vec![(line, None)],
+                            };
+                            match debug_runtime.process_debug_command(request).await {
+                                Ok(response) => {
+                                    println!("Breakpoint set: {:?}", response);
+                                }
+                                Err(e) => {
+                                    eprintln!("Failed to set breakpoint: {}", e);
+                                }
+                            }
                         }
                         Err(_) => {
                             println!("Error: Invalid line number '{}'", parts[1]);
@@ -241,14 +352,12 @@ async fn handle_debug_command_input(
             }
             ".step" => {
                 println!("Stepping to next line...");
-                debug_session.state = llmspell_engine::DebugSessionState::Paused;
-                // TODO: Integrate with ExecutionManager stepping
+                debug_runtime.step_over().await;
                 Ok(true)
             }
             ".continue" => {
                 println!("Continuing execution...");
-                debug_session.state = llmspell_engine::DebugSessionState::Active;
-                // TODO: Integrate with ExecutionManager continue
+                debug_runtime.resume().await;
                 Ok(true)
             }
             ".locals" => {
@@ -377,7 +486,6 @@ fn print_debug_help() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use tempfile::tempdir;
 
     #[tokio::test]

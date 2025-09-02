@@ -557,6 +557,118 @@ impl ScriptEngineBridge for LuaEngine {
         Ok(())
     }
 
+    fn install_debug_hooks(
+        &mut self,
+        hook: Arc<dyn crate::debug_runtime::DebugHook>,
+    ) -> Result<(), LLMSpellError> {
+        #[cfg(feature = "lua")]
+        {
+            use crate::debug_runtime::DebugControl;
+            use crate::lua::sync_utils::block_on_async;
+            use std::time::Duration;
+
+            // Create a wrapper that converts between our DebugHook trait and Lua's debug system
+            let lua = self.lua.clone();
+            let hook_clone = hook.clone();
+
+            // Install Lua debug hook that calls our DebugHook trait
+            let lua_guard = lua.lock();
+            lua_guard.set_hook(
+                mlua::HookTriggers {
+                    on_calls: true,
+                    on_returns: true,
+                    every_line: true,
+                    every_nth_instruction: None,
+                },
+                move |_lua, debug| {
+                    let hook = hook_clone.clone();
+
+                    // Get debug info
+                    let event = debug.event();
+                    let line = debug.curr_line();
+                    let source_info = debug.source();
+                    let source = source_info.short_src.as_deref().unwrap_or("<unknown>");
+
+                    // Use a short timeout for debug hooks (100ms)
+                    let timeout = Some(Duration::from_millis(100));
+
+                    // Route to appropriate hook method based on event type
+                    let control = match event {
+                        mlua::DebugEvent::Line if line > 0 => {
+                            // Call on_line hook
+                            let source_owned = source.to_string();
+                            block_on_async(
+                                "debug_on_line",
+                                async move {
+                                    Ok::<DebugControl, std::io::Error>(
+                                        hook.on_line(line.try_into().unwrap_or(0), &source_owned)
+                                            .await,
+                                    )
+                                },
+                                timeout,
+                            )
+                            .unwrap_or(DebugControl::Continue)
+                        }
+                        mlua::DebugEvent::Call => {
+                            // Call on_function_enter hook
+                            let name = "<function>".to_string();
+                            block_on_async(
+                                "debug_on_function_enter",
+                                async move {
+                                    Ok::<DebugControl, std::io::Error>(
+                                        hook.on_function_enter(&name, Vec::new()).await,
+                                    )
+                                },
+                                timeout,
+                            )
+                            .unwrap_or(DebugControl::Continue)
+                        }
+                        mlua::DebugEvent::Ret | mlua::DebugEvent::TailCall => {
+                            // Call on_function_exit hook
+                            let name = "<function>".to_string();
+                            block_on_async(
+                                "debug_on_function_exit",
+                                async move {
+                                    Ok::<DebugControl, std::io::Error>(
+                                        hook.on_function_exit(&name, None).await,
+                                    )
+                                },
+                                timeout,
+                            )
+                            .unwrap_or(DebugControl::Continue)
+                        }
+                        _ => DebugControl::Continue,
+                    };
+
+                    // Handle control flow
+                    match control {
+                        DebugControl::Pause
+                        | DebugControl::Terminate
+                        | DebugControl::StepIn
+                        | DebugControl::StepOut
+                        | DebugControl::StepOver
+                        | DebugControl::Continue => {
+                            // Continue execution
+                            // TODO: Implement actual pause/termination mechanism for Pause and Terminate
+                        }
+                    }
+
+                    Ok(())
+                },
+            );
+
+            Ok(())
+        }
+
+        #[cfg(not(feature = "lua"))]
+        {
+            Err(LLMSpellError::Component {
+                message: "Lua feature not enabled".to_string(),
+                source: None,
+            })
+        }
+    }
+
     async fn set_script_args(
         &mut self,
         args: std::collections::HashMap<String, String>,

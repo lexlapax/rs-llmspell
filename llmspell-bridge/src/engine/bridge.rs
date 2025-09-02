@@ -74,6 +74,27 @@ pub trait ScriptEngineBridge: Send + Sync {
     ///
     /// Returns an error if the execution context cannot be set
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError>;
+
+    /// Install debug hooks for execution control
+    ///
+    /// This method allows installing debug hooks that can control script execution
+    /// for debugging purposes (breakpoints, stepping, etc.)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine doesn't support debugging or hook installation fails
+    fn install_debug_hooks(
+        &mut self,
+        _hook: Arc<dyn crate::debug_runtime::DebugHook>,
+    ) -> Result<(), LLMSpellError> {
+        Err(LLMSpellError::Component {
+            message: format!(
+                "{} engine does not support debugging",
+                self.get_engine_name()
+            ),
+            source: None,
+        })
+    }
 }
 
 /// Output from script execution

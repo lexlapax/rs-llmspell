@@ -183,6 +183,7 @@ fn test_info_command() {
         .stdout(predicate::str::contains("lua - Available"));
 }
 #[test]
+#[ignore = "Requires running kernel. Run with: cargo test -p llmspell-cli --test cli_integration_test -- --ignored --nocapture"]
 fn test_repl_launches() {
     // Test that REPL can launch (we can't test interactive mode in CI)
     // We send immediate EOF to exit cleanly

@@ -111,6 +111,7 @@
 //! debug!(user = "alice", "Processing request");
 //! ```
 
+pub mod debug;
 pub mod error;
 pub mod events;
 pub mod execution_context;
@@ -130,6 +131,10 @@ pub mod traits {
 }
 
 // Re-export commonly used types
+pub use debug::{
+    BreakpointInfo, DebugCapability, DebugRequest, DebugResponse, DebugState, LocationInfo,
+    PauseReason, StackFrameInfo, StepType, VariableInfo,
+};
 pub use error::{LLMSpellError, Result};
 pub use execution_context::{ContextScope, ExecutionContext, InheritancePolicy};
 pub use traits::{
