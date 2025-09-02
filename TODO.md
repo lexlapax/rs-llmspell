@@ -1831,71 +1831,139 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 
 ---
 
-## Phase 9.6: Configuration and CLI Commands (Days 14-15)
+## Phase 9.6: CLI Developer Experience (Days 14-15)
 
-### Task 9.6.1: Configuration System
+### Task 9.6.1: UnifiedProtocolEngine Configuration System
 **Priority**: HIGH  
 **Estimated Time**: 6 hours  
 **Assignee**: Config Team
 
-**Description**: Implement comprehensive configuration for debugging and REPL.
+**Description**: Implement configuration system for UnifiedProtocolEngine, debug settings, and REPL behavior to enable rich developer experience.
+
+**ARCHITECTURE ALIGNMENT (UnifiedProtocolEngine from 9.5):**
+- **Single Process**: Configure UnifiedProtocolEngine for in-process execution (no kernel discovery)
+- **MessageProcessor Settings**: Configure script execution behavior, debug hooks, performance limits
+- **Protocol Routing**: Configure MessageRouter strategies (Direct, RoundRobin, LoadBalanced, Broadcast)
+- **Debug Integration**: Configure debug infrastructure from Phases 9.1-9.3 (ExecutionBridge, diagnostics)
+- **REPL Behavior**: Configure history, completion, output formatting
 
 **Acceptance Criteria:**
-- [ ] TOML configuration parsing
-- [ ] Debug settings configurable
-- [ ] REPL settings configurable
-- [ ] Remote settings supported
-- [ ] Environment variable override
-- [ ] Configuration validation
+- [ ] TOML configuration parsing for UnifiedProtocolEngine settings
+- [ ] Debug mode configuration (breakpoints, stepping, variable inspection)  
+- [ ] REPL behavior configuration (history size, completion, output formatting)
+- [ ] MessageProcessor configuration (execution limits, hook integration)
+- [ ] MessageRouter strategy configuration (routing algorithms, handler registration)
+- [ ] Environment variable override support
+- [ ] Configuration validation with meaningful error messages
 
 **Implementation Steps:**
-1. Define configuration structure
-2. Implement TOML parsing
-3. Add environment variable support
-4. Create validation logic
-5. Document all settings
-6. Test configuration loading
+1. Define UnifiedProtocolEngine configuration structure:
+   ```rust
+   // llmspell-config/src/engine.rs
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct EngineConfig {
+       pub binding: BindingConfig,
+       pub routing: RoutingConfig, 
+       pub debug: DebugConfig,
+       pub repl: ReplConfig,
+       pub performance: PerformanceConfig,
+   }
+   
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct BindingConfig {
+       pub ip: String,                    // "127.0.0.1" 
+       pub port_range_start: u16,         // 9555
+       pub max_clients: usize,            // 10
+   }
+   
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct RoutingConfig {
+       pub shell_strategy: RoutingStrategy,     // Direct
+       pub iopub_strategy: RoutingStrategy,     // Broadcast  
+       pub control_strategy: RoutingStrategy,   // RoundRobin
+       pub default_strategy: RoutingStrategy,   // Direct
+   }
+   
+   #[derive(Debug, Clone, Serialize, Deserialize)]
+   pub struct DebugConfig {
+       pub enabled: bool,                 // true
+       pub breakpoints_enabled: bool,     // true
+       pub step_debugging_enabled: bool,  // true
+       pub variable_inspection_enabled: bool, // true
+       pub hook_profiling_enabled: bool,  // false
+   }
+   
+   #[derive(Debug, Clone, Serialize, Deserialize)] 
+   pub struct ReplConfig {
+       pub history_size: usize,           // 1000
+       pub history_file: Option<PathBuf>, // ~/.llmspell/history
+       pub tab_completion: bool,          // true
+       pub ctrl_r_search: bool,           // true
+       pub output_formatting: OutputFormat, // Enhanced
+   }
+   ```
+
+2. Implement configuration loading with environment override:
+   ```rust
+   // Load from multiple sources with precedence
+   // 1. CLI args override
+   // 2. Environment variables (LLMSPELL_DEBUG_ENABLED=true)
+   // 3. llmspell.toml file
+   // 4. Default configuration
+   ```
+
+3. Add validation logic for configuration consistency
+4. Document all configuration options with examples
+5. Test configuration loading and validation
 
 **Definition of Done:**
-- [ ] Configuration loads correctly
-- [ ] All settings work
-- [ ] Validation comprehensive
-- [ ] Documentation complete
+- [ ] Configuration loads from TOML, environment, and defaults
+- [ ] UnifiedProtocolEngine can be configured for debug/non-debug modes
+- [ ] REPL behavior fully configurable
+- [ ] Configuration validation prevents invalid combinations
+- [ ] Documentation complete with examples
+- [ ] Zero clippy warnings
 
-### Task 9.6.2: CLI Debug System Integration
+### Task 9.6.2: CLI Debug Integration with UnifiedProtocolEngine
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: CLI Team
 
-**Description**: Complete integration of comprehensive debug system with CLI commands, leveraging existing InteractiveDebugger, DebugSessionManager, and ExecutionManager infrastructure.
+**Description**: Implement `llmspell debug` command and `--debug` flag using UnifiedProtocolEngine architecture with existing debug infrastructure from Phases 9.1-9.3.
 
-**EXISTING COMPREHENSIVE DEBUG CAPABILITIES:**
-- ✅ **Interactive Debugging**: Full `InteractiveDebugger` with session management (`llmspell-debug/src/interactive.rs`)
-- ✅ **Breakpoint Management**: Conditional breakpoints with hit counts via `ExecutionManager` (`execution_bridge.rs:240-427`)
-- ✅ **Variable Inspection**: Complete variable system with lazy expansion (`Variable` struct + caching)
-- ✅ **Stack Navigation**: Full stack trace support via `StackFrame` unified types (`execution_bridge.rs:393-404`)
-- ✅ **Step Debugging**: StepInto/StepOver/StepOut with mode transitions (`execution_bridge.rs:498-535`)
-- ✅ **Condition Evaluation**: Lua expression evaluation for breakpoints (`condition_eval.rs:18-109`)
-- ✅ **Session Management**: Multi-client debug sessions with script locking (`session_manager.rs:15-418`)
-- ✅ **REPL Commands**: All debug commands implemented (`.break`, `.step`, `.continue`, `.locals`, `.stack`, `.watch`, `.info`)
+**ARCHITECTURE ALIGNMENT (UnifiedProtocolEngine + Existing Debug Infrastructure):**
+- **Single Process**: CLI creates UnifiedProtocolEngine in-process (no TCP client/server)
+- **MessageProcessor Pattern**: Implement MessageProcessor trait that integrates existing debug infrastructure
+- **Debug Infrastructure Reuse**: Leverage existing InteractiveDebugger, ExecutionManager, DebugSessionManager from 9.1-9.3
+- **Protocol Integration**: Use LRP/LDP message types for internal communication within the engine
+- **Configuration Driven**: Debug behavior configured via Task 9.6.1 configuration system
 
-**INTEGRATION GAPS TO CLOSE:**
-- [ ] Add `llmspell debug <script>` command that uses existing debug infrastructure
-- [ ] Wire `--debug` flag to activate InteractiveDebugger for script execution
-- [ ] Connect REPL debug commands to kernel TCP transport (complete existing LDPRequest flows)
-- [ ] Integrate DebugSessionManager for persistent debug sessions
-- [ ] Implement LDP protocol handlers in kernel (EvaluateRequest, ContinueRequest, etc.)
-- [ ] Fix kernel auto-start for REPL connection or require manual kernel start
+**EXISTING DEBUG INFRASTRUCTURE TO INTEGRATE:**
+- ✅ **InteractiveDebugger** with session management (from Phase 9.2.1)
+- ✅ **ExecutionManager** with breakpoint/variable/stack management (from Phase 9.2)
+- ✅ **DebugSessionManager** with multi-client support (from Phase 9.2.2)
+- ✅ **ConditionEvaluator** for breakpoint conditions (from Phase 9.2.5)
+- ✅ **Variable Inspector** with lazy expansion (from Phase 9.2.7)
+- ✅ **Step Debugging** with mode transitions (from Phase 9.2.6)
+- ✅ **Stack Navigator** for call stack inspection (from Phase 9.2.9)
+
+**Developer Experience Goals:**
+- [ ] `llmspell debug script.lua` - Dedicated debug command
+- [ ] `llmspell run script.lua --debug` - Debug flag for existing commands  
+- [ ] `llmspell exec "code" --debug` - Debug flag for inline execution
+- [ ] Interactive debug REPL with `.break`, `.step`, `.continue`, etc.
+- [ ] Enhanced error display with source context and suggestions
 
 **Acceptance Criteria:**
-- [ ] `llmspell debug <script>` starts script in debug mode using existing InteractiveDebugger
-- [ ] `llmspell run <script> --debug` activates debug mode with DebugSessionManager
-- [ ] All REPL debug commands (`.break`, `.step`, etc.) functional via TCP to kernel
-- [ ] Conditional breakpoints work using existing ConditionEvaluator
-- [ ] Variable inspection uses existing Variable system with ExecutionManager
-- [ ] Stack navigation uses existing StackFrame types and formatting
-- [ ] Debug sessions persist using existing DebugSessionManager
-- [ ] Step debugging preserves existing StepMode transitions
+- [ ] `llmspell debug <script>` command implemented using UnifiedProtocolEngine
+- [ ] `--debug` flag activates debug mode for `run` and `exec` commands
+- [ ] CLI creates UnifiedProtocolEngine with debug-enabled MessageProcessor
+- [ ] MessageProcessor integrates existing debug infrastructure (InteractiveDebugger, ExecutionManager, etc.)
+- [ ] REPL debug commands work through MessageProcessor (no TCP needed)
+- [ ] Breakpoints, stepping, variable inspection fully functional
+- [ ] Enhanced error reporting with source context
+- [ ] Debug sessions managed through existing DebugSessionManager
+- [ ] Configuration from Task 9.6.1 controls debug behavior
 
 **Implementation Steps:**
 1. Add debug subcommand to CLI:
@@ -1909,25 +1977,93 @@ llmspell-engine/                    # Renamed from llmspell-protocol
        args: Vec<String>,
    },
    ```
-2. Implement debug command handler using existing infrastructure:
+
+2. Implement DebugMessageProcessor that integrates existing debug infrastructure:
    ```rust
-   // Use existing InteractiveDebugger + DebugSessionManager
-   pub async fn handle_debug_command(script: PathBuf, args: Vec<String>) -> Result<()> {
-       let kernel = CliKernelDiscovery::builder().build().discover_or_start().await?;
-       let debug_session = kernel.create_debug_session().await?;
-       let interactive_debugger = InteractiveDebugger::new(
-           kernel.execution_manager(), 
-           kernel.shared_context()
-       );
-       // ... execute script with debug session active
+   // llmspell-cli/src/debug_processor.rs
+   use llmspell_engine::{MessageProcessor, UniversalMessage, ProtocolType};
+   use llmspell_debug::{InteractiveDebugger, ExecutionManager, DebugSessionManager};
+   
+   pub struct DebugMessageProcessor {
+       interactive_debugger: InteractiveDebugger,
+       execution_manager: Arc<ExecutionManager>,
+       session_manager: Arc<DebugSessionManager>,
+       script_runtime: Arc<ScriptRuntime>,
+   }
+   
+   #[async_trait]
+   impl MessageProcessor for DebugMessageProcessor {
+       async fn process_message(&self, msg: UniversalMessage) -> Result<UniversalMessage> {
+           match (msg.protocol, msg.content) {
+               (ProtocolType::LRP, MessageContent::Request { method: "execute_request", params }) => {
+                   // Execute with debug hooks enabled
+                   let result = self.script_runtime.execute_with_debug(&code, &self.execution_manager).await?;
+                   // Return execution response
+               },
+               (ProtocolType::LDP, MessageContent::Request { method: "set_breakpoint", params }) => {
+                   // Use existing ExecutionManager for breakpoint management
+                   self.execution_manager.set_breakpoint(file, line, condition).await?;
+                   // Return success response
+               },
+               // Handle other debug protocol messages...
+           }
+       }
    }
    ```
-3. Complete TCP transport for existing REPL debug commands
-4. Test all existing debug capabilities through CLI integration
+
+3. Update CLI debug command handler:
+   ```rust
+   // llmspell-cli/src/commands/debug.rs
+   pub async fn handle_debug_command(script: PathBuf, args: Vec<String>, config: EngineConfig) -> Result<()> {
+       // Create debug-enabled MessageProcessor
+       let debug_processor = DebugMessageProcessor::new(script.clone(), config.debug.clone()).await?;
+       
+       // Create UnifiedProtocolEngine with debug processor
+       let engine = UnifiedProtocolEngine::new()
+           .with_processor(Box::new(debug_processor))
+           .with_config(config)
+           .build().await?;
+       
+       // Start debug session
+       println!("🐛 Starting debug session for: {}", script.display());
+       println!("📝 Debug commands: .break, .step, .continue, .locals, .stack, .help");
+       
+       // Create enhanced REPL interface
+       let mut repl = DebugReplInterface::new(engine).await?;
+       repl.run_debug_session().await?;
+       
+       Ok(())
+   }
+   ```
+
+4. Add --debug flag support to existing run/exec commands:
+   ```rust
+   // Update existing commands to support debug mode
+   pub async fn handle_run_command(script: PathBuf, args: Vec<String>, debug: bool, config: EngineConfig) -> Result<()> {
+       let processor: Box<dyn MessageProcessor> = if debug {
+           Box::new(DebugMessageProcessor::new(script.clone(), config.debug.clone()).await?)
+       } else {
+           Box::new(StandardMessageProcessor::new(config.runtime.clone()).await?)
+       };
+       
+       let engine = UnifiedProtocolEngine::new()
+           .with_processor(processor)
+           .with_config(config)
+           .build().await?;
+           
+       // Execute script through engine
+       engine.execute_script(script, args).await?;
+       
+       Ok(())
+   }
+   ```
+
+5. Test debug integration with UnifiedProtocolEngine
+6. Verify all existing debug capabilities work through MessageProcessor pattern
 
 **Definition of Done:**
 - [ ] Debug command implemented using existing infrastructure
-- [ ] All REPL debug commands work via TCP
+- [ ] All REPL debug commands work via MessageProcessor pattern
 - [ ] Conditional breakpoints functional
 - [ ] Variable inspection working
 - [ ] Stack navigation operational
@@ -1941,12 +2077,17 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 - [ ] `cargo fmt --all --check` passes
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
-### Task 9.6.3: Core REPL Enhancement
+### Task 9.6.3: Enhanced REPL with UnifiedProtocolEngine
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: CLI Team
 
-**Description**: Complete REPL functionality using existing rustyline infrastructure.
+**Description**: Complete REPL functionality using existing rustyline infrastructure, integrated with UnifiedProtocolEngine for debug command processing.
+
+**ARCHITECTURE ALIGNMENT (UnifiedProtocolEngine Integration):**
+- **In-Process REPL**: REPL interface communicates directly with UnifiedProtocolEngine via MessageProcessor
+- **Debug Command Processing**: Debug commands (`.break`, `.step`, etc.) processed through DebugMessageProcessor
+- **Configuration Integration**: REPL behavior configured via Task 9.6.1 ReplConfig
 
 **EXISTING INFRASTRUCTURE:**
 - ✅ History file loading/saving via rustyline (`repl_interface.rs:90-134`)
@@ -1984,12 +2125,17 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
 
 
-### Task 9.6.4: Core Documentation Update
+### Task 9.6.4: Documentation Update for UnifiedProtocolEngine Integration
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Assignee**: Documentation Team
 
-**Description**: Update documentation to reflect comprehensive debug capabilities and CLI integration.
+**Description**: Update documentation to reflect comprehensive debug capabilities and CLI integration using UnifiedProtocolEngine architecture.
+
+**ARCHITECTURE ALIGNMENT (UnifiedProtocolEngine Documentation Focus):**
+- **Single Process Model**: Document that debug integration works in-process via MessageProcessor (no TCP client/server complexity)
+- **Configuration System**: Document EngineConfig, DebugConfig, ReplConfig from Task 9.6.1
+- **Developer Experience**: Emphasize simplicity of `llmspell --debug` and `llmspell debug` commands
 
 **Acceptance Criteria:**
 - [ ] Debug command documentation (`.break`, `.step`, `.continue`, `.locals`, `.stack`, `.watch`)
@@ -2009,12 +2155,12 @@ llmspell-engine/                    # Renamed from llmspell-protocol
 - [ ] Quick start guide functional
 - [ ] API docs updated
 
-### Task 9.6.5: Section 9.6 Quality Gates and Testing
+### Task 9.6.5: Quality Gates and UnifiedProtocolEngine Integration Testing
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
 
-**Description**: Quality checks and testing of CLI debug integration with existing infrastructure.
+**Description**: Quality checks and testing of CLI debug integration with UnifiedProtocolEngine and existing debug infrastructure.
 
 **Acceptance Criteria:**
 - [ ] CLI debug commands tested
@@ -2037,7 +2183,7 @@ llmspell-engine/                    # Renamed from llmspell-protocol
    ```bash
    # Test CLI debug flag and commands
    cargo test --package llmspell-cli -- debug
-   # Test REPL debug command TCP transport
+   # Test REPL debug command MessageProcessor integration
    cargo test --package llmspell-cli -- repl_debug
    ```
 
