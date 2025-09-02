@@ -13,6 +13,9 @@ pub struct DebugConfig {
     /// Whether debugging is enabled
     pub enabled: bool,
 
+    /// Debug mode: "tracing" (simple output) or "interactive" (breakpoints, stepping)
+    pub mode: String,
+
     /// Default debug level (Off, Error, Warn, Info, Debug, Trace)
     pub level: String,
 
@@ -27,17 +30,22 @@ pub struct DebugConfig {
 
     /// Stack trace settings
     pub stack_trace: StackTraceConfig,
+
+    /// Interactive debugging features (only used when mode = "interactive")
+    pub interactive: InteractiveDebugConfig,
 }
 
 impl Default for DebugConfig {
     fn default() -> Self {
         Self {
-            enabled: false,            // Default: disabled in production
-            level: "info".to_string(), // Default: info level
+            enabled: false,              // Default: disabled in production
+            mode: "tracing".to_string(), // Default: simple tracing mode
+            level: "info".to_string(),   // Default: info level
             output: DebugOutputConfig::default(),
             module_filters: ModuleFilterConfig::default(),
             performance: PerformanceConfig::default(),
             stack_trace: StackTraceConfig::default(),
+            interactive: InteractiveDebugConfig::default(),
         }
     }
 }
@@ -177,6 +185,41 @@ impl Default for StackTraceConfig {
     }
 }
 
+/// Interactive debugging configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InteractiveDebugConfig {
+    /// Enable breakpoints
+    pub breakpoints_enabled: bool,
+
+    /// Enable step debugging
+    pub step_debugging_enabled: bool,
+
+    /// Enable variable inspection
+    pub variable_inspection_enabled: bool,
+
+    /// Enable stack navigation
+    pub stack_navigation_enabled: bool,
+
+    /// Debug session timeout in seconds
+    pub session_timeout_seconds: u64,
+
+    /// Maximum debug messages to buffer
+    pub max_debug_buffer_size: usize,
+}
+
+impl Default for InteractiveDebugConfig {
+    fn default() -> Self {
+        Self {
+            breakpoints_enabled: true,
+            step_debugging_enabled: true,
+            variable_inspection_enabled: true,
+            stack_navigation_enabled: true,
+            session_timeout_seconds: 1800, // 30 minutes
+            max_debug_buffer_size: 10000,
+        }
+    }
+}
+
 impl DebugConfig {
     /// Create debug config from environment variables
     pub fn from_env() -> Self {
@@ -246,6 +289,10 @@ impl DebugConfig {
         if other.enabled {
             self.enabled = other.enabled;
         }
+        if other.mode != "tracing" {
+            // Assuming "tracing" is default
+            self.mode = other.mode;
+        }
         if other.level != "info" {
             // Assuming "info" is default
             self.level = other.level;
@@ -281,6 +328,14 @@ impl DebugConfig {
         // Merge stack trace config
         if other.stack_trace.enabled {
             self.stack_trace = other.stack_trace;
+        }
+
+        // Merge interactive config
+        // Only merge if not default values
+        if other.interactive.breakpoints_enabled
+            != InteractiveDebugConfig::default().breakpoints_enabled
+        {
+            self.interactive = other.interactive;
         }
 
         self

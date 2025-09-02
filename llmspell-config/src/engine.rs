@@ -15,8 +15,6 @@ pub struct EngineConfig {
     pub binding: BindingConfig,
     /// Message routing configuration
     pub routing: RoutingConfig,
-    /// Debug system configuration
-    pub debug: DebugConfig,
     /// REPL behavior configuration
     pub repl: ReplConfig,
     /// Performance configuration
@@ -78,43 +76,6 @@ impl Default for RoutingConfig {
             default_strategy: RoutingStrategy::Direct,
             enable_metrics: false,
             handler_registration_timeout_ms: 5000,
-        }
-    }
-}
-
-/// Debug configuration for UnifiedProtocolEngine integration
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(default)]
-pub struct DebugConfig {
-    /// Enable debug mode globally
-    pub enabled: bool,
-    /// Enable breakpoint functionality
-    pub breakpoints_enabled: bool,
-    /// Enable step debugging
-    pub step_debugging_enabled: bool,
-    /// Enable variable inspection
-    pub variable_inspection_enabled: bool,
-    /// Enable hook profiling for debug overhead measurement
-    pub hook_profiling_enabled: bool,
-    /// Debug session timeout in seconds
-    pub session_timeout_seconds: u64,
-    /// Maximum debug messages to buffer
-    pub max_debug_buffer_size: usize,
-    /// Enable debug protocol tracing
-    pub protocol_tracing_enabled: bool,
-}
-
-impl Default for DebugConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            breakpoints_enabled: true,
-            step_debugging_enabled: true,
-            variable_inspection_enabled: true,
-            hook_profiling_enabled: false,
-            session_timeout_seconds: 1800, // 30 minutes
-            max_debug_buffer_size: 10000,
-            protocol_tracing_enabled: false,
         }
     }
 }
@@ -271,14 +232,6 @@ impl EngineConfig {
             });
         }
 
-        // Validate debug configuration
-        if self.debug.session_timeout_seconds == 0 {
-            return Err(EngineConfigError::Validation {
-                field: "debug.session_timeout_seconds".to_string(),
-                message: "Debug session timeout must be greater than 0".to_string(),
-            });
-        }
-
         Ok(())
     }
 }
@@ -309,13 +262,6 @@ impl EngineConfigBuilder {
     #[must_use]
     pub fn routing(mut self, routing: RoutingConfig) -> Self {
         self.config.routing = routing;
-        self
-    }
-
-    /// Set the debug configuration
-    #[must_use]
-    pub fn debug(mut self, debug: DebugConfig) -> Self {
-        self.config.debug = debug;
         self
     }
 
@@ -383,9 +329,7 @@ mod tests {
             RoutingStrategy::RoundRobin
         ));
 
-        assert!(config.debug.enabled);
-        assert!(config.debug.breakpoints_enabled);
-        assert!(config.debug.step_debugging_enabled);
+        // Debug configuration removed - now in top-level DebugConfig
 
         assert_eq!(config.repl.history_size, 1000);
         assert!(config.repl.tab_completion);
@@ -404,16 +348,12 @@ mod tests {
                 max_clients: 20,
                 ..Default::default()
             })
-            .debug(DebugConfig {
-                enabled: false,
-                ..Default::default()
-            })
             .build();
 
         assert_eq!(config.binding.ip, "0.0.0.0");
         assert_eq!(config.binding.port_range_start, 8080);
         assert_eq!(config.binding.max_clients, 20);
-        assert!(!config.debug.enabled);
+        // Debug configuration removed - now in top-level DebugConfig
     }
 
     #[test]
@@ -499,18 +439,5 @@ mod tests {
         assert_eq!(config.batch_size, 10);
         assert!(config.enable_connection_pooling);
         assert_eq!(config.connection_pool_size, 10);
-    }
-
-    #[test]
-    fn test_debug_config_defaults() {
-        let config = DebugConfig::default();
-        assert!(config.enabled);
-        assert!(config.breakpoints_enabled);
-        assert!(config.step_debugging_enabled);
-        assert!(config.variable_inspection_enabled);
-        assert!(!config.hook_profiling_enabled);
-        assert_eq!(config.session_timeout_seconds, 1800);
-        assert_eq!(config.max_debug_buffer_size, 10000);
-        assert!(!config.protocol_tracing_enabled);
     }
 }

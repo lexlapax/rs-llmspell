@@ -672,38 +672,6 @@ fn validate_unified_protocol_engine_config(config: &LLMSpellConfig) -> Result<()
         });
     }
 
-    // Validate debug configuration
-    let debug_config = &engine.debug;
-
-    if debug_config.session_timeout_seconds == 0 {
-        return Err(ConfigError::Validation {
-            field: Some("engine.debug.session_timeout_seconds".to_string()),
-            message: "Debug session timeout must be greater than 0".to_string(),
-        });
-    }
-
-    if debug_config.session_timeout_seconds > 86400 {
-        // 24 hours
-        warn!(
-            "Engine debug session timeout {} seconds is very long - may consume resources",
-            debug_config.session_timeout_seconds
-        );
-    }
-
-    if debug_config.max_debug_buffer_size == 0 {
-        return Err(ConfigError::Validation {
-            field: Some("engine.debug.max_debug_buffer_size".to_string()),
-            message: "Debug buffer size must be greater than 0".to_string(),
-        });
-    }
-
-    if debug_config.max_debug_buffer_size > 1_000_000 {
-        warn!(
-            "Engine debug buffer size {} is very large - may consume significant memory",
-            debug_config.max_debug_buffer_size
-        );
-    }
-
     // Validate REPL configuration
     let repl = &engine.repl;
 
@@ -1249,26 +1217,6 @@ mod tests {
         match result.unwrap_err() {
             ConfigError::Validation { field, message } => {
                 assert_eq!(field, Some("engine.binding.max_clients".to_string()));
-                assert!(message.contains("must be greater than 0"));
-            }
-            _ => panic!("Expected validation error"),
-        }
-    }
-
-    #[test]
-    fn test_validate_engine_debug_zero_timeout() {
-        let mut config = LLMSpellConfig::default();
-        config.engine.debug.session_timeout_seconds = 0;
-
-        let result = validate_unified_protocol_engine_config(&config);
-        assert!(result.is_err());
-
-        match result.unwrap_err() {
-            ConfigError::Validation { field, message } => {
-                assert_eq!(
-                    field,
-                    Some("engine.debug.session_timeout_seconds".to_string())
-                );
                 assert!(message.contains("must be greater than 0"));
             }
             _ => panic!("Expected validation error"),

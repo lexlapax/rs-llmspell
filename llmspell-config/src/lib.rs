@@ -14,8 +14,8 @@ pub use crate::debug::DebugConfig;
 pub use crate::engines::{EngineConfigs, JSConfig, LuaConfig};
 // Re-export UnifiedProtocolEngine configurations
 pub use crate::engine::{
-    BindingConfig, DebugConfig as EngineDebugConfig, EngineConfig, EngineConfigBuilder,
-    EngineConfigError, OutputFormat, PerformanceConfig, ReplConfig, RoutingConfig,
+    BindingConfig, EngineConfig, EngineConfigBuilder, EngineConfigError, OutputFormat,
+    PerformanceConfig, ReplConfig, RoutingConfig,
 };
 pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, IsolationMode};
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
@@ -311,31 +311,36 @@ impl LLMSpellConfig {
                 }
             }
 
-            // Merge debug settings
+            // Merge debug settings from engine to top-level debug config
             if let Some(debug_config) = engine.get("debug").and_then(|v| v.as_object()) {
                 if let Some(enabled) = debug_config.get("enabled").and_then(|v| v.as_bool()) {
-                    debug!("Overriding engine.debug.enabled from env: {}", enabled);
-                    self.engine.debug.enabled = enabled;
+                    debug!("Overriding debug.enabled from env: {}", enabled);
+                    self.debug.enabled = enabled;
+                }
+                if let Some(mode) = debug_config.get("mode").and_then(|v| v.as_str()) {
+                    debug!("Overriding debug.mode from env: {}", mode);
+                    self.debug.mode = mode.to_string();
                 }
                 if let Some(breakpoints_enabled) = debug_config
                     .get("breakpoints_enabled")
                     .and_then(|v| v.as_bool())
                 {
                     debug!(
-                        "Overriding engine.debug.breakpoints_enabled from env: {}",
+                        "Overriding debug.interactive.breakpoints_enabled from env: {}",
                         breakpoints_enabled
                     );
-                    self.engine.debug.breakpoints_enabled = breakpoints_enabled;
+                    self.debug.interactive.breakpoints_enabled = breakpoints_enabled;
                 }
                 if let Some(variable_inspection_enabled) = debug_config
                     .get("variable_inspection_enabled")
                     .and_then(|v| v.as_bool())
                 {
                     debug!(
-                        "Overriding engine.debug.variable_inspection_enabled from env: {}",
+                        "Overriding debug.interactive.variable_inspection_enabled from env: {}",
                         variable_inspection_enabled
                     );
-                    self.engine.debug.variable_inspection_enabled = variable_inspection_enabled;
+                    self.debug.interactive.variable_inspection_enabled =
+                        variable_inspection_enabled;
                 }
             }
 
@@ -1825,8 +1830,7 @@ mod tests {
             crate::engine::RoutingStrategy::LoadBalanced
         ));
 
-        assert!(!config.engine.debug.enabled);
-        assert!(!config.engine.debug.breakpoints_enabled);
+        // Debug configuration now in top-level config.debug
 
         assert_eq!(config.engine.repl.history_size, 2000);
         assert!(matches!(
@@ -1860,9 +1864,7 @@ mod tests {
             crate::engine::RoutingStrategy::RoundRobin
         ));
 
-        assert!(config.engine.debug.enabled);
-        assert!(config.engine.debug.breakpoints_enabled);
-        assert!(config.engine.debug.step_debugging_enabled);
+        // Debug configuration now in top-level config.debug
 
         assert_eq!(config.engine.repl.history_size, 1000);
         assert!(config.engine.repl.tab_completion);
@@ -1888,10 +1890,6 @@ mod tests {
                 max_clients: 25,
                 ..Default::default()
             })
-            .debug(crate::engine::DebugConfig {
-                enabled: false,
-                ..Default::default()
-            })
             .build();
 
         let config = LLMSpellConfig::builder().engine(custom_engine).build();
@@ -1900,7 +1898,7 @@ mod tests {
         assert_eq!(config.engine.binding.ip, "192.168.1.1");
         assert_eq!(config.engine.binding.port_range_start, 7777);
         assert_eq!(config.engine.binding.max_clients, 25);
-        assert!(!config.engine.debug.enabled);
+        // Debug configuration now in top-level config.debug
 
         // Test that the custom config still passes validation
         let validation_result = crate::validation::validate_config(&config);

@@ -69,28 +69,21 @@ pub async fn execute_script_file(
     // Read script content
     let script_content = fs::read_to_string(&script_path).await?;
 
+    // If debug mode is requested, ensure the config reflects it
+    let mut runtime_config = runtime_config;
     if debug_mode {
-        // Debug execution path using DebugBridge (Bridge Pattern architecture)
-        // This provides hybrid local/protocol debugging with Task 9.7 readiness
-        super::debug::handle_debug_command(
-            script_path.clone(),
-            args,
-            engine,
-            runtime_config,
-            output_format,
-        )
-        .await
-    } else {
-        // Non-debug execution path (existing implementation)
-        super::run_debug::execute_script_nondebug(
-            script_content,
-            script_path,
-            engine,
-            runtime_config,
-            stream,
-            args,
-            output_format,
-        )
-        .await
+        runtime_config.debug.enabled = true;
     }
+
+    // Execute the script - debug hooks will be installed if config.debug.enabled is true
+    super::run_debug::execute_script_nondebug(
+        script_content,
+        script_path,
+        engine,
+        runtime_config,
+        stream,
+        args,
+        output_format,
+    )
+    .await
 }

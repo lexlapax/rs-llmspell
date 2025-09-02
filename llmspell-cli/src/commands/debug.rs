@@ -40,9 +40,9 @@ pub async fn handle_debug_command(
     let debug_config = DebugConfig {
         mode: DebugMode::Local(LocalDebugConfig {
             script_path: Some(script.clone()),
-            enable_breakpoints: config.engine.debug.breakpoints_enabled,
-            enable_stepping: config.engine.debug.step_debugging_enabled,
-            enable_variable_inspection: config.engine.debug.variable_inspection_enabled,
+            enable_breakpoints: config.debug.interactive.breakpoints_enabled,
+            enable_stepping: config.debug.interactive.step_debugging_enabled,
+            enable_variable_inspection: config.debug.interactive.variable_inspection_enabled,
             enable_stack_navigation: true, // Not in engine config, default enabled
             performance: PerformanceConfig {
                 init_target_ms: 10, // <10ms initialization target

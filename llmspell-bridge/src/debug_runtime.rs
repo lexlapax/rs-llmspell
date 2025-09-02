@@ -67,7 +67,7 @@ pub struct DebugRuntime {
 }
 
 /// Execution state tracked by debug runtime
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ExecutionState {
     /// Current line being executed
     current_line: u32,
@@ -263,13 +263,15 @@ impl DebugRuntime {
 }
 
 /// Debug hook implementation that routes to `ExecutionManager`
-struct ExecutionManagerHook {
+pub struct ExecutionManagerHook {
     _capabilities: Arc<RwLock<HashMap<String, Arc<dyn DebugCapability>>>>,
     state: Arc<RwLock<ExecutionState>>,
 }
 
 impl ExecutionManagerHook {
-    fn new(
+    /// Create a new `ExecutionManagerHook`
+    #[must_use]
+    pub fn new(
         capabilities: Arc<RwLock<HashMap<String, Arc<dyn DebugCapability>>>>,
         state: Arc<RwLock<ExecutionState>>,
     ) -> Self {

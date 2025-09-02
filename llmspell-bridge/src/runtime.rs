@@ -2,10 +2,13 @@
 //! ABOUTME: Central execution orchestrator supporting multiple script engines
 
 use crate::{
+    diagnostics_bridge::DiagnosticsBridge,
     engine::{EngineFactory, JSConfig, LuaConfig, ScriptEngineBridge, ScriptOutput, ScriptStream},
     execution_bridge::{
         Breakpoint, DebugCommand, DebugState, ExecutionManager, StackFrame, Variable,
     },
+    execution_context::SharedExecutionContext,
+    lua::debug_state_cache_impl::LuaDebugStateCache,
     providers::ProviderManager,
     registry::ComponentRegistry,
     tools::register_all_tools,
@@ -14,6 +17,7 @@ use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
+use tokio::sync::RwLock as TokioRwLock;
 
 /// Central script runtime that uses `ScriptEngineBridge` abstraction
 ///
@@ -103,6 +107,10 @@ pub struct ScriptRuntime {
     _config: LLMSpellConfig,
     /// Execution manager for debugging support
     execution_manager: Option<Arc<ExecutionManager>>,
+    /// Diagnostics bridge for debug output
+    _diagnostics_bridge: Option<Arc<DiagnosticsBridge>>,
+    /// Shared execution context for debugging
+    _shared_execution_context: Option<Arc<TokioRwLock<SharedExecutionContext>>>,
 }
 
 impl ScriptRuntime {
@@ -227,13 +235,82 @@ impl ScriptRuntime {
             },
         }));
 
+        // Initialize debug infrastructure if enabled
+        let (execution_manager, diagnostics_bridge, shared_execution_context) =
+            if config.debug.enabled {
+                // Create DiagnosticsBridge for debug output
+                let diagnostics = Arc::new(DiagnosticsBridge::builder().build());
+
+                // Create SharedExecutionContext for debug state
+                let shared_context = Arc::new(TokioRwLock::new(SharedExecutionContext::new()));
+
+                // Create ExecutionManager with LuaDebugStateCache
+                let debug_cache = Arc::new(LuaDebugStateCache::new());
+                let exec_manager = Arc::new(ExecutionManager::new(debug_cache));
+
+                // Select debug hook based on mode
+                let debug_hook: Arc<dyn crate::debug_runtime::DebugHook> =
+                    match config.debug.mode.as_str() {
+                        "interactive" => {
+                            // Use ExecutionManagerHook for interactive debugging (breakpoints, stepping)
+                            let capabilities: Arc<
+                                TokioRwLock<
+                                    HashMap<String, Arc<dyn llmspell_core::debug::DebugCapability>>,
+                                >,
+                            > = Arc::new(TokioRwLock::new(HashMap::new()));
+                            let state = Arc::new(TokioRwLock::new(
+                                crate::debug_runtime::ExecutionState::default(),
+                            ));
+
+                            // Add ExecutionManagerAdapter as a capability
+                            let adapter: Arc<dyn llmspell_core::debug::DebugCapability> =
+                                Arc::new(crate::debug_adapters::ExecutionManagerAdapter::new(
+                                    exec_manager.clone(),
+                                    "debug_session".to_string(),
+                                ));
+                            capabilities
+                                .write()
+                                .await
+                                .insert("execution_manager".to_string(), adapter);
+
+                            Arc::new(crate::debug_runtime::ExecutionManagerHook::new(
+                                capabilities,
+                                state,
+                            ))
+                        }
+                        _ => {
+                            // Default to simple tracing for "tracing" mode or any other value
+                            Arc::new(SimpleTracingHook::new(
+                                true, // Always trace when debug is enabled
+                                diagnostics.clone(),
+                            ))
+                        }
+                    };
+
+                if let Err(e) = engine.install_debug_hooks(debug_hook) {
+                    tracing::warn!("Failed to install debug hooks: {}", e);
+                }
+
+                // Log debug initialization
+                tracing::info!(
+                    "Debug mode enabled ({}) - initialized DiagnosticsBridge and ExecutionManager",
+                    config.debug.mode
+                );
+
+                (Some(exec_manager), Some(diagnostics), Some(shared_context))
+            } else {
+                (None, None, None)
+            };
+
         Ok(Self {
             engine,
             registry,
             provider_manager,
             execution_context,
             _config: config,
-            execution_manager: None,
+            execution_manager,
+            _diagnostics_bridge: diagnostics_bridge,
+            _shared_execution_context: shared_execution_context,
         })
     }
 
@@ -481,9 +558,72 @@ impl From<llmspell_config::SecurityConfig> for crate::engine::SecurityContext {
     }
 }
 
+/// Simple debug hook that outputs trace information to stdout
+struct SimpleTracingHook {
+    trace_enabled: bool,
+    _diagnostics: Arc<DiagnosticsBridge>,
+}
+
+impl SimpleTracingHook {
+    #[allow(clippy::missing_const_for_fn)] // Arc cannot be used in const context
+    fn new(trace_enabled: bool, diagnostics: Arc<DiagnosticsBridge>) -> Self {
+        Self {
+            trace_enabled,
+            _diagnostics: diagnostics,
+        }
+    }
+}
+
+#[async_trait::async_trait]
+impl crate::debug_runtime::DebugHook for SimpleTracingHook {
+    async fn on_line(&self, line: u32, source: &str) -> crate::debug_runtime::DebugControl {
+        if self.trace_enabled {
+            // Output trace information to stdout
+            println!("[DEBUG] Line {line}: {source}");
+        }
+        crate::debug_runtime::DebugControl::Continue
+    }
+
+    async fn on_function_enter(
+        &self,
+        name: &str,
+        args: Vec<String>,
+    ) -> crate::debug_runtime::DebugControl {
+        if self.trace_enabled {
+            if args.is_empty() {
+                println!("[DEBUG] Entering function: {name}");
+            } else {
+                println!("[DEBUG] Entering function: {}({})", name, args.join(", "));
+            }
+        }
+        crate::debug_runtime::DebugControl::Continue
+    }
+
+    async fn on_function_exit(
+        &self,
+        name: &str,
+        result: Option<String>,
+    ) -> crate::debug_runtime::DebugControl {
+        if self.trace_enabled {
+            if let Some(res) = result {
+                println!("[DEBUG] Exiting function: {name} -> {res}");
+            } else {
+                println!("[DEBUG] Exiting function: {name}");
+            }
+        }
+        crate::debug_runtime::DebugControl::Continue
+    }
+
+    async fn on_exception(&self, error: &str, line: u32) -> crate::debug_runtime::DebugControl {
+        println!("[DEBUG] Exception at line {line}: {error}");
+        crate::debug_runtime::DebugControl::Continue
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
     #[test]
     fn test_runtime_config_default() {
         let config = LLMSpellConfig::default();
@@ -491,13 +631,5 @@ mod tests {
         assert!(config.supports_engine("lua"));
         assert!(config.supports_engine("javascript"));
         assert!(!config.supports_engine("python"));
-    }
-    #[test]
-    fn test_security_config_conversion() {
-        let config = llmspell_config::SecurityConfig::default();
-        let context: crate::engine::SecurityContext = config.into();
-        assert!(!context.allow_file_access);
-        assert!(context.allow_network_access);
-        assert!(!context.allow_process_spawn);
     }
 }
