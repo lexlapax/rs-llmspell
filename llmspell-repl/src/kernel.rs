@@ -447,28 +447,21 @@ impl LLMSpellKernel {
         &self,
         code: &str,
     ) -> std::result::Result<
-        std::result::Result<
-            std::result::Result<llmspell_bridge::ScriptOutput, llmspell_core::LLMSpellError>,
-            tokio::task::JoinError,
-        >,
+        Result<llmspell_bridge::ScriptOutput, llmspell_core::LLMSpellError>,
         tokio::time::error::Elapsed,
     > {
         let timeout_duration =
             tokio::time::Duration::from_secs(self.resource_limits.max_execution_time);
         let runtime = self.runtime.clone();
-        let code_clone = code.to_string();
+        let code = code.to_string();
 
-        tracing::debug!("About to spawn_blocking for script execution");
-        tokio::time::timeout(
-            timeout_duration,
-            tokio::task::spawn_blocking(move || {
-                tracing::debug!("Inside spawn_blocking, about to execute script");
-                futures::executor::block_on(async {
-                    let runtime_guard = runtime.lock().await;
-                    runtime_guard.execute_script(&code_clone).await
-                })
-            }),
-        )
+        tracing::debug!("About to execute script with timeout");
+        tokio::time::timeout(timeout_duration, async move {
+            tracing::debug!("Acquiring runtime lock for script execution");
+            let runtime_guard = runtime.lock().await;
+            tracing::debug!("Executing script");
+            runtime_guard.execute_script(&code).await
+        })
         .await
     }
 
@@ -524,8 +517,8 @@ impl LLMSpellKernel {
 
         // Handle result based on execution outcome
         let response = match result {
-            Ok(Ok(Ok(_))) => Self::handle_success(execution_count, silent),
-            Ok(Ok(Err(_)) | Err(_)) | Err(_) => Self::handle_error(execution_count, silent),
+            Ok(Ok(_)) => Self::handle_success(execution_count, silent),
+            Ok(Err(_)) | Err(_) => Self::handle_error(execution_count, silent),
         };
 
         // Finish execution

@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::RwLock;
@@ -101,7 +102,7 @@ pub struct UniversalMessage {
 }
 
 /// Message content variants
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(tag = "type")]
 pub enum MessageContent {
     /// Request message
@@ -160,6 +161,10 @@ pub struct MessageRouter {
     routes: Arc<RwLock<RouteTable>>,
     /// Channel-specific routing strategies
     strategies: HashMap<ChannelType, RoutingStrategy>,
+    /// Round-robin counters per channel
+    round_robin_counters: Arc<RwLock<HashMap<(ProtocolType, ChannelType), AtomicUsize>>>,
+    /// Handler load metrics for load balancing
+    handler_loads: Arc<RwLock<HashMap<String, AtomicUsize>>>,
 }
 
 /// Routing table for message dispatch
@@ -193,6 +198,8 @@ impl MessageRouter {
                 active_handlers: HashSet::new(),
             })),
             strategies,
+            round_robin_counters: Arc::new(RwLock::new(HashMap::new())),
+            handler_loads: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -221,12 +228,47 @@ impl MessageRouter {
             RoutingStrategy::Broadcast => Ok(handlers),
             RoutingStrategy::Direct => Ok(vec![handlers[0].clone()]),
             RoutingStrategy::RoundRobin => {
-                // TODO: Implement round-robin selection
-                Ok(vec![handlers[0].clone()])
+                // Get or create counter for this route and increment atomically
+                let next_idx = {
+                    let mut counters = self.round_robin_counters.write().await;
+                    counters
+                        .entry(key)
+                        .or_insert_with(|| AtomicUsize::new(0))
+                        .fetch_add(1, Ordering::Relaxed)
+                        % handlers.len()
+                };
+                Ok(vec![handlers[next_idx].clone()])
             }
             RoutingStrategy::LoadBalanced => {
-                // TODO: Implement load-balanced selection
-                Ok(vec![handlers[0].clone()])
+                // Collect current loads without holding lock
+                let current_loads: Vec<(String, usize)> = {
+                    let loads = self.handler_loads.read().await;
+                    handlers
+                        .iter()
+                        .map(|h| {
+                            (
+                                h.clone(),
+                                loads.get(h).map_or(0, |l| l.load(Ordering::Relaxed)),
+                            )
+                        })
+                        .collect()
+                };
+
+                // Find handler with minimum load
+                let selected_handler = current_loads
+                    .into_iter()
+                    .min_by_key(|(_, load)| *load)
+                    .map_or_else(|| handlers[0].clone(), |(handler, _)| handler);
+
+                // Increment load for selected handler
+                self.handler_loads
+                    .write()
+                    .await
+                    .entry(selected_handler.clone())
+                    .or_insert_with(|| AtomicUsize::new(0))
+                    .fetch_add(1, Ordering::Relaxed);
+
+                Ok(vec![selected_handler])
             }
         }
     }
@@ -255,6 +297,20 @@ impl MessageRouter {
         drop(routes);
 
         Ok(())
+    }
+
+    /// Decrement load for a handler after processing completes
+    pub async fn decrement_handler_load(&self, handler_id: &str) {
+        let loads = self.handler_loads.read().await;
+        if let Some(load) = loads.get(handler_id) {
+            // Saturating sub to prevent underflow
+            load.fetch_sub(1, Ordering::Relaxed);
+        }
+    }
+
+    /// Set routing strategy for a channel (primarily for testing)
+    pub fn set_strategy(&mut self, channel: ChannelType, strategy: RoutingStrategy) {
+        self.strategies.insert(channel, strategy);
     }
 }
 
@@ -421,7 +477,7 @@ impl UnifiedProtocolEngine {
         use crate::transport::tcp::TcpTransport;
         use tracing::{debug, error, warn};
 
-        let mut transport = Box::new(TcpTransport::new(stream));
+        let transport = Box::new(TcpTransport::new(stream));
         let processor = self.processor.clone();
         let _adapters = self.adapters.clone();
 
@@ -539,7 +595,7 @@ impl ProtocolEngine for UnifiedProtocolEngine {
         };
 
         // Send via transport
-        let mut transport = self.transport.write().await;
+        let transport = self.transport.write().await;
         transport.send(protocol_msg).await?;
         drop(transport);
 
@@ -548,7 +604,7 @@ impl ProtocolEngine for UnifiedProtocolEngine {
 
     async fn recv(&self, channel: ChannelType) -> Result<UniversalMessage, EngineError> {
         // Receive from transport
-        let mut transport = self.transport.write().await;
+        let transport = self.transport.write().await;
         let protocol_msg = transport.recv().await?;
         drop(transport);
 

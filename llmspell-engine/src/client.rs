@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::{mpsc, oneshot, Mutex, RwLock};
+use tokio::sync::{mpsc, oneshot, RwLock};
 use tracing::{debug, error, warn};
 
 use crate::protocol::message::{MessageType, ProtocolMessage};
@@ -35,7 +35,7 @@ pub enum ClientError {
 /// Protocol client for sending requests and receiving responses
 pub struct ProtocolClient {
     /// Transport layer
-    transport: Arc<Mutex<Box<dyn Transport>>>,
+    transport: Arc<RwLock<Box<dyn Transport>>>,
 
     /// Pending requests awaiting responses
     pending: Arc<RwLock<HashMap<String, oneshot::Sender<ProtocolMessage>>>>,
@@ -54,7 +54,7 @@ impl ProtocolClient {
     /// Create a new protocol client with the given transport
     #[must_use]
     pub fn new(transport: Box<dyn Transport>) -> Self {
-        let transport = Arc::new(Mutex::new(transport));
+        let transport = Arc::new(RwLock::new(transport));
         let pending = Arc::new(RwLock::new(HashMap::new()));
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel(1);
 
@@ -151,7 +151,8 @@ impl ProtocolClient {
     async fn send_message(&self, msg: ProtocolMessage) -> Result<(), ClientError> {
         let msg_id = msg.msg_id.clone();
         debug!("Sending message via transport: msg_id={}", msg_id);
-        self.transport.lock().await.send(msg).await?;
+
+        self.transport.read().await.send(msg).await?;
         debug!("Message sent successfully: msg_id={}", msg_id);
         Ok(())
     }
@@ -221,13 +222,13 @@ impl ProtocolClient {
 
     /// Receive a single message from the transport
     async fn recv_from_transport(
-        transport: Arc<Mutex<Box<dyn Transport>>>,
+        transport: Arc<RwLock<Box<dyn Transport>>>,
     ) -> Result<ProtocolMessage, ClientError> {
         debug!("Attempting to receive message from transport");
 
         let result = {
-            let mut transport_guard = transport.lock().await;
-            debug!("Acquired transport lock, calling recv");
+            let transport_guard = transport.read().await;
+            debug!("Acquired transport read lock, calling recv");
             transport_guard.recv().await
         };
 
@@ -275,17 +276,24 @@ impl ProtocolClient {
 
     /// Receive messages from transport and route to pending requests
     async fn receive_message(
-        transport: Arc<Mutex<Box<dyn Transport>>>,
+        transport: Arc<RwLock<Box<dyn Transport>>>,
         pending: Arc<RwLock<HashMap<String, oneshot::Sender<ProtocolMessage>>>>,
     ) -> Result<(), ClientError> {
-        // Receive message from transport
         let msg = Self::recv_from_transport(transport).await?;
         debug!(
             "Received message: msg_id={}, msg_type={:?}",
             msg.msg_id, msg.msg_type
         );
 
-        // Route based on message type
+        Self::process_received_message(msg, pending).await;
+        Ok(())
+    }
+
+    /// Process a received message based on its type
+    async fn process_received_message(
+        msg: ProtocolMessage,
+        pending: Arc<RwLock<HashMap<String, oneshot::Sender<ProtocolMessage>>>>,
+    ) {
         match msg.msg_type {
             MessageType::Response | MessageType::Error => {
                 Self::route_response(msg, pending).await;
@@ -300,9 +308,6 @@ impl ProtocolClient {
                 );
             }
         }
-
-        debug!("receive_message completed successfully, continuing loop");
-        Ok(())
     }
 
     /// Shutdown the client
@@ -318,7 +323,7 @@ impl ProtocolClient {
         }
 
         // Close transport
-        let _ = self.transport.lock().await.close().await;
+        let _ = self.transport.write().await.close().await;
     }
 }
 

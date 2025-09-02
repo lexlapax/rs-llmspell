@@ -24,6 +24,12 @@ llmspell-utils = { path = "../llmspell-utils" }
 
 [dev-dependencies]
 tokio-test = "0.4"
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+tracing-subscriber = "0.3"
+
+[[bench]]
+name = "unified_engine_bench"
+harness = false
 
 [lints]
 workspace = true

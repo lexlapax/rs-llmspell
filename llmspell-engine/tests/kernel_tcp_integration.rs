@@ -51,6 +51,9 @@ async fn test_kernel_tcp_communication() -> Result<(), Box<dyn std::error::Error
         return Err("Expected KernelInfoReply".into());
     }
 
+    // Small delay to ensure connection is stable
+    tokio::time::sleep(Duration::from_millis(100)).await;
+
     // Test 2: Execute request
     println!("\nTest 2: Sending execute request...");
     let response = timeout(
