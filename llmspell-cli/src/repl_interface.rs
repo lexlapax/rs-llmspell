@@ -7,9 +7,81 @@ use anyhow::Result;
 use llmspell_bridge::{diagnostics_bridge::DiagnosticsBridge, hook_profiler::WorkloadClassifier};
 use llmspell_config::LLMSpellConfig;
 use llmspell_repl::protocol::LDPRequest;
+use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
-use rustyline::DefaultEditor;
+use rustyline::highlight::Highlighter;
+use rustyline::hint::Hinter;
+use rustyline::validate::Validator;
+use rustyline::{Config, Context, DefaultEditor, Editor, Helper};
 use std::path::PathBuf;
+
+/// Debug command completion helper
+struct DebugCommandHelper {
+    commands: Vec<String>,
+}
+
+impl DebugCommandHelper {
+    fn new() -> Self {
+        Self {
+            commands: vec![
+                ".help".to_string(),
+                ".break".to_string(),
+                ".step".to_string(),
+                ".continue".to_string(),
+                ".locals".to_string(),
+                ".stack".to_string(),
+                ".watch".to_string(),
+                ".info".to_string(),
+                ".clear".to_string(),
+                ".disable".to_string(),
+                ".enable".to_string(),
+            ],
+        }
+    }
+}
+
+impl Completer for DebugCommandHelper {
+    type Candidate = Pair;
+
+    fn complete(
+        &self,
+        line: &str,
+        pos: usize,
+        _ctx: &Context<'_>,
+    ) -> rustyline::Result<(usize, Vec<Pair>)> {
+        let start = line[..pos].rfind(' ').map(|i| i + 1).unwrap_or(0);
+        let prefix = &line[start..pos];
+
+        if prefix.starts_with('.') {
+            let matches: Vec<Pair> = self
+                .commands
+                .iter()
+                .filter(|cmd| cmd.starts_with(prefix))
+                .map(|cmd| Pair {
+                    display: cmd.clone(),
+                    replacement: cmd.clone(),
+                })
+                .collect();
+            Ok((start, matches))
+        } else {
+            Ok((pos, Vec::new()))
+        }
+    }
+}
+
+impl Hinter for DebugCommandHelper {
+    type Hint = String;
+
+    fn hint(&self, _line: &str, _pos: usize, _ctx: &Context<'_>) -> Option<String> {
+        None
+    }
+}
+
+impl Highlighter for DebugCommandHelper {}
+
+impl Validator for DebugCommandHelper {}
+
+impl Helper for DebugCommandHelper {}
 
 /// REPL interface builder with dependency injection
 #[derive(Default)]
@@ -82,10 +154,21 @@ impl CLIReplInterface {
         CLIReplInterfaceBuilder::new()
     }
 
-    /// Run the interactive REPL loop
-    pub async fn run_interactive_loop(&mut self) -> Result<()> {
-        // Initialize editor
-        let mut editor = DefaultEditor::new()?;
+    /// Run the interactive REPL loop with tab completion support
+    async fn run_interactive_loop_with_completion(&mut self) -> Result<()> {
+        // Get configuration values
+        let history_size = self
+            .config
+            .as_ref()
+            .map(|c| c.engine.repl.history_size)
+            .unwrap_or(1000);
+
+        // Build editor configuration
+        let config = Config::builder().max_history_size(history_size)?.build();
+
+        // Create editor with helper
+        let mut editor = Editor::<DebugCommandHelper, _>::with_config(config)?;
+        editor.set_helper(Some(DebugCommandHelper::new()));
 
         // Load history if available
         if let Some(history_path) = &self.history_file {
@@ -137,6 +220,89 @@ impl CLIReplInterface {
         self.kernel.disconnect().await?;
 
         Ok(())
+    }
+
+    /// Run the interactive REPL loop without tab completion
+    async fn run_interactive_loop_without_completion(&mut self) -> Result<()> {
+        // Get configuration values
+        let history_size = self
+            .config
+            .as_ref()
+            .map(|c| c.engine.repl.history_size)
+            .unwrap_or(1000);
+
+        // Build editor configuration
+        let config = Config::builder().max_history_size(history_size)?.build();
+
+        // Create editor without helper
+        let mut editor = Editor::<(), _>::with_config(config)?;
+
+        // Load history if available
+        if let Some(history_path) = &self.history_file {
+            let _ = editor.load_history(history_path);
+        }
+
+        println!("LLMSpell REPL - Connected to kernel");
+        println!("Type '.help' for commands, 'exit' or press Ctrl+D to quit");
+        println!();
+
+        loop {
+            let readline = editor.readline("llmspell> ");
+
+            match readline {
+                Ok(line) => {
+                    // Add to history
+                    let _ = editor.add_history_entry(&line);
+
+                    // Handle the input
+                    if line.trim() == "exit" {
+                        break;
+                    }
+
+                    if let Err(e) = self.handle_input(&line).await {
+                        eprintln!("Error: {}", e);
+                    }
+                }
+                Err(ReadlineError::Interrupted) => {
+                    println!("^C");
+                    continue;
+                }
+                Err(ReadlineError::Eof) => {
+                    println!("^D");
+                    break;
+                }
+                Err(err) => {
+                    eprintln!("Error: {:?}", err);
+                    break;
+                }
+            }
+        }
+
+        // Save history
+        if let Some(history_path) = &self.history_file {
+            let _ = editor.save_history(history_path);
+        }
+
+        // Disconnect from kernel
+        self.kernel.disconnect().await?;
+
+        Ok(())
+    }
+
+    /// Run the interactive REPL loop
+    pub async fn run_interactive_loop(&mut self) -> Result<()> {
+        // Check if tab completion is enabled in config
+        let tab_completion_enabled = self
+            .config
+            .as_ref()
+            .map(|c| c.engine.repl.tab_completion)
+            .unwrap_or(true);
+
+        if tab_completion_enabled {
+            self.run_interactive_loop_with_completion().await
+        } else {
+            self.run_interactive_loop_without_completion().await
+        }
     }
 
     /// Handle user input
@@ -366,5 +532,65 @@ impl CLIReplInterface {
         println!("  exit               - Exit REPL");
         println!();
         println!("Enter any other text to execute as code");
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rustyline::history::MemHistory;
+
+    #[test]
+    fn test_debug_command_completion() {
+        let helper = DebugCommandHelper::new();
+        let history = MemHistory::new();
+        let ctx = Context::new(&history);
+
+        // Test completion for ".br" prefix
+        let (start, completions) = helper.complete(".br", 3, &ctx).unwrap();
+        assert_eq!(start, 0);
+        assert_eq!(completions.len(), 1);
+        assert_eq!(completions[0].replacement, ".break");
+
+        // Test completion for ".st" prefix
+        let (start, completions) = helper.complete(".st", 3, &ctx).unwrap();
+        assert_eq!(start, 0);
+        assert_eq!(completions.len(), 2); // .step and .stack
+
+        // Test no completion for non-command
+        let (start, completions) = helper.complete("print", 5, &ctx).unwrap();
+        assert_eq!(start, 5);
+        assert_eq!(completions.len(), 0);
+    }
+
+    #[test]
+    fn test_all_debug_commands_included() {
+        let helper = DebugCommandHelper::new();
+        let history = MemHistory::new();
+        let ctx = Context::new(&history);
+
+        // Test that all commands are available for completion
+        let expected_commands = vec![
+            ".help",
+            ".break",
+            ".step",
+            ".continue",
+            ".locals",
+            ".stack",
+            ".watch",
+            ".info",
+            ".clear",
+            ".disable",
+            ".enable",
+        ];
+
+        for cmd in expected_commands {
+            let (_, completions) = helper.complete(cmd, cmd.len(), &ctx).unwrap();
+            assert!(
+                completions.iter().any(|c| c.replacement == cmd),
+                "Command {} not found in completions",
+                cmd
+            );
+        }
     }
 }
