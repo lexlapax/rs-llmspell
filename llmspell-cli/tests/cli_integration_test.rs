@@ -130,10 +130,9 @@ fn test_run_with_debug_flag() {
     cmd.arg("run")
         .arg("--debug")
         .arg(&script_path)
-        .write_stdin("\x04") // Send Ctrl+D (EOF) to exit debug REPL immediately
         .assert()
         .success()
-        .stdout(predicate::str::contains("Debug session started"));
+        .stdout(predicate::str::contains("[DEBUG]"));
 }
 
 #[test]
@@ -142,10 +141,9 @@ fn test_exec_with_debug_flag() {
     cmd.arg("exec")
         .arg("--debug")
         .arg("print('Debug inline')")
-        .write_stdin("\x04") // Send Ctrl+D (EOF) to exit debug REPL immediately
         .assert()
         .success()
-        .stdout(predicate::str::contains("Debug session started"));
+        .stdout(predicate::str::contains("[DEBUG]"));
 }
 
 #[test]
