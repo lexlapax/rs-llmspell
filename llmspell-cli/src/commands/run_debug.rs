@@ -8,7 +8,9 @@ use crate::kernel::{
 use crate::output::format_output;
 use anyhow::Result;
 use llmspell_bridge::{
-    circuit_breaker::ExponentialBackoffBreaker, diagnostics_bridge::DiagnosticsBridge,
+    circuit_breaker::ExponentialBackoffBreaker,
+    diagnostics_bridge::DiagnosticsBridge,
+    engine::{ScriptMetadata, ScriptOutput},
 };
 use llmspell_config::LLMSpellConfig;
 use std::path::PathBuf;
@@ -98,36 +100,39 @@ async fn handle_debug_execution(
 pub async fn execute_script_nondebug(
     script_content: String,
     script_path: PathBuf,
-    engine: crate::cli::ScriptEngine,
+    _engine: crate::cli::ScriptEngine, // Engine selection handled by kernel
     runtime_config: LLMSpellConfig,
-    stream: bool,
+    _stream: bool, // Streaming handled differently in kernel mode
     args: Vec<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    use crate::output::print_stream;
-
     // Parse script arguments
     let parsed_args = parse_script_args(args, &script_path);
     if !parsed_args.is_empty() {
         tracing::debug!("Parsed script arguments: {:?}", parsed_args);
     }
 
-    // Create runtime for the selected engine
-    let mut runtime = crate::commands::create_runtime(engine, runtime_config).await?;
+    // Create kernel connection instead of direct runtime
+    let mut kernel = crate::commands::create_kernel_connection(runtime_config).await?;
 
-    // Pass script arguments to the runtime
-    runtime.set_script_args(parsed_args).await?;
+    // Execute script via kernel connection
+    // TODO: Add support for script arguments in kernel protocol
+    let result = kernel.execute(&script_content).await?;
 
-    // Execute script
-    if stream && runtime.supports_streaming() {
-        // Execute with streaming
-        let mut stream = runtime.execute_script_streaming(&script_content).await?;
-        print_stream(&mut stream, output_format).await?;
-    } else {
-        // Execute without streaming
-        let result = runtime.execute_script(&script_content).await?;
-        println!("{}", format_output(&result, output_format)?);
-    }
+    // Create ScriptOutput from kernel result
+    let script_output = ScriptOutput {
+        output: result,
+        console_output: vec![], // TODO: Get console output from kernel
+        metadata: ScriptMetadata {
+            engine: "kernel".to_string(),
+            execution_time_ms: 0, // TODO: Get timing from kernel
+            memory_usage_bytes: None,
+            warnings: vec![],
+        },
+    };
+
+    // Format and display the result
+    println!("{}", format_output(&script_output, output_format)?);
 
     Ok(())
 }

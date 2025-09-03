@@ -16,8 +16,8 @@ pub mod setup;
 pub mod validate;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
+use crate::kernel::KernelConnectionTrait;
 use anyhow::Result;
-use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
 use std::path::PathBuf;
 
@@ -154,17 +154,20 @@ pub async fn execute_command(
     }
 }
 
-/// Create a script runtime for the specified engine
-pub async fn create_runtime(engine: ScriptEngine, config: LLMSpellConfig) -> Result<ScriptRuntime> {
-    match engine {
-        ScriptEngine::Lua => ScriptRuntime::new_with_lua(config)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create Lua runtime: {}", e)),
-        ScriptEngine::Javascript => {
-            anyhow::bail!("JavaScript engine not available yet (coming in Phase 5)")
-        }
-        ScriptEngine::Python => {
-            anyhow::bail!("Python engine not available yet (coming in Phase 9)")
-        }
-    }
+/// Create a kernel connection for the specified engine (replacing direct runtime creation)
+pub async fn create_kernel_connection(
+    _config: LLMSpellConfig,
+) -> Result<Box<dyn crate::kernel::KernelConnectionTrait>> {
+    let mut kernel = crate::kernel::KernelConnectionBuilder::new()
+        .discovery(Box::new(crate::kernel::CliKernelDiscovery::new()))
+        .circuit_breaker(Box::new(
+            llmspell_bridge::circuit_breaker::ExponentialBackoffBreaker::default(),
+        ))
+        .diagnostics(llmspell_bridge::diagnostics_bridge::DiagnosticsBridge::builder().build())
+        .build();
+
+    // Connect to kernel or start new one
+    kernel.connect_or_start().await?;
+
+    Ok(Box::new(kernel))
 }

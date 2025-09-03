@@ -2,7 +2,9 @@
 //! ABOUTME: Handles script execution with streaming and output formatting
 
 use crate::cli::{OutputFormat, ScriptEngine};
+use crate::output::format_output;
 use anyhow::Result;
+use llmspell_bridge::engine::{ScriptMetadata, ScriptOutput};
 use llmspell_config::LLMSpellConfig;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -54,9 +56,9 @@ pub fn parse_script_args(args: Vec<String>, script_path: &Path) -> HashMap<Strin
 /// Execute a script file
 pub async fn execute_script_file(
     script_path: PathBuf,
-    engine: ScriptEngine,
+    _engine: ScriptEngine, // Engine selection handled by kernel
     runtime_config: LLMSpellConfig,
-    stream: bool,
+    _stream: bool, // Streaming handled differently in kernel mode
     args: Vec<String>,
     output_format: OutputFormat,
     debug_mode: bool,
@@ -75,15 +77,34 @@ pub async fn execute_script_file(
         runtime_config.debug.enabled = true;
     }
 
-    // Execute the script - debug hooks will be installed if config.debug.enabled is true
-    super::run_debug::execute_script_nondebug(
-        script_content,
-        script_path,
-        engine,
-        runtime_config,
-        stream,
-        args,
-        output_format,
-    )
-    .await
+    // Unified execution path via kernel - no longer need separate debug/non-debug paths
+    // Parse script arguments
+    let parsed_args = parse_script_args(args, &script_path);
+    if !parsed_args.is_empty() {
+        tracing::debug!("Parsed script arguments: {:?}", parsed_args);
+    }
+
+    // Create kernel connection instead of direct runtime
+    let mut kernel = super::create_kernel_connection(runtime_config).await?;
+
+    // Execute script via kernel
+    // TODO: Add support for script arguments in kernel protocol
+    let result = kernel.execute(&script_content).await?;
+
+    // Create ScriptOutput from kernel result
+    let script_output = ScriptOutput {
+        output: result,
+        console_output: vec![], // TODO: Get console output from kernel
+        metadata: ScriptMetadata {
+            engine: "kernel".to_string(),
+            execution_time_ms: 0, // TODO: Get timing from kernel
+            memory_usage_bytes: None,
+            warnings: vec![],
+        },
+    };
+
+    // Format and display the result
+    println!("{}", format_output(&script_output, output_format)?);
+
+    Ok(())
 }

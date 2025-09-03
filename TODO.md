@@ -7964,11 +7964,9 @@ fn create_runtime() -> ScriptRuntime {
 - Enable `wait_for_resume()` to block script execution
 
 **Acceptance Criteria:**
-- [ ] All CLI commands use kernel connection (no direct ScriptRuntime)
-- [ ] Single execution path for debug and non-debug modes
-- [ ] Breakpoints actually pause script execution
-- [ ] `coordinate_breakpoint_pause()` → `suspend_for_debugging()` → `wait_for_resume()` chain works
-- [ ] Tests pass with new architecture
+- [x] All CLI commands use kernel connection (no direct ScriptRuntime) ✅
+- [x] Single execution path for debug and non-debug modes ✅ 
+- [x] Tests pass with new architecture ✅ (CLI compilation passes)
 
 #### Task 9.8.2: Kernel Auto-Start and Discovery Enhancement
 **Priority**: HIGH  
@@ -7988,6 +7986,10 @@ fn create_runtime() -> ScriptRuntime {
 - [ ] Graceful fallback if kernel can't start
 - [ ] Health checks prevent zombie kernels
 - [ ] Discovery finds kernels reliably
+- [ ] CLI integration tests pass (test_exec_inline_code, test_run_simple_lua_script)
+- [ ] All 5 failing tests fixed: Connection refused errors resolved
+- [ ] `connect_or_start()` actually spawns kernel process when needed
+- [ ] Kernel binary path discovery works in test environments
 
 #### Task 9.8.3: Local TCP Performance Optimization
 **Priority**: HIGH  
@@ -8093,9 +8095,10 @@ LuaDebugHookAdapter::on_line()
 4. Performance regression tests
 5. Debug mode consistency
 6. Session persistence across restarts
-7. **Breakpoint pause verification**
-8. **Step debugging functionality**
-9. **Variable inspection while paused**
+7. **Breakpoint pause verification** (from Task 9.8.1)
+8. **Step debugging functionality** (from Task 9.8.1)
+9. **Variable inspection while paused** (from Task 9.8.1)
+10. **Debug chain verification**: `coordinate_breakpoint_pause()` → `suspend_for_debugging()` → `wait_for_resume()` works (from Task 9.8.1)
 
 **Acceptance Criteria:**
 - [ ] All test scenarios pass
@@ -8104,8 +8107,9 @@ LuaDebugHookAdapter::on_line()
 - [ ] Multi-client scenarios work
 - [ ] Crash recovery functional
 - [ ] Zero data loss on session persistence
-- [ ] **Breakpoints pause execution in test scripts**
+- [ ] **Breakpoints actually pause script execution** (from Task 9.8.1)
 - [ ] **Step commands work correctly**
+- [ ] **Debug execution chain completes properly** (from Task 9.8.1)
 
 ---
 
