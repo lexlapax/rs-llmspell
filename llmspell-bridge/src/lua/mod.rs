@@ -8,6 +8,7 @@ pub mod engine;
 pub mod globals;
 pub mod hook_adapter;
 pub mod hook_multiplexer;
+pub mod lua_debug_bridge;
 pub mod output;
 pub mod stack_navigator_impl;
 pub mod sync_utils;

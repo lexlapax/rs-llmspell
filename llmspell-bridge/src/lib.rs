@@ -300,6 +300,9 @@ pub mod lua;
 #[cfg(feature = "javascript")]
 pub mod javascript;
 
+// Debug coordination module
+pub mod debug_coordinator;
+
 // Re-exports for convenience
 pub use engine::{
     register_engine_plugin, unregister_engine_plugin, EngineFactory, EngineFeatures, EngineInfo,
@@ -307,6 +310,7 @@ pub use engine::{
     ScriptStream, SecurityContext,
 };
 
+pub use debug_coordinator::DebugCoordinator;
 pub use debug_runtime::{DebugControl, DebugHook, DebugRuntime};
 pub use llmspell_config::LLMSpellConfig;
 pub use providers::ProviderManager;

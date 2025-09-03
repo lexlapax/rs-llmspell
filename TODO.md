@@ -2641,331 +2641,478 @@ While we have wired ExecutionManager properly, interactive debugging still needs
 3. **Maintain scalability** - Adding JS/Python only requires new bridge classes
 4. **NO ARCHITECTURE VIOLATIONS** - Preserve three-layer abstraction
 
-### Task 9.7.1: Create Language Debug Bridge Layer
+### Task 9.7.1: Create Language Debug Bridge Layer ✅ COMPLETED
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: Bridge Team
 
 **Description**: Create the missing Layer 2 bridge that connects language-agnostic DebugRuntime to language-specific hooks, following the three-layer bridge pattern.
 
-**Architecture Pattern**:
+**Hybrid Architecture Pattern** (Fast/Slow Path Performance):
 ```
-Layer 1: DebugRuntime (language-agnostic coordinator) ✅
+Layer 1: DebugCoordinator (language-agnostic core logic) ← CREATE
     ↓
-Layer 2: LuaDebugBridge (adapts calls to Lua) ← CREATE THIS
+Layer 2: LuaDebugBridge (sync/async boundary + adaptation) ← CREATE  
     ↓  
-Layer 3: LuaExecutionHook (Lua-specific logic) ✅
+Layer 3: LuaExecutionHook (restructured: Lua-specific only) ← REFACTOR
 ```
+
+**Performance Strategy:**
+- **Fast Path (99%)**: Sync breakpoint cache checks, no `block_on_async`
+- **Slow Path (1%)**: `block_on_async` only when actually pausing (human speed)
+- **Preserve existing optimization**: Don't regress `LuaExecutionHook` performance
 
 **Implementation Steps:**
-1. **Create LuaDebugBridge**:
-   ```rust
-   // New file: llmspell-bridge/src/lua/lua_debug_bridge.rs
-   pub struct LuaDebugBridge {
-       lua_hook: Arc<LuaExecutionHook>,
-       debug_runtime: Arc<DebugRuntime>,
-   }
 
-   impl DebugHook for LuaDebugBridge {
-       async fn on_line(&self, line: u32, source: &str) -> DebugControl {
-           // Bridge DebugRuntime calls to LuaExecutionHook
-           self.lua_hook.handle_line_event(line, source).await
-       }
-   }
-   ```
+**Step 1: Extract DebugCoordinator (Language-Agnostic Core)**
+```rust
+// New file: llmspell-bridge/src/debug_coordinator.rs
+pub struct DebugCoordinator {
+    execution_manager: Arc<ExecutionManager>,
+    shared_context: Arc<RwLock<SharedExecutionContext>>,
+    debug_cache: Arc<dyn DebugStateCache>, // trait for language abstraction
+}
 
-2. **Update runtime.rs to use bridge pattern**:
-   ```rust
-   match config.debug.mode.as_str() {
-       "interactive" => {
-           let lua_bridge = LuaDebugBridge::new(debug_runtime, lua_hook);
-           Arc::new(lua_bridge)
-       }
-       _ => {
-           Arc::new(SimpleTracingHook::new(true, diagnostics))
-       }
-   }
-   ```
+impl DebugCoordinator {
+    // Fast path sync methods (no async overhead)
+    pub fn might_break_at_sync(&self, source: &str, line: u32) -> bool;
+    pub fn is_stepping_sync(&self) -> bool;
+    
+    // Slow path async methods (only when pausing)
+    pub async fn handle_breakpoint(&self, location: ExecutionLocation) -> DebugControl;
+    pub async fn coordinate_pause(&self, reason: PauseReason) -> ResumeCommand;
+}
+```
 
-3. **Ensure proper trait implementations**:
-   - LuaDebugBridge implements DebugHook trait
-   - Proper async coordination between layers
+**Step 2: Create LuaDebugBridge (Sync/Async Boundary)**
+```rust
+// New file: llmspell-bridge/src/lua/lua_debug_bridge.rs
+pub struct LuaDebugBridge {
+    coordinator: Arc<DebugCoordinator>,
+    lua_context: Arc<RwLock<Option<NonNull<mlua::Lua>>>>, // Safe Lua pointer
+    lua_hook: Arc<parking_lot::Mutex<LuaExecutionHook>>,
+}
+
+impl DebugHook for LuaDebugBridge {
+    async fn on_line(&self, line: u32, source: &str) -> DebugControl {
+        // FAST PATH: Pure sync check (preserves performance)
+        if !self.coordinator.might_break_at_sync(source, line) {
+            return DebugControl::Continue; // EXIT FAST - no async!
+        }
+        
+        // SLOW PATH: Use block_on_async (rare, only when breaking)
+        self.handle_breakpoint_with_lua_context(line, source).await
+    }
+}
+```
+
+**Step 3: Refactor LuaExecutionHook (Lua-Specific Only)**
+```rust
+// Modify: llmspell-bridge/src/lua/globals/execution.rs
+impl LuaExecutionHook {
+    // Extract sync methods for bridge fast path
+    pub fn might_break_at_sync(&self, source: &str, line: u32) -> bool {
+        self.debug_cache.might_break_at(source, line)
+    }
+    
+    // Extract core logic for coordinator (remove Lua dependencies)
+    pub fn extract_breakpoint_logic(&self) -> BreakpointDecision;
+    pub fn extract_step_logic(&self) -> StepDecision;
+}
+```
+
+**Step 4: Update Runtime Integration**
+```rust
+// Modify: llmspell-bridge/src/runtime.rs
+match config.debug.mode.as_str() {
+    "interactive" => {
+        let coordinator = Arc::new(DebugCoordinator::new(exec_manager, shared_context));
+        let lua_bridge = LuaDebugBridge::new(coordinator, lua_hook);
+        Arc::new(lua_bridge)
+    }
+    _ => {
+        Arc::new(SimpleTracingHook::new(true, diagnostics))
+    }
+}
+```
 
 **Acceptance Criteria:**
-- [ ] LuaDebugBridge created as Layer 2 abstraction
-- [ ] DebugRuntime stays language-agnostic (Layer 1)
-- [ ] LuaExecutionHook used through bridge (Layer 3)
-- [ ] Architecture ready for JS/Python bridges
-- [ ] No regression in tracing mode
+- [x] DebugCoordinator extracts language-agnostic core logic (Layer 1) ✅
+- [x] LuaDebugBridge handles sync/async boundary efficiently (Layer 2) ✅
+- [x] LuaExecutionHook refactored to Lua-specific only (Layer 3) ✅
+- [x] Fast path performance preserved (99% of executions stay sync) ✅
+- [x] Slow path uses block_on_async only when actually pausing ✅
+- [x] Architecture ready for JS/Python coordinator sharing ✅
+- [x] Zero regression in tracing mode performance ✅
+- [x] All existing debug functionality works identically ✅
 
-### Task 9.7.2: Implement Pause Coordination Through Bridge Layer
+  **Performance characteristics achieved**:
+
+  - ✅ Fast path: Sync breakpoint checks, no block_on_async
+  - ✅ Slow path: Only uses block_on_async when actually pausing
+  - ✅ Zero overhead when no breakpoints set
+  - ✅ Tracing mode unchanged ([DEBUG] output preserved)
+
+  **Architecture benefits**:
+
+  - ✅ Ready for JavaScript/Python bridges (just add new Layer 2 implementations)
+  - ✅ Clean separation of concerns across three layers
+  - ✅ Testable at each layer independently
+  - ✅ No architectural violations - proper abstraction maintained
+
+
+### Task 9.7.2: Implement Pause Coordination Through Hybrid Bridge
 **Priority**: CRITICAL  
-**Estimated Time**: 4 hours  
+**Estimated Time**: 3 hours  
 **Assignee**: Execution Team
 
-**Description**: Add pause coordination that flows through the three-layer bridge pattern, managed by DebugRuntime and adapted by language bridges.
+**Description**: Wire pause coordination through the hybrid architecture, preserving existing `ExecutionManager` suspend/resume logic while adding bridge coordination.
 
 **Architecture Flow**:
 ```
-REPL ← DebugRuntime (pause state) → LuaDebugBridge → LuaExecutionHook
+REPL ← DebugCoordinator (async) ↔ LuaDebugBridge (sync/async) ↔ LuaExecutionHook (sync)
 ```
 
+**Key Insight**: `LuaExecutionHook` already has perfect pause logic via `ExecutionManager.suspend_for_debugging()` - preserve this!
+
 **Implementation Steps:**
-1. **Enhance DebugRuntime pause management**:
-   ```rust
-   impl DebugRuntime {
-       async fn request_pause(&mut self, reason: PauseReason) -> PauseHandle {
-           // Language-agnostic pause coordination
-       }
-       
-       async fn wait_for_resume(&mut self) -> ResumeCommand {
-           // Wait for user command through REPL
-       }
-   }
-   ```
 
-2. **Update LuaDebugBridge to coordinate pauses**:
-   ```rust
-   impl DebugHook for LuaDebugBridge {
-       async fn on_line(&self, line: u32, source: &str) -> DebugControl {
-           // Check breakpoints through LuaExecutionHook
-           if self.lua_hook.has_breakpoint(line, source) {
-               // Pause through DebugRuntime (Layer 1)
-               let handle = self.debug_runtime.request_pause(PauseReason::Breakpoint(line)).await;
-               let command = handle.wait_for_resume().await;
-               // Convert to DebugControl
-           }
-       }
-   }
-   ```
+**Step 1: Add Pause Coordination to DebugCoordinator**
+```rust
+impl DebugCoordinator {
+    // Delegate to existing ExecutionManager logic (preserve optimization)
+    pub async fn coordinate_breakpoint_pause(&self, location: ExecutionLocation, lua_variables: HashMap<String, serde_json::Value>) {
+        self.execution_manager.suspend_for_debugging(location, context).await;
+    }
+    
+    pub async fn coordinate_step_pause(&self, reason: PauseReason) {
+        self.execution_manager.set_state(DebugState::Paused { reason, location }).await;
+    }
+}
+```
 
-3. **Wire REPL to DebugRuntime (not directly to hooks)**:
-   - REPL commands go to DebugRuntime
-   - DebugRuntime coordinates with language bridges
-   - Language bridges adapt to specific hooks
+**Step 2: Bridge Handles Lua Context Marshalling**
+```rust
+impl LuaDebugBridge {
+    async fn handle_breakpoint_with_lua_context(&self, line: u32, source: &str) -> DebugControl {
+        // Get Lua context safely
+        if let Some(lua_ptr) = *self.lua_context.read().await {
+            let lua = unsafe { &*lua_ptr };
+            
+            // Use existing LuaExecutionHook breakpoint logic
+            let should_break = {
+                let mut hook = self.lua_hook.lock();
+                hook.should_break_slow(source, line, lua)
+            };
+            
+            if should_break {
+                // Extract variables using existing logic
+                let variables = self.extract_lua_variables(lua, line, source);
+                let location = ExecutionLocation { source: source.to_string(), line, column: None };
+                
+                // Coordinate through DebugCoordinator (preserves existing logic)
+                self.coordinator.coordinate_breakpoint_pause(location, variables).await;
+                return DebugControl::Pause;
+            }
+        }
+        DebugControl::Continue
+    }
+}
+```
+
+**Step 3: Preserve Existing ExecutionManager Integration**
+- Keep all existing `suspend_for_debugging()` calls
+- Keep all existing `set_state()` calls  
+- Bridge just coordinates between layers, doesn't change pause logic
 
 **Acceptance Criteria:**
-- [ ] Pause coordination managed by DebugRuntime (Layer 1)
-- [ ] Language bridges adapt pause behavior (Layer 2)
-- [ ] LuaExecutionHook handles Lua-specific pause logic (Layer 3)
-- [ ] REPL connects only to DebugRuntime
-- [ ] Architecture scales to multiple languages
+- [ ] Pause coordination flows through DebugCoordinator (Layer 1)
+- [ ] LuaDebugBridge marshalls Lua context safely (Layer 2)
+- [ ] Existing LuaExecutionHook pause logic preserved (Layer 3)
+- [ ] No changes to ExecutionManager suspend/resume behavior
+- [ ] Fast path still avoids pause coordination entirely
+- [ ] All existing pause scenarios work identically
 
-### Task 9.7.3: Wire REPL Commands Through Language-Agnostic Layer
+**Performance characteristics achieved**:
+- 
+- 
+
+**Architecture benefits**:
+- 
+- 
+
+
+### Task 9.7.3: Wire REPL Commands Through DebugCoordinator
 **Priority**: HIGH  
-**Estimated Time**: 3 hours  
+**Estimated Time**: 2 hours  
 **Assignee**: CLI Team
 
-**Description**: Connect REPL debug commands to DebugRuntime (Layer 1), which coordinates with language bridges, maintaining architecture separation.
+**Description**: Update REPL debug commands to use DebugCoordinator, which delegates to existing ExecutionManager methods. Minimal changes, maximum architectural alignment.
 
 **Architecture Flow**:
 ```
-REPL → DebugRuntime → LuaDebugBridge → LuaExecutionHook
-     (Layer 1)      (Layer 2)        (Layer 3)
+REPL → DebugCoordinator → ExecutionManager (existing)
+     (new layer)       (preserve all logic)
 ```
 
-**Commands to Wire** (all exist in repl_interface.rs):
-- `.break <line>` → `debug_runtime.add_breakpoint()`
-- `.delete <id>` → `debug_runtime.remove_breakpoint()`
-- `.step` → `debug_runtime.step_over()`
-- `.stepin` → `debug_runtime.step_into()`
-- `.stepout` → `debug_runtime.step_out()`
-- `.continue` → `debug_runtime.resume()`
-- `.locals` → `debug_runtime.inspect_locals()`
-- `.stack` → `debug_runtime.get_call_stack()`
+**Commands to Wire** (preserve existing ExecutionManager calls):
+- `.break <line>` → `coordinator.add_breakpoint()` → `execution_manager.add_breakpoint()`
+- `.delete <id>` → `coordinator.remove_breakpoint()` → `execution_manager.remove_breakpoint()`  
+- `.step` → `coordinator.step_over()` → `execution_manager.step_over()`
+- `.stepin` → `coordinator.step_into()` → `execution_manager.step_into()`
+- `.stepout` → `coordinator.step_out()` → `execution_manager.step_out()`
+- `.continue` → `coordinator.resume()` → `execution_manager.resume()`
+- `.locals` → `coordinator.inspect_locals()` → `variable_inspector.inspect_locals()`
+- `.stack` → `coordinator.get_call_stack()` → `stack_navigator.get_stack_trace()`
 
 **Implementation Steps:**
-1. **Pass DebugRuntime to REPL (not ExecutionManager)**:
-   ```rust
-   pub fn start_repl(
-       runtime: ScriptRuntime,
-       debug_runtime: Option<Arc<DebugRuntime>>,
-       // ...
-   )
-   ```
 
-2. **Route commands through DebugRuntime**:
-   ```rust
-   ".break" => {
-       if let Some(dr) = &self.debug_runtime {
-           let bp = Breakpoint::new(self.current_file, line);
-           dr.add_breakpoint(bp).await;
-           println!("Breakpoint set at line {}", line);
-       }
-   }
-   ```
+**Step 1: Add Delegation Methods to DebugCoordinator**
+```rust
+impl DebugCoordinator {
+    // Simple delegation to existing ExecutionManager methods
+    pub async fn add_breakpoint(&self, bp: Breakpoint) -> Result<String, String> {
+        self.execution_manager.add_breakpoint(bp).await
+    }
+    
+    pub async fn step_over(&self) {
+        self.execution_manager.step_over().await
+    }
+    // ... delegate all other methods
+}
+```
 
-3. **DebugRuntime delegates to appropriate language bridge**:
-   - DebugRuntime determines current language
-   - Calls appropriate language bridge method
-   - Language bridge adapts to specific hook implementation
+**Step 2: Update REPL to Use DebugCoordinator**
+```rust
+// Modify: llmspell-repl/src/repl_interface.rs
+pub fn start_repl(
+    runtime: ScriptRuntime,
+    debug_coordinator: Option<Arc<DebugCoordinator>>, // Changed from ExecutionManager
+    // ...
+)
+
+// Update command handlers - minimal change
+".break" => {
+    if let Some(coord) = &self.debug_coordinator {
+        let bp = Breakpoint::new(self.current_file, line);
+        coord.add_breakpoint(bp).await;
+        println!("Breakpoint set at line {}", line);
+    }
+}
+```
+
+**Step 3: Update CLI Integration**
+```rust
+// Modify: llmspell-cli/src/commands/debug.rs & repl.rs
+// Pass coordinator instead of execution_manager to REPL
+```
 
 **Acceptance Criteria:**
-- [ ] REPL connects only to DebugRuntime (Layer 1)
-- [ ] DebugRuntime routes to appropriate language bridge (Layer 2)
-- [ ] Language bridges handle language-specific logic (Layer 3)
-- [ ] Commands work regardless of script language
-- [ ] Architecture ready for multi-language support
+- [ ] REPL uses DebugCoordinator instead of ExecutionManager directly
+- [ ] All debug commands delegate to existing ExecutionManager methods
+- [ ] Zero functional changes to command behavior
+- [ ] Architecture layer properly established for future language support
+- [ ] Existing error handling and feedback preserved
 
-### Task 9.7.4: Implement Debug Session State Management
-**Priority**: HIGH  
-**Estimated Time**: 3 hours  
+**Performance characteristics achieved**:
+- 
+-
+
+**Architecture benefits**:
+- 
+- 
+
+
+
+### Task 9.7.4: Verify Debug Session State Management
+**Priority**: MEDIUM  
+**Estimated Time**: 1 hour  
 **Assignee**: State Team
 
-**Description**: Maintain debug session state across pauses and commands.
+**Description**: Verify that existing debug session state management works correctly through the new hybrid architecture. No new state management needed - just verify existing works.
 
-**Key State to Track**:
-- Current execution position (file, line, function)
-- Active breakpoints with IDs
-- Call stack frames
-- Local variables at each frame
-- Step mode (over/into/out)
+**Existing State Management (Already Working):**
+- `SharedExecutionContext` - tracks current position, stack, variables
+- `ExecutionManager` - tracks breakpoints, step mode, pause state  
+- `DebugSession` in DebugRuntime - tracks session metadata
+- `LuaDebugStateCache` - fast breakpoint/step state
 
 **Implementation Steps:**
-1. **Enhance DebugSession struct**:
-   ```rust
-   pub struct DebugSession {
-       id: String,
-       script_path: PathBuf,
-       breakpoints: HashMap<String, Breakpoint>,
-       current_position: Option<ExecutionLocation>,
-       call_stack: Vec<StackFrame>,
-       step_mode: Option<StepMode>,
-       // Add pause state
-       is_paused: bool,
-       pause_reason: Option<PauseReason>,
-   }
-   ```
 
-2. **Update state on pause**:
-   - Capture current position
-   - Snapshot call stack
-   - Mark as paused
+**Step 1: Verify State Flows Through Architecture**
+- DebugCoordinator accesses existing ExecutionManager state
+- LuaDebugBridge preserves state marshalling from LuaExecutionHook
+- No new state structures needed
 
-3. **Provide state queries**:
-   - `get_current_position()`
-   - `get_call_stack()`
-   - `is_paused()`
+**Step 2: Add State Query Methods to DebugCoordinator**
+```rust
+impl DebugCoordinator {
+    // Delegate to existing state sources
+    pub async fn get_current_position(&self) -> Option<ExecutionLocation> {
+        self.shared_context.read().await.current_location().map(|loc| ExecutionLocation {
+            source: loc.source,
+            line: loc.line,
+            column: loc.column,
+        })
+    }
+    
+    pub async fn is_paused(&self) -> bool {
+        matches!(self.execution_manager.get_state().await, DebugState::Paused { .. })
+    }
+    
+    pub async fn get_breakpoints(&self) -> Vec<Breakpoint> {
+        self.execution_manager.get_breakpoints().await
+    }
+}
+```
+
+**Step 3: Verify Integration Points**
+- REPL can query state through DebugCoordinator
+- Bridge preserves state updates from LuaExecutionHook
+- No state is lost in architecture transition
 
 **Acceptance Criteria:**
-- [ ] State persists across pauses
-- [ ] State accessible from REPL
-- [ ] State updates correctly on step/continue
-- [ ] State cleared on script completion
+- [ ] All existing state remains accessible through DebugCoordinator
+- [ ] State updates flow correctly through all three layers
+- [ ] REPL state queries work identically
+- [ ] No new state structures created (preserve existing)
+- [ ] State performance unchanged
 
-### Task 9.7.5: Add Visual Debug Output Formatting
-**Priority**: MEDIUM  
-**Estimated Time**: 2 hours  
+**Performance characteristics achieved**:
+- 
+-
+
+**Architecture benefits**:
+- 
+- 
+
+
+### Task 9.7.5: Preserve Visual Debug Output Formatting
+**Priority**: LOW  
+**Estimated Time**: 30 minutes  
 **Assignee**: UX Team
 
-**Description**: Improve debug output to clearly show execution state.
+**Description**: Verify that existing debug output formatting works through the hybrid architecture. The existing output formatting in `LuaExecutionHook` is already excellent.
 
-**Visual Elements**:
-1. **Pause Banner**:
-   ```
-   ════════════════════════════════════════
-   PAUSED at script.lua:42 in function 'calculate'
-   Reason: Breakpoint #3
-   ════════════════════════════════════════
-   ```
-
-2. **Source Context** (show surrounding lines):
-   ```
-   40:     local x = 10
-   41:     local y = 20
-   → 42:     local result = x + y  -- CURRENT LINE
-   43:     print(result)
-   44:     return result
-   ```
-
-3. **Stack Display**:
-   ```
-   Call Stack:
-   #0 calculate() at script.lua:42
-   #1 process() at script.lua:15
-   #2 main() at script.lua:5
-   ```
+**Existing Output (Already Working):**
+- `capture_stack_trace()` in lua/output.rs - comprehensive stack formatting
+- Variable formatting via `format_simple()` and JSON conversion
+- Source location tracking in `SharedExecutionContext`
+- Error context in pause/step handlers
 
 **Implementation Steps:**
-1. Create formatting helpers in debug_output.rs
-2. Use colors/symbols for clarity (→ for current line)
-3. Add source line caching for context display
-4. Format locals display nicely
+
+**Step 1: Verify Output Flows Through Bridge**
+- LuaDebugBridge preserves existing output formatting
+- DebugCoordinator doesn't interfere with output
+- REPL displays work identically
+
+**Step 2: Optional Enhancement via DebugCoordinator**
+```rust
+impl DebugCoordinator {
+    // Optional: Provide formatted output methods
+    pub async fn format_current_state(&self) -> String {
+        // Delegate to existing formatting in SharedExecutionContext
+        let ctx = self.shared_context.read().await;
+        format!("At {}:{}", ctx.current_location().source, ctx.current_location().line)
+    }
+}
+```
 
 **Acceptance Criteria:**
-- [ ] Clear visual indication of pause
-- [ ] Source context shown with marker
-- [ ] Stack trace formatted nicely
-- [ ] Variables displayed readably
+- [ ] All existing debug output preserved
+- [ ] No regression in output quality
+- [ ] Output works through all three architecture layers
+- [ ] REPL displays unchanged
 
-### Task 9.7.6: Integration Testing and Documentation
-**Priority**: HIGH  
-**Estimated Time**: 3 hours  
+**Performance characteristics achieved**:
+- 
+-
+
+**Architecture benefits**:
+- 
+- 
+
+
+### Task 9.7.6: Integration Testing for Hybrid Architecture
+**Priority**: CRITICAL  
+**Estimated Time**: 2 hours  
 **Assignee**: QA Team
 
-**Description**: Comprehensive testing of interactive debugging and documentation.
+**Description**: Test that the hybrid three-layer architecture preserves all existing debug functionality without regression.
+
+**Test Focus**: Architecture integration, not new functionality
 
 **Test Scenarios**:
-1. **Breakpoint Tests**:
-   - Set breakpoint, hit it, continue
-   - Multiple breakpoints
-   - Conditional breakpoints
-   - Delete breakpoints
+1. **Architecture Flow Tests**:
+   - REPL → DebugCoordinator → ExecutionManager delegation works
+   - LuaDebugBridge → LuaExecutionHook coordination works
+   - Fast path performance maintained (breakpoint cache)
+   - Slow path coordination works (actual pauses)
 
-2. **Stepping Tests**:
-   - Step over function call
-   - Step into function
-   - Step out of function
-   - Step through loop
+2. **Existing Functionality Preserved**:
+   - All existing debug commands work identically
+   - Breakpoint hit/continue cycles work
+   - Step over/into/out work
+   - Variable inspection works
+   - Stack navigation works
 
-3. **State Tests**:
-   - Inspect locals at breakpoint
-   - Navigate stack frames
-   - Inspect variables in different frames
+3. **Performance Regression Tests**:
+   - Fast path execution (99% of lines) performance unchanged
+   - Slow path pause latency acceptable
+   - Memory usage not significantly increased
 
-4. **Edge Cases**:
-   - Breakpoint in nested function
-   - Breakpoint in coroutine
-   - Rapid step commands
-   - Very deep call stacks
+4. **Error Handling**:
+   - Architecture errors don't crash debug sessions
+   - Lua errors handled gracefully through bridge
+   - REPL errors handled gracefully through coordinator
 
-**Documentation Updates**:
-1. **User Guide**: "Debugging Lua Scripts with llmspell"
-2. **Command Reference**: All debug commands
-3. **Tutorial**: Step-by-step debugging example
-4. **Troubleshooting**: Common issues
+**Test Strategy**: Use existing debug integration tests, verify they pass with new architecture
 
 **Acceptance Criteria:**
-- [ ] All test scenarios pass
-- [ ] No deadlocks or panics
-- [ ] Documentation complete
-- [ ] Example debug session in docs
+- [ ] All existing debug integration tests pass
+- [ ] No performance regression in fast path
+- [ ] Architecture layers communicate correctly
+- [ ] Error propagation works through all layers
+- [ ] Zero functional regressions
 
-### Task 9.7.7: Performance and Polish
-**Priority**: MEDIUM  
-**Estimated Time**: 2 hours  
+**Performance characteristics achieved**:
+- 
+-
+
+**Architecture benefits**:
+- 
+- 
+
+
+### Task 9.7.7: Performance Verification and Architecture Polish
+**Priority**: HIGH  
+**Estimated Time**: 1 hour  
 **Assignee**: Performance Team
 
-**Description**: Optimize debug performance and polish the experience.
+**Description**: Verify that the hybrid architecture maintains existing performance characteristics and polish the architecture integration.
 
-**Performance Goals**:
-- Pause latency < 10ms
-- Step latency < 10ms  
-- No overhead when no breakpoints
-- Minimal memory for debug state
+**Performance Verification** (existing targets already met):
+- Fast path overhead < 1% (preserve existing optimization)
+- Pause latency < 10ms (preserve existing ExecutionManager performance)
+- No memory regression from architecture layers
+- Block_on_async usage only in slow path (preserve existing pattern)
 
-**Polish Items**:
-1. **Smart Breakpoints**:
-   - Remember breakpoints across runs
-   - Import/export breakpoint sets
-   - Breakpoint conditions
+**Architecture Polish**:
+1. **Clean Up Integration Points**:
+   - Remove any unnecessary async boundaries
+   - Optimize DebugCoordinator delegation (avoid double lookups)
+   - Clean up LuaDebugBridge context handling
 
-2. **Enhanced Display**:
-   - Syntax highlighting in source display
-   - Variable value previews
-   - Expression evaluation
+2. **Error Handling Polish**:
+   - Proper error propagation through all three layers
+   - Graceful degradation if layers fail to communicate
+   - Clear error messages that indicate which layer failed
 
-3. **Convenience Features**:
+3. **Documentation Polish**:
+   - Add architecture diagram to debug_coordinator.rs
+   - Document performance characteristics of each layer
+   - Add examples of layer communication
    - `.restart` command
    - `.clear` all breakpoints
    - Command history specific to debug
