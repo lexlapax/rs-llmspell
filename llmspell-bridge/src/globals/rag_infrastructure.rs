@@ -230,21 +230,56 @@ async fn try_load_hnsw_from_path(
     }
 }
 
-/// Create new HNSW storage with optional persistence
-fn create_new_hnsw_storage(
+/// Create new HNSW storage with optional persistence (loads existing data if present)
+async fn create_new_hnsw_storage(
     dimensions: usize,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
     persistence_path: Option<&std::path::Path>,
 ) -> llmspell_storage::backends::vector::hnsw::HNSWVectorStorage {
     use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
 
-    let storage = HNSWVectorStorage::new(dimensions, hnsw_config);
-
     if let Some(path) = persistence_path {
-        storage.with_persistence(path.to_path_buf())
+        // Use from_path to load existing data if it exists
+        HNSWVectorStorage::from_path(path, dimensions, hnsw_config.clone())
+            .await
+            .unwrap_or_else(|_| {
+                // If loading fails (e.g., path doesn't exist), create new with persistence
+                HNSWVectorStorage::new(dimensions, hnsw_config).with_persistence(path.to_path_buf())
+            })
     } else {
-        storage
+        HNSWVectorStorage::new(dimensions, hnsw_config)
     }
+}
+
+/// Create HNSW storage with persistence
+async fn create_hnsw_storage_with_persistence(
+    path: &std::path::Path,
+    dimensions: usize,
+    hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
+) -> Arc<dyn VectorStorage> {
+    debug!(
+        "Loading or creating HNSW storage with persistence at: {:?}",
+        path
+    );
+
+    // Try to load existing data first
+    if let Some(storage) = try_load_hnsw_from_path(path, dimensions, hnsw_config.clone()).await {
+        return Arc::new(storage);
+    }
+
+    // Create new storage with persistence
+    let storage = create_new_hnsw_storage(dimensions, hnsw_config, Some(path)).await;
+    Arc::new(storage)
+}
+
+/// Create HNSW storage without persistence
+async fn create_hnsw_storage_without_persistence(
+    dimensions: usize,
+    hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
+) -> Arc<dyn VectorStorage> {
+    warn!("HNSW storage created without persistence - data will not survive restarts");
+    let storage = create_new_hnsw_storage(dimensions, hnsw_config, None).await;
+    Arc::new(storage)
 }
 
 /// Create HNSW storage with real implementation
@@ -254,28 +289,19 @@ async fn create_hnsw_storage(
 ) -> Arc<dyn VectorStorage> {
     debug!("Creating HNSW vector storage for RAG");
 
-    if let Some(ref path) = config.vector_storage.persistence_path {
-        debug!(
-            "Loading or creating HNSW storage with persistence at: {:?}",
-            path
-        );
-
-        // Try to load existing data first
-        if let Some(storage) =
-            try_load_hnsw_from_path(path, config.vector_storage.dimensions, hnsw_config.clone())
-                .await
-        {
-            return Arc::new(storage);
+    match config.vector_storage.persistence_path {
+        Some(ref path) => {
+            create_hnsw_storage_with_persistence(
+                path,
+                config.vector_storage.dimensions,
+                hnsw_config,
+            )
+            .await
         }
-
-        // Create new storage with persistence
-        let storage =
-            create_new_hnsw_storage(config.vector_storage.dimensions, hnsw_config, Some(path));
-        Arc::new(storage)
-    } else {
-        warn!("HNSW storage created without persistence - data will not survive restarts");
-        let storage = create_new_hnsw_storage(config.vector_storage.dimensions, hnsw_config, None);
-        Arc::new(storage)
+        None => {
+            create_hnsw_storage_without_persistence(config.vector_storage.dimensions, hnsw_config)
+                .await
+        }
     }
 }
 
