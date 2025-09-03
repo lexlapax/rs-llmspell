@@ -99,6 +99,10 @@ async fn test_debug_hook_integration() {
         async fn on_exception(&self, _error: &str, _line: u32) -> DebugControl {
             DebugControl::Pause
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     let config = LLMSpellConfig::default();

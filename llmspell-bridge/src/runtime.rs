@@ -232,14 +232,12 @@ impl ScriptRuntime {
         let debug_hook: Arc<dyn crate::debug_runtime::DebugHook> = match config.debug.mode.as_str()
         {
             "interactive" => {
-                // Use ExecutionManagerHook for interactive debugging (breakpoints, stepping)
-                let state = Arc::new(TokioRwLock::new(
-                    crate::debug_runtime::ExecutionState::default(),
-                ));
-
-                Arc::new(crate::debug_runtime::ExecutionManagerHook::new(
-                    capabilities,
-                    state,
+                // Use LuaDebugHookAdapter for interactive debugging (breakpoints, stepping)
+                // This bridges Layer 1 (DebugHook) to Layer 3 (HookHandler)
+                Arc::new(crate::lua::debug_hook_adapter::LuaDebugHookAdapter::new(
+                    exec_manager.clone(),
+                    coordinator.clone(),
+                    shared_context.clone(),
                 ))
             }
             _ => {
@@ -726,6 +724,10 @@ impl crate::debug_runtime::DebugHook for SimpleTracingHook {
     async fn on_exception(&self, error: &str, line: u32) -> crate::debug_runtime::DebugControl {
         println!("[DEBUG] Exception at line {line}: {error}");
         crate::debug_runtime::DebugControl::Continue
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

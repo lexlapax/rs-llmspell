@@ -32,6 +32,7 @@ use std::time::Duration;
 ///
 /// Handles the sync/async boundary and Lua context marshalling between
 /// the language-agnostic coordinator and Lua-specific implementation.
+#[derive(Clone)]
 pub struct LuaDebugBridge {
     /// Reference to the language-agnostic debug coordinator
     coordinator: Arc<DebugCoordinator>,
