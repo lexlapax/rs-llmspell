@@ -95,7 +95,8 @@ impl HookHandler for LuaDebugBridge {
 
             // Use block_on_async to coordinate pause
             let coordinator = self.coordinator.clone();
-            block_on_async(
+            let pause_source = source.to_string();
+            if let Err(e) = block_on_async(
                 "coordinate_breakpoint_pause",
                 async move {
                     coordinator
@@ -104,8 +105,16 @@ impl HookHandler for LuaDebugBridge {
                     Ok::<(), std::io::Error>(())
                 },
                 Some(Duration::from_millis(100)),
-            )
-            .ok();
+            ) {
+                // Log error with layer identification for debugging
+                tracing::error!(
+                    "Layer 2 (LuaDebugBridge) failed to coordinate pause at {}:{}: {:?}",
+                    pause_source,
+                    line_num,
+                    e
+                );
+                // Graceful degradation: continue execution instead of crashing
+            }
         }
 
         Ok(())
