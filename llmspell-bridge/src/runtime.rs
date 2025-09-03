@@ -181,6 +181,94 @@ impl ScriptRuntime {
         }
     }
 
+    /// Initialize debug infrastructure based on configuration
+    async fn init_debug_infrastructure(
+        config: &LLMSpellConfig,
+        engine: &mut Box<dyn ScriptEngineBridge>,
+    ) -> (
+        Option<Arc<ExecutionManager>>,
+        Option<Arc<DebugCoordinator>>,
+        Option<Arc<DiagnosticsBridge>>,
+        Option<Arc<TokioRwLock<SharedExecutionContext>>>,
+    ) {
+        if !config.debug.enabled {
+            return (None, None, None, None);
+        }
+
+        // Create DiagnosticsBridge for debug output
+        let diagnostics = Arc::new(DiagnosticsBridge::builder().build());
+
+        // Create SharedExecutionContext for debug state
+        let shared_context = Arc::new(TokioRwLock::new(SharedExecutionContext::new()));
+
+        // Create ExecutionManager with LuaDebugStateCache
+        let debug_cache = Arc::new(LuaDebugStateCache::new());
+        let exec_manager = Arc::new(ExecutionManager::new(debug_cache));
+
+        // Create capabilities for DebugCoordinator
+        let capabilities: Arc<
+            TokioRwLock<HashMap<String, Arc<dyn llmspell_core::debug::DebugCapability>>>,
+        > = Arc::new(TokioRwLock::new(HashMap::new()));
+
+        // Add ExecutionManagerAdapter as a capability
+        let adapter: Arc<dyn llmspell_core::debug::DebugCapability> =
+            Arc::new(crate::debug_adapters::ExecutionManagerAdapter::new(
+                exec_manager.clone(),
+                "debug_session".to_string(),
+            ));
+        capabilities
+            .write()
+            .await
+            .insert("execution_manager".to_string(), adapter);
+
+        // Create DebugCoordinator with ExecutionManager
+        let coordinator = Arc::new(DebugCoordinator::new(
+            shared_context.clone(),
+            capabilities.clone(),
+            exec_manager.clone(),
+        ));
+
+        // Select debug hook based on mode
+        let debug_hook: Arc<dyn crate::debug_runtime::DebugHook> = match config.debug.mode.as_str()
+        {
+            "interactive" => {
+                // Use ExecutionManagerHook for interactive debugging (breakpoints, stepping)
+                let state = Arc::new(TokioRwLock::new(
+                    crate::debug_runtime::ExecutionState::default(),
+                ));
+
+                Arc::new(crate::debug_runtime::ExecutionManagerHook::new(
+                    capabilities,
+                    state,
+                ))
+            }
+            _ => {
+                // Default to simple tracing for "tracing" mode or any other value
+                Arc::new(SimpleTracingHook::new(
+                    true, // Always trace when debug is enabled
+                    diagnostics.clone(),
+                ))
+            }
+        };
+
+        if let Err(e) = engine.install_debug_hooks(debug_hook) {
+            tracing::warn!("Failed to install debug hooks: {}", e);
+        }
+
+        // Log debug initialization
+        tracing::info!(
+            "Debug mode enabled ({}) - initialized DiagnosticsBridge, ExecutionManager, and DebugCoordinator",
+            config.debug.mode
+        );
+
+        (
+            Some(exec_manager),
+            Some(coordinator),
+            Some(diagnostics),
+            Some(shared_context),
+        )
+    }
+
     /// Core initialization with any engine
     async fn new_with_engine(
         mut engine: Box<dyn ScriptEngineBridge>,
@@ -240,82 +328,7 @@ impl ScriptRuntime {
 
         // Initialize debug infrastructure if enabled
         let (execution_manager, debug_coordinator, diagnostics_bridge, shared_execution_context) =
-            if config.debug.enabled {
-                // Create DiagnosticsBridge for debug output
-                let diagnostics = Arc::new(DiagnosticsBridge::builder().build());
-
-                // Create SharedExecutionContext for debug state
-                let shared_context = Arc::new(TokioRwLock::new(SharedExecutionContext::new()));
-
-                // Create ExecutionManager with LuaDebugStateCache
-                let debug_cache = Arc::new(LuaDebugStateCache::new());
-                let exec_manager = Arc::new(ExecutionManager::new(debug_cache));
-
-                // Create capabilities for DebugCoordinator
-                let capabilities: Arc<
-                    TokioRwLock<HashMap<String, Arc<dyn llmspell_core::debug::DebugCapability>>>,
-                > = Arc::new(TokioRwLock::new(HashMap::new()));
-
-                // Add ExecutionManagerAdapter as a capability
-                let adapter: Arc<dyn llmspell_core::debug::DebugCapability> =
-                    Arc::new(crate::debug_adapters::ExecutionManagerAdapter::new(
-                        exec_manager.clone(),
-                        "debug_session".to_string(),
-                    ));
-                capabilities
-                    .write()
-                    .await
-                    .insert("execution_manager".to_string(), adapter);
-
-                // Create DebugCoordinator with ExecutionManager
-                let coordinator = Arc::new(DebugCoordinator::new(
-                    shared_context.clone(),
-                    capabilities.clone(),
-                    exec_manager.clone(),
-                ));
-
-                // Select debug hook based on mode
-                let debug_hook: Arc<dyn crate::debug_runtime::DebugHook> =
-                    match config.debug.mode.as_str() {
-                        "interactive" => {
-                            // Use ExecutionManagerHook for interactive debugging (breakpoints, stepping)
-                            let state = Arc::new(TokioRwLock::new(
-                                crate::debug_runtime::ExecutionState::default(),
-                            ));
-
-                            Arc::new(crate::debug_runtime::ExecutionManagerHook::new(
-                                capabilities,
-                                state,
-                            ))
-                        }
-                        _ => {
-                            // Default to simple tracing for "tracing" mode or any other value
-                            Arc::new(SimpleTracingHook::new(
-                                true, // Always trace when debug is enabled
-                                diagnostics.clone(),
-                            ))
-                        }
-                    };
-
-                if let Err(e) = engine.install_debug_hooks(debug_hook) {
-                    tracing::warn!("Failed to install debug hooks: {}", e);
-                }
-
-                // Log debug initialization
-                tracing::info!(
-                    "Debug mode enabled ({}) - initialized DiagnosticsBridge, ExecutionManager, and DebugCoordinator",
-                    config.debug.mode
-                );
-
-                (
-                    Some(exec_manager),
-                    Some(coordinator),
-                    Some(diagnostics),
-                    Some(shared_context),
-                )
-            } else {
-                (None, None, None, None)
-            };
+            Self::init_debug_infrastructure(&config, &mut engine).await;
 
         Ok(Self {
             engine,

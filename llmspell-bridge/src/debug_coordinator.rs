@@ -402,4 +402,100 @@ mod tests {
         assert!(!coordinator.is_paused().await);
         assert_eq!(coordinator.get_debug_state().await, DebugState::Running);
     }
+
+    #[tokio::test]
+    async fn test_state_flows_through_layers() {
+        // Task 9.7.4: Verify state flows through all architecture layers
+        let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
+        let capabilities = Arc::new(RwLock::new(HashMap::new()));
+        let debug_cache = Arc::new(SharedDebugStateCache::new());
+        let execution_manager = Arc::new(ExecutionManager::new(debug_cache));
+
+        let coordinator = DebugCoordinator::new(
+            shared_context.clone(),
+            capabilities,
+            execution_manager.clone(),
+        );
+
+        // Test 1: SharedExecutionContext state flows
+        {
+            let mut ctx = shared_context.write().await;
+            ctx.set_location(SourceLocation {
+                source: "state_test.lua".to_string(),
+                line: 42,
+                column: Some(8),
+            });
+            ctx.variables.insert(
+                "test_var".to_string(),
+                serde_json::Value::String("test_value".to_string()),
+            );
+            ctx.push_frame(StackFrame {
+                id: "frame1".to_string(),
+                name: "test_function".to_string(),
+                source: "state_test.lua".to_string(),
+                line: 42,
+                column: None,
+                locals: vec![],
+                is_user_code: true,
+            });
+        }
+
+        // Verify state is accessible through coordinator
+        let position = coordinator.get_current_position().await;
+        assert!(position.is_some());
+        let pos = position.unwrap();
+        assert_eq!(pos.source, "state_test.lua");
+        assert_eq!(pos.line, 42);
+        assert_eq!(pos.column, Some(8));
+
+        let locals = coordinator.inspect_locals().await;
+        assert!(locals.contains_key("test_var"));
+        assert_eq!(
+            locals.get("test_var").unwrap(),
+            &serde_json::Value::String("test_value".to_string())
+        );
+
+        let stack = coordinator.get_call_stack().await;
+        assert_eq!(stack.len(), 1);
+        assert_eq!(stack[0].name, "test_function");
+
+        // Test 2: ExecutionManager state flows
+        let bp = Breakpoint::new("state_test.lua".to_string(), 50);
+        let bp_id = coordinator.add_breakpoint(bp).await.unwrap();
+
+        let breakpoints = coordinator.get_breakpoints().await;
+        assert_eq!(breakpoints.len(), 1);
+        assert_eq!(breakpoints[0].line, 50);
+
+        // Test 3: Debug state coordination
+        coordinator
+            .coordinate_step_pause(
+                PauseReason::Step,
+                ExecutionLocation {
+                    source: "state_test.lua".to_string(),
+                    line: 50,
+                    column: None,
+                },
+            )
+            .await;
+
+        assert!(coordinator.is_paused().await);
+        let state = coordinator.get_debug_state().await;
+        assert!(matches!(
+            state,
+            DebugState::Paused {
+                reason: PauseReason::Step,
+                ..
+            }
+        ));
+
+        // Test 4: State query methods work correctly
+        let formatted = coordinator.format_current_state().await;
+        assert!(formatted.contains("state_test.lua:42"));
+
+        // Clean up
+        coordinator.remove_breakpoint(&bp_id).await.unwrap();
+        coordinator.resume().await;
+        assert!(!coordinator.is_paused().await);
+    }
 }
