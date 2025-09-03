@@ -21,8 +21,10 @@ use llmspell_repl::{
 };
 use serde_json::Value;
 use std::collections::HashMap;
+use std::process::Stdio;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
 
@@ -60,6 +62,9 @@ pub trait KernelConnectionTrait: Send + Sync {
 
     /// Check if debug mode is supported
     fn supports_debug(&self) -> bool;
+
+    /// Perform a health check on the kernel
+    async fn health_check(&mut self) -> Result<bool>;
 }
 
 /// Handle for debug execution
@@ -123,6 +128,7 @@ impl KernelConnectionBuilder {
             execution_manager: None,
             debug_session_manager: None,
             connected: false,
+            kernel_process: None,
         }
     }
 }
@@ -141,6 +147,153 @@ pub struct KernelConnection {
     execution_manager: Option<Arc<ExecutionManager>>,
     debug_session_manager: Option<Arc<RwLock<DebugSessionManager>>>,
     connected: bool,
+    kernel_process: Option<tokio::process::Child>,
+}
+
+impl KernelConnection {
+    /// Start a new kernel process and connect to it
+    async fn start_new_kernel(&mut self) -> Result<()> {
+        let kernel_id = uuid::Uuid::new_v4().to_string();
+        let port = 9555; // TODO: Find available port
+        let info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
+
+        // Write connection file first
+        info.write_connection_file().await?;
+
+        // Spawn kernel process
+        let mut kernel_process = Self::spawn_kernel(port).await?;
+
+        // Wait for kernel to be ready and connect
+        let addr = format!("{}:{}", info.ip, info.shell_port);
+
+        match Self::wait_for_kernel_ready(&addr, 50).await {
+            Ok(protocol_client) => {
+                // Successfully started and connected
+                self.connection_info = Some(info);
+                self.client = Some(ConnectedClient::new("cli-user".to_string()));
+                self.protocol_client = Some(protocol_client);
+                self.kernel_process = Some(kernel_process);
+                self.connected = true;
+                tracing::info!("Started new kernel and connected via TCP");
+                Ok(())
+            }
+            Err(e) => {
+                // Failed to connect, kill the kernel process
+                tracing::error!("Failed to connect to spawned kernel: {}", e);
+                kernel_process.kill().await.ok();
+                info.remove_connection_file().await.ok();
+                Err(e)
+            }
+        }
+    }
+
+    /// Find the kernel binary path
+    fn find_kernel_binary() -> Result<std::path::PathBuf> {
+        // Try common locations
+        let possible_paths = [
+            // In target directory (development)
+            "target/debug/llmspell-kernel",
+            "target/release/llmspell-kernel",
+            // Installed in PATH
+            "llmspell-kernel",
+            // Relative to current executable
+            "../target/debug/llmspell-kernel",
+            "../target/release/llmspell-kernel",
+        ];
+
+        for path_str in &possible_paths {
+            let path = std::path::Path::new(path_str);
+            if path.exists() && path.is_file() {
+                return Ok(path.to_path_buf());
+            }
+
+            // Also try using `which` for PATH resolution
+            if !path_str.contains('/') {
+                if let Ok(output) = std::process::Command::new("which").arg(path_str).output() {
+                    if output.status.success() {
+                        let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                        if !path_str.is_empty() {
+                            return Ok(std::path::PathBuf::from(path_str));
+                        }
+                    }
+                }
+            }
+        }
+
+        // For tests, try to find it relative to the manifest directory
+        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+            let test_path = std::path::Path::new(&manifest_dir)
+                .join("target")
+                .join("debug")
+                .join("llmspell-kernel");
+            if test_path.exists() {
+                return Ok(test_path);
+            }
+        }
+
+        anyhow::bail!(
+            "Could not find llmspell-kernel binary. Please ensure it is built and in your PATH."
+        )
+    }
+
+    /// Spawn a kernel process
+    async fn spawn_kernel(port: u16) -> Result<tokio::process::Child> {
+        let kernel_path = Self::find_kernel_binary()?;
+
+        tracing::info!("Starting kernel from: {}", kernel_path.display());
+
+        let child = Command::new(&kernel_path)
+            .arg("--port")
+            .arg(port.to_string())
+            .arg("--engine")
+            .arg("lua")  // Default to Lua engine
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdin(Stdio::null())
+            .spawn()
+            .map_err(|e| anyhow::anyhow!("Failed to spawn kernel process: {}", e))?;
+
+        tracing::info!("Kernel process spawned with PID: {:?}", child.id());
+        Ok(child)
+    }
+
+    /// Wait for kernel to be ready by attempting to connect
+    async fn wait_for_kernel_ready(addr: &str, max_retries: u32) -> Result<ProtocolClient> {
+        let retry_delay = Duration::from_millis(100);
+
+        for attempt in 1..=max_retries {
+            tracing::debug!(
+                "Attempting to connect to kernel (attempt {}/{})",
+                attempt,
+                max_retries
+            );
+
+            match ProtocolClient::connect(addr).await {
+                Ok(client) => {
+                    tracing::info!("Successfully connected to kernel");
+                    return Ok(client);
+                }
+                Err(e) => {
+                    if attempt < max_retries {
+                        tracing::debug!(
+                            "Connection attempt {} failed: {}, retrying...",
+                            attempt,
+                            e
+                        );
+                        sleep(retry_delay).await;
+                    } else {
+                        return Err(anyhow::anyhow!(
+                            "Failed to connect to kernel after {} attempts: {}",
+                            max_retries,
+                            e
+                        ));
+                    }
+                }
+            }
+        }
+
+        unreachable!()
+    }
 }
 
 #[async_trait]
@@ -148,34 +301,32 @@ impl KernelConnectionTrait for KernelConnection {
     async fn connect_or_start(&mut self) -> Result<()> {
         // Try to discover existing kernel
         if let Some(kernel) = self.discovery.discover_first().await? {
-            // Connect via TCP protocol
+            // Try to connect to existing kernel
             let addr = format!("{}:{}", kernel.ip, kernel.shell_port);
-            let protocol_client = ProtocolClient::connect(&addr)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to connect to kernel: {}", e))?;
 
-            self.connection_info = Some(kernel);
-            self.client = Some(ConnectedClient::new("cli-user".to_string()));
-            self.protocol_client = Some(protocol_client);
-            self.connected = true;
-            tracing::info!("Connected to existing kernel via TCP");
+            match ProtocolClient::connect(&addr).await {
+                Ok(protocol_client) => {
+                    // Successfully connected to existing kernel
+                    self.connection_info = Some(kernel);
+                    self.client = Some(ConnectedClient::new("cli-user".to_string()));
+                    self.protocol_client = Some(protocol_client);
+                    self.connected = true;
+                    tracing::info!("Connected to existing kernel via TCP");
+                }
+                Err(e) => {
+                    tracing::warn!("Found kernel connection file but couldn't connect: {}", e);
+                    tracing::info!("Will start a new kernel instead");
+
+                    // Remove stale connection file
+                    kernel.remove_connection_file().await.ok();
+
+                    // Fall through to start new kernel
+                    self.start_new_kernel().await?;
+                }
+            }
         } else {
-            // Start new kernel
-            let kernel_id = uuid::Uuid::new_v4().to_string();
-            let info = ConnectionInfo::new(kernel_id, "127.0.0.1".to_string(), 9555);
-            info.write_connection_file().await?;
-
-            // Connect via TCP protocol
-            let addr = format!("{}:{}", info.ip, info.shell_port);
-            let protocol_client = ProtocolClient::connect(&addr)
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to connect to kernel: {}", e))?;
-
-            self.connection_info = Some(info);
-            self.client = Some(ConnectedClient::new("cli-user".to_string()));
-            self.protocol_client = Some(protocol_client);
-            self.connected = true;
-            tracing::info!("Started new kernel and connected via TCP");
+            // No existing kernel found, start new one
+            self.start_new_kernel().await?;
         }
 
         // Initialize execution manager
@@ -264,14 +415,72 @@ impl KernelConnectionTrait for KernelConnection {
     }
 
     async fn disconnect(&mut self) -> Result<()> {
-        // Shutdown TCP client
+        // Shutdown TCP client first
         if let Some(client) = self.protocol_client.take() {
             client.shutdown().await;
         }
 
+        // If we spawned a kernel process, shut it down gracefully
+        if let Some(mut kernel_process) = self.kernel_process.take() {
+            tracing::info!("Shutting down kernel process");
+
+            // Try sending interrupt signal first (graceful shutdown)
+            if let Some(pid) = kernel_process.id() {
+                // Send SIGTERM for graceful shutdown (on Unix-like systems)
+                #[cfg(unix)]
+                {
+                    use nix::sys::signal::{self, Signal};
+                    use nix::unistd::Pid;
+
+                    if let Err(e) = signal::kill(Pid::from_raw(pid as i32), Signal::SIGTERM) {
+                        tracing::warn!("Failed to send SIGTERM to kernel: {}", e);
+                    }
+                }
+
+                // On Windows, we can only kill the process
+                #[cfg(windows)]
+                {
+                    kernel_process.kill().await.ok();
+                }
+            }
+
+            // Give the process time to shut down gracefully
+            let shutdown_timeout = Duration::from_secs(5);
+            let shutdown_start = Instant::now();
+
+            loop {
+                // Check if process has exited
+                match kernel_process.try_wait() {
+                    Ok(Some(_status)) => {
+                        tracing::info!("Kernel process exited gracefully");
+                        break;
+                    }
+                    Ok(None) => {
+                        // Process still running
+                        if shutdown_start.elapsed() > shutdown_timeout {
+                            // Timeout reached, force kill
+                            tracing::warn!("Kernel process did not exit gracefully, force killing");
+                            kernel_process.kill().await.ok();
+                            kernel_process.wait().await.ok();
+                            break;
+                        }
+                        // Wait a bit before checking again
+                        sleep(Duration::from_millis(100)).await;
+                    }
+                    Err(e) => {
+                        tracing::error!("Error checking kernel process status: {}", e);
+                        kernel_process.kill().await.ok();
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Remove connection file
         if let Some(info) = &self.connection_info {
             info.remove_connection_file().await?;
         }
+
         self.connected = false;
         Ok(())
     }
@@ -355,6 +564,42 @@ impl KernelConnectionTrait for KernelConnection {
 
     fn supports_debug(&self) -> bool {
         self.execution_manager.is_some() || self.diagnostics.is_some()
+    }
+
+    async fn health_check(&mut self) -> Result<bool> {
+        if !self.connected {
+            return Ok(false);
+        }
+
+        // Try to execute a simple command to check if kernel is responsive
+        match self.execute("return 'health_ok'").await {
+            Ok(result) => {
+                // Check if we got the expected response
+                if let Some(s) = result.as_str() {
+                    Ok(s == "health_ok")
+                } else {
+                    Ok(true) // Kernel responded, even if not with expected value
+                }
+            }
+            Err(e) => {
+                tracing::warn!("Health check failed: {}", e);
+
+                // If health check failed, mark as disconnected
+                self.connected = false;
+
+                // Try to reconnect
+                if let Err(reconnect_err) = self.connect_or_start().await {
+                    tracing::error!(
+                        "Failed to reconnect after health check failure: {}",
+                        reconnect_err
+                    );
+                    Ok(false)
+                } else {
+                    // Successfully reconnected
+                    Ok(true)
+                }
+            }
+        }
     }
 }
 
@@ -449,6 +694,64 @@ impl CliKernelDiscovery {
 
     pub fn builder() -> CliKernelDiscoveryBuilder {
         CliKernelDiscoveryBuilder::new()
+    }
+
+    /// Get multiple search paths for kernel discovery
+    pub fn get_search_paths() -> Vec<std::path::PathBuf> {
+        let mut paths = vec![];
+
+        // Default user directory (~/.llmspell/kernels)
+        if let Some(home) = dirs::home_dir() {
+            paths.push(home.join(".llmspell").join("kernels"));
+        }
+
+        // System-wide directory (/tmp on Unix, %TEMP% on Windows)
+        paths.push(std::env::temp_dir().join("llmspell-kernels"));
+
+        // Current working directory (for development)
+        if let Ok(cwd) = std::env::current_dir() {
+            paths.push(cwd.join(".llmspell-kernels"));
+        }
+
+        // Check LLMSPELL_KERNEL_DIR environment variable
+        if let Ok(kernel_dir) = std::env::var("LLMSPELL_KERNEL_DIR") {
+            paths.push(std::path::PathBuf::from(kernel_dir));
+        }
+
+        // For tests, check the test-specific directory
+        if cfg!(test) {
+            paths.push(std::path::PathBuf::from("/tmp/llmspell-test-kernels"));
+        }
+
+        paths
+    }
+
+    /// Discover kernels from multiple locations
+    pub async fn discover_from_multiple_locations(
+        search_paths: &[std::path::PathBuf],
+    ) -> Result<Vec<ConnectionInfo>> {
+        let mut all_kernels = vec![];
+
+        for path in search_paths {
+            if !path.exists() {
+                continue;
+            }
+
+            // Create a temporary KernelDiscovery for this path
+            let discovery = KernelDiscovery::with_dir(path.clone());
+
+            match discovery.discover_kernels().await {
+                Ok(kernels) => {
+                    tracing::debug!("Found {} kernels in {}", kernels.len(), path.display());
+                    all_kernels.extend(kernels);
+                }
+                Err(e) => {
+                    tracing::debug!("Failed to discover kernels in {}: {}", path.display(), e);
+                }
+            }
+        }
+
+        Ok(all_kernels)
     }
 
     /// Record a discovery attempt with session recorder
@@ -614,8 +917,9 @@ impl CliKernelDiscovery {
             }
         }
 
-        // Try to discover kernels
-        let kernels = self.discovery.discover_kernels().await?;
+        // Try to discover kernels from multiple locations
+        let search_paths = CliKernelDiscovery::get_search_paths();
+        let kernels = CliKernelDiscovery::discover_from_multiple_locations(&search_paths).await?;
         for info in kernels {
             if self.try_connect_with_retry(&info).await? {
                 // Cache the connection
@@ -632,7 +936,9 @@ impl CliKernelDiscovery {
 
     /// Enhanced discover_all that uses cache and circuit breaker (requires mutable access)
     pub async fn discover_all_alive(&mut self) -> Result<Vec<ConnectionInfo>> {
-        let kernels = self.discovery.discover_kernels().await?;
+        // Try to discover kernels from multiple locations
+        let search_paths = CliKernelDiscovery::get_search_paths();
+        let kernels = CliKernelDiscovery::discover_from_multiple_locations(&search_paths).await?;
         let mut alive_kernels = Vec::new();
 
         for info in kernels {
@@ -663,8 +969,10 @@ impl KernelDiscoveryTrait for CliKernelDiscovery {
             }
         }
 
-        // Try to discover kernels
-        let kernels = self.discovery.discover_kernels().await?;
+        // Try to discover kernels from multiple locations
+        let search_paths = CliKernelDiscovery::get_search_paths();
+        let kernels = CliKernelDiscovery::discover_from_multiple_locations(&search_paths).await?;
+
         for info in kernels {
             // Check if kernel is alive - note: this is a limitation since we can't modify self
             // In real usage, the caller should use discover_first_alive instead
@@ -680,7 +988,9 @@ impl KernelDiscoveryTrait for CliKernelDiscovery {
     }
 
     async fn discover_all(&self) -> Result<Vec<ConnectionInfo>> {
-        let kernels = self.discovery.discover_kernels().await?;
+        // Try to discover kernels from multiple locations
+        let search_paths = CliKernelDiscovery::get_search_paths();
+        let kernels = CliKernelDiscovery::discover_from_multiple_locations(&search_paths).await?;
         let mut alive_kernels = Vec::new();
 
         for info in kernels {
@@ -779,6 +1089,10 @@ impl KernelConnectionTrait for NullKernelConnection {
 
     fn supports_debug(&self) -> bool {
         false // Null implementation doesn't support real debugging
+    }
+
+    async fn health_check(&mut self) -> Result<bool> {
+        Ok(false) // Null connection always fails health check
     }
 }
 

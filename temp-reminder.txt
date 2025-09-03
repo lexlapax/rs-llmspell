@@ -11,3 +11,7 @@
 - debug for scripts not working
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
+- ok, wait a minute, isn't the kernel supposed to be in llmspell-engine , why is it in llmspell-cli? 
+llmspell-repl? ultrathink about this , analyze and tell me how it ended up there.. look at the entirety
+of TODO to figre this out.. andme where it should be. don't change code. think about providing me 
+options after mega analysis and research  

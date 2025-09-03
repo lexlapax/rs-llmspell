@@ -517,7 +517,20 @@ impl LLMSpellKernel {
 
         // Handle result based on execution outcome
         let response = match result {
-            Ok(Ok(_)) => Self::handle_success(execution_count, silent),
+            Ok(Ok(script_output)) => {
+                // Include the script output in the response
+                let payload = if let Ok(json_value) = serde_json::to_value(&script_output.output) {
+                    Some(vec![json_value])
+                } else {
+                    None
+                };
+                LRPResponse::ExecuteReply {
+                    status: "ok".to_string(),
+                    execution_count,
+                    user_expressions: None,
+                    payload,
+                }
+            }
             Ok(Err(_)) | Err(_) => Self::handle_error(execution_count, silent),
         };
 

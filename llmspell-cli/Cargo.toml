@@ -42,6 +42,9 @@ async-trait = { workspace = true }
 rustyline = "14.0"
 tempfile = "3.8"
 
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.28", features = ["signal", "process"] }
+
 [dev-dependencies]
 assert_cmd = "2.0"
 predicates = "3.0"

@@ -7976,20 +7976,26 @@ fn create_runtime() -> ScriptRuntime {
 **Description**: Implement automatic kernel startup when CLI needs it, with improved discovery.
 
 **Implementation Steps:**
-1. Add kernel auto-start logic to CLI
-2. Implement kernel health checks
-3. Add kernel shutdown timeout/cleanup
-4. Enhance discovery with multiple connection file locations
+1. ✅ Add kernel auto-start logic to CLI
+2. ✅ Implement kernel health checks
+3. ✅ Add kernel shutdown timeout/cleanup
+4. ✅ Enhance discovery with multiple connection file locations
+
+**Current Issue**: 
+- Kernel starts successfully but protocol connection drops when sending execute request
+- "Connection closed" error occurs immediately after successful TCP connection
+- Kernel's ExecuteReply now includes script output in payload (fixed)
+- Need to debug protocol message exchange between client and server
 
 **Acceptance Criteria:**
-- [ ] Kernel starts automatically if not running
-- [ ] Graceful fallback if kernel can't start
-- [ ] Health checks prevent zombie kernels
-- [ ] Discovery finds kernels reliably
+- [x] Kernel starts automatically if not running
+- [x] Graceful fallback if kernel can't start  
+- [x] Health checks prevent zombie kernels
+- [x] Discovery finds kernels reliably
 - [ ] CLI integration tests pass (test_exec_inline_code, test_run_simple_lua_script)
-- [ ] All 5 failing tests fixed: Connection refused errors resolved
-- [ ] `connect_or_start()` actually spawns kernel process when needed
-- [ ] Kernel binary path discovery works in test environments
+- [ ] All 5 failing tests fixed: Protocol communication errors resolved
+- [x] `connect_or_start()` actually spawns kernel process when needed
+- [x] Kernel binary path discovery works in test environments
 
 #### Task 9.8.3: Local TCP Performance Optimization
 **Priority**: HIGH  
