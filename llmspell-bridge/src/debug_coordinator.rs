@@ -404,6 +404,104 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_debug_output_formatting() {
+        // Task 9.7.5: Verify debug output formatting through all layers
+        let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
+        let capabilities = Arc::new(RwLock::new(HashMap::new()));
+        let debug_cache = Arc::new(SharedDebugStateCache::new());
+        let execution_manager = Arc::new(ExecutionManager::new(debug_cache));
+
+        let coordinator = DebugCoordinator::new(
+            shared_context.clone(),
+            capabilities,
+            execution_manager.clone(),
+        );
+
+        // Test 1: Basic state formatting
+        {
+            let mut ctx = shared_context.write().await;
+            ctx.set_location(SourceLocation {
+                source: "test_format.lua".to_string(),
+                line: 100,
+                column: Some(15),
+            });
+        }
+
+        let formatted = coordinator.format_current_state().await;
+        assert_eq!(formatted, "At test_format.lua:100");
+
+        // Test 2: No location formatting
+        {
+            let mut ctx = shared_context.write().await;
+            ctx.location = None;
+        }
+
+        let formatted = coordinator.format_current_state().await;
+        assert_eq!(formatted, "No current execution location");
+
+        // Test 3: Variables are preserved through coordinator
+        {
+            let mut ctx = shared_context.write().await;
+            ctx.variables.insert(
+                "test_var".to_string(),
+                serde_json::Value::String("formatted_value".to_string()),
+            );
+            ctx.variables.insert(
+                "test_number".to_string(),
+                serde_json::Value::Number(serde_json::Number::from(42)),
+            );
+            ctx.variables
+                .insert("test_bool".to_string(), serde_json::Value::Bool(true));
+        }
+
+        let locals = coordinator.inspect_locals().await;
+        assert_eq!(locals.len(), 3);
+        assert_eq!(
+            locals.get("test_var").unwrap(),
+            &serde_json::Value::String("formatted_value".to_string())
+        );
+        assert_eq!(
+            locals.get("test_number").unwrap(),
+            &serde_json::Value::Number(serde_json::Number::from(42))
+        );
+        assert_eq!(
+            locals.get("test_bool").unwrap(),
+            &serde_json::Value::Bool(true)
+        );
+
+        // Test 4: Stack formatting is preserved
+        {
+            let mut ctx = shared_context.write().await;
+            ctx.push_frame(StackFrame {
+                id: "frame1".to_string(),
+                name: "main".to_string(),
+                source: "test_format.lua".to_string(),
+                line: 10,
+                column: None,
+                locals: vec![],
+                is_user_code: true,
+            });
+            ctx.push_frame(StackFrame {
+                id: "frame2".to_string(),
+                name: "helper_function".to_string(),
+                source: "test_format.lua".to_string(),
+                line: 50,
+                column: Some(8),
+                locals: vec![],
+                is_user_code: true,
+            });
+        }
+
+        let stack = coordinator.get_call_stack().await;
+        assert_eq!(stack.len(), 2);
+        assert_eq!(stack[0].name, "main");
+        assert_eq!(stack[0].line, 10);
+        assert_eq!(stack[1].name, "helper_function");
+        assert_eq!(stack[1].line, 50);
+        assert_eq!(stack[1].column, Some(8));
+    }
+
+    #[tokio::test]
     async fn test_state_flows_through_layers() {
         // Task 9.7.4: Verify state flows through all architecture layers
         let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));

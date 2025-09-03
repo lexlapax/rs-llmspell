@@ -127,15 +127,35 @@ impl HookHandler for LuaDebugBridge {
 /// Extract Lua variables from current context
 impl LuaDebugBridge {
     fn extract_lua_variables(
-        _lua: &Lua,
+        lua: &Lua,
         line: u32,
         source: &str,
     ) -> HashMap<String, serde_json::Value> {
         let mut variables = HashMap::new();
 
-        // Extract local variables from Lua debug info
-        // Note: Simplified extraction for now - full implementation would use debug info
-        // to extract locals, upvalues, and globals
+        // Try to extract local variables using Lua debug API
+        if let Ok(debug_table) = lua.globals().get::<_, mlua::Table>("debug") {
+            if let Ok(getlocal) = debug_table.get::<_, mlua::Function>("getlocal") {
+                // Get locals from the current frame (level 2 to skip this function)
+                let mut local_index = 1;
+                while local_index <= 50 {
+                    // Reasonable limit
+                    match getlocal
+                        .call::<_, (Option<String>, Option<mlua::Value>)>((2, local_index))
+                    {
+                        Ok((Some(name), Some(value))) if !name.starts_with('(') => {
+                            // Skip internal variables like (temporary)
+                            // Use format_simple from output.rs for consistent formatting
+                            let formatted_value = crate::lua::output::format_simple(&value);
+                            variables
+                                .insert(name.clone(), serde_json::Value::String(formatted_value));
+                        }
+                        _ => break, // No more locals or error
+                    }
+                    local_index += 1;
+                }
+            }
+        }
 
         // Add debug metadata
         variables.insert(
