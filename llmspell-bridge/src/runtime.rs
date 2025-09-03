@@ -2,6 +2,7 @@
 //! ABOUTME: Central execution orchestrator supporting multiple script engines
 
 use crate::{
+    debug_coordinator::DebugCoordinator,
     diagnostics_bridge::DiagnosticsBridge,
     engine::{EngineFactory, JSConfig, LuaConfig, ScriptEngineBridge, ScriptOutput, ScriptStream},
     execution_bridge::{
@@ -107,6 +108,8 @@ pub struct ScriptRuntime {
     _config: LLMSpellConfig,
     /// Execution manager for debugging support
     execution_manager: Option<Arc<ExecutionManager>>,
+    /// Debug coordinator for language-agnostic debug operations
+    debug_coordinator: Option<Arc<DebugCoordinator>>,
     /// Diagnostics bridge for debug output
     _diagnostics_bridge: Option<Arc<DiagnosticsBridge>>,
     /// Shared execution context for debugging
@@ -236,7 +239,7 @@ impl ScriptRuntime {
         }));
 
         // Initialize debug infrastructure if enabled
-        let (execution_manager, diagnostics_bridge, shared_execution_context) =
+        let (execution_manager, debug_coordinator, diagnostics_bridge, shared_execution_context) =
             if config.debug.enabled {
                 // Create DiagnosticsBridge for debug output
                 let diagnostics = Arc::new(DiagnosticsBridge::builder().build());
@@ -248,30 +251,37 @@ impl ScriptRuntime {
                 let debug_cache = Arc::new(LuaDebugStateCache::new());
                 let exec_manager = Arc::new(ExecutionManager::new(debug_cache));
 
+                // Create capabilities for DebugCoordinator
+                let capabilities: Arc<
+                    TokioRwLock<HashMap<String, Arc<dyn llmspell_core::debug::DebugCapability>>>,
+                > = Arc::new(TokioRwLock::new(HashMap::new()));
+
+                // Add ExecutionManagerAdapter as a capability
+                let adapter: Arc<dyn llmspell_core::debug::DebugCapability> =
+                    Arc::new(crate::debug_adapters::ExecutionManagerAdapter::new(
+                        exec_manager.clone(),
+                        "debug_session".to_string(),
+                    ));
+                capabilities
+                    .write()
+                    .await
+                    .insert("execution_manager".to_string(), adapter);
+
+                // Create DebugCoordinator with ExecutionManager
+                let coordinator = Arc::new(DebugCoordinator::new(
+                    shared_context.clone(),
+                    capabilities.clone(),
+                    exec_manager.clone(),
+                ));
+
                 // Select debug hook based on mode
                 let debug_hook: Arc<dyn crate::debug_runtime::DebugHook> =
                     match config.debug.mode.as_str() {
                         "interactive" => {
                             // Use ExecutionManagerHook for interactive debugging (breakpoints, stepping)
-                            let capabilities: Arc<
-                                TokioRwLock<
-                                    HashMap<String, Arc<dyn llmspell_core::debug::DebugCapability>>,
-                                >,
-                            > = Arc::new(TokioRwLock::new(HashMap::new()));
                             let state = Arc::new(TokioRwLock::new(
                                 crate::debug_runtime::ExecutionState::default(),
                             ));
-
-                            // Add ExecutionManagerAdapter as a capability
-                            let adapter: Arc<dyn llmspell_core::debug::DebugCapability> =
-                                Arc::new(crate::debug_adapters::ExecutionManagerAdapter::new(
-                                    exec_manager.clone(),
-                                    "debug_session".to_string(),
-                                ));
-                            capabilities
-                                .write()
-                                .await
-                                .insert("execution_manager".to_string(), adapter);
 
                             Arc::new(crate::debug_runtime::ExecutionManagerHook::new(
                                 capabilities,
@@ -293,13 +303,18 @@ impl ScriptRuntime {
 
                 // Log debug initialization
                 tracing::info!(
-                    "Debug mode enabled ({}) - initialized DiagnosticsBridge and ExecutionManager",
+                    "Debug mode enabled ({}) - initialized DiagnosticsBridge, ExecutionManager, and DebugCoordinator",
                     config.debug.mode
                 );
 
-                (Some(exec_manager), Some(diagnostics), Some(shared_context))
+                (
+                    Some(exec_manager),
+                    Some(coordinator),
+                    Some(diagnostics),
+                    Some(shared_context),
+                )
             } else {
-                (None, None, None)
+                (None, None, None, None)
             };
 
         Ok(Self {
@@ -309,6 +324,7 @@ impl ScriptRuntime {
             execution_context,
             _config: config,
             execution_manager,
+            debug_coordinator,
             _diagnostics_bridge: diagnostics_bridge,
             _shared_execution_context: shared_execution_context,
         })
@@ -456,9 +472,39 @@ impl ScriptRuntime {
         self.execution_manager.clone()
     }
 
+    /// Get the debug coordinator instance if available
+    #[must_use]
+    pub fn get_debug_coordinator(&self) -> Option<Arc<DebugCoordinator>> {
+        self.debug_coordinator.clone()
+    }
+
     /// Set breakpoints for debugging
     pub async fn set_breakpoints(&mut self, breakpoints: Vec<Breakpoint>) -> Vec<Breakpoint> {
-        if let Some(ref execution_manager) = self.execution_manager {
+        // Prefer DebugCoordinator if available (it delegates to ExecutionManager)
+        if let Some(ref coordinator) = self.debug_coordinator {
+            // Clear existing breakpoints first
+            let existing = coordinator.get_breakpoints().await;
+            for bp in existing {
+                let _ = coordinator.remove_breakpoint(&bp.id).await;
+            }
+
+            // Add new breakpoints through coordinator
+            let mut verified_breakpoints = Vec::new();
+            for bp in breakpoints {
+                match coordinator.add_breakpoint(bp.clone()).await {
+                    Ok(id) => {
+                        let mut verified = bp;
+                        verified.id = id;
+                        verified_breakpoints.push(verified);
+                    }
+                    Err(e) => {
+                        tracing::warn!("Failed to add breakpoint: {}", e);
+                    }
+                }
+            }
+            verified_breakpoints
+        } else if let Some(ref execution_manager) = self.execution_manager {
+            // Fallback to ExecutionManager directly if no coordinator
             // Clear existing breakpoints
             execution_manager.clear().await;
 
@@ -480,7 +526,10 @@ impl ScriptRuntime {
 
     /// Get current debug state
     pub async fn get_debug_state(&self) -> DebugState {
-        if let Some(ref execution_manager) = self.execution_manager {
+        // Prefer DebugCoordinator if available
+        if let Some(ref coordinator) = self.debug_coordinator {
+            coordinator.get_debug_state().await
+        } else if let Some(ref execution_manager) = self.execution_manager {
             execution_manager.get_state().await
         } else {
             DebugState::Terminated
@@ -489,7 +538,10 @@ impl ScriptRuntime {
 
     /// Get stack trace during debugging
     pub async fn get_stack_trace(&self) -> Vec<StackFrame> {
-        if let Some(ref execution_manager) = self.execution_manager {
+        // Prefer DebugCoordinator if available
+        if let Some(ref coordinator) = self.debug_coordinator {
+            coordinator.get_call_stack().await
+        } else if let Some(ref execution_manager) = self.execution_manager {
             execution_manager.get_stack_trace().await
         } else {
             Vec::new()
@@ -498,6 +550,25 @@ impl ScriptRuntime {
 
     /// Get variables in current or specified frame
     pub async fn get_variables(&self, frame_id: Option<&str>) -> Vec<Variable> {
+        // Prefer DebugCoordinator if available for current frame
+        if frame_id.is_none() {
+            if let Some(ref coordinator) = self.debug_coordinator {
+                // Get locals from coordinator and convert to Vec<Variable>
+                let locals = coordinator.inspect_locals().await;
+                return locals
+                    .into_iter()
+                    .map(|(name, value)| Variable {
+                        name,
+                        value: value.to_string(),
+                        var_type: "unknown".to_string(),
+                        has_children: false,
+                        reference: None,
+                    })
+                    .collect();
+            }
+        }
+
+        // Otherwise use ExecutionManager for specific frame or fallback
         if let Some(ref execution_manager) = self.execution_manager {
             if let Some(frame_id) = frame_id {
                 execution_manager
@@ -523,7 +594,33 @@ impl ScriptRuntime {
 
     /// Send a debug command (continue, step, pause, etc.)
     pub async fn send_debug_command(&self, command: DebugCommand) {
-        if let Some(ref execution_manager) = self.execution_manager {
+        // Prefer DebugCoordinator if available (it delegates to ExecutionManager)
+        if let Some(ref coordinator) = self.debug_coordinator {
+            match command {
+                DebugCommand::Continue => {
+                    coordinator.resume().await;
+                }
+                DebugCommand::StepInto => {
+                    coordinator.step_into().await;
+                }
+                DebugCommand::StepOver => {
+                    coordinator.step_over().await;
+                }
+                DebugCommand::StepOut => {
+                    coordinator.step_out().await;
+                }
+                DebugCommand::Terminate => {
+                    // Coordinator doesn't have terminate, use ExecutionManager directly
+                    if let Some(ref execution_manager) = self.execution_manager {
+                        execution_manager.set_state(DebugState::Terminated).await;
+                    }
+                }
+                DebugCommand::Pause => {
+                    // Pause will be handled by the engine
+                }
+            }
+        } else if let Some(ref execution_manager) = self.execution_manager {
+            // Fallback to ExecutionManager directly if no coordinator
             match command {
                 DebugCommand::Continue => {
                     execution_manager.set_state(DebugState::Running).await;
@@ -535,7 +632,6 @@ impl ScriptRuntime {
                     // Step commands and pause will be handled by the engine
                 }
             }
-            // TODO: Propagate to engine when engine supports it
         }
     }
 
