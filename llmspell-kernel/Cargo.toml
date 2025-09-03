@@ -19,13 +19,23 @@ serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 uuid = { version = "1.11", features = ["v4", "serde"] }
 async-trait = "0.1"
+clap = { version = "4.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"] }
+glob = "0.3"
+dirs = "5.0"
+hex = "0.4"
 
 # Internal crates (minimal initial dependencies)
 llmspell-bridge = { path = "../llmspell-bridge" }
 llmspell-config = { path = "../llmspell-config" }
+llmspell-core = { path = "../llmspell-core" }
 llmspell-debug = { path = "../llmspell-debug" }
 llmspell-sessions = { path = "../llmspell-sessions" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-utils = { path = "../llmspell-utils" }
+
+# Temporary dependency - will be removed after Jupyter implementation
+llmspell-engine = { path = "../llmspell-engine" }
 
 # ZeroMQ and Jupyter (to be uncommented in Task 9.8.5)
 # zmq = "0.10"

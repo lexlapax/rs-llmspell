@@ -1,18 +1,12 @@
-//! `LLMSpell` REPL - Kernel-as-service with debugging infrastructure
+//! LLMSpell REPL - Client interface for kernel connections
 //!
-//! This crate provides a kernel service following Jupyter's proven multi-client architecture,
-//! enabling interactive REPL sessions, debugging capabilities, and multi-client support
-//! for the `LLMSpell` scripting platform.
+//! This crate provides client-side REPL functionality that connects to 
+//! the LLMSpell kernel (now in llmspell-kernel crate).
+//!
+//! The kernel implementation has been moved to llmspell-kernel for better
+//! architectural separation: kernel=execution, repl=client interface.
 
 pub mod client; // Client connection handling
-pub mod connection; // Connection management
-pub mod discovery; // Connection file discovery
-pub mod kernel; // Core kernel service
-pub mod protocol; // LRP/LDP protocol definitions
-                  // protocol_handler removed - functionality moved to MessageProcessor in kernel
-pub mod security; // Authentication and authorization
 
-// Re-export main types for convenience
-pub use connection::ConnectionInfo;
-pub use kernel::LLMSpellKernel;
-pub use protocol::{LDPRequest, LDPResponse, LRPRequest, LRPResponse};
+// Re-export types from llmspell-kernel for convenience  
+pub use llmspell_kernel::{ConnectionInfo, LLMSpellKernel, KernelConfig};

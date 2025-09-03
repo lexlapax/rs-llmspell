@@ -1,52 +1,707 @@
-//! Core kernel implementation
+//! Core kernel service implementation
 //!
-//! This will eventually contain the kernel moved from llmspell-repl (Task 9.8.4)
-//! and be updated to use Jupyter protocol (Task 9.8.5).
+//! The `LLMSpellKernel` wraps the `ScriptRuntime` from llmspell-bridge and provides
+//! multi-client debugging and REPL capabilities.
 
 use anyhow::Result;
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
+use llmspell_engine::ProtocolEngine; // Import the trait for register_adapter
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::{oneshot, Mutex, RwLock};
+use uuid::Uuid;
 
-/// Jupyter-compatible kernel for LLMSpell
-///
-/// This struct will replace the LLMSpellKernel from llmspell-repl/src/kernel.rs
-/// in Task 9.8.4, then be updated to use Jupyter protocol in Task 9.8.5.
-pub struct JupyterKernel {
+use crate::client::{ClientManager, ConnectedClient};
+use crate::connection::ConnectionInfo;
+use crate::protocol::LRPResponse;
+use crate::security::SecurityManager;
+
+/// Kernel execution state
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KernelState {
+    /// Kernel is idle and ready for commands
+    Idle,
+    /// Kernel is executing code
+    Busy,
+    /// Kernel is starting up
+    Starting,
+    /// Kernel is shutting down
+    Stopping,
+}
+
+/// Configuration for kernel startup
+#[derive(Debug, Clone)]
+pub struct KernelConfig {
+    /// Unique kernel identifier
+    pub kernel_id: Option<String>,
+    /// IP address to bind to
+    pub ip: String,
+    /// Port range start for allocating channels
+    pub port_range_start: u16,
+    /// Enable debug mode
+    pub debug_enabled: bool,
+    /// Maximum number of clients
+    pub max_clients: usize,
+    /// Script engine to use (lua, javascript)
+    pub engine: String,
+    /// `LLMSpell` runtime configuration
+    pub runtime_config: LLMSpellConfig,
+    /// Enable authentication
+    pub auth_enabled: bool,
+}
+
+impl Default for KernelConfig {
+    fn default() -> Self {
+        Self {
+            kernel_id: None,
+            ip: "127.0.0.1".to_string(),
+            port_range_start: 9555,
+            debug_enabled: false,
+            max_clients: 10,
+            engine: "lua".to_string(),
+            runtime_config: LLMSpellConfig::default(),
+            auth_enabled: false,
+        }
+    }
+}
+
+/// Resource limits per client
+#[derive(Debug, Clone)]
+pub struct ClientResourceLimits {
+    /// Maximum execution time in seconds
+    pub max_execution_time: u64,
+    /// Maximum memory usage in bytes
+    pub max_memory_bytes: usize,
+    /// Maximum concurrent executions
+    pub max_concurrent_executions: usize,
+    /// Rate limit (requests per minute)
+    pub rate_limit_per_minute: u32,
+}
+
+impl Default for ClientResourceLimits {
+    fn default() -> Self {
+        Self {
+            max_execution_time: 60,              // 1 minute
+            max_memory_bytes: 100 * 1024 * 1024, // 100MB
+            max_concurrent_executions: 5,
+            rate_limit_per_minute: 60,
+        }
+    }
+}
+
+/// Main kernel service that manages script execution and debugging
+pub struct LLMSpellKernel {
     /// Unique kernel identifier
     pub kernel_id: String,
 
     /// Script runtime from llmspell-bridge
     pub runtime: Arc<Mutex<ScriptRuntime>>,
 
-    /// Configuration
-    pub config: LLMSpellConfig,
-    // Future fields for Jupyter protocol (Task 9.8.5):
-    // pub transport: ZmqTransport,
-    // pub connection_info: ConnectionInfo,
-    // pub execution_count: u32,
+    /// Client manager
+    pub client_manager: Arc<ClientManager>,
+
+    /// Protocol engine for handling protocol messages
+    pub protocol_engine: Option<Arc<llmspell_engine::UnifiedProtocolEngine>>,
+
+    /// Current execution state
+    pub execution_state: Arc<RwLock<KernelState>>,
+
+    /// Kernel configuration
+    pub config: KernelConfig,
+
+    /// Connection information
+    pub connection_info: ConnectionInfo,
+
+    /// Security manager
+    pub security_manager: Arc<SecurityManager>,
+
+    /// Resource limits per client
+    pub resource_limits: ClientResourceLimits,
+
+    /// Execution counter for tracking
+    pub execution_count: Arc<Mutex<u32>>,
+
+    /// Shutdown signal sender
+    shutdown_tx: Option<oneshot::Sender<()>>,
+    // Debug components will be added in Phase 9.2
+    // pub debugger: Arc<Debugger>,
+    // pub profiler: Arc<PerformanceProfiler>,
+    // pub tracer: Arc<DistributedTracer>,
 }
 
-impl JupyterKernel {
-    /// Create a new kernel instance
+impl LLMSpellKernel {
+    /// Start a new kernel with the given configuration
     ///
-    /// This is a placeholder that will be fully implemented in Task 9.8.4
-    /// when we move the kernel code from llmspell-repl.
-    pub fn new(config: LLMSpellConfig) -> Result<Self> {
-        todo!("Will be implemented in Task 9.8.4 when moving kernel from llmspell-repl")
+    /// # Errors
+    ///
+    /// Returns an error if kernel initialization fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if `kernel_id` is None after generation (should never happen)
+    pub async fn start(mut config: KernelConfig) -> Result<Self> {
+        // Generate kernel ID if not provided
+        if config.kernel_id.is_none() {
+            config.kernel_id = Some(Uuid::new_v4().to_string());
+        }
+        let kernel_id = config.kernel_id.clone().unwrap();
+
+        tracing::info!(
+            "Starting LLMSpell kernel {} with engine {}",
+            kernel_id,
+            config.engine
+        );
+
+        // Create script runtime from llmspell-bridge
+        let runtime =
+            ScriptRuntime::new_with_engine_name(&config.engine, config.runtime_config.clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
+
+        // Protocol engine will be initialized in run() method
+        // We store it as Option to set it up after kernel creation
+
+        // Create connection info
+        let connection_info = ConnectionInfo::new(
+            kernel_id.clone(),
+            config.ip.clone(),
+            config.port_range_start,
+        );
+
+        // Write connection file
+        connection_info.write_connection_file().await?;
+
+        // Create security manager
+        let security_manager = Arc::new(SecurityManager::new(
+            connection_info.key.clone(),
+            config.auth_enabled,
+        ));
+
+        // Create client manager
+        let client_manager = Arc::new(ClientManager::new(config.max_clients));
+
+        // Create shutdown channel
+        let (shutdown_tx, _shutdown_rx) = oneshot::channel();
+
+        // Create kernel instance
+        let kernel = Self {
+            kernel_id: kernel_id.clone(),
+            runtime: Arc::new(Mutex::new(runtime)),
+            client_manager,
+            protocol_engine: None,
+            execution_state: Arc::new(RwLock::new(KernelState::Starting)),
+            config: config.clone(),
+            connection_info,
+            security_manager,
+            resource_limits: ClientResourceLimits::default(),
+            execution_count: Arc::new(Mutex::new(0)),
+            shutdown_tx: Some(shutdown_tx),
+        };
+
+        // Set state to idle
+        *kernel.execution_state.write().await = KernelState::Idle;
+
+        tracing::info!("Kernel {} started successfully", kernel_id);
+        Ok(kernel)
     }
 
-    /// Start the kernel server
+    /// Start a new kernel with sidecar support for service mesh pattern
     ///
-    /// In Task 9.8.5, this will be updated to use ZeroMQ transport
-    /// and implement the Jupyter protocol.
-    pub async fn serve(&mut self) -> Result<()> {
-        todo!("Will be implemented in Task 9.8.4, then updated for Jupyter in 9.8.5")
+    /// # Errors
+    ///
+    /// Returns an error if kernel or sidecar initialization fails
+    pub async fn start_with_sidecar(config: KernelConfig) -> Result<Self> {
+        use llmspell_engine::sidecar::{
+            LocalServiceDiscovery, NullMetricsCollector, Sidecar, SidecarConfig,
+        };
+        use llmspell_engine::UnifiedProtocolEngine;
+        use llmspell_utils::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
+        use std::sync::Arc;
+
+        // Create the kernel first
+        let kernel = Box::pin(Self::start(config.clone())).await?;
+
+        // Create protocol engine for sidecar
+        // Note: This is a placeholder - in real implementation, we'd use the actual transport
+        // from the UnifiedProtocolEngine when it's created in run()
+        let transport = Box::new(
+            llmspell_engine::transport::tcp::TcpTransport::connect(&format!(
+                "{}:{}",
+                config.ip, config.port_range_start
+            ))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create transport: {}", e))?,
+        );
+
+        let engine = Arc::new(UnifiedProtocolEngine::new(transport));
+
+        // Create sidecar components
+        let circuit_breaker = CircuitBreaker::new(CircuitBreakerConfig::default());
+        let discovery = Arc::new(LocalServiceDiscovery::new());
+        let metrics = Arc::new(NullMetricsCollector); // Use null for now, can be replaced
+        let sidecar_config = SidecarConfig::default();
+
+        // Create sidecar
+        let _sidecar = Sidecar::new(engine, circuit_breaker, discovery, metrics, sidecar_config);
+
+        // In a full implementation, we would:
+        // 1. Store the sidecar in the kernel struct
+        // 2. Intercept all messages through the sidecar
+        // 3. Register the kernel service with discovery
+
+        tracing::info!("Kernel {} started with sidecar support", kernel.kernel_id);
+
+        Ok(kernel)
     }
 
-    /// Execute code (placeholder for Jupyter execute_request handler)
-    pub async fn execute(&mut self, code: &str) -> Result<serde_json::Value> {
-        todo!("Will be implemented in Task 9.8.4, then updated for Jupyter in 9.8.5")
+    /// Run the kernel event loop
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the event loop fails
+    #[allow(clippy::cognitive_complexity)]
+    pub async fn run(mut self) -> Result<()> {
+        tracing::info!("[9.8.2] Kernel {} entering main event loop", self.kernel_id);
+
+        // Start channel listeners
+        // Channels are now handled by UnifiedProtocolEngine
+
+        // Create a new shutdown channel (the old one is dropped with self)
+        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
+        // Drop the old shutdown sender if it exists
+        drop(self.shutdown_tx.take());
+
+        // Now we can move self into Arc to be used as MessageProcessor
+        let kernel_arc = Arc::new(self);
+
+        let server_config = llmspell_engine::ServerConfig {
+            ip: kernel_arc.config.ip.clone(),
+            shell_port: kernel_arc.connection_info.shell_port,
+            iopub_port: kernel_arc.connection_info.iopub_port,
+            stdin_port: kernel_arc.connection_info.stdin_port,
+            control_port: kernel_arc.connection_info.control_port,
+            heartbeat_port: kernel_arc.connection_info.hb_port,
+            max_connections: kernel_arc.config.max_clients,
+        };
+
+        // Create the unified protocol engine with the kernel as message processor
+        // Use mock transport for now - the serve() method will handle TCP connections
+        let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
+        let mut protocol_engine = llmspell_engine::UnifiedProtocolEngine::with_processor(
+            transport,
+            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>,
+        );
+
+        // Register LRP and LDP adapters with processor support
+        let repl_protocol_adapter = llmspell_engine::LRPAdapter::with_processor(
+            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>
+        );
+        let debug_protocol_adapter = llmspell_engine::LDPAdapter::with_processor(
+            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>,
+        );
+
+        protocol_engine
+            .register_adapter(
+                llmspell_engine::ProtocolType::LRP,
+                Box::new(repl_protocol_adapter),
+            )
+            .await?;
+        protocol_engine
+            .register_adapter(
+                llmspell_engine::ProtocolType::LDP,
+                Box::new(debug_protocol_adapter),
+            )
+            .await?;
+
+        // Create a ctrl-c handler
+        let ctrl_c = tokio::signal::ctrl_c();
+
+        // Spawn protocol engine task
+        let server_handle = tokio::spawn(async move {
+            if let Err(e) = protocol_engine.serve(server_config).await {
+                tracing::error!("Protocol engine error: {}", e);
+            }
+        });
+
+        // Keep shutdown_tx alive in a separate task
+        let _shutdown_guard = tokio::spawn(async move {
+            // This task will hold shutdown_tx until it's dropped
+            let _tx = shutdown_tx;
+            // Sleep forever (or until the task is cancelled)
+            tokio::time::sleep(std::time::Duration::from_secs(u64::MAX)).await;
+        });
+
+        // Main event loop
+        tokio::select! {
+            // Wait for shutdown signal
+            _ = shutdown_rx => {
+                tracing::info!("Kernel {} received shutdown signal", kernel_arc.kernel_id);
+            }
+            // Wait for Ctrl+C
+            _ = ctrl_c => {
+                tracing::info!("Kernel {} received Ctrl+C signal", kernel_arc.kernel_id);
+            }
+            // Wait for server task to complete (error case)
+            _ = server_handle => {
+                tracing::warn!("Protocol server task ended unexpectedly");
+            }
+        }
+
+        // Shutdown the kernel - need to extract from Arc
+        if let Ok(kernel) = Arc::try_unwrap(kernel_arc) {
+            kernel.shutdown().await?;
+        } else {
+            tracing::warn!("Could not cleanly shutdown kernel - Arc still has references");
+        }
+        Ok(())
+    }
+
+    /// Shutdown the kernel gracefully
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if shutdown fails
+    #[allow(clippy::cognitive_complexity)]
+    pub async fn shutdown(self) -> Result<()> {
+        tracing::info!("Shutting down kernel {}", self.kernel_id);
+
+        // Set state to stopping
+        *self.execution_state.write().await = KernelState::Stopping;
+
+        // Disconnect all clients
+        let all_clients = self.client_manager.get_all_clients().await;
+        for client in all_clients {
+            tracing::info!("Disconnecting client {}", client.client_id);
+            self.client_manager.remove_client(&client.client_id).await;
+        }
+
+        // Stop channels
+        // Channels stopped when UnifiedProtocolEngine shuts down
+
+        // Remove connection file
+        self.connection_info.remove_connection_file().await?;
+
+        // Send shutdown signal if receiver exists
+        if let Some(tx) = self.shutdown_tx {
+            let _ = tx.send(());
+        }
+
+        tracing::info!("Kernel {} shutdown complete", self.kernel_id);
+        Ok(())
+    }
+
+    /// Add a new client connection
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if adding the client fails
+    pub async fn add_client(&self, client: ConnectedClient) -> Result<()> {
+        // Check authentication if enabled
+        if self.config.auth_enabled {
+            // Client should have been authenticated before adding
+            // This is handled by the connection handler
+        }
+
+        self.client_manager.add_client(client.clone()).await?;
+
+        // Broadcast client connection to IOPub
+        // TODO: Use ChannelSet
+        // self.channels.iopub.publish(IOPubMessage::Status {
+        //     execution_state: "idle".to_string(),
+        // })?;
+
+        tracing::info!(
+            "Client {} connected to kernel {}",
+            client.client_id,
+            self.kernel_id
+        );
+        Ok(())
+    }
+
+    /// Remove a client connection
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if removing the client fails
+    pub async fn remove_client(&self, client_id: &str) -> Result<()> {
+        if let Some(client) = self.client_manager.remove_client(client_id).await {
+            tracing::info!(
+                "Client {} disconnected from kernel {}",
+                client.client_id,
+                self.kernel_id
+            );
+        }
+        Ok(())
+    }
+
+    /// Update execution state and return the new count
+    async fn prepare_execution(&self) -> u32 {
+        *self.execution_state.write().await = KernelState::Busy;
+        let mut count = self.execution_count.lock().await;
+        *count += 1;
+        *count
+    }
+
+    /// Execute script with timeout handling
+    async fn execute_with_timeout(
+        &self,
+        code: &str,
+    ) -> std::result::Result<
+        Result<llmspell_bridge::ScriptOutput, llmspell_core::LLMSpellError>,
+        tokio::time::error::Elapsed,
+    > {
+        let timeout_duration =
+            tokio::time::Duration::from_secs(self.resource_limits.max_execution_time);
+        let runtime = self.runtime.clone();
+        let code = code.to_string();
+
+        tracing::debug!("About to execute script with timeout");
+        tokio::time::timeout(timeout_duration, async move {
+            tracing::debug!("Acquiring runtime lock for script execution");
+            let runtime_guard = runtime.lock().await;
+            tracing::debug!("Executing script");
+            runtime_guard.execute_script(&code).await
+        })
+        .await
+    }
+
+    /// Create execution response
+    fn create_execute_response(status: &str, execution_count: u32) -> LRPResponse {
+        LRPResponse::ExecuteReply {
+            status: status.to_string(),
+            execution_count,
+            user_expressions: None,
+            payload: None,
+        }
+    }
+
+    /// Handle execution success
+    fn handle_success(execution_count: u32, _silent: bool) -> LRPResponse {
+        // TODO: Broadcast output if not silent
+        Self::create_execute_response("ok", execution_count)
+    }
+
+    /// Handle execution error
+    fn handle_error(execution_count: u32, _silent: bool) -> LRPResponse {
+        // TODO: Broadcast error if not silent
+        Self::create_execute_response("error", execution_count)
+    }
+
+    /// Finish execution and update state
+    async fn finish_execution(&self, _silent: bool) {
+        *self.execution_state.write().await = KernelState::Idle;
+        // TODO: Broadcast idle status if not silent
+    }
+
+    /// Execute code for a client with resource limits
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if code execution fails
+    pub async fn execute_code(
+        &self,
+        _client_id: &str,
+        code: String,
+        silent: bool,
+    ) -> Result<LRPResponse> {
+        tracing::debug!("execute_code called with code: {}", code);
+
+        // Prepare for execution
+        let execution_count = self.prepare_execution().await;
+
+        // TODO: Broadcast busy status if not silent
+
+        // Execute code with timeout
+        let result = self.execute_with_timeout(&code).await;
+        tracing::debug!("Script execution result: {:?}", result.is_ok());
+
+        // Handle result based on execution outcome
+        let response = match result {
+            Ok(Ok(script_output)) => {
+                // Include the script output in the response
+                let payload = if let Ok(json_value) = serde_json::to_value(&script_output.output) {
+                    Some(vec![json_value])
+                } else {
+                    None
+                };
+                LRPResponse::ExecuteReply {
+                    status: "ok".to_string(),
+                    execution_count,
+                    user_expressions: None,
+                    payload,
+                }
+            }
+            Ok(Err(_)) | Err(_) => Self::handle_error(execution_count, silent),
+        };
+
+        // Finish execution
+        self.finish_execution(silent).await;
+
+        Ok(response)
+    }
+
+    /// Get kernel information
+    #[must_use]
+    pub fn get_kernel_info(&self) -> LRPResponse {
+        use crate::protocol::{HelpLink, LanguageInfo};
+
+        LRPResponse::KernelInfoReply {
+            protocol_version: "1.0".to_string(),
+            implementation: "llmspell".to_string(),
+            implementation_version: env!("CARGO_PKG_VERSION").to_string(),
+            language_info: LanguageInfo {
+                name: self.config.engine.clone(),
+                version: "1.0".to_string(),
+                mimetype: match self.config.engine.as_str() {
+                    "lua" => "text/x-lua",
+                    "javascript" => "text/javascript",
+                    _ => "text/plain",
+                }
+                .to_string(),
+                file_extension: match self.config.engine.as_str() {
+                    "lua" => ".lua",
+                    "javascript" => ".js",
+                    _ => ".txt",
+                }
+                .to_string(),
+                pygments_lexer: Some(self.config.engine.clone()),
+                codemirror_mode: Some(self.config.engine.clone()),
+                nbconvert_exporter: None,
+            },
+            banner: format!(
+                "LLMSpell Kernel v{} - {}",
+                env!("CARGO_PKG_VERSION"),
+                self.config.engine
+            ),
+            debugger: self.config.debug_enabled,
+            help_links: vec![HelpLink {
+                text: "LLMSpell Documentation".to_string(),
+                url: "https://github.com/lexlapax/rs-llmspell".to_string(),
+            }],
+        }
+    }
+
+    /// Check if kernel can accept more clients
+    pub async fn can_accept_client(&self) -> bool {
+        let current_clients = self.client_manager.get_all_clients().await;
+        current_clients.len() < self.config.max_clients
+    }
+}
+
+// MessageProcessor implementation for clean separation between protocol and business logic
+#[async_trait::async_trait]
+impl llmspell_engine::MessageProcessor for LLMSpellKernel {
+    async fn process_lrp(
+        &self,
+        request: llmspell_engine::LRPRequest,
+    ) -> Result<llmspell_engine::LRPResponse, llmspell_engine::ProcessorError> {
+        use llmspell_engine::{LRPRequest, LRPResponse, ProcessorError};
+
+        tracing::info!("[9.8.2] process_lrp called with request: {:?}", request);
+        let response = match request {
+            LRPRequest::KernelInfoRequest => self.get_kernel_info(),
+
+            LRPRequest::ExecuteRequest { code, silent, .. } => self
+                .execute_code("processor", code, silent)
+                .await
+                .map_err(|e| ProcessorError::ProcessingFailed(e.to_string()))?,
+
+            LRPRequest::CompleteRequest { cursor_pos, .. } => {
+                // TODO: Implement completion
+                LRPResponse::CompleteReply {
+                    matches: vec![],
+                    cursor_start: cursor_pos,
+                    cursor_end: cursor_pos,
+                    metadata: Some(serde_json::Value::Null),
+                    status: "ok".to_string(),
+                }
+            }
+
+            LRPRequest::InspectRequest { .. } => {
+                // TODO: Implement inspection
+                LRPResponse::InspectReply {
+                    status: "ok".to_string(),
+                    found: false,
+                    data: Some(serde_json::Value::Null),
+                    metadata: Some(serde_json::Value::Null),
+                }
+            }
+
+            LRPRequest::IsCompleteRequest { code } => LRPResponse::IsCompleteReply {
+                status: if code.trim().is_empty() {
+                    "incomplete"
+                } else {
+                    "complete"
+                }
+                .to_string(),
+                indent: String::new(),
+            },
+
+            LRPRequest::ShutdownRequest { restart } => LRPResponse::ShutdownReply { restart },
+
+            LRPRequest::InterruptRequest => LRPResponse::InterruptReply,
+
+            LRPRequest::HistoryRequest { .. } => LRPResponse::HistoryReply { history: vec![] },
+
+            LRPRequest::CommInfoRequest { .. } => LRPResponse::CommInfoReply {
+                comms: serde_json::Value::Object(serde_json::Map::new()),
+            },
+
+            LRPRequest::ConnectRequest => LRPResponse::ConnectReply {
+                shell_port: self.connection_info.shell_port,
+                iopub_port: self.connection_info.iopub_port,
+                stdin_port: self.connection_info.stdin_port,
+                control_port: self.connection_info.control_port,
+                hb_port: self.connection_info.hb_port,
+            },
+        };
+
+        Ok(response)
+    }
+
+    async fn process_ldp(
+        &self,
+        request: llmspell_engine::LDPRequest,
+    ) -> Result<llmspell_engine::LDPResponse, llmspell_engine::ProcessorError> {
+        use llmspell_engine::{LDPRequest, LDPResponse};
+
+        let response = match request {
+            LDPRequest::InitializeRequest { .. } => LDPResponse::InitializeResponse {
+                capabilities: serde_json::json!({
+                    "supportsConfigurationDoneRequest": true,
+                    "supportsFunctionBreakpoints": false,
+                    "supportsConditionalBreakpoints": true,
+                    "supportsEvaluateForHovers": true,
+                    "supportsStepBack": false,
+                    "supportsSetVariable": true,
+                    "supportsRestartFrame": false,
+                    "supportsStepInTargetsRequest": false,
+                    "supportsModulesRequest": false,
+                    "supportsTerminateThreadsRequest": false,
+                    "supportsDelayedStackTraceLoading": false,
+                }),
+            },
+            _ => {
+                // TODO: Implement other debug commands
+                return Err(llmspell_engine::ProcessorError::NotImplemented(
+                    "Debug command not yet implemented".to_string(),
+                ));
+            }
+        };
+
+        Ok(response)
+    }
+}
+
+// Add Debug impl for kernel to satisfy MessageProcessor trait
+impl std::fmt::Debug for LLMSpellKernel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LLMSpellKernel")
+            .field("kernel_id", &self.kernel_id)
+            .field("config", &self.config)
+            .field("execution_state", &self.execution_state)
+            .field("connection_info", &self.connection_info)
+            .field("execution_count", &self.execution_count)
+            .finish_non_exhaustive()
     }
 }

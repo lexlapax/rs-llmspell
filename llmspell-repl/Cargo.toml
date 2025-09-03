@@ -7,29 +7,24 @@ repository.workspace = true
 license.workspace = true
 keywords.workspace = true
 categories.workspace = true
-description = "Kernel-as-service REPL with debugging infrastructure for LLMSpell"
+description = "Client-side REPL interface for LLMSpell kernel connections"
 
 [dependencies]
 # Async runtime
 tokio = { workspace = true }
 async-trait = { workspace = true }
-futures = { version = "0.3" }
 
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-# UUID generation
+# Additional dependencies needed by client.rs
 uuid = { workspace = true }
+chrono = { workspace = true }
 
-# Internal dependencies
-llmspell-bridge = { path = "../llmspell-bridge" }
+# Internal dependencies - now depends on llmspell-kernel instead of engine
+llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-config = { path = "../llmspell-config" }
-llmspell-core = { path = "../llmspell-core" }
-# llmspell-debug created in task 9.2.1
-llmspell-debug = { path = "../llmspell-debug" }
-llmspell-engine = { path = "../llmspell-engine" }
-llmspell-utils = { path = "../llmspell-utils" }
 
 # Error handling
 anyhow = { workspace = true }
@@ -38,41 +33,10 @@ thiserror = { workspace = true }
 # Logging and tracing
 tracing = { workspace = true }
 
-# Concurrency primitives
-parking_lot = { workspace = true }
-dashmap = { workspace = true }
-
-# For TCP socket transport (replacing zmq for now with tokio's built-in)
-tokio-util = { workspace = true }
-
-# File watching for hot reload (will be needed in 9.3)
-notify = "6.1"
-
-# For connection file discovery
-glob = "0.3"
-dirs = "5.0"
-
-# For message channels
-tokio-stream = { workspace = true }
-crossbeam = { workspace = true }
-
-# Time handling
-chrono = { workspace = true }
-
-# For HMAC placeholder in security
-hex = "0.4"
-
-# For binary
-clap = { workspace = true }
-tracing-subscriber = { workspace = true }
-
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = { workspace = true }
 
-[[bin]]
-name = "llmspell-kernel"
-path = "src/bin/kernel.rs"
 
 [lints]
 workspace = true

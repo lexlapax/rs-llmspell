@@ -8248,12 +8248,12 @@ Fastpath and Debug/Trace should both follow the same path. the Debug/Trace may g
    ```
 
 **Acceptance Criteria:**
-- [ ] Kernel code moved to llmspell-kernel crate
-- [ ] llmspell-kernel binary builds and runs
-- [ ] llmspell-repl contains only client code
-- [ ] Clear separation: kernel=execution, repl=client interface
-- [ ] All existing tests still pass
-- [ ] CLI can discover and connect to new kernel binary
+- [x] Kernel code moved to llmspell-kernel crate (kernel.rs, bin/kernel.rs, connection.rs, discovery.rs, security.rs, client.rs, protocol.rs)
+- [x] llmspell-kernel binary builds and runs
+- [x] llmspell-repl contains only client code
+- [x] Clear separation: kernel=execution, repl=client interface  
+- [ ] All existing tests still pass (to be verified in later tasks)
+- [x] CLI can discover and connect to new kernel binary
 
 #### Task 9.8.5: Implement Jupyter Protocol in llmspell-kernel
 **Priority**: CRITICAL  

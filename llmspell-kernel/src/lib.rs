@@ -12,7 +12,13 @@
 //! multi-protocol abstractions (UnifiedProtocolEngine, adapters, sidecars)
 //! that are incompatible with Jupyter's single-protocol model.
 
+// Core modules moved from llmspell-repl
 pub mod kernel;
+pub mod connection;
+pub mod discovery;
+pub mod security;
+pub mod client;
+pub mod protocol;
 
 // These modules will be populated in Task 9.8.5
 // pub mod jupyter;
@@ -20,7 +26,10 @@ pub mod kernel;
 // pub mod execution;
 // pub mod debug;
 
-pub use kernel::JupyterKernel;
+// Re-export key types
+pub use kernel::{LLMSpellKernel, KernelConfig, KernelState};
+pub use connection::ConnectionInfo;
+pub use discovery::KernelDiscovery;
 
 // Re-export key types that will be added later
 // pub use jupyter::ConnectionInfo;
