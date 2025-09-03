@@ -8443,52 +8443,13 @@ After Phase 9.9, we will have:
 
 ---
 
-## Phase 11: Enterprise IDE and Remote Debug Integration (Future)
+## Phase 11: Enterprise IDE and Developer Tools Integration
 
-**Description**: Advanced enterprise features moved from Phase 9.4 to avoid scope creep. These features build on the comprehensive debug infrastructure established in Phase 9.
+**Status**: Planning Complete  
+**Location**: Moved to `docs/in-progress/PHASE11-TODO.md`  
+**Timeline**: Weeks 39-40 (10 working days)  
+**Dependencies**: Phase 9 (Kernel as Execution Hub), Phase 10 (Memory System)  
 
+**Description**: Comprehensive IDE integration, web client foundation, and remote debugging capabilities leveraging Phase 9's unified kernel architecture. Includes LSP/DAP protocols, VS Code extension, multi-tenant web support, and enterprise security features.
 
-### Task 11.2: Web Client Foundation
-**Priority**: MEDIUM  
-**Estimated Time**: 6 hours  
-
-**Description**: Web REPL client using Phase 9.2 kernel protocols, interactive debugging WebSocket integration.
-
-**Prerequisites**: Phase 9 debug system complete, WebSocket transport layer
-**Enterprise Focus**: Multi-tenant web debugging, enterprise dashboard integration
-
-### Task 11.3: IDE Integration (LSP/DAP)
-**Priority**: HIGH  
-**Estimated Time**: 10 hours  
-
-**Description**: LSP/DAP integration for enterprise IDE support.
-
-**Prerequisites**: Phase 9 debug system, enterprise authentication
-**Enterprise Focus**: Multi-IDE support, enterprise security integration, performance monitoring
-
-### Task 11.4: VS Code Extension
-**Priority**: HIGH  
-**Estimated Time**: 8 hours  
-
-**Description**: VS Code extension with enterprise debugging UI.
-
-**Prerequisites**: Task 11.5.2 LSP/DAP integration
-**Enterprise Focus**: Enterprise marketplace distribution, telemetry integration
-
-### Task 11.5: Remote Debugging Security
-**Priority**: HIGH  
-**Estimated Time**: 6 hours  
-
-**Description**: Enterprise security for remote debugging connections.
-
-**Prerequisites**: Phase 9 debug system, enterprise auth infrastructure
-**Enterprise Focus**: Certificate management, audit logging, compliance features
-
-### Task 11.6: Media and Streaming Support
-**Priority**: MEDIUM  
-**Estimated Time**: 6 hours  
-
-**Description**: Enterprise media handling and streaming protocols.
-
-**Prerequisites**: Phase 9 protocol foundation
-**Enterprise Focus**: Large file streaming, multimedia debugging, enterprise bandwidth management
+For detailed task breakdown, see: `docs/in-progress/PHASE11-TODO.md`
