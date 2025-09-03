@@ -112,7 +112,8 @@ impl LuaExecutionHook {
     }
 
     /// Check if we should break at current location (SLOW PATH - only called when `might_break_at` returns true)
-    fn should_break_slow(&self, source: &str, line: u32, lua: &Lua) -> bool {
+    #[must_use]
+    pub fn should_break_slow(&self, source: &str, line: u32, lua: &Lua) -> bool {
         // This is the slow path - only called when we might have a breakpoint
         let exec_mgr = self.execution_manager.clone();
         let source_str = source.to_string();

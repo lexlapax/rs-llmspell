@@ -18,7 +18,10 @@
 //! - Slow path async methods (1% when pausing) - uses `block_on_async`
 //! - Coordinates debug state across language boundaries
 
-use crate::execution_bridge::{Breakpoint, DebugState, ExecutionLocation, PauseReason, StackFrame};
+use crate::execution_bridge::{
+    Breakpoint, DebugState, DebugStepType, ExecutionLocation, ExecutionManager, PauseReason,
+    StackFrame,
+};
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
 use llmspell_core::debug::{DebugCapability, DebugRequest, DebugResponse};
 use std::collections::HashMap;
@@ -42,6 +45,9 @@ pub struct DebugCoordinator {
 
     /// Current debug state
     debug_state: Arc<RwLock<DebugState>>,
+
+    /// Execution manager for delegating debug operations
+    execution_manager: Arc<ExecutionManager>,
 }
 
 impl DebugCoordinator {
@@ -50,12 +56,14 @@ impl DebugCoordinator {
     pub fn new(
         shared_context: Arc<RwLock<SharedExecutionContext>>,
         capabilities: Arc<RwLock<HashMap<String, Arc<dyn DebugCapability>>>>,
+        execution_manager: Arc<ExecutionManager>,
     ) -> Self {
         Self {
             shared_context,
             capabilities,
             breakpoints: Arc::new(RwLock::new(HashMap::new())),
             debug_state: Arc::new(RwLock::new(DebugState::Running)),
+            execution_manager,
         }
     }
 
@@ -102,17 +110,22 @@ impl DebugCoordinator {
         );
 
         // Update shared context with debugging information
-        {
-            let mut ctx = self.shared_context.write().await;
-            ctx.variables = variables;
-            ctx.set_location(SourceLocation {
-                source: location.source.clone(),
-                line: location.line,
-                column: location.column,
-            });
-        }
+        let mut ctx = self.shared_context.write().await;
+        ctx.variables.clone_from(&variables);
+        ctx.set_location(SourceLocation {
+            source: location.source.clone(),
+            line: location.line,
+            column: location.column,
+        });
+        let context = ctx.clone();
+        drop(ctx);
 
-        // Set paused state
+        // Delegate to ExecutionManager (preserves existing logic)
+        self.execution_manager
+            .suspend_for_debugging(location.clone(), context)
+            .await;
+
+        // Also update our local state for fast path checks
         {
             let mut state = self.debug_state.write().await;
             *state = DebugState::Paused {
@@ -128,7 +141,15 @@ impl DebugCoordinator {
     pub async fn coordinate_step_pause(&self, reason: PauseReason, location: ExecutionLocation) {
         trace!("Coordinating step pause: {:?}", reason);
 
-        // Set paused state
+        // Delegate to ExecutionManager
+        self.execution_manager
+            .set_state(DebugState::Paused {
+                reason: reason.clone(),
+                location: location.clone(),
+            })
+            .await;
+
+        // Also update our local state for fast path checks
         {
             let mut state = self.debug_state.write().await;
             *state = DebugState::Paused { reason, location };
@@ -178,8 +199,36 @@ impl DebugCoordinator {
     /// Resume execution
     pub async fn resume(&self) {
         trace!("Resume through coordinator");
+        // Delegate to ExecutionManager
+        self.execution_manager.set_state(DebugState::Running).await;
+
+        // Also update our local state
         let mut state = self.debug_state.write().await;
         *state = DebugState::Running;
+    }
+
+    /// Step over (delegates to `ExecutionManager`)
+    pub async fn step_over(&self) {
+        trace!("Step over through coordinator");
+        self.execution_manager
+            .start_step(DebugStepType::StepOver)
+            .await;
+    }
+
+    /// Step into (delegates to `ExecutionManager`)
+    pub async fn step_into(&self) {
+        trace!("Step into through coordinator");
+        self.execution_manager
+            .start_step(DebugStepType::StepIn)
+            .await;
+    }
+
+    /// Step out (delegates to `ExecutionManager`)
+    pub async fn step_out(&self) {
+        trace!("Step out through coordinator");
+        self.execution_manager
+            .start_step(DebugStepType::StepOut)
+            .await;
     }
 
     /// Get breakpoints
@@ -281,13 +330,16 @@ pub struct DebugCoordinatorStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::debug_state_cache::SharedDebugStateCache;
 
     #[tokio::test]
     async fn test_debug_coordinator_creation() {
         let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
         let capabilities = Arc::new(RwLock::new(HashMap::new()));
+        let debug_cache = Arc::new(SharedDebugStateCache::new());
+        let execution_manager = Arc::new(ExecutionManager::new(debug_cache));
 
-        let coordinator = DebugCoordinator::new(shared_context, capabilities);
+        let coordinator = DebugCoordinator::new(shared_context, capabilities, execution_manager);
 
         // Test fast path methods (should not panic)
         assert!(!coordinator.might_break_at_sync("test.lua", 1));
@@ -298,8 +350,10 @@ mod tests {
     async fn test_breakpoint_management() {
         let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
         let capabilities = Arc::new(RwLock::new(HashMap::new()));
+        let debug_cache = Arc::new(SharedDebugStateCache::new());
+        let execution_manager = Arc::new(ExecutionManager::new(debug_cache));
 
-        let coordinator = DebugCoordinator::new(shared_context, capabilities);
+        let coordinator = DebugCoordinator::new(shared_context, capabilities, execution_manager);
 
         // Test breakpoint management
         let bp = Breakpoint::new("test.lua".to_string(), 10);
@@ -317,8 +371,10 @@ mod tests {
     async fn test_state_management() {
         let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
         let capabilities = Arc::new(RwLock::new(HashMap::new()));
+        let debug_cache = Arc::new(SharedDebugStateCache::new());
+        let execution_manager = Arc::new(ExecutionManager::new(debug_cache));
 
-        let coordinator = DebugCoordinator::new(shared_context, capabilities);
+        let coordinator = DebugCoordinator::new(shared_context, capabilities, execution_manager);
 
         // Initially running
         assert!(!coordinator.is_paused().await);

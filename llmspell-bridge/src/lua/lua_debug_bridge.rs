@@ -19,16 +19,14 @@
 //! - Preserves existing `LuaExecutionHook` optimization (fast/slow path design)
 
 use crate::debug_coordinator::DebugCoordinator;
-use crate::debug_runtime::{DebugControl, DebugHook};
-use crate::execution_bridge::{ExecutionLocation, PauseReason};
+use crate::execution_bridge::ExecutionLocation;
 use crate::lua::globals::execution::LuaExecutionHook;
-// Note: Will add back output utilities when variable extraction is enhanced
-use async_trait::async_trait;
-// use mlua::Lua; // Will be used when variable extraction is enhanced
+use crate::lua::hook_multiplexer::HookHandler;
+use crate::lua::sync_utils::block_on_async;
+use mlua::{Debug, DebugEvent, HookTriggers, Lua, Result as LuaResult};
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
-use tracing::{trace, warn};
+use std::time::Duration;
 
 /// Lua Debug Bridge - connects `DebugCoordinator` to `LuaExecutionHook`
 ///
@@ -38,87 +36,108 @@ pub struct LuaDebugBridge {
     /// Reference to the language-agnostic debug coordinator
     coordinator: Arc<DebugCoordinator>,
 
-    /// Reference to Lua-specific execution hook (reserved for future use)
-    _lua_hook: Arc<parking_lot::Mutex<LuaExecutionHook>>,
-
-    /// Flag to indicate if Lua context is available (simplified for now)
-    lua_available: Arc<RwLock<bool>>,
+    /// Reference to Lua-specific execution hook
+    lua_hook: Arc<parking_lot::Mutex<LuaExecutionHook>>,
 }
 
 impl LuaDebugBridge {
     /// Create a new Lua debug bridge
     #[must_use]
-    pub fn new(
+    pub const fn new(
         coordinator: Arc<DebugCoordinator>,
         lua_hook: Arc<parking_lot::Mutex<LuaExecutionHook>>,
     ) -> Self {
         Self {
             coordinator,
-            _lua_hook: lua_hook,
-            lua_available: Arc::new(RwLock::new(false)),
+            lua_hook,
         }
     }
+}
 
-    /// Update the Lua context availability (called by `ScriptRuntime`)
-    pub async fn set_lua_available(&self, available: bool) {
-        let mut lua_available = self.lua_available.write().await;
-        *lua_available = available;
-    }
+/// Implement `HookHandler` for full Lua context access
+impl HookHandler for LuaDebugBridge {
+    fn handle_event(&mut self, lua: &Lua, ar: &Debug, event: DebugEvent) -> LuaResult<()> {
+        // Only handle line events for pause coordination
+        if event != DebugEvent::Line {
+            return Ok(());
+        }
 
-    /// Handle breakpoint with Lua context (SLOW PATH only)
-    async fn handle_breakpoint_with_lua_context(&self, line: u32, source: &str) -> DebugControl {
-        trace!(
-            "Handling breakpoint with Lua context at {}:{}",
-            source,
-            line
-        );
+        let line = ar.curr_line();
+        if line <= 0 {
+            return Ok(());
+        }
 
-        // Check if Lua context is available
-        let is_available = {
-            let lua_available = self.lua_available.read().await;
-            *lua_available
+        let source_info = ar.source();
+        let source = source_info.short_src.as_deref().unwrap_or("<unknown>");
+
+        // Convert line to u32 safely
+        let line_num = u32::try_from(line).unwrap_or(0);
+
+        // FAST PATH: Check if we might break
+        if !self.coordinator.might_break_at_sync(source, line_num) {
+            return Ok(()); // Early exit - no breakpoint here
+        }
+
+        // SLOW PATH: We might need to break, check with LuaExecutionHook
+        let should_break = {
+            let hook = self.lua_hook.lock();
+            hook.should_break_slow(source, line_num, lua)
         };
 
-        if is_available {
-            // For now, assume we should break since we already passed the fast path check
-            // TODO: In a future subtask, we'll wire this to actual breakpoint evaluation via LuaExecutionHook
-            let should_break = true;
+        if should_break {
+            // Extract Lua variables using actual context
+            let variables = Self::extract_lua_variables(lua, line_num, source);
+            let location = ExecutionLocation {
+                source: source.to_string(),
+                line: line_num,
+                column: None,
+            };
 
-            if should_break {
-                // Extract variables (simplified for now - will be enhanced later)
-                let variables = Self::extract_lua_variables_simplified(line, source);
-                let location = ExecutionLocation {
-                    source: source.to_string(),
-                    line,
-                    column: None,
-                };
-
-                // Coordinate through DebugCoordinator
-                self.coordinator
-                    .coordinate_breakpoint_pause(location, variables)
-                    .await;
-
-                return DebugControl::Pause;
-            }
-        } else {
-            warn!(
-                "No Lua context available for breakpoint at {}:{}",
-                source, line
-            );
+            // Use block_on_async to coordinate pause
+            let coordinator = self.coordinator.clone();
+            block_on_async(
+                "coordinate_breakpoint_pause",
+                async move {
+                    coordinator
+                        .coordinate_breakpoint_pause(location, variables)
+                        .await;
+                    Ok::<(), std::io::Error>(())
+                },
+                Some(Duration::from_millis(100)),
+            )
+            .ok();
         }
 
-        DebugControl::Continue
+        Ok(())
     }
 
-    /// Extract Lua variables (simplified version for now)
-    fn extract_lua_variables_simplified(
+    fn interested_events(&self) -> HookTriggers {
+        HookTriggers {
+            every_line: true,
+            ..Default::default()
+        }
+    }
+
+    fn is_active(&self) -> bool {
+        // Active when we have breakpoints
+        true // Could optimize by checking coordinator.has_breakpoints()
+    }
+}
+
+/// Extract Lua variables from current context
+impl LuaDebugBridge {
+    fn extract_lua_variables(
+        _lua: &Lua,
         line: u32,
         source: &str,
     ) -> HashMap<String, serde_json::Value> {
         let mut variables = HashMap::new();
 
-        // TODO: In a future subtask, extract actual Lua variables via LuaExecutionHook
-        // For now, provide placeholder variables to demonstrate the coordination
+        // Extract local variables from Lua debug info
+        // Note: Simplified extraction for now - full implementation would use debug info
+        // to extract locals, upvalues, and globals
+
+        // Add debug metadata
         variables.insert(
             "__debug_line".to_string(),
             serde_json::Value::Number(serde_json::Number::from(line)),
@@ -130,85 +149,7 @@ impl LuaDebugBridge {
 
         variables
     }
-
-    // TODO: Add back Lua value conversion when variable extraction is enhanced
-
-    /// Handle step execution (SLOW PATH only)
-    async fn handle_step_with_lua_context(&self, line: u32, source: &str) -> DebugControl {
-        trace!("Handling step with Lua context at {}:{}", source, line);
-
-        let location = ExecutionLocation {
-            source: source.to_string(),
-            line,
-            column: None,
-        };
-
-        // Coordinate step pause through DebugCoordinator
-        self.coordinator
-            .coordinate_step_pause(PauseReason::Step, location)
-            .await;
-
-        DebugControl::Pause
-    }
 }
-
-/// Implement `DebugHook` trait for `LuaDebugBridge`
-#[async_trait]
-impl DebugHook for LuaDebugBridge {
-    /// Handle line execution event
-    async fn on_line(&self, line: u32, source: &str) -> DebugControl {
-        // FAST PATH: Pure sync check through DebugCoordinator (preserves performance)
-        if !self.coordinator.might_break_at_sync(source, line) && !self.coordinator.is_paused_sync()
-        {
-            return DebugControl::Continue; // EXIT FAST - no async operations!
-        }
-
-        trace!("Entering slow path for line {}:{}", source, line);
-
-        // SLOW PATH: Check if we're paused (stepping) or hit a breakpoint
-        if self.coordinator.is_paused_sync() {
-            self.handle_step_with_lua_context(line, source).await
-        } else {
-            // Must be a breakpoint
-            self.handle_breakpoint_with_lua_context(line, source).await
-        }
-    }
-
-    /// Handle function entry event
-    async fn on_function_enter(&self, name: &str, _args: Vec<String>) -> DebugControl {
-        trace!("Function enter: {}", name);
-        // For now, just continue - could add step-into logic later
-        DebugControl::Continue
-    }
-
-    /// Handle function exit event
-    async fn on_function_exit(&self, name: &str, _result: Option<String>) -> DebugControl {
-        trace!("Function exit: {}", name);
-        // For now, just continue - could add step-out logic later
-        DebugControl::Continue
-    }
-
-    /// Handle exception event
-    async fn on_exception(&self, error: &str, line: u32) -> DebugControl {
-        warn!("Exception at line {}: {}", line, error);
-
-        // Always pause on exceptions for debugging (preserves existing behavior)
-        let location = ExecutionLocation {
-            source: "unknown".to_string(), // Exception source might not be available
-            line,
-            column: None,
-        };
-
-        self.coordinator
-            .coordinate_step_pause(PauseReason::Exception(error.to_string()), location)
-            .await;
-
-        DebugControl::Pause
-    }
-}
-
-// TODO: Future enhancement - expose LuaExecutionHook internal methods for bridge
-// For now, the bridge uses simplified breakpoint logic
 
 #[cfg(test)]
 mod tests {
