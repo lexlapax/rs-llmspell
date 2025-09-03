@@ -230,24 +230,20 @@ async fn try_load_hnsw_from_path(
     }
 }
 
-/// Create new HNSW storage with optional persistence (loads existing data if present)
-async fn create_new_hnsw_storage(
+/// Create new HNSW storage with optional persistence (does NOT load existing data)
+fn create_new_hnsw_storage(
     dimensions: usize,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
     persistence_path: Option<&std::path::Path>,
 ) -> llmspell_storage::backends::vector::hnsw::HNSWVectorStorage {
     use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
 
+    let storage = HNSWVectorStorage::new(dimensions, hnsw_config);
+
     if let Some(path) = persistence_path {
-        // Use from_path to load existing data if it exists
-        HNSWVectorStorage::from_path(path, dimensions, hnsw_config.clone())
-            .await
-            .unwrap_or_else(|_| {
-                // If loading fails (e.g., path doesn't exist), create new with persistence
-                HNSWVectorStorage::new(dimensions, hnsw_config).with_persistence(path.to_path_buf())
-            })
+        storage.with_persistence(path.to_path_buf())
     } else {
-        HNSWVectorStorage::new(dimensions, hnsw_config)
+        storage
     }
 }
 
@@ -268,17 +264,17 @@ async fn create_hnsw_storage_with_persistence(
     }
 
     // Create new storage with persistence
-    let storage = create_new_hnsw_storage(dimensions, hnsw_config, Some(path)).await;
+    let storage = create_new_hnsw_storage(dimensions, hnsw_config, Some(path));
     Arc::new(storage)
 }
 
 /// Create HNSW storage without persistence
-async fn create_hnsw_storage_without_persistence(
+fn create_hnsw_storage_without_persistence(
     dimensions: usize,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
 ) -> Arc<dyn VectorStorage> {
     warn!("HNSW storage created without persistence - data will not survive restarts");
-    let storage = create_new_hnsw_storage(dimensions, hnsw_config, None).await;
+    let storage = create_new_hnsw_storage(dimensions, hnsw_config, None);
     Arc::new(storage)
 }
 
@@ -300,7 +296,6 @@ async fn create_hnsw_storage(
         }
         None => {
             create_hnsw_storage_without_persistence(config.vector_storage.dimensions, hnsw_config)
-                .await
         }
     }
 }

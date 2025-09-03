@@ -817,60 +817,132 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-## Advanced Integration Phases
+### **Phase 11: Enterprise IDE and Developer Tools Integration (Weeks 39-40)**
 
-### **Phase 11: Advanced Workflow Features (Weeks 39-40)**
+**Goal**: Implement comprehensive IDE integration, web client foundation, and remote debugging capabilities leveraging Phase 9's unified kernel architecture  
+**Priority**: HIGH (Developer Experience - Critical for enterprise adoption)  
+**Dependencies**: Requires Phase 9 (Kernel as Execution Hub) and Phase 10 (Memory System for context)
 
-**Goal**: Enhance basic workflows with enterprise-grade features leveraging full infrastructure
-**Priority**: MEDIUM (Advanced Orchestration)
-**Dependencies**: Requires Phase 8 Vector Storage and Phase 10 Memory System
-**Phase 4 Integration**: CompositeHook and Fork/Retry patterns from Phase 4 enable advanced workflow orchestration with less custom code.
+**Rationale**: With the kernel-as-execution-hub architecture from Phase 9.8, IDE integration becomes natural. Multiple clients (CLI, Web, IDE) can connect to the same kernel session, enabling collaborative debugging and development.
 
 **Components**:
-- **Advanced Workflow Features**:
-  - Workflow state persistence integration (builds on Phase 5 State Management)
-  - Hook/event integration for workflow lifecycle (builds on Phase 4 Hooks)
-  - Session-aware workflow context (builds on Phase 6 Sessions)
-  - Vector storage for workflow context and templates
-  - **Fork and Retry patterns using Phase 4 HookResult enhancements**
-  - **CompositeHook patterns for workflow-level hook composition**
-- **Advanced Workflow Patterns**:
-  - `StreamingWorkflow` for real-time data processing
-  - `ParallelWorkflow` with complex synchronization
-  - Advanced error recovery and rollback mechanisms
-  - Workflow template marketplace and sharing
-- **Enterprise Features**:
-  - Workflow monitoring and observability
-  - Performance optimization and caching
-  - Distributed workflow execution
-  - Integration with external workflow engines
+
+#### **11.1: Web Client Foundation (Week 39 - Part 1)**
+- **Web REPL Interface**:
+  - WebSocket transport layer for kernel protocol
+  - Browser-based terminal emulator
+  - Syntax highlighting and auto-completion
+  - Session persistence across browser refreshes
+- **Interactive Debug UI**:
+  - Visual breakpoint management
+  - Variable inspector with tree view
+  - Call stack visualization
+  - Step controls with keyboard shortcuts
+- **Multi-tenant Support**:
+  - User authentication and session isolation
+  - Resource limits per web session
+  - Enterprise SSO integration hooks
+
+#### **11.2: IDE Integration - LSP/DAP Implementation (Week 39 - Part 2)**
+- **Language Server Protocol (LSP)**:
+  - Code completion from kernel runtime
+  - Hover information with type details
+  - Go-to-definition using kernel state
+  - Real-time diagnostics from execution
+  - Refactoring support with kernel validation
+- **Debug Adapter Protocol (DAP)**:
+  - Full DAP 1.0 compliance
+  - Breakpoint synchronization with kernel
+  - Variable evaluation in debug context
+  - Conditional breakpoint expressions
+  - Log points and data breakpoints
+- **Multi-IDE Support**:
+  - Protocol-based architecture works with any LSP/DAP client
+  - Tested with VS Code, Neovim, IntelliJ, Emacs
+
+#### **11.3: VS Code Extension (Week 40 - Part 1)**
+- **Extension Features**:
+  - One-click debugging with automatic kernel start
+  - Integrated REPL panel
+  - Syntax highlighting for Lua/JavaScript
+  - Snippet library for common patterns
+  - Task runner integration
+- **Advanced Debugging UI**:
+  - Inline variable values during debug
+  - Conditional breakpoint editor
+  - Watch expression evaluator
+  - Memory usage visualizer
+- **Marketplace Integration**:
+  - Published to VS Code marketplace
+  - Auto-update mechanism
+  - Telemetry for usage analytics (optional)
+
+#### **11.4: Remote Debugging Security (Week 40 - Part 2)**
+- **Secure Connection Layer**:
+  - TLS 1.3 for all remote connections
+  - Certificate-based authentication
+  - SSH tunnel support
+  - VPN-friendly architecture
+- **Enterprise Security Features**:
+  - RBAC for debug operations
+  - Audit logging for all debug sessions
+  - Compliance mode (HIPAA, SOC2)
+  - Secret masking in debug output
+- **Session Management**:
+  - Secure session tokens
+  - Automatic timeout and cleanup
+  - Session recording for audit
+  - Multi-factor authentication support
+
+#### **11.5: Media and Streaming Support**
+- **Streaming Protocols**:
+  - WebRTC for real-time media debugging
+  - HLS/DASH for streaming content
+  - Binary WebSocket for efficient data transfer
+- **Media Debugging**:
+  - Image preview in debugger
+  - Audio waveform visualization
+  - Video frame stepping
+  - Large file streaming without memory exhaustion
+- **Performance Optimization**:
+  - Chunked transfer for large data
+  - Progressive loading for media
+  - Bandwidth management
+  - Client-side caching
 
 **Success Criteria**:
-- [ ] Workflow state persists across sessions (Phase 5 integration)
-- [ ] Workflow lifecycle hooks firing correctly (Phase 4 integration)
-- [ ] Session context preserved in workflows (Phase 6 integration)
-- [ ] Vector storage enables workflow context search (Phase 8 integration)
-- [ ] Memory system provides cross-workflow context (Phase 10 integration)
-- [ ] Advanced streaming and parallel patterns functional
-- [ ] Workflow monitoring and observability operational
-- [ ] Performance optimization delivers measurable improvements
-- [ ] Enterprise-grade error recovery mechanisms working
-- [ ] **Fork operations from hooks create parallel workflow branches**
-- [ ] **Retry patterns with exponential backoff work via hooks**
-- [ ] **Workflow hooks can modify execution flow dynamically**
+- [ ] Web client connects to kernel via WebSocket
+- [ ] LSP provides code completion and diagnostics
+- [ ] DAP enables full debugging from any IDE
+- [ ] VS Code extension published and functional
+- [ ] Remote debugging works securely over internet
+- [ ] Multi-client debugging sessions work (2+ IDEs on same kernel)
+- [ ] Media debugging doesn't exhaust memory
+- [ ] Performance acceptable (<100ms latency for local, <200ms remote)
+- [ ] Enterprise security requirements met
 
 **Testing Requirements**:
-- Advanced workflow pattern unit tests
-- Infrastructure integration tests (state, hooks, sessions, vector storage)
-- Complex error recovery validation
-- Performance benchmarking and optimization validation
-- Workflow persistence and session integration tests
-- Distributed workflow execution tests
-- Workflow template marketplace validation
-- **Fork/Retry pattern integration tests**
-- **Dynamic flow modification tests**
+- WebSocket connection stability tests
+- LSP protocol compliance validation
+- DAP protocol compliance validation
+- Multi-IDE integration tests
+- Security penetration testing
+- Performance benchmarks (local and remote)
+- Media handling stress tests
+- Multi-client synchronization tests
+- Browser compatibility testing (Chrome, Firefox, Safari, Edge)
+
+**Integration with Previous Phases**:
+- **Phase 9.8 (Kernel Hub)**: All IDE clients connect to unified kernel
+- **Phase 9 (Debug Infrastructure)**: Reuses debug bridges and execution manager
+- **Phase 10 (Memory)**: IDE can visualize memory system state
+- **Future Phase 12 (Daemon)**: IDE can manage long-running services
+- **Future Phase 13-14 (MCP)**: IDE becomes MCP client/server
 
 ---
+
+## Advanced Integration Phases
+
 
 ### **Phase 12: Daemon and Service Mode (Weeks 41-42)**
 
@@ -972,8 +1044,90 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - Load testing with multiple clients
 
 ---
+### **Phase 15: A2A Client Support (Weeks 57-58)**
 
-### **Phase 15: JavaScript Engine Support (Weeks 47-48)**
+**Goal**: Agent-to-Agent communication as client  
+**Priority**: LOW (Advanced Networking)
+
+**Components**:
+- A2A protocol client implementation
+- Agent discovery and delegation
+- Network communication and retries
+- Task distribution patterns
+
+**Success Criteria**:
+- [ ] Can discover remote agents via A2A protocol
+- [ ] Task delegation to remote agents works
+- [ ] Network failures handled with retries
+- [ ] Agent capabilities properly negotiated
+- [ ] Distributed task execution functional
+
+**Testing Requirements**:
+- A2A protocol client tests
+- Agent discovery validation
+- Network failure simulation tests
+- Task delegation integration tests
+- Distributed execution tests
+
+---
+
+### **Phase 16: A2A Server Support (Weeks 59-60)**
+
+**Goal**: Expose local agents via A2A protocol  
+**Priority**: LOW (Advanced Networking)
+
+**Components**:
+- A2A protocol server implementation
+- Agent exposure and capability advertisement
+- Multi-agent coordination
+- Load balancing and failover
+
+**Success Criteria**:
+- [ ] A2A server accepts agent connections
+- [ ] Local agents discoverable by remote clients
+- [ ] Multi-agent coordination works
+- [ ] Load is distributed across available agents
+- [ ] Failover mechanisms handle agent failures
+
+**Testing Requirements**:
+- A2A server implementation tests
+- Agent exposure validation
+- Multi-agent coordination tests
+- Load balancing functionality tests
+- Failover mechanism tests
+
+---
+
+## Production Optimization Phase
+
+### **Phase 17: Library Mode Support (Weeks 41-42)**
+
+**Goal**: Support usage as native module in external runtimes  
+**Priority**: MEDIUM (Alternative Usage Mode)
+
+**Components**:
+- C API layer for FFI
+- `RuntimeMode::Library` implementation
+- `SelectiveInitStrategy` for partial initialization
+- Native module packaging (LuaRock, NPM)
+
+**Success Criteria**:
+- [ ] Can be compiled as shared library
+- [ ] C API allows external lua_State injection
+- [ ] Selective initialization works (tools-only, agents-only)
+- [ ] Native modules can be required in external scripts
+- [ ] Memory management safe in external runtimes
+
+**Testing Requirements**:
+- C API functionality tests
+- External runtime integration tests
+- Memory safety validation
+- Selective initialization tests
+- Native module packaging tests
+
+---
+
+### **Phase 18: JavaScript Engine Support (Weeks 43-44)**
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
@@ -1024,38 +1178,9 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-## Production Optimization Phase
-
-### **Phase 16: Library Mode Support (Weeks 49-50)**
-
-**Goal**: Support usage as native module in external runtimes  
-**Priority**: MEDIUM (Alternative Usage Mode)
-
-**Components**:
-- C API layer for FFI
-- `RuntimeMode::Library` implementation
-- `SelectiveInitStrategy` for partial initialization
-- Native module packaging (LuaRock, NPM)
-
-**Success Criteria**:
-- [ ] Can be compiled as shared library
-- [ ] C API allows external lua_State injection
-- [ ] Selective initialization works (tools-only, agents-only)
-- [ ] Native modules can be required in external scripts
-- [ ] Memory management safe in external runtimes
-
-**Testing Requirements**:
-- C API functionality tests
-- External runtime integration tests
-- Memory safety validation
-- Selective initialization tests
-- Native module packaging tests
-
----
-
 ## Additional Enhancement Phases
 
-### **Phase 17: Cross-Platform Support (Weeks 51-52)**
+### **Phase 19: Cross-Platform Support (Weeks 45-46)**
 
 **Goal**: Full Windows support and cross-platform compatibility  
 **Priority**: MEDIUM (Platform Coverage)
@@ -1083,7 +1208,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 ---
 ## Platform Support Phases
 
-### **Phase 18: Production Optimization (Weeks 53-54)**
+### **Phase 20: Production Optimization (Weeks 47-48)**
 
 **Goal**: Performance optimization and production hardening  
 **Priority**: HIGH (Production Readiness)
@@ -1120,7 +1245,60 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ## Enhanced Capabilities
 
-### **Phase 19: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 55-56)**
+### **Phase 21: Advanced Workflow Features (Weeks 49-50)**
+
+**Goal**: Enhance basic workflows with enterprise-grade features leveraging full infrastructure
+**Priority**: MEDIUM (Advanced Orchestration)
+**Dependencies**: Requires Phase 8 Vector Storage and Phase 10 Memory System
+**Phase 4 Integration**: CompositeHook and Fork/Retry patterns from Phase 4 enable advanced workflow orchestration with less custom code.
+
+**Components**:
+- **Advanced Workflow Features**:
+  - Workflow state persistence integration (builds on Phase 5 State Management)
+  - Hook/event integration for workflow lifecycle (builds on Phase 4 Hooks)
+  - Session-aware workflow context (builds on Phase 6 Sessions)
+  - Vector storage for workflow context and templates
+  - **Fork and Retry patterns using Phase 4 HookResult enhancements**
+  - **CompositeHook patterns for workflow-level hook composition**
+- **Advanced Workflow Patterns**:
+  - `StreamingWorkflow` for real-time data processing
+  - `ParallelWorkflow` with complex synchronization
+  - Advanced error recovery and rollback mechanisms
+  - Workflow template marketplace and sharing
+- **Enterprise Features**:
+  - Workflow monitoring and observability
+  - Performance optimization and caching
+  - Distributed workflow execution
+  - Integration with external workflow engines
+
+**Success Criteria**:
+- [ ] Workflow state persists across sessions (Phase 5 integration)
+- [ ] Workflow lifecycle hooks firing correctly (Phase 4 integration)
+- [ ] Session context preserved in workflows (Phase 6 integration)
+- [ ] Vector storage enables workflow context search (Phase 8 integration)
+- [ ] Memory system provides cross-workflow context (Phase 10 integration)
+- [ ] Advanced streaming and parallel patterns functional
+- [ ] Workflow monitoring and observability operational
+- [ ] Performance optimization delivers measurable improvements
+- [ ] Enterprise-grade error recovery mechanisms working
+- [ ] **Fork operations from hooks create parallel workflow branches**
+- [ ] **Retry patterns with exponential backoff work via hooks**
+- [ ] **Workflow hooks can modify execution flow dynamically**
+
+**Testing Requirements**:
+- Advanced workflow pattern unit tests
+- Infrastructure integration tests (state, hooks, sessions, vector storage)
+- Complex error recovery validation
+- Performance benchmarking and optimization validation
+- Workflow persistence and session integration tests
+- Distributed workflow execution tests
+- Workflow template marketplace validation
+- **Fork/Retry pattern integration tests**
+- **Dynamic flow modification tests**
+
+---
+
+### **Phase 22: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 51-52)**
 
 **Goal**: Implement additional data processing and integration tools  
 **Priority**: LOW (Post-Production Enhancement)
@@ -1146,61 +1324,8 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 - Security review
 
 ---
-### **Phase 20: A2A Client Support (Weeks 57-58)**
 
-**Goal**: Agent-to-Agent communication as client  
-**Priority**: LOW (Advanced Networking)
-
-**Components**:
-- A2A protocol client implementation
-- Agent discovery and delegation
-- Network communication and retries
-- Task distribution patterns
-
-**Success Criteria**:
-- [ ] Can discover remote agents via A2A protocol
-- [ ] Task delegation to remote agents works
-- [ ] Network failures handled with retries
-- [ ] Agent capabilities properly negotiated
-- [ ] Distributed task execution functional
-
-**Testing Requirements**:
-- A2A protocol client tests
-- Agent discovery validation
-- Network failure simulation tests
-- Task delegation integration tests
-- Distributed execution tests
-
----
-
-### **Phase 21: A2A Server Support (Weeks 59-60)**
-
-**Goal**: Expose local agents via A2A protocol  
-**Priority**: LOW (Advanced Networking)
-
-**Components**:
-- A2A protocol server implementation
-- Agent exposure and capability advertisement
-- Multi-agent coordination
-- Load balancing and failover
-
-**Success Criteria**:
-- [ ] A2A server accepts agent connections
-- [ ] Local agents discoverable by remote clients
-- [ ] Multi-agent coordination works
-- [ ] Load is distributed across available agents
-- [ ] Failover mechanisms handle agent failures
-
-**Testing Requirements**:
-- A2A server implementation tests
-- Agent exposure validation
-- Multi-agent coordination tests
-- Load balancing functionality tests
-- Failover mechanism tests
-
----
-
-### **Phase 22: Multimodal Tools Implementation (Weeks 61-62)**
+### **Phase 23: Multimodal Tools Implementation (Weeks 53-54)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
@@ -1260,7 +1385,7 @@ Rs-LLMSpell follows a carefully structured 18+ phase implementation approach tha
 
 ---
 
-### **Phase 23: AI/ML Complex Tools (Weeks 63-64)**
+### **Phase 24: AI/ML Complex Tools (Weeks 55-56)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
@@ -1411,9 +1536,9 @@ Each phase must pass:
 - **MVP with External Tools & Agent Infrastructure**: 16 weeks (Phases 0-3)
 - **Production Infrastructure**: 22 weeks (Phases 0-6, includes enhanced hooks +3 days)
 - **Pre-1.0 Polish**: 27 weeks (Phases 0-7, API consistency and documentation)
-- **Advanced Features**: 40 weeks (Phases 0-11, includes vector storage, REPL/debugging, memory, workflows)
-- **Multi-Language Ready**: 48 weeks (Phases 0-15, JavaScript support -3 days saved)
-- **Full Feature Set**: 64 weeks (All 23 phases, -1 week from Phase 18 optimization)
+- **Advanced Features**: 40 weeks (Phases 0-11, includes vector storage, REPL/debugging, memory, IDE integration)
+- **Multi-Language Ready**: 44 weeks (Phases 0-18, JavaScript support)
+- **Full Feature Set**: 56 weeks (All 24 phases)
 
 ### Resource Requirements
 
