@@ -7900,7 +7900,16 @@ The missing 15% is the core feature - without actual pausing, interactive debugg
 
 ### Phase 9.8: Kernel as Execution Hub Architecture (Days 15-16)
 
-**🏗️ CRITICAL ARCHITECTURAL FIX**: Unify all script execution through the kernel, eliminating dual execution paths and **completing debug functionality from 85% to 100%**.
+**🏗️ CRITICAL ARCHITECTURAL PIVOT**: After completing 9.8.1-9.8.2, we discovered that our custom LRP/LDP protocols were unnecessary reinvention. We're pivoting to Jupyter Messaging Protocol with ZeroMQ transport, which solves our technical issues AND provides ecosystem compatibility.
+
+**Original Goal**: Unify all script execution through the kernel, eliminating dual execution paths and **completing debug functionality from 85% to 100%**.
+
+**New Approach**: Adopt Jupyter protocol which:
+- **Solves TCP Issues**: ZeroMQ handles bidirectional messaging correctly (no split Framed problems)
+- **Native DAP Support**: Jupyter protocol tunnels DAP via debug_request/reply/event messages
+- **Ecosystem Compatibility**: Works with Jupyter notebooks, consoles, VS Code immediately
+- **Proven Architecture**: 10+ years of production use, well-documented patterns
+- **Simplifies Phase 11**: DAP support already built into Jupyter protocol
 
 **Rationale**: Analysis during 9.7 revealed that debug infrastructure is 85% complete but **cannot actually pause execution** because CLI creates its own ScriptRuntime independent of the kernel. This refactor fixes the fundamental architectural flaw preventing debug from working.
 
@@ -7974,6 +7983,21 @@ fn create_runtime() -> ScriptRuntime {
 **Assignee**: Kernel Team
 
 **Description**: Implement automatic kernel startup when CLI needs it, with improved discovery.
+  Data and control flow wise, What SHOULD happen:
+  1. CLI executes exec "print('hello')"
+  2. CLI calls connect_or_start() → spawns kernel process
+  3. Kernel starts:
+    - Creates ScriptRuntime with Lua engine
+    - Creates UnifiedProtocolEngine
+    - Calls serve() to listen on TCP ports
+  4. CLI connects via ProtocolClient::connect()
+  5. CLI sends LRPRequest::ExecuteRequest
+  6. Kernel receives in handle_connection() loop
+  7. Kernel processes via MessageProcessor::process_lrp()
+  8. Kernel executes script via ScriptRuntime
+  9. Kernel sends LRPResponse::ExecuteReply with result
+  10. CLI receives and displays output
+Fastpath and Debug/Trace should both follow the same path. the Debug/Trace may go through additional layers:
 
 **Implementation Steps:**
 1. ✅ Add kernel auto-start logic to CLI
@@ -7982,10 +8006,14 @@ fn create_runtime() -> ScriptRuntime {
 4. ✅ Enhance discovery with multiple connection file locations
 
 **Current Issue**: 
-- Kernel starts successfully but protocol connection drops when sending execute request
-- "Connection closed" error occurs immediately after successful TCP connection
+- **CRITICAL ARCHITECTURAL ISSUE DISCOVERED**:
+  - We reinvented the wheel with custom LRP/LDP protocols instead of using Jupyter protocol
+  - The split Framed TCP transport issue is a symptom of not using proven patterns
+  - Jupyter uses ZeroMQ which handles bidirectional messaging correctly
+  - Jupyter protocol natively supports DAP tunneling for Phase 11 requirements
+- **SOLUTION**: Migrate to Jupyter Messaging Protocol (see new Task 9.8.3-9.8.5)
 - Kernel's ExecuteReply now includes script output in payload (fixed)
-- Need to debug protocol message exchange between client and server
+- Tests still failing: test_exec_inline_code, test_run_simple_lua_script with timeout
 
 **Acceptance Criteria:**
 - [x] Kernel starts automatically if not running
@@ -7997,45 +8025,466 @@ fn create_runtime() -> ScriptRuntime {
 - [x] `connect_or_start()` actually spawns kernel process when needed
 - [x] Kernel binary path discovery works in test environments
 
-#### Task 9.8.3: Local TCP Performance Optimization
-**Priority**: HIGH  
+#### Task 9.8.3: Create New llmspell-kernel Crate (Option A)
+**Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
-**Assignee**: Performance Team
+**Assignee**: Architecture Team
 
-**Description**: Optimize local TCP communication to minimize overhead.
+**Description**: Create a fresh `llmspell-kernel` crate with Jupyter-first architecture, keeping `llmspell-engine` temporarily for backward compatibility. This avoids retrofitting Phase 9.5's incompatible multi-protocol abstractions.
+
+**Rationale**: 
+- Phase 9.5 components (UnifiedProtocolEngine, adapters, sidecars) were designed for multi-protocol support
+- Jupyter is single-protocol and doesn't need these abstractions (becomes technical debt)
+- Multiple crates depend on llmspell-engine - need gradual migration path
+- Clean start enables Jupyter-first design without legacy baggage
+- llmspell-engine can be deprecated after migration complete
 
 **Implementation Steps:**
-1. Implement Unix domain socket support (faster than TCP locally)
-2. Add connection pooling/reuse
-3. Optimize message serialization (consider bincode/msgpack)
-4. Add performance benchmarks
+1. **Create new crate structure**:
+   ```bash
+   cargo new llmspell-kernel --lib
+   cd llmspell-kernel
+   ```
+
+2. **Update workspace Cargo.toml**:
+   ```toml
+   [workspace]
+   members = [
+     # ... existing members ...
+     "llmspell-kernel",  # ADD THIS
+   ]
+   ```
+
+3. **Create directory structure**:
+   ```
+   llmspell-kernel/
+   ├── Cargo.toml
+   ├── src/
+   │   ├── lib.rs                    # Crate root, exports public API
+   │   ├── kernel.rs                  # Core JupyterKernel struct (will be moved from repl)
+   │   ├── jupyter/
+   │   │   ├── mod.rs                 # Jupyter protocol module root
+   │   │   ├── protocol.rs            # Message types and serialization
+   │   │   ├── channels.rs            # 5 ZeroMQ channels management
+   │   │   └── connection.rs          # Connection file format
+   │   ├── transport/
+   │   │   ├── mod.rs                 # Transport layer root
+   │   │   ├── zeromq.rs              # ZeroMQ socket implementation
+   │   │   └── heartbeat.rs           # Heartbeat channel handler
+   │   ├── execution/
+   │   │   ├── mod.rs                 # Execution module root
+   │   │   ├── runtime_manager.rs     # Manages ScriptRuntime lifecycle
+   │   │   └── session.rs             # Session state management
+   │   ├── debug/
+   │   │   ├── mod.rs                 # Debug module root
+   │   │   ├── dap_adapter.rs         # DAP via Jupyter debug messages
+   │   │   └── state.rs               # Debug state tracking
+   │   └── bin/
+   │       └── llmspell-kernel.rs     # Kernel executable entry point
+   ```
+
+4. **Initial Cargo.toml dependencies**:
+   ```toml
+   [package]
+   name = "llmspell-kernel"
+   version = "0.1.0"
+   edition = "2021"
+
+   [dependencies]
+   # Core dependencies
+   anyhow = "1.0"
+   tokio = { version = "1.41", features = ["full"] }
+   tracing = "0.1"
+   serde = { version = "1.0", features = ["derive"] }
+   serde_json = "1.0"
+   uuid = { version = "1.11", features = ["v4", "serde"] }
+   
+   # Internal crates (minimal initial dependencies)
+   llmspell-bridge = { path = "../llmspell-bridge" }
+   llmspell-config = { path = "../llmspell-config" }
+   llmspell-debug = { path = "../llmspell-debug" }
+   llmspell-sessions = { path = "../llmspell-sessions" }
+   llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+   
+   # ZeroMQ and Jupyter (to be added in 9.8.5)
+   # zmq = "0.10"
+   # jupyter-protocol = { git = "https://github.com/llmspell/jupyter-protocol" }
+   
+   [[bin]]
+   name = "llmspell-kernel"
+   path = "src/bin/llmspell-kernel.rs"
+   ```
+
+5. **Create minimal lib.rs**:
+   ```rust
+   //! llmspell-kernel: Jupyter-compatible execution kernel for LLMSpell
+   //! 
+   //! This crate provides the core execution engine that:
+   //! - Implements Jupyter Messaging Protocol
+   //! - Manages ScriptRuntime instances
+   //! - Handles debug/DAP integration
+   //! - Supports multiple client connections
+   
+   pub mod kernel;
+   // pub mod jupyter;  // Uncomment when implementing
+   // pub mod transport;
+   // pub mod execution;
+   // pub mod debug;
+   
+   pub use kernel::JupyterKernel;
+   ```
+
+6. **Create minimal kernel.rs**:
+   ```rust
+   //! Core kernel implementation
+   
+   use anyhow::Result;
+   
+   pub struct JupyterKernel {
+       // Will be populated from llmspell-repl/src/kernel.rs
+   }
+   
+   impl JupyterKernel {
+       pub fn new() -> Result<Self> {
+           todo!("Will be implemented in Task 9.8.4")
+       }
+   }
+   ```
+
+7. **Create minimal binary**:
+   ```rust
+   // src/bin/llmspell-kernel.rs
+   use anyhow::Result;
+   
+   #[tokio::main]
+   async fn main() -> Result<()> {
+       println!("llmspell-kernel placeholder - will be implemented in Task 9.8.4");
+       Ok(())
+   }
+   ```
 
 **Acceptance Criteria:**
-- [ ] Local execution overhead <5ms vs direct
-- [ ] Unix domain sockets work on supported platforms
-- [ ] Benchmarks show acceptable performance
-- [ ] Fallback to TCP when needed
+- [ ] New llmspell-kernel crate created with proper structure
+- [ ] Added to workspace members in root Cargo.toml
+- [ ] Initial Cargo.toml with minimal dependencies
+- [ ] Directory structure prepared for Jupyter implementation
+- [ ] Builds successfully (even if mostly empty stubs)
+- [ ] No dependency on llmspell-engine (clean start)
 
-#### Task 9.8.4: Session Persistence and State Management
+#### Task 9.8.4: Move Kernel Code to llmspell-kernel Crate
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: Architecture Team
+
+**Description**: Move kernel implementation from llmspell-repl to the new llmspell-kernel crate, establishing clear architectural boundaries.
+
+**Rationale**:
+- Kernel is the core execution engine, not a REPL component
+- REPL should be a client to the kernel, not contain it
+- Clear separation: llmspell-kernel=execution, llmspell-repl=client interface
+- Enables deprecation path for llmspell-engine after migration
+
+**Implementation Steps:**
+1. **Move core kernel files**:
+   ```bash
+   # From llmspell-repl to llmspell-kernel
+   cp llmspell-repl/src/kernel.rs llmspell-kernel/src/kernel.rs
+   cp llmspell-repl/src/bin/kernel.rs llmspell-kernel/src/bin/llmspell-kernel.rs
+   
+   # Also move related modules
+   cp llmspell-repl/src/connection.rs llmspell-kernel/src/connection.rs
+   cp llmspell-repl/src/discovery.rs llmspell-kernel/src/discovery.rs
+   cp llmspell-repl/src/security.rs llmspell-kernel/src/security.rs
+   ```
+
+2. **Update llmspell-kernel/src/lib.rs**:
+   ```rust
+   pub mod kernel;
+   pub mod connection;
+   pub mod discovery;
+   pub mod security;
+   
+   pub use kernel::{LLMSpellKernel, KernelConfig, KernelState};
+   pub use connection::ConnectionInfo;
+   pub use discovery::KernelDiscovery;
+   ```
+
+3. **Update imports in moved files**:
+   - Change `crate::protocol` to use temporary compatibility imports
+   - Update `llmspell_repl::` to `llmspell_kernel::`
+   - Keep using llmspell-engine's protocol types temporarily
+
+4. **Add llmspell-engine dependency temporarily**:
+   ```toml
+   # In llmspell-kernel/Cargo.toml
+   [dependencies]
+   # Temporary - will be removed after Jupyter implementation
+   llmspell-engine = { path = "../llmspell-engine" }
+   ```
+
+5. **Update llmspell-repl to remove kernel code**:
+   - Delete kernel.rs, connection.rs, discovery.rs, security.rs from llmspell-repl
+   - Keep only client-side code (ConnectedClient, ReplInterface, etc.)
+   - Update llmspell-repl/Cargo.toml to depend on llmspell-kernel
+
+6. **Update binary path in llmspell-cli**:
+   ```rust
+   // In llmspell-cli kernel discovery
+   let kernel_binary = "llmspell-kernel";  // Changed from "llmspell-repl-kernel"
+   ```
+
+7. **Verify separation**:
+   ```bash
+   # llmspell-kernel should contain:
+   - Kernel server implementation
+   - Connection management
+   - Protocol handling (temporarily)
+   - Security and discovery
+   
+   # llmspell-repl should only contain:
+   - REPL interface
+   - Client connections
+   - User interaction logic
+   ```
+
+**Acceptance Criteria:**
+- [ ] Kernel code moved to llmspell-kernel crate
+- [ ] llmspell-kernel binary builds and runs
+- [ ] llmspell-repl contains only client code
+- [ ] Clear separation: kernel=execution, repl=client interface
+- [ ] All existing tests still pass
+- [ ] CLI can discover and connect to new kernel binary
+
+#### Task 9.8.5: Implement Jupyter Protocol in llmspell-kernel
+**Priority**: CRITICAL  
+**Estimated Time**: 12 hours  
+**Assignee**: Protocol Team
+
+**Description**: Implement Jupyter Messaging Protocol in the new llmspell-kernel crate using ZeroMQ transport, replacing custom LRP/LDP protocols.
+
+**Rationale**:
+- Jupyter protocol is proven for 10+ years in production
+- ZeroMQ handles bidirectional messaging correctly (fixes TCP framing issues)
+- Native DAP support via debug_request/reply/event messages
+- Immediate ecosystem compatibility (notebooks, VS Code, JupyterLab)
+
+**Implementation Steps:**
+1. **Add Jupyter and ZeroMQ dependencies**:
+   ```toml
+   # In llmspell-kernel/Cargo.toml
+   [dependencies]
+   zmq = "0.10"
+   # Fork or use existing jupyter crate
+   jupyter-protocol = { git = "https://github.com/evcxr/evcxr" }  # Or similar
+   hmac = "0.12"
+   sha2 = "0.10"
+   hex = "0.4"
+   ```
+
+2. **Implement ZeroMQ transport (llmspell-kernel/src/transport/zeromq.rs)**:
+   ```rust
+   pub struct ZmqTransport {
+       shell: zmq::Socket,      // REQ-REP for execute
+       iopub: zmq::Socket,       // PUB for output
+       stdin: zmq::Socket,       // REQ-REP for input
+       control: zmq::Socket,     // REQ-REP for control
+       heartbeat: zmq::Socket,   // REP for heartbeat
+   }
+   
+   impl ZmqTransport {
+       pub fn bind(config: &ConnectionInfo) -> Result<Self>
+       pub async fn recv_shell_msg() -> Result<JupyterMessage>
+       pub async fn send_iopub_msg(msg: JupyterMessage) -> Result<()>
+   }
+   ```
+
+3. **Define Jupyter protocol types (llmspell-kernel/src/jupyter/protocol.rs)**:
+   ```rust
+   #[derive(Serialize, Deserialize)]
+   pub struct JupyterMessage {
+       pub header: Header,
+       pub parent_header: Option<Header>,
+       pub metadata: Value,
+       pub content: MessageContent,
+   }
+   
+   #[derive(Serialize, Deserialize)]
+   #[serde(tag = "msg_type")]
+   pub enum MessageContent {
+       #[serde(rename = "execute_request")]
+       ExecuteRequest { code: String, silent: bool },
+       #[serde(rename = "execute_reply")]
+       ExecuteReply { status: String, execution_count: u32 },
+       #[serde(rename = "kernel_info_request")]
+       KernelInfoRequest {},
+       // ... other message types
+       #[serde(rename = "debug_request")]
+       DebugRequest { command: String, arguments: Value },  // DAP support
+   }
+   ```
+
+4. **Create connection file format (llmspell-kernel/src/jupyter/connection.rs)**:
+   ```rust
+   #[derive(Serialize, Deserialize)]
+   pub struct ConnectionInfo {
+       pub shell_port: u16,
+       pub iopub_port: u16,
+       pub stdin_port: u16,
+       pub control_port: u16,
+       pub hb_port: u16,
+       pub ip: String,
+       pub key: String,  // HMAC signing key
+       pub transport: String,  // "tcp"
+       pub signature_scheme: String,  // "hmac-sha256"
+       pub kernel_name: String,  // "llmspell"
+   }
+   ```
+
+5. **Update kernel to use Jupyter protocol**:
+   ```rust
+   impl JupyterKernel {
+       pub async fn serve_jupyter(&mut self) -> Result<()> {
+           let transport = ZmqTransport::bind(&self.connection_info)?;
+           
+           loop {
+               tokio::select! {
+                   msg = transport.recv_shell_msg() => {
+                       self.handle_shell_message(msg?).await?;
+                   }
+                   msg = transport.recv_control_msg() => {
+                       self.handle_control_message(msg?).await?;
+                   }
+               }
+           }
+       }
+       
+       async fn handle_shell_message(&mut self, msg: JupyterMessage) -> Result<()> {
+           match msg.content {
+               MessageContent::ExecuteRequest { code, .. } => {
+                   let result = self.runtime.execute(&code).await?;
+                   // Send execute_reply and stream output to iopub
+               }
+               MessageContent::DebugRequest { .. } => {
+                   // Handle DAP commands through Jupyter
+               }
+               // ... other messages
+           }
+       }
+   }
+   ```
+
+6. **Test with real Jupyter console**:
+   ```bash
+   # Start our kernel
+   llmspell-kernel --connection-file kernel.json
+   
+   # Connect with Jupyter
+   jupyter console --existing kernel.json
+   ```
+
+**Acceptance Criteria:**
+- [ ] ZeroMQ transport working with 5 channels
+- [ ] Core Jupyter messages implemented (execute, kernel_info, shutdown)
+- [ ] Connection files use standard Jupyter format
+- [ ] Can connect with `jupyter console --existing`
+- [ ] DAP commands work through debug_request/reply
+- [ ] No more TCP framing issues
+- [ ] Output streaming works via IOPub channel
+
+#### Task 9.8.6: Update CLI to Use llmspell-kernel
+**Priority**: HIGH  
+**Estimated Time**: 3 hours  
+**Assignee**: CLI Team
+
+**Description**: Update llmspell-cli to use the new llmspell-kernel crate instead of llmspell-engine for kernel connections.
+
+**Rationale**:
+- CLI currently depends on llmspell-engine for ProtocolClient
+- Need to migrate to llmspell-kernel while maintaining compatibility
+- Gradual migration path - keep llmspell-engine working temporarily
+
+**Implementation Steps:**
+1. **Update llmspell-cli/Cargo.toml**:
+   ```toml
+   [dependencies]
+   # Add new kernel dependency
+   llmspell-kernel = { path = "../llmspell-kernel" }
+   # Keep engine temporarily for protocol types
+   llmspell-engine = { path = "../llmspell-engine" }
+   ```
+
+2. **Update kernel discovery to use new binary**:
+   ```rust
+   // In llmspell-cli/src/kernel/connection.rs
+   fn find_kernel_binary() -> PathBuf {
+       // Look for "llmspell-kernel" instead of old name
+       which::which("llmspell-kernel")
+           .or_else(|_| {
+               // Check target directory
+               let mut path = std::env::current_exe()?;
+               path.pop(); // Remove current binary name
+               path.push("llmspell-kernel");
+               Ok(path)
+           })
+   }
+   ```
+
+3. **Create compatibility layer**:
+   ```rust
+   // Temporary adapter while migrating
+   pub struct KernelClient {
+       // Will eventually use Jupyter client
+       // For now, still uses ProtocolClient from engine
+       inner: ProtocolClient,
+   }
+   ```
+
+4. **Update connection info handling**:
+   ```rust
+   // Prepare for Jupyter connection files
+   pub enum ConnectionFormat {
+       Legacy(ConnectionInfo),  // Current format
+       Jupyter(JupyterConnectionInfo),  // Future format
+   }
+   ```
+
+5. **Test kernel discovery and connection**:
+   ```bash
+   # Build new kernel
+   cargo build --package llmspell-kernel --bin llmspell-kernel
+   
+   # Test CLI can find and start it
+   cargo run --bin llmspell -- exec "print('hello')"
+   ```
+
+**Acceptance Criteria:**
+- [ ] CLI updated to use llmspell-kernel crate
+- [ ] Kernel discovery finds new binary name
+- [ ] Connection still works with current protocol (compatibility)
+- [ ] All CLI tests pass with new kernel
+- [ ] Prepared for Jupyter protocol migration
+
+#### Task 9.8.7: Session Persistence with Jupyter Protocol
 **Priority**: MEDIUM  
 **Estimated Time**: 4 hours  
 **Assignee**: Kernel Team
 
-**Description**: Implement session persistence so kernel maintains state across CLI invocations.
+**Description**: Integrate llmspell-sessions and llmspell-state with Jupyter protocol for session persistence.
 
 **Implementation Steps:**
-1. Add session ID to kernel connection
-2. Implement state snapshot/restore
-3. Add session timeout configuration
-4. Create session management commands
+1. Map Jupyter kernel sessions to llmspell-sessions
+2. Store kernel state using llmspell-state-persistence
+3. Implement Jupyter comm messages for session management
+4. Add session metadata to kernel_info_reply
+5. Support kernel restart with state restoration
 
 **Acceptance Criteria:**
-- [ ] Variables persist across CLI invocations
-- [ ] Session timeout configurable
-- [ ] Can list/attach to existing sessions
-- [ ] Clean session cleanup on timeout
+- [ ] Jupyter kernel sessions map to llmspell sessions
+- [ ] State persists across kernel restarts
+- [ ] Session artifacts accessible via Jupyter comms
+- [ ] Compatible with Jupyter session management
 
-#### Task 9.8.5: Debug Functionality Completion
+#### Task 9.8.8: Debug Functionality Completion
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: Debug Team
@@ -8066,28 +8515,246 @@ LuaDebugHookAdapter::on_line()
 - [ ] Stack navigation works while paused
 - [ ] Debug functionality at 100% (not 85%)
 
-#### Task 9.8.6: Migration and Compatibility
-**Priority**: HIGH  
-**Estimated Time**: 3 hours  
-**Assignee**: DevEx Team
+#### Task 9.8.9: Complete Removal of llmspell-engine
+**Priority**: CRITICAL  
+**Estimated Time**: 6 hours  
+**Assignee**: Architecture Team
 
-**Description**: Ensure smooth migration for existing users and scripts.
+**Description**: Completely remove llmspell-engine crate and all its dependencies after migrating functionality to llmspell-kernel.
+
+**Rationale**:
+- llmspell-engine contains Phase 9.5 multi-protocol abstractions incompatible with Jupyter
+- Clean removal prevents confusion and technical debt
+- Forces proper migration to new architecture
+
+**🔍 DISCOVERY PHASE (MUST DO FIRST - 2 hours):**
+```bash
+# INSTRUCTION FOR IMPLEMENTER: Run these discovery commands first!
+# This will reveal the full scope of cleanup needed
+
+# 1. Find ALL dependencies on llmspell-engine
+grep -r "llmspell-engine" --include="Cargo.toml" .
+grep -r "llmspell_engine::" --include="*.rs" .
+grep -r "use llmspell_engine" --include="*.rs" .
+
+# 2. Identify what each crate uses from llmspell-engine
+# Expected findings to investigate:
+# - llmspell-cli: Uses ProtocolClient, LRPRequest/Response
+# - llmspell-repl: Uses protocol types, client code
+# - llmspell-config: May have protocol configurations
+# - llmspell-bridge: May use debug_bridge, processor traits
+
+# 3. Map Phase 9.5 components that need removal
+ls -la llmspell-engine/src/
+# Components to analyze for migration needs:
+# - UnifiedProtocolEngine → Not needed (Jupyter has own)
+# - MessageProcessor trait → Might be useful, extract?
+# - DebugBridge → Check if used, might need in kernel
+# - Adapters/Sidecars/Channels → Delete (multi-protocol cruft)
+
+# 4. Check for indirect dependencies
+cargo tree -p llmspell-engine --invert
+
+# 5. Find test dependencies
+grep -r "llmspell-engine" --include="*.rs" tests/
+```
 
 **Implementation Steps:**
-1. Add `--direct` flag for backward compatibility (bypasses kernel)
-2. Create migration guide documentation
-3. Add helpful error messages for breaking changes
-4. Update all examples to use kernel architecture
-5. Document performance implications
+1. **Migration Mapping (based on discovery)**:
+   ```rust
+   // Document what needs to move where:
+   // llmspell_engine::ProtocolClient → llmspell_kernel::client::KernelClient
+   // llmspell_engine::LRPRequest → Jupyter ExecuteRequest
+   // llmspell_engine::LRPResponse → Jupyter ExecuteReply
+   // llmspell_engine::MessageProcessor → Extract to llmspell-core if needed
+   // llmspell_engine::DebugBridge → Move to llmspell-kernel if still needed
+   ```
+
+2. **Update all dependent crates**:
+   ```toml
+   # Remove from all Cargo.toml files:
+   # llmspell-engine = { path = "../llmspell-engine" }
+   
+   # Replace with:
+   # llmspell-kernel = { path = "../llmspell-kernel" }
+   ```
+
+3. **Migrate or replace code patterns**:
+   ```rust
+   // Old pattern:
+   use llmspell_engine::{ProtocolClient, LRPRequest};
+   let client = ProtocolClient::connect(...);
+   client.send(LRPRequest::Execute {...});
+   
+   // New pattern:
+   use llmspell_kernel::client::JupyterClient;
+   let client = JupyterClient::connect(...);
+   client.execute_request(...);
+   ```
+
+4. **Delete the crate entirely**:
+   ```bash
+   # After all migrations complete:
+   rm -rf llmspell-engine/
+   
+   # Remove from workspace:
+   # Edit Cargo.toml, remove "llmspell-engine" from members
+   ```
+
+5. **Verify clean removal**:
+   ```bash
+   # Should return nothing:
+   grep -r "llmspell-engine" --include="*.toml" .
+   grep -r "llmspell_engine" --include="*.rs" .
+   cargo build --workspace
+   cargo test --workspace
+   ```
+
+**Components to Extract Before Deletion:**
+- [ ] MessageProcessor trait → Move to llmspell-core if other crates need it
+- [ ] Any reusable types → Move to llmspell-core
+- [ ] Test utilities → Move to llmspell-testing
 
 **Acceptance Criteria:**
-- [ ] Clear migration path documented
-- [ ] `--direct` flag works for users needing old behavior
-- [ ] Helpful errors guide users to new model
-- [ ] Examples updated for new architecture
-- [ ] Performance comparison documented (kernel vs direct)
+- [ ] Discovery phase completed and documented
+- [ ] All dependencies migrated to llmspell-kernel
+- [ ] llmspell-engine directory completely removed
+- [ ] No references to llmspell_engine remain in codebase
+- [ ] All tests pass without llmspell-engine
+- [ ] Workspace builds successfully
+- [ ] No orphaned imports or types
 
-#### Task 9.8.7: Integration Testing and Validation
+#### Task 9.8.10: Clean Migration to Jupyter Architecture
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: DevEx Team
+
+**Description**: Ensure clean migration from custom LRP/LDP protocols to Jupyter protocol with complete removal of old code.
+
+**🧹 CLEANUP CHECKLIST (Do after 9.8.9 discovery):**
+```bash
+# INSTRUCTION FOR IMPLEMENTER: Complete this cleanup checklist!
+
+# 1. Protocol-related files to remove:
+rm -f llmspell-repl/src/protocol.rs  # Old LRP/LDP definitions
+rm -rf llmspell-engine/src/protocol/  # All custom protocol code
+rm -f llmspell-engine/src/transport.rs
+rm -f llmspell-engine/src/client.rs
+rm -f llmspell-engine/src/server.rs
+
+# 2. Phase 9.5 abstractions to remove:
+rm -f llmspell-engine/src/adapters.rs  # Protocol adapters
+rm -f llmspell-engine/src/channels.rs  # Channel views
+rm -rf llmspell-engine/src/sidecar/    # Service mesh pattern
+rm -f llmspell-engine/src/engine.rs    # UnifiedProtocolEngine
+
+# 3. Update imports in remaining files:
+# Search and replace patterns:
+# "use llmspell_engine::protocol::" → Remove or replace with Jupyter
+# "use llmspell_engine::ProtocolEngine" → Remove
+# "use llmspell_engine::MessageProcessor" → Move trait to llmspell-core first
+# "LRPRequest::" → "ExecuteRequest::" (Jupyter equivalent)
+# "LDPRequest::" → "DebugRequest::" (Jupyter equivalent)
+```
+
+**Migration Implementation:**
+1. **Create Jupyter client wrapper**:
+   ```rust
+   // In llmspell-kernel/src/client.rs
+   pub struct JupyterClient {
+       zmq_context: zmq::Context,
+       shell_socket: zmq::Socket,
+       iopub_socket: zmq::Socket,
+       // ... other sockets
+   }
+   
+   impl JupyterClient {
+       pub async fn connect(connection_file: &Path) -> Result<Self> {
+           // Read Jupyter connection file
+           // Connect to ZeroMQ sockets
+       }
+       
+       pub async fn execute(&mut self, code: &str) -> Result<ExecuteReply> {
+           // Send ExecuteRequest via shell socket
+           // Receive ExecuteReply
+       }
+   }
+   ```
+
+2. **Update all examples**:
+   ```lua
+   -- Old: examples using custom protocol
+   -- New: examples using Jupyter kernel
+   
+   -- Start kernel first:
+   -- $ llmspell-kernel
+   
+   -- Then run scripts:
+   -- $ llmspell run example.lua
+   ```
+
+3. **Migration guide content**:
+   ```markdown
+   # Migration from LRP/LDP to Jupyter Protocol
+   
+   ## Breaking Changes
+   - Custom LRP/LDP protocols removed entirely
+   - llmspell-engine crate removed
+   - New llmspell-kernel binary replaces old kernel
+   
+   ## For Script Users
+   - No changes needed - scripts work the same
+   - Kernel starts automatically when needed
+   
+   ## For Library Users
+   - Replace `llmspell_engine::ProtocolClient` with `llmspell_kernel::JupyterClient`
+   - Update protocol message types to Jupyter equivalents
+   
+   ## New Benefits
+   - Connect with Jupyter notebooks: `jupyter console --existing`
+   - Use VS Code Jupyter extension
+   - Compatible with JupyterLab
+   ```
+
+4. **Add helpful migration errors**:
+   ```rust
+   // In places where old code was used:
+   #[deprecated = "LRP protocol removed. Use JupyterClient instead. See migration guide."]
+   
+   // Or compile-time error:
+   compile_error!("llmspell_engine removed. Migrate to llmspell_kernel. See docs/MIGRATION.md");
+   ```
+
+5. **Verify no old code remains**:
+   ```bash
+   # Final verification script:
+   #!/bin/bash
+   echo "Checking for old protocol remnants..."
+   
+   # Should all return empty:
+   grep -r "LRPRequest\|LDPRequest" --include="*.rs" .
+   grep -r "ProtocolEngine\|UnifiedProtocolEngine" --include="*.rs" .
+   grep -r "MessageRouter\|ProtocolAdapter" --include="*.rs" .
+   grep -r "llmspell_engine" --include="*.rs" .
+   
+   echo "Building without llmspell-engine..."
+   cargo build --workspace
+   
+   echo "Running tests..."
+   cargo test --workspace
+   ```
+
+**Acceptance Criteria:**
+- [ ] Migration guide complete with code examples
+- [ ] All old protocol code completely removed
+- [ ] No references to LRP/LDP remain
+- [ ] All examples updated to use Jupyter
+- [ ] Helpful error messages for migration
+- [ ] Performance comparison documented
+- [ ] Clean build without llmspell-engine
+- [ ] All tests pass with new architecture
+
+#### Task 9.8.11: Integration Testing and Validation
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
@@ -8101,10 +8768,10 @@ LuaDebugHookAdapter::on_line()
 4. Performance regression tests
 5. Debug mode consistency
 6. Session persistence across restarts
-7. **Breakpoint pause verification** (from Task 9.8.1)
-8. **Step debugging functionality** (from Task 9.8.1)
-9. **Variable inspection while paused** (from Task 9.8.1)
-10. **Debug chain verification**: `coordinate_breakpoint_pause()` → `suspend_for_debugging()` → `wait_for_resume()` works (from Task 9.8.1)
+7. **Jupyter protocol compatibility**: Real Jupyter clients can connect
+8. **DAP tunneling**: Debug messages work through Jupyter protocol
+9. **ZeroMQ stability**: No connection drops or framing issues
+10. **Migration completeness**: All LRP/LDP functionality ported
 
 **Acceptance Criteria:**
 - [ ] All test scenarios pass
@@ -8113,9 +8780,36 @@ LuaDebugHookAdapter::on_line()
 - [ ] Multi-client scenarios work
 - [ ] Crash recovery functional
 - [ ] Zero data loss on session persistence
-- [ ] **Breakpoints actually pause script execution** (from Task 9.8.1)
-- [ ] **Step commands work correctly**
-- [ ] **Debug execution chain completes properly** (from Task 9.8.1)
+- [ ] **Jupyter notebook can connect to our kernel**
+- [ ] **VS Code Jupyter extension works**
+- [ ] **No custom protocol code remains**
+
+### Phase 9.8 Summary:
+
+**Tasks Completed (Checkpoints):**
+- ✅ 9.8.1: Refactor CLI to Always Use Kernel Connection
+- ✅ 9.8.2: Kernel Auto-Start and Discovery Enhancement
+
+**New Option A Tasks (Clean Start with llmspell-kernel):**
+- 9.8.3: Create New llmspell-kernel Crate (fresh Jupyter-first design)
+- 9.8.4: Move Kernel Code to llmspell-kernel (from llmspell-repl)
+- 9.8.5: Implement Jupyter Protocol in llmspell-kernel (with ZeroMQ)
+- 9.8.6: Update CLI to Use llmspell-kernel (migration path)
+- 9.8.7: Session Persistence with Jupyter Protocol (unchanged)
+- 9.8.8: Debug Functionality Completion (unchanged)
+- 9.8.9: Deprecate llmspell-engine (gradual removal)
+- 9.8.10: Migration and Compatibility (updated for new architecture)
+- 9.8.11: Integration Testing and Validation
+
+**Key Architectural Changes (Option A - Clean Start):**
+1. Create new llmspell-kernel crate (Jupyter-first design)
+2. Keep llmspell-engine temporarily (gradual deprecation)
+3. Replace custom LRP/LDP with Jupyter Messaging Protocol
+4. Use ZeroMQ instead of TCP (solves framing issues)
+5. DAP tunneled through Jupyter (Phase 11 ready)
+6. Kernel moves from llmspell-repl to llmspell-kernel
+7. Phase 9.5 abstractions (UnifiedProtocolEngine, adapters) become technical debt
+8. Immediate ecosystem compatibility (notebooks, VS Code)
 
 ---
 

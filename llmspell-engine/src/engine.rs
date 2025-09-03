@@ -417,7 +417,7 @@ impl UnifiedProtocolEngine {
     pub async fn serve(&mut self, config: crate::ServerConfig) -> Result<(), crate::ServerError> {
         use tokio::net::TcpListener;
         use tokio::sync::broadcast;
-        use tracing::info;
+        use tracing::{info, error};
 
         info!(
             "Starting unified protocol engine on {}:{}",
@@ -448,8 +448,10 @@ impl UnifiedProtocolEngine {
                 }
                 result = shell_listener.accept() => {
                     if let Ok((stream, addr)) = result {
-                        info!("New shell connection from {}", addr);
+                        info!("[9.8.2] serve - New shell connection from {}", addr);
                         self.handle_connection(stream, addr, ChannelType::Shell);
+                    } else if let Err(e) = result {
+                        error!("[9.8.2] serve - Error accepting shell connection: {}", e);
                     }
                 }
                 result = iopub_listener.accept() => {
@@ -482,28 +484,32 @@ impl UnifiedProtocolEngine {
         let _adapters = self.adapters.clone();
 
         tokio::spawn(async move {
-            debug!("Handling {} connection from {}", channel, addr);
+            debug!("[9.8.2] handle_connection - Handling {} connection from {}", channel, addr);
 
             // Message processing loop
             loop {
                 // 1. Read message from transport
+                debug!("[9.8.2] handle_connection - waiting to recv from transport");
                 let request = match transport.recv().await {
-                    Ok(msg) => msg,
+                    Ok(msg) => {
+                        debug!("[9.8.2] handle_connection - received message successfully");
+                        msg
+                    }
                     Err(crate::TransportError::ConnectionClosed) => {
-                        debug!("Connection closed from {}", addr);
+                        debug!("[9.8.2] handle_connection - Connection closed from {}", addr);
                         break;
                     }
                     Err(e) => {
-                        error!("Error receiving from {}: {}", addr, e);
+                        error!("[9.8.2] handle_connection - Error receiving from {}: {}", addr, e);
                         break;
                     }
                 };
 
                 debug!(
-                    "Received request from {}: msg_id={}, msg_type={:?}, channel={}",
+                    "[9.8.2] handle_connection - Received request from {}: msg_id={}, msg_type={:?}, channel={}",
                     addr, request.msg_id, request.msg_type, request.channel
                 );
-                debug!("Request content: {:?}", request.content);
+                debug!("[9.8.2] handle_connection - Request content: {:?}", request.content);
 
                 // 2. Process the message and get response
                 let response = if let Some(proc) = &processor {
@@ -548,11 +554,12 @@ impl UnifiedProtocolEngine {
                 };
 
                 // 3. Send response back
-                debug!("Sending response: msg_id={}", response.msg_id);
+                debug!("[9.8.2] handle_connection - Sending response: msg_id={}", response.msg_id);
                 if let Err(e) = transport.send(response).await {
-                    error!("Error sending response to {}: {}", addr, e);
+                    error!("[9.8.2] handle_connection - Error sending response to {}: {}", addr, e);
                     break;
                 }
+                debug!("[9.8.2] handle_connection - Response sent successfully");
             }
 
             debug!("Connection handler for {} terminated", addr);

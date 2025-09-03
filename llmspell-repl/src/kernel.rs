@@ -261,7 +261,7 @@ impl LLMSpellKernel {
     /// Returns an error if the event loop fails
     #[allow(clippy::cognitive_complexity)]
     pub async fn run(mut self) -> Result<()> {
-        tracing::info!("Kernel {} entering main event loop", self.kernel_id);
+        tracing::info!("[9.8.2] Kernel {} entering main event loop", self.kernel_id);
 
         // Start channel listeners
         // Channels are now handled by UnifiedProtocolEngine
@@ -597,7 +597,7 @@ impl llmspell_engine::MessageProcessor for LLMSpellKernel {
     ) -> Result<llmspell_engine::LRPResponse, llmspell_engine::ProcessorError> {
         use llmspell_engine::{LRPRequest, LRPResponse, ProcessorError};
 
-        tracing::info!("process_lrp called with request: {:?}", request);
+        tracing::info!("[9.8.2] process_lrp called with request: {:?}", request);
         let response = match request {
             LRPRequest::KernelInfoRequest => self.get_kernel_info(),
 

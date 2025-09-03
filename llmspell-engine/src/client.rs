@@ -58,23 +58,35 @@ impl ProtocolClient {
         let pending = Arc::new(RwLock::new(HashMap::new()));
         let (shutdown_tx, mut shutdown_rx) = mpsc::channel(1);
 
-        // Spawn receiver task
+        // Spawn receiver task with a small delay to allow initial handshake
         let transport_clone = transport.clone();
         let pending_clone = pending.clone();
         let receiver_handle = tokio::spawn(async move {
-            debug!("Protocol client receiver task starting");
+            // CRITICAL: Wait a moment before starting to recv to avoid protocol deadlock
+            // The server expects the client to send first (e.g., ConnectRequest)
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            
+            debug!("[9.8.2] Protocol client receiver task starting");
             loop {
                 tokio::select! {
                     _ = shutdown_rx.recv() => {
-                        debug!("Protocol client receiver shutting down");
+                        debug!("[9.8.2] Protocol client receiver shutting down");
                         break;
                     }
                     result = Self::receive_message(transport_clone.clone(), pending_clone.clone()) => {
                         if let Err(e) = result {
                             error!("Error receiving message: {}", e);
-                            break;
+                            // Don't break on first error - connection might be establishing
+                            // Only break on connection closed
+                            if matches!(e, ClientError::Transport(crate::TransportError::ConnectionClosed)) {
+                                error!("Connection closed, exiting receiver loop");
+                                break;
+                            }
+                            // For other errors, continue trying
+                            debug!("Non-fatal error, continuing receiver loop");
+                        } else {
+                            debug!("Received and processed a message successfully");
                         }
-                        debug!("Received and processed a message successfully");
                     }
                 }
             }
@@ -98,7 +110,9 @@ impl ProtocolClient {
     pub async fn connect(addr: &str) -> Result<Self, ClientError> {
         use crate::transport::tcp::TcpTransport;
 
+        debug!("ProtocolClient::connect - connecting to {}", addr);
         let transport = TcpTransport::connect(addr).await?;
+        debug!("ProtocolClient::connect - transport created, creating client");
         Ok(Self::new(Box::new(transport)))
     }
 
@@ -111,10 +125,12 @@ impl ProtocolClient {
     /// Returns `ClientError::Transport` if sending fails
     pub async fn send_lrp_request(&self, request: LRPRequest) -> Result<LRPResponse, ClientError> {
         let msg_id = self.next_msg_id.fetch_add(1, Ordering::SeqCst).to_string();
-        debug!("Sending LRP request with msg_id={}: {:?}", msg_id, request);
+        debug!("[9.8.2] send_lrp_request - msg_id={}, request={:?}", msg_id, request);
         let msg = ProtocolMessage::request(&msg_id, request);
 
+        debug!("[9.8.2] send_lrp_request - calling send_and_wait");
         let response = self.send_and_wait(msg).await?;
+        debug!("[9.8.2] send_lrp_request - got response from send_and_wait");
 
         response
             .as_lrp_response()
@@ -206,17 +222,20 @@ impl ProtocolClient {
     async fn send_and_wait(&self, msg: ProtocolMessage) -> Result<ProtocolMessage, ClientError> {
         let msg_id = msg.msg_id.clone();
         debug!(
-            "send_and_wait: msg_id={}, msg_type={:?}",
+            "[9.8.2] send_and_wait - msg_id={}, msg_type={:?}",
             msg_id, msg.msg_type
         );
 
         // Register pending request
+        debug!("[9.8.2] send_and_wait - registering pending request");
         let rx = self.register_pending(&msg_id).await;
 
         // Send request
+        debug!("[9.8.2] send_and_wait - sending message");
         self.send_message(msg).await?;
 
         // Wait for response
+        debug!("[9.8.2] send_and_wait - waiting for response");
         self.wait_for_response(msg_id, rx).await
     }
 

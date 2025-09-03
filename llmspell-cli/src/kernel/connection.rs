@@ -154,17 +154,25 @@ impl KernelConnection {
     /// Start a new kernel process and connect to it
     async fn start_new_kernel(&mut self) -> Result<()> {
         let kernel_id = uuid::Uuid::new_v4().to_string();
+        tracing::debug!("[9.8.2] start_new_kernel - kernel_id: {}", kernel_id);
         let port = 9555; // TODO: Find available port
         let info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
 
         // Write connection file first
+        tracing::debug!("[9.8.2] start_new_kernel - writing connection file");
         info.write_connection_file().await?;
 
         // Spawn kernel process
+        tracing::debug!("[9.8.2] start_new_kernel - spawning kernel process on port {}", port);
         let mut kernel_process = Self::spawn_kernel(port).await?;
 
+        // Give kernel time to fully start up
+        tracing::debug!("[9.8.2] start_new_kernel - waiting 500ms for kernel to start");
+        sleep(Duration::from_millis(500)).await;
+        
         // Wait for kernel to be ready and connect
         let addr = format!("{}:{}", info.ip, info.shell_port);
+        tracing::debug!("[9.8.2] start_new_kernel - waiting for kernel at {}", addr);
 
         match Self::wait_for_kernel_ready(&addr, 50).await {
             Ok(protocol_client) => {
@@ -240,6 +248,7 @@ impl KernelConnection {
     async fn spawn_kernel(port: u16) -> Result<tokio::process::Child> {
         let kernel_path = Self::find_kernel_binary()?;
 
+        tracing::debug!("[9.8.2] spawn_kernel - kernel binary path: {}", kernel_path.display());
         tracing::info!("Starting kernel from: {}", kernel_path.display());
 
         let child = Command::new(&kernel_path)
@@ -299,13 +308,16 @@ impl KernelConnection {
 #[async_trait]
 impl KernelConnectionTrait for KernelConnection {
     async fn connect_or_start(&mut self) -> Result<()> {
+        tracing::debug!("[9.8.2] connect_or_start - starting");
         // Try to discover existing kernel
         if let Some(kernel) = self.discovery.discover_first().await? {
+            tracing::debug!("[9.8.2] connect_or_start - found existing kernel: {}", kernel.kernel_id);
             // Try to connect to existing kernel
             let addr = format!("{}:{}", kernel.ip, kernel.shell_port);
 
             match ProtocolClient::connect(&addr).await {
                 Ok(protocol_client) => {
+                    tracing::debug!("[9.8.2] connect_or_start - successfully connected to existing kernel");
                     // Successfully connected to existing kernel
                     self.connection_info = Some(kernel);
                     self.client = Some(ConnectedClient::new("cli-user".to_string()));
@@ -325,6 +337,7 @@ impl KernelConnectionTrait for KernelConnection {
                 }
             }
         } else {
+            tracing::debug!("[9.8.2] connect_or_start - no existing kernel found, starting new one");
             // No existing kernel found, start new one
             self.start_new_kernel().await?;
         }
@@ -341,6 +354,7 @@ impl KernelConnectionTrait for KernelConnection {
     }
 
     async fn execute(&mut self, code: &str) -> Result<Value> {
+        tracing::debug!("[9.8.2] execute - starting with code: {}", code);
         if !self.connected {
             anyhow::bail!("Not connected to kernel");
         }
@@ -350,6 +364,7 @@ impl KernelConnectionTrait for KernelConnection {
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("Protocol client not initialized"))?;
 
+        tracing::debug!("[9.8.2] execute - sending execute request via TCP");
         // Send execute request via TCP
         let request = LRPRequest::ExecuteRequest {
             code: code.to_string(),
@@ -360,10 +375,15 @@ impl KernelConnectionTrait for KernelConnection {
             stop_on_error: true,
         };
 
+        tracing::debug!("[9.8.2] execute - about to send_lrp_request");
         let response = protocol_client
             .send_lrp_request(request)
             .await
-            .map_err(|e| anyhow::anyhow!("Failed to execute code: {}", e))?;
+            .map_err(|e| {
+                tracing::error!("[9.8.2] execute - send_lrp_request failed: {}", e);
+                anyhow::anyhow!("Failed to execute code: {}", e)
+            })?;
+        tracing::debug!("[9.8.2] execute - received response from kernel");
 
         match response {
             LRPResponse::ExecuteReply {

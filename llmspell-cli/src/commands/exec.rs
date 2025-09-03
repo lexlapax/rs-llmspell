@@ -16,6 +16,8 @@ pub async fn execute_inline_script(
     debug_mode: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
+    tracing::debug!("[9.8.2] execute_inline_script - starting with code: {}", code);
+    
     // Unified execution path - kernel handles debug vs non-debug internally
     let mut runtime_config = runtime_config;
     if debug_mode {
@@ -23,11 +25,14 @@ pub async fn execute_inline_script(
         runtime_config.debug.mode = "interactive".to_string();
     }
 
+    tracing::debug!("[9.8.2] execute_inline_script - creating kernel connection");
     // Create kernel connection instead of direct runtime
     let mut kernel = super::create_kernel_connection(runtime_config).await?;
 
+    tracing::debug!("[9.8.2] execute_inline_script - executing code via kernel");
     // Execute code via kernel
     let result = kernel.execute(&code).await?;
+    tracing::debug!("[9.8.2] execute_inline_script - received result: {:?}", result);
 
     // Create ScriptOutput from kernel result
     let script_output = ScriptOutput {
