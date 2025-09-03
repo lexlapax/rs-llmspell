@@ -65,7 +65,7 @@ impl ProtocolClient {
             // CRITICAL: Wait a moment before starting to recv to avoid protocol deadlock
             // The server expects the client to send first (e.g., ConnectRequest)
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            
+
             debug!("[9.8.2] Protocol client receiver task starting");
             loop {
                 tokio::select! {
@@ -125,7 +125,10 @@ impl ProtocolClient {
     /// Returns `ClientError::Transport` if sending fails
     pub async fn send_lrp_request(&self, request: LRPRequest) -> Result<LRPResponse, ClientError> {
         let msg_id = self.next_msg_id.fetch_add(1, Ordering::SeqCst).to_string();
-        debug!("[9.8.2] send_lrp_request - msg_id={}, request={:?}", msg_id, request);
+        debug!(
+            "[9.8.2] send_lrp_request - msg_id={}, request={:?}",
+            msg_id, request
+        );
         let msg = ProtocolMessage::request(&msg_id, request);
 
         debug!("[9.8.2] send_lrp_request - calling send_and_wait");

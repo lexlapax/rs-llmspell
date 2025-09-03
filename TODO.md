@@ -8164,12 +8164,12 @@ Fastpath and Debug/Trace should both follow the same path. the Debug/Trace may g
    ```
 
 **Acceptance Criteria:**
-- [ ] New llmspell-kernel crate created with proper structure
-- [ ] Added to workspace members in root Cargo.toml
-- [ ] Initial Cargo.toml with minimal dependencies
-- [ ] Directory structure prepared for Jupyter implementation
-- [ ] Builds successfully (even if mostly empty stubs)
-- [ ] No dependency on llmspell-engine (clean start)
+- [x] New llmspell-kernel crate created with proper structure
+- [x] Added to workspace members in root Cargo.toml
+- [x] Initial Cargo.toml with minimal dependencies
+- [x] Directory structure prepared for Jupyter implementation
+- [x] Builds successfully (even if mostly empty stubs)
+- [x] No dependency on llmspell-engine (clean start)
 
 #### Task 9.8.4: Move Kernel Code to llmspell-kernel Crate
 **Priority**: CRITICAL  

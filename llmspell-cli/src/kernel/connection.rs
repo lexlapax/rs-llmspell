@@ -163,13 +163,16 @@ impl KernelConnection {
         info.write_connection_file().await?;
 
         // Spawn kernel process
-        tracing::debug!("[9.8.2] start_new_kernel - spawning kernel process on port {}", port);
+        tracing::debug!(
+            "[9.8.2] start_new_kernel - spawning kernel process on port {}",
+            port
+        );
         let mut kernel_process = Self::spawn_kernel(port).await?;
 
         // Give kernel time to fully start up
         tracing::debug!("[9.8.2] start_new_kernel - waiting 500ms for kernel to start");
         sleep(Duration::from_millis(500)).await;
-        
+
         // Wait for kernel to be ready and connect
         let addr = format!("{}:{}", info.ip, info.shell_port);
         tracing::debug!("[9.8.2] start_new_kernel - waiting for kernel at {}", addr);
@@ -248,14 +251,17 @@ impl KernelConnection {
     async fn spawn_kernel(port: u16) -> Result<tokio::process::Child> {
         let kernel_path = Self::find_kernel_binary()?;
 
-        tracing::debug!("[9.8.2] spawn_kernel - kernel binary path: {}", kernel_path.display());
+        tracing::debug!(
+            "[9.8.2] spawn_kernel - kernel binary path: {}",
+            kernel_path.display()
+        );
         tracing::info!("Starting kernel from: {}", kernel_path.display());
 
         let child = Command::new(&kernel_path)
             .arg("--port")
             .arg(port.to_string())
             .arg("--engine")
-            .arg("lua")  // Default to Lua engine
+            .arg("lua") // Default to Lua engine
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::null())
@@ -311,13 +317,18 @@ impl KernelConnectionTrait for KernelConnection {
         tracing::debug!("[9.8.2] connect_or_start - starting");
         // Try to discover existing kernel
         if let Some(kernel) = self.discovery.discover_first().await? {
-            tracing::debug!("[9.8.2] connect_or_start - found existing kernel: {}", kernel.kernel_id);
+            tracing::debug!(
+                "[9.8.2] connect_or_start - found existing kernel: {}",
+                kernel.kernel_id
+            );
             // Try to connect to existing kernel
             let addr = format!("{}:{}", kernel.ip, kernel.shell_port);
 
             match ProtocolClient::connect(&addr).await {
                 Ok(protocol_client) => {
-                    tracing::debug!("[9.8.2] connect_or_start - successfully connected to existing kernel");
+                    tracing::debug!(
+                        "[9.8.2] connect_or_start - successfully connected to existing kernel"
+                    );
                     // Successfully connected to existing kernel
                     self.connection_info = Some(kernel);
                     self.client = Some(ConnectedClient::new("cli-user".to_string()));
@@ -337,7 +348,9 @@ impl KernelConnectionTrait for KernelConnection {
                 }
             }
         } else {
-            tracing::debug!("[9.8.2] connect_or_start - no existing kernel found, starting new one");
+            tracing::debug!(
+                "[9.8.2] connect_or_start - no existing kernel found, starting new one"
+            );
             // No existing kernel found, start new one
             self.start_new_kernel().await?;
         }

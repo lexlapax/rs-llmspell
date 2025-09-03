@@ -1,14 +1,27 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+//! llmspell-kernel: Jupyter-compatible execution kernel for LLMSpell
+//!
+//! This crate provides the core execution engine that:
+//! - Implements Jupyter Messaging Protocol (Task 9.8.5)
+//! - Manages ScriptRuntime instances from llmspell-bridge
+//! - Handles debug/DAP integration
+//! - Supports multiple client connections via ZeroMQ
+//!
+//! ## Architecture
+//!
+//! This is a clean-start crate created in Task 9.8.3 to avoid Phase 9.5's
+//! multi-protocol abstractions (UnifiedProtocolEngine, adapters, sidecars)
+//! that are incompatible with Jupyter's single-protocol model.
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub mod kernel;
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
-}
+// These modules will be populated in Task 9.8.5
+// pub mod jupyter;
+// pub mod transport;
+// pub mod execution;
+// pub mod debug;
+
+pub use kernel::JupyterKernel;
+
+// Re-export key types that will be added later
+// pub use jupyter::ConnectionInfo;
+// pub use transport::ZmqTransport;
