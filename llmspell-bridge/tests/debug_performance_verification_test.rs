@@ -58,10 +58,20 @@ async fn test_fast_path_overhead_under_1_percent() {
     }
     let with_bp_time = with_bp_start.elapsed();
 
-    // Calculate overhead
-    let overhead_percent = ((with_bp_time.as_nanos() as f64 - baseline_time.as_nanos() as f64)
-        / baseline_time.as_nanos() as f64)
-        * 100.0;
+    // Calculate overhead using integer arithmetic to avoid precision loss warnings
+    // We only need 2 decimal places of precision for percentage
+    let with_bp_nanos = with_bp_time.as_nanos();
+    let baseline_nanos = baseline_time.as_nanos();
+    let overhead_percent = if baseline_nanos == 0 {
+        0.0
+    } else {
+        // Calculate percentage with 2 decimal places using integer arithmetic
+        // (difference * 10000 / baseline) gives us percentage * 100
+        let diff = with_bp_nanos.saturating_sub(baseline_nanos);
+        let percent_x100 = (diff * 10000) / baseline_nanos;
+        // Convert to f64 only at the end for display
+        f64::from(u32::try_from(percent_x100).unwrap_or(u32::MAX)) / 100.0
+    };
 
     println!("Baseline time: {baseline_time:?}");
     println!("With breakpoints time: {with_bp_time:?}");
@@ -132,32 +142,30 @@ fn test_memory_usage_no_regression() {
     let bridge_size = size_of::<LuaDebugBridge>();
 
     println!("Component sizes:");
-    println!("  DebugCoordinator: {} bytes", coordinator_size);
-    println!("  ExecutionManager: {} bytes", execution_manager_size);
-    println!("  LuaExecutionHook: {} bytes", lua_hook_size);
-    println!("  LuaDebugBridge: {} bytes", bridge_size);
+    println!("  DebugCoordinator: {coordinator_size} bytes");
+    println!("  ExecutionManager: {execution_manager_size} bytes");
+    println!("  LuaExecutionHook: {lua_hook_size} bytes");
+    println!("  LuaDebugBridge: {bridge_size} bytes");
 
     // Total architecture overhead should be minimal
     let total_overhead = coordinator_size + bridge_size;
-    println!("Total architecture overhead: {} bytes", total_overhead);
+    println!("Total architecture overhead: {total_overhead} bytes");
 
     // The bridge should be just Arc references (small)
     assert!(
         bridge_size < 100,
-        "LuaDebugBridge size was {} bytes, expected < 100",
-        bridge_size
+        "LuaDebugBridge size was {bridge_size} bytes, expected < 100"
     );
 
     // Total overhead should be reasonable
     assert!(
         total_overhead < 500,
-        "Total overhead was {} bytes, expected < 500",
-        total_overhead
+        "Total overhead was {total_overhead} bytes, expected < 500"
     );
 }
 
-/// Test 4: Block_on_async Only in Slow Path
-/// Verifies that block_on_async is only used when actually pausing
+/// Test 4: `block_on_async` Only in Slow Path
+/// Verifies that `block_on_async` is only used when actually pausing
 #[tokio::test]
 async fn test_block_on_async_only_in_slow_path() {
     // This test verifies the architecture design rather than measuring performance
@@ -167,7 +175,7 @@ async fn test_block_on_async_only_in_slow_path() {
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let capabilities = Arc::new(RwLock::new(HashMap::new()));
     let debug_cache = Arc::new(SharedDebugStateCache::new());
-    let execution_manager = Arc::new(ExecutionManager::new(debug_cache.clone()));
+    let execution_manager = Arc::new(ExecutionManager::new(debug_cache));
 
     let coordinator = Arc::new(DebugCoordinator::new(
         shared_context.clone(),
@@ -190,10 +198,10 @@ async fn test_block_on_async_only_in_slow_path() {
 
     // Verify block_on_async usage in LuaDebugBridge (slow path only)
     let lua_hook = Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new(
-        execution_manager.clone(),
-        shared_context.clone(),
+        execution_manager,
+        shared_context,
     )));
-    let _bridge = LuaDebugBridge::new(coordinator.clone(), lua_hook);
+    let _bridge = LuaDebugBridge::new(coordinator, lua_hook);
 
     // The bridge uses block_on_async only in handle_event when actually pausing
     // This is verified by code inspection and the architecture design

@@ -3295,6 +3295,434 @@ impl DebugCoordinator {
 - Integration tests verify architecture works correctly
 - No regressions detected
 
+
+### Task 9.7.8: Fix Critical Wiring Gap - Connect LuaDebugBridge to Runtime
+**Priority**: CRITICAL (BLOCKING)
+**Estimated Time**: 3 hours
+**Assignee**: Debug Team
+**Status**: PENDING
+
+**Description**: Complete the missing 15% of debug functionality by properly wiring LuaDebugBridge in runtime.rs, replacing the incomplete ExecutionManagerHook that doesn't check breakpoints.
+
+**🔴 CRITICAL ISSUE DISCOVERED**: 
+After thorough analysis, we found that LuaDebugBridge was created but NEVER wired into runtime.rs. Instead, ExecutionManagerHook is used which:
+- Has TODO comments saying it doesn't check breakpoints (line 295)
+- Only handles stepping (incompletely)
+- Has no connection to LuaExecutionHook which has all the breakpoint logic
+- Is a dead-end placeholder that was never meant to be the final solution
+
+**Root Cause Analysis**:
+1. Task 9.7.1 specified to wire LuaDebugBridge in runtime.rs (lines 2724-2737 of TODO.md)
+2. We created the files but marked task complete without actually wiring them
+3. ExecutionManagerHook was left as placeholder, breaking the architecture
+
+**Architectural Mismatch to Resolve**:
+- `DebugHook` trait: Used by `install_debug_hooks()` in engine.rs (engine-level hooks)
+- `HookHandler` trait: Used by `HookMultiplexer` for Lua-specific hooks
+- `LuaDebugBridge` implements `HookHandler` but runtime expects `DebugHook`
+- Need adapter pattern to bridge these two systems
+
+**🏗️ THREE-LAYER BRIDGE ARCHITECTURE ADHERENCE**:
+Per the established pattern (Bridge → Shared → Script layers), our debug architecture MUST follow:
+
+**Layer 1 - Bridge (Native Rust/Language-Agnostic)**:
+- **Traits**: `DebugHook`, `DebugCapability` - pure abstractions
+- **Components**: `DebugCoordinator`, `ExecutionManager`, `DebugRuntime`
+- **Purpose**: Language-agnostic debug logic, no Lua dependencies
+- **Location**: `llmspell-bridge/src/` root level files
+
+**Layer 2 - Shared (Adaptation/Integration)**:
+- **Components**: `LuaDebugHookAdapter` (NEW - missing piece!)
+- **Purpose**: Bridges between Layer 1 traits and Layer 3 implementations
+- **Responsibilities**:
+  - Implements `DebugHook` trait (for Layer 1 integration)
+  - Contains `HookMultiplexer` (for Layer 3 management)
+  - Coordinates between language-agnostic and language-specific
+- **Location**: `llmspell-bridge/src/lua/` bridge files
+
+**Layer 3 - Script (Lua-Specific)**:
+- **Traits**: `HookHandler` - Lua-specific abstraction
+- **Components**: `LuaExecutionHook`, `LuaDebugBridge`, Lua globals
+- **Purpose**: Lua-specific implementation with mlua dependencies
+- **Location**: `llmspell-bridge/src/lua/globals/`, deep Lua-specific files
+
+**WHY THIS ARCHITECTURE MATTERS**:
+1. **Scalability**: Adding JavaScript/Python only requires new Layer 2 adapter + Layer 3 implementation
+2. **Separation**: Lua code never leaks into Layer 1, keeping it language-agnostic
+3. **Testability**: Each layer can be tested independently
+4. **Consistency**: Follows the same pattern as CLI → KernelConnection → Script Runtime
+
+**Implementation Steps**:
+
+**Step 1: Create Layer 2 Adapter (Shared Layer)**
+```rust
+// New: llmspell-bridge/src/lua/debug_hook_adapter.rs
+// LAYER 2: Shared/Adaptation layer - bridges Layer 1 and Layer 3
+pub struct LuaDebugHookAdapter {
+    multiplexer: Arc<HookMultiplexer>,  // Manages Layer 3 handlers
+    lua_execution_hook: Arc<parking_lot::Mutex<LuaExecutionHook>>,  // Layer 3 component
+    lua_debug_bridge: Arc<parking_lot::Mutex<LuaDebugBridge>>,  // Layer 3 component
+}
+
+impl LuaDebugHookAdapter {
+    pub fn new(
+        execution_manager: Arc<ExecutionManager>,  // Layer 1 component
+        coordinator: Arc<DebugCoordinator>,       // Layer 1 component  
+        shared_context: Arc<RwLock<SharedExecutionContext>>,  // Layer 1 shared state
+    ) -> Self {
+        let multiplexer = Arc::new(HookMultiplexer::new());
+        
+        // Create Layer 3 component: LuaExecutionHook (has Lua-specific breakpoint logic)
+        let lua_execution_hook = Arc::new(parking_lot::Mutex::new(
+            LuaExecutionHook::new(execution_manager, shared_context)
+        ));
+        
+        // Create Layer 3 component: LuaDebugBridge (Lua-specific coordination)
+        let lua_debug_bridge = Arc::new(parking_lot::Mutex::new(
+            LuaDebugBridge::new(coordinator, lua_execution_hook.clone())
+        ));
+        
+        // Register Layer 3 handlers with multiplexer
+        multiplexer.register_handler(
+            "execution".to_string(),
+            HookPriority::DEBUG,
+            Box::new(lua_execution_hook.clone())  // Layer 3: HookHandler impl
+        ).unwrap();
+        
+        multiplexer.register_handler(
+            "bridge".to_string(),
+            HookPriority(1), // Higher priority than execution
+            Box::new(lua_debug_bridge.clone())  // Layer 3: HookHandler impl
+        ).unwrap();
+        
+        Self { multiplexer, lua_execution_hook, lua_debug_bridge }
+    }
+}
+
+// LAYER 2 RESPONSIBILITY: Implement Layer 1 trait (DebugHook) 
+// to bridge to Layer 3 traits (HookHandler)
+#[async_trait]
+impl DebugHook for LuaDebugHookAdapter {
+    async fn on_line(&self, line: u32, source: &str) -> DebugControl {
+        // Layer 2 doesn't directly handle - delegates to Layer 3 via install_on_lua()
+        // Actual Lua hooking happens through HookMultiplexer
+        DebugControl::Continue
+    }
+    
+    // ... other methods delegate similarly
+}
+
+impl LuaDebugHookAdapter {
+    /// Install the multiplexer on a Lua instance
+    pub fn install_on_lua(&self, lua: &Lua) -> LuaResult<()> {
+        self.multiplexer.install(lua)
+    }
+}
+```
+
+**Step 2: Fix Runtime Integration (Connect Layers)**
+```rust
+// Modify: llmspell-bridge/src/runtime.rs lines 232-252
+"interactive" => {
+    // Create Layer 2 adapter that bridges Layer 1 (DebugHook) to Layer 3 (HookHandler)
+    let adapter = Arc::new(LuaDebugHookAdapter::new(
+        exec_manager.clone(),     // Layer 1: ExecutionManager
+        coordinator.clone(),       // Layer 1: DebugCoordinator
+        shared_context.clone(),    // Layer 1: SharedExecutionContext
+    ));
+    
+    // Store adapter for later Lua installation (Layer 3 connection)
+    self.lua_debug_adapter = Some(adapter.clone());
+    
+    // Return as DebugHook for Layer 1 engine integration
+    adapter  // Implements DebugHook trait for engine.install_debug_hooks()
+}
+```
+
+**Step 3: Connect Layer 2 to Layer 3 (Lua Installation)**
+```rust
+// Modify: llmspell-bridge/src/lua/engine.rs in initialize or execute
+if let Some(adapter) = &self.lua_debug_adapter {
+    // This connects Layer 2 adapter to Layer 3 Lua runtime
+    // HookMultiplexer will install Layer 3 handlers (LuaExecutionHook, LuaDebugBridge)
+    adapter.install_on_lua(&lua)?;  // Bridges the gap!
+}
+```
+
+**Step 4: Remove Dead Code**
+- Delete `ExecutionManagerHook` (lines 266-374 in debug_runtime.rs)
+- Remove test code that references ExecutionManagerHook
+- Clean up any unused imports
+
+**Acceptance Criteria**:
+- [ ] LuaDebugHookAdapter created to bridge DebugHook and HookHandler traits
+- [ ] HookMultiplexer properly wires LuaExecutionHook and LuaDebugBridge
+- [ ] Runtime.rs uses the adapter instead of ExecutionManagerHook
+- [ ] Adapter installed on Lua instance during engine initialization
+- [ ] ExecutionManagerHook completely removed (dead code)
+- [ ] Breakpoints actually checked during execution (not TODO)
+- [ ] All existing tests still pass
+- [ ] New integration test confirms breakpoints pause execution
+
+**Critical Validation Points**:
+1. Verify `might_break_at_sync()` is actually called during execution
+2. Confirm `should_break_slow()` evaluates conditions when hit
+3. Ensure `coordinate_breakpoint_pause()` suspends execution
+4. Test that execution resumes after continue command
+5. Verify variables are captured at breakpoint
+
+**Architecture Validation**:
+The solution strictly adheres to the three-layer bridge architecture:
+- **Layer 1 (Bridge)**: DebugCoordinator, ExecutionManager remain language-agnostic
+- **Layer 2 (Shared)**: LuaDebugHookAdapter bridges between Layer 1 and Layer 3
+- **Layer 3 (Script)**: LuaExecutionHook, LuaDebugBridge remain Lua-specific
+- **No layer violations**: Lua code stays in Layer 3, abstractions in Layer 1
+- **Scalability proven**: JavaScript would add JSDebugHookAdapter (Layer 2) + JSExecutionHook (Layer 3)
+
+
+### Task 9.7.9: Comprehensive Debug Testing with Example Application
+**Priority**: HIGH
+**Estimated Time**: 2 hours  
+**Assignee**: QA Team
+**Status**: PENDING
+
+**Description**: Create and test a comprehensive debugging example that exercises ALL debug functionality to verify 100% completion and identify any remaining gaps.
+
+**Implementation Steps**:
+
+**Step 1: Create Debug Test Application**
+```lua
+-- examples/script-users/features/debug-showcase.lua
+-- Comprehensive debugging feature showcase
+
+-- Test 1: Basic breakpoints
+function calculate_fibonacci(n)
+    if n <= 1 then
+        return n  -- Breakpoint here (line 7)
+    end
+    local a, b = 0, 1
+    for i = 2, n do
+        local temp = a + b  -- Breakpoint here (line 11)
+        a = b
+        b = temp
+    end
+    return b
+end
+
+-- Test 2: Conditional breakpoints
+function process_items(items)
+    local total = 0
+    for i, item in ipairs(items) do
+        if item.value > 100 then  -- Conditional breakpoint: item.value > 100
+            total = total + item.value * 1.1
+        else
+            total = total + item.value
+        end
+    end
+    return total
+end
+
+-- Test 3: Hit count breakpoints
+function stress_test()
+    local counter = 0
+    for i = 1, 1000 do
+        counter = counter + 1  -- Hit count breakpoint: break on 500th hit
+        if counter % 100 == 0 then
+            print("Processed", counter)
+        end
+    end
+    return counter
+end
+
+-- Test 4: Step debugging
+function nested_calls()
+    local result = step_one()
+    return result
+end
+
+function step_one()
+    local value = 10
+    return step_two(value)  -- Step into this
+end
+
+function step_two(val)
+    local doubled = val * 2
+    return step_three(doubled)  -- Step over this
+end
+
+function step_three(val)
+    return val + 5  -- Step out from here
+end
+
+-- Test 5: Variable inspection
+function test_variables()
+    local simple = "hello"
+    local number = 42
+    local table_var = {
+        name = "test",
+        values = {1, 2, 3},
+        nested = {
+            deep = "value"
+        }
+    }
+    local function_var = calculate_fibonacci
+    
+    -- Breakpoint here to inspect all variable types
+    return { simple, number, table_var, function_var }
+end
+
+-- Test 6: Stack navigation
+function deep_recursion(n, accumulator)
+    if n <= 0 then
+        return accumulator  -- Breakpoint here to see full stack
+    end
+    return deep_recursion(n - 1, accumulator + n)
+end
+
+-- Test 7: Exception handling
+function test_error_handling()
+    local success, result = pcall(function()
+        error("Intentional error for debugging")  -- Should pause here
+    end)
+    return success, result
+end
+
+-- Main test runner
+function main()
+    print("=== Debug Showcase Starting ===")
+    
+    -- Run all tests
+    print("Fibonacci(10):", calculate_fibonacci(10))
+    
+    local items = {
+        {name = "A", value = 50},
+        {name = "B", value = 150},  -- Should trigger conditional breakpoint
+        {name = "C", value = 75},
+    }
+    print("Process items:", process_items(items))
+    
+    print("Stress test:", stress_test())
+    print("Nested calls:", nested_calls())
+    print("Variables:", test_variables())
+    print("Deep recursion:", deep_recursion(5, 0))
+    
+    local ok, err = test_error_handling()
+    print("Error test:", ok, err)
+    
+    print("=== Debug Showcase Complete ===")
+end
+
+-- Entry point
+main()
+```
+
+**Step 2: Create Debug Session Test Script**
+```bash
+#!/bin/bash
+# examples/script-users/features/test-debug.sh
+
+echo "=== Testing LLMSpell Debug Functionality ==="
+
+# Test 1: Run with tracing (should work already)
+echo "Test 1: Tracing mode"
+llmspell run --debug examples/script-users/features/debug-showcase.lua
+
+# Test 2: Interactive debug mode with breakpoints
+echo "Test 2: Interactive debugging"
+cat << 'EOF' | llmspell debug examples/script-users/features/debug-showcase.lua
+.break 7
+.break 11
+.break 34 counter == 500
+.continue
+.locals
+.stack
+.step
+.stepin
+.stepout
+.continue
+.quit
+EOF
+
+# Test 3: Verify all commands work
+echo "Test 3: Command verification"
+llmspell debug --help | grep -E "break|step|continue|locals|stack"
+```
+
+**Step 3: Create Integration Test**
+```rust
+// llmspell-bridge/tests/debug_integration_end_to_end_test.rs
+#[tokio::test]
+async fn test_complete_debug_functionality() {
+    // Setup
+    let config = create_debug_config();
+    let runtime = ScriptRuntime::new_with_config(config).await.unwrap();
+    
+    // Test 1: Verify breakpoint actually pauses
+    runtime.set_breakpoint("test.lua", 10).await;
+    let handle = runtime.execute_async(script);
+    
+    // Should pause at breakpoint
+    tokio::time::sleep(Duration::from_millis(100)).await;
+    assert!(runtime.is_paused().await);
+    
+    // Test 2: Variable inspection at breakpoint
+    let vars = runtime.get_variables().await;
+    assert!(vars.contains_key("local_var"));
+    
+    // Test 3: Step operations
+    runtime.step_over().await;
+    assert_eq!(runtime.get_current_line().await, 11);
+    
+    // Test 4: Continue execution
+    runtime.continue_execution().await;
+    let result = handle.await.unwrap();
+    assert!(result.is_ok());
+}
+```
+
+**Step 4: Performance Verification**
+```rust
+#[test]
+fn test_no_debug_overhead() {
+    // Run same script with and without debug mode
+    // Verify < 1% overhead when no breakpoints set
+}
+```
+
+**Acceptance Criteria**:
+- [ ] debug-showcase.lua exercises all debug features
+- [ ] Test script successfully runs in tracing mode
+- [ ] Interactive debug mode with breakpoints works
+- [ ] All debug commands (.break, .step, .continue, .locals, .stack) functional
+- [ ] Breakpoints actually pause execution (not just logged)
+- [ ] Conditional breakpoints work with expressions
+- [ ] Hit count breakpoints trigger correctly
+- [ ] Step into/over/out navigate properly
+- [ ] Variable inspection shows correct values
+- [ ] Stack traces are accurate and complete
+- [ ] Exception debugging pauses at error
+- [ ] Performance overhead < 1% when no breakpoints
+- [ ] All dead code removed (ExecutionManagerHook gone)
+- [ ] Integration test passes end-to-end
+
+**Validation Checklist**:
+- [ ] Run `cargo test debug` - all tests pass
+- [ ] Run `./test-debug.sh` - all manual tests work
+- [ ] Check `git grep ExecutionManagerHook` - no results (dead code removed)
+- [ ] Profile with/without debug mode - < 1% overhead
+- [ ] Set breakpoint, run script - execution pauses
+- [ ] At breakpoint, inspect variables - correct values shown
+- [ ] Step through code - correct line progression
+- [ ] Continue from breakpoint - execution resumes
+- [ ] Debug 1000-line script - responsive performance
+
+**Success Metrics**:
+- 100% of debug commands functional
+- 0% dead code remaining
+- < 1% performance overhead
+- All integration tests passing
+- Example application fully debuggable
+
 ---
 
 ## Phase 9.8: Kernel as Execution Hub Architecture (Days 15-16)
