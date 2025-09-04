@@ -13,6 +13,7 @@ async fn test_kernel_info_includes_session_metadata() {
         debug_enabled: false,
         max_clients: 10,
         auth_enabled: false,
+        state_dir: None,
     };
     
     let transport = NullTransport;

@@ -18,6 +18,7 @@ async fn test_kernel_creation() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -48,6 +49,7 @@ async fn test_kernel_shutdown() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -78,6 +80,7 @@ async fn test_kernel_state_transitions() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -135,6 +138,7 @@ async fn test_kernel_configuration() -> Result<()> {
         debug_enabled: true,
         max_clients: 5,
         auth_enabled: true,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -163,6 +167,7 @@ async fn test_multiple_kernel_instances() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let kernel2_config = KernelConfig {
@@ -172,6 +177,7 @@ async fn test_multiple_kernel_instances() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection1 = ConnectionInfo::new(
@@ -217,6 +223,7 @@ async fn test_kernel_execution_counter() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -256,6 +263,7 @@ async fn test_kernel_resource_limits() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -293,6 +301,7 @@ async fn test_kernel_invalid_engine() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -319,6 +328,7 @@ async fn test_kernel_from_config() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let result = GenericKernel::from_config(kernel_config).await;

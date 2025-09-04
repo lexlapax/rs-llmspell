@@ -16,6 +16,7 @@ async fn test_kernel_factory_creation() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -47,6 +48,7 @@ async fn test_kernel_state_management() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -117,6 +119,7 @@ async fn test_multiple_kernel_instances() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let kernel2_config = KernelConfig {
@@ -126,6 +129,7 @@ async fn test_multiple_kernel_instances() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection1 = ConnectionInfo::new(
@@ -167,6 +171,7 @@ async fn test_kernel_debug_mode() -> Result<()> {
         debug_enabled: true, // Enable debug mode
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -190,6 +195,7 @@ async fn test_kernel_auth_mode() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: true, // Enable authentication
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -217,6 +223,7 @@ async fn test_kernel_config_validation() -> Result<()> {
         debug_enabled: false,
         max_clients: 1,
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(
@@ -279,6 +286,7 @@ async fn test_kernel_max_clients() -> Result<()> {
         debug_enabled: false,
         max_clients: 2, // Limit to 2 clients
         auth_enabled: false,
+        state_dir: None,
     };
 
     let connection_info = ConnectionInfo::new(

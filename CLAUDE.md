@@ -49,7 +49,7 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 ## Project-Specific Commands
 - **"attack complexity"** = use megathink mode, no "for now" solutions
-- **"phase impact?"** = analyze how change affects phases 8-16
+- **"phase impact?"** = analyze how change affects future phases
 - **"trait implications?"** = consider trait hierarchy and dependencies
 - **"benchmark this"** = check against performance targets above
 
@@ -69,8 +69,8 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 1. Read relevant phase doc + TODO.md
 2. Write failing test using llmspell-testing helpers
 3. Implement minimal solution
-4. Run ./scripts/quality-check-fast.sh
-5. Update TODO.md sub-tasks as completed
+4. Run ./scripts/quality-check-minimal.sh
+5. Update TODO.md sub-tasks as are completed
 
 ## Banned Project Behaviors
 - Creating new files (edit existing)
@@ -81,3 +81,4 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 - Skipping tests to meet deadlines
 - when writing lua scripts use  the `docs/user-guide/api/lua/README.md` to actually see what API/function calls to make in lua. do not guess.
 - fix clippy warnings properly with ultrathink rather than first resorting to clippy allow
+- break down complex functions into smaller logical functions - no cognitive complexity

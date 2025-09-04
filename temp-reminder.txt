@@ -12,3 +12,15 @@
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
 
+Ultrathink, analyze and confirm or deny or provide alternatives.
+StatePersistence is already used or not used by ScriptRuntime based on the LLMSpellConfig passed to it.
+StatePersistence , on disk or not should already be a field in the Config.
+The kernel should not use a different statepersistent from ScriptRuntime.
+The kernel should use the same config for persistence as is in the LLMSpellConfig.
+ScriptRuntime needs to use the same persistence. 
+There may be lock read/write issues between kernel and Script Runtime that needs to be fixed or looked at.
+Why is the kernel using it's own kernel config. The LLMSpellConfig is a singular structure for all of llmspell.
+All the kernel configs should be part of that config structure.
+The code needs to be changed to accomodate that, including how the llmspell-kernel binary instantiates it.
+for tests, you need to create a llmspell config structure with the right setup and pass it to the test.
+Ultra think, analyze and tell me what needs to happen to do this. in detail.

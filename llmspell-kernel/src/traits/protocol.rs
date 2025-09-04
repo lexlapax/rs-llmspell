@@ -53,4 +53,17 @@ pub trait Protocol: Send + Sync {
 
     /// Get the channel a message should be sent on
     fn reply_channel(&self, msg: &Self::Message) -> &str;
+
+    /// Create a broadcast/event message (e.g., for `IOPub` channel)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message creation fails.
+    fn create_broadcast(
+        &self,
+        msg_type: &str,
+        content: serde_json::Value,
+        parent_msg: Option<&Self::Message>,
+        kernel_id: &str,
+    ) -> Result<Self::Message>;
 }

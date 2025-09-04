@@ -35,6 +35,7 @@ struct CommChannel {
     comm_id: String,
     target_name: String,
     session_id: Option<SessionId>,
+    kernel_id: String,
     #[allow(dead_code)]
     created_at: chrono::DateTime<chrono::Utc>,
 }
@@ -44,7 +45,7 @@ struct CommChannel {
 #[serde(tag = "action")]
 pub enum SessionCommRequest {
     #[serde(rename = "get_state")]
-    GetState { key: String },
+    GetState { key: Option<String> },
 
     #[serde(rename = "set_state")]
     SetState { key: String, value: Value },
@@ -54,6 +55,9 @@ pub enum SessionCommRequest {
 
     #[serde(rename = "set_variables")]
     SetVariables { variables: HashMap<String, Value> },
+
+    #[serde(rename = "get_session_info")]
+    GetSessionInfo { session_id: Option<String> },
 
     #[serde(rename = "get_execution_count")]
     GetExecutionCount,
@@ -114,6 +118,7 @@ impl CommManager {
             comm_id: comm_id.clone(),
             target_name: target_name.clone(),
             session_id,
+            kernel_id: kernel_id.to_string(),
             created_at: chrono::Utc::now(),
         };
 
@@ -127,6 +132,23 @@ impl CommManager {
     /// # Errors
     /// Returns error if message parsing or handling fails
     pub async fn handle_comm_msg(&self, comm_id: &str, data: Value) -> Result<SessionCommResponse> {
+        let (channel, request, session_id) =
+            self.validate_and_parse_comm_request(comm_id, data).await?;
+
+        self.process_comm_request(request, &session_id, &channel)
+            .await
+    }
+
+    /// Validate comm and parse request data
+    async fn validate_and_parse_comm_request(
+        &self,
+        comm_id: &str,
+        data: Value,
+    ) -> Result<(
+        CommChannel,
+        SessionCommRequest,
+        llmspell_sessions::SessionId,
+    )> {
         // Get comm channel
         let channel = {
             let comms = self.comms.read().await;
@@ -138,30 +160,51 @@ impl CommManager {
 
         // Only handle session management comms
         if channel.target_name != SESSION_COMM_TARGET && channel.target_name != STATE_COMM_TARGET {
-            return Ok(SessionCommResponse::Error {
-                message: format!("Unsupported target: {}", channel.target_name),
-            });
+            anyhow::bail!("Unsupported target: {}", channel.target_name);
         }
 
         // Parse request
         let request: SessionCommRequest = serde_json::from_value(data)?;
 
         // Get session ID
-        let session_id = channel
+        let session_id = *channel
             .session_id
             .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No session associated with comm"))?;
 
-        // Handle request
+        Ok((channel, request, session_id))
+    }
+
+    /// Process the actual comm request
+    async fn process_comm_request(
+        &self,
+        request: SessionCommRequest,
+        session_id: &llmspell_sessions::SessionId,
+        channel: &CommChannel,
+    ) -> Result<SessionCommResponse> {
         match request {
             SessionCommRequest::GetState { key } => {
-                let value = self
-                    .session_mapper
-                    .get_kernel_state(session_id, &key)
-                    .await?;
-                Ok(SessionCommResponse::Ok {
-                    data: value.unwrap_or(Value::Null),
-                })
+                if let Some(key) = key {
+                    // Get specific key
+                    let value = self
+                        .session_mapper
+                        .get_kernel_state(session_id, &key)
+                        .await?;
+                    Ok(SessionCommResponse::Ok {
+                        data: value.unwrap_or(Value::Null),
+                    })
+                } else {
+                    // Get all kernel state
+                    // For now, return an empty object - could be extended to return all state
+                    Ok(SessionCommResponse::Ok {
+                        data: serde_json::json!({
+                            "type": "state_snapshot",
+                            "kernel_id": channel.kernel_id,
+                            "session_id": session_id,
+                            "state": {}
+                        }),
+                    })
+                }
             }
 
             SessionCommRequest::SetState { key, value } => {
@@ -186,6 +229,33 @@ impl CommManager {
                     .await?;
                 Ok(SessionCommResponse::Ok {
                     data: Value::Bool(true),
+                })
+            }
+
+            SessionCommRequest::GetSessionInfo {
+                session_id: request_session_id,
+            } => {
+                // Get session artifacts (variables)
+                // If a specific session was requested, try to get/create it
+                let target_session_id = if let Some(req_session) = request_session_id {
+                    self.session_mapper
+                        .get_or_create_session(&req_session, &channel.kernel_id)
+                        .await?
+                } else {
+                    *session_id
+                };
+
+                let artifacts = self
+                    .session_mapper
+                    .get_variables(&target_session_id)
+                    .await?;
+
+                Ok(SessionCommResponse::Ok {
+                    data: serde_json::json!({
+                        "type": "session_artifacts",
+                        "session_id": target_session_id,
+                        "artifacts": artifacts
+                    }),
                 })
             }
 
@@ -371,16 +441,11 @@ mod tests {
             "key": "test"
         });
 
-        let response = comm_manager
-            .handle_comm_msg(&comm_id, request)
-            .await
-            .unwrap();
+        let result = comm_manager.handle_comm_msg(&comm_id, request).await;
 
-        match response {
-            SessionCommResponse::Error { message } => {
-                assert!(message.contains("Unsupported target"));
-            }
-            SessionCommResponse::Ok { .. } => panic!("Expected error for unsupported target"),
-        }
+        // Should return an error for unsupported target
+        assert!(result.is_err());
+        let error_msg = result.unwrap_err().to_string();
+        assert!(error_msg.contains("Unsupported target"));
     }
 }

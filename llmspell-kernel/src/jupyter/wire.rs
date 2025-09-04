@@ -147,31 +147,34 @@ impl WireProtocol {
     pub fn encode_message(&self, msg: &JupyterMessage, channel: &str) -> Result<Vec<Vec<u8>>> {
         let mut parts = Vec::new();
 
-        // Extract and add identities
-        if let Some(identities) = msg.metadata.get("__identities") {
-            if let Some(id_array) = identities.as_array() {
-                tracing::info!(
-                    "Encoding with {} identities for {} channel",
-                    id_array.len(),
-                    channel
-                );
-                for id in id_array {
-                    if let Some(id_str) = id.as_str() {
-                        if let Ok(id_bytes) = hex::decode(id_str) {
-                            parts.push(id_bytes);
+        // IOPub is a PUB socket - no identities needed
+        if channel != "iopub" {
+            // Extract and add identities for ROUTER sockets
+            if let Some(identities) = msg.metadata.get("__identities") {
+                if let Some(id_array) = identities.as_array() {
+                    tracing::info!(
+                        "Encoding with {} identities for {} channel",
+                        id_array.len(),
+                        channel
+                    );
+                    for id in id_array {
+                        if let Some(id_str) = id.as_str() {
+                            if let Ok(id_bytes) = hex::decode(id_str) {
+                                parts.push(id_bytes);
+                            }
                         }
                     }
                 }
             }
-        }
 
-        // Must have identities for ROUTER sockets
-        if parts.is_empty() {
-            tracing::error!("No identities for ROUTER socket on {} channel", channel);
-            return Err(anyhow::anyhow!(
-                "No routing identity available for reply on {} channel",
-                channel
-            ));
+            // Must have identities for ROUTER sockets (shell, control)
+            if parts.is_empty() {
+                tracing::error!("No identities for ROUTER socket on {} channel", channel);
+                return Err(anyhow::anyhow!(
+                    "No routing identity available for reply on {} channel",
+                    channel
+                ));
+            }
         }
 
         // Add delimiter
@@ -286,6 +289,52 @@ impl WireProtocol {
                 Ok(MessageContent::ShutdownRequest { restart })
             }
             "interrupt_request" => Ok(MessageContent::InterruptRequest {}),
+            "comm_open" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::CommOpen {
+                    comm_id: value["comm_id"].as_str().unwrap_or("").to_string(),
+                    target_name: value["target_name"].as_str().unwrap_or("").to_string(),
+                    data: value
+                        .get("data")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!({})),
+                    metadata: value
+                        .get("metadata")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                })
+            }
+            "comm_msg" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::CommMsg {
+                    comm_id: value["comm_id"].as_str().unwrap_or("").to_string(),
+                    data: value
+                        .get("data")
+                        .cloned()
+                        .unwrap_or_else(|| serde_json::json!({})),
+                    metadata: value
+                        .get("metadata")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                })
+            }
+            "comm_close" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::CommClose {
+                    comm_id: value["comm_id"].as_str().unwrap_or("").to_string(),
+                    data: value.get("data").cloned(),
+                    metadata: value
+                        .get("metadata")
+                        .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                })
+            }
+            "comm_info_request" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::CommInfoRequest {
+                    target_name: value
+                        .get("target_name")
+                        .and_then(|v| v.as_str())
+                        .map(std::string::ToString::to_string),
+                })
+            }
             // Add more message types as needed
             _ => {
                 // For unknown types, try generic deserialization

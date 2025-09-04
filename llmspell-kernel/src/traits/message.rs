@@ -37,6 +37,12 @@ pub trait KernelMessage: Send + Sync + Debug + Clone {
         self.msg_type().ends_with("_request")
     }
 
+    /// Get message header as JSON for parent tracking (for `IOPub` messages)
+    /// Returns None if not applicable for this protocol
+    fn header_for_parent(&self) -> Option<Value> {
+        None
+    }
+
     /// Check if this is a reply message
     fn is_reply(&self) -> bool {
         self.msg_type().ends_with("_reply")

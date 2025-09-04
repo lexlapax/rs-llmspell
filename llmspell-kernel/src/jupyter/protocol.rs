@@ -49,6 +49,9 @@ pub enum MessageContent {
         language_info: LanguageInfo,
         banner: String,
         help_links: Vec<HelpLink>,
+        // LLMSpell extension for session metadata
+        #[serde(skip_serializing_if = "Option::is_none")]
+        llmspell_session_metadata: Option<Value>,
     },
 
     // === CODE EXECUTION ===
@@ -66,8 +69,17 @@ pub enum MessageContent {
     ExecuteReply {
         status: ExecutionStatus,
         execution_count: u32,
+        #[serde(skip_serializing_if = "Option::is_none")]
         user_expressions: Option<HashMap<String, Value>>,
+        #[serde(skip_serializing_if = "Option::is_none")]
         payload: Option<Vec<Value>>,
+        // Error fields (only present when status = "error")
+        #[serde(skip_serializing_if = "Option::is_none")]
+        ename: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        evalue: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        traceback: Option<Vec<String>>,
     },
 
     #[serde(rename = "execute_input")]
@@ -250,6 +262,7 @@ pub enum ExecutionState {
 }
 
 impl ExecutionState {
+    #[allow(dead_code)]
     fn from_str(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "busy" => Self::Busy,
@@ -389,7 +402,95 @@ impl KernelMessage for JupyterMessage {
     }
 
     fn content(&self) -> Value {
-        serde_json::to_value(&self.content).unwrap_or(Value::Null)
+        // Extract the inner content data without the enum wrapper
+        match &self.content {
+            MessageContent::CommOpen {
+                comm_id,
+                target_name,
+                data,
+                metadata,
+            } => {
+                let mut obj = serde_json::json!({
+                    "comm_id": comm_id,
+                    "target_name": target_name,
+                    "data": data,
+                });
+                if let Some(meta) = metadata {
+                    obj["metadata"] = serde_json::to_value(meta).unwrap_or(Value::Null);
+                }
+                obj
+            }
+            MessageContent::CommMsg {
+                comm_id,
+                data,
+                metadata,
+            } => {
+                let mut obj = serde_json::json!({
+                    "comm_id": comm_id,
+                    "data": data,
+                });
+                if let Some(meta) = metadata {
+                    obj["metadata"] = serde_json::to_value(meta).unwrap_or(Value::Null);
+                }
+                obj
+            }
+            MessageContent::CommClose {
+                comm_id,
+                data,
+                metadata,
+            } => {
+                let mut obj = serde_json::json!({
+                    "comm_id": comm_id,
+                });
+                if let Some(d) = data {
+                    obj["data"] = d.clone();
+                }
+                if let Some(meta) = metadata {
+                    obj["metadata"] = serde_json::to_value(meta).unwrap_or(Value::Null);
+                }
+                obj
+            }
+            MessageContent::ExecuteRequest {
+                code,
+                silent,
+                store_history,
+                user_expressions,
+                allow_stdin,
+                stop_on_error,
+            } => {
+                let mut obj = serde_json::json!({
+                    "code": code,
+                    "silent": silent,
+                });
+                if let Some(sh) = store_history {
+                    obj["store_history"] = serde_json::json!(sh);
+                }
+                if let Some(ue) = user_expressions {
+                    obj["user_expressions"] = serde_json::to_value(ue).unwrap_or(Value::Null);
+                }
+                if let Some(ai) = allow_stdin {
+                    obj["allow_stdin"] = serde_json::json!(ai);
+                }
+                if let Some(soe) = stop_on_error {
+                    obj["stop_on_error"] = serde_json::json!(soe);
+                }
+                obj
+            }
+            MessageContent::ShutdownRequest { restart } => {
+                serde_json::json!({
+                    "restart": restart,
+                })
+            }
+            MessageContent::CommInfoRequest { target_name } => {
+                let mut obj = serde_json::json!({});
+                if let Some(tn) = target_name {
+                    obj["target_name"] = serde_json::json!(tn);
+                }
+                obj
+            }
+            // For other message types, serialize the whole enum (fallback)
+            _ => serde_json::to_value(&self.content).unwrap_or(Value::Null),
+        }
     }
 
     fn metadata(&self) -> Value {
@@ -419,6 +520,11 @@ impl KernelMessage for JupyterMessage {
             metadata: Value::Object(Map::new()),
             content: content_enum,
         }
+    }
+
+    fn header_for_parent(&self) -> Option<Value> {
+        // Convert header to JSON for parent tracking
+        serde_json::to_value(&self.header).ok()
     }
 }
 
@@ -547,21 +653,14 @@ impl Protocol for JupyterProtocol {
         // Create reply message type
         let reply_type = request.header.msg_type.replace("_request", "_reply");
 
-        // Convert Value to MessageContent
-        let content_enum = serde_json::from_value::<MessageContent>(content.clone())
-            .unwrap_or_else(|_| {
-                content
-                    .get("execution_state")
-                    .and_then(|s| s.as_str())
-                    .map_or(
-                        MessageContent::Status {
-                            execution_state: ExecutionState::Idle,
-                        },
-                        |state| MessageContent::Status {
-                            execution_state: ExecutionState::from_str(state),
-                        },
-                    )
-            });
+        tracing::debug!("Creating reply for {}: {:?}", reply_type, content);
+
+        // Create appropriate MessageContent based on reply type
+        let content_enum = match reply_type.as_str() {
+            "kernel_info_reply" => Self::create_kernel_info_reply_content(&content),
+            "execute_reply" => Self::create_execute_reply_content(&content),
+            _ => Self::create_default_reply_content(content, &reply_type),
+        };
 
         let mut reply = JupyterMessage::new(&reply_type, content_enum);
 
@@ -597,5 +696,169 @@ impl Protocol for JupyterProtocol {
                 }
             }
         }
+    }
+
+    fn create_broadcast(
+        &self,
+        msg_type: &str,
+        content: serde_json::Value,
+        parent_msg: Option<&Self::Message>,
+        kernel_id: &str,
+    ) -> Result<Self::Message, anyhow::Error> {
+        // Create header
+        let header = MessageHeader {
+            msg_id: uuid::Uuid::new_v4().to_string(),
+            msg_type: msg_type.to_string(),
+            username: "kernel".to_string(),
+            session: kernel_id.to_string(),
+            date: chrono::Utc::now(),
+            version: "5.3".to_string(),
+        };
+
+        // Set parent header if provided
+        let parent_header = parent_msg.map(|p| p.header.clone());
+
+        // Convert content to MessageContent enum based on msg_type
+        let message_content = match msg_type {
+            "comm_open" => MessageContent::CommOpen {
+                comm_id: content["comm_id"].as_str().unwrap_or("").to_string(),
+                target_name: content["target_name"].as_str().unwrap_or("").to_string(),
+                data: content
+                    .get("data")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({})),
+                metadata: None,
+            },
+            "comm_msg" => MessageContent::CommMsg {
+                comm_id: content["comm_id"].as_str().unwrap_or("").to_string(),
+                data: content
+                    .get("data")
+                    .cloned()
+                    .unwrap_or_else(|| serde_json::json!({})),
+                metadata: None,
+            },
+            "status" => {
+                let state = match content["execution_state"].as_str().unwrap_or("idle") {
+                    "busy" => ExecutionState::Busy,
+                    "starting" => ExecutionState::Starting,
+                    _ => ExecutionState::Idle,
+                };
+                MessageContent::Status {
+                    execution_state: state,
+                }
+            }
+            _ => {
+                // For other message types, try generic deserialization
+                serde_json::from_value(content)?
+            }
+        };
+
+        Ok(JupyterMessage {
+            header,
+            parent_header,
+            metadata: serde_json::json!({}),
+            content: message_content,
+        })
+    }
+}
+
+impl JupyterProtocol {
+    fn create_kernel_info_reply_content(content: &Value) -> MessageContent {
+        // Extract llmspell_session_metadata if present
+        let session_metadata = content.get("llmspell_session_metadata").cloned();
+
+        MessageContent::KernelInfoReply {
+            status: content["status"].as_str().unwrap_or("ok").to_string(),
+            protocol_version: content["protocol_version"]
+                .as_str()
+                .unwrap_or("5.3")
+                .to_string(),
+            implementation: content["implementation"]
+                .as_str()
+                .unwrap_or("llmspell")
+                .to_string(),
+            implementation_version: content["implementation_version"]
+                .as_str()
+                .unwrap_or("0.8.0")
+                .to_string(),
+            language_info: serde_json::from_value(content["language_info"].clone()).unwrap_or_else(
+                |e| {
+                    tracing::warn!(
+                        "Failed to parse language_info, using generic fallback: {}",
+                        e
+                    );
+                    LanguageInfo {
+                        name: "unknown".to_string(),
+                        version: "0.0.0".to_string(),
+                        mimetype: "text/plain".to_string(),
+                        file_extension: ".txt".to_string(),
+                        pygments_lexer: None,
+                        codemirror_mode: None,
+                        nbconvert_exporter: None,
+                    }
+                },
+            ),
+            banner: content["banner"]
+                .as_str()
+                .unwrap_or("LLMSpell Kernel")
+                .to_string(),
+            help_links: vec![],
+            llmspell_session_metadata: session_metadata,
+        }
+    }
+
+    fn create_execute_reply_content(content: &Value) -> MessageContent {
+        // Parse the raw JSON into ExecuteReply
+        let status = content["status"].as_str().unwrap_or("ok");
+        let execution_count =
+            u32::try_from(content["execution_count"].as_u64().unwrap_or(0)).unwrap_or(0);
+
+        if status == "error" {
+            MessageContent::ExecuteReply {
+                status: ExecutionStatus::Error,
+                execution_count,
+                user_expressions: None,
+                payload: None,
+                ename: content["ename"]
+                    .as_str()
+                    .map(std::string::ToString::to_string),
+                evalue: content["evalue"]
+                    .as_str()
+                    .map(std::string::ToString::to_string),
+                traceback: content["traceback"].as_array().map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
+                        .collect()
+                }),
+            }
+        } else {
+            MessageContent::ExecuteReply {
+                status: ExecutionStatus::Ok,
+                execution_count,
+                user_expressions: content
+                    .get("user_expressions")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                payload: content
+                    .get("payload")
+                    .and_then(|v| serde_json::from_value(v.clone()).ok()),
+                ename: None,
+                evalue: None,
+                traceback: None,
+            }
+        }
+    }
+
+    fn create_default_reply_content(content: Value, reply_type: &str) -> MessageContent {
+        // Try to parse directly or fall back to Status
+        serde_json::from_value::<MessageContent>(content).unwrap_or_else(|e| {
+            tracing::warn!(
+                "Failed to parse content as MessageContent for {}: {}",
+                reply_type,
+                e
+            );
+            MessageContent::Status {
+                execution_state: ExecutionState::Idle,
+            }
+        })
     }
 }

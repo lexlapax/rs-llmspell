@@ -55,6 +55,10 @@ struct Args {
     #[arg(long)]
     config: Option<String>,
 
+    /// State persistence directory path
+    #[arg(long)]
+    state_dir: Option<String>,
+
     /// Verbosity level (can be used multiple times)
     #[arg(short, long, action = clap::ArgAction::Count)]
     verbose: u8,
@@ -83,6 +87,7 @@ async fn main() -> Result<()> {
         debug_enabled: args.debug,
         max_clients: args.max_clients,
         auth_enabled: args.auth,
+        state_dir: args.state_dir.map(std::path::PathBuf::from),
     };
 
     // Create connection info with CLI args

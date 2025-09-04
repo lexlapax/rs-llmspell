@@ -111,6 +111,16 @@ impl Protocol for NullProtocol {
     fn reply_channel(&self, _msg: &Self::Message) -> &'static str {
         "null"
     }
+
+    fn create_broadcast(
+        &self,
+        msg_type: &str,
+        content: serde_json::Value,
+        _parent_msg: Option<&Self::Message>,
+        _kernel_id: &str,
+    ) -> Result<Self::Message> {
+        Ok(NullMessage::new(msg_type.to_string(), content))
+    }
 }
 
 /// Null message for testing

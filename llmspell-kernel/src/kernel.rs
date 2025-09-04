@@ -45,6 +45,8 @@ pub struct KernelConfig {
     pub max_clients: usize,
     /// Enable authentication
     pub auth_enabled: bool,
+    /// State persistence directory path
+    pub state_dir: Option<std::path::PathBuf>,
 }
 
 /// Resource limits per client
@@ -108,6 +110,9 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
 
     /// Shutdown signal sender
     shutdown_tx: Option<oneshot::Sender<()>>,
+
+    /// Current request header for `IOPub` parent tracking
+    current_request_header: Arc<RwLock<Option<serde_json::Value>>>,
 }
 
 impl<T: Transport, P: Protocol> GenericKernel<T, P> {
@@ -160,7 +165,31 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         let client_manager = Arc::new(ClientManager::new(config.max_clients));
 
         // Create session mapper for persistence
-        let session_mapper = Arc::new(SessionMapper::new().await?);
+        let session_mapper = Arc::new(if let Some(state_dir) = &config.state_dir {
+            // Use file-based persistence if state_dir is provided
+            let mapper = SessionMapper::new_with_persistence(state_dir.clone()).await?;
+
+            // Check if last shutdown was clean or a crash
+            let was_clean = mapper.was_clean_shutdown().await.unwrap_or(false);
+            if !was_clean {
+                tracing::warn!("Detected unclean shutdown - kernel may have crashed previously");
+            }
+
+            // Try to restore previous sessions
+            if let Err(e) = mapper.restore_all_sessions().await {
+                tracing::warn!(
+                    "Failed to restore sessions from {}: {}",
+                    state_dir.display(),
+                    e
+                );
+            } else {
+                tracing::info!("Restored sessions from {}", state_dir.display());
+            }
+            mapper
+        } else {
+            // Use in-memory persistence by default
+            SessionMapper::new().await?
+        });
 
         // Create comm manager for session communication
         let comm_manager = Arc::new(CommManager::new(session_mapper.clone())?);
@@ -179,7 +208,103 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             session_mapper,
             comm_manager,
             shutdown_tx: None,
+            current_request_header: Arc::new(RwLock::new(None)),
         })
+    }
+
+    /// Publish a message to the `IOPub` channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message publishing fails
+    async fn publish_iopub(&self, msg_type: &str, content: serde_json::Value) -> Result<()> {
+        tracing::debug!("publish_iopub: Publishing {} message", msg_type);
+
+        // Both conditions return None, so simplify
+        let parent_msg = None;
+
+        tracing::debug!("publish_iopub: Creating broadcast message with parent tracking");
+
+        // Use protocol's create_broadcast method (protocol-agnostic)
+        let msg = self
+            .protocol
+            .create_broadcast(msg_type, content, parent_msg, &self.kernel_id)?;
+
+        // Encode the message for sending
+        let parts = self.protocol.encode(&msg, "iopub")?;
+
+        // Send via transport on IOPub channel
+        self.transport.send("iopub", parts).await?;
+        tracing::debug!(
+            "publish_iopub: Successfully published {} message to IOPub",
+            msg_type
+        );
+        Ok(())
+    }
+
+    /// Publish execution status to `IOPub`
+    async fn publish_status(&self, status: &str) -> Result<()> {
+        self.publish_iopub(
+            "status",
+            serde_json::json!({
+                "execution_state": status
+            }),
+        )
+        .await
+    }
+
+    /// Publish stream output to `IOPub`
+    async fn publish_stream(&self, name: &str, text: &str) -> Result<()> {
+        self.publish_iopub(
+            "stream",
+            serde_json::json!({
+                "name": name,
+                "text": text
+            }),
+        )
+        .await
+    }
+
+    /// Publish execute input echo to `IOPub`
+    async fn publish_execute_input(&self, code: &str, execution_count: u32) -> Result<()> {
+        self.publish_iopub(
+            "execute_input",
+            serde_json::json!({
+                "code": code,
+                "execution_count": execution_count
+            }),
+        )
+        .await
+    }
+
+    /// Publish execute result to `IOPub`
+    async fn publish_execute_result(
+        &self,
+        execution_count: u32,
+        data: serde_json::Value,
+    ) -> Result<()> {
+        self.publish_iopub(
+            "execute_result",
+            serde_json::json!({
+                "execution_count": execution_count,
+                "data": data,
+                "metadata": {}
+            }),
+        )
+        .await
+    }
+
+    /// Publish error to `IOPub`
+    async fn publish_error(&self, ename: &str, evalue: &str, traceback: Vec<String>) -> Result<()> {
+        self.publish_iopub(
+            "error",
+            serde_json::json!({
+                "ename": ename,
+                "evalue": evalue,
+                "traceback": traceback
+            }),
+        )
+        .await
     }
 
     /// Run the kernel - protocol-agnostic main loop
@@ -200,11 +325,22 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         // Main protocol-agnostic loop
         loop {
-            // Check all channels for messages
+            // Check only channels that can receive messages
+            // Skip iopub (PUB socket - send only) and heartbeat (handled separately)
             for channel in self.transport.channels() {
+                if channel == "iopub" || channel == "heartbeat" {
+                    continue;
+                }
+
                 if let Some(parts) = self.transport.recv(&channel).await? {
                     // Decode message using protocol
                     let message = self.protocol.decode(parts, &channel)?;
+
+                    // Store the request header for IOPub parent tracking
+                    // This is necessary for proper Jupyter protocol compliance
+                    if let Some(header) = message.header_for_parent() {
+                        *self.current_request_header.write().await = Some(header);
+                    }
 
                     // Process message
                     let should_reply = self.protocol.requires_reply(&message);
@@ -287,7 +423,18 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "language_info": {
                 "name": self.config.engine.clone(),
                 "version": "1.0.0",
-                "file_extension": if self.config.engine == "lua" { ".lua" } else { ".js" }
+                "mimetype": match self.config.engine.as_str() {
+                    "lua" => "text/x-lua",
+                    "javascript" | "js" => "text/javascript",
+                    "python" | "py" => "text/x-python",
+                    _ => "text/plain"
+                },
+                "file_extension": match self.config.engine.as_str() {
+                    "lua" => ".lua",
+                    "javascript" | "js" => ".js",
+                    "python" | "py" => ".py",
+                    _ => ".txt"
+                }
             },
             "banner": format!("LLMSpell Kernel v{} - {}", env!("CARGO_PKG_VERSION"), self.config.engine),
             "help_links": [],
@@ -297,6 +444,25 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     async fn handle_execute(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        let (code, silent, execution_count) = self.setup_execution(&content).await?;
+
+        if !silent {
+            self.publish_execution_start(code, execution_count).await;
+        }
+
+        let output = self
+            .execute_code_streaming(code, silent, execution_count)
+            .await?;
+
+        self.finalize_execution(silent, execution_count, output)
+            .await
+    }
+
+    /// Setup execution parameters and session state
+    async fn setup_execution<'a>(
+        &self,
+        content: &'a serde_json::Value,
+    ) -> Result<(&'a str, bool, u32)> {
         let code = content["code"].as_str().unwrap_or("");
         let silent = content["silent"].as_bool().unwrap_or(false);
 
@@ -311,10 +477,6 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             .get_or_create_session(session_id, &self.kernel_id)
             .await?;
 
-        if !silent {
-            *self.execution_state.write().await = KernelState::Busy;
-        }
-
         let execution_count = {
             let mut count = self.execution_count.lock().await;
             *count += 1;
@@ -326,13 +488,34 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             .store_execution_count(&llmspell_session_id, execution_count)
             .await?;
 
-        // Execute code using ScriptRuntime
-        // Execute and collect output from the stream
+        Ok((code, silent, execution_count))
+    }
+
+    /// Publish execution start notifications
+    async fn publish_execution_start(&self, code: &str, execution_count: u32) {
+        // Set state to busy
+        *self.execution_state.write().await = KernelState::Busy;
+
+        // Publish status update to IOPub
+        let _ = self.publish_status("busy").await;
+
+        // Publish execute_input to IOPub
+        let _ = self.publish_execute_input(code, execution_count).await;
+    }
+
+    /// Execute code with streaming output
+    async fn execute_code_streaming(
+        &self,
+        code: &str,
+        silent: bool,
+        execution_count: u32,
+    ) -> Result<String> {
         let mut output = String::new();
         let result = {
             let runtime = self.runtime.lock().await;
             runtime.execute_script_streaming(code).await
         };
+
         match result {
             Ok(mut script_stream) => {
                 use futures::StreamExt;
@@ -340,34 +523,82 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     match chunk {
                         Ok(agent_chunk) => {
                             // Extract text content from the chunk
-                            output.push_str(&agent_chunk.content.to_string());
+                            let chunk_text = agent_chunk.content.to_string();
+                            output.push_str(&chunk_text);
+
+                            // Stream output to IOPub in real-time if not silent
+                            if !silent && !chunk_text.is_empty() {
+                                let _ = self.publish_stream("stdout", &chunk_text).await;
+                            }
                         }
                         Err(e) => {
-                            *self.execution_state.write().await = KernelState::Idle;
-                            return Ok(serde_json::json!({
-                                "status": "error",
-                                "execution_count": execution_count,
-                                "ename": "ExecutionError",
-                                "evalue": e.to_string(),
-                                "traceback": vec![e.to_string()]
-                            }));
+                            return self
+                                .handle_execution_error(e.into(), silent, execution_count)
+                                .await;
                         }
                     }
                 }
             }
             Err(e) => {
-                *self.execution_state.write().await = KernelState::Idle;
-                return Ok(serde_json::json!({
-                    "status": "error",
-                    "execution_count": execution_count,
-                    "ename": "ExecutionError",
-                    "evalue": e.to_string(),
-                    "traceback": vec![e.to_string()]
-                }));
+                return self
+                    .handle_execution_error(e.into(), silent, execution_count)
+                    .await;
             }
         }
 
+        Ok(output)
+    }
+
+    /// Handle execution errors consistently
+    async fn handle_execution_error(
+        &self,
+        e: anyhow::Error,
+        silent: bool,
+        execution_count: u32,
+    ) -> Result<String> {
+        // Publish error to IOPub if not silent
+        if !silent {
+            let _ = self
+                .publish_error("ExecutionError", &e.to_string(), vec![e.to_string()])
+                .await;
+            let _ = self.publish_status("idle").await;
+        }
+
         *self.execution_state.write().await = KernelState::Idle;
+        Err(anyhow::anyhow!(serde_json::json!({
+            "status": "error",
+            "execution_count": execution_count,
+            "ename": "ExecutionError",
+            "evalue": e.to_string(),
+            "traceback": vec![e.to_string()]
+        })))
+    }
+
+    /// Finalize execution and return response
+    async fn finalize_execution(
+        &self,
+        silent: bool,
+        execution_count: u32,
+        output: String,
+    ) -> Result<serde_json::Value> {
+        // Publish execute_result to IOPub if we have output and not silent
+        if !silent && !output.is_empty() {
+            let _ = self
+                .publish_execute_result(
+                    execution_count,
+                    serde_json::json!({
+                        "text/plain": output.clone()
+                    }),
+                )
+                .await;
+        }
+
+        // Set state back to idle and publish status
+        *self.execution_state.write().await = KernelState::Idle;
+        if !silent {
+            let _ = self.publish_status("idle").await;
+        }
+
         Ok(serde_json::json!({
             "status": "ok",
             "execution_count": execution_count,
@@ -381,6 +612,20 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         let restart = content["restart"].as_bool().unwrap_or(false);
 
         *self.execution_state.write().await = KernelState::Stopping;
+
+        // Save sessions and mark clean shutdown
+        if self.config.state_dir.is_some() {
+            if let Err(e) = self.session_mapper.save_all_sessions().await {
+                tracing::error!("Failed to save sessions on shutdown request: {}", e);
+            } else {
+                tracing::info!("Saved sessions on shutdown request");
+            }
+
+            // Mark this as a clean shutdown
+            if let Err(e) = self.session_mapper.mark_clean_shutdown().await {
+                tracing::error!("Failed to mark clean shutdown: {}", e);
+            }
+        }
 
         Ok(serde_json::json!({
             "status": "ok",
@@ -398,6 +643,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     async fn handle_comm_open(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        tracing::debug!("handle_comm_open received content: {:?}", content);
         let comm_id = content["comm_id"]
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing comm_id"))?;
@@ -419,6 +665,47 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         tracing::debug!("Opened comm {} with target {}", comm_id, target_name);
 
+        // Send comm_open reply on IOPub to acknowledge the comm channel
+        // This lets the client know we accepted the comm
+        let _ = self
+            .publish_iopub(
+                "comm_open",
+                serde_json::json!({
+                    "comm_id": comm_id,
+                    "target_name": target_name,
+                    "data": {
+                        "status": "ready",
+                        "session_id": session_id,
+                        "kernel_id": self.kernel_id,
+                        "capabilities": ["session_artifacts", "state_access"]
+                    }
+                }),
+            )
+            .await;
+
+        // For llmspell.session target, send initial session info
+        if target_name == crate::comm_handler::SESSION_COMM_TARGET {
+            // Get the current session info
+            if let Some(session_state) = self.session_mapper.get_session(&self.kernel_id).await {
+                let _ = self
+                    .publish_iopub(
+                        "comm_msg",
+                        serde_json::json!({
+                            "comm_id": comm_id,
+                            "data": {
+                                "type": "session_info",
+                                "session_id": session_state.session_id.to_string(),
+                                "jupyter_id": session_state.jupyter_id,
+                                "kernel_id": session_state.kernel_id,
+                                "execution_count": session_state.execution_count,
+                                "created_at": session_state.created_at.to_string()
+                            }
+                        }),
+                    )
+                    .await;
+            }
+        }
+
         Ok(serde_json::json!({
             "status": "ok"
         }))
@@ -430,7 +717,19 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             .ok_or_else(|| anyhow::anyhow!("Missing comm_id"))?;
         let data = content["data"].clone();
 
+        // Handle comm message and get response
         let response = self.comm_manager.handle_comm_msg(comm_id, data).await?;
+
+        // Send response back via IOPub comm_msg
+        let _ = self
+            .publish_iopub(
+                "comm_msg",
+                serde_json::json!({
+                    "comm_id": comm_id,
+                    "data": response
+                }),
+            )
+            .await;
 
         Ok(serde_json::to_value(response)?)
     }
@@ -473,6 +772,22 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         // Set state to stopping
         *self.execution_state.write().await = KernelState::Stopping;
+
+        // Save all sessions to persistent storage if enabled
+        if self.config.state_dir.is_some() {
+            if let Err(e) = self.session_mapper.save_all_sessions().await {
+                tracing::error!("Failed to save sessions on shutdown: {}", e);
+            } else {
+                tracing::info!("Saved sessions to persistent storage");
+            }
+
+            // Mark this as a clean shutdown
+            if let Err(e) = self.session_mapper.mark_clean_shutdown().await {
+                tracing::error!("Failed to mark clean shutdown: {}", e);
+            } else {
+                tracing::info!("Marked clean shutdown");
+            }
+        }
 
         // Disconnect all clients
         let all_clients = self.client_manager.get_all_clients().await;
