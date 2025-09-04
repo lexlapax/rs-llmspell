@@ -41,6 +41,7 @@ llmspell-engine = { path = "../llmspell-engine" }
 zmq = "0.10"
 hmac = "0.12"
 sha2 = "0.10"
+subtle = "2.6"
 rand = "0.8"
 futures = "0.3"
 # Note: hex already included above, jupyter-protocol types implemented manually
@@ -52,6 +53,29 @@ path = "src/bin/llmspell-kernel.rs"
 [dev-dependencies]
 tempfile = "3.14"
 tokio-test = "0.4"
+futures = "0.3"
+pretty_assertions = "1.4"
+
+# Test target definitions
+[[test]]
+name = "transport"
+path = "tests/unit/transport.rs"
+
+[[test]]
+name = "protocol"
+path = "tests/unit/protocol.rs"
+
+[[test]]
+name = "hmac_verification"
+path = "tests/security/hmac_verification.rs"
+
+[[test]]
+name = "jupyter_compatibility"
+path = "tests/integration/jupyter_compatibility.rs"
+
+[[test]]
+name = "kernel_lifecycle"
+path = "tests/integration/kernel_lifecycle.rs"
 
 [lints]
 workspace = true

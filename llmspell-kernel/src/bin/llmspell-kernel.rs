@@ -1,15 +1,15 @@
-//! LLMSpell Kernel Binary - Lightweight wrapper
+//! `LLMSpell` Kernel Binary - Lightweight wrapper
 //!
-//! This binary is a thin wrapper that starts the LLMSpell kernel.
-//! The actual kernel implementation is in llmspell_kernel::kernel module.
+//! This binary is a thin wrapper that starts the `LLMSpell` kernel.
+//! The actual kernel implementation is in `llmspell_kernel::kernel` module.
 
 use anyhow::Result;
 use clap::Parser;
 use llmspell_config::LLMSpellConfig;
-use llmspell_kernel::{KernelConfig, LLMSpellKernel};
+use llmspell_kernel::{ConnectionInfo, JupyterKernel, KernelConfig};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
 
-/// LLMSpell Kernel - Jupyter-compatible execution kernel
+/// `LLMSpell` Kernel - Jupyter-compatible execution kernel
 #[derive(Parser, Debug)]
 #[command(name = "llmspell-kernel")]
 #[command(version, about, long_about = None)]
@@ -66,35 +66,41 @@ async fn main() -> Result<()> {
         LLMSpellConfig::default()
     };
 
-    // Create kernel configuration
+    // Create kernel configuration with custom connection info
     let kernel_config = KernelConfig {
-        kernel_id: args.kernel_id,
-        ip: args.ip,
-        port_range_start: args.port,
-        debug_enabled: args.debug,
-        max_clients: args.max_clients,
+        kernel_id: args.kernel_id.clone(),
         engine: args.engine,
         runtime_config,
+        debug_enabled: args.debug,
+        max_clients: args.max_clients,
         auth_enabled: args.auth,
     };
 
-    // Start and run the kernel (heavy lifting is in kernel.rs)
-    let kernel = LLMSpellKernel::start(kernel_config).await?;
-    kernel.run().await?;
+    // Create connection info with CLI args
+    let kernel_id = args
+        .kernel_id
+        .unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), args.ip, args.port);
+
+    // Create kernel using factory method - handles all wiring internally
+    let mut kernel =
+        JupyterKernel::from_config_with_connection(kernel_config, connection_info).await?;
+
+    // Serve kernel
+    kernel.serve().await?;
 
     Ok(())
 }
 
 fn setup_logging(verbosity: u8) {
     let filter_level = match verbosity {
-        0 => "warn", 
+        0 => "warn",
         1 => "info",
         2 => "debug",
         _ => "trace",
     };
 
-    let filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new(filter_level));
+    let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter_level));
 
     tracing_subscriber::registry()
         .with(fmt::layer())

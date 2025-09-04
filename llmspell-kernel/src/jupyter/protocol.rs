@@ -1,14 +1,15 @@
-//! Jupyter protocol message types for LLMSpell kernel
+//! Jupyter protocol message types for `LLMSpell` kernel
 //!
 //! Implements standard Jupyter messaging protocol with extensions for:
 //! - DAP (Debug Adapter Protocol) support via debug messages
 //! - Daemon management for kernel lifecycle control
-//! - LLMSpell-specific script execution features
+//! - `LLMSpell`-specific script execution features
 
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, Map};
-use std::collections::HashMap;
+use crate::traits::KernelMessage;
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
+use std::collections::HashMap;
 use uuid::Uuid;
 
 /// Main Jupyter message structure
@@ -38,7 +39,7 @@ pub enum MessageContent {
     // === KERNEL LIFECYCLE ===
     #[serde(rename = "kernel_info_request")]
     KernelInfoRequest {},
-    
+
     #[serde(rename = "kernel_info_reply")]
     KernelInfoReply {
         status: String,
@@ -70,12 +71,9 @@ pub enum MessageContent {
     },
 
     #[serde(rename = "execute_input")]
-    ExecuteInput {
-        code: String,
-        execution_count: u32,
-    },
+    ExecuteInput { code: String, execution_count: u32 },
 
-    #[serde(rename = "execute_result")]  
+    #[serde(rename = "execute_result")]
     ExecuteResult {
         execution_count: u32,
         data: HashMap<String, Value>,
@@ -84,10 +82,7 @@ pub enum MessageContent {
 
     // === OUTPUT STREAMS ===
     #[serde(rename = "stream")]
-    Stream {
-        name: StreamType,
-        text: String,
-    },
+    Stream { name: StreamType, text: String },
 
     #[serde(rename = "display_data")]
     DisplayData {
@@ -105,41 +100,27 @@ pub enum MessageContent {
 
     // === STATUS UPDATES ===
     #[serde(rename = "status")]
-    Status {
-        execution_state: ExecutionState,
-    },
+    Status { execution_state: ExecutionState },
 
     // === INPUT REQUESTS ===
     #[serde(rename = "input_request")]
-    InputRequest {
-        prompt: String,
-        password: bool,
-    },
+    InputRequest { prompt: String, password: bool },
 
     #[serde(rename = "input_reply")]
-    InputReply {
-        value: String,
-    },
+    InputReply { value: String },
 
     // === CONTROL MESSAGES ===
     #[serde(rename = "shutdown_request")]
-    ShutdownRequest {
-        restart: bool,
-    },
+    ShutdownRequest { restart: bool },
 
     #[serde(rename = "shutdown_reply")]
-    ShutdownReply {
-        status: String,
-        restart: bool,
-    },
+    ShutdownReply { status: String, restart: bool },
 
     #[serde(rename = "interrupt_request")]
     InterruptRequest {},
 
     #[serde(rename = "interrupt_reply")]
-    InterruptReply {
-        status: String,
-    },
+    InterruptReply { status: String },
 
     // === DEBUG SUPPORT (DAP integration) ===
     #[serde(rename = "debug_request")]
@@ -185,10 +166,7 @@ pub enum MessageContent {
 
     // === COMPLETION & INSPECTION ===
     #[serde(rename = "complete_request")]
-    CompleteRequest {
-        code: String,
-        cursor_pos: u32,
-    },
+    CompleteRequest { code: String, cursor_pos: u32 },
 
     #[serde(rename = "complete_reply")]
     CompleteReply {
@@ -215,7 +193,7 @@ pub enum MessageContent {
     },
 }
 
-/// Execution status for execute_reply messages
+/// Execution status for `execute_reply` messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionStatus {
@@ -233,6 +211,16 @@ pub enum ExecutionState {
     Starting,
 }
 
+impl ExecutionState {
+    fn from_str(s: &str) -> Self {
+        match s.to_lowercase().as_str() {
+            "busy" => Self::Busy,
+            "starting" => Self::Starting,
+            _ => Self::Idle,
+        }
+    }
+}
+
 /// Stream types for output
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -241,7 +229,7 @@ pub enum StreamType {
     Stderr,
 }
 
-/// Language information for kernel_info_reply
+/// Language information for `kernel_info_reply`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LanguageInfo {
     pub name: String,
@@ -253,7 +241,7 @@ pub struct LanguageInfo {
     pub nbconvert_exporter: Option<String>,
 }
 
-/// Help link for kernel_info_reply
+/// Help link for `kernel_info_reply`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HelpLink {
     pub text: String,
@@ -266,7 +254,7 @@ pub struct HelpLink {
 pub enum DaemonCommand {
     ListKernels,
     StartKernel,
-    StopKernel, 
+    StopKernel,
     RestartKernel,
     KernelStatus,
     DaemonStatus,
@@ -289,6 +277,7 @@ pub struct KernelInfo {
 
 impl JupyterMessage {
     /// Create new message with generated header
+    #[must_use]
     pub fn new(msg_type: &str, content: MessageContent) -> Self {
         Self {
             header: MessageHeader::new(msg_type),
@@ -299,7 +288,8 @@ impl JupyterMessage {
     }
 
     /// Create reply message with parent header
-    pub fn reply(parent: &JupyterMessage, msg_type: &str, content: MessageContent) -> Self {
+    #[must_use]
+    pub fn reply(parent: &Self, msg_type: &str, content: MessageContent) -> Self {
         Self {
             header: MessageHeader::new(msg_type),
             parent_header: Some(parent.header.clone()),
@@ -309,16 +299,19 @@ impl JupyterMessage {
     }
 
     /// Get message type from header
+    #[must_use]
     pub fn msg_type(&self) -> &str {
         &self.header.msg_type
     }
 
     /// Check if this is a request message
+    #[must_use]
     pub fn is_request(&self) -> bool {
         self.header.msg_type.ends_with("_request")
     }
 
     /// Check if this is a reply message  
+    #[must_use]
     pub fn is_reply(&self) -> bool {
         self.header.msg_type.ends_with("_reply")
     }
@@ -326,6 +319,7 @@ impl JupyterMessage {
 
 impl MessageHeader {
     /// Create new header with generated ID and current timestamp
+    #[must_use]
     pub fn new(msg_type: &str) -> Self {
         Self {
             msg_id: Uuid::new_v4().to_string(),
@@ -334,6 +328,58 @@ impl MessageHeader {
             session: Uuid::new_v4().to_string(),
             date: Utc::now(),
             version: "5.3".to_string(), // Jupyter protocol version
+        }
+    }
+}
+
+/// Implement `KernelMessage` trait for `JupyterMessage`
+impl KernelMessage for JupyterMessage {
+    fn msg_type(&self) -> &str {
+        &self.header.msg_type
+    }
+
+    fn msg_id(&self) -> &str {
+        &self.header.msg_id
+    }
+
+    fn session_id(&self) -> &str {
+        &self.header.session
+    }
+
+    fn parent_id(&self) -> Option<&str> {
+        self.parent_header.as_ref().map(|h| h.msg_id.as_str())
+    }
+
+    fn content(&self) -> Value {
+        serde_json::to_value(&self.content).unwrap_or(Value::Null)
+    }
+
+    fn metadata(&self) -> Value {
+        self.metadata.clone()
+    }
+
+    fn set_parent(&mut self, parent_id: String, parent_type: String) {
+        let mut parent_header = MessageHeader::new(&parent_type);
+        parent_header.msg_id = parent_id;
+        parent_header.session.clone_from(&self.header.session);
+        self.parent_header = Some(parent_header);
+    }
+
+    fn new(msg_type: String, content: Value) -> Self {
+        // Convert Value back to MessageContent
+        // For simplicity, we'll use a generic content type
+        let content_enum = serde_json::from_value::<MessageContent>(content).map_or(
+            MessageContent::Status {
+                execution_state: ExecutionState::Idle,
+            },
+            |parsed| parsed,
+        );
+
+        Self {
+            header: MessageHeader::new(&msg_type),
+            parent_header: None,
+            metadata: Value::Object(Map::new()),
+            content: content_enum,
         }
     }
 }
@@ -348,6 +394,170 @@ impl Default for LanguageInfo {
             pygments_lexer: Some("lua".to_string()),
             codemirror_mode: Some("lua".to_string()),
             nbconvert_exporter: None,
+        }
+    }
+}
+
+// === JUPYTER PROTOCOL IMPLEMENTATION ===
+use super::WireProtocol;
+use crate::connection::ConnectionInfo;
+use crate::traits::{transport::ChannelConfig, Protocol, TransportConfig};
+use async_trait::async_trait;
+
+/// Jupyter protocol implementation
+pub struct JupyterProtocol {
+    wire: WireProtocol,
+    connection_info: ConnectionInfo,
+}
+
+impl JupyterProtocol {
+    /// Create a new Jupyter protocol handler
+    #[must_use]
+    pub fn new(connection_info: ConnectionInfo) -> Self {
+        let wire = WireProtocol::new(connection_info.key.clone());
+        Self {
+            wire,
+            connection_info,
+        }
+    }
+}
+
+#[async_trait]
+impl Protocol for JupyterProtocol {
+    type Message = JupyterMessage;
+
+    fn decode(&self, parts: Vec<Vec<u8>>, channel: &str) -> Result<Self::Message, anyhow::Error> {
+        self.wire.decode_message(&parts, channel)
+    }
+
+    fn encode(&self, msg: &Self::Message, channel: &str) -> Result<Vec<Vec<u8>>, anyhow::Error> {
+        self.wire.encode_message(msg, channel)
+    }
+
+    fn transport_config(&self) -> TransportConfig {
+        let mut channels = HashMap::new();
+
+        // Shell channel (ROUTER for request-reply)
+        channels.insert(
+            "shell".to_string(),
+            ChannelConfig {
+                endpoint: self.connection_info.shell_port.to_string(),
+                pattern: "router".to_string(),
+            },
+        );
+
+        // IOPub channel (PUB for broadcasting)
+        channels.insert(
+            "iopub".to_string(),
+            ChannelConfig {
+                endpoint: self.connection_info.iopub_port.to_string(),
+                pattern: "pub".to_string(),
+            },
+        );
+
+        // Stdin channel (ROUTER for input requests)
+        channels.insert(
+            "stdin".to_string(),
+            ChannelConfig {
+                endpoint: self.connection_info.stdin_port.to_string(),
+                pattern: "router".to_string(),
+            },
+        );
+
+        // Control channel (ROUTER for control messages)
+        channels.insert(
+            "control".to_string(),
+            ChannelConfig {
+                endpoint: self.connection_info.control_port.to_string(),
+                pattern: "router".to_string(),
+            },
+        );
+
+        // Heartbeat channel (REP for keep-alive)
+        channels.insert(
+            "heartbeat".to_string(),
+            ChannelConfig {
+                endpoint: self.connection_info.hb_port.to_string(),
+                pattern: "rep".to_string(),
+            },
+        );
+
+        TransportConfig {
+            transport_type: self.connection_info.transport.clone(),
+            base_address: self.connection_info.ip.clone(),
+            channels,
+        }
+    }
+
+    fn name(&self) -> &'static str {
+        "jupyter"
+    }
+
+    fn version(&self) -> &'static str {
+        "5.3"
+    }
+
+    fn requires_reply(&self, msg: &Self::Message) -> bool {
+        msg.header.msg_type.ends_with("_request")
+    }
+
+    fn create_reply(
+        &self,
+        request: &Self::Message,
+        content: Value,
+    ) -> Result<Self::Message, anyhow::Error> {
+        // Create reply message type
+        let reply_type = request.header.msg_type.replace("_request", "_reply");
+
+        // Convert Value to MessageContent
+        let content_enum = serde_json::from_value::<MessageContent>(content.clone())
+            .unwrap_or_else(|_| {
+                content
+                    .get("execution_state")
+                    .and_then(|s| s.as_str())
+                    .map_or(
+                        MessageContent::Status {
+                            execution_state: ExecutionState::Idle,
+                        },
+                        |state| MessageContent::Status {
+                            execution_state: ExecutionState::from_str(state),
+                        },
+                    )
+            });
+
+        let mut reply = JupyterMessage::new(&reply_type, content_enum);
+
+        // Set parent header
+        reply.parent_header = Some(request.header.clone());
+
+        // Copy identities from request metadata for routing
+        if let Some(identities) = request.metadata.get("__identities") {
+            reply.metadata["__identities"] = identities.clone();
+        }
+
+        Ok(reply)
+    }
+
+    fn reply_channel(&self, msg: &Self::Message) -> &'static str {
+        // Most replies go back on the same channel as the request
+        // Except for IOPub which is for broadcasting only
+        match msg.header.msg_type.as_str() {
+            t if t.starts_with("stream") => "iopub",
+            t if t.starts_with("display") => "iopub",
+            t if t.starts_with("status") => "iopub",
+            t if t.starts_with("execute_result") => "iopub",
+            t if t.starts_with("error") => "iopub",
+            _ => {
+                // For requests, reply on the same channel
+                // This is determined by where the request came from
+                if msg.header.msg_type.contains("control") {
+                    "control"
+                } else if msg.header.msg_type.contains("stdin") {
+                    "stdin"
+                } else {
+                    "shell" // Default to shell channel
+                }
+            }
         }
     }
 }
