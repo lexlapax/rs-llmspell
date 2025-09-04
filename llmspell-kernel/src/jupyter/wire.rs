@@ -31,6 +31,14 @@ pub struct WireProtocol {
     signing_key: String,
 }
 
+/// Helper struct for message parts
+struct MessageParts {
+    header: Vec<u8>,
+    parent_header: Vec<u8>,
+    metadata: Vec<u8>,
+    content: Vec<u8>,
+}
+
 impl WireProtocol {
     /// Create new wire protocol handler with signing key
     #[must_use]
@@ -147,67 +155,95 @@ impl WireProtocol {
     pub fn encode_message(&self, msg: &JupyterMessage, channel: &str) -> Result<Vec<Vec<u8>>> {
         let mut parts = Vec::new();
 
-        // IOPub is a PUB socket - no identities needed
+        // Handle routing identities for non-IOPub channels
         if channel != "iopub" {
-            // Extract and add identities for ROUTER sockets
-            if let Some(identities) = msg.metadata.get("__identities") {
-                if let Some(id_array) = identities.as_array() {
-                    tracing::info!(
-                        "Encoding with {} identities for {} channel",
-                        id_array.len(),
-                        channel
-                    );
-                    for id in id_array {
-                        if let Some(id_str) = id.as_str() {
-                            if let Ok(id_bytes) = hex::decode(id_str) {
-                                parts.push(id_bytes);
-                            }
-                        }
-                    }
-                }
-            }
-
-            // Must have identities for ROUTER sockets (shell, control)
-            if parts.is_empty() {
-                tracing::error!("No identities for ROUTER socket on {} channel", channel);
-                return Err(anyhow::anyhow!(
-                    "No routing identity available for reply on {} channel",
-                    channel
-                ));
-            }
+            Self::add_routing_identities(&mut parts, msg, channel)?;
         }
 
         // Add delimiter
         parts.push(b"<IDS|MSG>".to_vec());
 
-        // Serialize message components
-        let header = serde_json::to_vec(&msg.header).context("Failed to serialize header")?;
-        let parent_header = match &msg.parent_header {
-            Some(ph) => serde_json::to_vec(ph).context("Failed to serialize parent_header")?,
-            None => b"{}".to_vec(), // Empty JSON object for Jupyter compatibility
-        };
+        // Serialize and add message components
+        let message_parts = Self::serialize_message_components(msg)?;
+        let hmac = self.calculate_hmac(&[
+            &message_parts.header,
+            &message_parts.parent_header,
+            &message_parts.metadata,
+            &message_parts.content,
+        ]);
 
-        // Filter out __identities from metadata before sending
-        let mut clean_metadata = msg.metadata.clone();
-        if let Some(obj) = clean_metadata.as_object_mut() {
-            obj.remove("__identities");
-        }
-        let metadata =
-            serde_json::to_vec(&clean_metadata).context("Failed to serialize metadata")?;
-        let content = serde_json::to_vec(&msg.content).context("Failed to serialize content")?;
-
-        // Calculate HMAC
-        let hmac = self.calculate_hmac(&[&header, &parent_header, &metadata, &content]);
-
-        // Add message parts in order
         parts.push(hmac);
-        parts.push(header);
-        parts.push(parent_header);
-        parts.push(metadata);
-        parts.push(content);
+        parts.push(message_parts.header);
+        parts.push(message_parts.parent_header);
+        parts.push(message_parts.metadata);
+        parts.push(message_parts.content);
 
         tracing::info!("Encoded {} parts for {} channel", parts.len(), channel);
         Ok(parts)
+    }
+
+    fn add_routing_identities(
+        parts: &mut Vec<Vec<u8>>,
+        msg: &JupyterMessage,
+        channel: &str,
+    ) -> Result<()> {
+        if let Some(identities) = msg.metadata.get("__identities") {
+            Self::extract_identities(parts, identities, channel);
+        }
+
+        // Must have identities for ROUTER sockets
+        if parts.is_empty() {
+            tracing::error!("No identities for ROUTER socket on {} channel", channel);
+            return Err(anyhow::anyhow!(
+                "No routing identity available for reply on {} channel",
+                channel
+            ));
+        }
+        Ok(())
+    }
+
+    fn extract_identities(parts: &mut Vec<Vec<u8>>, identities: &Value, channel: &str) {
+        if let Some(id_array) = identities.as_array() {
+            tracing::info!(
+                "Encoding with {} identities for {} channel",
+                id_array.len(),
+                channel
+            );
+            for id in id_array {
+                if let Some(id_str) = id.as_str() {
+                    if let Ok(id_bytes) = hex::decode(id_str) {
+                        parts.push(id_bytes);
+                    }
+                }
+            }
+        }
+    }
+
+    fn serialize_message_components(msg: &JupyterMessage) -> Result<MessageParts> {
+        let header = serde_json::to_vec(&msg.header).context("Failed to serialize header")?;
+
+        let parent_header = match &msg.parent_header {
+            Some(ph) => serde_json::to_vec(ph).context("Failed to serialize parent_header")?,
+            None => b"{}".to_vec(),
+        };
+
+        let metadata = Self::serialize_clean_metadata(&msg.metadata)?;
+        let content = serde_json::to_vec(&msg.content).context("Failed to serialize content")?;
+
+        Ok(MessageParts {
+            header,
+            parent_header,
+            metadata,
+            content,
+        })
+    }
+
+    fn serialize_clean_metadata(metadata: &Value) -> Result<Vec<u8>> {
+        let mut clean_metadata = metadata.clone();
+        if let Some(obj) = clean_metadata.as_object_mut() {
+            obj.remove("__identities");
+        }
+        serde_json::to_vec(&clean_metadata).context("Failed to serialize metadata")
     }
 
     /// Calculate HMAC-SHA256 signature for message authentication

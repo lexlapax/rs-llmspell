@@ -486,76 +486,14 @@ impl SessionMapper {
     /// # Errors
     /// Returns error only if session list retrieval fails completely
     pub async fn restore_all_sessions(&self) -> Result<()> {
-        // Get the list of session IDs
-        let session_ids = match self
-            .state_manager
-            .get(StateScope::Global, "kernel:session_list")
-            .await
-        {
-            Ok(Some(value)) => match serde_json::from_value::<Vec<String>>(value) {
-                Ok(ids) => ids,
-                Err(e) => {
-                    tracing::error!("Failed to parse session list: {}", e);
-                    return Ok(()); // Continue with empty session list
-                }
-            },
-            Ok(None) => {
-                tracing::info!("No sessions to restore");
-                return Ok(());
-            }
-            Err(e) => {
-                tracing::warn!("Failed to get session list: {}", e);
-                return Ok(()); // Continue with empty session list
-            }
-        };
+        let session_ids = self.get_session_list().await?;
+        if session_ids.is_empty() {
+            tracing::info!("No sessions to restore");
+            return Ok(());
+        }
 
         tracing::info!("Attempting to restore {} sessions", session_ids.len());
-        let mut restored_count = 0;
-        let mut failed_count = 0;
-
-        for jupyter_id in session_ids {
-            let session_key = format!("session:{jupyter_id}");
-
-            match self
-                .state_manager
-                .get(StateScope::Global, &session_key)
-                .await
-            {
-                Ok(Some(metadata)) => {
-                    // Try to restore this session, log and continue if it fails
-                    match Self::parse_session_metadata(&jupyter_id, &metadata) {
-                        Ok(session_state) => {
-                            self.sessions
-                                .write()
-                                .await
-                                .insert(jupyter_id.clone(), session_state);
-                            restored_count += 1;
-                            tracing::debug!("Restored session: {}", jupyter_id);
-                        }
-                        Err(e) => {
-                            failed_count += 1;
-                            tracing::error!(
-                                "Failed to parse session {} metadata: {}. Skipping.",
-                                jupyter_id,
-                                e
-                            );
-                        }
-                    }
-                }
-                Ok(None) => {
-                    failed_count += 1;
-                    tracing::warn!("Session {} metadata not found. Skipping.", jupyter_id);
-                }
-                Err(e) => {
-                    failed_count += 1;
-                    tracing::error!(
-                        "Failed to get session {} metadata: {}. Skipping.",
-                        jupyter_id,
-                        e
-                    );
-                }
-            }
-        }
+        let (restored_count, failed_count) = self.restore_session_batch(&session_ids).await;
 
         tracing::info!(
             "Session restoration complete: {} restored, {} failed",
@@ -564,6 +502,94 @@ impl SessionMapper {
         );
 
         Ok(())
+    }
+
+    async fn get_session_list(&self) -> Result<Vec<String>> {
+        match self
+            .state_manager
+            .get(StateScope::Global, "kernel:session_list")
+            .await
+        {
+            Ok(Some(value)) => match serde_json::from_value::<Vec<String>>(value) {
+                Ok(ids) => Ok(ids),
+                Err(e) => {
+                    tracing::error!("Failed to parse session list: {}", e);
+                    Ok(Vec::new())
+                }
+            },
+            Ok(None) => Ok(Vec::new()),
+            Err(e) => {
+                tracing::warn!("Failed to get session list: {}", e);
+                Ok(Vec::new())
+            }
+        }
+    }
+
+    async fn restore_session_batch(&self, session_ids: &[String]) -> (usize, usize) {
+        let mut restored_count = 0;
+        let mut failed_count = 0;
+
+        for jupyter_id in session_ids {
+            match self.restore_single_session(jupyter_id).await {
+                Ok(true) => {
+                    restored_count += 1;
+                    tracing::debug!("Restored session: {}", jupyter_id);
+                }
+                Ok(false) | Err(_) => {
+                    failed_count += 1;
+                }
+            }
+        }
+
+        (restored_count, failed_count)
+    }
+
+    async fn restore_single_session(&self, jupyter_id: &str) -> Result<bool> {
+        let session_key = format!("session:{jupyter_id}");
+
+        match self
+            .state_manager
+            .get(StateScope::Global, &session_key)
+            .await
+        {
+            Ok(Some(metadata)) => self.process_session_metadata(jupyter_id, &metadata).await,
+            Ok(None) => {
+                tracing::warn!("Session {} metadata not found. Skipping.", jupyter_id);
+                Ok(false)
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to get session {} metadata: {}. Skipping.",
+                    jupyter_id,
+                    e
+                );
+                Ok(false)
+            }
+        }
+    }
+
+    async fn process_session_metadata(
+        &self,
+        jupyter_id: &str,
+        metadata: &serde_json::Value,
+    ) -> Result<bool> {
+        match Self::parse_session_metadata(jupyter_id, metadata) {
+            Ok(session_state) => {
+                self.sessions
+                    .write()
+                    .await
+                    .insert(jupyter_id.to_string(), session_state);
+                Ok(true)
+            }
+            Err(e) => {
+                tracing::error!(
+                    "Failed to parse session {} metadata: {}. Skipping.",
+                    jupyter_id,
+                    e
+                );
+                Ok(false)
+            }
+        }
     }
 
     /// Restore specific sessions from persistent storage
@@ -575,52 +601,8 @@ impl SessionMapper {
             "Attempting to restore {} specific sessions",
             session_ids.len()
         );
-        let mut restored_count = 0;
-        let mut failed_count = 0;
 
-        for jupyter_id in session_ids {
-            let session_key = format!("session:{jupyter_id}");
-
-            match self
-                .state_manager
-                .get(StateScope::Global, &session_key)
-                .await
-            {
-                Ok(Some(metadata)) => {
-                    // Try to restore this session, log and continue if it fails
-                    match Self::parse_session_metadata(&jupyter_id, &metadata) {
-                        Ok(session_state) => {
-                            self.sessions
-                                .write()
-                                .await
-                                .insert(jupyter_id.clone(), session_state);
-                            restored_count += 1;
-                            tracing::debug!("Restored session: {}", jupyter_id);
-                        }
-                        Err(e) => {
-                            failed_count += 1;
-                            tracing::error!(
-                                "Failed to parse session {} metadata: {}. Skipping.",
-                                jupyter_id,
-                                e
-                            );
-                        }
-                    }
-                }
-                Ok(None) => {
-                    failed_count += 1;
-                    tracing::warn!("Session {} metadata not found. Skipping.", jupyter_id);
-                }
-                Err(e) => {
-                    failed_count += 1;
-                    tracing::error!(
-                        "Failed to get session {} metadata: {}. Skipping.",
-                        jupyter_id,
-                        e
-                    );
-                }
-            }
-        }
+        let (restored_count, failed_count) = self.restore_session_batch(&session_ids).await;
 
         tracing::info!(
             "Partial session restoration complete: {} restored, {} failed",

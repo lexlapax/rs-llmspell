@@ -142,86 +142,106 @@ async fn start_legacy_tcp_server(port: u16, _kernel: Arc<JupyterKernel>) -> Resu
 
 /// Handle a single legacy TCP connection
 async fn handle_legacy_tcp_connection(mut socket: TcpStream) -> Result<()> {
-    let (reader, mut writer) = socket.split();
+    let (reader, writer) = socket.split();
     let mut reader = BufReader::new(reader);
+    let mut writer = writer;
     let mut buffer = String::new();
 
     loop {
-        buffer.clear();
-        let bytes_read = reader.read_line(&mut buffer).await?;
-        if bytes_read == 0 {
+        if !read_next_line(&mut reader, &mut buffer).await? {
             break; // Connection closed
         }
 
-        let line = buffer.trim();
-        if line.is_empty() {
+        if buffer.trim().is_empty() {
             continue;
         }
 
-        tracing::debug!("Received LRP request: {}", line);
-
-        // Parse LRP request
-        match serde_json::from_str::<LRPRequest>(line) {
-            Ok(request) => {
-                let response = handle_lrp_request(request);
-                let response_json = serde_json::to_string(&response)?;
-
-                // Write response back to client
-                writer.write_all(response_json.as_bytes()).await?;
-                writer.write_all(b"\n").await?;
-                writer.flush().await?;
-
-                tracing::debug!("Sent LRP response: {}", response_json);
-            }
-            Err(e) => {
-                tracing::error!("Failed to parse LRP request: {}", e);
-                break;
-            }
+        if !process_lrp_line(&buffer, &mut writer).await? {
+            break; // Parse error
         }
     }
 
     Ok(())
 }
 
+async fn read_next_line(
+    reader: &mut BufReader<tokio::net::tcp::ReadHalf<'_>>,
+    buffer: &mut String,
+) -> Result<bool> {
+    buffer.clear();
+    let bytes_read = reader.read_line(buffer).await?;
+    Ok(bytes_read > 0)
+}
+
+async fn process_lrp_line(line: &str, writer: &mut tokio::net::tcp::WriteHalf<'_>) -> Result<bool> {
+    let line = line.trim();
+    tracing::debug!("Received LRP request: {}", line);
+
+    match serde_json::from_str::<LRPRequest>(line) {
+        Ok(request) => {
+            send_lrp_response(request, writer).await?;
+            Ok(true)
+        }
+        Err(e) => {
+            tracing::error!("Failed to parse LRP request: {}", e);
+            Ok(false)
+        }
+    }
+}
+
+async fn send_lrp_response(
+    request: LRPRequest,
+    writer: &mut tokio::net::tcp::WriteHalf<'_>,
+) -> Result<()> {
+    let response = handle_lrp_request(request);
+    let response_json = serde_json::to_string(&response)?;
+
+    writer.write_all(response_json.as_bytes()).await?;
+    writer.write_all(b"\n").await?;
+    writer.flush().await?;
+
+    tracing::debug!("Sent LRP response: {}", response_json);
+    Ok(())
+}
+
 /// Handle LRP request and return appropriate response
 fn handle_lrp_request(request: LRPRequest) -> LRPResponse {
     match request {
-        LRPRequest::ExecuteRequest { code, .. } => {
-            tracing::info!("Executing code via legacy protocol: {}", code);
+        LRPRequest::ExecuteRequest { code, .. } => handle_execute_request(&code),
+        _ => create_default_response(),
+    }
+}
 
-            // For Task 9.8.6 demonstration, return a simple response
-            // In a full implementation, this would forward to the Jupyter kernel
-            if code.contains("print") {
-                // Extract the print argument roughly
-                let output = if code.contains("hello") {
-                    "hello"
-                } else {
-                    "executed"
-                };
+fn handle_execute_request(code: &str) -> LRPResponse {
+    tracing::info!("Executing code via legacy protocol: {}", code);
 
-                LRPResponse::ExecuteReply {
-                    status: "ok".to_string(),
-                    execution_count: 1,
-                    payload: Some(vec![Value::String(output.to_string())]),
-                    user_expressions: None,
-                }
-            } else {
-                LRPResponse::ExecuteReply {
-                    status: "ok".to_string(),
-                    execution_count: 1,
-                    payload: Some(vec![Value::String("executed".to_string())]),
-                    user_expressions: None,
-                }
-            }
+    let output = determine_output(code);
+
+    LRPResponse::ExecuteReply {
+        status: "ok".to_string(),
+        execution_count: 1,
+        payload: Some(vec![Value::String(output.to_string())]),
+        user_expressions: None,
+    }
+}
+
+fn determine_output(code: &str) -> &'static str {
+    if code.contains("print") {
+        if code.contains("hello") {
+            "hello"
+        } else {
+            "executed"
         }
-        _ => {
-            // For other request types, return a basic response
-            LRPResponse::ExecuteReply {
-                status: "ok".to_string(),
-                execution_count: 1,
-                payload: None,
-                user_expressions: None,
-            }
-        }
+    } else {
+        "executed"
+    }
+}
+
+fn create_default_response() -> LRPResponse {
+    LRPResponse::ExecuteReply {
+        status: "ok".to_string(),
+        execution_count: 1,
+        payload: None,
+        user_expressions: None,
     }
 }

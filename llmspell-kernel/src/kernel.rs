@@ -302,69 +302,94 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     ///
     /// Returns an error if the kernel fails to serve messages or encounters a fatal error.
     pub async fn serve(&mut self) -> Result<()> {
+        self.log_serving_info();
+        *self.execution_state.write().await = KernelState::Idle;
+
+        loop {
+            if self.process_available_messages().await? {
+                tracing::info!("Shutdown requested");
+                return Ok(());
+            }
+
+            self.transport.heartbeat().await?;
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        }
+    }
+
+    fn log_serving_info(&self) {
         tracing::info!(
             "Kernel {} serving with {} protocol (version {})",
             self.kernel_id,
             self.protocol.name(),
             self.protocol.version()
         );
+    }
 
-        // Set state to idle
-        *self.execution_state.write().await = KernelState::Idle;
-
-        // Main protocol-agnostic loop
-        loop {
-            // Check only channels that can receive messages
-            // Skip iopub (PUB socket - send only) and heartbeat (handled separately)
-            for channel in self.transport.channels() {
-                if channel == "iopub" || channel == "heartbeat" {
-                    continue;
-                }
-
-                if let Some(parts) = self.transport.recv(&channel).await? {
-                    // Decode message using protocol
-                    let message = self.protocol.decode(parts, &channel)?;
-
-                    // Store the request header for IOPub parent tracking
-                    // This is necessary for proper Jupyter protocol compliance
-                    if let Some(header) = message.header_for_parent() {
-                        *self.current_request_header.write().await = Some(header);
-                    }
-
-                    // Process message
-                    let should_reply = self.protocol.requires_reply(&message);
-                    let reply_content = self.process_message(message.clone()).await?;
-
-                    if should_reply {
-                        // Create reply using protocol
-                        let reply = self.protocol.create_reply(&message, reply_content)?;
-
-                        // Encode reply
-                        let reply_parts = self.protocol.encode(&reply, &channel)?;
-
-                        // Send reply
-                        let reply_channel = self.protocol.reply_channel(&reply);
-                        self.transport.send(reply_channel, reply_parts).await?;
-                    }
-
-                    // Check for shutdown
-                    if message.msg_type() == "shutdown_request" {
-                        tracing::info!("Shutdown requested");
-                        return Ok(());
-                    }
-                }
+    /// Process messages from all channels
+    /// Returns true if shutdown was requested
+    async fn process_available_messages(&self) -> Result<bool> {
+        for channel in self.transport.channels() {
+            if Self::should_skip_channel(&channel) {
+                continue;
             }
 
-            // Handle heartbeat if needed
-            self.transport.heartbeat().await?;
-
-            // Small yield to prevent busy loop
-            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+            if let Some(shutdown_requested) = self.process_channel_message(&channel).await? {
+                return Ok(shutdown_requested);
+            }
         }
+        Ok(false)
+    }
+
+    fn should_skip_channel(channel: &str) -> bool {
+        channel == "iopub" || channel == "heartbeat"
+    }
+
+    /// Process a single channel's message
+    /// Returns Some(true) if shutdown was requested
+    async fn process_channel_message(&self, channel: &str) -> Result<Option<bool>> {
+        if let Some(parts) = self.transport.recv(channel).await? {
+            let message = self.protocol.decode(parts, channel)?;
+            self.store_request_header(&message).await?;
+
+            let shutdown_requested = self.handle_message_and_reply(message, channel).await?;
+            return Ok(Some(shutdown_requested));
+        }
+        Ok(None)
+    }
+
+    async fn store_request_header(&self, message: &P::Message) -> Result<()> {
+        if let Some(header) = message.header_for_parent() {
+            *self.current_request_header.write().await = Some(header);
+        }
+        Ok(())
+    }
+
+    async fn handle_message_and_reply(&self, message: P::Message, channel: &str) -> Result<bool> {
+        let is_shutdown = message.msg_type() == "shutdown_request";
+        let should_reply = self.protocol.requires_reply(&message);
+        let reply_content = self.process_message(message.clone()).await?;
+
+        if should_reply {
+            self.send_reply(&message, reply_content, channel).await?;
+        }
+
+        Ok(is_shutdown)
+    }
+
+    async fn send_reply(
+        &self,
+        message: &P::Message,
+        reply_content: serde_json::Value,
+        channel: &str,
+    ) -> Result<()> {
+        let reply = self.protocol.create_reply(message, reply_content)?;
+        let reply_parts = self.protocol.encode(&reply, channel)?;
+        let reply_channel = self.protocol.reply_channel(&reply);
+        self.transport.send(reply_channel, reply_parts).await
     }
 
     /// Process a message - protocol-agnostic
-    async fn process_message<M: KernelMessage>(&self, message: M) -> Result<serde_json::Value> {
+    async fn process_message(&self, message: P::Message) -> Result<serde_json::Value> {
         let msg_type = message.msg_type();
         let content = message.content();
 
