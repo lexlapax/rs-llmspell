@@ -1,7 +1,7 @@
-//! LLMSpell REPL - Client interface for kernel connections
+//! `LLMSpell` REPL - Client interface for kernel connections
 //!
 //! This crate provides client-side REPL functionality that connects to
-//! the LLMSpell kernel (now in llmspell-kernel crate).
+//! the `LLMSpell` kernel (now in llmspell-kernel crate).
 //!
 //! The kernel implementation has been moved to llmspell-kernel for better
 //! architectural separation: kernel=execution, repl=client interface.

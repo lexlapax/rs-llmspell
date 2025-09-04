@@ -21,6 +21,9 @@ llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-repl = { path = "../llmspell-repl" }
 llmspell-debug = { path = "../llmspell-debug" }
+# Add new kernel dependency
+llmspell-kernel = { path = "../llmspell-kernel" }
+# Keep engine temporarily for protocol types
 llmspell-engine = { path = "../llmspell-engine" }
 tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
@@ -41,6 +44,7 @@ dialoguer = "0.11"
 async-trait = { workspace = true }
 rustyline = "14.0"
 tempfile = "3.8"
+which = "6.0"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.28", features = ["signal", "process"] }

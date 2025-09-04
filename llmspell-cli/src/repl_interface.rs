@@ -6,7 +6,7 @@ use crate::kernel::KernelConnectionTrait;
 use anyhow::Result;
 use llmspell_bridge::{diagnostics_bridge::DiagnosticsBridge, hook_profiler::WorkloadClassifier};
 use llmspell_config::LLMSpellConfig;
-use llmspell_repl::protocol::LDPRequest;
+use llmspell_engine::LDPRequest;
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;

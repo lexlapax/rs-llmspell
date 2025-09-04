@@ -16,9 +16,10 @@ use llmspell_bridge::{
 };
 use llmspell_debug::session_manager::DebugSessionManager;
 use llmspell_engine::{LDPRequest, LDPResponse, LRPRequest, LRPResponse, ProtocolClient};
-use llmspell_repl::{
-    client::ConnectedClient, connection::ConnectionInfo, discovery::KernelDiscovery,
-};
+use llmspell_kernel::KernelDiscovery;
+use llmspell_repl::{client::ConnectedClient, ConnectionInfo};
+// Import Jupyter ConnectionInfo with an alias to avoid conflicts
+use llmspell_kernel::ConnectionInfo as JupyterConnectionInfo;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::process::Stdio;
@@ -27,6 +28,153 @@ use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::sync::RwLock;
 use tokio::time::sleep;
+
+/// Connection format enum for Legacy vs Jupyter formats
+#[derive(Debug, Clone)]
+pub enum ConnectionFormat {
+    /// Current format from llmspell-repl
+    Legacy(ConnectionInfo),
+    /// Future format from llmspell-kernel
+    Jupyter(JupyterConnectionInfo),
+}
+
+impl ConnectionFormat {
+    /// Extract the kernel ID regardless of format
+    pub fn kernel_id(&self) -> &str {
+        match self {
+            ConnectionFormat::Legacy(info) => &info.kernel_id,
+            ConnectionFormat::Jupyter(info) => &info.kernel_id,
+        }
+    }
+
+    /// Extract the IP address regardless of format
+    pub fn ip(&self) -> &str {
+        match self {
+            ConnectionFormat::Legacy(info) => &info.ip,
+            ConnectionFormat::Jupyter(info) => &info.ip,
+        }
+    }
+
+    /// Extract the shell port regardless of format  
+    pub fn shell_port(&self) -> u16 {
+        match self {
+            ConnectionFormat::Legacy(info) => info.shell_port,
+            ConnectionFormat::Jupyter(info) => info.shell_port,
+        }
+    }
+
+    /// Convert to legacy format (for now)
+    pub fn to_legacy(self) -> ConnectionInfo {
+        match self {
+            ConnectionFormat::Legacy(info) => info,
+            ConnectionFormat::Jupyter(jupyter_info) => {
+                // Convert Jupyter format to Legacy format
+                ConnectionInfo::new(
+                    jupyter_info.kernel_id,
+                    jupyter_info.ip,
+                    jupyter_info.shell_port,
+                )
+            }
+        }
+    }
+
+    /// Detect format from file content
+    pub async fn from_file(path: &std::path::Path) -> Result<Self> {
+        let content = tokio::fs::read_to_string(path).await?;
+
+        // Try to parse as Jupyter format first
+        if let Ok(jupyter_info) = serde_json::from_str::<JupyterConnectionInfo>(&content) {
+            return Ok(ConnectionFormat::Jupyter(jupyter_info));
+        }
+
+        // Fall back to legacy format
+        if let Ok(legacy_info) = serde_json::from_str::<ConnectionInfo>(&content) {
+            return Ok(ConnectionFormat::Legacy(legacy_info));
+        }
+
+        anyhow::bail!("Could not parse connection file as either Legacy or Jupyter format")
+    }
+}
+
+/// Temporary adapter while migrating from llmspell-engine to llmspell-kernel
+pub struct KernelClient {
+    /// Will eventually use Jupyter client
+    /// For now, still uses ProtocolClient from engine
+    inner: ProtocolClient,
+}
+
+impl KernelClient {
+    /// Create a new KernelClient wrapping ProtocolClient
+    pub async fn connect(addr: &str) -> Result<Self> {
+        let inner = ProtocolClient::connect(addr).await?;
+        Ok(Self { inner })
+    }
+
+    /// Execute code through the wrapped client
+    pub async fn execute(&self, code: &str) -> Result<Value> {
+        let request = LRPRequest::ExecuteRequest {
+            code: code.to_string(),
+            silent: false,
+            store_history: true,
+            user_expressions: None,
+            allow_stdin: false,
+            stop_on_error: true,
+        };
+
+        let response = self.inner.send_lrp_request(request).await?;
+
+        match response {
+            LRPResponse::ExecuteReply {
+                status, payload, ..
+            } => {
+                if status == "ok" {
+                    // Extract result from payload if present
+                    if let Some(payload_vec) = payload {
+                        if let Some(first) = payload_vec.first() {
+                            Ok(first.clone())
+                        } else {
+                            Ok(Value::Null)
+                        }
+                    } else {
+                        Ok(Value::Null)
+                    }
+                } else {
+                    anyhow::bail!("Execution failed with status: {}", status)
+                }
+            }
+            _ => anyhow::bail!("Unexpected response type"),
+        }
+    }
+
+    /// Send debug command through the wrapped client
+    pub async fn send_debug_command(&self, command: LDPRequest) -> Result<LDPResponse> {
+        self.inner
+            .send_ldp_request(command)
+            .await
+            .map_err(|e| anyhow::anyhow!("Debug command failed: {}", e))
+    }
+
+    /// Shutdown the wrapped client
+    pub async fn shutdown(self) {
+        self.inner.shutdown().await;
+    }
+
+    /// Check if the connection is healthy
+    pub async fn health_check(&self) -> Result<bool> {
+        // Try to execute a simple command to check if kernel is responsive
+        match self.execute("return 'health_ok'").await {
+            Ok(result) => {
+                // Check if we got the expected response
+                if let Some(s) = result.as_str() {
+                    Ok(s == "health_ok")
+                } else {
+                    Ok(true) // Kernel responded, even if not with expected value
+                }
+            }
+            Err(_) => Ok(false),
+        }
+    }
+}
 
 /// Trait for kernel connection operations
 #[async_trait]
@@ -174,8 +322,13 @@ impl KernelConnection {
         sleep(Duration::from_millis(500)).await;
 
         // Wait for kernel to be ready and connect
-        let addr = format!("{}:{}", info.ip, info.shell_port);
-        tracing::debug!("[9.8.2] start_new_kernel - waiting for kernel at {}", addr);
+        // For legacy compatibility, connect to shell_port + 10 where TCP server runs
+        let tcp_port = info.shell_port + 10;
+        let addr = format!("{}:{}", info.ip, tcp_port);
+        tracing::debug!(
+            "[9.8.2] start_new_kernel - waiting for kernel at {} (legacy TCP port)",
+            addr
+        );
 
         match Self::wait_for_kernel_ready(&addr, 50).await {
             Ok(protocol_client) => {
@@ -200,51 +353,49 @@ impl KernelConnection {
 
     /// Find the kernel binary path
     fn find_kernel_binary() -> Result<std::path::PathBuf> {
-        // Try common locations
-        let possible_paths = [
-            // In target directory (development)
-            "target/debug/llmspell-kernel",
-            "target/release/llmspell-kernel",
-            // Installed in PATH
-            "llmspell-kernel",
-            // Relative to current executable
-            "../target/debug/llmspell-kernel",
-            "../target/release/llmspell-kernel",
-        ];
-
-        for path_str in &possible_paths {
-            let path = std::path::Path::new(path_str);
-            if path.exists() && path.is_file() {
-                return Ok(path.to_path_buf());
-            }
-
-            // Also try using `which` for PATH resolution
-            if !path_str.contains('/') {
-                if let Ok(output) = std::process::Command::new("which").arg(path_str).output() {
-                    if output.status.success() {
-                        let path_str = String::from_utf8_lossy(&output.stdout).trim().to_string();
-                        if !path_str.is_empty() {
-                            return Ok(std::path::PathBuf::from(path_str));
-                        }
+        // Look for "llmspell-kernel" instead of old name
+        which::which("llmspell-kernel")
+            .or_else(|_| {
+                // Check target directory
+                if let Ok(current_exe) = std::env::current_exe() {
+                    let mut path = current_exe;
+                    path.pop(); // Remove current binary name
+                    path.push("llmspell-kernel");
+                    if path.exists() {
+                        return Ok(path);
                     }
                 }
-            }
-        }
 
-        // For tests, try to find it relative to the manifest directory
-        if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
-            let test_path = std::path::Path::new(&manifest_dir)
-                .join("target")
-                .join("debug")
-                .join("llmspell-kernel");
-            if test_path.exists() {
-                return Ok(test_path);
-            }
-        }
+                // Try common development locations
+                let possible_paths = [
+                    "target/debug/llmspell-kernel",
+                    "target/release/llmspell-kernel",
+                    "../target/debug/llmspell-kernel", 
+                    "../target/release/llmspell-kernel",
+                ];
 
-        anyhow::bail!(
-            "Could not find llmspell-kernel binary. Please ensure it is built and in your PATH."
-        )
+                for path_str in &possible_paths {
+                    let path = std::path::Path::new(path_str);
+                    if path.exists() && path.is_file() {
+                        return Ok(path.to_path_buf());
+                    }
+                }
+
+                // For tests, try to find it relative to the manifest directory
+                if let Ok(manifest_dir) = std::env::var("CARGO_MANIFEST_DIR") {
+                    let test_path = std::path::Path::new(&manifest_dir)
+                        .join("target")
+                        .join("debug")
+                        .join("llmspell-kernel");
+                    if test_path.exists() {
+                        return Ok(test_path);
+                    }
+                }
+
+                anyhow::bail!(
+                    "Could not find llmspell-kernel binary. Please ensure it is built and in your PATH."
+                )
+            })
     }
 
     /// Spawn a kernel process
@@ -262,6 +413,7 @@ impl KernelConnection {
             .arg(port.to_string())
             .arg("--engine")
             .arg("lua") // Default to Lua engine
+            .arg("--legacy-tcp") // Enable backward compatibility with LRP/TCP protocol
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::null())
@@ -321,8 +473,9 @@ impl KernelConnectionTrait for KernelConnection {
                 "[9.8.2] connect_or_start - found existing kernel: {}",
                 kernel.kernel_id
             );
-            // Try to connect to existing kernel
-            let addr = format!("{}:{}", kernel.ip, kernel.shell_port);
+            // Try to connect to existing kernel via legacy TCP port
+            let tcp_port = kernel.shell_port + 10;
+            let addr = format!("{}:{}", kernel.ip, tcp_port);
 
             match ProtocolClient::connect(&addr).await {
                 Ok(protocol_client) => {
@@ -1149,7 +1302,7 @@ mod tests {
     use llmspell_bridge::{
         null_circuit_breaker::NullCircuitBreaker, null_session_recorder::NullSessionRecorder,
     };
-    use llmspell_repl::connection::ConnectionInfo;
+    use llmspell_repl::ConnectionInfo;
     use std::time::Duration;
 
     #[tokio::test]
