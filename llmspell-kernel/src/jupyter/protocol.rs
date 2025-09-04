@@ -191,6 +191,44 @@ pub enum MessageContent {
         data: HashMap<String, Value>,
         metadata: HashMap<String, Value>,
     },
+
+    // === COMM CHANNELS FOR CUSTOM COMMUNICATION ===
+    #[serde(rename = "comm_open")]
+    CommOpen {
+        comm_id: String,
+        target_name: String,
+        data: Value,
+        metadata: Option<HashMap<String, Value>>,
+    },
+
+    #[serde(rename = "comm_msg")]
+    CommMsg {
+        comm_id: String,
+        data: Value,
+        metadata: Option<HashMap<String, Value>>,
+    },
+
+    #[serde(rename = "comm_close")]
+    CommClose {
+        comm_id: String,
+        data: Option<Value>,
+        metadata: Option<HashMap<String, Value>>,
+    },
+
+    #[serde(rename = "comm_info_request")]
+    CommInfoRequest { target_name: Option<String> },
+
+    #[serde(rename = "comm_info_reply")]
+    CommInfoReply {
+        status: String,
+        comms: HashMap<String, CommInfo>,
+    },
+}
+
+/// Information about an open comm channel
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommInfo {
+    pub target_name: String,
 }
 
 /// Execution status for `execute_reply` messages

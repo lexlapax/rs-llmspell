@@ -12,7 +12,9 @@ use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::client::ClientManager;
+use crate::comm_handler::CommManager;
 use crate::security::SecurityManager;
+use crate::session_persistence::SessionMapper;
 use crate::traits::{KernelMessage, Protocol, Transport};
 
 /// Kernel execution state
@@ -98,6 +100,12 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
     /// Execution counter for tracking
     pub execution_count: Arc<Mutex<u32>>,
 
+    /// Session persistence mapper
+    pub session_mapper: Arc<SessionMapper>,
+
+    /// Comm channel manager for session management
+    pub comm_manager: Arc<CommManager>,
+
     /// Shutdown signal sender
     shutdown_tx: Option<oneshot::Sender<()>>,
 }
@@ -151,6 +159,12 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         // Create client manager
         let client_manager = Arc::new(ClientManager::new(config.max_clients));
 
+        // Create session mapper for persistence
+        let session_mapper = Arc::new(SessionMapper::new().await?);
+
+        // Create comm manager for session communication
+        let comm_manager = Arc::new(CommManager::new(session_mapper.clone())?);
+
         Ok(Self {
             kernel_id,
             transport,
@@ -162,6 +176,8 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             security_manager,
             resource_limits: ClientResourceLimits::default(),
             execution_count: Arc::new(Mutex::new(0)),
+            session_mapper,
+            comm_manager,
             shutdown_tx: None,
         })
     }
@@ -235,6 +251,10 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "execute_request" => self.handle_execute(content).await,
             "shutdown_request" => self.handle_shutdown(content).await,
             "interrupt_request" => Ok(Self::handle_interrupt()),
+            "comm_open" => self.handle_comm_open(content).await,
+            "comm_msg" => self.handle_comm_msg(content).await,
+            "comm_close" => self.handle_comm_close(content).await,
+            "comm_info_request" => self.handle_comm_info_request(content).await,
             _ => {
                 tracing::warn!("Unknown message type: {}", msg_type);
                 Ok(serde_json::json!({
@@ -245,7 +265,20 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         }
     }
 
-    fn handle_kernel_info(&self) -> serde_json::Value {
+    pub fn handle_kernel_info(&self) -> serde_json::Value {
+        // Include session metadata extensions for llmspell
+        let session_metadata = serde_json::json!({
+            "persistence_enabled": true,
+            "session_mapper": "llmspell-sessions",
+            "state_backend": "llmspell-state-persistence",
+            "comm_targets": [
+                crate::comm_handler::SESSION_COMM_TARGET,
+                crate::comm_handler::STATE_COMM_TARGET,
+            ],
+            "max_clients": self.config.max_clients,
+            "kernel_id": self.kernel_id.clone(),
+        });
+
         serde_json::json!({
             "status": "ok",
             "protocol_version": "5.3",
@@ -257,13 +290,26 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                 "file_extension": if self.config.engine == "lua" { ".lua" } else { ".js" }
             },
             "banner": format!("LLMSpell Kernel v{} - {}", env!("CARGO_PKG_VERSION"), self.config.engine),
-            "help_links": []
+            "help_links": [],
+            // LLMSpell extensions
+            "llmspell_session_metadata": session_metadata
         })
     }
 
     async fn handle_execute(&self, content: serde_json::Value) -> Result<serde_json::Value> {
         let code = content["code"].as_str().unwrap_or("");
         let silent = content["silent"].as_bool().unwrap_or(false);
+
+        // Get session ID from the message metadata (if available)
+        let session_id = content["metadata"]["session_id"]
+            .as_str()
+            .unwrap_or(&self.kernel_id);
+
+        // Get or create session for this execution
+        let llmspell_session_id = self
+            .session_mapper
+            .get_or_create_session(session_id, &self.kernel_id)
+            .await?;
 
         if !silent {
             *self.execution_state.write().await = KernelState::Busy;
@@ -274,6 +320,11 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             *count += 1;
             *count
         };
+
+        // Store execution count in session state
+        self.session_mapper
+            .store_execution_count(&llmspell_session_id, execution_count)
+            .await?;
 
         // Execute code using ScriptRuntime
         // Execute and collect output from the stream
@@ -344,6 +395,72 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         serde_json::json!({
             "status": "ok"
         })
+    }
+
+    async fn handle_comm_open(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        let comm_id = content["comm_id"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing comm_id"))?;
+        let target_name = content["target_name"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing target_name"))?;
+
+        // Get session from message metadata (would normally come from header)
+        let session_id = content["session"].as_str().unwrap_or("default-session");
+
+        self.comm_manager
+            .open_comm(
+                comm_id.to_string(),
+                target_name.to_string(),
+                session_id,
+                &self.kernel_id,
+            )
+            .await?;
+
+        tracing::debug!("Opened comm {} with target {}", comm_id, target_name);
+
+        Ok(serde_json::json!({
+            "status": "ok"
+        }))
+    }
+
+    async fn handle_comm_msg(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        let comm_id = content["comm_id"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing comm_id"))?;
+        let data = content["data"].clone();
+
+        let response = self.comm_manager.handle_comm_msg(comm_id, data).await?;
+
+        Ok(serde_json::to_value(response)?)
+    }
+
+    async fn handle_comm_close(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        let comm_id = content["comm_id"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing comm_id"))?;
+
+        self.comm_manager.close_comm(comm_id).await?;
+
+        tracing::debug!("Closed comm {}", comm_id);
+
+        Ok(serde_json::json!({
+            "status": "ok"
+        }))
+    }
+
+    async fn handle_comm_info_request(
+        &self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let target_name = content["target_name"].as_str();
+
+        let comms = self.comm_manager.get_comm_info(target_name).await;
+
+        Ok(serde_json::json!({
+            "status": "ok",
+            "comms": comms
+        }))
     }
 
     /// Shutdown the kernel gracefully

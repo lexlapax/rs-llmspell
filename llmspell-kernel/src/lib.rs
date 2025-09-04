@@ -26,11 +26,13 @@ pub mod traits;
 
 // Core modules
 pub mod client;
+pub mod comm_handler;
 pub mod connection;
 pub mod discovery;
 pub mod kernel;
 pub mod protocol;
 pub mod security;
+pub mod session_persistence;
 
 // Jupyter protocol implementation (Task 9.8.5)
 pub mod jupyter;
