@@ -16,6 +16,7 @@ use crate::{
 };
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
+use llmspell_state_persistence::manager::StateManager;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::sync::RwLock as TokioRwLock;
@@ -174,6 +175,41 @@ impl ScriptRuntime {
         match engine_name {
             "lua" => Self::new_with_lua(config).await,
             "javascript" | "js" => Self::new_with_javascript(config).await,
+            _ => Err(LLMSpellError::Validation {
+                field: Some("engine".to_string()),
+                message: format!("Unsupported engine: {engine_name}. Available: lua, javascript"),
+            }),
+        }
+    }
+
+    /// Create a new runtime with a specific engine and external `StateManager`
+    ///
+    /// This constructor allows sharing a `StateManager` instance between the kernel
+    /// and the runtime, ensuring they use the same state backend.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine is not found or runtime initialization fails
+    pub async fn new_with_engine_and_state_manager(
+        engine_name: &str,
+        config: LLMSpellConfig,
+        state_manager: Arc<StateManager>,
+    ) -> Result<Self, LLMSpellError> {
+        match engine_name {
+            "lua" => {
+                let lua_config = LuaConfig::default();
+                let engine = EngineFactory::create_lua_engine_with_state_manager(
+                    &lua_config,
+                    Some(Arc::new(config.clone())),
+                    state_manager,
+                )?;
+                Self::new_with_engine(engine, config).await
+            }
+            "javascript" | "js" => {
+                // JavaScript engine doesn't support external StateManager yet
+                // Fall back to creating its own
+                Self::new_with_javascript(config).await
+            }
             _ => Err(LLMSpellError::Validation {
                 field: Some("engine".to_string()),
                 message: format!("Unsupported engine: {engine_name}. Available: lua, javascript"),

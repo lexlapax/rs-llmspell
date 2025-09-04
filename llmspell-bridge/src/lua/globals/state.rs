@@ -22,10 +22,11 @@ fn create_save_handler(
 
         if let Some(state) = &state_access {
             // Use block_on_async utility for proper async-to-sync conversion
+            // StateAccess handles scoping internally, so we just pass the key
             let state_clone = state.clone();
             let result = crate::lua::sync_utils::block_on_async(
                 "state_save",
-                async move { state_clone.write(&full_key, json_value).await },
+                async move { state_clone.write(&key, json_value).await },
                 None,
             );
 
@@ -47,20 +48,13 @@ fn create_load_handler(
     fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 ) -> impl Fn(&Lua, (String, String)) -> mlua::Result<Value> {
     move |lua, (scope_str, key): (String, String)| {
-        // For custom scope with workflow keys, construct the key properly
-        // The StateAccess will add its own prefix, so we just pass the key part
+        // For fallback state, we use scope:key format
         let full_key = format!("{scope_str}:{key}");
-        let actual_key = if scope_str == "custom" && key.starts_with(':') {
-            // Remove leading colon for custom::workflow keys
-            key[1..].to_string()
-        } else {
-            key.clone()
-        };
-        tracing::info!(
-            "Lua State.load: scope='{}', key='{}', actual_key='{}', full_key='{}'",
+
+        tracing::debug!(
+            "Lua State.load: scope='{}', key='{}', full_key='{}'",
             scope_str,
             key,
-            actual_key,
             full_key
         );
 
@@ -73,11 +67,11 @@ fn create_load_handler(
             },
             |state| {
                 // Use block_on_async utility for proper async-to-sync conversion
-                // Pass the actual_key which will get the Custom("") prefix from StateManagerAdapter
+                // StateAccess handles scoping internally, so we just pass the key
                 let state_clone = state.clone();
                 let result = crate::lua::sync_utils::block_on_async(
                     "state_load",
-                    async move { state_clone.read(&actual_key).await },
+                    async move { state_clone.read(&key).await },
                     None,
                 );
 
@@ -99,24 +93,28 @@ fn create_delete_handler(
     move |_, (scope_str, key): (String, String)| {
         let full_key = format!("{scope_str}:{key}");
 
-        if let Some(state) = &state_access {
-            // Use block_on_async utility for proper async-to-sync conversion
-            let state_clone = state.clone();
-            let result = crate::lua::sync_utils::block_on_async(
-                "state_delete",
-                async move { state_clone.delete(&full_key).await },
-                None,
-            );
+        state_access.as_ref().map_or_else(
+            || {
+                let mut state = fallback_state.write();
+                state.remove(&full_key);
+                Ok(())
+            },
+            |state| {
+                // Use block_on_async utility for proper async-to-sync conversion
+                // StateAccess handles scoping internally, so we just pass the key
+                let state_clone = state.clone();
+                let result = crate::lua::sync_utils::block_on_async(
+                    "state_delete",
+                    async move { state_clone.delete(&key).await },
+                    None,
+                );
 
-            match result {
-                Ok(_) => Ok(()),
-                Err(e) => Err(LuaError::RuntimeError(format!("State delete error: {e}"))),
-            }
-        } else {
-            let mut state = fallback_state.write();
-            state.remove(&full_key);
-            Ok(())
-        }
+                match result {
+                    Ok(_) => Ok(()),
+                    Err(e) => Err(LuaError::RuntimeError(format!("State delete error: {e}"))),
+                }
+            },
+        )
     }
 }
 

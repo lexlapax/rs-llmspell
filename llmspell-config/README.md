@@ -1,10 +1,11 @@
 # llmspell-config
 
-Comprehensive configuration management for Rs-LLMSpell framework with specialized RAG, multi-tenant, and performance tuning support.
+Comprehensive configuration management for Rs-LLMSpell framework with unified kernel configuration, specialized RAG, multi-tenant, and performance tuning support.
 
 ## Features
 
 ### Core Configuration Management
+- **Unified Configuration**: Single LLMSpellConfig for kernel, runtime, and state persistence
 - **Layered Configuration**: Hierarchical config (defaults → file → environment → runtime)
 - **Type-Safe Validation**: Compile-time configuration validation with serde
 - **Hot-Reloading**: Dynamic configuration updates without service restart
@@ -17,6 +18,42 @@ Comprehensive configuration management for Rs-LLMSpell framework with specialize
 - **Multi-Tenant Settings**: Tenant-specific configuration with inheritance and overrides
 
 ## Usage
+
+### Unified Configuration Architecture
+```rust
+use llmspell_config::{LLMSpellConfig, GlobalRuntimeConfig, KernelSettings};
+
+// Single configuration for entire system - kernel, runtime, and state
+let config = LLMSpellConfig::builder()
+    .default_engine("lua")
+    .runtime(
+        GlobalRuntimeConfig::builder()
+            // Kernel configuration
+            .kernel(KernelSettings {
+                max_clients: 10,
+                auth_enabled: true,
+                heartbeat_interval_ms: 30000,
+                legacy_tcp_port_offset: 1000,
+                shutdown_timeout_seconds: 30,
+            })
+            // State persistence configuration
+            .state_persistence(StatePersistenceConfig {
+                enabled: true,
+                backend_type: "sled".to_string(),
+                ..Default::default()
+            })
+            // Session management
+            .sessions(SessionConfig {
+                enabled: true,
+                ..Default::default()
+            })
+            .build(),
+    )
+    .build();
+
+// Used by kernel, ScriptRuntime, and all components
+let shared_config = Arc::new(config);
+```
 
 ### Basic Configuration
 ```rust

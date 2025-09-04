@@ -11,11 +11,12 @@
 This crate provides the bridge layer between script languages and rs-llmspell's Rust implementation, enabling:
 
 - **Zero-Configuration Access**: Pre-injected global objects (Agent, Tool, Workflow, State, Hook, Event, RAG)
+- **Shared State Architecture**: ScriptRuntime shares StateManager with kernel for unified state
 - **RAG Integration (Phase 8)**: Complete RAG pipeline access with multi-tenant isolation
 - **Synchronous API**: Transparent async-to-sync conversion for script compatibility
 - **Cross-Language Support**: Consistent API across Lua and JavaScript
 - **Performance Optimized**: <5ms injection overhead, <10ms execution overhead
-- **State Management**: Full Phase 5 persistent state access from scripts
+- **State Management**: Full Phase 5 persistent state access from scripts with shared backend
 - **Hook & Event Integration**: Complete Phase 4 hook/event system access
 - **Multi-Tenant RAG**: Tenant-scoped document ingestion and retrieval operations
 
@@ -266,6 +267,55 @@ RAG.delete_documents("tenant:company-123", {
 RAG.cleanup_tenant("tenant:old-company")
 ```
 
+## Shared State Architecture (Phase 9)
+
+The bridge now supports shared state management between kernel and ScriptRuntime:
+
+### Creating ScriptRuntime with Shared StateManager
+
+```rust
+use llmspell_bridge::ScriptRuntime;
+use llmspell_state_persistence::factory::StateFactory;
+use llmspell_config::LLMSpellConfig;
+use std::sync::Arc;
+
+// Create configuration with state persistence enabled
+let config = Arc::new(LLMSpellConfig::builder()
+    .default_engine("lua")
+    .runtime(GlobalRuntimeConfig::builder()
+        .state_persistence(StatePersistenceConfig {
+            enabled: true,
+            backend_type: "sled".to_string(),
+            ..Default::default()
+        })
+        .build())
+    .build());
+
+// Create shared StateManager
+let state_manager = StateFactory::create_from_config(&config).await?
+    .expect("State persistence enabled");
+
+// Create ScriptRuntime with the shared StateManager
+let runtime = ScriptRuntime::new_with_engine_and_state_manager(
+    "lua",
+    (*config).clone(),
+    state_manager.clone(),  // Pass the shared StateManager
+).await?;
+
+// Now State global in scripts uses the shared backend
+let result = runtime.execute_script(r#"
+    State.save("global", "shared_key", {value = 42})
+    return State.load("global", "shared_key")
+"#).await?;
+```
+
+### Benefits of Shared State
+
+1. **No File Lock Conflicts**: Single StateManager prevents concurrent access issues
+2. **Data Consistency**: Kernel and scripts see the same state immediately
+3. **Memory Efficiency**: One state backend instead of multiple instances
+4. **Simplified Testing**: Single state manager simplifies test setup
+
 ## Architecture
 
 The bridge consists of several layers:
@@ -429,4 +479,4 @@ cargo bench -p llmspell-bridge
 
 ## License
 
-This project is dual-licensed under MIT OR Apache-2.0.
+This project is licensed under  Apache-2.0.

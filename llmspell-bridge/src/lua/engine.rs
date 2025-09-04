@@ -41,6 +41,8 @@ pub struct LuaEngine {
     execution_manager: Option<Arc<crate::execution_bridge::ExecutionManager>>,
     #[cfg(feature = "lua")]
     lua_debug_adapter: Option<Arc<crate::lua::debug_hook_adapter::LuaDebugHookAdapter>>,
+    /// External `StateManager` for shared state access
+    external_state_manager: Option<Arc<llmspell_state_persistence::manager::StateManager>>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -79,6 +81,7 @@ impl LuaEngine {
                 execution_hook: None,
                 execution_manager: None,
                 lua_debug_adapter: None,
+                external_state_manager: None,
             })
         }
 
@@ -89,7 +92,54 @@ impl LuaEngine {
                 execution_context: ExecutionContext::default(),
                 runtime_config: None,
                 script_args: None,
-                debug_manager: None,
+                execution_manager: None,
+                external_state_manager: None,
+            })
+        }
+    }
+
+    /// Create a new Lua engine with the given configuration and external `StateManager`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua feature is not enabled or engine creation fails
+    pub fn new_with_state_manager(
+        config: &LuaConfig,
+        state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
+    ) -> Result<Self, LLMSpellError> {
+        #[cfg(feature = "lua")]
+        {
+            use mlua::Lua;
+
+            // Create Lua instance (async is enabled via feature flag)
+            let lua = Lua::new();
+
+            // Install output capture (without debug bridge for now)
+            let console_capture = install_output_capture(&lua, None).ok();
+
+            Ok(Self {
+                lua: Arc::new(parking_lot::Mutex::new(lua)),
+                _config: config.clone(),
+                execution_context: ExecutionContext::default(),
+                runtime_config: None,
+                script_args: None,
+                console_capture,
+                execution_hook: None,
+                execution_manager: None,
+                lua_debug_adapter: None,
+                external_state_manager: Some(state_manager),
+            })
+        }
+
+        #[cfg(not(feature = "lua"))]
+        {
+            Ok(Self {
+                _config: config.clone(),
+                execution_context: ExecutionContext::default(),
+                runtime_config: None,
+                script_args: None,
+                execution_manager: None,
+                external_state_manager: Some(state_manager),
             })
         }
     }
@@ -445,8 +495,18 @@ impl ScriptEngineBridge for LuaEngine {
             // Create GlobalContext with state support if configured
             let mut state_access: Option<Arc<dyn llmspell_core::traits::state::StateAccess>> = None;
 
-            // Check if state persistence is enabled and create state access
-            if let Some(runtime_config) = &self.runtime_config {
+            // Check if an external StateManager was provided first
+            if let Some(ref external_sm) = self.external_state_manager {
+                // Use the external StateManager by wrapping it in a StateManagerAdapter
+                let adapter = crate::state_adapter::StateManagerAdapter::new(
+                    external_sm.clone(),
+                    llmspell_state_persistence::StateScope::Global,
+                );
+                state_access =
+                    Some(Arc::new(adapter) as Arc<dyn llmspell_core::traits::state::StateAccess>);
+                tracing::debug!("Using external StateManager for state access");
+            } else if let Some(runtime_config) = &self.runtime_config {
+                // Only create a new StateManager if no external one was provided
                 if runtime_config.runtime.state_persistence.enabled {
                     // Try to create StateManagerAdapter for state access
                     match futures::executor::block_on(
@@ -476,6 +536,13 @@ impl ScriptEngineBridge for LuaEngine {
                     ))
                 },
             );
+
+            // If we have an external StateManager, also store it in bridge refs
+            // so get_or_create_state_infrastructure can find it
+            if let Some(ref external_sm) = self.external_state_manager {
+                global_context.set_bridge("state_manager", external_sm.clone());
+                tracing::debug!("Stored external StateManager in GlobalContext bridge refs");
+            }
 
             // Pass runtime config through global context if available
             if let Some(runtime_config) = &self.runtime_config {

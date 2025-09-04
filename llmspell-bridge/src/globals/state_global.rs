@@ -106,8 +106,8 @@ impl StateGlobal {
         schema_registry: Option<Arc<SchemaRegistry>>,
         backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
     ) -> Self {
-        // Use StateManagerAdapter with Custom scope for StateGlobal
-        // This allows reading keys that were written by NoScopeStateAdapter
+        // Use StateManagerAdapter with Global scope for external StateManager
+        // This ensures consistency with how the kernel stores data
         tracing::info!(
             "StateGlobal: Creating StateManagerAdapter with StateManager at {:p}",
             Arc::as_ptr(&state_manager)
@@ -115,7 +115,7 @@ impl StateGlobal {
         let state_access: Arc<dyn StateAccess> =
             Arc::new(crate::state_adapter::StateManagerAdapter::new(
                 state_manager.clone(),
-                StateScope::Custom(String::new()),
+                StateScope::Global,
             ));
 
         Self {

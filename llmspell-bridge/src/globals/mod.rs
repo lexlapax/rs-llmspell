@@ -160,6 +160,23 @@ async fn register_agent_workflow(
 
 /// Create `StateGlobal` with migration support if configured
 async fn create_state_global(context: &Arc<GlobalContext>) -> Arc<state_global::StateGlobal> {
+    // First check if there's already a state_manager in bridge refs (external StateManager)
+    if let Some(state_manager) =
+        context.get_bridge::<llmspell_state_persistence::manager::StateManager>("state_manager")
+    {
+        tracing::debug!(
+            "Found external StateManager in GlobalContext, creating StateGlobal with it"
+        );
+        // Create StateGlobal with the external StateManager (no migration/backup for now)
+        return Arc::new(state_global::StateGlobal::with_full_support(
+            state_manager,
+            None,
+            None,
+            None,
+        ));
+    }
+
+    // Otherwise check runtime config for state persistence settings
     if let Some(runtime_config) =
         context.get_bridge::<llmspell_config::LLMSpellConfig>("runtime_config")
     {

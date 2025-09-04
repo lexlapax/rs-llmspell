@@ -1,12 +1,14 @@
 # llmspell-state-persistence
 
-Enterprise-grade persistent state management for rs-llmspell with multi-backend support, schema migrations, and atomic backups.
+Enterprise-grade persistent state management for rs-llmspell with shared state architecture, multi-backend support, schema migrations, and atomic backups.
 
 ## Overview
 
-This crate provides the complete state persistence implementation for rs-llmspell (Phase 5), enabling production-ready state management with:
+This crate provides the complete state persistence implementation for rs-llmspell (Phase 5 & 9), enabling production-ready state management with:
 
+- **Shared State Architecture**: Single StateManager instance shared across kernel and ScriptRuntime
 - **Multi-Backend Support**: Memory (default), Sled, and RocksDB
+- **State Factory**: Automatic creation of shared StateManager from configuration
 - **State Scoping**: 6 levels (Global, Agent, Workflow, Step, Session, Custom)
 - **Schema Migrations**: Version management with field transformations
 - **Atomic Backups**: SHA256-validated backups with compression
@@ -50,6 +52,38 @@ This crate provides the complete state persistence implementation for rs-llmspel
 - Access control per agent
 
 ## Usage
+
+### Shared State Architecture (Phase 9)
+
+```rust
+use llmspell_state_persistence::factory::StateFactory;
+use llmspell_config::LLMSpellConfig;
+use std::sync::Arc;
+
+// Create shared StateManager from configuration
+let config = Arc::new(LLMSpellConfig::builder()
+    .runtime(GlobalRuntimeConfig::builder()
+        .state_persistence(StatePersistenceConfig {
+            enabled: true,
+            backend_type: "sled".to_string(),
+            ..Default::default()
+        })
+        .build())
+    .build());
+
+// StateFactory ensures single instance creation
+let state_manager = StateFactory::create_from_config(&config).await?
+    .expect("State persistence is enabled");
+
+// Share the same StateManager across components
+let kernel_state = state_manager.clone();
+let runtime_state = state_manager.clone();
+
+// Both kernel and ScriptRuntime use the same state backend
+kernel_state.set(StateScope::Global, "shared_key", value).await?;
+let retrieved = runtime_state.get(StateScope::Global, "shared_key").await?;
+assert_eq!(retrieved, Some(value)); // Same data visible to both
+```
 
 ### Basic State Operations
 

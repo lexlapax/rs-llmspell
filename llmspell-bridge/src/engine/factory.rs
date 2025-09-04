@@ -49,6 +49,34 @@ impl EngineFactory {
         }
     }
 
+    /// Create a Lua engine with the given configuration, runtime config, and external `StateManager`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua feature is not enabled or engine creation fails
+    pub fn create_lua_engine_with_state_manager(
+        config: &LuaConfig,
+        runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
+        state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
+    ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+        #[cfg(feature = "lua")]
+        {
+            use crate::lua::LuaEngine;
+            let mut engine = LuaEngine::new_with_state_manager(config, state_manager)?;
+            if let Some(rc) = runtime_config {
+                engine.set_runtime_config(rc);
+            }
+            Ok(Box::new(engine))
+        }
+        #[cfg(not(feature = "lua"))]
+        {
+            Err(LLMSpellError::Component {
+                message: "Lua engine not enabled. Enable the 'lua' feature.".to_string(),
+                source: None,
+            })
+        }
+    }
+
     /// Create a JavaScript engine with the given configuration
     ///
     /// # Errors

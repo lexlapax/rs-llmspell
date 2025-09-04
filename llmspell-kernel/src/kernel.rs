@@ -135,10 +135,20 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             .map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?;
 
         // Create script runtime from llmspell-bridge with shared state manager
-        let runtime =
+        let runtime = if let Some(ref sm) = state_manager {
+            ScriptRuntime::new_with_engine_and_state_manager(
+                &config.default_engine,
+                (*config).clone(),
+                sm.clone(),
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?
+        } else {
+            // Fallback to creating runtime without external state manager
             ScriptRuntime::new_with_engine_name(&config.default_engine, (*config).clone())
                 .await
-                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
+                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?
+        };
 
         // Get transport configuration from protocol
         let transport_config = protocol.transport_config();
