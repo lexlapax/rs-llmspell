@@ -20,17 +20,16 @@ pub mod security;
 pub mod client;
 pub mod protocol;
 
-// These modules will be populated in Task 9.8.5
-// pub mod jupyter;
-// pub mod transport;
-// pub mod execution;
-// pub mod debug;
+// Jupyter protocol implementation (Task 9.8.5)
+pub mod jupyter;
+pub mod transport;
+// pub mod execution;  // Will be implemented later
+// pub mod debug;      // Will be implemented later
 
 // Re-export key types
 pub use kernel::{LLMSpellKernel, KernelConfig, KernelState};
 pub use connection::ConnectionInfo;
 pub use discovery::KernelDiscovery;
 
-// Re-export key types that will be added later
-// pub use jupyter::ConnectionInfo;
-// pub use transport::ZmqTransport;
+// Re-export Jupyter protocol types
+pub use transport::ZmqTransport;

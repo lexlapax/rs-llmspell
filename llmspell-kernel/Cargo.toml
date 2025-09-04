@@ -37,12 +37,13 @@ llmspell-utils = { path = "../llmspell-utils" }
 # Temporary dependency - will be removed after Jupyter implementation
 llmspell-engine = { path = "../llmspell-engine" }
 
-# ZeroMQ and Jupyter (to be uncommented in Task 9.8.5)
-# zmq = "0.10"
-# jupyter-protocol = { git = "https://github.com/llmspell/jupyter-protocol" }
-# hmac = "0.12"
-# sha2 = "0.10"
-# hex = "0.4"
+# ZeroMQ and Jupyter dependencies  
+zmq = "0.10"
+hmac = "0.12"
+sha2 = "0.10"
+rand = "0.8"
+futures = "0.3"
+# Note: hex already included above, jupyter-protocol types implemented manually
 
 [[bin]]
 name = "llmspell-kernel"

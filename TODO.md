@@ -8383,13 +8383,13 @@ Fastpath and Debug/Trace should both follow the same path. the Debug/Trace may g
    ```
 
 **Acceptance Criteria:**
-- [ ] ZeroMQ transport working with 5 channels
-- [ ] Core Jupyter messages implemented (execute, kernel_info, shutdown)
-- [ ] Connection files use standard Jupyter format
-- [ ] Can connect with `jupyter console --existing`
-- [ ] DAP commands work through debug_request/reply
-- [ ] No more TCP framing issues
-- [ ] Output streaming works via IOPub channel
+- [x] ZeroMQ transport working with 5 channels
+- [x] Core Jupyter messages implemented (execute, kernel_info, shutdown) 
+- [x] Connection files use standard Jupyter format
+- [x] Can connect with `jupyter console --existing` (receives messages)
+- [ ] DAP commands work through debug_request/reply - TODO
+- [x] No more TCP framing issues
+- [ ] Output streaming works via IOPub channel - TODO
 
 #### Task 9.8.6: Update CLI to Use llmspell-kernel
 **Priority**: HIGH  

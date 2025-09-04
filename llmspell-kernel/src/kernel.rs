@@ -6,15 +6,14 @@
 use anyhow::Result;
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
-use llmspell_engine::ProtocolEngine; // Import the trait for register_adapter
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
 use crate::client::{ClientManager, ConnectedClient};
 use crate::connection::ConnectionInfo;
-use crate::protocol::LRPResponse;
 use crate::security::SecurityManager;
+use crate::transport::ZmqTransport;
 
 /// Kernel execution state
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -100,9 +99,6 @@ pub struct LLMSpellKernel {
     /// Client manager
     pub client_manager: Arc<ClientManager>,
 
-    /// Protocol engine for handling protocol messages
-    pub protocol_engine: Option<Arc<llmspell_engine::UnifiedProtocolEngine>>,
-
     /// Current execution state
     pub execution_state: Arc<RwLock<KernelState>>,
 
@@ -158,8 +154,7 @@ impl LLMSpellKernel {
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
 
-        // Protocol engine will be initialized in run() method
-        // We store it as Option to set it up after kernel creation
+        // Jupyter protocol will be handled by serve_jupyter() method
 
         // Create connection info
         let connection_info = ConnectionInfo::new(
@@ -188,7 +183,6 @@ impl LLMSpellKernel {
             kernel_id: kernel_id.clone(),
             runtime: Arc::new(Mutex::new(runtime)),
             client_manager,
-            protocol_engine: None,
             execution_state: Arc::new(RwLock::new(KernelState::Starting)),
             config: config.clone(),
             connection_info,
@@ -205,155 +199,19 @@ impl LLMSpellKernel {
         Ok(kernel)
     }
 
-    /// Start a new kernel with sidecar support for service mesh pattern
+    /// Run the kernel with Jupyter protocol
     ///
     /// # Errors
     ///
-    /// Returns an error if kernel or sidecar initialization fails
-    pub async fn start_with_sidecar(config: KernelConfig) -> Result<Self> {
-        use llmspell_engine::sidecar::{
-            LocalServiceDiscovery, NullMetricsCollector, Sidecar, SidecarConfig,
-        };
-        use llmspell_engine::UnifiedProtocolEngine;
-        use llmspell_utils::circuit_breaker::{CircuitBreaker, CircuitBreakerConfig};
-        use std::sync::Arc;
-
-        // Create the kernel first
-        let kernel = Box::pin(Self::start(config.clone())).await?;
-
-        // Create protocol engine for sidecar
-        // Note: This is a placeholder - in real implementation, we'd use the actual transport
-        // from the UnifiedProtocolEngine when it's created in run()
-        let transport = Box::new(
-            llmspell_engine::transport::tcp::TcpTransport::connect(&format!(
-                "{}:{}",
-                config.ip, config.port_range_start
-            ))
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create transport: {}", e))?,
-        );
-
-        let engine = Arc::new(UnifiedProtocolEngine::new(transport));
-
-        // Create sidecar components
-        let circuit_breaker = CircuitBreaker::new(CircuitBreakerConfig::default());
-        let discovery = Arc::new(LocalServiceDiscovery::new());
-        let metrics = Arc::new(NullMetricsCollector); // Use null for now, can be replaced
-        let sidecar_config = SidecarConfig::default();
-
-        // Create sidecar
-        let _sidecar = Sidecar::new(engine, circuit_breaker, discovery, metrics, sidecar_config);
-
-        // In a full implementation, we would:
-        // 1. Store the sidecar in the kernel struct
-        // 2. Intercept all messages through the sidecar
-        // 3. Register the kernel service with discovery
-
-        tracing::info!("Kernel {} started with sidecar support", kernel.kernel_id);
-
-        Ok(kernel)
-    }
-
-    /// Run the kernel event loop
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the event loop fails
-    #[allow(clippy::cognitive_complexity)]
+    /// Returns an error if the Jupyter protocol server fails
     pub async fn run(mut self) -> Result<()> {
-        tracing::info!("[9.8.2] Kernel {} entering main event loop", self.kernel_id);
-
-        // Start channel listeners
-        // Channels are now handled by UnifiedProtocolEngine
-
-        // Create a new shutdown channel (the old one is dropped with self)
-        let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
-        // Drop the old shutdown sender if it exists
-        drop(self.shutdown_tx.take());
-
-        // Now we can move self into Arc to be used as MessageProcessor
-        let kernel_arc = Arc::new(self);
-
-        let server_config = llmspell_engine::ServerConfig {
-            ip: kernel_arc.config.ip.clone(),
-            shell_port: kernel_arc.connection_info.shell_port,
-            iopub_port: kernel_arc.connection_info.iopub_port,
-            stdin_port: kernel_arc.connection_info.stdin_port,
-            control_port: kernel_arc.connection_info.control_port,
-            heartbeat_port: kernel_arc.connection_info.hb_port,
-            max_connections: kernel_arc.config.max_clients,
-        };
-
-        // Create the unified protocol engine with the kernel as message processor
-        // Use mock transport for now - the serve() method will handle TCP connections
-        let transport = Box::new(llmspell_engine::transport::mock::MockTransport::new());
-        let mut protocol_engine = llmspell_engine::UnifiedProtocolEngine::with_processor(
-            transport,
-            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>,
+        tracing::info!(
+            "Starting LLMSpell kernel {} with Jupyter protocol",
+            self.kernel_id
         );
 
-        // Register LRP and LDP adapters with processor support
-        let repl_protocol_adapter = llmspell_engine::LRPAdapter::with_processor(
-            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>
-        );
-        let debug_protocol_adapter = llmspell_engine::LDPAdapter::with_processor(
-            kernel_arc.clone() as Arc<dyn llmspell_engine::MessageProcessor>,
-        );
-
-        protocol_engine
-            .register_adapter(
-                llmspell_engine::ProtocolType::LRP,
-                Box::new(repl_protocol_adapter),
-            )
-            .await?;
-        protocol_engine
-            .register_adapter(
-                llmspell_engine::ProtocolType::LDP,
-                Box::new(debug_protocol_adapter),
-            )
-            .await?;
-
-        // Create a ctrl-c handler
-        let ctrl_c = tokio::signal::ctrl_c();
-
-        // Spawn protocol engine task
-        let server_handle = tokio::spawn(async move {
-            if let Err(e) = protocol_engine.serve(server_config).await {
-                tracing::error!("Protocol engine error: {}", e);
-            }
-        });
-
-        // Keep shutdown_tx alive in a separate task
-        let _shutdown_guard = tokio::spawn(async move {
-            // This task will hold shutdown_tx until it's dropped
-            let _tx = shutdown_tx;
-            // Sleep forever (or until the task is cancelled)
-            tokio::time::sleep(std::time::Duration::from_secs(u64::MAX)).await;
-        });
-
-        // Main event loop
-        tokio::select! {
-            // Wait for shutdown signal
-            _ = shutdown_rx => {
-                tracing::info!("Kernel {} received shutdown signal", kernel_arc.kernel_id);
-            }
-            // Wait for Ctrl+C
-            _ = ctrl_c => {
-                tracing::info!("Kernel {} received Ctrl+C signal", kernel_arc.kernel_id);
-            }
-            // Wait for server task to complete (error case)
-            _ = server_handle => {
-                tracing::warn!("Protocol server task ended unexpectedly");
-            }
-        }
-
-        // Shutdown the kernel - need to extract from Arc
-        if let Ok(kernel) = Arc::try_unwrap(kernel_arc) {
-            kernel.shutdown().await?;
-        } else {
-            tracing::warn!("Could not cleanly shutdown kernel - Arc still has references");
-        }
-        Ok(())
+        // Start the Jupyter protocol server
+        self.serve_jupyter().await
     }
 
     /// Shutdown the kernel gracefully
@@ -465,120 +323,10 @@ impl LLMSpellKernel {
         .await
     }
 
-    /// Create execution response
-    fn create_execute_response(status: &str, execution_count: u32) -> LRPResponse {
-        LRPResponse::ExecuteReply {
-            status: status.to_string(),
-            execution_count,
-            user_expressions: None,
-            payload: None,
-        }
-    }
-
-    /// Handle execution success
-    fn handle_success(execution_count: u32, _silent: bool) -> LRPResponse {
-        // TODO: Broadcast output if not silent
-        Self::create_execute_response("ok", execution_count)
-    }
-
-    /// Handle execution error
-    fn handle_error(execution_count: u32, _silent: bool) -> LRPResponse {
-        // TODO: Broadcast error if not silent
-        Self::create_execute_response("error", execution_count)
-    }
-
     /// Finish execution and update state
     async fn finish_execution(&self, _silent: bool) {
         *self.execution_state.write().await = KernelState::Idle;
         // TODO: Broadcast idle status if not silent
-    }
-
-    /// Execute code for a client with resource limits
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if code execution fails
-    pub async fn execute_code(
-        &self,
-        _client_id: &str,
-        code: String,
-        silent: bool,
-    ) -> Result<LRPResponse> {
-        tracing::debug!("execute_code called with code: {}", code);
-
-        // Prepare for execution
-        let execution_count = self.prepare_execution().await;
-
-        // TODO: Broadcast busy status if not silent
-
-        // Execute code with timeout
-        let result = self.execute_with_timeout(&code).await;
-        tracing::debug!("Script execution result: {:?}", result.is_ok());
-
-        // Handle result based on execution outcome
-        let response = match result {
-            Ok(Ok(script_output)) => {
-                // Include the script output in the response
-                let payload = if let Ok(json_value) = serde_json::to_value(&script_output.output) {
-                    Some(vec![json_value])
-                } else {
-                    None
-                };
-                LRPResponse::ExecuteReply {
-                    status: "ok".to_string(),
-                    execution_count,
-                    user_expressions: None,
-                    payload,
-                }
-            }
-            Ok(Err(_)) | Err(_) => Self::handle_error(execution_count, silent),
-        };
-
-        // Finish execution
-        self.finish_execution(silent).await;
-
-        Ok(response)
-    }
-
-    /// Get kernel information
-    #[must_use]
-    pub fn get_kernel_info(&self) -> LRPResponse {
-        use crate::protocol::{HelpLink, LanguageInfo};
-
-        LRPResponse::KernelInfoReply {
-            protocol_version: "1.0".to_string(),
-            implementation: "llmspell".to_string(),
-            implementation_version: env!("CARGO_PKG_VERSION").to_string(),
-            language_info: LanguageInfo {
-                name: self.config.engine.clone(),
-                version: "1.0".to_string(),
-                mimetype: match self.config.engine.as_str() {
-                    "lua" => "text/x-lua",
-                    "javascript" => "text/javascript",
-                    _ => "text/plain",
-                }
-                .to_string(),
-                file_extension: match self.config.engine.as_str() {
-                    "lua" => ".lua",
-                    "javascript" => ".js",
-                    _ => ".txt",
-                }
-                .to_string(),
-                pygments_lexer: Some(self.config.engine.clone()),
-                codemirror_mode: Some(self.config.engine.clone()),
-                nbconvert_exporter: None,
-            },
-            banner: format!(
-                "LLMSpell Kernel v{} - {}",
-                env!("CARGO_PKG_VERSION"),
-                self.config.engine
-            ),
-            debugger: self.config.debug_enabled,
-            help_links: vec![HelpLink {
-                text: "LLMSpell Documentation".to_string(),
-                url: "https://github.com/lexlapax/rs-llmspell".to_string(),
-            }],
-        }
     }
 
     /// Check if kernel can accept more clients
@@ -588,108 +336,416 @@ impl LLMSpellKernel {
     }
 }
 
-// MessageProcessor implementation for clean separation between protocol and business logic
-#[async_trait::async_trait]
-impl llmspell_engine::MessageProcessor for LLMSpellKernel {
-    async fn process_lrp(
-        &self,
-        request: llmspell_engine::LRPRequest,
-    ) -> Result<llmspell_engine::LRPResponse, llmspell_engine::ProcessorError> {
-        use llmspell_engine::{LRPRequest, LRPResponse, ProcessorError};
+// ================== JUPYTER PROTOCOL IMPLEMENTATION ==================
 
-        tracing::info!("[9.8.2] process_lrp called with request: {:?}", request);
-        let response = match request {
-            LRPRequest::KernelInfoRequest => self.get_kernel_info(),
+impl LLMSpellKernel {
+    // ================== JUPYTER PROTOCOL IMPLEMENTATION ==================
 
-            LRPRequest::ExecuteRequest { code, silent, .. } => self
-                .execute_code("processor", code, silent)
-                .await
-                .map_err(|e| ProcessorError::ProcessingFailed(e.to_string()))?,
-
-            LRPRequest::CompleteRequest { cursor_pos, .. } => {
-                // TODO: Implement completion
-                LRPResponse::CompleteReply {
-                    matches: vec![],
-                    cursor_start: cursor_pos,
-                    cursor_end: cursor_pos,
-                    metadata: Some(serde_json::Value::Null),
-                    status: "ok".to_string(),
-                }
-            }
-
-            LRPRequest::InspectRequest { .. } => {
-                // TODO: Implement inspection
-                LRPResponse::InspectReply {
-                    status: "ok".to_string(),
-                    found: false,
-                    data: Some(serde_json::Value::Null),
-                    metadata: Some(serde_json::Value::Null),
-                }
-            }
-
-            LRPRequest::IsCompleteRequest { code } => LRPResponse::IsCompleteReply {
-                status: if code.trim().is_empty() {
-                    "incomplete"
-                } else {
-                    "complete"
-                }
-                .to_string(),
-                indent: String::new(),
-            },
-
-            LRPRequest::ShutdownRequest { restart } => LRPResponse::ShutdownReply { restart },
-
-            LRPRequest::InterruptRequest => LRPResponse::InterruptReply,
-
-            LRPRequest::HistoryRequest { .. } => LRPResponse::HistoryReply { history: vec![] },
-
-            LRPRequest::CommInfoRequest { .. } => LRPResponse::CommInfoReply {
-                comms: serde_json::Value::Object(serde_json::Map::new()),
-            },
-
-            LRPRequest::ConnectRequest => LRPResponse::ConnectReply {
-                shell_port: self.connection_info.shell_port,
-                iopub_port: self.connection_info.iopub_port,
-                stdin_port: self.connection_info.stdin_port,
-                control_port: self.connection_info.control_port,
-                hb_port: self.connection_info.hb_port,
-            },
+    /// Serve Jupyter protocol using ZeroMQ transport (replaces old run() method)
+    pub async fn serve_jupyter(&mut self) -> Result<()> {
+        use crate::jupyter::connection::{
+            ConnectionConfig, ConnectionInfo as JupyterConnectionInfo,
         };
+        use crate::transport::ZmqTransport;
 
-        Ok(response)
+        tracing::info!(
+            "Starting Jupyter protocol server for kernel {}",
+            self.kernel_id
+        );
+
+        // Create Jupyter connection info
+        let jupyter_connection = JupyterConnectionInfo::new(
+            ConnectionConfig::new()
+                .with_ip(self.config.ip.clone())
+                .with_port_range(self.config.port_range_start)
+                .with_kernel_name("llmspell".to_string()),
+        )?;
+
+        // Save connection file for Jupyter clients
+        let connection_file = JupyterConnectionInfo::temp_connection_file(&self.kernel_id);
+        jupyter_connection.save_to_file(&connection_file)?;
+        tracing::info!("Jupyter connection file: {}", connection_file.display());
+
+        // Bind ZeroMQ transport
+        let transport = ZmqTransport::bind(&jupyter_connection)?;
+
+        // Set kernel state to idle
+        *self.execution_state.write().await = KernelState::Idle;
+
+        // Main Jupyter protocol loop
+        loop {
+            // Handle shell messages first
+            if let Err(e) = self.handle_shell_channel(&transport).await {
+                tracing::error!("Shell channel error: {}", e);
+            }
+
+            // Handle control messages
+            if let Err(e) = self.handle_control_channel(&transport).await {
+                tracing::error!("Control channel error: {}", e);
+                if e.to_string().contains("shutdown") {
+                    break;
+                }
+            }
+
+            // Handle stdin messages
+            if let Err(e) = self.handle_stdin_channel(&transport).await {
+                tracing::error!("Stdin channel error: {}", e);
+            }
+
+            // Handle heartbeat
+            if let Err(e) = self.handle_heartbeat_channel(&transport).await {
+                tracing::debug!("Heartbeat channel error: {}", e);
+            }
+
+            // Small delay to prevent busy loop
+            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        }
+
+        tracing::info!("Jupyter protocol server shutting down");
+        Ok(())
     }
 
-    async fn process_ldp(
-        &self,
-        request: llmspell_engine::LDPRequest,
-    ) -> Result<llmspell_engine::LDPResponse, llmspell_engine::ProcessorError> {
-        use llmspell_engine::{LDPRequest, LDPResponse};
+    /// Handle messages from shell channel (execute, kernel_info, completion, inspection)
+    async fn handle_shell_channel(&mut self, transport: &ZmqTransport) -> Result<()> {
+        use crate::jupyter::protocol::MessageContent;
 
-        let response = match request {
-            LDPRequest::InitializeRequest { .. } => LDPResponse::InitializeResponse {
-                capabilities: serde_json::json!({
-                    "supportsConfigurationDoneRequest": true,
-                    "supportsFunctionBreakpoints": false,
-                    "supportsConditionalBreakpoints": true,
-                    "supportsEvaluateForHovers": true,
-                    "supportsStepBack": false,
-                    "supportsSetVariable": true,
-                    "supportsRestartFrame": false,
-                    "supportsStepInTargetsRequest": false,
-                    "supportsModulesRequest": false,
-                    "supportsTerminateThreadsRequest": false,
-                    "supportsDelayedStackTraceLoading": false,
-                }),
+        if let Some(msg) = transport.recv_shell_msg()? {
+            tracing::debug!("Received shell message: {}", msg.header.msg_type);
+
+            let reply = match &msg.content {
+                MessageContent::KernelInfoRequest {} => self.handle_kernel_info_request(&msg),
+                MessageContent::ExecuteRequest { code, silent, .. } => {
+                    self.handle_execute_request(&msg, code, *silent).await?
+                }
+                MessageContent::CompleteRequest { code, cursor_pos } => {
+                    self.handle_complete_request(&msg, code, *cursor_pos)
+                }
+                MessageContent::InspectRequest {
+                    code,
+                    cursor_pos,
+                    detail_level,
+                } => self.handle_inspect_request(&msg, code, *cursor_pos, *detail_level),
+                _ => {
+                    tracing::warn!("Unhandled shell message type: {}", msg.header.msg_type);
+                    return Ok(());
+                }
+            };
+
+            transport.send_shell_reply(&reply)?;
+        }
+        Ok(())
+    }
+
+    /// Handle messages from control channel (shutdown, interrupt, daemon requests)
+    async fn handle_control_channel(&mut self, transport: &ZmqTransport) -> Result<()> {
+        use crate::jupyter::protocol::MessageContent;
+
+        if let Some(msg) = transport.recv_control_msg()? {
+            tracing::debug!("Received control message: {}", msg.header.msg_type);
+
+            let reply = match &msg.content {
+                MessageContent::ShutdownRequest { restart } => {
+                    let reply = self.handle_shutdown_request(&msg, *restart).await?;
+                    transport.send_control_reply(&reply)?;
+                    return Err(anyhow::anyhow!("Kernel shutdown requested"));
+                }
+                MessageContent::InterruptRequest {} => self.handle_interrupt_request(&msg).await,
+                MessageContent::DaemonRequest {
+                    command,
+                    kernel_id,
+                    config,
+                } => {
+                    self.handle_daemon_request(&msg, command, kernel_id.as_deref(), config.as_ref())
+                }
+                _ => {
+                    tracing::warn!("Unhandled control message type: {}", msg.header.msg_type);
+                    return Ok(());
+                }
+            };
+
+            transport.send_control_reply(&reply)?;
+        }
+        Ok(())
+    }
+
+    /// Handle messages from stdin channel (input requests)
+    async fn handle_stdin_channel(&mut self, transport: &ZmqTransport) -> Result<()> {
+        use crate::jupyter::protocol::MessageContent;
+
+        if let Some(msg) = transport.recv_stdin_msg()? {
+            tracing::debug!("Received stdin message: {}", msg.header.msg_type);
+
+            match &msg.content {
+                MessageContent::InputReply { value } => {
+                    // Handle input from user
+                    tracing::info!("Received input: {}", value);
+                    return Ok(());
+                }
+                _ => {
+                    tracing::warn!("Unhandled stdin message type: {}", msg.header.msg_type);
+                    return Ok(());
+                }
+            };
+        }
+        Ok(())
+    }
+
+    /// Handle heartbeat channel (simple echo)
+    async fn handle_heartbeat_channel(&self, transport: &ZmqTransport) -> Result<()> {
+        transport.handle_heartbeat()?;
+        Ok(())
+    }
+
+    // ================== JUPYTER MESSAGE HANDLERS ==================
+
+    /// Handle kernel_info_request
+    fn handle_kernel_info_request(
+        &self,
+        parent: &crate::jupyter::protocol::JupyterMessage,
+    ) -> crate::jupyter::protocol::JupyterMessage {
+        use crate::jupyter::protocol::{HelpLink, JupyterMessage, LanguageInfo, MessageContent};
+
+        JupyterMessage::reply(
+            parent,
+            "kernel_info_reply",
+            MessageContent::KernelInfoReply {
+                status: "ok".to_string(),
+                protocol_version: "5.3".to_string(),
+                implementation: "llmspell".to_string(),
+                implementation_version: env!("CARGO_PKG_VERSION").to_string(),
+                language_info: LanguageInfo {
+                    name: self.config.engine.clone(),
+                    version: "1.0".to_string(),
+                    mimetype: match self.config.engine.as_str() {
+                        "lua" => "text/x-lua".to_string(),
+                        "javascript" => "text/javascript".to_string(),
+                        _ => "text/plain".to_string(),
+                    },
+                    file_extension: match self.config.engine.as_str() {
+                        "lua" => ".lua".to_string(),
+                        "javascript" => ".js".to_string(),
+                        _ => ".txt".to_string(),
+                    },
+                    pygments_lexer: Some(self.config.engine.clone()),
+                    codemirror_mode: Some(self.config.engine.clone()),
+                    nbconvert_exporter: None,
+                },
+                banner: format!(
+                    "LLMSpell {} - {} Script Engine",
+                    env!("CARGO_PKG_VERSION"),
+                    self.config.engine
+                ),
+                help_links: vec![HelpLink {
+                    text: "LLMSpell Documentation".to_string(),
+                    url: "https://github.com/llmspell/llmspell".to_string(),
+                }],
             },
-            _ => {
-                // TODO: Implement other debug commands
-                return Err(llmspell_engine::ProcessorError::NotImplemented(
-                    "Debug command not yet implemented".to_string(),
-                ));
+        )
+    }
+
+    /// Handle execute_request
+    async fn handle_execute_request(
+        &mut self,
+        parent: &crate::jupyter::protocol::JupyterMessage,
+        code: &String,
+        silent: bool,
+    ) -> Result<crate::jupyter::protocol::JupyterMessage> {
+        use crate::jupyter::protocol::{ExecutionStatus, JupyterMessage, MessageContent};
+
+        tracing::debug!("Executing code: {}", code);
+
+        // Update execution count and state
+        let execution_count = self.prepare_execution().await;
+
+        // TODO: Publish execute_input to iopub if not silent
+
+        // Execute code with timeout
+        let result = self.execute_with_timeout(code).await;
+
+        let reply = match result {
+            Ok(Ok(script_output)) => {
+                // TODO: Publish execution result to iopub if not silent
+
+                JupyterMessage::reply(
+                    parent,
+                    "execute_reply",
+                    MessageContent::ExecuteReply {
+                        status: ExecutionStatus::Ok,
+                        execution_count,
+                        user_expressions: None,
+                        payload: if let Ok(json_value) = serde_json::to_value(&script_output.output)
+                        {
+                            Some(vec![json_value])
+                        } else {
+                            None
+                        },
+                    },
+                )
+            }
+            Ok(Err(_)) | Err(_) => {
+                // TODO: Publish error to iopub if not silent
+
+                JupyterMessage::reply(
+                    parent,
+                    "execute_reply",
+                    MessageContent::ExecuteReply {
+                        status: ExecutionStatus::Error,
+                        execution_count,
+                        user_expressions: None,
+                        payload: None,
+                    },
+                )
             }
         };
 
-        Ok(response)
+        // Finish execution
+        self.finish_execution(silent).await;
+
+        Ok(reply)
+    }
+
+    /// Handle completion_request
+    fn handle_complete_request(
+        &self,
+        parent: &crate::jupyter::protocol::JupyterMessage,
+        _code: &str,
+        _cursor_pos: u32,
+    ) -> crate::jupyter::protocol::JupyterMessage {
+        use crate::jupyter::protocol::{JupyterMessage, MessageContent};
+        use std::collections::HashMap;
+
+        // TODO: Implement actual completion logic based on script engine
+        JupyterMessage::reply(
+            parent,
+            "complete_reply",
+            MessageContent::CompleteReply {
+                matches: vec![], // Empty for now
+                cursor_start: 0,
+                cursor_end: 0,
+                metadata: HashMap::new(),
+                status: "ok".to_string(),
+            },
+        )
+    }
+
+    /// Handle inspect_request
+    fn handle_inspect_request(
+        &self,
+        parent: &crate::jupyter::protocol::JupyterMessage,
+        _code: &str,
+        _cursor_pos: u32,
+        _detail_level: u32,
+    ) -> crate::jupyter::protocol::JupyterMessage {
+        use crate::jupyter::protocol::{JupyterMessage, MessageContent};
+        use std::collections::HashMap;
+
+        // TODO: Implement actual inspection logic based on script engine
+        JupyterMessage::reply(
+            parent,
+            "inspect_reply",
+            MessageContent::InspectReply {
+                status: "ok".to_string(),
+                found: false,
+                data: HashMap::new(),
+                metadata: HashMap::new(),
+            },
+        )
+    }
+
+    /// Handle shutdown_request
+    async fn handle_shutdown_request(
+        &mut self,
+        parent: &crate::jupyter::protocol::JupyterMessage,
+        restart: bool,
+    ) -> Result<crate::jupyter::protocol::JupyterMessage> {
+        use crate::jupyter::protocol::{JupyterMessage, MessageContent};
+
+        tracing::info!("Shutdown requested, restart: {}", restart);
+
+        // TODO: Implement proper shutdown logic
+
+        Ok(JupyterMessage::reply(
+            parent,
+            "shutdown_reply",
+            MessageContent::ShutdownReply {
+                status: "ok".to_string(),
+                restart,
+            },
+        ))
+    }
+
+    /// Handle interrupt_request  
+    async fn handle_interrupt_request(
+        &mut self,
+        parent: &crate::jupyter::protocol::JupyterMessage,
+    ) -> crate::jupyter::protocol::JupyterMessage {
+        use crate::jupyter::protocol::{JupyterMessage, MessageContent};
+
+        tracing::info!("Interrupt requested");
+
+        // TODO: Implement actual interrupt logic (stop running execution)
+
+        JupyterMessage::reply(
+            parent,
+            "interrupt_reply",
+            MessageContent::InterruptReply {
+                status: "ok".to_string(),
+            },
+        )
+    }
+
+    /// Handle daemon_request (custom LLMSpell extension)
+    fn handle_daemon_request(
+        &self,
+        parent: &crate::jupyter::protocol::JupyterMessage,
+        command: &crate::jupyter::protocol::DaemonCommand,
+        _kernel_id: Option<&str>,
+        _config: Option<&serde_json::Value>,
+    ) -> crate::jupyter::protocol::JupyterMessage {
+        use crate::jupyter::protocol::{DaemonCommand, JupyterMessage, KernelInfo, MessageContent};
+        use chrono::Utc;
+
+        match command {
+            DaemonCommand::KernelStatus => {
+                let kernel_info = KernelInfo {
+                    kernel_id: self.kernel_id.clone(),
+                    status: format!(
+                        "{:?}",
+                        *futures::executor::block_on(self.execution_state.read())
+                    ),
+                    engine: self.config.engine.clone(),
+                    connections: 1, // TODO: Get actual connection count
+                    uptime: 0,      // TODO: Calculate actual uptime
+                    last_activity: Utc::now(),
+                };
+
+                JupyterMessage::reply(
+                    parent,
+                    "daemon_reply",
+                    MessageContent::DaemonReply {
+                        status: "ok".to_string(),
+                        command: command.clone(),
+                        result: serde_json::to_value(&kernel_info).ok(),
+                        error: None,
+                        kernels: Some(vec![kernel_info]),
+                    },
+                )
+            }
+            _ => {
+                // TODO: Implement other daemon commands
+                JupyterMessage::reply(
+                    parent,
+                    "daemon_reply",
+                    MessageContent::DaemonReply {
+                        status: "error".to_string(),
+                        command: command.clone(),
+                        result: None,
+                        error: Some("Daemon command not yet implemented".to_string()),
+                        kernels: None,
+                    },
+                )
+            }
+        }
     }
 }
 
