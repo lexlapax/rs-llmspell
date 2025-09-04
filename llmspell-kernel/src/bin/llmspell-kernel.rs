@@ -7,7 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use llmspell_config::LLMSpellConfig;
 use llmspell_engine::{LRPRequest, LRPResponse};
-use llmspell_kernel::{ConnectionInfo, JupyterKernel, KernelConfig};
+use llmspell_kernel::{ConnectionInfo, JupyterKernel};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
@@ -31,22 +31,6 @@ struct Args {
     #[arg(long, default_value = "9555")]
     port: u16,
 
-    /// Script engine to use (lua, javascript)
-    #[arg(long, default_value = "lua")]
-    engine: String,
-
-    /// Maximum number of clients
-    #[arg(long, default_value = "10")]
-    max_clients: usize,
-
-    /// Enable debug mode
-    #[arg(long)]
-    debug: bool,
-
-    /// Enable authentication
-    #[arg(long)]
-    auth: bool,
-
     /// Enable legacy TCP/LRP protocol compatibility (deprecated)
     #[arg(long)]
     legacy_tcp: bool,
@@ -54,10 +38,6 @@ struct Args {
     /// Configuration file path
     #[arg(long)]
     config: Option<String>,
-
-    /// State persistence directory path
-    #[arg(long)]
-    state_dir: Option<String>,
 
     /// Verbosity level (can be used multiple times)
     #[arg(short, long, action = clap::ArgAction::Count)]
@@ -72,23 +52,13 @@ async fn main() -> Result<()> {
     setup_logging(args.verbose);
 
     // Load configuration
-    let runtime_config = if let Some(config_path) = &args.config {
+    let runtime_config = Arc::new(if let Some(config_path) = &args.config {
         let config_str = tokio::fs::read_to_string(config_path).await?;
-        serde_json::from_str(&config_str)?
+        LLMSpellConfig::from_toml(&config_str)
+            .map_err(|e| anyhow::anyhow!("Config error: {}", e))?
     } else {
         LLMSpellConfig::default()
-    };
-
-    // Create kernel configuration with custom connection info
-    let kernel_config = KernelConfig {
-        kernel_id: args.kernel_id.clone(),
-        engine: args.engine,
-        runtime_config,
-        debug_enabled: args.debug,
-        max_clients: args.max_clients,
-        auth_enabled: args.auth,
-        state_dir: args.state_dir.map(std::path::PathBuf::from),
-    };
+    });
 
     // Create connection info with CLI args
     let kernel_id = args
@@ -97,8 +67,12 @@ async fn main() -> Result<()> {
     let connection_info = ConnectionInfo::new(kernel_id.clone(), args.ip, args.port);
 
     // Create kernel using factory method - handles all wiring internally
-    let mut kernel =
-        JupyterKernel::from_config_with_connection(kernel_config, connection_info.clone()).await?;
+    let mut kernel = JupyterKernel::from_config_with_connection(
+        kernel_id,
+        runtime_config,
+        connection_info.clone(),
+    )
+    .await?;
 
     // If legacy TCP compatibility is requested, start both servers
     if args.legacy_tcp {

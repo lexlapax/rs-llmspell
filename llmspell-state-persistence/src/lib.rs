@@ -41,6 +41,7 @@ pub mod backend_adapter;
 pub mod backup;
 pub mod circular_ref;
 pub mod config;
+pub mod factory;
 pub mod hooks;
 pub mod key_manager;
 pub mod manager;
@@ -60,6 +61,7 @@ pub use config::{
     MigrationStep, PerformanceConfig, PersistenceConfig, RocksDBConfig, SledConfig, StateSchema,
     StorageBackendType,
 };
+pub use factory::StateFactory;
 // Re-export from llmspell-state-traits
 pub use key_manager::{KeyManager, StateAccessControl, StatePermission};
 pub use llmspell_state_traits::{

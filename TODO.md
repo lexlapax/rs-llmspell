@@ -9054,15 +9054,261 @@ Clean architecture achieved with proper dependency flow: Kernel → Protocol →
    );
    ```
 
+9. **Add new constructor to ScriptRuntime for shared StateManager**:
+   ```rust
+   // In llmspell-bridge/src/runtime.rs
+   impl ScriptRuntime {
+       /// Create runtime with engine name and shared state manager
+       pub async fn new_with_engine_and_state_manager(
+           engine_name: &str,
+           config: LLMSpellConfig,
+           state_manager: Option<Arc<StateManager>>,
+       ) -> Result<Self, LLMSpellError> {
+           match engine_name {
+               "lua" => Self::new_with_lua_and_state(config, state_manager).await,
+               "javascript" | "js" => Self::new_with_js_and_state(config, state_manager).await,
+               _ => Err(LLMSpellError::Validation { /* ... */ }),
+           }
+       }
+       
+       // Keep existing constructors for backward compatibility
+       pub async fn new_with_engine_name(name: &str, config: LLMSpellConfig) -> Result<Self> {
+           Self::new_with_engine_and_state_manager(name, config, None).await
+       }
+   }
+   ```
+
+10. **Update LuaEngine to accept and use external StateManager**:
+   ```rust
+   // In llmspell-bridge/src/lua/engine.rs
+   pub struct LuaEngineAdapter {
+       // ... existing fields ...
+       external_state_manager: Option<Arc<StateManager>>,  // NEW
+   }
+   
+   impl LuaEngineAdapter {
+       pub fn set_state_manager(&mut self, state_manager: Option<Arc<StateManager>>) {
+           self.external_state_manager = state_manager;
+       }
+   }
+   
+   // In inject_apis():
+   fn inject_apis(&mut self, registry: &Arc<ComponentRegistry>, providers: &Arc<ProviderManager>) {
+       // Use external StateManager if provided, otherwise create new
+       let state_access = if let Some(ref sm) = self.external_state_manager {
+           Some(Arc::new(StateManagerAdapter::new(
+               sm.clone(),
+               StateScope::Global,
+           )) as Arc<dyn StateAccess>)
+       } else if config.runtime.state_persistence.enabled {
+           // Fallback: create new StateManager (backward compat)
+           match StateManagerAdapter::from_config(&config.runtime.state_persistence).await {
+               Ok(adapter) => Some(Arc::new(adapter) as Arc<dyn StateAccess>),
+               Err(e) => {
+                   tracing::warn!("Failed to create state adapter: {}", e);
+                   None
+               }
+           }
+       } else {
+           None
+       };
+   }
+   ```
+
+11. **Update EngineFactory to thread StateManager through**:
+   ```rust
+   // In llmspell-bridge/src/engine/factory.rs
+   impl EngineFactory {
+       pub fn create_lua_engine_with_state(
+           config: &LuaConfig,
+           runtime_config: Option<Arc<LLMSpellConfig>>,
+           state_manager: Option<Arc<StateManager>>,  // NEW
+       ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+           let mut engine = LuaEngine::new(config)?;
+           if let Some(rc) = runtime_config {
+               engine.set_runtime_config(rc);
+           }
+           if let Some(sm) = state_manager {
+               engine.set_state_manager(Some(sm));  // NEW
+           }
+           Ok(Box::new(engine))
+       }
+   }
+   ```
+
+12. **Update kernel.rs to pass shared StateManager to ScriptRuntime**:
+   ```rust
+   // In llmspell-kernel/src/kernel.rs
+   impl<T: Transport, P: Protocol> GenericKernel<T, P> {
+       pub async fn new(
+           kernel_id: String,
+           config: Arc<LLMSpellConfig>,
+           mut transport: T,
+           protocol: P,
+       ) -> Result<Self> {
+           // Create shared StateManager from config
+           let state_manager = StateFactory::create_from_config(&config).await?;
+           
+           // Pass shared StateManager to ScriptRuntime
+           let runtime = ScriptRuntime::new_with_engine_and_state_manager(
+               &config.default_engine,
+               (*config).clone(),
+               state_manager.clone(),  // Pass the SAME instance
+           ).await?;
+           
+           // Pass to SessionMapper
+           let session_mapper = Arc::new(
+               SessionMapper::with_state_manager(state_manager.clone()).await?
+           );
+           
+           // Both runtime and session_mapper now share the same StateManager
+       }
+   }
+   ```
+
+13. **Create integration tests for shared state verification**:
+   ```rust
+   // In llmspell-kernel/tests/shared_state_test.rs
+   #[tokio::test]
+   async fn test_kernel_and_runtime_share_state() {
+       let config = create_test_config_with_persistence();
+       let kernel = create_kernel_with_config(config.clone()).await?;
+       
+       // Write state through kernel's StateManager
+       kernel.state_manager.as_ref().unwrap()
+           .set(StateScope::Global, "test_key", json!("kernel_value"))
+           .await?;
+       
+       // Read through ScriptRuntime's StateManager  
+       let runtime_state = kernel.runtime.lock().await
+           .execute_script(r#"return state.get("test_key")"#)
+           .await?;
+       
+       assert_eq!(runtime_state.value, json!("kernel_value"));
+       
+       // Write through ScriptRuntime
+       kernel.runtime.lock().await
+           .execute_script(r#"state.set("runtime_key", "runtime_value")"#)
+           .await?;
+       
+       // Read through kernel's StateManager
+       let kernel_state = kernel.state_manager.as_ref().unwrap()
+           .get(StateScope::Global, "runtime_key")
+           .await?;
+       
+       assert_eq!(kernel_state, Some(json!("runtime_value")));
+   }
+   
+   #[tokio::test]
+   async fn test_no_file_lock_conflicts() {
+       // Test that shared StateManager prevents file lock conflicts
+       let config = create_file_based_config();
+       let kernel = create_kernel_with_config(config).await?;
+       
+       // Concurrent writes should not conflict
+       let handles = (0..10).map(|i| {
+           let sm = kernel.state_manager.clone().unwrap();
+           tokio::spawn(async move {
+               sm.set(StateScope::Global, &format!("key_{}", i), json!(i)).await
+           })
+       });
+       
+       // All writes should succeed without lock conflicts
+       for h in handles {
+           assert!(h.await?.is_ok());
+       }
+   }
+   ```
+
+14. **Update existing bridge tests to verify state sharing**:
+   ```rust
+   // In llmspell-bridge/tests/state_integration_test.rs
+   #[tokio::test]
+   async fn test_bridge_uses_external_state_manager() {
+       let state_manager = Arc::new(StateManager::new().await?);
+       
+       // Pre-populate state
+       state_manager.set(StateScope::Global, "pre_existing", json!("data")).await?;
+       
+       // Create runtime with external StateManager
+       let runtime = ScriptRuntime::new_with_engine_and_state_manager(
+           "lua",
+           LLMSpellConfig::default(),
+           Some(state_manager.clone()),
+       ).await?;
+       
+       // Script should see pre-existing state
+       let result = runtime.execute_script(r#"
+           return state.get("pre_existing")
+       "#).await?;
+       
+       assert_eq!(result.value, json!("data"));
+   }
+   ```
+
+15. **Add StateManager pointer verification tests**:
+   ```rust
+   #[tokio::test]
+   async fn test_same_state_manager_instance() {
+       let config = Arc::new(create_test_config());
+       let kernel = JupyterKernel::from_config(None, config).await?;
+       
+       // Get StateManager pointers
+       let kernel_sm_ptr = kernel.state_manager.as_ref()
+           .map(|sm| Arc::as_ptr(sm));
+       
+       // Extract StateManager from runtime (need accessor method)
+       let runtime_sm_ptr = kernel.runtime.lock().await
+           .get_state_manager()
+           .map(|sm| Arc::as_ptr(sm));
+       
+       // Verify they point to the same instance
+       assert_eq!(kernel_sm_ptr, runtime_sm_ptr, 
+                  "Kernel and Runtime must share the same StateManager instance");
+   }
+   ```
+
 **Testing Requirements:**
+
+**Core Shared State Tests:**
 - [ ] **Unit test**: StateFactory creates correct backend from config
-- [ ] **Unit test**: Shared StateManager accessed by both kernel and runtime
-- [ ] **Unit test**: No file lock conflicts with shared state
-- [ ] **Integration test**: Kernel starts with LLMSpellConfig only
-- [ ] **Integration test**: ScriptRuntime uses same StateManager as kernel
+- [ ] **Unit test**: ScriptRuntime.new_with_engine_and_state_manager() accepts external StateManager
+- [ ] **Unit test**: LuaEngine.set_state_manager() properly stores external StateManager
+- [ ] **Unit test**: LuaEngine uses external StateManager when available, falls back otherwise
+- [ ] **Unit test**: No file lock conflicts with shared StateManager
+
+**Integration Tests:**
+- [ ] **Integration test**: Kernel writes state → ScriptRuntime reads same value
+- [ ] **Integration test**: ScriptRuntime writes state → Kernel reads same value
+- [ ] **Integration test**: Session created in kernel → visible in ScriptRuntime
+- [ ] **Integration test**: Session created in ScriptRuntime → visible in kernel
+- [ ] **Integration test**: Concurrent state operations don't conflict
 - [ ] **Integration test**: State persists across kernel restarts with unified config
+- [ ] **Integration test**: Kernel starts with LLMSpellConfig only (no KernelConfig)
+
+**Pointer Verification Tests:**
+- [ ] **Unit test**: Kernel and ScriptRuntime use same StateManager instance (pointer equality)
+- [ ] **Unit test**: SessionMapper uses same StateManager instance as kernel
+- [ ] **Unit test**: All components share single StateManager when persistence enabled
+- [ ] **Unit test**: Components fall back to separate in-memory state when persistence disabled
+
+**Bridge Tests:**
+- [ ] **Bridge test**: State set via Lua state.set() readable by kernel StateManager
+- [ ] **Bridge test**: State set via kernel StateManager readable by Lua state.get()
+- [ ] **Bridge test**: Workflow state operations use shared StateManager
+- [ ] **Bridge test**: Agent state operations use shared StateManager
+- [ ] **Bridge test**: Session artifacts stored via shared StateManager
+
+**Regression Tests:**
 - [ ] **Regression test**: All existing kernel tests pass with new structure
+- [ ] **Regression test**: All existing bridge state tests pass with shared StateManager
+- [ ] **Regression test**: All existing session tests pass with shared StateManager
+- [ ] **Regression test**: All existing workflow tests pass with shared state
+
+**Performance Tests:**
 - [ ] **Performance test**: No degradation from shared StateManager
+- [ ] **Performance test**: No lock contention under concurrent load
+- [ ] **Performance test**: Memory usage remains stable with shared state
 
 **Benefits:**
 1. **Single Source of Truth**: One config to rule them all
@@ -9072,17 +9318,28 @@ Clean architecture achieved with proper dependency flow: Kernel → Protocol →
 5. **Clear Architecture**: Config vs runtime parameters obvious
 
 **Definition of Done:**
-- [ ] KernelConfig struct deleted
-- [ ] LLMSpellConfig extended with KernelSettings
-- [ ] StateFactory implemented and tested
-- [ ] GenericKernel uses LLMSpellConfig directly
-- [ ] ScriptRuntime accepts shared StateManager
-- [ ] SessionMapper uses shared StateManager
-- [ ] Kernel binary updated to use unified config
-- [ ] All tests updated and passing
+- [x] KernelConfig struct deleted ✅
+- [x] LLMSpellConfig extended with KernelSettings ✅
+- [x] StateFactory implemented and tested ✅
+- [x] GenericKernel uses LLMSpellConfig directly ✅
+- [ ] ScriptRuntime.new_with_engine_and_state_manager() implemented (Step 9)
+- [ ] LuaEngine accepts external StateManager via set_state_manager() (Step 10)
+- [ ] EngineFactory.create_lua_engine_with_state() passes StateManager through (Step 11)
+- [ ] Kernel passes shared StateManager to ScriptRuntime (Step 12)
+- [ ] Integration tests verify shared state between components (Step 13)
+- [ ] Bridge tests updated to use external StateManager (Step 14)
+- [ ] Pointer verification tests confirm same instance (Step 15)
+- [x] SessionMapper uses shared StateManager ✅
+- [x] Kernel binary updated to use unified config ✅
+- [ ] All Core Shared State Tests pass
+- [ ] All Integration Tests pass
+- [ ] All Pointer Verification Tests pass  
+- [ ] All Bridge Tests pass
+- [ ] All Regression Tests pass
+- [ ] All Performance Tests pass
 - [ ] Documentation updated
 - [ ] `cargo clippy --workspace --all-targets --all-features -- -D warnings` passes
-- [ ] Zero configuration duplication remains
+- [ ] Zero state duplication - single StateManager instance shared by all components
 
 
 #### Task 9.8.9: Debug Functionality Completion

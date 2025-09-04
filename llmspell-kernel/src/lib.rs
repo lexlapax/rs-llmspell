@@ -43,7 +43,7 @@ pub mod transport;
 // Re-export key types
 pub use connection::ConnectionInfo;
 pub use discovery::KernelDiscovery;
-pub use kernel::{GenericKernel, KernelConfig, KernelState};
+pub use kernel::{GenericKernel, KernelState};
 
 // Re-export trait-based architecture
 pub use traits::{KernelMessage, Protocol, Transport, TransportConfig};

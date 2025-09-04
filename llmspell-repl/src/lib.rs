@@ -9,4 +9,4 @@
 pub mod client; // Client connection handling
 
 // Re-export types from llmspell-kernel for convenience
-pub use llmspell_kernel::{ConnectionInfo, KernelConfig, LLMSpellKernel};
+pub use llmspell_kernel::{ConnectionInfo, LLMSpellKernel};

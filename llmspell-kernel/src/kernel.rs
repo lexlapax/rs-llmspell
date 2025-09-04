@@ -7,6 +7,7 @@
 use anyhow::Result;
 use llmspell_bridge::ScriptRuntime;
 use llmspell_config::LLMSpellConfig;
+use llmspell_state_persistence::{StateFactory, StateManager};
 use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
@@ -28,25 +29,6 @@ pub enum KernelState {
     Starting,
     /// Kernel is shutting down
     Stopping,
-}
-
-/// Configuration for kernel startup
-#[derive(Debug, Clone)]
-pub struct KernelConfig {
-    /// Unique kernel identifier
-    pub kernel_id: Option<String>,
-    /// Script engine to use (lua, javascript)
-    pub engine: String,
-    /// `LLMSpell` runtime configuration
-    pub runtime_config: LLMSpellConfig,
-    /// Enable debug mode
-    pub debug_enabled: bool,
-    /// Maximum number of clients
-    pub max_clients: usize,
-    /// Enable authentication
-    pub auth_enabled: bool,
-    /// State persistence directory path
-    pub state_dir: Option<std::path::PathBuf>,
 }
 
 /// Resource limits per client
@@ -90,8 +72,11 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
     /// Current execution state
     pub execution_state: Arc<RwLock<KernelState>>,
 
-    /// Kernel configuration
-    pub config: KernelConfig,
+    /// Shared configuration
+    pub config: Arc<LLMSpellConfig>,
+
+    /// Shared state manager
+    pub state_manager: Option<Arc<StateManager>>,
 
     /// Security manager
     pub security_manager: Arc<SecurityManager>,
@@ -125,23 +110,33 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// # Panics
     ///
     /// Panics if `kernel_id` is None after generation (should never happen).
-    pub async fn new(mut config: KernelConfig, mut transport: T, protocol: P) -> Result<Self> {
-        // Generate kernel ID if not provided
-        if config.kernel_id.is_none() {
-            config.kernel_id = Some(Uuid::new_v4().to_string());
-        }
-        let kernel_id = config.kernel_id.clone().unwrap();
+    pub async fn new(
+        kernel_id: String,
+        config: Arc<LLMSpellConfig>,
+        mut transport: T,
+        protocol: P,
+    ) -> Result<Self> {
+        let kernel_id = if kernel_id.is_empty() {
+            Uuid::new_v4().to_string()
+        } else {
+            kernel_id
+        };
 
         tracing::info!(
             "Starting kernel {} with {} protocol and engine {}",
             kernel_id,
             protocol.name(),
-            config.engine
+            config.default_engine
         );
 
-        // Create script runtime from llmspell-bridge
+        // Create shared StateManager from config
+        let state_manager = StateFactory::create_from_config(&config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?;
+
+        // Create script runtime from llmspell-bridge with shared state manager
         let runtime =
-            ScriptRuntime::new_with_engine_name(&config.engine, config.runtime_config.clone())
+            ScriptRuntime::new_with_engine_name(&config.default_engine, (*config).clone())
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?;
 
@@ -159,36 +154,19 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         // Create security manager with kernel key
         let kernel_key = Uuid::new_v4().to_string();
-        let security_manager = Arc::new(SecurityManager::new(kernel_key, config.auth_enabled));
+        let security_manager = Arc::new(SecurityManager::new(
+            kernel_key,
+            config.runtime.kernel.auth_enabled,
+        ));
 
         // Create client manager
-        let client_manager = Arc::new(ClientManager::new(config.max_clients));
+        let client_manager = Arc::new(ClientManager::new(config.runtime.kernel.max_clients));
 
-        // Create session mapper for persistence
-        let session_mapper = Arc::new(if let Some(state_dir) = &config.state_dir {
-            // Use file-based persistence if state_dir is provided
-            let mapper = SessionMapper::new_with_persistence(state_dir.clone()).await?;
-
-            // Check if last shutdown was clean or a crash
-            let was_clean = mapper.was_clean_shutdown().await.unwrap_or(false);
-            if !was_clean {
-                tracing::warn!("Detected unclean shutdown - kernel may have crashed previously");
-            }
-
-            // Try to restore previous sessions
-            if let Err(e) = mapper.restore_all_sessions().await {
-                tracing::warn!(
-                    "Failed to restore sessions from {}: {}",
-                    state_dir.display(),
-                    e
-                );
-            } else {
-                tracing::info!("Restored sessions from {}", state_dir.display());
-            }
-            mapper
+        // Create session mapper with shared state manager
+        let session_mapper = Arc::new(if let Some(ref sm) = state_manager {
+            SessionMapper::with_state_manager(Some(sm.clone())).await?
         } else {
-            // Use in-memory persistence by default
-            SessionMapper::new().await?
+            SessionMapper::with_state_manager(None).await?
         });
 
         // Create comm manager for session communication
@@ -202,6 +180,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             client_manager,
             execution_state: Arc::new(RwLock::new(KernelState::Starting)),
             config,
+            state_manager,
             security_manager,
             resource_limits: ClientResourceLimits::default(),
             execution_count: Arc::new(Mutex::new(0)),
@@ -411,7 +390,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                 crate::comm_handler::SESSION_COMM_TARGET,
                 crate::comm_handler::STATE_COMM_TARGET,
             ],
-            "max_clients": self.config.max_clients,
+            "max_clients": self.config.runtime.kernel.max_clients,
             "kernel_id": self.kernel_id.clone(),
         });
 
@@ -421,22 +400,22 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "implementation": "llmspell",
             "implementation_version": env!("CARGO_PKG_VERSION"),
             "language_info": {
-                "name": self.config.engine.clone(),
+                "name": self.config.default_engine.clone(),
                 "version": "1.0.0",
-                "mimetype": match self.config.engine.as_str() {
+                "mimetype": match self.config.default_engine.as_str() {
                     "lua" => "text/x-lua",
                     "javascript" | "js" => "text/javascript",
                     "python" | "py" => "text/x-python",
                     _ => "text/plain"
                 },
-                "file_extension": match self.config.engine.as_str() {
+                "file_extension": match self.config.default_engine.as_str() {
                     "lua" => ".lua",
                     "javascript" | "js" => ".js",
                     "python" | "py" => ".py",
                     _ => ".txt"
                 }
             },
-            "banner": format!("LLMSpell Kernel v{} - {}", env!("CARGO_PKG_VERSION"), self.config.engine),
+            "banner": format!("LLMSpell Kernel v{} - {}", env!("CARGO_PKG_VERSION"), self.config.default_engine),
             "help_links": [],
             // LLMSpell extensions
             "llmspell_session_metadata": session_metadata
@@ -614,7 +593,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         *self.execution_state.write().await = KernelState::Stopping;
 
         // Save sessions and mark clean shutdown
-        if self.config.state_dir.is_some() {
+        if self.state_manager.is_some() {
             if let Err(e) = self.session_mapper.save_all_sessions().await {
                 tracing::error!("Failed to save sessions on shutdown request: {}", e);
             } else {
@@ -774,7 +753,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         *self.execution_state.write().await = KernelState::Stopping;
 
         // Save all sessions to persistent storage if enabled
-        if self.config.state_dir.is_some() {
+        if self.state_manager.is_some() {
             if let Err(e) = self.session_mapper.save_all_sessions().await {
                 tracing::error!("Failed to save sessions on shutdown: {}", e);
             } else {
@@ -826,12 +805,12 @@ impl GenericKernel<ZmqTransport, JupyterProtocol> {
     /// # Panics
     ///
     /// Panics if `kernel_id` is None after generation (should never happen).
-    pub async fn from_config(mut config: KernelConfig) -> Result<Self> {
+    pub async fn from_config(
+        kernel_id: Option<String>,
+        config: Arc<LLMSpellConfig>,
+    ) -> Result<Self> {
         // Generate kernel ID if not provided
-        if config.kernel_id.is_none() {
-            config.kernel_id = Some(Uuid::new_v4().to_string());
-        }
-        let kernel_id = config.kernel_id.clone().unwrap();
+        let kernel_id = kernel_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
         // Create default connection info (IP and port will be handled by caller)
         let connection_info = ConnectionInfo::new(
@@ -849,7 +828,7 @@ impl GenericKernel<ZmqTransport, JupyterProtocol> {
         let protocol = JupyterProtocol::new(connection_info.clone());
 
         // Create kernel using the generic constructor
-        Box::pin(Self::new(config, transport, protocol)).await
+        Box::pin(Self::new(kernel_id, config, transport, protocol)).await
     }
 
     /// Create kernel with custom connection info
@@ -861,7 +840,8 @@ impl GenericKernel<ZmqTransport, JupyterProtocol> {
     ///
     /// Returns an error if kernel creation fails.
     pub async fn from_config_with_connection(
-        config: KernelConfig,
+        kernel_id: String,
+        config: Arc<LLMSpellConfig>,
         connection_info: ConnectionInfo,
     ) -> Result<Self> {
         // Write connection file for Jupyter clients
@@ -876,6 +856,6 @@ impl GenericKernel<ZmqTransport, JupyterProtocol> {
         let protocol = JupyterProtocol::new(connection_info.clone());
 
         // Create kernel using the generic constructor
-        Box::pin(Self::new(config, transport, protocol)).await
+        Box::pin(Self::new(kernel_id, config, transport, protocol)).await
     }
 }

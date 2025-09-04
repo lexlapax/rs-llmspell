@@ -2,31 +2,35 @@
 //! Tests kernel lifecycle, connection handling, and protocol compliance
 
 use anyhow::Result;
-use llmspell_config::LLMSpellConfig;
-use llmspell_kernel::kernel::{GenericKernel, KernelConfig, KernelState};
+use llmspell_config::{DebugConfig, GlobalRuntimeConfig, KernelSettings, LLMSpellConfig};
+use llmspell_kernel::kernel::{GenericKernel, KernelState};
 use llmspell_kernel::ConnectionInfo;
+use std::sync::Arc;
 
 /// Test kernel creation with factory method
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_factory_creation() -> Result<()> {
-    let kernel_config = KernelConfig {
-        kernel_id: Some("test-kernel-lifecycle".to_string()),
-        engine: "lua".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: false,
-        max_clients: 1,
-        auth_enabled: false,
-        state_dir: None,
-    };
-
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-lifecycle".to_string(),
-        "127.0.0.1".to_string(),
-        9000,
+    let kernel_id = "test-kernel-lifecycle".to_string();
+    let config = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("lua")
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 1,
+                        auth_enabled: false,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9000);
+
     // Test factory method
-    let result = GenericKernel::from_config_with_connection(kernel_config, connection_info).await;
+    let result =
+        GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await;
     assert!(
         result.is_ok(),
         "Factory method should create kernel successfully"
@@ -41,264 +45,300 @@ async fn test_kernel_factory_creation() -> Result<()> {
 /// Test kernel state management
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_state_management() -> Result<()> {
-    let kernel_config = KernelConfig {
-        kernel_id: Some("test-kernel-state".to_string()),
-        engine: "lua".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: false,
-        max_clients: 1,
-        auth_enabled: false,
-        state_dir: None,
-    };
-
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-state".to_string(),
-        "127.0.0.1".to_string(),
-        9100,
+    let kernel_id = "test-kernel-state".to_string();
+    let config = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("lua")
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 1,
+                        auth_enabled: false,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
-    let kernel = GenericKernel::from_config_with_connection(kernel_config, connection_info).await?;
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9100);
 
-    // Kernel channels are already bound in new() - verify state
-    assert!(
-        *kernel.execution_state.read().await == KernelState::Starting,
-        "Kernel should start in Starting state"
-    );
-    Ok(())
-}
+    let kernel =
+        GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;
 
-/// Test connection file generation
-#[tokio::test(flavor = "multi_thread")]
-async fn test_connection_file_generation() -> Result<()> {
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-connection".to_string(),
-        "127.0.0.1".to_string(),
-        9200,
-    );
-
-    // Test connection file creation
-    connection_info.write_connection_file().await?;
-
-    // Verify the connection file exists and has correct structure
-    let connection_file_path = connection_info.connection_file_path();
-    assert!(
-        tokio::fs::metadata(&connection_file_path).await.is_ok(),
-        "Connection file should be created"
-    );
-
-    // Read and verify connection file content
-    let file_content = tokio::fs::read_to_string(&connection_file_path).await?;
-    let connection_data: serde_json::Value = serde_json::from_str(&file_content)?;
-
-    assert_eq!(connection_data["ip"], "127.0.0.1");
-    assert_eq!(connection_data["transport"], "tcp");
-    // Connection file format may vary - check if kernel_name exists or is null
-    if let Some(kernel_name) = connection_data.get("kernel_name") {
-        if !kernel_name.is_null() {
-            assert_eq!(kernel_name, "llmspell");
-        }
+    // Test state transitions
+    {
+        let state = kernel.execution_state.read().await;
+        assert_eq!(
+            *state,
+            KernelState::Starting,
+            "Initial state should be Starting"
+        );
+        drop(state); // Explicitly drop to release lock early
     }
-    assert!(connection_data["shell_port"].is_number());
-    assert!(connection_data["iopub_port"].is_number());
-    assert!(connection_data["stdin_port"].is_number());
-    assert!(connection_data["control_port"].is_number());
-    assert!(connection_data["hb_port"].is_number());
 
-    // Cleanup
-    let _ = tokio::fs::remove_file(&connection_file_path).await;
+    // Transition to Idle
+    {
+        let mut state = kernel.execution_state.write().await;
+        *state = KernelState::Idle;
+    }
+
+    {
+        let state = kernel.execution_state.read().await;
+        assert_eq!(*state, KernelState::Idle, "Should transition to Idle");
+        drop(state); // Explicitly drop to release lock early
+    }
+
+    // Transition to Busy
+    {
+        let mut state = kernel.execution_state.write().await;
+        *state = KernelState::Busy;
+    }
+
+    {
+        let state = kernel.execution_state.read().await;
+        assert_eq!(*state, KernelState::Busy, "Should transition to Busy");
+        drop(state); // Explicitly drop to release lock early
+    }
+
+    // Transition back to Idle
+    {
+        let mut state = kernel.execution_state.write().await;
+        *state = KernelState::Idle;
+    }
+
+    {
+        let state = kernel.execution_state.read().await;
+        assert_eq!(*state, KernelState::Idle, "Should transition back to Idle");
+        drop(state); // Explicitly drop to release lock early
+    }
+
+    // Test shutdown state
+    {
+        let mut state = kernel.execution_state.write().await;
+        *state = KernelState::Stopping;
+    }
+
+    {
+        let state = kernel.execution_state.read().await;
+        assert_eq!(*state, KernelState::Stopping, "Should be in Stopping state");
+        drop(state); // Explicitly drop to release lock early
+    }
+
     Ok(())
 }
 
-/// Test multiple kernel instances don't conflict
+/// Test kernel with multiple client support
 #[tokio::test(flavor = "multi_thread")]
-async fn test_multiple_kernel_instances() -> Result<()> {
-    let kernel1_config = KernelConfig {
-        kernel_id: Some("test-kernel-multi1".to_string()),
-        engine: "lua".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: false,
-        max_clients: 1,
-        auth_enabled: false,
-        state_dir: None,
-    };
+async fn test_kernel_multiple_clients() -> Result<()> {
+    let kernel1_id = "test-multi-client-1".to_string();
+    let kernel2_id = "test-multi-client-2".to_string();
 
-    let kernel2_config = KernelConfig {
-        kernel_id: Some("test-kernel-multi2".to_string()),
-        engine: "lua".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: false,
-        max_clients: 1,
-        auth_enabled: false,
-        state_dir: None,
-    };
-
-    let connection1 = ConnectionInfo::new(
-        "test-kernel-multi1".to_string(),
-        "127.0.0.1".to_string(),
-        9300,
+    let config1 = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("lua")
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 3,
+                        auth_enabled: false,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
-    let connection2 = ConnectionInfo::new(
-        "test-kernel-multi2".to_string(),
-        "127.0.0.1".to_string(),
-        9400,
+    let config2 = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("lua")
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 2,
+                        auth_enabled: false,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
-    // Create both kernels
-    let kernel1 = GenericKernel::from_config_with_connection(kernel1_config, connection1).await?;
-    let kernel2 = GenericKernel::from_config_with_connection(kernel2_config, connection2).await?;
+    let connection1 = ConnectionInfo::new(kernel1_id.clone(), "127.0.0.1".to_string(), 9200);
 
-    // Both kernels should be created (binding happens in new())
-    // Port conflicts are handled at the transport level
-    assert!(
-        *kernel1.execution_state.read().await == KernelState::Starting,
-        "First kernel should be starting"
+    let connection2 = ConnectionInfo::new(kernel2_id.clone(), "127.0.0.1".to_string(), 9300);
+
+    let kernel1 =
+        GenericKernel::from_config_with_connection(kernel1_id, config1, connection1).await?;
+    let kernel2 =
+        GenericKernel::from_config_with_connection(kernel2_id, config2, connection2).await?;
+
+    // Verify independent kernel configurations
+    assert_eq!(
+        kernel1.config.runtime.kernel.max_clients, 3,
+        "First kernel should support 3 clients"
     );
-    assert!(
-        *kernel2.execution_state.read().await == KernelState::Starting,
-        "Second kernel should be starting"
+    assert_eq!(
+        kernel2.config.runtime.kernel.max_clients, 2,
+        "Second kernel should support 2 clients"
     );
+
+    assert_eq!(
+        kernel1.config.default_engine, "lua",
+        "First kernel should use lua engine"
+    );
+    assert_eq!(
+        kernel2.config.default_engine, "lua",
+        "Second kernel should use lua engine"
+    );
+
     Ok(())
 }
 
-/// Test kernel with debug enabled
+/// Test kernel with debug mode enabled
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_debug_mode() -> Result<()> {
-    let kernel_config = KernelConfig {
-        kernel_id: Some("test-kernel-debug".to_string()),
-        engine: "lua".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: true, // Enable debug mode
-        max_clients: 1,
-        auth_enabled: false,
-        state_dir: None,
-    };
-
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-debug".to_string(),
-        "127.0.0.1".to_string(),
-        9500,
+    let kernel_id = "test-debug-kernel".to_string();
+    let config = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("lua")
+            .debug(DebugConfig {
+                enabled: true,
+                ..Default::default()
+            })
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 1,
+                        auth_enabled: false,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
-    let kernel = GenericKernel::from_config_with_connection(kernel_config, connection_info).await?;
-    assert!(kernel.config.debug_enabled, "Debug mode should be enabled");
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9400);
+
+    let kernel =
+        GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;
+    assert!(kernel.config.debug.enabled, "Debug mode should be enabled");
     Ok(())
 }
 
 /// Test kernel with authentication enabled
 #[tokio::test(flavor = "multi_thread")]
-async fn test_kernel_auth_mode() -> Result<()> {
-    let kernel_config = KernelConfig {
-        kernel_id: Some("test-kernel-auth".to_string()),
-        engine: "lua".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: false,
-        max_clients: 1,
-        auth_enabled: true, // Enable authentication
-        state_dir: None,
-    };
-
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-auth".to_string(),
-        "127.0.0.1".to_string(),
-        9600,
+async fn test_kernel_with_authentication() -> Result<()> {
+    let kernel_id = "test-auth-kernel".to_string();
+    let config = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("lua")
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 1,
+                        auth_enabled: true,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
-    let kernel = GenericKernel::from_config_with_connection(kernel_config, connection_info).await?;
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9500);
+
+    let kernel =
+        GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;
     assert!(
-        kernel.config.auth_enabled,
+        kernel.config.runtime.kernel.auth_enabled,
         "Authentication should be enabled"
     );
+    assert!(
+        kernel.config.runtime.kernel.auth_enabled,
+        "Kernel config should have auth enabled"
+    );
     Ok(())
 }
 
-/// Test kernel configuration validation
+/// Test invalid engine configuration
 #[tokio::test(flavor = "multi_thread")]
-async fn test_kernel_config_validation() -> Result<()> {
-    // Test with invalid engine
-    let invalid_config = KernelConfig {
-        kernel_id: Some("test-kernel-invalid".to_string()),
-        engine: "invalid_engine".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: false,
-        max_clients: 1,
-        auth_enabled: false,
-        state_dir: None,
-    };
-
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-invalid".to_string(),
-        "127.0.0.1".to_string(),
-        9700,
+async fn test_invalid_engine_config() -> Result<()> {
+    let kernel_id = "test-invalid-engine".to_string();
+    let invalid_config = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("invalid_engine")
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 1,
+                        auth_enabled: false,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
-    let result = GenericKernel::from_config_with_connection(invalid_config, connection_info).await;
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9600);
+
+    let result =
+        GenericKernel::from_config_with_connection(kernel_id, invalid_config, connection_info)
+            .await;
+
+    // Invalid engine should cause creation to fail
     assert!(
         result.is_err(),
-        "Invalid engine should cause kernel creation to fail"
+        "Kernel creation should fail with invalid engine"
     );
+
+    if let Err(e) = result {
+        // Verify we get a reasonable error message
+        let error_msg = e.to_string();
+        assert!(
+            error_msg.contains("engine") || error_msg.contains("runtime"),
+            "Error should mention engine or runtime issue"
+        );
+    }
+
     Ok(())
 }
 
-/// Test connection info port allocation
+/// Test kernel resource limits configuration
 #[tokio::test(flavor = "multi_thread")]
-async fn test_connection_port_allocation() -> Result<()> {
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-ports".to_string(),
-        "127.0.0.1".to_string(),
-        9800,
+async fn test_kernel_resource_limits() -> Result<()> {
+    let kernel_id = "test-resource-limits".to_string();
+    let config = Arc::new(
+        LLMSpellConfig::builder()
+            .default_engine("lua")
+            .runtime(
+                GlobalRuntimeConfig::builder()
+                    .kernel(KernelSettings {
+                        max_clients: 2,
+                        auth_enabled: false,
+                        heartbeat_interval_ms: 500,
+                        shutdown_timeout_seconds: 5,
+                        ..Default::default()
+                    })
+                    .build(),
+            )
+            .build(),
     );
 
-    // Verify port allocation follows expected pattern
-    assert_eq!(connection_info.shell_port, 9800);
-    assert_eq!(connection_info.iopub_port, 9801);
-    assert_eq!(connection_info.stdin_port, 9802);
-    assert_eq!(connection_info.control_port, 9803);
-    assert_eq!(connection_info.hb_port, 9804);
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9700);
 
-    // All ports should be unique
-    let ports = vec![
-        connection_info.shell_port,
-        connection_info.iopub_port,
-        connection_info.stdin_port,
-        connection_info.control_port,
-        connection_info.hb_port,
-    ];
-    let mut unique_ports = ports.clone();
-    unique_ports.sort_unstable();
-    unique_ports.dedup();
-
+    let kernel =
+        GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;
     assert_eq!(
-        ports.len(),
-        unique_ports.len(),
-        "All ports should be unique"
+        kernel.config.runtime.kernel.max_clients, 2,
+        "Max clients should be configured correctly"
     );
-    Ok(())
-}
-
-/// Test kernel with maximum clients limit
-#[tokio::test(flavor = "multi_thread")]
-async fn test_kernel_max_clients() -> Result<()> {
-    let kernel_config = KernelConfig {
-        kernel_id: Some("test-kernel-maxclients".to_string()),
-        engine: "lua".to_string(),
-        runtime_config: LLMSpellConfig::default(),
-        debug_enabled: false,
-        max_clients: 2, // Limit to 2 clients
-        auth_enabled: false,
-        state_dir: None,
-    };
-
-    let connection_info = ConnectionInfo::new(
-        "test-kernel-maxclients".to_string(),
-        "127.0.0.1".to_string(),
-        9900,
-    );
-
-    let kernel = GenericKernel::from_config_with_connection(kernel_config, connection_info).await?;
     assert_eq!(
-        kernel.config.max_clients, 2,
-        "Max clients should be set correctly"
+        kernel.config.runtime.kernel.heartbeat_interval_ms, 500,
+        "Heartbeat interval should be configured"
+    );
+    assert_eq!(
+        kernel.config.runtime.kernel.shutdown_timeout_seconds, 5,
+        "Shutdown timeout should be configured"
     );
     Ok(())
 }

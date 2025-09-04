@@ -1182,6 +1182,34 @@ impl Default for LLMSpellConfigBuilder {
     }
 }
 
+/// Kernel-specific settings
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct KernelSettings {
+    /// Maximum number of clients that can connect to the kernel
+    pub max_clients: usize,
+    /// Enable authentication for kernel connections
+    pub auth_enabled: bool,
+    /// Heartbeat interval in milliseconds
+    pub heartbeat_interval_ms: u64,
+    /// Port offset for legacy TCP connections (added to base port)
+    pub legacy_tcp_port_offset: u16,
+    /// Shutdown timeout in seconds - how long to wait for clean shutdown
+    pub shutdown_timeout_seconds: u64,
+}
+
+impl Default for KernelSettings {
+    fn default() -> Self {
+        Self {
+            max_clients: 10,
+            auth_enabled: false,
+            heartbeat_interval_ms: 100,
+            legacy_tcp_port_offset: 1000,
+            shutdown_timeout_seconds: 10,
+        }
+    }
+}
+
 /// Global runtime configuration
 #[derive(Debug, Clone, Deserialize, Serialize)]
 #[serde(default)]
@@ -1198,6 +1226,8 @@ pub struct GlobalRuntimeConfig {
     pub state_persistence: StatePersistenceConfig,
     /// Session management settings
     pub sessions: SessionConfig,
+    /// Kernel-specific settings
+    pub kernel: KernelSettings,
 }
 
 impl Default for GlobalRuntimeConfig {
@@ -1209,6 +1239,7 @@ impl Default for GlobalRuntimeConfig {
             security: SecurityConfig::default(),
             state_persistence: StatePersistenceConfig::default(),
             sessions: SessionConfig::default(),
+            kernel: KernelSettings::default(),
         }
     }
 }
@@ -1275,6 +1306,13 @@ impl GlobalRuntimeConfigBuilder {
     #[must_use]
     pub fn sessions(mut self, sessions: SessionConfig) -> Self {
         self.config.sessions = sessions;
+        self
+    }
+
+    /// Set the kernel configuration
+    #[must_use]
+    pub fn kernel(mut self, kernel: KernelSettings) -> Self {
+        self.config.kernel = kernel;
         self
     }
 

@@ -95,6 +95,28 @@ impl SessionMapper {
         })
     }
 
+    /// Create a new session mapper with a shared state manager
+    ///
+    /// # Errors
+    /// Returns error if state manager initialization fails when None is provided
+    pub async fn with_state_manager(state_manager: Option<Arc<StateManager>>) -> Result<Self> {
+        let state_manager = if let Some(sm) = state_manager {
+            sm
+        } else {
+            // Fallback to in-memory if no state manager provided
+            Arc::new(
+                StateManager::new()
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?,
+            )
+        };
+
+        Ok(Self {
+            sessions: Arc::new(RwLock::new(HashMap::new())),
+            state_manager,
+        })
+    }
+
     /// Create or get a session for a Jupyter session ID
     ///
     /// # Errors
