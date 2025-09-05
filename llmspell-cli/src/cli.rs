@@ -48,7 +48,7 @@ pub struct Cli {
     pub debug_perf: bool,
 
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 /// Available script engines
@@ -83,8 +83,8 @@ impl ScriptEngine {
     pub fn availability_message(&self) -> &'static str {
         match self {
             ScriptEngine::Lua => "Available",
-            ScriptEngine::Javascript => "Coming in Phase 5",
-            ScriptEngine::Python => "Coming in Phase 9",
+            ScriptEngine::Javascript => "Coming in Phase 19",
+            ScriptEngine::Python => "Coming in Phase 22",
         }
     }
 }
@@ -244,6 +244,21 @@ pub enum Commands {
         /// Script arguments
         #[arg(last = true)]
         args: Vec<String>,
+    },
+
+    /// Start kernel server for Jupyter protocol
+    Kernel {
+        /// Port to listen on
+        #[arg(short, long, default_value = "9555")]
+        port: u16,
+
+        /// Kernel ID (generated if not provided)
+        #[arg(short = 'i', long)]
+        id: Option<String>,
+
+        /// Connection file path (for Jupyter discovery)
+        #[arg(short = 'f', long)]
+        connection_file: Option<PathBuf>,
     },
 }
 

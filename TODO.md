@@ -9459,9 +9459,9 @@ This isn't just removing old protocols - it's **building a complete in-process k
 
 **Implementation Steps:**
 
-**PHASE 1: Fix Compilation (Critical Blocker)**
+**PHASE 1: Fix Compilation (Critical Blocker)** ✅ COMPLETED
 
-1. **Fix KernelConnectionBuilder methods** ❌ CRITICAL:
+1. **Fix KernelConnectionBuilder methods** ✅ COMPLETED:
    ```rust
    // BROKEN CODE:
    .diagnostics(DiagnosticsBridge::builder().build()) // ← METHOD DOESN'T EXIST
@@ -9482,7 +9482,7 @@ This isn't just removing old protocols - it's **building a complete in-process k
    }
    ```
 
-2. **Implement missing KernelConnectionTrait methods** ❌ CRITICAL:
+2. **Implement missing KernelConnectionTrait methods** ✅ COMPLETED:
    ```rust
    // BROKEN CODE:
    kernel.connect_or_start().await?; // ← METHOD DOESN'T EXIST
@@ -9499,7 +9499,7 @@ This isn't just removing old protocols - it's **building a complete in-process k
    }
    ```
 
-3. **Fix trait bound issues** ❌ CRITICAL:
+3. **Fix trait bound issues** ✅ COMPLETED:
    ```rust
    // BROKEN CODE:
    .circuit_breaker(Box::new(ExponentialBackoffBreaker::default())) 
@@ -9519,9 +9519,9 @@ This isn't just removing old protocols - it's **building a complete in-process k
    impl KernelConnectionTrait for NullKernelConnection { ... }
    ```
 
-**PHASE 2: In-Process Kernel Creation**
+**PHASE 2: In-Process Kernel Creation** ✅ COMPLETED (as JupyterKernelClient)
 
-5. **Implement InProcessKernelConnection** ❌ NEW:
+5. **Implement InProcessKernelConnection** ✅ COMPLETED (as JupyterKernelClient):
    ```rust
    pub struct InProcessKernelConnection {
        kernel: JupyterKernel,
@@ -9558,7 +9558,7 @@ This isn't just removing old protocols - it's **building a complete in-process k
    }
    ```
 
-6. **Update kernel creation in run.rs** ❌ FIXING:
+6. **Update kernel creation in run.rs** ✅ COMPLETED:
    ```rust
    // CURRENT BROKEN CODE:
    let mut kernel = super::create_kernel_connection(runtime_config).await?; // ← RETURNS ERROR
@@ -9578,7 +9578,7 @@ This isn't just removing old protocols - it's **building a complete in-process k
 
 **PHASE 3: REPL Integration**
 
-7. **Fix REPL kernel integration** ❌ BROKEN:
+7. **Fix REPL kernel integration** ✅ COMPLETED:
    ```rust
    // CURRENT BROKEN CODE in repl.rs:
    let mut kernel = KernelConnectionBuilder::new()
@@ -9599,7 +9599,7 @@ This isn't just removing old protocols - it's **building a complete in-process k
        .build()?;
    ```
 
-8. **Implement REPL session management** ❌ NEW:
+8. **Implement REPL session management** ✅ COMPLETED (via kernel SessionMapper):
    ```rust
    // Need to maintain REPL state through kernel
    impl CLIReplInterface {
@@ -9623,9 +9623,9 @@ This isn't just removing old protocols - it's **building a complete in-process k
    }
    ```
 
-**PHASE 4: Standalone Kernel Mode**
+**PHASE 4: Standalone Kernel Mode** ✅ COMPLETED (refactored as `kernel` command)
 
-9. **Add --kernel CLI option for standalone mode** ❌ NEW:
+9. **Add kernel command for standalone mode** ✅ COMPLETED (better than flag):
    ```rust
    // In llmspell-cli/src/cli.rs:
    #[derive(Parser, Debug)]
@@ -9647,7 +9647,7 @@ This isn't just removing old protocols - it's **building a complete in-process k
    }
    ```
 
-10. **Implement standalone kernel startup** ❌ NEW:
+10. **Implement standalone kernel startup** ✅ COMPLETED (in commands/kernel.rs):
     ```rust
     // In llmspell-cli/src/commands/mod.rs:
     pub async fn start_standalone_kernel(
@@ -9678,7 +9678,22 @@ This isn't just removing old protocols - it's **building a complete in-process k
     }
     ```
 
-11. **Update main CLI dispatch** ❌ MODIFY:
+11. **Update main CLI dispatch** ✅ COMPLETED (implemented as Commands::Kernel):
+    - Properly implemented as a command, not a flag
+    - Located in commands/kernel.rs for modularity
+    - Renamed src/kernel to src/kernel_client for clarity
+
+**ARCHITECTURAL IMPROVEMENTS MADE**:
+- ✅ **Cleaned up debug files**: Removed redundant debug_simple.rs and run_debug.rs 
+- ✅ **Renamed kernel to kernel_client**: Better naming for clarity
+- ✅ **Made kernel a command not a flag**: Better UX and consistency
+
+**ARCHITECTURAL DEBT IDENTIFIED**:
+- **repl_interface.rs misplaced**: 585 lines of REPL business logic in llmspell-cli instead of llmspell-repl
+- **llmspell-repl underutilized**: Only contains a client stub when it should have the core REPL logic
+- **TODO for Phase 10**: Refactor REPL architecture to properly separate concerns
+
+12. **Original Phase 4 Item 11** (now obsolete):
     ```rust
     // In llmspell-cli/src/main.rs or commands/mod.rs:
     pub async fn run_cli_commands(cli: Cli) -> Result<()> {
@@ -9703,14 +9718,14 @@ This isn't just removing old protocols - it's **building a complete in-process k
 **Usage Examples:**
 ```bash
 # Start standalone kernel (blocks until Ctrl+C)
-llmspell --kernel
+llmspell kernel
 # Starting LLMSpell kernel...
 #   Kernel ID: abc-123-def
 #   Port: 9555  
 #   Press Ctrl+C to stop
 
 # Start kernel on specific port with custom ID
-llmspell --kernel --kernel-port 8888 --kernel-id my-kernel
+llmspell kernel --port 8888 --id my-kernel
 
 # Normal CLI usage (in-process kernel)  
 llmspell run script.lua
@@ -9806,16 +9821,16 @@ llmspell run script.lua --connect-to-kernel abc-123-def
 
 
 **Acceptance Criteria:**
-- [ ] **Compilation**: Full workspace builds without errors
-- [ ] **Run Command**: `llmspell run script.lua` executes through in-process kernel  
-- [ ] **REPL Command**: `llmspell repl` starts interactive session through kernel
-- [ ] **Standalone Kernel**: `llmspell --kernel` starts server mode (blocks until Ctrl+C)
-- [ ] **Debug Commands**: `.break`, `.step`, `.continue` work in REPL
-- [ ] **Debug Run**: `llmspell run --debug script.lua` enables debugging
-- [ ] **Binary Removal**: llmspell-kernel binary removed, CLI is unified entry point
-- [ ] **Error Handling**: Graceful error messages for all failure modes
-- [ ] **Tests**: All CLI tests pass with new architecture
-- [ ] **Performance**: No significant performance regression vs direct execution
+- [x] **Compilation**: Full workspace builds without errors ✅
+- [x] **Run Command**: `llmspell run script.lua` executes through in-process kernel ✅
+- [x] **REPL Command**: `llmspell repl` starts interactive session through kernel ✅
+- [x] **Standalone Kernel**: `llmspell kernel` starts server mode (blocks until Ctrl+C) ✅
+- [ ] **Debug Commands**: `.break`, `.step`, `.continue` work in REPL (Phase 5)
+- [ ] **Debug Run**: `llmspell run --debug script.lua` enables debugging (Phase 5)
+- [ ] **Binary Removal**: llmspell-kernel binary removed, CLI is unified entry point (Phase 5)
+- [x] **Error Handling**: Graceful error messages for all failure modes ✅
+- [ ] **Tests**: All CLI tests pass with new architecture (needs verification)
+- [ ] **Performance**: No significant performance regression vs direct execution (needs benchmarking)
 
 **Definition of Done:**
 All CLI functionality (run, repl, debug) works through in-process kernel with same user experience as before, but using Jupyter protocol internally.

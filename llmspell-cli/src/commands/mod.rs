@@ -3,16 +3,15 @@
 
 pub mod apps;
 pub mod backup;
-#[path = "debug_simple.rs"]
 pub mod debug;
 pub mod exec;
 pub mod info;
 pub mod init;
+pub mod kernel;
 pub mod keys;
 pub mod providers;
 pub mod repl;
 pub mod run;
-pub mod run_debug;
 pub mod setup;
 pub mod validate;
 
@@ -151,17 +150,20 @@ pub async fn execute_command(
             // Use dedicated DebugBridge architecture for debug command
             debug::handle_debug_command(script, args, engine, runtime_config, output_format).await
         }
+        Commands::Kernel { port, id, connection_file } => {
+            kernel::start_kernel(engine, port, id, connection_file, runtime_config).await
+        }
     }
 }
 
 /// Create a kernel connection for the specified engine (replacing direct runtime creation)
 pub async fn create_kernel_connection(
     _config: LLMSpellConfig,
-) -> Result<Box<dyn crate::kernel::KernelConnectionTrait>> {
-    let mut kernel = crate::kernel::KernelConnectionBuilder::new()
-        .discovery(Box::new(crate::kernel::CliKernelDiscovery::new()))
+) -> Result<Box<dyn crate::kernel_client::KernelConnectionTrait>> {
+    let mut kernel = crate::kernel_client::KernelConnectionBuilder::new()
+        .discovery(Box::new(crate::kernel_client::CliKernelDiscovery::new()))
         .circuit_breaker(Box::new(
-            crate::kernel::CliCircuitBreaker::new(),
+            crate::kernel_client::CliCircuitBreaker::new(),
         ))
         .diagnostics(llmspell_bridge::diagnostics_bridge::DiagnosticsBridge::builder().build())
         .build()

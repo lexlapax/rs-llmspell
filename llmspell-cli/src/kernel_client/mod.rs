@@ -1,6 +1,7 @@
-//! Kernel management module for CLI client
+//! Kernel client module for connecting to kernel servers
 //!
-//! Provides kernel connection, discovery, and debug event handling functionality.
+//! Provides kernel connection, discovery, and debug event handling for CLI commands
+//! that need to communicate with a kernel server (either local or remote).
 
 pub mod connection;
 pub mod debug_handler;

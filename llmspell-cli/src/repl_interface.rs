@@ -2,7 +2,7 @@
 //!
 //! Provides the main REPL loop with dependency injection and workload-aware performance.
 
-use crate::kernel::KernelConnectionTrait;
+use crate::kernel_client::KernelConnectionTrait;
 use anyhow::Result;
 use llmspell_bridge::{diagnostics_bridge::DiagnosticsBridge, hook_profiler::WorkloadClassifier};
 use llmspell_config::LLMSpellConfig;

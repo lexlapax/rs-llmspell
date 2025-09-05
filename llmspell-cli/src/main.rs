@@ -55,8 +55,13 @@ async fn main() -> Result<()> {
     // Apply CLI debug settings to config (for passing to script engines)
     apply_debug_cli_to_config(&cli, &mut runtime_config);
 
-    // Execute the command
-    execute_command(cli.command, cli.engine, runtime_config, cli.output).await?;
+    // Execute the command if provided
+    if let Some(command) = cli.command {
+        execute_command(command, cli.engine, runtime_config, cli.output).await?;
+    } else {
+        eprintln!("No command provided. Use --help for usage information.");
+        std::process::exit(1);
+    }
 
     Ok(())
 }

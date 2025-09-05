@@ -2,7 +2,7 @@
 //! ABOUTME: Provides an interactive read-eval-print loop
 
 use crate::cli::ScriptEngine;
-use crate::kernel::{CliCircuitBreaker, CliKernelDiscovery, KernelConnectionBuilder};
+use crate::kernel_client::{CliCircuitBreaker, CliKernelDiscovery, KernelConnectionBuilder};
 use crate::repl_interface::CLIReplInterface;
 use anyhow::Result;
 use llmspell_bridge::{
