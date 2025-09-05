@@ -7,7 +7,6 @@ pub mod config;
 pub mod embedded_resources;
 pub mod kernel_client;
 pub mod output;
-pub mod repl_interface;
 
 #[cfg(test)]
 pub mod test_helpers;

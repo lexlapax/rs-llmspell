@@ -86,18 +86,20 @@ let runtime = ScriptRuntime::new_with_engine_and_state_manager(
 
 ### Starting the Kernel
 
+The kernel is now integrated into the main llmspell CLI:
+
 ```bash
 # Start kernel with default configuration
-llmspell-kernel
-
-# Start with specific engine
-llmspell-kernel --engine lua
+llmspell kernel
 
 # Start with custom port
-llmspell-kernel --port 5678
+llmspell kernel --port 5678
 
-# Enable authentication
-llmspell-kernel --auth
+# Start with custom ID
+llmspell kernel --id my-kernel-id
+
+# Note: The kernel library is still used internally by llmspell-cli
+# for both standalone and in-process execution modes
 ```
 
 ### Connection File Format

@@ -150,9 +150,11 @@ pub async fn execute_command(
             // Use dedicated DebugBridge architecture for debug command
             debug::handle_debug_command(script, args, engine, runtime_config, output_format).await
         }
-        Commands::Kernel { port, id, connection_file } => {
-            kernel::start_kernel(engine, port, id, connection_file, runtime_config).await
-        }
+        Commands::Kernel {
+            port,
+            id,
+            connection_file,
+        } => kernel::start_kernel(engine, port, id, connection_file, runtime_config).await,
     }
 }
 
@@ -162,9 +164,7 @@ pub async fn create_kernel_connection(
 ) -> Result<Box<dyn crate::kernel_client::KernelConnectionTrait>> {
     let mut kernel = crate::kernel_client::KernelConnectionBuilder::new()
         .discovery(Box::new(crate::kernel_client::CliKernelDiscovery::new()))
-        .circuit_breaker(Box::new(
-            crate::kernel_client::CliCircuitBreaker::new(),
-        ))
+        .circuit_breaker(Box::new(crate::kernel_client::CliCircuitBreaker::new()))
         .diagnostics(llmspell_bridge::diagnostics_bridge::DiagnosticsBridge::builder().build())
         .build()
         .await?;

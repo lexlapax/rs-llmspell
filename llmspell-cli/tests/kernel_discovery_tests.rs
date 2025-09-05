@@ -53,26 +53,26 @@ fn test_find_kernel_binary_in_path() {
 #[test]
 fn test_find_kernel_binary_fallback_to_target_directory() {
     // This test verifies that find_kernel_binary() falls back to
-    // checking the target/debug directory when not in PATH
+    // checking for the main llmspell binary which includes kernel functionality
 
-    // Ensure the kernel is NOT in PATH by setting a minimal PATH
+    // Ensure the llmspell is NOT in PATH by setting a minimal PATH
     let original_path = env::var("PATH").unwrap_or_default();
     env::set_var("PATH", "/usr/bin:/bin");
 
-    // Check if target/debug/llmspell-kernel exists
-    // (it should after cargo build --bin llmspell-kernel)
-    let target_debug_path = PathBuf::from("target/debug/llmspell-kernel");
-    let target_release_path = PathBuf::from("target/release/llmspell-kernel");
+    // Check if target/debug/llmspell exists
+    // (it should after cargo build --bin llmspell)
+    let target_debug_path = PathBuf::from("target/debug/llmspell");
+    let target_release_path = PathBuf::from("target/release/llmspell");
 
     // At least one of these should exist after building
-    let kernel_exists = target_debug_path.exists() || target_release_path.exists();
+    let llmspell_exists = target_debug_path.exists() || target_release_path.exists();
 
-    if kernel_exists {
-        // In a real implementation, find_kernel_binary would check these paths
+    if llmspell_exists {
+        // The kernel functionality is now part of the main llmspell binary
         // This test verifies the fallback logic would work
         assert!(
             target_debug_path.exists() || target_release_path.exists(),
-            "Kernel binary should exist in target directory after build"
+            "llmspell binary should exist in target directory after build"
         );
     }
 

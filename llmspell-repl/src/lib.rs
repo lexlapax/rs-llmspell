@@ -1,12 +1,18 @@
-//! `LLMSpell` REPL - Client interface for kernel connections
+//! `LLMSpell` REPL - Core REPL business logic
 //!
-//! This crate provides client-side REPL functionality that connects to
-//! the `LLMSpell` kernel (now in llmspell-kernel crate).
+//! This crate provides the core REPL functionality including:
+//! - Command parsing and handling
+//! - Kernel communication
+//! - Session state management
+//! - Debug command interfaces
 //!
-//! The kernel implementation has been moved to llmspell-kernel for better
-//! architectural separation: kernel=execution, repl=client interface.
+//! The CLI layer provides only terminal I/O - all business logic lives here.
 
-pub mod client; // Client connection handling
+pub mod client; // Legacy client connection handling (to be removed)
+pub mod session; // Core REPL session management
+
+// Re-export main types
+pub use session::{KernelConnection, ReplConfig, ReplResponse, ReplSession, WorkloadType};
 
 // Re-export types from llmspell-kernel for convenience
 pub use llmspell_kernel::{ConnectionInfo, LLMSpellKernel};

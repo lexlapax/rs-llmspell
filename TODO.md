@@ -9687,11 +9687,7 @@ This isn't just removing old protocols - it's **building a complete in-process k
 - ✅ **Cleaned up debug files**: Removed redundant debug_simple.rs and run_debug.rs 
 - ✅ **Renamed kernel to kernel_client**: Better naming for clarity
 - ✅ **Made kernel a command not a flag**: Better UX and consistency
-
-**ARCHITECTURAL DEBT IDENTIFIED**:
-- **repl_interface.rs misplaced**: 585 lines of REPL business logic in llmspell-cli instead of llmspell-repl
-- **llmspell-repl underutilized**: Only contains a client stub when it should have the core REPL logic
-- **TODO for Phase 10**: Refactor REPL architecture to properly separate concerns
+- ✅ **Identified REPL debt**: Created Phase 4.5 to fix before adding debug features
 
 12. **Original Phase 4 Item 11** (now obsolete):
     ```rust
@@ -9736,6 +9732,126 @@ llmspell run script.lua --connect-to-kernel abc-123-def
 ```
 
 **ARCHITECTURAL BENEFIT**: With `--kernel` option in CLI, we can **remove the separate llmspell-kernel binary entirely**. The CLI becomes the unified entry point for all functionality.
+
+**PHASE 4.5: Fix REPL Architecture (CRITICAL - Before Debug Implementation)** ✅ COMPLETED
+
+**Problem**: 585 lines of REPL business logic in wrong place
+- `llmspell-cli/src/repl_interface.rs` shouldn't exist at all
+- `llmspell-repl` crate is nearly empty (just a client stub)
+- Violates separation of concerns badly
+
+**Why This Must Happen Before Phase 5**:
+- Phase 5 adds debug commands to REPL
+- If we add them to the wrong place, we make the debt WORSE
+- Debug logic belongs in llmspell-repl, not CLI
+
+**Solution Architecture**:
+```
+CURRENT (BAD):
+commands/repl.rs → repl_interface.rs (585 lines!) → kernel_client → kernel
+
+CORRECT (GOOD):  
+commands/repl.rs (thin terminal I/O) → llmspell-repl::ReplSession → kernel_client → kernel
+```
+
+**Implementation Tasks**:
+
+1. **Create ReplSession in llmspell-repl crate** ✅ COMPLETED:
+   ```rust
+   // llmspell-repl/src/session.rs
+   pub struct ReplSession {
+       kernel: Box<dyn KernelConnectionTrait>,
+       config: LLMSpellConfig,
+       execution_count: u32,
+   }
+   
+   impl ReplSession {
+       // All business logic moves here:
+       pub async fn handle_input(&mut self, input: &str) -> Result<String>;
+       pub async fn execute_code(&mut self, code: &str) -> Result<String>;
+       pub async fn handle_command(&mut self, cmd: &str) -> Result<String>;
+       async fn handle_breakpoint_command(&mut self, parts: &[&str]) -> Result<String>;
+       async fn handle_step_command(&mut self) -> Result<String>;
+       // ... all other command handlers
+   }
+   ```
+
+2. **Move terminal I/O to commands/repl.rs** ✅ COMPLETED:
+   ```rust
+   // commands/repl.rs - ONLY terminal interaction
+   pub async fn start_repl(
+       engine: ScriptEngine,
+       config: LLMSpellConfig, 
+       history_file: Option<PathBuf>
+   ) -> Result<()> {
+       // Create session (business logic)
+       let session = llmspell_repl::ReplSession::new(config, engine).await?;
+       
+       // Terminal setup (presentation only)
+       let mut editor = setup_editor(history_file)?;
+       
+       println!("LLMSpell REPL - Connected to kernel");
+       
+       // Simple I/O loop
+       loop {
+           match editor.readline("llmspell> ") {
+               Ok(line) => {
+                   editor.add_history_entry(&line);
+                   
+                   if line.trim() == "exit" {
+                       break;
+                   }
+                   
+                   // Delegate ALL logic to ReplSession
+                   match session.handle_input(&line).await {
+                       Ok(output) => println!("{}", output),
+                       Err(e) => eprintln!("Error: {}", e),
+                   }
+               }
+               Err(ReadlineError::Eof) => break,
+               Err(e) => {
+                   eprintln!("Error: {:?}", e);
+                   break;
+               }
+           }
+       }
+       
+       editor.save_history(&history_file)?;
+       Ok(())
+   }
+   ```
+
+3. **Delete repl_interface.rs entirely** ✅ COMPLETED:
+   - Remove the 585-line file
+   - Update lib.rs to remove `pub mod repl_interface;`
+   - No intermediate abstraction needed!
+
+4. **Update dependencies** ✅ COMPLETED:
+   ```toml
+   # llmspell-repl/Cargo.toml
+   [dependencies]
+   llmspell-kernel = { path = "../llmspell-kernel" }
+   llmspell-config = { path = "../llmspell-config" }
+   # ... other deps for business logic
+   
+   # llmspell-cli/Cargo.toml  
+   [dependencies]
+   llmspell-repl = { path = "../llmspell-repl" }
+   rustyline = "..." # Terminal I/O only
+   ```
+
+**Acceptance Criteria**:
+- [x] `repl_interface.rs` is DELETED
+- [x] `llmspell-repl` contains ALL business logic (385 lines in session.rs)
+- [x] `commands/repl.rs` is <150 lines (147 lines - terminal I/O only)
+- [x] Clear separation: repl = logic, cli = presentation
+- [x] All REPL commands still work
+
+**PHASE 4.5 COMPLETION INSIGHTS**:
+- Successfully moved 585 lines from repl_interface.rs to proper location
+- Created clean KernelConnectionAdapter trait bridging pattern
+- Achieved proper separation: llmspell-repl owns business logic, CLI just does I/O
+- Ready for Phase 5 debug integration with clean architecture
 
 **PHASE 5: Debug Integration**
 
@@ -9795,17 +9911,20 @@ llmspell run script.lua --connect-to-kernel abc-123-def
 
 **CLEANUP PHASE: Remove Redundant Binary**
 
-14. **Remove llmspell-kernel binary** ❌ NEW:
+14. **Remove llmspell-kernel binary** ✅ COMPLETED:
     ```bash
-    # Since CLI now has --kernel option, remove separate binary
-    rm -rf llmspell-kernel/src/bin/llmspell-kernel.rs
-    
-    # Update Cargo.toml to remove binary target:
-    # DELETE from llmspell-kernel/Cargo.toml:
-    # [[bin]]
-    # name = "llmspell-kernel"  
-    # path = "src/bin/llmspell-kernel.rs"
+    # Since CLI now has kernel command, removed separate binary
+    # Actions taken:
+    # 1. Removed [[bin]] section from llmspell-kernel/Cargo.toml
+    # 2. Deleted src/bin/llmspell-kernel.rs
+    # 3. Removed empty src/bin directory
+    # 4. Updated README.md to reference 'llmspell kernel' command
+    # 5. Updated kernel discovery tests to check for llmspell binary instead
     ```
+    **INSIGHTS**: 
+    - Unified entry point improves user experience
+    - Kernel library still exists for internal use
+    - Tests updated to reflect architectural change
 
 15. **Update documentation and scripts** ❌ NEW:
     ```bash

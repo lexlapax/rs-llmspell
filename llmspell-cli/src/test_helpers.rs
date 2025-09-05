@@ -2,44 +2,103 @@
 //!
 //! Provides helper functions for creating test instances with null implementations.
 
-use crate::kernel::{KernelConnectionBuilder, NullKernelConnection, NullKernelDiscovery};
-use crate::repl_interface::CLIReplInterface;
+use crate::kernel_client::{KernelConnectionBuilder, KernelConnectionTrait};
+use anyhow::Result;
+use async_trait::async_trait;
 use llmspell_bridge::{
-    diagnostics_bridge::DiagnosticsBridge, null_circuit_breaker::NullCircuitBreaker,
-    null_hook_profiler::NullHookProfiler, null_profiler::NullProfiler,
+    diagnostics_bridge::DiagnosticsBridge,
+    hook_profiler::WorkloadClassifier,
+    null_circuit_breaker::NullCircuitBreaker,
+    null_hook_profiler::NullHookProfiler,
+    null_profiler::NullProfiler,
     null_session_recorder::NullSessionRecorder,
 };
 use llmspell_config::LLMSpellConfig;
+use serde_json::Value;
+
+/// Null implementation of KernelConnectionTrait for testing
+pub struct NullKernelConnection {
+    connected: bool,
+}
+
+impl NullKernelConnection {
+    pub fn new() -> Self {
+        Self { connected: false }
+    }
+}
+
+#[async_trait]
+impl KernelConnectionTrait for NullKernelConnection {
+    async fn connect_or_start(&mut self) -> Result<()> {
+        self.connected = true;
+        Ok(())
+    }
+
+    async fn execute(&mut self, _code: &str) -> Result<String> {
+        Ok("null execution".to_string())
+    }
+
+    async fn execute_inline(&mut self, _code: &str) -> Result<String> {
+        Ok("null inline execution".to_string())
+    }
+
+    async fn repl(&mut self) -> Result<()> {
+        Ok(())
+    }
+
+    async fn info(&mut self) -> Result<Value> {
+        Ok(serde_json::json!({
+            "kernel": "null",
+            "version": "0.0.0"
+        }))
+    }
+
+    async fn send_debug_command(&mut self, _command: Value) -> Result<Value> {
+        Ok(Value::Null)
+    }
+
+    async fn shutdown(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    fn classify_workload(&self, _operation: &str) -> WorkloadClassifier {
+        WorkloadClassifier::Light
+    }
+
+    fn execution_manager(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
+}
 
 /// Create a test kernel connection with null implementations
 pub fn create_test_kernel() -> NullKernelConnection {
     NullKernelConnection::new()
 }
 
-/// Create a test REPL interface with null implementations
-pub fn create_test_cli() -> CLIReplInterface {
-    let kernel = Box::new(create_test_kernel());
-
-    let diagnostics = DiagnosticsBridge::builder()
+/// Create a test diagnostics bridge with null implementations
+pub fn create_test_diagnostics() -> DiagnosticsBridge {
+    DiagnosticsBridge::builder()
         .profiler(Box::new(NullProfiler::new()))
         .hook_profiler(Box::new(NullHookProfiler::new()))
         .circuit_breaker(Box::new(NullCircuitBreaker::new()))
         .session_recorder(Box::new(NullSessionRecorder::new()))
-        .build();
-
-    CLIReplInterface::builder()
-        .kernel(kernel)
-        .diagnostics(diagnostics)
         .build()
-        .expect("Failed to create test CLI")
 }
 
 /// Create a test kernel connection builder with null implementations
 pub fn create_test_kernel_builder() -> KernelConnectionBuilder {
     KernelConnectionBuilder::new()
-        .discovery(Box::new(NullKernelDiscovery))
-        .circuit_breaker(Box::new(NullCircuitBreaker::new()))
-        .session_recorder(Box::new(NullSessionRecorder::new()))
+        .diagnostics(create_test_diagnostics())
 }
 
 /// Create a test configuration
@@ -50,7 +109,6 @@ pub fn create_test_config() -> LLMSpellConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::kernel::KernelConnectionTrait;
 
     #[tokio::test]
     async fn test_null_kernel_connection() {
@@ -66,7 +124,7 @@ mod tests {
             .execute("test code")
             .await
             .expect("Failed to execute");
-        assert_eq!(result.as_str().unwrap(), "null execution");
+        assert_eq!(result, "null execution");
 
         // Test disconnection
         kernel.disconnect().await.expect("Failed to disconnect");
@@ -74,8 +132,8 @@ mod tests {
     }
 
     #[test]
-    fn test_create_test_cli() {
-        let _cli = create_test_cli();
+    fn test_create_test_diagnostics() {
+        let _diagnostics = create_test_diagnostics();
         // Just verify it can be created without panicking
     }
 

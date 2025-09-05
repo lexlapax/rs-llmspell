@@ -14,17 +14,17 @@ use llmspell_kernel::KernelDiscovery;
 use llmspell_repl::ConnectionInfo;
 
 // Import Jupyter ConnectionInfo with an alias to avoid conflicts
+use chrono;
+use hmac::{Hmac, Mac};
 use llmspell_kernel::jupyter::connection::ConnectionInfo as JupyterConnectionInfo;
 use serde_json::Value;
+use sha2::Sha256;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::sync::RwLock;
-use hmac::{Hmac, Mac};
-use sha2::Sha256;
 use uuid;
-use chrono;
 use zmq::{Context as ZmqContext, Socket, SocketType};
 
 /// Classify operation workload based on operation name
@@ -282,7 +282,9 @@ pub struct CliCircuitBreaker {
 impl CliCircuitBreaker {
     pub fn new() -> Self {
         Self {
-            breaker: Arc::new(Mutex::new(llmspell_bridge::circuit_breaker::ExponentialBackoffBreaker::default())),
+            breaker: Arc::new(Mutex::new(
+                llmspell_bridge::circuit_breaker::ExponentialBackoffBreaker::default(),
+            )),
         }
     }
 }
@@ -343,7 +345,10 @@ impl KernelConnectionBuilder {
         self
     }
 
-    pub fn diagnostics(mut self, diagnostics: llmspell_bridge::diagnostics_bridge::DiagnosticsBridge) -> Self {
+    pub fn diagnostics(
+        mut self,
+        diagnostics: llmspell_bridge::diagnostics_bridge::DiagnosticsBridge,
+    ) -> Self {
         self.diagnostics = Some(diagnostics);
         self
     }
@@ -356,8 +361,10 @@ impl KernelConnectionBuilder {
     pub async fn build(self) -> Result<Box<dyn KernelConnectionTrait>> {
         // Return basic implementation with Jupyter client
         let connection = BasicKernelConnection::new(
-            self.discovery.unwrap_or_else(|| Box::new(CliKernelDiscovery::new())),
-            self.circuit_breaker.unwrap_or_else(|| Box::new(CliCircuitBreaker::new())),
+            self.discovery
+                .unwrap_or_else(|| Box::new(CliKernelDiscovery::new())),
+            self.circuit_breaker
+                .unwrap_or_else(|| Box::new(CliCircuitBreaker::new())),
             self.diagnostics,
         )?;
         Ok(Box::new(connection))
@@ -469,23 +476,29 @@ impl JupyterKernelClient {
     pub fn connect_to_kernel(&mut self, connection_info: JupyterConnectionInfo) -> Result<()> {
         // Parse HMAC key
         let hmac_key = hex::decode(&connection_info.key)?;
-        
+
         // Create shell socket (REQ to connect to kernel's ROUTER)
         let shell_socket = {
             let context = self.context.lock().unwrap();
             let socket = context.socket(SocketType::REQ)?;
-            let addr = format!("tcp://{}:{}", connection_info.ip, connection_info.shell_port);
+            let addr = format!(
+                "tcp://{}:{}",
+                connection_info.ip, connection_info.shell_port
+            );
             socket.connect(&addr)?;
             socket.set_linger(1000)?; // 1 second linger
             socket.set_rcvtimeo(5000)?; // 5 second timeout
             socket
         };
 
-        // Create iopub socket (SUB to connect to kernel's PUB) 
+        // Create iopub socket (SUB to connect to kernel's PUB)
         let iopub_socket = {
             let context = self.context.lock().unwrap();
             let socket = context.socket(SocketType::SUB)?;
-            let addr = format!("tcp://{}:{}", connection_info.ip, connection_info.iopub_port);
+            let addr = format!(
+                "tcp://{}:{}",
+                connection_info.ip, connection_info.iopub_port
+            );
             socket.connect(&addr)?;
             socket.set_subscribe(b"")?; // Subscribe to all messages
             socket.set_rcvtimeo(1000)?; // 1 second timeout for non-blocking
@@ -504,7 +517,7 @@ impl JupyterKernelClient {
     pub fn create_message(&self, msg_type: &str, content: Value) -> Result<Vec<Vec<u8>>> {
         let msg_id = uuid::Uuid::new_v4().to_string();
         let timestamp = chrono::Utc::now().to_rfc3339();
-        
+
         // Create header
         let header = serde_json::json!({
             "msg_id": msg_id,
@@ -551,7 +564,7 @@ impl JupyterKernelClient {
 
     pub fn send_execute_request(&mut self, code: &str) -> Result<()> {
         self.execution_count += 1;
-        
+
         let content = serde_json::json!({
             "code": code,
             "silent": false,
@@ -562,7 +575,7 @@ impl JupyterKernelClient {
         });
 
         let parts = self.create_message("execute_request", content)?;
-        
+
         let shell_socket = self.shell_socket.lock().unwrap();
         if let Some(socket) = shell_socket.as_ref() {
             socket.send_multipart(parts, 0)?;
@@ -579,16 +592,18 @@ impl JupyterKernelClient {
                     if parts.len() >= 6 {
                         // Parse the reply content (last part)
                         let content_json: Value = serde_json::from_slice(&parts[5])?;
-                        
+
                         // Extract result from execute_reply
                         if let Some(status) = content_json.get("status") {
                             if status == "ok" {
                                 Ok("Execution completed successfully".to_string())
                             } else {
-                                let error_name = content_json.get("ename")
+                                let error_name = content_json
+                                    .get("ename")
                                     .and_then(|v| v.as_str())
                                     .unwrap_or("Unknown");
-                                let error_value = content_json.get("evalue")
+                                let error_value = content_json
+                                    .get("evalue")
                                     .and_then(|v| v.as_str())
                                     .unwrap_or("Unknown error");
                                 Ok(format!("Error: {}: {}", error_name, error_value))
@@ -597,7 +612,10 @@ impl JupyterKernelClient {
                             Ok("No status in reply".to_string())
                         }
                     } else {
-                        anyhow::bail!("Invalid message format: expected at least 6 parts, got {}", parts.len())
+                        anyhow::bail!(
+                            "Invalid message format: expected at least 6 parts, got {}",
+                            parts.len()
+                        )
                     }
                 }
                 Err(zmq::Error::EAGAIN) => anyhow::bail!("Timeout waiting for execute reply"),
@@ -616,7 +634,7 @@ impl KernelConnectionTrait for JupyterKernelClient {
         let discovery = CliKernelDiscovery::new();
         let discovery_guard = discovery.discovery.read().await;
         let kernels = discovery_guard.discover_kernels().await;
-        
+
         if let Ok(kernels) = kernels {
             if let Some(kernel_info) = kernels.first() {
                 // Convert to JupyterConnectionInfo format
@@ -632,7 +650,7 @@ impl KernelConnectionTrait for JupyterKernelClient {
                     signature_scheme: "hmac-sha256".to_string(),
                     kernel_name: "llmspell".to_string(),
                 };
-                
+
                 self.connect_to_kernel(jupyter_info)?;
                 return Ok(());
             }
