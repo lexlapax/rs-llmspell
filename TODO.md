@@ -3304,119 +3304,213 @@ CLI --connect → JupyterKernelClient → ZeroMQ → External Kernel Server
 **Risk**: High - affects all CLI commands
 **Impact**: Unblocks everything - current architecture is fundamentally broken
 
-**PHASE 5: Debug Integration (Hybrid Architecture)**
+**PHASE 5: Debug Integration (Kernel-Based Architecture)**
 
-**ARCHITECTURAL DECISION**: Use hybrid approach - basic commands direct to ExecutionManager, complex via InteractiveDebugger
+**🎯 GOAL**: Complete debug functionality by connecting the **existing ExecutionManager** through the kernel architecture established in Phase 4.6.
 
-12. **Implement debug commands through kernel** ❌ NEW:
-   
-   **Step 1: Add debug handling to kernel** (llmspell-kernel/src/kernel.rs):
-   ```rust
-   // In process_message() - add case:
-   "debug_request" => self.handle_debug_request(content).await,
-   
-   // New method:
-   async fn handle_debug_request(&self, content: Value) -> Result<Value> {
-       let command = content["command"].as_str().unwrap_or("");
-       let args = &content["arguments"];
-       
-       // Access ExecutionManager through ScriptRuntime
-       let runtime = self.runtime.lock().await;
-       let exec_mgr = runtime.get_execution_manager()
-           .ok_or_else(|| anyhow!("Debug not enabled"))?;
-       
-       match command {
-           // Direct ExecutionManager calls (simple operations)
-           "setBreakpoints" => {
-               let source = args["source"]["name"].as_str().unwrap_or("repl");
-               for line in args["lines"].as_array().unwrap() {
-                   let bp = Breakpoint::new(source.to_string(), line.as_u64().unwrap() as u32);
-                   exec_mgr.add_breakpoint(bp).await;
-               }
-               Ok(json!({"success": true}))
-           }
-           "continue" => {
-               exec_mgr.continue_execution().await?;
-               Ok(json!({"success": true}))
-           }
-           "stepIn" => {
-               exec_mgr.step_in().await?;
-               Ok(json!({"success": true}))
-           }
-           
-           // Complex operations via InteractiveDebugger (future)
-           "setConditionalBreakpoint" | "evaluate" => {
-               // TODO: Route through llmspell-debug::InteractiveDebugger
-               Err(anyhow!("Advanced debug features not yet implemented"))
-           }
-           
-           _ => Err(anyhow!("Unknown debug command: {}", command))
-       }
-   }
-   ```
-   
-   **Step 2: Fix JupyterKernelClient** (llmspell-cli/src/kernel_client/connection.rs):
-   ```rust
-   async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
-       // Create proper Jupyter debug_request message
-       let msg = json!({
-           "header": {
-               "msg_id": uuid::Uuid::new_v4().to_string(),
-               "msg_type": "debug_request",
-               "session": self.session_id,
-           },
-           "content": command,
-       });
-       
-       // Send through shell socket and wait for reply
-       self.send_shell_request(msg).await
-   }
-   ```
-   
-   **Step 3: Expose ExecutionManager** (llmspell-bridge/src/runtime.rs):
-   ```rust
-   impl ScriptRuntime {
-       /// Get execution manager for debug operations
-       pub fn get_execution_manager(&self) -> Option<Arc<ExecutionManager>> {
-           self.execution_manager.clone()
-       }
-   }
-   ```
+**✅ ARCHITECTURAL INSIGHT (Post-Analysis)**: 
+The debug infrastructure is **85% complete** - ExecutionManager has full functionality (breakpoints, stepping, variables, stack inspection). The missing 15% is **just wiring** through the in-process kernel architecture.
 
-13. **Update debug run command** ❌ BROKEN:
-    ```rust
-    // Current run_debug.rs just returns error
-    // Need actual implementation:
-    
-    pub async fn execute_script_debug(
-        script_content: String,
-        script_path: PathBuf,
-        runtime_config: LLMSpellConfig,
-        args: Vec<String>,
-        output_format: OutputFormat,
-    ) -> Result<()> {
-        // Enable debug in config
-        let mut config = runtime_config;
-        config.debug.enabled = true;
-        
-        // Create kernel connection with debug enabled  
-        let mut kernel = create_kernel_connection(config).await?;
-        
-        // Execute with debug support
-        let result = kernel.execute(&script_content).await?;
-        println!("{}", format_output(&parse_kernel_result(result), output_format)?);
-        
-        kernel.disconnect().await?;
-        Ok(())
+**Current Architecture Flow:**
+```
+CLI --debug → InProcessKernel → GenericKernel → ScriptRuntime → ExecutionManager
+```
+
+**Implementation Strategy**: **Minimal routing changes** - leverage existing APIs rather than rebuilding
+
+### Task 9.8.10.5.1: Add ExecutionManager Getter to ScriptRuntime ❌ NEW
+**Priority**: CRITICAL  
+**Estimated Time**: 30 minutes  
+**Assignee**: Bridge Team
+
+**Description**: Expose ExecutionManager from ScriptRuntime so the kernel can access debug functionality.
+
+**Implementation:**
+```rust
+// File: llmspell-bridge/src/runtime.rs
+impl ScriptRuntime {
+    /// Get execution manager for debug operations
+    /// Returns None if debug mode is disabled
+    pub fn get_execution_manager(&self) -> Option<Arc<ExecutionManager>> {
+        self.execution_manager.clone()
     }
-    ```
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Method added to ScriptRuntime impl
+- [ ] Returns Option<Arc<ExecutionManager>> 
+- [ ] None when debug disabled, Some when enabled
+- [ ] Zero impact on non-debug performance
+
+### Task 9.8.10.5.2: Add Debug Request Handler to GenericKernel ❌ NEW  
+**Priority**: CRITICAL  
+**Estimated Time**: 2-3 hours  
+**Assignee**: Kernel Team
+
+**Description**: Add debug message processing to GenericKernel that routes to ExecutionManager.
+
+**Implementation:**
+```rust
+// File: llmspell-kernel/src/kernel.rs
+impl<T: Transport, P: Protocol> GenericKernel<T, P> {
+    /// Handle debug requests via existing ExecutionManager API
+    pub async fn handle_debug_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        let command = content["command"].as_str().unwrap_or("");
+        let args = &content["arguments"];
+        
+        // Access ExecutionManager through ScriptRuntime
+        let runtime = self.runtime.lock().await;
+        let exec_mgr = runtime.get_execution_manager()
+            .ok_or_else(|| anyhow!("Debug not enabled - use --debug flag"))?;
+        
+        match command {
+            "setBreakpoints" => {
+                let source = args["source"]["name"].as_str().unwrap_or("repl");
+                let mut breakpoint_ids = Vec::new();
+                
+                for line in args["lines"].as_array().unwrap_or(&vec![]) {
+                    if let Some(line_num) = line.as_u64() {
+                        let bp = Breakpoint::new(source.to_string(), line_num as u32);
+                        let id = exec_mgr.add_breakpoint(bp).await;
+                        breakpoint_ids.push(id);
+                    }
+                }
+                Ok(serde_json::json!({
+                    "success": true,
+                    "breakpoints": breakpoint_ids
+                }))
+            }
+            "continue" => {
+                exec_mgr.send_command(DebugCommand::Continue).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "stepIn" => {
+                exec_mgr.send_command(DebugCommand::StepInto).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "stepOver" => {
+                exec_mgr.send_command(DebugCommand::StepOver).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "stepOut" => {
+                exec_mgr.send_command(DebugCommand::StepOut).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "getVariables" => {
+                let frame_id = args["frameId"].as_str();
+                let variables = exec_mgr.get_variables(frame_id).await;
+                Ok(serde_json::json!({
+                    "success": true,
+                    "variables": variables
+                }))
+            }
+            "getStack" => {
+                let stack = exec_mgr.get_stack_trace().await;
+                Ok(serde_json::json!({
+                    "success": true,
+                    "stackFrames": stack
+                }))
+            }
+            _ => Err(anyhow::anyhow!("Unknown debug command: {}", command))
+        }
+    }
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Method added to GenericKernel impl
+- [ ] Routes to ExecutionManager API calls correctly
+- [ ] Returns proper JSON responses
+- [ ] Error handling for disabled debug mode
+
+### Task 9.8.10.5.3: Update InProcessKernel Debug Commands ❌ NEW
+**Priority**: HIGH
+**Estimated Time**: 1-2 hours  
+**Assignee**: CLI Team
+
+**Description**: Update InProcessKernel to call kernel debug handler directly (no network overhead).
+
+**Implementation:**
+```rust
+// File: llmspell-cli/src/kernel_client/in_process.rs
+impl KernelConnectionTrait for InProcessKernel {
+    async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
+        // Direct call to kernel (no network)
+        let kernel = self.kernel.read().await;
+        kernel.handle_debug_request(command).await
+            .map_err(|e| anyhow::anyhow!("Debug command failed: {}", e))
+    }
+}
+```
+
+**Acceptance Criteria:**
+- [ ] send_debug_command calls kernel directly  
+- [ ] No network serialization overhead
+- [ ] Proper error propagation
+- [ ] Maintains KernelConnectionTrait interface
+
+### Task 9.8.10.5.4: Create Debug-Enabled Run Command ❌ NEW
+**Priority**: MEDIUM
+**Estimated Time**: 1 hour
+**Assignee**: CLI Team
+
+**Description**: Fix broken debug run command to actually enable debug mode.
+
+**Current Problem**: `run_debug.rs` just returns error - no actual implementation
+
+**Implementation:**
+```rust
+// File: llmspell-cli/src/commands/run_debug.rs (fix existing)
+pub async fn execute_script_debug(
+    script_content: String,
+    script_path: PathBuf,
+    runtime_config: LLMSpellConfig,
+    args: Vec<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    // Enable debug in config
+    let mut config = runtime_config;
+    config.debug.enabled = true;
+    config.debug.mode = "interactive".to_string();
+    
+    // Create kernel connection with debug enabled  
+    let mut kernel = super::create_kernel_connection(config, None).await?;
+    
+    // Execute with debug support - same as normal run
+    let result = kernel.execute(&script_content).await?;
+    
+    // Create ScriptOutput from kernel result (same as run.rs)
+    let script_output = ScriptOutput {
+        output: serde_json::Value::String(result),
+        console_output: vec![],
+        metadata: ScriptMetadata {
+            engine: "kernel".to_string(),
+            execution_time_ms: 0,
+            memory_usage_bytes: None,
+            warnings: vec![],
+        },
+    };
+    
+    println!("{}", format_output(&script_output, output_format)?);
+    Ok(())
+}
+```
+
+**Acceptance Criteria:**
+- [ ] Actually enables debug in config
+- [ ] Uses existing create_kernel_connection
+- [ ] Same execution path as normal run
+- [ ] Proper output formatting
 
 **PHASE 5 ARCHITECTURAL SUMMARY**:
-- **Approach**: Hybrid - basic commands direct to ExecutionManager, complex via InteractiveDebugger
-- **Rationale**: Balances immediate functionality with future extensibility
-- **Key Insight**: ExecutionManager already exists in ScriptRuntime with full debug support
-- **Implementation**: 8 hours (4h kernel, 2h client, 2h testing)
-- **Risk**: Low - uses existing proven components
+- **Approach**: **Minimal Wiring** - Connect existing ExecutionManager through established kernel architecture
+- **Rationale**: **85% of debug infrastructure already exists** - just need routing between components
+- **Key Insight**: ExecutionManager has complete debug API, GenericKernel has ScriptRuntime access, just missing getters/handlers
+- **Implementation**: **6-8 hours total** (30min getter, 2-3h kernel handler, 1-2h CLI updates, 1-2h testing)
+- **Risk**: **Very Low** - No new components, just connecting existing APIs
+- **Dependencies**: Phase 4.6 in-process kernel architecture ✅ (already complete)
+- **Future-Proof**: External kernels will get same debug support via protocol messaging
 
 **CLEANUP PHASE: Remove Redundant Binary**
 
