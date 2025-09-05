@@ -3627,7 +3627,7 @@ All CLI functionality (run, repl, debug) works through in-process kernel with sa
     - ✅ All 8 CLI lib tests pass
     - ✅ Clean architecture with clear separation of concerns
 
-#### Task 9.8.11: End-to-End CLI Functionality Verification
+### Task 9.8.11: End-to-End CLI Functionality Verification
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
@@ -3939,7 +3939,7 @@ echo "CLI successfully migrated to unified in-process kernel architecture."
 **Definition of Done:**
 The CLI provides the same user experience as before the migration, but now runs entirely through the in-process kernel architecture. All functionality works reliably with proper error handling and performance characteristics.
 
-#### Task 9.8.12: Integration Testing and Validation
+### Task 9.8.12: Integration Testing and Validation
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
@@ -4043,6 +4043,343 @@ The CLI provides the same user experience as before the migration, but now runs 
 - **What we have**: In-process kernel with null transport/protocol
 - **What was planned**: Jupyter kernel with ZeroMQ transport
 - **Result**: Simpler but less capable architecture
+
+
+### Task 9.8.13: CLI Architecture Restructuring and Flag Cleanup
+**Priority**: HIGH  
+**Estimated Time**: 8 hours  
+**Assignee**: CLI Team
+**Description**: Direct restructuring of CLI commands and flags to fix usability issues identified in 9.8.11/9.8.12 testing. **NO BACKWARD COMPATIBILITY** - breaking changes are acceptable as we're pre-1.0.
+
+**Problems to Address:**
+1. **Confused Flag Hierarchy**: `--debug` means both trace logging AND interactive debugging
+2. **Command Structure Issues**: `Kernel` uses flags instead of subcommands, `Apps` has 3-level nesting
+3. **Architectural Disconnects**: Script arguments parsed but not passed, `--engine` flag ignored
+4. **Flag Duplication**: RAG flags repeated across commands (5 flags × 4 commands = 20 duplicates)
+
+**Subtasks:**
+
+#### 9.8.13.1: Design and Document New CLI Structure
+**Time**: 1 hour
+**Implementation**:
+1. Create `docs/technical/cli-restructure-design.md` with:
+   - Current vs proposed command hierarchy comparison
+   - Flag consolidation strategy (global vs command-specific)
+   - Direct replacement approach (no compatibility layer)
+
+2. Define new command structure:
+   ```bash
+   # Global flags: --trace, --config, --output, --help
+   llmspell [GLOBAL_FLAGS] COMMAND [COMMAND_FLAGS] [-- SCRIPT_ARGS]
+   
+   # Primary commands
+   run, exec, repl, debug
+   
+   # Subcommand groups
+   kernel: start|stop|status|connect
+   state: show|clear|export|import
+   session: list|replay|delete
+   config: init|validate|show
+   backup: create|restore|list|delete
+   ```
+
+3. Document flag inheritance rules:
+   - Global flags available to all commands
+   - Command flags override globals where applicable
+   - Subcommands inherit parent command flags
+
+**Acceptance Criteria:**
+- [ ] Design document created
+- [ ] Command hierarchy diagram included
+- [ ] Flag changes documented
+- [ ] Breaking changes clearly listed
+
+#### 9.8.13.2: Separate --trace from --debug Functionality
+**Time**: 2 hours
+**Implementation**:
+1. Replace `--debug` flag with `--trace` for logging/diagnostics:
+   ```rust
+   // cli.rs
+   #[arg(long, global = true, value_enum)]
+   pub trace: Option<TraceLevel>,  // trace, debug, info, warn, error
+   ```
+
+2. Create dedicated `debug` command for interactive debugging:
+   ```rust
+   Debug {
+       script: PathBuf,
+       #[arg(long)]
+       break_at: Vec<String>,  // file:line breakpoints
+       #[arg(long)]
+       watch: Vec<String>,     // watch expressions
+       #[arg(last = true)]
+       args: Vec<String>,      // script arguments
+   }
+   ```
+
+3. Replace all `--debug` references with `--trace` in:
+   - Command handlers (run.rs, exec.rs, repl.rs)
+   - Configuration mapping (main.rs:105-106)
+   - Debug handler initialization
+   - Remove any legacy debug flag handling code
+
+**Acceptance Criteria:**
+- [ ] `--trace` controls logging verbosity
+- [ ] `debug` command launches interactive debugger
+- [ ] No confusion between diagnostics and debugging
+- [ ] Tests updated for new naming
+
+#### 9.8.13.3: Implement Kernel Subcommands
+**Time**: 1.5 hours
+**Implementation**:
+1. Replace flat `Kernel` command with subcommand group:
+   ```rust
+   #[derive(Subcommand)]
+   pub enum KernelCommands {
+       Start { 
+           #[arg(short, long, default_value = "9555")]
+           port: u16,
+           #[arg(long)]
+           daemon: bool,
+       },
+       Stop { id: Option<String> },
+       Status,
+       Connect { address: String },
+   }
+   ```
+
+2. Update command routing in commands/mod.rs:
+   ```rust
+   Commands::Kernel { command } => match command {
+       KernelCommands::Start { port, daemon } => kernel::start(port, daemon),
+       KernelCommands::Stop { id } => kernel::stop(id),
+       KernelCommands::Status => kernel::status(),
+       KernelCommands::Connect { address } => kernel::connect(address),
+   }
+   ```
+
+3. Implement status command to show running kernels:
+   - Scan ~/.llmspell/kernels/ for connection files
+   - Check kernel health via heartbeat
+   - Display kernel info in table format
+
+**Acceptance Criteria:**
+- [ ] `llmspell kernel start` launches kernel
+- [ ] `llmspell kernel status` shows running kernels
+- [ ] `llmspell kernel stop` terminates kernel
+- [ ] `llmspell kernel connect` establishes connection
+
+#### 9.8.13.4: Fix Script Argument Passing
+**Time**: 2 hours
+**Implementation**:
+1. Extend kernel protocol to pass arguments:
+   ```rust
+   // In kernel protocol messages
+   pub struct ExecuteRequest {
+       code: String,
+       args: Vec<String>,  // ADD THIS
+       // ... other fields
+   }
+   ```
+
+2. Update run.rs to pass parsed arguments through kernel:
+   ```rust
+   // run.rs:93-94
+   let request = ExecuteRequest {
+       code: script_content,
+       args: parsed_args,  // PASS THESE
+   };
+   let result = kernel.execute_with_args(request).await?;
+   ```
+
+3. Inject arguments into script environment:
+   ```rust
+   // In ScriptRuntime
+   lua.globals().set("arg", args)?;  // Lua convention
+   ```
+
+**Acceptance Criteria:**
+- [ ] `llmspell run script.lua -- arg1 arg2` passes arguments
+- [ ] Arguments accessible in script via `arg` table
+- [ ] Works for all script engines (Lua initially)
+- [ ] Integration test validates argument passing
+
+#### 9.8.13.5: Implement --format Flag for Output
+**Time**: 0.5 hours
+**Implementation**:
+1. Add command-specific format flag:
+   ```rust
+   Run {
+       // ... existing fields
+       #[arg(long, value_enum)]
+       format: Option<OutputFormat>,  // json, yaml, pretty, raw
+   }
+   ```
+
+2. Apply formatting in output.rs:
+   ```rust
+   match format.unwrap_or(global_format) {
+       OutputFormat::Json => serde_json::to_string_pretty(&output)?,
+       OutputFormat::Yaml => serde_yaml::to_string(&output)?,
+       OutputFormat::Pretty => format_pretty(&output),
+       OutputFormat::Raw => output.raw_string(),
+   }
+   ```
+
+**Acceptance Criteria:**
+- [ ] `--format json` outputs JSON
+- [ ] `--format yaml` outputs YAML  
+- [ ] Command flag overrides global `--output`
+- [ ] Default format is text/pretty
+
+#### 9.8.13.6: Wire Up --engine Flag
+**Time**: 0.5 hours
+**Implementation**:
+1. Delete global `--engine` flag from Cli struct
+2. Add engine flag to relevant commands:
+   ```rust
+   Run {
+       #[arg(long, value_enum)]
+       engine: Option<ScriptEngine>,
+   }
+   ```
+
+3. Pass engine selection to kernel:
+   ```rust
+   // In create_kernel_connection
+   let config = runtime_config;
+   if let Some(engine) = engine {
+       config.default_engine = engine.as_str().to_string();
+   }
+   ```
+
+**Acceptance Criteria:**
+- [ ] `llmspell run script.js --engine javascript` selects JS engine
+- [ ] Engine selection propagates to kernel
+- [ ] Default engine from config if not specified
+- [ ] Error if requested engine unavailable
+
+#### 9.8.13.7: Simplify RAG Configuration
+**Time**: 0.5 hours
+**Implementation**:
+1. Create RAG profiles in config:
+   ```toml
+   [rag.profiles.production]
+   enabled = true
+   backend = "hnsw"
+   dimensions = 384
+   ```
+
+2. Delete 5 RAG flags and add single profile selector:
+   ```rust
+   Run {
+       #[arg(long)]
+       rag_profile: Option<String>,  // Instead of 5 flags
+   }
+   ```
+
+3. Load profile from config:
+   ```rust
+   if let Some(profile) = rag_profile {
+       config.rag = config.rag.profiles.get(&profile)
+           .ok_or_else(|| anyhow!("Unknown RAG profile: {}", profile))?
+           .clone();
+   }
+   ```
+
+**Acceptance Criteria:**
+- [ ] RAG profiles defined in config
+- [ ] Single `--rag-profile` flag replaces 5 flags
+- [ ] Profile settings override defaults
+- [ ] Error on unknown profile
+
+#### 9.8.13.8: Flatten Apps Command Structure
+**Time**: 0.5 hours
+**Implementation**:
+1. Simplify to two-level structure:
+   ```rust
+   Apps {
+       #[arg(value_name = "APP_NAME")]
+       name: Option<String>,  // None = list apps
+       #[arg(last = true)]
+       args: Vec<String>,
+   }
+   ```
+
+2. Handle in commands/apps.rs:
+   ```rust
+   match name {
+       None => list_available_apps(output_format),
+       Some(app) => run_app(&app, args, engine, output_format),
+   }
+   ```
+
+**Acceptance Criteria:**
+- [ ] `llmspell app` lists available apps
+- [ ] `llmspell app file-organizer -- /path` runs app
+- [ ] Cleaner than 3-level subcommand nesting
+- [ ] Tab completion still works
+
+#### 9.8.13.9: Add State and Session Commands
+**Time**: 0.5 hours  
+**Implementation**:
+1. Create new command groups:
+   ```rust
+   State {
+       #[command(subcommand)]
+       command: StateCommands,
+   },
+   Session {
+       #[command(subcommand)]  
+       command: SessionCommands,
+   }
+   ```
+
+2. Implement state operations:
+   - `state show`: Display persisted state
+   - `state clear`: Clear state by scope
+   - `state export`: Export to JSON
+   - `state import`: Import from JSON
+
+3. Implement session operations:
+   - `session list`: Show all sessions
+   - `session replay <id>`: Replay session
+   - `session delete <id>`: Remove session
+
+**Acceptance Criteria:**
+- [ ] State commands interact with StateManager
+- [ ] Session commands use llmspell-sessions
+- [ ] Proper scope filtering for state
+- [ ] JSON import/export works
+
+#### 9.8.13.10: Update Help Text and Documentation
+**Time**: 0.5 hours
+**Implementation**:
+1. Update all command help strings in cli.rs
+2. Generate new CLI documentation:
+   ```bash
+   llmspell --help > docs/user-guide/cli-reference.md
+   ```
+3. Update README.md with new command examples
+
+**Acceptance Criteria:**
+- [ ] Help text reflects new structure
+- [ ] Documentation updated
+- [ ] Examples use new commands
+
+**Definition of Done:**
+- [ ] All subtasks completed
+- [ ] Old/invalid code removed completely
+- [ ] Integration tests updated for new CLI structure
+- [ ] Documentation reflects all changes
+- [ ] Script arguments actually passed to scripts
+- [ ] --format flag controls output formatting
+- [ ] --engine flag selects script engine
+- [ ] Kernel subcommands implemented
+- [ ] RAG configuration simplified
+- [ ] Apps structure flattened
+- [ ] No dead code paths remaining
+
 
 ### Phase 9.8 Summary:
 
@@ -4401,7 +4738,6 @@ After Phase 9.9, we will have:
 
 **🎯 FOCUSED SCOPE**: Enterprise features (LSP/DAP, VS Code, remote debugging, web clients) moved to Phase 11.5
 
----
 
 **🚀 Phase 9 transforms LLMSpell from a powerful scripting platform into a developer-friendly system with world-class debugging capabilities through its kernel-as-service architecture.**
 

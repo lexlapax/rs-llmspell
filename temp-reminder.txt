@@ -11,3 +11,72 @@
 - debug for scripts not working
 - remove custom steps or document it properly
 - agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
+
+
+6. **Test 6: REPL Debug Commands** ⚠️ **PARTIAL IMPLEMENTATION**
+   - Created `/tmp/test_repl_debug.exp` TCL/Expect script
+   - `.break`, `.step`, `.continue` commands work ✅
+   - `.locals` command times out ❌ (returns "not yet implemented")
+   - `.stack`, `.watch` commands respond but may not be fully functional
+   - Debug infrastructure present but incomplete
+
+
+
+8. **Test 8: Interactive Debug Session** ❌ **NOT IMPLEMENTED**
+   - No `llmspell debug` command exists
+   - Would require separate debug entry point
+
+
+ **Test 9: Kernel Recovery** ⏭️ **SKIPPED**
+   **Kernel Recovery**:
+   - Simulate kernel error during execution
+   - Verify CLI shows meaningful error
+   - Verify subsequent commands work
+   - Requires fault injection testing
+   - Not automatable without test harness
+
+10. **Connection Recovery**:
+    - Test REPL session interrupted
+    - Verify graceful restart capability
+    - Requires network interruption simulation
+    - Beyond scope of basic verification
+
+14. **Test 14: Kernel Custom Options** ⚠️ **PARTIAL**
+    ```bash
+    llmspell --kernel --kernel-port 8888 --kernel-id test-kernel &
+    # Should start on port 8888 with ID test-kernel
+    ```
+    - `--port` flag works ✅
+    - `--kernel-id` flag doesn't exist ❌
+    - Uses CLI pattern not originally specified flags
+
+15. **Test 15: Output Formatting** ❌ **NOT IMPLEMENTED**
+    - No `--format` flag exists
+    - Only debug formatting available (`--debug-format`)
+    ```bash
+    llmspell run script.lua --format json
+    llmspell run script.lua --format table  
+    llmspell run script.lua --format plain
+    # All formats should work correctly
+    ```
+
+16. **Test 16: Engine Selection** ❌ **NOT IMPLEMENTED**
+    - No `--engine` flag on run command
+    - Engine specified in config only
+
+17. **Configuration Loading**:
+    ```bash
+    llmspell run script.lua --config custom.toml
+    # Custom config should be passed to kernel
+    ```
+
+3. **Kernel crash recovery** ⚠️ **PARTIAL**
+   - Created `/tmp/test_kernel_crash_recovery.sh` test script
+   - Error handling works, process recovers after errors
+   - Hard crashes (infinite loops) require timeout/termination
+   - Stack overflow handled gracefully
+
+7. **Jupyter protocol compatibility** ❌ **NOT APPLICABLE**
+   - Current architecture uses in-process kernel with null protocol
+   - No ZeroMQ/Jupyter protocol implementation active
+   - Standalone kernel exists but uses null protocol
