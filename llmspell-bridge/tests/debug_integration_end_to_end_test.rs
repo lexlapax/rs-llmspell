@@ -3,9 +3,9 @@
 //! This test exercises ALL debug functionality to verify 100% completion.
 //! Tests breakpoints, stepping, variable inspection, stack navigation, and more.
 
+use llmspell_bridge::debug_runtime::{DebugSession, DebugSessionState};
 use llmspell_bridge::{DebugRuntime, ScriptRuntime};
 use llmspell_config::LLMSpellConfig;
-use llmspell_engine::{DebugSession, DebugSessionState};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

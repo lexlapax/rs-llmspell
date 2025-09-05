@@ -6,13 +6,15 @@
 use anyhow::Result;
 use clap::Parser;
 use llmspell_config::LLMSpellConfig;
-use llmspell_engine::{LRPRequest, LRPResponse};
 use llmspell_kernel::{ConnectionInfo, JupyterKernel};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tracing_subscriber::{fmt, prelude::*, EnvFilter};
+
+// Legacy protocol types removed per Phase 9.8
 
 /// `LLMSpell` Kernel - Jupyter-compatible execution kernel
 #[derive(Parser, Debug)]
@@ -31,7 +33,7 @@ struct Args {
     #[arg(long, default_value = "9555")]
     port: u16,
 
-    /// Enable legacy TCP/LRP protocol compatibility (deprecated)
+    /// Enable legacy TCP protocol compatibility (deprecated)
     #[arg(long)]
     legacy_tcp: bool,
 
@@ -120,7 +122,7 @@ fn setup_logging(verbosity: u8) {
         .init();
 }
 
-/// Simple TCP server for legacy LRP protocol compatibility (Task 9.8.6)
+/// Simple TCP server for legacy protocol compatibility (deprecated)
 /// This is a temporary bridge to allow CLI to connect during migration
 async fn start_legacy_tcp_server(port: u16, _kernel: Arc<JupyterKernel>) -> Result<()> {
     let addr = format!("127.0.0.1:{port}");
@@ -175,73 +177,19 @@ async fn read_next_line(
 
 async fn process_lrp_line(line: &str, writer: &mut tokio::net::tcp::WriteHalf<'_>) -> Result<bool> {
     let line = line.trim();
-    tracing::debug!("Received LRP request: {}", line);
+    tracing::debug!("Received legacy request: {}", line);
 
-    match serde_json::from_str::<LRPRequest>(line) {
-        Ok(request) => {
-            send_lrp_response(request, writer).await?;
-            Ok(true)
-        }
-        Err(e) => {
-            tracing::error!("Failed to parse LRP request: {}", e);
-            Ok(false)
-        }
-    }
-}
+    // Legacy protocol removed - just return error response
+    let response = serde_json::json!({
+        "status": "error",
+        "message": "Legacy protocol removed. Use Jupyter protocol."
+    });
 
-async fn send_lrp_response(
-    request: LRPRequest,
-    writer: &mut tokio::net::tcp::WriteHalf<'_>,
-) -> Result<()> {
-    let response = handle_lrp_request(request);
     let response_json = serde_json::to_string(&response)?;
-
     writer.write_all(response_json.as_bytes()).await?;
     writer.write_all(b"\n").await?;
     writer.flush().await?;
 
-    tracing::debug!("Sent LRP response: {}", response_json);
-    Ok(())
-}
-
-/// Handle LRP request and return appropriate response
-fn handle_lrp_request(request: LRPRequest) -> LRPResponse {
-    match request {
-        LRPRequest::ExecuteRequest { code, .. } => handle_execute_request(&code),
-        _ => create_default_response(),
-    }
-}
-
-fn handle_execute_request(code: &str) -> LRPResponse {
-    tracing::info!("Executing code via legacy protocol: {}", code);
-
-    let output = determine_output(code);
-
-    LRPResponse::ExecuteReply {
-        status: "ok".to_string(),
-        execution_count: 1,
-        payload: Some(vec![Value::String(output.to_string())]),
-        user_expressions: None,
-    }
-}
-
-fn determine_output(code: &str) -> &'static str {
-    if code.contains("print") {
-        if code.contains("hello") {
-            "hello"
-        } else {
-            "executed"
-        }
-    } else {
-        "executed"
-    }
-}
-
-fn create_default_response() -> LRPResponse {
-    LRPResponse::ExecuteReply {
-        status: "ok".to_string(),
-        execution_count: 1,
-        payload: None,
-        user_expressions: None,
-    }
+    tracing::debug!("Sent error response: {}", response_json);
+    Ok(false) // Close connection
 }

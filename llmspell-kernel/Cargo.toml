@@ -34,9 +34,6 @@ llmspell-sessions = { path = "../llmspell-sessions" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-utils = { path = "../llmspell-utils" }
 
-# Temporary dependency - will be removed after Jupyter implementation
-llmspell-engine = { path = "../llmspell-engine" }
-
 # ZeroMQ and Jupyter dependencies  
 zmq = "0.10"
 hmac = "0.12"

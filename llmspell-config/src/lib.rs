@@ -12,11 +12,6 @@ use tracing::debug;
 // Re-export engine configurations from bridge
 pub use crate::debug::DebugConfig;
 pub use crate::engines::{EngineConfigs, JSConfig, LuaConfig};
-// Re-export UnifiedProtocolEngine configurations
-pub use crate::engine::{
-    BindingConfig, EngineConfig, EngineConfigBuilder, EngineConfigError, OutputFormat,
-    PerformanceConfig, ReplConfig, RoutingConfig,
-};
 pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, IsolationMode};
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
 pub use crate::rag::{
@@ -26,7 +21,6 @@ pub use crate::rag::{
 pub use crate::tools::{FileOperationsConfig, ToolsConfig};
 
 pub mod debug;
-pub mod engine;
 pub mod engines;
 pub mod env;
 pub mod env_registry;
@@ -57,8 +51,6 @@ pub struct LLMSpellConfig {
     pub default_engine: String,
     /// Engine-specific configurations  
     pub engines: EngineConfigs,
-    /// UnifiedProtocolEngine configuration
-    pub engine: EngineConfig,
     /// Provider configurations
     pub providers: ProviderManagerConfig,
     /// Global runtime settings
@@ -81,7 +73,6 @@ impl Default for LLMSpellConfig {
         Self {
             default_engine: "lua".to_string(),
             engines: EngineConfigs::default(),
-            engine: EngineConfig::default(),
             providers: ProviderManagerConfig::default(),
             runtime: GlobalRuntimeConfig::default(),
             tools: ToolsConfig::default(),
@@ -251,68 +242,11 @@ impl LLMSpellConfig {
             }
         }
 
-        // Merge UnifiedProtocolEngine configurations
-        if let Some(engine) = json.get("engine").and_then(|v| v.as_object()) {
-            // Merge binding settings
-            if let Some(binding) = engine.get("binding").and_then(|v| v.as_object()) {
-                if let Some(ip) = binding.get("ip").and_then(|v| v.as_str()) {
-                    debug!("Overriding engine.binding.ip from env: {}", ip);
-                    self.engine.binding.ip = ip.to_string();
-                }
-                if let Some(port_start) = binding.get("port_range_start").and_then(|v| v.as_u64()) {
-                    debug!(
-                        "Overriding engine.binding.port_range_start from env: {}",
-                        port_start
-                    );
-                    self.engine.binding.port_range_start = port_start as u16;
-                }
-                if let Some(max_clients) = binding.get("max_clients").and_then(|v| v.as_u64()) {
-                    debug!(
-                        "Overriding engine.binding.max_clients from env: {}",
-                        max_clients
-                    );
-                    self.engine.binding.max_clients = max_clients as usize;
-                }
-            }
-
-            // Merge routing settings
-            if let Some(routing) = engine.get("routing").and_then(|v| v.as_object()) {
-                if let Some(shell_strategy) = routing.get("shell_strategy").and_then(|v| v.as_str())
-                {
-                    debug!(
-                        "Overriding engine.routing.shell_strategy from env: {}",
-                        shell_strategy
-                    );
-                    if let Ok(strategy) = serde_json::from_str(&format!("\"{}\"", shell_strategy)) {
-                        self.engine.routing.shell_strategy = strategy;
-                    }
-                }
-                if let Some(iopub_strategy) = routing.get("iopub_strategy").and_then(|v| v.as_str())
-                {
-                    debug!(
-                        "Overriding engine.routing.iopub_strategy from env: {}",
-                        iopub_strategy
-                    );
-                    if let Ok(strategy) = serde_json::from_str(&format!("\"{}\"", iopub_strategy)) {
-                        self.engine.routing.iopub_strategy = strategy;
-                    }
-                }
-                if let Some(control_strategy) =
-                    routing.get("control_strategy").and_then(|v| v.as_str())
-                {
-                    debug!(
-                        "Overriding engine.routing.control_strategy from env: {}",
-                        control_strategy
-                    );
-                    if let Ok(strategy) = serde_json::from_str(&format!("\"{}\"", control_strategy))
-                    {
-                        self.engine.routing.control_strategy = strategy;
-                    }
-                }
-            }
-
-            // Merge debug settings from engine to top-level debug config
-            if let Some(debug_config) = engine.get("debug").and_then(|v| v.as_object()) {
+        // Legacy engine configuration - skip if present
+        if let Some(_engine) = json.get("engine").and_then(|v| v.as_object()) {
+            // Legacy engine configuration fields are now ignored
+            // Debug settings moved to top-level debug config
+            if let Some(debug_config) = _engine.get("debug").and_then(|v| v.as_object()) {
                 if let Some(enabled) = debug_config.get("enabled").and_then(|v| v.as_bool()) {
                     debug!("Overriding debug.enabled from env: {}", enabled);
                     self.debug.enabled = enabled;
@@ -343,63 +277,7 @@ impl LLMSpellConfig {
                         variable_inspection_enabled;
                 }
             }
-
-            // Merge REPL settings
-            if let Some(repl) = engine.get("repl").and_then(|v| v.as_object()) {
-                if let Some(history_size) = repl.get("history_size").and_then(|v| v.as_u64()) {
-                    debug!(
-                        "Overriding engine.repl.history_size from env: {}",
-                        history_size
-                    );
-                    self.engine.repl.history_size = history_size as usize;
-                }
-                if let Some(output_formatting) =
-                    repl.get("output_formatting").and_then(|v| v.as_str())
-                {
-                    debug!(
-                        "Overriding engine.repl.output_formatting from env: {}",
-                        output_formatting
-                    );
-                    if let Ok(format) = serde_json::from_str(&format!("\"{}\"", output_formatting))
-                    {
-                        self.engine.repl.output_formatting = format;
-                    }
-                }
-            }
-
-            // Merge performance settings
-            if let Some(performance) = engine.get("performance").and_then(|v| v.as_object()) {
-                if let Some(max_concurrent_messages) = performance
-                    .get("max_concurrent_messages")
-                    .and_then(|v| v.as_u64())
-                {
-                    debug!(
-                        "Overriding engine.performance.max_concurrent_messages from env: {}",
-                        max_concurrent_messages
-                    );
-                    self.engine.performance.max_concurrent_messages =
-                        max_concurrent_messages as usize;
-                }
-                if let Some(message_timeout_ms) = performance
-                    .get("message_timeout_ms")
-                    .and_then(|v| v.as_u64())
-                {
-                    debug!(
-                        "Overriding engine.performance.message_timeout_ms from env: {}",
-                        message_timeout_ms
-                    );
-                    self.engine.performance.message_timeout_ms = message_timeout_ms;
-                }
-                if let Some(enable_batching) =
-                    performance.get("enable_batching").and_then(|v| v.as_bool())
-                {
-                    debug!(
-                        "Overriding engine.performance.enable_batching from env: {}",
-                        enable_batching
-                    );
-                    self.engine.performance.enable_batching = enable_batching;
-                }
-            }
+            // Legacy REPL and performance settings are now ignored
         }
 
         // Merge provider configurations
@@ -1155,13 +1033,6 @@ impl LLMSpellConfigBuilder {
         self
     }
 
-    /// Set the engine configuration
-    #[must_use]
-    pub fn engine(mut self, engine: EngineConfig) -> Self {
-        self.config.engine = engine;
-        self
-    }
-
     /// Set the RAG configuration
     #[must_use]
     pub fn rag(mut self, rag: RAGConfig) -> Self {
@@ -1822,123 +1693,10 @@ mod tests {
     }
 
     #[test]
-    fn test_engine_config_environment_merge() {
-        let mut config = LLMSpellConfig::default();
-
-        // Test engine configuration merging from environment-style JSON
-        let env_json = serde_json::json!({
-            "engine": {
-                "binding": {
-                    "ip": "0.0.0.0",
-                    "port_range_start": 8080,
-                    "max_clients": 50
-                },
-                "routing": {
-                    "shell_strategy": "RoundRobin",
-                    "iopub_strategy": "LoadBalanced"
-                },
-                "debug": {
-                    "enabled": false,
-                    "breakpoints_enabled": false
-                },
-                "repl": {
-                    "history_size": 2000,
-                    "output_formatting": "Json"
-                },
-                "performance": {
-                    "max_concurrent_messages": 500,
-                    "enable_batching": true
-                }
-            }
-        });
-
-        config.merge_from_json(&env_json).unwrap();
-
-        // Verify engine configuration was merged
-        assert_eq!(config.engine.binding.ip, "0.0.0.0");
-        assert_eq!(config.engine.binding.port_range_start, 8080);
-        assert_eq!(config.engine.binding.max_clients, 50);
-
-        assert!(matches!(
-            config.engine.routing.shell_strategy,
-            crate::engine::RoutingStrategy::RoundRobin
-        ));
-        assert!(matches!(
-            config.engine.routing.iopub_strategy,
-            crate::engine::RoutingStrategy::LoadBalanced
-        ));
-
-        // Debug configuration now in top-level config.debug
-
-        assert_eq!(config.engine.repl.history_size, 2000);
-        assert!(matches!(
-            config.engine.repl.output_formatting,
-            crate::engine::OutputFormat::Json
-        ));
-
-        assert_eq!(config.engine.performance.max_concurrent_messages, 500);
-        assert!(config.engine.performance.enable_batching);
-    }
-
-    #[test]
-    fn test_engine_config_default_integration() {
+    fn test_config_validation() {
         let config = LLMSpellConfig::default();
 
-        // Verify default engine configuration integrates properly
-        assert_eq!(config.engine.binding.ip, "127.0.0.1");
-        assert_eq!(config.engine.binding.port_range_start, 9555);
-        assert_eq!(config.engine.binding.max_clients, 10);
-
-        assert!(matches!(
-            config.engine.routing.shell_strategy,
-            crate::engine::RoutingStrategy::Direct
-        ));
-        assert!(matches!(
-            config.engine.routing.iopub_strategy,
-            crate::engine::RoutingStrategy::Broadcast
-        ));
-        assert!(matches!(
-            config.engine.routing.control_strategy,
-            crate::engine::RoutingStrategy::RoundRobin
-        ));
-
-        // Debug configuration now in top-level config.debug
-
-        assert_eq!(config.engine.repl.history_size, 1000);
-        assert!(config.engine.repl.tab_completion);
-        assert!(matches!(
-            config.engine.repl.output_formatting,
-            crate::engine::OutputFormat::Enhanced
-        ));
-
-        assert_eq!(config.engine.performance.max_concurrent_messages, 100);
-        assert!(!config.engine.performance.enable_batching);
-
-        // Test that the config passes validation
-        let validation_result = crate::validation::validate_config(&config);
-        assert!(validation_result.is_ok());
-    }
-
-    #[test]
-    fn test_engine_config_builder_integration() {
-        let custom_engine = crate::engine::EngineConfig::builder()
-            .binding(crate::engine::BindingConfig {
-                ip: "192.168.1.1".to_string(),
-                port_range_start: 7777,
-                max_clients: 25,
-                ..Default::default()
-            })
-            .build();
-
-        let config = LLMSpellConfig::builder().engine(custom_engine).build();
-
-        // Verify custom engine configuration is properly integrated
-        assert_eq!(config.engine.binding.ip, "192.168.1.1");
-        assert_eq!(config.engine.binding.port_range_start, 7777);
-        assert_eq!(config.engine.binding.max_clients, 25);
-        // Debug configuration now in top-level config.debug
-
-        // Test that the custom config still passes validation
+        // Test that the default config passes validation
         let validation_result = crate::validation::validate_config(&config);
         assert!(validation_result.is_ok());
     }

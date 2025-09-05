@@ -27,9 +27,9 @@ mod kernel_client_tests {
         // This test verifies that the execute method correctly delegates to inner client
 
         // Expected behavior:
-        // 1. KernelClient.execute(code) creates an LRPRequest::ExecuteRequest
-        // 2. Sends it via inner.send_lrp_request()
-        // 3. Processes the LRPResponse::ExecuteReply
+        // 1. KernelClient.execute(code) sends execute request
+        // 2. Sends it via inner
+        // 3. Processes the execute reply
         // 4. Extracts payload and returns it
 
         let test_code = "print('hello')";
@@ -65,23 +65,7 @@ mod kernel_client_tests {
     #[tokio::test]
     async fn test_kernel_client_debug_command_works() {
         // This test verifies that send_debug_command correctly delegates to inner client
-
-        use llmspell_engine::{LDPRequest, LDPResponse};
-
-        // Test request
-        let _test_request = LDPRequest::EvaluateRequest {
-            expression: "test_expr".to_string(),
-            frame_id: Some(0),
-            context: Some("debug".to_string()),
-            format: None,
-        };
-
-        // Expected response
-        let _expected_response = LDPResponse::ContinueResponse {
-            all_threads_continued: Some(false),
-        };
-
-        // Verify the method signature and delegation
+        // Debug request/response types removed
         // The delegation is verified by the actual implementation compiling correctly
     }
 

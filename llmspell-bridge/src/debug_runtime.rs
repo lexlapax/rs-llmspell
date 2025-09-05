@@ -9,11 +9,51 @@ use crate::{ScriptOutput, ScriptRuntime};
 use async_trait::async_trait;
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::debug::{DebugCapability, DebugRequest, DebugResponse};
-use llmspell_engine::{DebugSession, DebugSessionState, ProcessorError};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{info, trace};
+
+/// Debug session information
+#[derive(Debug, Clone)]
+pub struct DebugSession {
+    /// Unique session identifier
+    pub session_id: String,
+    /// Script being debugged
+    pub script_content: String,
+    /// Current debug state
+    pub state: DebugSessionState,
+    /// Session start time
+    pub start_time: std::time::Instant,
+}
+
+/// Debug session state
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DebugSessionState {
+    /// Session initialized but not started
+    Initialized,
+    /// Debugging in progress
+    Active,
+    /// Paused at breakpoint or step
+    Paused,
+    /// Session completed
+    Completed,
+    /// Session failed with error
+    Failed,
+}
+
+/// Processor error type
+#[derive(Debug, thiserror::Error)]
+pub enum ProcessorError {
+    #[error("Processing failed: {0}")]
+    ProcessingFailed(String),
+
+    #[error("Invalid request: {0}")]
+    InvalidRequest(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
+}
 
 /// Debug hook that gets called at key execution points
 #[async_trait]

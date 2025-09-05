@@ -13,10 +13,32 @@ use llmspell_bridge::{
     variable_inspector::VariableInspector,
 };
 use llmspell_debug::session_manager::DebugSessionManager;
-use llmspell_engine::channels::IOPubMessage;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
+
+// Stub IOPubMessage (will be replaced with Jupyter protocol messages)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum IOPubMessage {
+    DebugEvent(Value),
+    StreamOutput {
+        name: String,
+        text: String,
+    },
+    ExecuteResult {
+        data: Value,
+        execution_count: u64,
+    },
+    Error {
+        traceback: Vec<String>,
+        ename: String,
+        evalue: String,
+    },
+    Status {
+        execution_state: String,
+    },
+}
 
 use crate::cli::OutputFormat;
 

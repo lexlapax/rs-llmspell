@@ -1,6 +1,7 @@
 //! Integration tests for debug protocol routing and hook functionality
 
 use llmspell_bridge::debug_adapters::{ExecutionManagerAdapter, VariableInspectorAdapter};
+use llmspell_bridge::debug_runtime::{DebugSession, DebugSessionState};
 use llmspell_bridge::debug_state_cache::SharedDebugStateCache;
 use llmspell_bridge::execution_bridge::ExecutionManager;
 use llmspell_bridge::execution_context::SharedExecutionContext;
@@ -9,7 +10,6 @@ use llmspell_bridge::variable_inspector::VariableInspector;
 use llmspell_bridge::{debug_runtime::*, ScriptRuntime};
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::debug::{DebugCapability, DebugRequest, DebugResponse};
-use llmspell_engine::{DebugSession, DebugSessionState};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Instant;

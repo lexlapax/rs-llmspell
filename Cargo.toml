@@ -25,8 +25,12 @@ members = [
     "examples/rust-developers/custom-tool-example",
     "examples/rust-developers/custom-agent-example",
     "examples/rust-developers/async-patterns-example",
-    "examples/rust-developers/integration-test-example"
-, "llmspell-tenancy", "llmspell-repl", "llmspell-debug", "llmspell-engine", "llmspell-kernel"]
+    "examples/rust-developers/integration-test-example",
+    "llmspell-tenancy",
+    "llmspell-repl",
+    "llmspell-debug",
+    "llmspell-kernel"
+]
 
 [workspace.package]
 version = "0.8.0"

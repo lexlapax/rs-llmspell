@@ -7,9 +7,9 @@ pub mod debug_handler;
 
 // Re-export commonly used types
 pub use connection::{
-    CliKernelDiscovery, CliKernelDiscoveryBuilder, DebugExecutionHandle, KernelConnection,
-    KernelConnectionBuilder, KernelConnectionTrait, KernelDiscoveryTrait, NullKernelConnection,
-    NullKernelDiscovery,
+    CliCircuitBreaker, CliCircuitBreakerTrait, CliKernelDiscovery, CliKernelDiscoveryTrait,
+    ExecuteResult, KernelClient, KernelConnectionBuilder, KernelConnectionTrait,
+    MonitoredKernelConnection,
 };
 pub use debug_handler::{
     DebugEventHandler, DebugEventHandlerBuilder, DebugEventHandlerTrait, NullDebugEventHandler,

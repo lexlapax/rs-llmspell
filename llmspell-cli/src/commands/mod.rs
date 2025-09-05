@@ -3,6 +3,7 @@
 
 pub mod apps;
 pub mod backup;
+#[path = "debug_simple.rs"]
 pub mod debug;
 pub mod exec;
 pub mod info;

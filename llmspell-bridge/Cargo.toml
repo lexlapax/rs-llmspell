@@ -13,7 +13,6 @@ workspace = true
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
 llmspell-config = { path = "../llmspell-config" }
-llmspell-engine = { path = "../llmspell-engine" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-tools = { path = "../llmspell-tools" }
@@ -36,6 +35,7 @@ serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
+thiserror.workspace = true
 lazy_static.workspace = true
 parking_lot.workspace = true
 uuid = { workspace = true }

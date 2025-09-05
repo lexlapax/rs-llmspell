@@ -23,8 +23,6 @@ llmspell-repl = { path = "../llmspell-repl" }
 llmspell-debug = { path = "../llmspell-debug" }
 # Add new kernel dependency
 llmspell-kernel = { path = "../llmspell-kernel" }
-# Keep engine temporarily for protocol types
-llmspell-engine = { path = "../llmspell-engine" }
 tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 serde.workspace = true

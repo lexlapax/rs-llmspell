@@ -6,7 +6,6 @@ use crate::kernel::KernelConnectionTrait;
 use anyhow::Result;
 use llmspell_bridge::{diagnostics_bridge::DiagnosticsBridge, hook_profiler::WorkloadClassifier};
 use llmspell_config::LLMSpellConfig;
-use llmspell_engine::LDPRequest;
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
@@ -157,11 +156,8 @@ impl CLIReplInterface {
     /// Run the interactive REPL loop with tab completion support
     async fn run_interactive_loop_with_completion(&mut self) -> Result<()> {
         // Get configuration values
-        let history_size = self
-            .config
-            .as_ref()
-            .map(|c| c.engine.repl.history_size)
-            .unwrap_or(1000);
+        // Use default history size (engine config removed)
+        let history_size = 1000;
 
         // Build editor configuration
         let config = Config::builder().max_history_size(history_size)?.build();
@@ -225,11 +221,8 @@ impl CLIReplInterface {
     /// Run the interactive REPL loop without tab completion
     async fn run_interactive_loop_without_completion(&mut self) -> Result<()> {
         // Get configuration values
-        let history_size = self
-            .config
-            .as_ref()
-            .map(|c| c.engine.repl.history_size)
-            .unwrap_or(1000);
+        // Use default history size (engine config removed)
+        let history_size = 1000;
 
         // Build editor configuration
         let config = Config::builder().max_history_size(history_size)?.build();
@@ -292,11 +285,8 @@ impl CLIReplInterface {
     /// Run the interactive REPL loop
     pub async fn run_interactive_loop(&mut self) -> Result<()> {
         // Check if tab completion is enabled in config
-        let tab_completion_enabled = self
-            .config
-            .as_ref()
-            .map(|c| c.engine.repl.tab_completion)
-            .unwrap_or(true);
+        // Use default tab completion setting (engine config removed)
+        let tab_completion_enabled = true;
 
         if tab_completion_enabled {
             self.run_interactive_loop_with_completion().await
@@ -408,23 +398,17 @@ impl CLIReplInterface {
         let file = parts[1];
         let line: u32 = parts[2].parse()?;
 
-        // Create a proper SetBreakpointsRequest
-        let source = llmspell_engine::Source {
-            name: Some(file.to_string()),
-            path: Some(file.to_string()),
-            source_reference: None,
-            presentation_hint: None,
-            origin: None,
-            sources: None,
-            adapter_data: None,
-            checksums: None,
-        };
-        let request = LDPRequest::SetBreakpointsRequest {
-            source,
-            lines: vec![line],
-            breakpoints: None,
-            source_modified: None,
-        };
+        // Send breakpoint request as JSON
+        let request = serde_json::json!({
+            "command": "setBreakpoints",
+            "arguments": {
+                "source": {
+                    "name": file,
+                    "path": file
+                },
+                "lines": [line]
+            }
+        });
 
         let response = self.kernel.send_debug_command(request).await?;
         println!("Breakpoint response: {:?}", response);
@@ -434,11 +418,12 @@ impl CLIReplInterface {
 
     /// Handle step command
     async fn handle_step_command(&mut self) -> Result<()> {
-        let request = LDPRequest::StepInRequest {
-            thread_id: 1, // Default thread
-            target_id: None,
-            granularity: None,
-        };
+        let request = serde_json::json!({
+            "command": "stepIn",
+            "arguments": {
+                "threadId": 1
+            }
+        });
 
         let response = self.kernel.send_debug_command(request).await?;
         println!("Step response: {:?}", response);
@@ -448,10 +433,12 @@ impl CLIReplInterface {
 
     /// Handle continue command
     async fn handle_continue_command(&mut self) -> Result<()> {
-        let request = LDPRequest::ContinueRequest {
-            thread_id: 1, // Default thread
-            all_threads: None,
-        };
+        let request = serde_json::json!({
+            "command": "continue",
+            "arguments": {
+                "threadId": 1
+            }
+        });
 
         let response = self.kernel.send_debug_command(request).await?;
         println!("Continue response: {:?}", response);
@@ -474,12 +461,14 @@ impl CLIReplInterface {
 
     /// Handle stack command
     async fn handle_stack_command(&mut self) -> Result<()> {
-        let request = LDPRequest::StackTraceRequest {
-            thread_id: 1, // Default thread
-            start_frame: Some(0),
-            levels: Some(20),
-            format: None,
-        };
+        let request = serde_json::json!({
+            "command": "stackTrace",
+            "arguments": {
+                "threadId": 1,
+                "startFrame": 0,
+                "levels": 20
+            }
+        });
 
         let response = self.kernel.send_debug_command(request).await?;
         println!("Stack trace: {:?}", response);

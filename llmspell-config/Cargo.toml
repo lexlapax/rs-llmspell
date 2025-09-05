@@ -16,7 +16,6 @@ config-tests = []
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
-llmspell-engine = { path = "../llmspell-engine" }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 toml.workspace = true
