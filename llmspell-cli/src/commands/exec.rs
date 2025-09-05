@@ -12,7 +12,8 @@ pub async fn execute_inline_script(
     code: String,
     _engine: ScriptEngine, // Engine selection handled by kernel
     runtime_config: LLMSpellConfig,
-    _stream: bool, // Streaming handled differently in kernel mode
+    connect: Option<String>, // Connection string for external kernel
+    _stream: bool,           // Streaming handled differently in kernel mode
     debug_mode: bool,
     output_format: OutputFormat,
 ) -> Result<()> {
@@ -30,7 +31,7 @@ pub async fn execute_inline_script(
 
     tracing::debug!("[9.8.2] execute_inline_script - creating kernel connection");
     // Create kernel connection instead of direct runtime
-    let mut kernel = super::create_kernel_connection(runtime_config).await?;
+    let mut kernel = super::create_kernel_connection(runtime_config, connect).await?;
 
     tracing::debug!("[9.8.2] execute_inline_script - executing code via kernel");
     // Execute code via kernel

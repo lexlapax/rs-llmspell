@@ -202,15 +202,21 @@ pub trait CliCircuitBreakerTrait: Send + Sync {
 /// Kernel discovery implementation
 pub struct CliKernelDiscovery {
     discovery: Arc<RwLock<KernelDiscovery>>,
-    runtime_path: Option<std::path::PathBuf>,
+    _runtime_path: Option<std::path::PathBuf>,
 }
 
 impl CliKernelDiscovery {
     pub fn new() -> Self {
         Self {
             discovery: Arc::new(RwLock::new(KernelDiscovery::new())),
-            runtime_path: None,
+            _runtime_path: None,
         }
+    }
+}
+
+impl Default for CliKernelDiscovery {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -286,6 +292,12 @@ impl CliCircuitBreaker {
                 llmspell_bridge::circuit_breaker::ExponentialBackoffBreaker::default(),
             )),
         }
+    }
+}
+
+impl Default for CliCircuitBreaker {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -371,11 +383,17 @@ impl KernelConnectionBuilder {
     }
 }
 
+impl Default for KernelConnectionBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Basic kernel connection implementation (Phase 9.8.10 with Jupyter client)
 pub struct BasicKernelConnection {
-    discovery: Box<dyn CliKernelDiscoveryTrait>,
-    circuit_breaker: Box<dyn CliCircuitBreakerTrait>,
-    diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
+    _discovery: Box<dyn CliKernelDiscoveryTrait>,
+    _circuit_breaker: Box<dyn CliCircuitBreakerTrait>,
+    _diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
     jupyter_client: JupyterKernelClient,
 }
 
@@ -386,9 +404,9 @@ impl BasicKernelConnection {
         diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
     ) -> Result<Self> {
         Ok(Self {
-            discovery,
-            circuit_breaker,
-            diagnostics,
+            _discovery: discovery,
+            _circuit_breaker: circuit_breaker,
+            _diagnostics: diagnostics,
             jupyter_client: JupyterKernelClient::new()?,
         })
     }
@@ -715,11 +733,13 @@ impl KernelConnectionTrait for JupyterKernelClient {
 }
 
 /// Legacy protocol kernel connection (temporary during migration)
+#[allow(dead_code)]
 struct ProtocolKernelConnection {
     connection_info: ConnectionInfo,
     connected: bool,
 }
 
+#[allow(dead_code)]
 impl ProtocolKernelConnection {
     fn new(connection_info: ConnectionInfo) -> Self {
         Self {
@@ -784,16 +804,16 @@ impl KernelConnectionTrait for ProtocolKernelConnection {
 /// Performance monitoring kernel connection wrapper
 pub struct MonitoredKernelConnection<T: KernelConnectionTrait> {
     inner: T,
-    recorder: Arc<dyn SessionRecorder>,
-    start_time: Instant,
+    _recorder: Arc<dyn SessionRecorder>,
+    _start_time: Instant,
 }
 
 impl<T: KernelConnectionTrait> MonitoredKernelConnection<T> {
     pub fn new(inner: T, recorder: Arc<dyn SessionRecorder>) -> Self {
         Self {
             inner,
-            recorder,
-            start_time: Instant::now(),
+            _recorder: recorder,
+            _start_time: Instant::now(),
         }
     }
 

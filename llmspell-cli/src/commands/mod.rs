@@ -76,6 +76,7 @@ pub async fn execute_command(
     match command {
         Commands::Run {
             script,
+            connect,
             stream,
             debug,
             rag,
@@ -100,6 +101,7 @@ pub async fn execute_command(
                 script,
                 engine,
                 runtime_config,
+                connect,
                 stream,
                 args,
                 output_format,
@@ -109,6 +111,7 @@ pub async fn execute_command(
         }
         Commands::Exec {
             code,
+            connect,
             stream,
             debug,
             rag,
@@ -128,10 +131,20 @@ pub async fn execute_command(
             };
             rag_options.apply_to_config(&mut runtime_config).await?;
 
-            exec::execute_inline_script(code, engine, runtime_config, stream, debug, output_format)
-                .await
+            exec::execute_inline_script(
+                code,
+                engine,
+                runtime_config,
+                connect,
+                stream,
+                debug,
+                output_format,
+            )
+            .await
         }
-        Commands::Repl { history } => repl::start_repl(engine, runtime_config, history).await,
+        Commands::Repl { connect, history } => {
+            repl::start_repl(engine, runtime_config, connect, history).await
+        }
         Commands::Providers { detailed } => {
             providers::list_providers(runtime_config, detailed, output_format).await
         }
@@ -158,19 +171,25 @@ pub async fn execute_command(
     }
 }
 
-/// Create a kernel connection for the specified engine (replacing direct runtime creation)
+/// Create a kernel connection based on the connect flag
+/// If connect is Some, connects to external kernel
+/// If connect is None, creates in-process kernel
 pub async fn create_kernel_connection(
-    _config: LLMSpellConfig,
+    config: LLMSpellConfig,
+    connect: Option<String>,
 ) -> Result<Box<dyn crate::kernel_client::KernelConnectionTrait>> {
-    let mut kernel = crate::kernel_client::KernelConnectionBuilder::new()
-        .discovery(Box::new(crate::kernel_client::CliKernelDiscovery::new()))
-        .circuit_breaker(Box::new(crate::kernel_client::CliCircuitBreaker::new()))
-        .diagnostics(llmspell_bridge::diagnostics_bridge::DiagnosticsBridge::builder().build())
-        .build()
-        .await?;
+    use std::sync::Arc;
 
-    // Connect to kernel or start new one
-    kernel.connect_or_start().await?;
-
-    Ok(kernel)
+    if let Some(_connect_to) = connect {
+        // External kernel connection via ZeroMQ
+        // TODO: Implement external kernel connection
+        // This will require JupyterKernelClient to implement KernelConnectionTrait
+        anyhow::bail!(
+            "External kernel connection not fully implemented yet. Use in-process kernel for now."
+        );
+    } else {
+        // DEFAULT: In-process kernel
+        let kernel = crate::kernel_client::InProcessKernel::new(Arc::new(config)).await?;
+        Ok(Box::new(kernel))
+    }
 }

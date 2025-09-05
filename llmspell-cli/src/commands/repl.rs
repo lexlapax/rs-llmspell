@@ -2,11 +2,8 @@
 //! ABOUTME: Provides terminal interface, delegates logic to llmspell-repl
 
 use crate::cli::ScriptEngine;
-use crate::kernel_client::{
-    CliCircuitBreaker, CliKernelDiscovery, KernelConnectionBuilder, KernelConnectionTrait,
-};
+use crate::kernel_client::KernelConnectionTrait;
 use anyhow::Result;
-use llmspell_bridge::diagnostics_bridge::DiagnosticsBridge;
 use llmspell_bridge::hook_profiler::WorkloadClassifier;
 use llmspell_config::LLMSpellConfig;
 use llmspell_repl::{ReplConfig, ReplSession};
@@ -60,18 +57,14 @@ impl llmspell_repl::KernelConnection for KernelConnectionAdapter {
 pub async fn start_repl(
     engine: ScriptEngine,
     runtime_config: LLMSpellConfig,
+    connect: Option<String>,
     history_file: Option<PathBuf>,
 ) -> Result<()> {
     println!("LLMSpell REPL - {} engine", engine.as_str());
     println!("Connecting to kernel...");
 
-    // Build kernel connection
-    let kernel = KernelConnectionBuilder::new()
-        .discovery(Box::new(CliKernelDiscovery::new()))
-        .circuit_breaker(Box::new(CliCircuitBreaker::new()))
-        .diagnostics(DiagnosticsBridge::builder().build())
-        .build()
-        .await?;
+    // Create kernel connection using the shared function
+    let kernel = super::create_kernel_connection(runtime_config.clone(), connect).await?;
 
     // Wrap in adapter for llmspell-repl
     let kernel_adapter = Box::new(KernelConnectionAdapter { inner: kernel });

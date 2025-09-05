@@ -11,7 +11,7 @@ use std::path::PathBuf;
 /// Handle the debug command by forwarding to kernel
 pub async fn handle_debug_command(
     script: PathBuf,
-    args: Vec<String>,
+    _args: Vec<String>,
     _engine: ScriptEngine,
     _config: LLMSpellConfig,
     _output_format: OutputFormat,

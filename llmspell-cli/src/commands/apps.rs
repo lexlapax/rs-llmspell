@@ -205,6 +205,7 @@ async fn run_embedded_app(
         lua_path.clone(),
         engine,
         runtime_config,
+        None,  // No external kernel connection for embedded apps
         false, // No streaming for embedded apps
         args,
         output_format,

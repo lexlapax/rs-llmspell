@@ -5,6 +5,7 @@
 
 pub mod connection;
 pub mod debug_handler;
+pub mod in_process;
 
 // Re-export commonly used types
 pub use connection::{
@@ -15,3 +16,4 @@ pub use connection::{
 pub use debug_handler::{
     DebugEventHandler, DebugEventHandlerBuilder, DebugEventHandlerTrait, NullDebugEventHandler,
 };
+pub use in_process::InProcessKernel;

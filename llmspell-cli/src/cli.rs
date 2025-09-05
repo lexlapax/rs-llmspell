@@ -108,6 +108,10 @@ pub enum Commands {
         /// Script file to execute
         script: PathBuf,
 
+        /// Connect to external kernel (e.g., "localhost:9555" or "/path/to/connection.json")
+        #[arg(long)]
+        connect: Option<String>,
+
         /// Enable streaming output
         #[arg(long)]
         stream: bool,
@@ -147,6 +151,10 @@ pub enum Commands {
         #[arg(value_name = "CODE")]
         code: String,
 
+        /// Connect to external kernel (e.g., "localhost:9555" or "/path/to/connection.json")
+        #[arg(long)]
+        connect: Option<String>,
+
         /// Enable streaming output
         #[arg(long)]
         stream: bool,
@@ -178,6 +186,10 @@ pub enum Commands {
 
     /// Start interactive REPL
     Repl {
+        /// Connect to external kernel (e.g., "localhost:9555" or "/path/to/connection.json")
+        #[arg(long)]
+        connect: Option<String>,
+
         /// History file path
         #[arg(long)]
         history: Option<PathBuf>,

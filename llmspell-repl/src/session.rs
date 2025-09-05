@@ -8,7 +8,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::time::Instant;
 
-/// Trait for kernel connections (will be provided by llmspell-cli's kernel_client)
+/// Trait for kernel connections (will be provided by llmspell-cli's `kernel_client`)
 #[async_trait::async_trait]
 pub trait KernelConnection: Send + Sync {
     async fn connect_or_start(&mut self) -> Result<()>;
@@ -149,7 +149,7 @@ impl ReplSession {
                 self.handle_watch_command(&parts).await
             }
 
-            _ => Ok(ReplResponse::Error(format!("Unknown command: {}", cmd))),
+            _ => Ok(ReplResponse::Error(format!("Unknown command: {cmd}"))),
         }
     }
 
@@ -246,8 +246,7 @@ impl ReplSession {
 
         let expression = parts[1..].join(" ");
         Ok(ReplResponse::Info(format!(
-            "Watching expression: {}",
-            expression
+            "Watching expression: {expression}"
         )))
     }
 
@@ -259,7 +258,7 @@ impl ReplSession {
             let vars: Vec<String> = self
                 .variables
                 .iter()
-                .map(|(k, v)| format!("{}: {}", k, v))
+                .map(|(k, v)| format!("{k}: {v}"))
                 .collect();
             Ok(ReplResponse::Info(vars.join("\n")))
         }
@@ -375,22 +374,22 @@ pub enum ReplResponse {
 
 impl ReplResponse {
     /// Format response for display
-    pub fn format(&self) -> String {
+    #[must_use] pub fn format(&self) -> String {
         match self {
-            ReplResponse::Empty => String::new(),
-            ReplResponse::Exit => String::new(),
-            ReplResponse::Help(text) => text.clone(),
-            ReplResponse::Info(text) => text.clone(),
-            ReplResponse::Error(msg) => format!("Error: {}", msg),
-            ReplResponse::ExecutionResult { output, .. } => output.clone(),
-            ReplResponse::DebugResponse(value) => {
-                serde_json::to_string_pretty(value).unwrap_or_else(|_| format!("{:?}", value))
+            Self::Empty => String::new(),
+            Self::Exit => String::new(),
+            Self::Help(text) => text.clone(),
+            Self::Info(text) => text.clone(),
+            Self::Error(msg) => format!("Error: {msg}"),
+            Self::ExecutionResult { output, .. } => output.clone(),
+            Self::DebugResponse(value) => {
+                serde_json::to_string_pretty(value).unwrap_or_else(|_| format!("{value:?}"))
             }
         }
     }
 
     /// Check if this response should exit the REPL
-    pub fn should_exit(&self) -> bool {
-        matches!(self, ReplResponse::Exit)
+    #[must_use] pub const fn should_exit(&self) -> bool {
+        matches!(self, Self::Exit)
     }
 }

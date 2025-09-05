@@ -54,11 +54,13 @@ pub fn parse_script_args(args: Vec<String>, script_path: &Path) -> HashMap<Strin
 }
 
 /// Execute a script file
+#[allow(clippy::too_many_arguments)]
 pub async fn execute_script_file(
     script_path: PathBuf,
     _engine: ScriptEngine, // Engine selection handled by kernel
     runtime_config: LLMSpellConfig,
-    _stream: bool, // Streaming handled differently in kernel mode
+    connect: Option<String>, // Connection string for external kernel
+    _stream: bool,           // Streaming handled differently in kernel mode
     args: Vec<String>,
     output_format: OutputFormat,
     debug_mode: bool,
@@ -85,7 +87,7 @@ pub async fn execute_script_file(
     }
 
     // Create kernel connection instead of direct runtime
-    let mut kernel = super::create_kernel_connection(runtime_config).await?;
+    let mut kernel = super::create_kernel_connection(runtime_config, connect).await?;
 
     // Execute script via kernel
     // TODO: Add support for script arguments in kernel protocol

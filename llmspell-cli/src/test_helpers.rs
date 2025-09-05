@@ -6,12 +6,9 @@ use crate::kernel_client::{KernelConnectionBuilder, KernelConnectionTrait};
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_bridge::{
-    diagnostics_bridge::DiagnosticsBridge,
-    hook_profiler::WorkloadClassifier,
-    null_circuit_breaker::NullCircuitBreaker,
-    null_hook_profiler::NullHookProfiler,
-    null_profiler::NullProfiler,
-    null_session_recorder::NullSessionRecorder,
+    diagnostics_bridge::DiagnosticsBridge, hook_profiler::WorkloadClassifier,
+    null_circuit_breaker::NullCircuitBreaker, null_hook_profiler::NullHookProfiler,
+    null_profiler::NullProfiler, null_session_recorder::NullSessionRecorder,
 };
 use llmspell_config::LLMSpellConfig;
 use serde_json::Value;
@@ -24,6 +21,12 @@ pub struct NullKernelConnection {
 impl NullKernelConnection {
     pub fn new() -> Self {
         Self { connected: false }
+    }
+}
+
+impl Default for NullKernelConnection {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -97,8 +100,7 @@ pub fn create_test_diagnostics() -> DiagnosticsBridge {
 
 /// Create a test kernel connection builder with null implementations
 pub fn create_test_kernel_builder() -> KernelConnectionBuilder {
-    KernelConnectionBuilder::new()
-        .diagnostics(create_test_diagnostics())
+    KernelConnectionBuilder::new().diagnostics(create_test_diagnostics())
 }
 
 /// Create a test configuration
