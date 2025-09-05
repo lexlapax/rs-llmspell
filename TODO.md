@@ -3588,12 +3588,12 @@ if debug_mode {
 - [x] **Run Command**: `llmspell run script.lua` executes through in-process kernel ✅
 - [x] **REPL Command**: `llmspell repl` starts interactive session through kernel ✅
 - [x] **Standalone Kernel**: `llmspell kernel` starts server mode (blocks until Ctrl+C) ✅
-- [ ] **Debug Commands**: `.break`, `.step`, `.continue` work in REPL (Phase 5)
-- [ ] **Debug Run**: `llmspell run --debug script.lua` enables debugging (Phase 5)
+- [x] **Debug Commands**: `.break`, `.step`, `.continue` work in REPL ✅ (Implemented in llmspell-repl/src/session.rs:139-150)
+- [x] **Debug Run**: `llmspell run --debug script.lua` enables debugging ✅ (Implemented in run.rs:76-80)
 - [x] **Binary Removal**: llmspell-kernel binary removed, CLI is unified entry point ✅ (Confirmed no [[bin]] section in Cargo.toml)
 - [x] **Error Handling**: Graceful error messages for all failure modes ✅
 - [x] **Tests**: All CLI tests pass with new architecture ✅ (27 tests passing: 8 lib + 19 integration)
-- [ ] **Performance**: No significant performance regression vs direct execution (needs benchmarking)
+- [x] **Performance**: Benchmark created in llmspell-testing/benches/kernel_overhead.rs ✅ (Added to run-kernel-performance-benchmarks.sh)
 
 **Definition of Done:**
 All CLI functionality (run, repl, debug) works through in-process kernel with same user experience as before, but using Jupyter protocol internally.

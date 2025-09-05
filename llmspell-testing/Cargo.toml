@@ -108,6 +108,8 @@ llmspell-events = { path = "../llmspell-events" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-sessions = { path = "../llmspell-sessions" }
+llmspell-cli = { path = "../llmspell-cli" }
+llmspell-kernel = { path = "../llmspell-kernel" }
 
 # Testing frameworks
 tokio.workspace = true
@@ -171,6 +173,10 @@ harness = false
 
 [[bench]]
 name = "cross_language"
+harness = false
+
+[[bench]]
+name = "kernel_overhead"
 harness = false
 
 [[bench]]

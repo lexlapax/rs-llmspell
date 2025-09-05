@@ -104,6 +104,27 @@ else
 fi
 
 echo ""
+echo "🔬 Running Kernel Overhead Benchmarks..."
+
+# Run kernel overhead benchmarks
+echo "Running: cargo bench -p llmspell-testing --bench kernel_overhead"
+if KERNEL_OUTPUT=$(timeout 120s cargo bench -p llmspell-testing --bench kernel_overhead -- --quiet 2>&1); then
+    echo "Kernel overhead benchmarks completed"
+    
+    # Extract overhead percentage
+    DIRECT_TIME=$(echo "$KERNEL_OUTPUT" | grep "direct_scriptruntime_simple" | head -1 | grep -oE "[0-9.]+ [a-z]s" | head -1)
+    KERNEL_TIME=$(echo "$KERNEL_OUTPUT" | grep "kernel_inprocess_simple" | head -1 | grep -oE "[0-9.]+ [a-z]s" | head -1)
+    
+    if [ -n "$DIRECT_TIME" ] && [ -n "$KERNEL_TIME" ]; then
+        echo "Direct execution: $DIRECT_TIME"
+        echo "Kernel execution: $KERNEL_TIME"
+    fi
+else
+    echo "⚠️  Kernel overhead benchmarks timed out or failed"
+    KERNEL_OUTPUT=""
+fi
+
+echo ""
 echo "📋 Performance Summary Report"
 echo "================================"
 
