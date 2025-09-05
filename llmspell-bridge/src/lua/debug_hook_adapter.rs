@@ -74,7 +74,7 @@ impl LuaDebugHookAdapter {
             let bridge_clone = lua_debug_bridge.lock().clone();
             multiplexer
                 .register_handler(
-                    "debug_bridge".to_string(),
+                    "debug_bridge",
                     HookPriority::DEBUGGER, // Use the correct constant
                     Box::new(bridge_clone),
                 )

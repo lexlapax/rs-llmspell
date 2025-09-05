@@ -280,11 +280,7 @@ async fn test_hook_multiplexer_integration() {
     // Register with multiplexer
     let multiplexer = HookMultiplexer::new();
     multiplexer
-        .register_handler(
-            "debug_bridge".to_string(),
-            HookPriority(0),
-            Box::new(bridge),
-        )
+        .register_handler("debug_bridge", HookPriority(0), Box::new(bridge))
         .unwrap();
 
     // The multiplexer would normally be installed as a Lua hook

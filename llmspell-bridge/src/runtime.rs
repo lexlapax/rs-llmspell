@@ -227,9 +227,18 @@ impl ScriptRuntime {
         Option<Arc<DiagnosticsBridge>>,
         Option<Arc<TokioRwLock<SharedExecutionContext>>>,
     ) {
+        tracing::info!(
+            "init_debug_infrastructure called with debug.enabled = {}, debug.mode = {}",
+            config.debug.enabled,
+            config.debug.mode
+        );
+
         if !config.debug.enabled {
+            tracing::info!("Debug not enabled, skipping debug infrastructure initialization");
             return (None, None, None, None);
         }
+
+        tracing::info!("Debug enabled, initializing debug infrastructure");
 
         // Create DiagnosticsBridge for debug output
         let diagnostics = Arc::new(DiagnosticsBridge::builder().build());
@@ -285,8 +294,14 @@ impl ScriptRuntime {
             }
         };
 
+        tracing::info!(
+            "Runtime: Installing debug hooks for mode: {}",
+            config.debug.mode
+        );
         if let Err(e) = engine.install_debug_hooks(debug_hook) {
-            tracing::warn!("Failed to install debug hooks: {}", e);
+            tracing::error!("Runtime: Failed to install debug hooks: {}", e);
+        } else {
+            tracing::info!("Runtime: Successfully installed debug hooks");
         }
 
         // Log debug initialization
@@ -722,7 +737,7 @@ impl crate::debug_runtime::DebugHook for SimpleTracingHook {
     async fn on_line(&self, line: u32, source: &str) -> crate::debug_runtime::DebugControl {
         if self.trace_enabled {
             // Output trace information to stdout
-            println!("[DEBUG] Line {line}: {source}");
+            tracing::debug!("Line {}: {}", line, source);
         }
         crate::debug_runtime::DebugControl::Continue
     }
@@ -734,9 +749,9 @@ impl crate::debug_runtime::DebugHook for SimpleTracingHook {
     ) -> crate::debug_runtime::DebugControl {
         if self.trace_enabled {
             if args.is_empty() {
-                println!("[DEBUG] Entering function: {name}");
+                tracing::debug!("Entering function: {}", name);
             } else {
-                println!("[DEBUG] Entering function: {}({})", name, args.join(", "));
+                tracing::debug!("Entering function: {}({})", name, args.join(", "));
             }
         }
         crate::debug_runtime::DebugControl::Continue
@@ -749,16 +764,16 @@ impl crate::debug_runtime::DebugHook for SimpleTracingHook {
     ) -> crate::debug_runtime::DebugControl {
         if self.trace_enabled {
             if let Some(res) = result {
-                println!("[DEBUG] Exiting function: {name} -> {res}");
+                tracing::debug!("Exiting function: {} -> {}", name, res);
             } else {
-                println!("[DEBUG] Exiting function: {name}");
+                tracing::debug!("Exiting function: {}", name);
             }
         }
         crate::debug_runtime::DebugControl::Continue
     }
 
     async fn on_exception(&self, error: &str, line: u32) -> crate::debug_runtime::DebugControl {
-        println!("[DEBUG] Exception at line {line}: {error}");
+        tracing::error!("Exception at line {}: {}", line, error);
         crate::debug_runtime::DebugControl::Continue
     }
 

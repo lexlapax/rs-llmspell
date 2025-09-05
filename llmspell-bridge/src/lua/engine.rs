@@ -654,7 +654,9 @@ impl ScriptEngineBridge for LuaEngine {
                         source: Some(Box::new(e) as Box<dyn std::error::Error + Send + Sync>),
                     })?;
 
-                tracing::debug!("Installed LuaDebugHookAdapter with HookMultiplexer");
+                tracing::info!(
+                    "LuaEngine: Successfully installed LuaDebugHookAdapter with HookMultiplexer"
+                );
                 return Ok(());
             }
 

@@ -383,9 +383,28 @@ impl ExecutionManager {
 
     /// Get breakpoint at specific location
     pub async fn get_breakpoint_at(&self, source: &str, line: u32) -> Option<Breakpoint> {
-        self.breakpoints
-            .read()
-            .await
+        let breakpoints = self.breakpoints.read().await;
+
+        tracing::trace!(
+            "get_breakpoint_at: Looking for source='{}', line={}",
+            source,
+            line
+        );
+        for bp in breakpoints.values() {
+            tracing::trace!(
+                "get_breakpoint_at: Checking breakpoint - source='{}', line={}, enabled={}",
+                bp.source,
+                bp.line,
+                bp.enabled
+            );
+            tracing::trace!(
+                "get_breakpoint_at: Source match={}, line match={}",
+                bp.source == source,
+                bp.line == line
+            );
+        }
+
+        breakpoints
             .values()
             .find(|bp| bp.source == source && bp.line == line && bp.enabled)
             .cloned()

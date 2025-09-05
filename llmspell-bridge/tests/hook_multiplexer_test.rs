@@ -67,7 +67,7 @@ fn test_multiple_hooks_coexist() {
         sample_count: profiler_samples.clone(),
     });
     multiplexer
-        .register_handler("profiler".to_string(), HookPriority::PROFILER, profiler)
+        .register_handler("profiler", HookPriority::PROFILER, profiler)
         .unwrap();
 
     // Register a memory profiler
@@ -76,7 +76,7 @@ fn test_multiple_hooks_coexist() {
     });
     multiplexer
         .register_handler(
-            "memory".to_string(),
+            "memory",
             HookPriority(-500), // Between profiler and debugger
             memory_profiler,
         )
@@ -87,11 +87,7 @@ fn test_multiple_hooks_coexist() {
         line_count: line_executions.clone(),
     });
     multiplexer
-        .register_handler(
-            "performance".to_string(),
-            HookPriority::MONITOR,
-            perf_monitor,
-        )
+        .register_handler("performance", HookPriority::MONITOR, perf_monitor)
         .unwrap();
 
     // Install the multiplexer
@@ -165,7 +161,7 @@ fn test_dynamic_hook_management() {
     let profiler_samples = Arc::new(AtomicU64::new(0));
     multiplexer
         .register_handler(
-            "profiler".to_string(),
+            "profiler",
             HookPriority::PROFILER,
             Box::new(ProfilerHook {
                 sample_count: profiler_samples.clone(),
@@ -188,7 +184,7 @@ fn test_dynamic_hook_management() {
     let line_count = Arc::new(AtomicU64::new(0));
     multiplexer
         .register_handler(
-            "monitor".to_string(),
+            "monitor",
             HookPriority::MONITOR,
             Box::new(PerformanceMonitor {
                 line_count: line_count.clone(),
@@ -265,7 +261,7 @@ fn test_hook_priority_ordering() {
     for (id, priority) in [("first", -100), ("second", 0), ("third", 100)] {
         multiplexer
             .register_handler(
-                id.to_string(),
+                id,
                 HookPriority(priority),
                 Box::new(OrderedHook {
                     id: id.to_string(),

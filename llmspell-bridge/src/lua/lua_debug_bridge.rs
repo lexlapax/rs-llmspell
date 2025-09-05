@@ -26,7 +26,6 @@ use crate::lua::sync_utils::block_on_async;
 use mlua::{Debug, DebugEvent, HookTriggers, Lua, Result as LuaResult};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::Duration;
 
 /// Lua Debug Bridge - connects `DebugCoordinator` to `LuaExecutionHook`
 ///
@@ -74,10 +73,23 @@ impl HookHandler for LuaDebugBridge {
         // Convert line to u32 safely
         let line_num = u32::try_from(line).unwrap_or(0);
 
+        tracing::trace!("LuaDebugBridge: Line event at {}:{}", source, line_num);
+
         // FAST PATH: Check if we might break
         if !self.coordinator.might_break_at_sync(source, line_num) {
+            tracing::trace!(
+                "LuaDebugBridge: No breakpoint possible at {}:{}",
+                source,
+                line_num
+            );
             return Ok(()); // Early exit - no breakpoint here
         }
+
+        tracing::debug!(
+            "LuaDebugBridge: Potential breakpoint at {}:{}, checking slow path",
+            source,
+            line_num
+        );
 
         // SLOW PATH: We might need to break, check with LuaExecutionHook
         let should_break = {
@@ -85,7 +97,19 @@ impl HookHandler for LuaDebugBridge {
             hook.should_break_slow(source, line_num, lua)
         };
 
+        tracing::debug!(
+            "LuaDebugBridge: should_break = {} at {}:{}",
+            should_break,
+            source,
+            line_num
+        );
+
         if should_break {
+            tracing::info!(
+                "LuaDebugBridge: BREAKPOINT HIT at {}:{}, pausing execution",
+                source,
+                line_num
+            );
             // Extract Lua variables using actual context
             let variables = Self::extract_lua_variables(lua, line_num, source);
             let location = ExecutionLocation {
@@ -97,6 +121,8 @@ impl HookHandler for LuaDebugBridge {
             // Use block_on_async to coordinate pause
             let coordinator = self.coordinator.clone();
             let pause_source = source.to_string();
+            // Task 9.8.9: Remove timeout to allow proper blocking until resume() is called
+            // The 100ms timeout was preventing actual pause functionality
             if let Err(e) = block_on_async(
                 "coordinate_breakpoint_pause",
                 async move {
@@ -105,7 +131,7 @@ impl HookHandler for LuaDebugBridge {
                         .await;
                     Ok::<(), std::io::Error>(())
                 },
-                Some(Duration::from_millis(100)),
+                None, // No timeout - block until resume() is called
             ) {
                 // Log error with layer identification for debugging
                 tracing::error!(

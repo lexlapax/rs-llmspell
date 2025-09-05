@@ -67,15 +67,25 @@ impl HookMultiplexer {
     /// Returns an error if registration fails
     pub fn register_handler(
         &self,
-        id: String,
+        id: &str,
         priority: HookPriority,
         handler: Box<dyn HookHandler>,
     ) -> LuaResult<()> {
+        let triggers = handler.interested_events();
+        tracing::debug!("HookMultiplexer: Registering handler '{}' with priority {:?}, triggers: every_line={}, on_calls={}, on_returns={}", 
+            id, priority, triggers.every_line, triggers.on_calls, triggers.on_returns);
+
         // Add handler
-        self.handlers.write().insert(id, (priority, handler));
+        self.handlers
+            .write()
+            .insert(id.to_string(), (priority, handler));
 
         // Update combined triggers
         self.update_combined_triggers();
+
+        let combined = *self.combined_triggers.read();
+        tracing::debug!("HookMultiplexer: After registering '{}', combined triggers: every_line={}, on_calls={}, on_returns={}",
+            id, combined.every_line, combined.on_calls, combined.on_returns);
 
         Ok(())
     }
@@ -134,23 +144,49 @@ impl HookMultiplexer {
         let triggers = *self.combined_triggers.read();
 
         // Only install if we have handlers
-        if handlers.read().is_empty() {
+        let handler_count = handlers.read().len();
+        if handler_count == 0 {
+            tracing::warn!(
+                "HookMultiplexer::install: No handlers registered, skipping hook installation"
+            );
             return Ok(());
         }
 
+        tracing::info!("HookMultiplexer::install: Installing Lua hooks with {} handlers, triggers: every_line={}, on_calls={}, on_returns={}",
+            handler_count, triggers.every_line, triggers.on_calls, triggers.on_returns);
+
         lua.set_hook(triggers, move |lua, ar| {
             // Determine event type - check actual event first, not line number
-            let event = if ar.event() == mlua::DebugEvent::Call {
+            let line = ar.curr_line();
+            let mlua_event = ar.event();
+
+            let event = if mlua_event == mlua::DebugEvent::Call {
                 DebugEvent::Call
-            } else if ar.event() == mlua::DebugEvent::TailCall {
+            } else if mlua_event == mlua::DebugEvent::TailCall {
                 DebugEvent::TailCall
-            } else if ar.event() == mlua::DebugEvent::Ret {
+            } else if mlua_event == mlua::DebugEvent::Ret {
                 DebugEvent::Ret
-            } else if ar.curr_line() != -1 {
+            } else if line != -1 {
                 DebugEvent::Line
             } else {
+                tracing::trace!(
+                    "Unknown event type, mlua_event={:?}, line={}",
+                    mlua_event,
+                    line
+                );
                 return Ok(());
             };
+
+            // Log the event (only log line events at trace level to avoid spam)
+            if event == DebugEvent::Line {
+                tracing::trace!(
+                    "HookMultiplexer: Hook triggered for {:?} event at line {}",
+                    event,
+                    ar.curr_line()
+                );
+            } else {
+                tracing::debug!("HookMultiplexer: Hook triggered for {:?} event", event);
+            }
 
             // Get handlers sorted by priority
             let mut sorted_handlers: Vec<_> = {
@@ -164,6 +200,7 @@ impl HookMultiplexer {
             sorted_handlers.sort_by_key(|(_, p)| *p);
 
             // Execute handlers in priority order
+            tracing::trace!("Processing {} handlers", sorted_handlers.len());
             for (id, _) in sorted_handlers {
                 if let Some((_, handler)) = handlers.write().get_mut(&id) {
                     // Check if this handler is interested in this event
@@ -175,7 +212,15 @@ impl HookMultiplexer {
                         _ => false,
                     };
 
+                    tracing::trace!(
+                        "Handler '{}' interested={} for event {:?}",
+                        id,
+                        interested,
+                        event
+                    );
+
                     if interested {
+                        tracing::trace!("Calling handle_event for handler '{}'", id);
                         handler.handle_event(lua, &ar, event)?;
                     }
                 }
@@ -289,7 +334,7 @@ mod tests {
         });
 
         multiplexer
-            .register_handler("profiler".to_string(), HookPriority::PROFILER, profiler)
+            .register_handler("profiler", HookPriority::PROFILER, profiler)
             .unwrap();
 
         assert_eq!(multiplexer.handler_count(), 1);
@@ -332,11 +377,11 @@ mod tests {
         let multiplexer = HookMultiplexer::new();
 
         multiplexer
-            .register_handler("line".to_string(), HookPriority(0), Box::new(LineHandler))
+            .register_handler("line", HookPriority(0), Box::new(LineHandler))
             .unwrap();
 
         multiplexer
-            .register_handler("count".to_string(), HookPriority(1), Box::new(CountHandler))
+            .register_handler("count", HookPriority(1), Box::new(CountHandler))
             .unwrap();
 
         // Combined triggers should have both
