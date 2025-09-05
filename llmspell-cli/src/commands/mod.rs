@@ -17,7 +17,6 @@ pub mod setup;
 pub mod validate;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
-use crate::kernel::KernelConnectionTrait;
 use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
 use std::path::PathBuf;
@@ -162,13 +161,14 @@ pub async fn create_kernel_connection(
     let mut kernel = crate::kernel::KernelConnectionBuilder::new()
         .discovery(Box::new(crate::kernel::CliKernelDiscovery::new()))
         .circuit_breaker(Box::new(
-            llmspell_bridge::circuit_breaker::ExponentialBackoffBreaker::default(),
+            crate::kernel::CliCircuitBreaker::new(),
         ))
         .diagnostics(llmspell_bridge::diagnostics_bridge::DiagnosticsBridge::builder().build())
-        .build();
+        .build()
+        .await?;
 
     // Connect to kernel or start new one
     kernel.connect_or_start().await?;
 
-    Ok(Box::new(kernel))
+    Ok(kernel)
 }

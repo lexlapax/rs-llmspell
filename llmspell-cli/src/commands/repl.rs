@@ -2,11 +2,11 @@
 //! ABOUTME: Provides an interactive read-eval-print loop
 
 use crate::cli::ScriptEngine;
-use crate::kernel::{CliKernelDiscovery, KernelConnectionBuilder, KernelConnectionTrait};
+use crate::kernel::{CliCircuitBreaker, CliKernelDiscovery, KernelConnectionBuilder};
 use crate::repl_interface::CLIReplInterface;
 use anyhow::Result;
 use llmspell_bridge::{
-    circuit_breaker::ExponentialBackoffBreaker, diagnostics_bridge::DiagnosticsBridge,
+    diagnostics_bridge::DiagnosticsBridge,
 };
 use llmspell_config::LLMSpellConfig;
 use std::path::PathBuf;
@@ -23,16 +23,17 @@ pub async fn start_repl(
     // Build kernel connection with dependency injection
     let mut kernel = KernelConnectionBuilder::new()
         .discovery(Box::new(CliKernelDiscovery::new()))
-        .circuit_breaker(Box::new(ExponentialBackoffBreaker::default()))
+        .circuit_breaker(Box::new(CliCircuitBreaker::new()))
         .diagnostics(DiagnosticsBridge::builder().build())
-        .build();
+        .build()
+        .await?;
 
     // Connect to kernel or start new one
     kernel.connect_or_start().await?;
 
     // Build CLI REPL interface
     let mut cli_client = CLIReplInterface::builder()
-        .kernel(Box::new(kernel))
+        .kernel(kernel)
         .diagnostics(DiagnosticsBridge::builder().build())
         .config(runtime_config)
         .history_file(history_file.unwrap_or_else(|| {

@@ -42,7 +42,7 @@ pub async fn execute_inline_script(
 
     // Create ScriptOutput from kernel result
     let script_output = ScriptOutput {
-        output: result,
+        output: serde_json::Value::String(result),
         console_output: vec![], // TODO: Get console output from kernel
         metadata: ScriptMetadata {
             engine: "kernel".to_string(),

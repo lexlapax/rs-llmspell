@@ -16,13 +16,21 @@ use llmspell_repl::ConnectionInfo;
 // Import Jupyter ConnectionInfo with an alias to avoid conflicts
 use llmspell_kernel::ConnectionInfo as JupyterConnectionInfo;
 use serde_json::Value;
-use std::collections::HashMap;
 use std::process::Stdio;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::sync::RwLock;
-use tokio::time::sleep;
+
+/// Classify operation workload based on operation name
+fn classify_operation_workload(operation: &str) -> WorkloadClassifier {
+    match operation {
+        "execute_line" | "tab_complete" => WorkloadClassifier::Light,
+        "execute_block" => WorkloadClassifier::Medium,
+        "execute_file" => WorkloadClassifier::Heavy,
+        _ => WorkloadClassifier::Light,
+    }
+}
 
 /// Connection format enum for Legacy vs Jupyter formats
 #[derive(Debug, Clone)]
@@ -128,6 +136,15 @@ pub struct ExecuteResult {
 /// Trait for kernel connection implementations
 #[async_trait]
 pub trait KernelConnectionTrait: Send + Sync {
+    /// Connect to existing kernel or start a new one
+    async fn connect_or_start(&mut self) -> Result<()>;
+
+    /// Check if currently connected to a kernel
+    fn is_connected(&self) -> bool;
+
+    /// Disconnect from the kernel
+    async fn disconnect(&mut self) -> Result<()>;
+
     /// Execute code synchronously
     async fn execute(&mut self, code: &str) -> Result<String>;
 
@@ -142,6 +159,12 @@ pub trait KernelConnectionTrait: Send + Sync {
 
     /// Send debug command
     async fn send_debug_command(&mut self, command: Value) -> Result<Value>;
+
+    /// Classify workload for performance monitoring
+    fn classify_workload(&self, operation: &str) -> WorkloadClassifier;
+
+    /// Get execution manager (optional)
+    fn execution_manager(&self) -> Option<&dyn std::any::Any>;
 
     /// Shutdown the kernel
     async fn shutdown(&mut self) -> Result<()>;
@@ -189,15 +212,13 @@ impl CliKernelDiscovery {
 impl CliKernelDiscoveryTrait for CliKernelDiscovery {
     fn find_kernel(&self, kernel_id: &str) -> Option<ConnectionInfo> {
         let discovery = futures::executor::block_on(self.discovery.read());
-        discovery
-            .list_kernels()
-            .into_iter()
-            .find(|k| k.kernel_id == kernel_id)
+        let kernels = futures::executor::block_on(discovery.discover_kernels()).unwrap_or_default();
+        kernels.into_iter().find(|k| k.kernel_id == kernel_id)
     }
 
     fn list_kernels(&self) -> Vec<ConnectionInfo> {
         let discovery = futures::executor::block_on(self.discovery.read());
-        discovery.list_kernels()
+        futures::executor::block_on(discovery.discover_kernels()).unwrap_or_default()
     }
 
     fn auto_start_kernel(&self) -> Result<ConnectionInfo> {
@@ -218,7 +239,7 @@ impl CliKernelDiscoveryTrait for CliKernelDiscovery {
             .stderr(Stdio::piped());
 
         // Spawn kernel
-        let child = futures::executor::block_on(cmd.spawn())?;
+        let child = cmd.spawn()?;
 
         // Store process handle (in real implementation)
         let _ = child;
@@ -250,17 +271,13 @@ fn find_kernel_binary() -> Result<std::path::PathBuf> {
 
 /// CLI circuit breaker implementation
 pub struct CliCircuitBreaker {
-    breaker: Arc<CircuitBreaker>,
+    breaker: Arc<Mutex<dyn CircuitBreaker>>,
 }
 
 impl CliCircuitBreaker {
     pub fn new() -> Self {
         Self {
-            breaker: Arc::new(CircuitBreaker::new(
-                3,                       // max_failures
-                Duration::from_secs(60), // reset_timeout
-                Duration::from_secs(30), // timeout
-            )),
+            breaker: Arc::new(Mutex::new(llmspell_bridge::circuit_breaker::ExponentialBackoffBreaker::default())),
         }
     }
 }
@@ -268,19 +285,28 @@ impl CliCircuitBreaker {
 impl CliCircuitBreakerTrait for CliCircuitBreaker {
     fn execute<'a>(&'a self, operation: &'a str) -> Result<()> {
         let context = OperationContext {
-            operation: operation.to_string(),
-            workload: WorkloadClassifier::classify_workload(operation),
+            operation_name: operation.to_string(),
+            workload: classify_operation_workload(operation),
+            duration: Duration::from_secs(0),
+            success: true,
         };
 
-        futures::executor::block_on(async { self.breaker.call(context, async { Ok(()) }).await })
+        let breaker = self.breaker.lock().unwrap();
+        if breaker.allow_operation(&context) {
+            Ok(())
+        } else {
+            anyhow::bail!("Circuit breaker is open for operation: {}", operation)
+        }
     }
 
     fn is_open(&self) -> bool {
-        self.breaker.is_open()
+        let breaker = self.breaker.lock().unwrap();
+        breaker.is_open()
     }
 
     fn reset(&self) {
-        self.breaker.reset()
+        let mut breaker = self.breaker.lock().unwrap();
+        breaker.reset()
     }
 }
 
@@ -288,6 +314,7 @@ impl CliCircuitBreakerTrait for CliCircuitBreaker {
 pub struct KernelConnectionBuilder {
     discovery: Option<Box<dyn CliKernelDiscoveryTrait>>,
     circuit_breaker: Option<Box<dyn CliCircuitBreakerTrait>>,
+    diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
     connection_timeout: Duration,
 }
 
@@ -296,6 +323,7 @@ impl KernelConnectionBuilder {
         Self {
             discovery: None,
             circuit_breaker: None,
+            diagnostics: None,
             connection_timeout: Duration::from_secs(10),
         }
     }
@@ -310,24 +338,135 @@ impl KernelConnectionBuilder {
         self
     }
 
+    pub fn diagnostics(mut self, diagnostics: llmspell_bridge::diagnostics_bridge::DiagnosticsBridge) -> Self {
+        self.diagnostics = Some(diagnostics);
+        self
+    }
+
     pub fn timeout(mut self, timeout: Duration) -> Self {
         self.connection_timeout = timeout;
         self
     }
 
     pub async fn build(self) -> Result<Box<dyn KernelConnectionTrait>> {
-        // For now, return error as Jupyter implementation not ready
-        anyhow::bail!("Kernel connection not yet implemented. Use llmspell-kernel directly.")
+        // Return basic stub implementation that compiles
+        let connection = BasicKernelConnection::new(
+            self.discovery.unwrap_or_else(|| Box::new(CliKernelDiscovery::new())),
+            self.circuit_breaker.unwrap_or_else(|| Box::new(CliCircuitBreaker::new())),
+            self.diagnostics,
+        );
+        Ok(Box::new(connection))
+    }
+}
+
+/// Basic kernel connection implementation (Phase 9.8.10 stub)
+pub struct BasicKernelConnection {
+    discovery: Box<dyn CliKernelDiscoveryTrait>,
+    circuit_breaker: Box<dyn CliCircuitBreakerTrait>,
+    diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
+    connected: bool,
+}
+
+impl BasicKernelConnection {
+    pub fn new(
+        discovery: Box<dyn CliKernelDiscoveryTrait>,
+        circuit_breaker: Box<dyn CliCircuitBreakerTrait>,
+        diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
+    ) -> Self {
+        Self {
+            discovery,
+            circuit_breaker,
+            diagnostics,
+            connected: false,
+        }
+    }
+}
+
+#[async_trait]
+impl KernelConnectionTrait for BasicKernelConnection {
+    async fn connect_or_start(&mut self) -> Result<()> {
+        // Phase 9.8.10: Stub implementation - will be replaced with actual Jupyter client
+        self.connected = true;
+        Ok(())
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+
+    async fn execute(&mut self, _code: &str) -> Result<String> {
+        anyhow::bail!("Phase 9.8.10: In-process kernel execution not yet implemented")
+    }
+
+    async fn execute_inline(&mut self, _code: &str) -> Result<String> {
+        anyhow::bail!("Phase 9.8.10: In-process kernel execution not yet implemented")
+    }
+
+    async fn repl(&mut self) -> Result<()> {
+        anyhow::bail!("Phase 9.8.10: In-process kernel REPL not yet implemented")
+    }
+
+    async fn info(&mut self) -> Result<Value> {
+        Ok(serde_json::json!({
+            "status": "Phase 9.8.10 stub",
+            "connected": self.connected,
+            "implementation": "BasicKernelConnection"
+        }))
+    }
+
+    async fn send_debug_command(&mut self, _command: Value) -> Result<Value> {
+        anyhow::bail!("Phase 9.8.10: Debug commands not yet implemented")
+    }
+
+    fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
+        classify_operation_workload(operation)
+    }
+
+    fn execution_manager(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
+
+    async fn shutdown(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
     }
 }
 
 /// Legacy protocol kernel connection (temporary during migration)
 struct ProtocolKernelConnection {
     connection_info: ConnectionInfo,
+    connected: bool,
+}
+
+impl ProtocolKernelConnection {
+    fn new(connection_info: ConnectionInfo) -> Self {
+        Self {
+            connection_info,
+            connected: false,
+        }
+    }
 }
 
 #[async_trait]
 impl KernelConnectionTrait for ProtocolKernelConnection {
+    async fn connect_or_start(&mut self) -> Result<()> {
+        anyhow::bail!("Protocol connection removed. Use Jupyter kernel.")
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    async fn disconnect(&mut self) -> Result<()> {
+        self.connected = false;
+        Ok(())
+    }
+
     async fn execute(&mut self, _code: &str) -> Result<String> {
         anyhow::bail!("Protocol connection removed. Use Jupyter kernel.")
     }
@@ -351,7 +490,16 @@ impl KernelConnectionTrait for ProtocolKernelConnection {
         anyhow::bail!("Protocol connection removed. Use Jupyter kernel.")
     }
 
+    fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
+        classify_operation_workload(operation)
+    }
+
+    fn execution_manager(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
+
     async fn shutdown(&mut self) -> Result<()> {
+        self.connected = false;
         Ok(())
     }
 }
@@ -359,12 +507,12 @@ impl KernelConnectionTrait for ProtocolKernelConnection {
 /// Performance monitoring kernel connection wrapper
 pub struct MonitoredKernelConnection<T: KernelConnectionTrait> {
     inner: T,
-    recorder: Arc<SessionRecorder>,
+    recorder: Arc<dyn SessionRecorder>,
     start_time: Instant,
 }
 
 impl<T: KernelConnectionTrait> MonitoredKernelConnection<T> {
-    pub fn new(inner: T, recorder: Arc<SessionRecorder>) -> Self {
+    pub fn new(inner: T, recorder: Arc<dyn SessionRecorder>) -> Self {
         Self {
             inner,
             recorder,
@@ -380,6 +528,30 @@ impl<T: KernelConnectionTrait> MonitoredKernelConnection<T> {
 
 #[async_trait]
 impl<T: KernelConnectionTrait> KernelConnectionTrait for MonitoredKernelConnection<T> {
+    async fn connect_or_start(&mut self) -> Result<()> {
+        self.record_event("connect_start", serde_json::json!({}));
+        let result = self.inner.connect_or_start().await;
+        self.record_event(
+            "connect_end",
+            serde_json::json!({ "success": result.is_ok() }),
+        );
+        result
+    }
+
+    fn is_connected(&self) -> bool {
+        self.inner.is_connected()
+    }
+
+    async fn disconnect(&mut self) -> Result<()> {
+        self.record_event("disconnect_start", serde_json::json!({}));
+        let result = self.inner.disconnect().await;
+        self.record_event(
+            "disconnect_end",
+            serde_json::json!({ "success": result.is_ok() }),
+        );
+        result
+    }
+
     async fn execute(&mut self, code: &str) -> Result<String> {
         self.record_event("execute_start", serde_json::json!({ "code": code }));
         let result = self.inner.execute(code).await;
@@ -404,6 +576,14 @@ impl<T: KernelConnectionTrait> KernelConnectionTrait for MonitoredKernelConnecti
 
     async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
         self.inner.send_debug_command(command).await
+    }
+
+    fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
+        self.inner.classify_workload(operation)
+    }
+
+    fn execution_manager(&self) -> Option<&dyn std::any::Any> {
+        self.inner.execution_manager()
     }
 
     async fn shutdown(&mut self) -> Result<()> {
