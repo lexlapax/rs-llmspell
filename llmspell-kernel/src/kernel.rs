@@ -779,14 +779,15 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         }))
     }
 
-    /// Handle debug requests via existing ExecutionManager API
+    /// Handle debug requests via existing `ExecutionManager` API
     ///
-    /// Routes debug commands to the ScriptRuntime's ExecutionManager, providing
+    /// Routes debug commands to the `ScriptRuntime`'s `ExecutionManager`, providing
     /// a unified interface for debugging functionality regardless of kernel type.
     ///
     /// # Errors
     ///
     /// Returns an error if debug is not enabled or if the debug command fails.
+    #[allow(clippy::significant_drop_tightening)] // Runtime lock is needed for entire match
     pub async fn handle_debug_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
         let command = content["command"].as_str().unwrap_or("");
         let args = &content["arguments"];
@@ -804,7 +805,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                 if let Some(lines) = args["lines"].as_array() {
                     for line in lines {
                         if let Some(line_num) = line.as_u64() {
-                            let bp = Breakpoint::new(source.to_string(), line_num as u32);
+                            let bp = Breakpoint::new(source.to_string(), u32::try_from(line_num).unwrap_or(0));
                             let id = exec_mgr.add_breakpoint(bp).await;
                             breakpoint_ids.push(id);
                         }

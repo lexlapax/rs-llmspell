@@ -172,24 +172,26 @@ pub async fn execute_command(
 }
 
 /// Create a kernel connection based on the connect flag
-/// If connect is Some, connects to external kernel
-/// If connect is None, creates in-process kernel
+/// Always requires external kernel - user must start kernel separately
 pub async fn create_kernel_connection(
-    config: LLMSpellConfig,
+    _config: LLMSpellConfig,
     connect: Option<String>,
 ) -> Result<Box<dyn crate::kernel_client::KernelConnectionTrait>> {
-    use std::sync::Arc;
-
-    if let Some(_connect_to) = connect {
-        // External kernel connection via ZeroMQ
-        // TODO: Implement external kernel connection
-        // This will require JupyterKernelClient to implement KernelConnectionTrait
+    // External kernel required - no in-process option
+    // User must start kernel with: llmspell kernel start
+    
+    if connect.is_none() {
         anyhow::bail!(
-            "External kernel connection not fully implemented yet. Use in-process kernel for now."
+            "External kernel required. Start a kernel with:\n  \
+            llmspell kernel start\n\n\
+            Then use --connect flag to specify connection"
         );
-    } else {
-        // DEFAULT: In-process kernel
-        let kernel = crate::kernel_client::InProcessKernel::new(Arc::new(config)).await?;
-        Ok(Box::new(kernel))
     }
+    
+    // TODO: Implement ZeroMQ client connection to external kernel
+    // For now, fail with clear message
+    anyhow::bail!(
+        "External kernel connection not yet implemented.\n\
+        Please start kernel with: llmspell kernel start"
+    )
 }

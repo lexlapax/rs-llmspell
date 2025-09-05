@@ -1,12 +1,12 @@
-//! Benchmark comparing in-process kernel vs direct ScriptRuntime execution
+//! Benchmark comparing kernel vs direct ScriptRuntime execution
 //! 
 //! Measures overhead introduced by the kernel architecture:
-//! - OLD: Direct ScriptRuntime::execute_script()
-//! - NEW: InProcessKernel → GenericKernel → ScriptRuntime
+//! - Direct ScriptRuntime::execute_script()
+//! - External kernel via ZeroMQ (TODO: implement when ZmqKernelClient is ready)
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_bridge::runtime::ScriptRuntime;
-use llmspell_cli::kernel_client::{InProcessKernel, KernelConnectionTrait};
+// use llmspell_cli::kernel_client::KernelConnectionTrait; // TODO: Re-enable when ZmqKernelClient is ready
 use llmspell_config::LLMSpellConfig;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
@@ -76,61 +76,21 @@ fn benchmark_direct_execution(c: &mut Criterion) {
     });
 }
 
-fn benchmark_kernel_execution(c: &mut Criterion) {
+fn benchmark_kernel_execution(_c: &mut Criterion) {
+    // TODO: Implement when ZmqKernelClient is ready
+    // This will benchmark external kernel communication overhead
+    /*
     let rt = Runtime::new().unwrap();
     let config = create_test_config();
     
-    c.bench_function("kernel_inprocess_simple", |b| {
-        let kernel = rt.block_on(async {
-            InProcessKernel::new(config.clone()).await.unwrap()
-        });
-        let kernel_arc = Arc::new(tokio::sync::RwLock::new(kernel));
-        
-        b.to_async(&rt).iter(|| {
-            let kernel = kernel_arc.clone();
-            async move {
-                let mut kernel = kernel.write().await;
-                let result = kernel.execute(black_box("return 42")).await.unwrap();
-                black_box(result);
-            }
-        });
+    c.bench_function("kernel_external_simple", |b| {
+        // Start external kernel process
+        // Connect via ZmqKernelClient
+        // Benchmark execution
     });
-    
-    c.bench_function("kernel_inprocess_loop", |b| {
-        let kernel = rt.block_on(async {
-            InProcessKernel::new(config.clone()).await.unwrap()
-        });
-        let kernel_arc = Arc::new(tokio::sync::RwLock::new(kernel));
-        
-        b.to_async(&rt).iter(|| {
-            let kernel = kernel_arc.clone();
-            async move {
-                let mut kernel = kernel.write().await;
-                let result = kernel.execute(black_box(
-                    "local sum = 0; for i = 1, 100 do sum = sum + i end; return sum"
-                )).await.unwrap();
-                black_box(result);
-            }
-        });
-    });
-    
-    c.bench_function("kernel_inprocess_function", |b| {
-        let kernel = rt.block_on(async {
-            InProcessKernel::new(config.clone()).await.unwrap()
-        });
-        let kernel_arc = Arc::new(tokio::sync::RwLock::new(kernel));
-        
-        b.to_async(&rt).iter(|| {
-            let kernel = kernel_arc.clone();
-            async move {
-                let mut kernel = kernel.write().await;
-                let result = kernel.execute(black_box(
-                    "function fib(n) if n <= 1 then return n else return fib(n-1) + fib(n-2) end end; return fib(10)"
-                )).await.unwrap();
-                black_box(result);
-            }
-        });
-    });
+    */
+}
+    // TODO: Add more kernel benchmarks
 }
 
 fn benchmark_overhead_comparison(c: &mut Criterion) {
@@ -148,15 +108,17 @@ fn benchmark_overhead_comparison(c: &mut Criterion) {
         });
     });
     
-    c.bench_function("init_kernel_inprocess", |b| {
+    // TODO: Add external kernel initialization benchmark when ZmqKernelClient is ready
+    /*
+    c.bench_function("init_kernel_external", |b| {
         b.to_async(&rt).iter(|| {
             let config = config.clone();
             async move {
-                let kernel = InProcessKernel::new(config).await.unwrap();
-                black_box(kernel);
+                // Start kernel process and connect
             }
         });
     });
+    */
     
     // Measure execution overhead with pre-initialized instances
     let mut group = c.benchmark_group("execution_overhead");
@@ -178,21 +140,13 @@ fn benchmark_overhead_comparison(c: &mut Criterion) {
         });
     });
     
-    group.bench_function("minimal_kernel", |b| {
-        let kernel = rt.block_on(async {
-            InProcessKernel::new(config.clone()).await.unwrap()
-        });
-        let kernel_arc = Arc::new(tokio::sync::RwLock::new(kernel));
-        
-        b.to_async(&rt).iter(|| {
-            let kernel = kernel_arc.clone();
-            async move {
-                let mut kernel = kernel.write().await;
-                let result = kernel.execute("return 1").await.unwrap();
-                black_box(result);
-            }
-        });
+    // TODO: Add external kernel benchmark when ZmqKernelClient is ready
+    /*
+    group.bench_function("minimal_kernel_external", |b| {
+        // Connect to external kernel
+        // Benchmark minimal execution
     });
+    */
     
     group.finish();
 }

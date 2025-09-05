@@ -25,7 +25,7 @@ impl KernelClient {
     }
 
     pub async fn execute(&mut self, _code: &str) -> Result<ExecuteResult> {
-        // This is a placeholder - actual implementation uses InProcessKernel
+        // This is a placeholder - actual implementation requires external kernel
         Ok(ExecuteResult {
             success: true,
             output: Some(String::new()),
@@ -211,8 +211,8 @@ impl KernelConnectionBuilder {
     }
 
     pub async fn build(self) -> Result<Box<dyn KernelConnectionTrait>> {
-        // This builder is mainly for tests - real code uses InProcessKernel directly
-        anyhow::bail!("KernelConnectionBuilder is deprecated - use InProcessKernel directly")
+        // This builder is mainly for tests - real code requires external kernel
+        anyhow::bail!("KernelConnectionBuilder is deprecated - use external kernel")
     }
 }
 

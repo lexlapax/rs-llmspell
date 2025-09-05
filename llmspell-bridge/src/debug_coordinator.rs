@@ -54,7 +54,7 @@
 //! | Breakpoint Hit | Slow | <10ms | 1% | Full chain through 6 layers |
 //! | Variable Extract | Slow | <1ms | On pause | `LuaExecutionHook` via debug API |
 //! | Resume Wait | Block | Indefinite | On pause | `wait_for_resume()` blocks |
-//! | State Sync | Medium | <100μs | On change | Between Coordinator & ExecutionManager |
+//! | State Sync | Medium | <100μs | On change | Between Coordinator & `ExecutionManager` |
 //!
 //! # Communication Examples
 //!

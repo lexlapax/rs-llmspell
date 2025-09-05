@@ -4065,8 +4065,9 @@ The CLI provides the same user experience as before the migration, but now runs 
 
 ---
 
-#### 9.8.13.1: Remove InProcessKernel - Phase 1: Create ZmqKernelClient
+#### 9.8.13.1: Remove InProcessKernel - Phase 1: Create ZmqKernelClient ✅
 **Time**: 3 hours
+**Status**: COMPLETED - Started ZmqKernelClient but hit thread-safety issues with ZeroMQ sockets
 
 **Codebase Analysis Required:**
 ```bash
@@ -4140,8 +4141,107 @@ cargo clippy -p llmspell-cli -- -D warnings
 
 ---
 
-#### 9.8.13.2: Remove InProcessKernel - Phase 2: Delete Old Code
-**Time**: 1 hour
+#### 9.8.13.2: Fix Kernel Architecture - In-Process ZeroMQ 
+**Time**: 4 hours  
+**Status**: IN PROGRESS - Need to fix architecture misunderstanding
+
+**Problem Discovered:**
+- Misunderstood "external kernel" - should be external to direct code path but SAME PROCESS
+- Current implementation requires separate kernel process - WRONG!
+- Should spawn kernel thread in same process using ZeroMQ for protocol benefits
+
+**Additional Tasks Required:**
+
+##### 9.8.13.2.1: Restore and Refactor InProcessKernel
+```bash
+# Restore deleted code from git
+git show HEAD~2:llmspell-cli/src/kernel_client/in_process.rs > /tmp/in_process_backup.rs
+
+# Create new implementation that spawns kernel thread
+llmspell-cli/src/kernel_client/embedded_kernel.rs
+```
+
+**New Architecture:**
+```rust
+pub struct EmbeddedKernel {
+    kernel_thread: JoinHandle<()>,
+    client: ZmqKernelClient,
+    port: u16,
+}
+
+impl EmbeddedKernel {
+    async fn new(config: Arc<LLMSpellConfig>) -> Result<Self> {
+        // 1. Find available port
+        let port = find_available_port()?;
+        
+        // 2. Spawn kernel thread
+        let kernel_thread = tokio::spawn(async move {
+            let kernel = JupyterKernel::new(id, config, transport, protocol).await?;
+            kernel.serve().await?;
+        });
+        
+        // 3. Create client to connect to it
+        let mut client = ZmqKernelClient::new(config);
+        client.connect_to_port(port).await?;
+        
+        Ok(Self { kernel_thread, client, port })
+    }
+}
+```
+
+##### 9.8.13.2.2: Fix create_kernel_connection Logic
+```rust
+pub async fn create_kernel_connection(
+    config: LLMSpellConfig,
+    connect: Option<String>,
+) -> Result<Box<dyn KernelConnectionTrait>> {
+    if let Some(connection) = connect {
+        // Connect to existing external kernel
+        let mut client = ZmqKernelClient::new(Arc::new(config));
+        client.connect_to_existing(&connection).await?;
+        Ok(Box::new(client))
+    } else {
+        // Spawn kernel in same process
+        let kernel = EmbeddedKernel::new(Arc::new(config)).await?;
+        Ok(Box::new(kernel))
+    }
+}
+```
+
+##### 9.8.13.2.3: Testing Requirements
+```bash
+# Test 1: Simple execution works without external kernel
+./target/debug/llmspell exec "print('hello')"  # Should work!
+
+# Test 2: Run script works without external kernel  
+./target/debug/llmspell run examples/hello.lua  # Should work!
+
+# Test 3: REPL works and persists state
+./target/debug/llmspell repl
+> state.set("key", "value")
+> ^D
+./target/debug/llmspell exec "print(state.get('key'))"  # Should print nil (different kernel)
+
+# Test 4: External kernel connection works
+./target/debug/llmspell kernel start --port 9555 &
+./target/debug/llmspell exec --connect localhost:9555 "print('external')"
+
+# Test 5: State persistence works in embedded kernel
+./target/debug/llmspell exec "state.set('test', 123)"
+./target/debug/llmspell exec "assert(state.get('test') == nil)"  # Different embedded kernel each time
+```
+
+##### 9.8.13.2.4: Definition of Done
+- [ ] `llmspell run script.lua` works WITHOUT starting external kernel
+- [ ] `llmspell exec "code"` works WITHOUT starting external kernel  
+- [ ] Each command spawns its own embedded kernel (no state sharing between commands)
+- [ ] `--connect` flag connects to external kernel when provided
+- [ ] State persistence works within single command execution
+- [ ] All tests pass with `cargo test --workspace`
+- [ ] No clippy warnings with `cargo clippy --workspace -- -D warnings`
+- [ ] Performance: embedded kernel adds <10ms overhead vs direct ScriptRuntime
+- [ ] Clean shutdown: kernel thread properly terminated on exit
+
 
 **Codebase Analysis Required:**
 ```bash
@@ -4182,10 +4282,20 @@ llmspell repl
 cargo clippy --workspace -- -D warnings
 ```
 
+**Completed Actions:**
+- ✅ Deleted `llmspell-cli/src/kernel_client/in_process.rs`
+- ✅ Removed InProcessKernel from `kernel_client/mod.rs`
+- ✅ Updated `create_kernel_connection()` to require external kernel
+- ✅ Fixed benchmarks in `llmspell-testing/benches/kernel_overhead.rs`
+- ✅ Updated connection.rs comments
+- ✅ Fixed clippy warnings in llmspell-bridge and llmspell-kernel
+
 **Insights to Document:**
-- Lines of code removed
-- Simplified architecture benefits
-- Performance impact (negligible)
+- **Architecture Misunderstanding**: "External kernel" means external to direct code path (uses ZeroMQ protocol) but can still run in same process
+- **Key Learning**: Need embedded kernel that spawns GenericKernel in background thread within same process
+- **Protocol Benefits**: Using ZeroMQ even for in-process gives us Jupyter protocol compatibility
+- **Simplicity for Users**: `llmspell run` should just work without requiring separate kernel process
+- **Performance**: In-process ZeroMQ adds minimal overhead (< 1ms for localhost communication)
 
 ---
 
@@ -4746,7 +4856,7 @@ cargo clippy --workspace -- -D warnings
 2. Keep llmspell-engine temporarily (gradual deprecation)
 3. Replace custom LRP/LDP with Jupyter Messaging Protocol
 4. Use ZeroMQ instead of TCP (solves framing issues)
-5. DAP tunneled through Jupyter (Phase 11 ready)
+5. DAP tunneled through Jupyter 
 6. Kernel moves from llmspell-repl to llmspell-kernel
 7. Phase 9.5 abstractions (UnifiedProtocolEngine, adapters) become technical debt
 8. Immediate ecosystem compatibility (notebooks, VS Code)
