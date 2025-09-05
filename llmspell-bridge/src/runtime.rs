@@ -528,9 +528,10 @@ impl ScriptRuntime {
         // TODO: Propagate to engine when engine supports it
     }
 
-    /// Get the debugger instance if available
+    /// Get the execution manager for debug operations
+    /// Returns None if debug mode is disabled
     #[must_use]
-    pub fn get_debugger(&self) -> Option<Arc<ExecutionManager>> {
+    pub fn get_execution_manager(&self) -> Option<Arc<ExecutionManager>> {
         self.execution_manager.clone()
     }
 

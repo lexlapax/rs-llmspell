@@ -9,7 +9,7 @@ pub mod in_process;
 
 // Re-export commonly used types
 pub use connection::{
-    CliCircuitBreaker, CliCircuitBreakerTrait, CliKernelDiscovery, CliKernelDiscoveryTrait,
+    CliCircuitBreaker, CliCircuitBreakerTrait,
     ExecuteResult, KernelClient, KernelConnectionBuilder, KernelConnectionTrait,
     MonitoredKernelConnection,
 };

@@ -191,31 +191,12 @@ impl KernelConnectionTrait for InProcessKernel {
     }
 
     async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
-        // Debug commands can be handled directly
-        let _kernel = self.kernel.read().await;
-
-        // Check if this is a debug-related command
-        if let Some(cmd_type) = command.get("command").and_then(|v| v.as_str()) {
-            match cmd_type {
-                "setBreakpoints" | "continue" | "next" | "stepIn" | "stepOut" | "evaluate" => {
-                    // These would be handled by the debug infrastructure
-                    // For now, return a placeholder response
-                    Ok(serde_json::json!({
-                        "success": false,
-                        "message": "Debug commands not yet implemented for in-process kernel"
-                    }))
-                }
-                _ => Ok(serde_json::json!({
-                    "success": false,
-                    "message": format!("Unknown debug command: {}", cmd_type)
-                })),
-            }
-        } else {
-            Ok(serde_json::json!({
-                "success": false,
-                "message": "Invalid debug command format"
-            }))
-        }
+        // Direct call to kernel (no network overhead for in-process)
+        let kernel = self.kernel.read().await;
+        
+        // Route debug command directly to GenericKernel's handler
+        kernel.handle_debug_request(command).await
+            .map_err(|e| anyhow::anyhow!("Debug command failed: {}", e))
     }
 
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
@@ -232,9 +213,6 @@ impl KernelConnectionTrait for InProcessKernel {
         None
     }
 
-    async fn shutdown(&mut self) -> Result<()> {
-        self.disconnect().await
-    }
 }
 
 #[cfg(test)]

@@ -5,7 +5,10 @@
 //! This enables clean separation of concerns and easy extensibility.
 
 use anyhow::Result;
-use llmspell_bridge::ScriptRuntime;
+use llmspell_bridge::{
+    execution_bridge::{Breakpoint, DebugCommand},
+    ScriptRuntime,
+};
 use llmspell_config::LLMSpellConfig;
 use llmspell_state_persistence::{StateFactory, StateManager};
 use std::sync::Arc;
@@ -774,6 +777,77 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "status": "ok",
             "comms": comms
         }))
+    }
+
+    /// Handle debug requests via existing ExecutionManager API
+    ///
+    /// Routes debug commands to the ScriptRuntime's ExecutionManager, providing
+    /// a unified interface for debugging functionality regardless of kernel type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if debug is not enabled or if the debug command fails.
+    pub async fn handle_debug_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        let command = content["command"].as_str().unwrap_or("");
+        let args = &content["arguments"];
+        
+        // Access ExecutionManager through ScriptRuntime
+        let runtime = self.runtime.lock().await;
+        let exec_mgr = runtime.get_execution_manager()
+            .ok_or_else(|| anyhow::anyhow!("Debug not enabled - use --debug flag"))?;
+        
+        match command {
+            "setBreakpoints" => {
+                let source = args["source"]["name"].as_str().unwrap_or("repl");
+                let mut breakpoint_ids = Vec::new();
+                
+                if let Some(lines) = args["lines"].as_array() {
+                    for line in lines {
+                        if let Some(line_num) = line.as_u64() {
+                            let bp = Breakpoint::new(source.to_string(), line_num as u32);
+                            let id = exec_mgr.add_breakpoint(bp).await;
+                            breakpoint_ids.push(id);
+                        }
+                    }
+                }
+                Ok(serde_json::json!({
+                    "success": true,
+                    "breakpoints": breakpoint_ids
+                }))
+            }
+            "continue" => {
+                exec_mgr.send_command(DebugCommand::Continue).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "stepIn" => {
+                exec_mgr.send_command(DebugCommand::StepInto).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "stepOver" => {
+                exec_mgr.send_command(DebugCommand::StepOver).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "stepOut" => {
+                exec_mgr.send_command(DebugCommand::StepOut).await;
+                Ok(serde_json::json!({"success": true}))
+            }
+            "getVariables" => {
+                let frame_id = args["frameId"].as_str();
+                let variables = exec_mgr.get_variables(frame_id).await;
+                Ok(serde_json::json!({
+                    "success": true,
+                    "variables": variables
+                }))
+            }
+            "getStack" => {
+                let stack = exec_mgr.get_stack_trace().await;
+                Ok(serde_json::json!({
+                    "success": true,
+                    "stackFrames": stack
+                }))
+            }
+            _ => Err(anyhow::anyhow!("Unknown debug command: {}", command))
+        }
     }
 
     /// Shutdown the kernel gracefully
