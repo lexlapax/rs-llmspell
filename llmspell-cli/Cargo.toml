@@ -43,6 +43,11 @@ async-trait = { workspace = true }
 rustyline = "14.0"
 tempfile = "3.8"
 which = "6.0"
+# ZeroMQ for kernel communication
+zmq = "0.10"
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.28", features = ["signal", "process"] }

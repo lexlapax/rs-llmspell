@@ -14,13 +14,18 @@ use llmspell_kernel::KernelDiscovery;
 use llmspell_repl::ConnectionInfo;
 
 // Import Jupyter ConnectionInfo with an alias to avoid conflicts
-use llmspell_kernel::ConnectionInfo as JupyterConnectionInfo;
+use llmspell_kernel::jupyter::connection::ConnectionInfo as JupyterConnectionInfo;
 use serde_json::Value;
 use std::process::Stdio;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::process::Command;
 use tokio::sync::RwLock;
+use hmac::{Hmac, Mac};
+use sha2::Sha256;
+use uuid;
+use chrono;
+use zmq::{Context as ZmqContext, Socket, SocketType};
 
 /// Classify operation workload based on operation name
 fn classify_operation_workload(operation: &str) -> WorkloadClassifier {
@@ -46,7 +51,7 @@ impl ConnectionFormat {
     pub fn kernel_id(&self) -> &str {
         match self {
             ConnectionFormat::Legacy(info) => &info.kernel_id,
-            ConnectionFormat::Jupyter(info) => &info.kernel_id,
+            ConnectionFormat::Jupyter(info) => &info.kernel_name,
         }
     }
 
@@ -73,7 +78,7 @@ impl ConnectionFormat {
             ConnectionFormat::Jupyter(jupyter_info) => {
                 // Convert Jupyter format to Legacy format
                 ConnectionInfo::new(
-                    jupyter_info.kernel_id,
+                    jupyter_info.kernel_name,
                     jupyter_info.ip,
                     jupyter_info.shell_port,
                 )
@@ -349,22 +354,22 @@ impl KernelConnectionBuilder {
     }
 
     pub async fn build(self) -> Result<Box<dyn KernelConnectionTrait>> {
-        // Return basic stub implementation that compiles
+        // Return basic implementation with Jupyter client
         let connection = BasicKernelConnection::new(
             self.discovery.unwrap_or_else(|| Box::new(CliKernelDiscovery::new())),
             self.circuit_breaker.unwrap_or_else(|| Box::new(CliCircuitBreaker::new())),
             self.diagnostics,
-        );
+        )?;
         Ok(Box::new(connection))
     }
 }
 
-/// Basic kernel connection implementation (Phase 9.8.10 stub)
+/// Basic kernel connection implementation (Phase 9.8.10 with Jupyter client)
 pub struct BasicKernelConnection {
     discovery: Box<dyn CliKernelDiscoveryTrait>,
     circuit_breaker: Box<dyn CliCircuitBreakerTrait>,
     diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
-    connected: bool,
+    jupyter_client: JupyterKernelClient,
 }
 
 impl BasicKernelConnection {
@@ -372,55 +377,53 @@ impl BasicKernelConnection {
         discovery: Box<dyn CliKernelDiscoveryTrait>,
         circuit_breaker: Box<dyn CliCircuitBreakerTrait>,
         diagnostics: Option<llmspell_bridge::diagnostics_bridge::DiagnosticsBridge>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self> {
+        Ok(Self {
             discovery,
             circuit_breaker,
             diagnostics,
-            connected: false,
-        }
+            jupyter_client: JupyterKernelClient::new()?,
+        })
     }
 }
 
 #[async_trait]
 impl KernelConnectionTrait for BasicKernelConnection {
     async fn connect_or_start(&mut self) -> Result<()> {
-        // Phase 9.8.10: Stub implementation - will be replaced with actual Jupyter client
-        self.connected = true;
-        Ok(())
+        self.jupyter_client.connect_or_start().await
     }
 
     fn is_connected(&self) -> bool {
-        self.connected
+        self.jupyter_client.is_connected()
     }
 
     async fn disconnect(&mut self) -> Result<()> {
-        self.connected = false;
-        Ok(())
+        self.jupyter_client.disconnect().await
     }
 
-    async fn execute(&mut self, _code: &str) -> Result<String> {
-        anyhow::bail!("Phase 9.8.10: In-process kernel execution not yet implemented")
+    async fn execute(&mut self, code: &str) -> Result<String> {
+        self.jupyter_client.execute(code).await
     }
 
-    async fn execute_inline(&mut self, _code: &str) -> Result<String> {
-        anyhow::bail!("Phase 9.8.10: In-process kernel execution not yet implemented")
+    async fn execute_inline(&mut self, code: &str) -> Result<String> {
+        self.jupyter_client.execute_inline(code).await
     }
 
     async fn repl(&mut self) -> Result<()> {
-        anyhow::bail!("Phase 9.8.10: In-process kernel REPL not yet implemented")
+        self.jupyter_client.repl().await
     }
 
     async fn info(&mut self) -> Result<Value> {
+        let jupyter_info = self.jupyter_client.info().await?;
         Ok(serde_json::json!({
-            "status": "Phase 9.8.10 stub",
-            "connected": self.connected,
+            "status": "BasicKernelConnection with JupyterKernelClient",
+            "jupyter_info": jupyter_info,
             "implementation": "BasicKernelConnection"
         }))
     }
 
-    async fn send_debug_command(&mut self, _command: Value) -> Result<Value> {
-        anyhow::bail!("Phase 9.8.10: Debug commands not yet implemented")
+    async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
+        self.jupyter_client.send_debug_command(command).await
     }
 
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
@@ -432,8 +435,264 @@ impl KernelConnectionTrait for BasicKernelConnection {
     }
 
     async fn shutdown(&mut self) -> Result<()> {
+        self.jupyter_client.shutdown().await
+    }
+}
+
+/// Jupyter kernel client using ZeroMQ transport
+pub struct JupyterKernelClient {
+    context: Arc<Mutex<ZmqContext>>,
+    shell_socket: Arc<Mutex<Option<Socket>>>,
+    iopub_socket: Arc<Mutex<Option<Socket>>>,
+    connection_info: Option<JupyterConnectionInfo>,
+    hmac_key: Option<Vec<u8>>,
+    connected: bool,
+    session_id: String,
+    execution_count: u32,
+}
+
+impl JupyterKernelClient {
+    pub fn new() -> Result<Self> {
+        let context = ZmqContext::new();
+        Ok(Self {
+            context: Arc::new(Mutex::new(context)),
+            shell_socket: Arc::new(Mutex::new(None)),
+            iopub_socket: Arc::new(Mutex::new(None)),
+            connection_info: None,
+            hmac_key: None,
+            connected: false,
+            session_id: uuid::Uuid::new_v4().to_string(),
+            execution_count: 0,
+        })
+    }
+
+    pub fn connect_to_kernel(&mut self, connection_info: JupyterConnectionInfo) -> Result<()> {
+        // Parse HMAC key
+        let hmac_key = hex::decode(&connection_info.key)?;
+        
+        // Create shell socket (REQ to connect to kernel's ROUTER)
+        let shell_socket = {
+            let context = self.context.lock().unwrap();
+            let socket = context.socket(SocketType::REQ)?;
+            let addr = format!("tcp://{}:{}", connection_info.ip, connection_info.shell_port);
+            socket.connect(&addr)?;
+            socket.set_linger(1000)?; // 1 second linger
+            socket.set_rcvtimeo(5000)?; // 5 second timeout
+            socket
+        };
+
+        // Create iopub socket (SUB to connect to kernel's PUB) 
+        let iopub_socket = {
+            let context = self.context.lock().unwrap();
+            let socket = context.socket(SocketType::SUB)?;
+            let addr = format!("tcp://{}:{}", connection_info.ip, connection_info.iopub_port);
+            socket.connect(&addr)?;
+            socket.set_subscribe(b"")?; // Subscribe to all messages
+            socket.set_rcvtimeo(1000)?; // 1 second timeout for non-blocking
+            socket
+        };
+
+        *self.shell_socket.lock().unwrap() = Some(shell_socket);
+        *self.iopub_socket.lock().unwrap() = Some(iopub_socket);
+        self.connection_info = Some(connection_info);
+        self.hmac_key = Some(hmac_key);
+        self.connected = true;
+
+        Ok(())
+    }
+
+    pub fn create_message(&self, msg_type: &str, content: Value) -> Result<Vec<Vec<u8>>> {
+        let msg_id = uuid::Uuid::new_v4().to_string();
+        let timestamp = chrono::Utc::now().to_rfc3339();
+        
+        // Create header
+        let header = serde_json::json!({
+            "msg_id": msg_id,
+            "msg_type": msg_type,
+            "username": "client",
+            "session": self.session_id,
+            "date": timestamp,
+            "version": "5.3"
+        });
+
+        let parent_header = serde_json::json!({});
+        let metadata = serde_json::json!({});
+
+        // Serialize components
+        let header_str = serde_json::to_string(&header)?;
+        let parent_header_str = serde_json::to_string(&parent_header)?;
+        let metadata_str = serde_json::to_string(&metadata)?;
+        let content_str = serde_json::to_string(&content)?;
+
+        // Create signature
+        let signature = if let Some(key) = &self.hmac_key {
+            let mut mac = Hmac::<Sha256>::new_from_slice(key)?;
+            mac.update(header_str.as_bytes());
+            mac.update(parent_header_str.as_bytes());
+            mac.update(metadata_str.as_bytes());
+            mac.update(content_str.as_bytes());
+            hex::encode(mac.finalize().into_bytes())
+        } else {
+            String::new()
+        };
+
+        // Build multipart message: [identity], signature, header, parent_header, metadata, content
+        let parts = vec![
+            b"client".to_vec(), // identity
+            signature.into_bytes(),
+            header_str.into_bytes(),
+            parent_header_str.into_bytes(),
+            metadata_str.into_bytes(),
+            content_str.into_bytes(),
+        ];
+
+        Ok(parts)
+    }
+
+    pub fn send_execute_request(&mut self, code: &str) -> Result<()> {
+        self.execution_count += 1;
+        
+        let content = serde_json::json!({
+            "code": code,
+            "silent": false,
+            "store_history": true,
+            "user_expressions": {},
+            "allow_stdin": false,
+            "stop_on_error": true
+        });
+
+        let parts = self.create_message("execute_request", content)?;
+        
+        let shell_socket = self.shell_socket.lock().unwrap();
+        if let Some(socket) = shell_socket.as_ref() {
+            socket.send_multipart(parts, 0)?;
+        }
+
+        Ok(())
+    }
+
+    pub fn receive_execute_reply(&self) -> Result<String> {
+        let shell_socket = self.shell_socket.lock().unwrap();
+        if let Some(socket) = shell_socket.as_ref() {
+            match socket.recv_multipart(0) {
+                Ok(parts) => {
+                    if parts.len() >= 6 {
+                        // Parse the reply content (last part)
+                        let content_json: Value = serde_json::from_slice(&parts[5])?;
+                        
+                        // Extract result from execute_reply
+                        if let Some(status) = content_json.get("status") {
+                            if status == "ok" {
+                                Ok("Execution completed successfully".to_string())
+                            } else {
+                                let error_name = content_json.get("ename")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("Unknown");
+                                let error_value = content_json.get("evalue")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("Unknown error");
+                                Ok(format!("Error: {}: {}", error_name, error_value))
+                            }
+                        } else {
+                            Ok("No status in reply".to_string())
+                        }
+                    } else {
+                        anyhow::bail!("Invalid message format: expected at least 6 parts, got {}", parts.len())
+                    }
+                }
+                Err(zmq::Error::EAGAIN) => anyhow::bail!("Timeout waiting for execute reply"),
+                Err(e) => Err(e.into()),
+            }
+        } else {
+            anyhow::bail!("Shell socket not connected")
+        }
+    }
+}
+
+#[async_trait]
+impl KernelConnectionTrait for JupyterKernelClient {
+    async fn connect_or_start(&mut self) -> Result<()> {
+        // Try to find existing kernel first
+        let discovery = CliKernelDiscovery::new();
+        let discovery_guard = discovery.discovery.read().await;
+        let kernels = discovery_guard.discover_kernels().await;
+        
+        if let Ok(kernels) = kernels {
+            if let Some(kernel_info) = kernels.first() {
+                // Convert to JupyterConnectionInfo format
+                let jupyter_info = JupyterConnectionInfo {
+                    shell_port: kernel_info.shell_port,
+                    iopub_port: kernel_info.iopub_port,
+                    stdin_port: kernel_info.stdin_port,
+                    control_port: kernel_info.control_port,
+                    hb_port: kernel_info.hb_port,
+                    ip: kernel_info.ip.clone(),
+                    key: kernel_info.key.clone(),
+                    transport: kernel_info.transport.clone(),
+                    signature_scheme: "hmac-sha256".to_string(),
+                    kernel_name: "llmspell".to_string(),
+                };
+                
+                self.connect_to_kernel(jupyter_info)?;
+                return Ok(());
+            }
+        }
+
+        anyhow::bail!("No running kernel found. Please start llmspell-kernel first.")
+    }
+
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
+
+    async fn disconnect(&mut self) -> Result<()> {
+        *self.shell_socket.lock().unwrap() = None;
+        *self.iopub_socket.lock().unwrap() = None;
         self.connected = false;
         Ok(())
+    }
+
+    async fn execute(&mut self, code: &str) -> Result<String> {
+        if !self.connected {
+            anyhow::bail!("Not connected to kernel");
+        }
+
+        self.send_execute_request(code)?;
+        self.receive_execute_reply()
+    }
+
+    async fn execute_inline(&mut self, code: &str) -> Result<String> {
+        self.execute(code).await
+    }
+
+    async fn repl(&mut self) -> Result<()> {
+        anyhow::bail!("REPL mode not implemented for JupyterKernelClient")
+    }
+
+    async fn info(&mut self) -> Result<Value> {
+        Ok(serde_json::json!({
+            "status": "connected",
+            "connected": self.connected,
+            "implementation": "JupyterKernelClient",
+            "session_id": self.session_id,
+            "execution_count": self.execution_count
+        }))
+    }
+
+    async fn send_debug_command(&mut self, _command: Value) -> Result<Value> {
+        anyhow::bail!("Debug commands not yet implemented for JupyterKernelClient")
+    }
+
+    fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
+        classify_operation_workload(operation)
+    }
+
+    fn execution_manager(&self) -> Option<&dyn std::any::Any> {
+        None
+    }
+
+    async fn shutdown(&mut self) -> Result<()> {
+        self.disconnect().await
     }
 }
 
