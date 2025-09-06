@@ -35,8 +35,11 @@ pub struct ChannelConfig {
 /// Transport layer knows NOTHING about protocols - it just moves bytes
 #[async_trait]
 pub trait Transport: Send + Sync {
-    /// Bind to specified addresses from configuration
+    /// Bind to specified addresses from configuration (server mode)
     async fn bind(&mut self, config: &TransportConfig) -> Result<()>;
+
+    /// Connect to specified addresses from configuration (client mode)
+    async fn connect(&mut self, config: &TransportConfig) -> Result<()>;
 
     /// Receive multipart message from a channel
     /// Returns None if no message available (non-blocking)

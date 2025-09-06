@@ -2,9 +2,7 @@
 //! ABOUTME: Handles script execution with streaming and output formatting
 
 use crate::cli::{OutputFormat, ScriptEngine};
-use crate::output::format_output;
 use anyhow::Result;
-use llmspell_bridge::engine::{ScriptMetadata, ScriptOutput};
 use llmspell_config::LLMSpellConfig;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -62,7 +60,7 @@ pub async fn execute_script_file(
     connect: Option<String>, // Connection string for external kernel
     _stream: bool,           // Streaming handled differently in kernel mode
     args: Vec<String>,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
     debug_mode: bool,
 ) -> Result<()> {
     // Validate script file exists
@@ -93,20 +91,8 @@ pub async fn execute_script_file(
     // TODO: Add support for script arguments in kernel protocol
     let result = kernel.execute(&script_content).await?;
 
-    // Create ScriptOutput from kernel result
-    let script_output = ScriptOutput {
-        output: serde_json::Value::String(result),
-        console_output: vec![], // TODO: Get console output from kernel
-        metadata: ScriptMetadata {
-            engine: "kernel".to_string(),
-            execution_time_ms: 0, // TODO: Get timing from kernel
-            memory_usage_bytes: None,
-            warnings: vec![],
-        },
-    };
-
-    // Format and display the result
-    println!("{}", format_output(&script_output, output_format)?);
+    // Don't print anything - the kernel already printed to stdout
+    let _ = result; // Result is already handled by kernel
 
     Ok(())
 }

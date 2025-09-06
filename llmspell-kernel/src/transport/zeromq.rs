@@ -106,6 +106,62 @@ impl Transport for ZmqTransport {
         Ok(())
     }
 
+    async fn connect(&mut self, config: &TransportConfig) -> Result<()> {
+        // Create and connect sockets for each channel (client mode)
+        for (channel_name, channel_config) in &config.channels {
+            let socket_type = Self::pattern_to_socket_type(&channel_config.pattern)?;
+            let socket = {
+                let context = self.context.lock().unwrap();
+                context.socket(socket_type).with_context(|| {
+                    format!(
+                        "Failed to create {} socket for {}",
+                        channel_config.pattern, channel_name
+                    )
+                })?
+            };
+
+            // Build the address
+            let addr = if config.transport_type == "tcp" {
+                format!(
+                    "{}://{}:{}",
+                    config.transport_type, config.base_address, channel_config.endpoint
+                )
+            } else {
+                format!(
+                    "{}://{}{}",
+                    config.transport_type, config.base_address, channel_config.endpoint
+                )
+            };
+
+            // Connect instead of bind
+            socket
+                .connect(&addr)
+                .with_context(|| format!("Failed to connect {channel_name} to {addr}"))?;
+
+            // Set socket options for non-blocking operation
+            socket
+                .set_rcvtimeo(100)
+                .context("Failed to set receive timeout")?;
+
+            // For SUB sockets, subscribe to all messages
+            if channel_config.pattern == "sub" {
+                socket
+                    .set_subscribe(b"")
+                    .context("Failed to subscribe to all messages")?;
+            }
+
+            // Store the socket
+            self.sockets
+                .lock()
+                .unwrap()
+                .insert(channel_name.clone(), socket);
+
+            tracing::info!("Connected {} channel to {}", channel_name, addr);
+        }
+
+        Ok(())
+    }
+
     async fn recv(&self, channel: &str) -> Result<Option<Vec<Vec<u8>>>> {
         let result = self
             .sockets

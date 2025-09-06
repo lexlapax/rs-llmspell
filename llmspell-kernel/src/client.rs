@@ -1,250 +1,299 @@
-//! Client connection handling
+//! Generic client for connecting to kernels
 //!
-//! Manages individual client connections to the kernel.
+//! This module provides a client implementation that mirrors the kernel architecture,
+//! using the same Transport and Protocol traits for consistency.
 
-use anyhow::Result;
-use chrono::{DateTime, Utc};
-use std::collections::HashSet;
-use std::sync::Arc;
-use tokio::sync::RwLock;
+use anyhow::{Context, Result};
+use chrono::Utc;
 use uuid::Uuid;
 
-/// Represents a connected client to the kernel
-#[derive(Debug, Clone)]
-pub struct ConnectedClient {
-    /// Unique client identifier
-    pub client_id: String,
+use crate::connection::ConnectionInfo;
+use crate::jupyter::protocol::{JupyterMessage, MessageContent, MessageHeader, StreamType};
+use crate::traits::{Protocol, Transport, TransportConfig};
+use crate::traits::transport::ChannelConfig;
+
+/// Generic client for connecting to kernels
+pub struct GenericClient<T: Transport, P: Protocol> {
+    /// Transport layer for communication
+    transport: T,
+    /// Protocol handler
+    protocol: P,
+    /// Connection information
+    connection_info: ConnectionInfo,
     /// Client session ID
-    pub session_id: String,
-    /// Username associated with the client
-    pub username: String,
-    /// Client connection timestamp
-    pub connected_at: DateTime<Utc>,
-    /// Last activity timestamp
-    pub last_activity: Arc<RwLock<DateTime<Utc>>>,
-    /// Client capabilities
-    pub capabilities: ClientCapabilities,
-    /// Client state
-    pub state: Arc<RwLock<ClientState>>,
+    session_id: String,
+    /// Username for this client
+    username: String,
+    /// Execution counter
+    execution_count: u32,
 }
 
-/// Client capability types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum Capability {
-    /// Client supports debugging
-    DebugSupport,
-    /// Client supports media messages
-    MediaSupport,
-    /// Client supports streaming
-    StreamingSupport,
-    /// Client supports hot reload
-    HotReloadSupport,
-}
-
-/// Client capabilities
-#[derive(Debug, Clone)]
-pub struct ClientCapabilities {
-    /// Set of supported capabilities
-    capabilities: HashSet<Capability>,
-    /// Protocol version
-    pub protocol_version: String,
-}
-
-impl Default for ClientCapabilities {
-    fn default() -> Self {
-        let mut capabilities = HashSet::new();
-        capabilities.insert(Capability::MediaSupport);
-        Self {
-            capabilities,
-            protocol_version: "1.0".to_string(),
-        }
-    }
-}
-
-impl ClientCapabilities {
-    /// Check if a capability is supported
-    #[must_use]
-    pub fn has(&self, capability: Capability) -> bool {
-        self.capabilities.contains(&capability)
-    }
-
-    /// Add a capability
-    pub fn add(&mut self, capability: Capability) {
-        self.capabilities.insert(capability);
-    }
-
-    /// Remove a capability
-    pub fn remove(&mut self, capability: Capability) {
-        self.capabilities.remove(&capability);
-    }
-}
-
-/// Client state
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ClientState {
-    /// Client is connected and idle
-    Connected,
-    /// Client is executing code
-    Executing,
-    /// Client is in debug mode
-    Debugging,
-    /// Client is disconnecting
-    Disconnecting,
-}
-
-impl ConnectedClient {
-    /// Create a new connected client
-    #[must_use]
-    pub fn new(username: String) -> Self {
-        let now = Utc::now();
-        Self {
-            client_id: Uuid::new_v4().to_string(),
-            session_id: Uuid::new_v4().to_string(),
-            username,
-            connected_at: now,
-            last_activity: Arc::new(RwLock::new(now)),
-            capabilities: ClientCapabilities::default(),
-            state: Arc::new(RwLock::new(ClientState::Connected)),
-        }
-    }
-
-    /// Create a new connected client with specific ID
-    #[must_use]
-    pub fn with_id(client_id: String, username: String) -> Self {
-        let now = Utc::now();
-        Self {
-            client_id,
-            session_id: Uuid::new_v4().to_string(),
-            username,
-            connected_at: now,
-            last_activity: Arc::new(RwLock::new(now)),
-            capabilities: ClientCapabilities::default(),
-            state: Arc::new(RwLock::new(ClientState::Connected)),
-        }
-    }
-
-    /// Update last activity timestamp
-    pub async fn update_activity(&self) {
-        let mut last = self.last_activity.write().await;
-        *last = Utc::now();
-    }
-
-    /// Get idle duration
-    pub async fn idle_duration(&self) -> chrono::Duration {
-        let last = self.last_activity.read().await;
-        Utc::now() - *last
-    }
-
-    /// Set client state
-    pub async fn set_state(&self, state: ClientState) {
-        *self.state.write().await = state;
-        self.update_activity().await;
-    }
-
-    /// Get client state
-    pub async fn get_state(&self) -> ClientState {
-        self.state.read().await.clone()
-    }
-
-    /// Check if client is active (not idle for more than timeout)
-    pub async fn is_active(&self, timeout_secs: i64) -> bool {
-        self.idle_duration().await.num_seconds() < timeout_secs
-    }
-}
-
-/// Client manager for tracking all connected clients
-pub struct ClientManager {
-    /// Map of client ID to client
-    clients: Arc<RwLock<std::collections::HashMap<String, ConnectedClient>>>,
-    /// Maximum number of clients
-    max_clients: usize,
-}
-
-impl ClientManager {
-    /// Create a new client manager
-    #[must_use]
-    pub fn new(max_clients: usize) -> Self {
-        Self {
-            clients: Arc::new(RwLock::new(std::collections::HashMap::new())),
-            max_clients,
-        }
-    }
-
-    /// Add a new client
+impl<T: Transport, P: Protocol> GenericClient<T, P> {
+    /// Create a new client and connect to a kernel
     ///
     /// # Errors
     ///
-    /// Returns an error if the maximum number of clients has been reached
-    pub async fn add_client(&self, client: ConnectedClient) -> Result<()> {
-        let mut clients = self.clients.write().await;
+    /// Returns an error if connection fails
+    pub async fn connect(
+        mut transport: T,
+        protocol: P,
+        connection_info: ConnectionInfo,
+    ) -> Result<Self> {
+        // Configure transport for client mode (connect instead of bind)
+        let config = Self::create_client_config(&connection_info);
+        transport
+            .connect(&config)
+            .await
+            .context("Failed to connect to kernel")?;
 
-        if clients.len() >= self.max_clients {
-            anyhow::bail!("Maximum number of clients ({}) reached", self.max_clients);
-        }
-
-        let client_id = client.client_id.clone();
-        clients.insert(client_id.clone(), client);
-        drop(clients);
-
-        tracing::info!("Client {} added", client_id);
-        Ok(())
+        Ok(Self {
+            transport,
+            protocol,
+            connection_info,
+            session_id: Uuid::new_v4().to_string(),
+            username: whoami::username(),
+            execution_count: 0,
+        })
     }
 
-    /// Remove a client
-    pub async fn remove_client(&self, client_id: &str) -> Option<ConnectedClient> {
-        let client = self.clients.write().await.remove(client_id);
+    /// Create transport configuration for client connection
+    fn create_client_config(conn_info: &ConnectionInfo) -> TransportConfig {
+        let mut config = TransportConfig {
+            transport_type: conn_info.transport.clone(),
+            base_address: conn_info.ip.clone(),
+            channels: std::collections::HashMap::new(),
+        };
 
-        if client.is_some() {
-            tracing::info!("Client {} removed", client_id);
-        }
+        // Configure channels for client mode (opposite patterns from server)
+        config.channels.insert(
+            "shell".to_string(),
+            ChannelConfig {
+                pattern: "req".to_string(), // Client uses REQ for request-reply
+                endpoint: conn_info.shell_port.to_string(),
+            },
+        );
 
-        client
+        config.channels.insert(
+            "iopub".to_string(),
+            ChannelConfig {
+                pattern: "sub".to_string(), // Client subscribes
+                endpoint: conn_info.iopub_port.to_string(),
+            },
+        );
+
+        config.channels.insert(
+            "stdin".to_string(),
+            ChannelConfig {
+                pattern: "req".to_string(),  // Use REQ for request-reply
+                endpoint: conn_info.stdin_port.to_string(),
+            },
+        );
+
+        config.channels.insert(
+            "control".to_string(),
+            ChannelConfig {
+                pattern: "req".to_string(),  // Use REQ for request-reply
+                endpoint: conn_info.control_port.to_string(),
+            },
+        );
+
+        config
     }
 
-    /// Get a client by ID
-    pub async fn get_client(&self, client_id: &str) -> Option<ConnectedClient> {
-        let clients = self.clients.read().await;
-        clients.get(client_id).cloned()
+    /// Get the session ID
+    #[must_use]
+    pub fn session_id(&self) -> &str {
+        &self.session_id
     }
 
-    /// Get all clients
-    pub async fn get_all_clients(&self) -> Vec<ConnectedClient> {
-        let clients = self.clients.read().await;
-        clients.values().cloned().collect()
-    }
-
-    /// Get active clients
-    pub async fn get_active_clients(&self, timeout_secs: i64) -> Vec<ConnectedClient> {
-        let clients = self.clients.read().await;
-        let mut active = Vec::new();
-
-        for client in clients.values() {
-            if client.is_active(timeout_secs).await {
-                active.push(client.clone());
-            }
-        }
-        drop(clients);
-
-        active
-    }
-
-    /// Clean up inactive clients
-    pub async fn cleanup_inactive(&self, timeout_secs: i64) -> Vec<String> {
-        let clients = self.clients.read().await;
-        let mut to_remove = Vec::new();
-
-        for (id, client) in clients.iter() {
-            if !client.is_active(timeout_secs).await {
-                to_remove.push(id.clone());
-            }
-        }
-
-        drop(clients);
-
-        for id in &to_remove {
-            self.remove_client(id).await;
-        }
-
-        to_remove
+    /// Get the connection info
+    #[must_use]
+    pub const fn connection_info(&self) -> &ConnectionInfo {
+        &self.connection_info
     }
 }
+
+/// Jupyter-specific client implementation
+impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtocol> {
+    /// Execute code on the kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution fails
+    pub async fn execute(&mut self, code: &str) -> Result<MessageContent> {
+        self.execution_count += 1;
+
+        // Create execute request message with empty identity for REQ socket
+        let mut metadata = serde_json::Map::new();
+        // Add empty identity for client-initiated messages (REQ socket doesn't need routing)
+        metadata.insert("__identities".to_string(), serde_json::json!([""]));
+        
+        let msg = JupyterMessage {
+            header: MessageHeader {
+                msg_id: Uuid::new_v4().to_string(),
+                msg_type: "execute_request".to_string(),
+                username: self.username.clone(),
+                session: self.session_id.clone(),
+                date: Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::Value::Object(metadata),
+            content: MessageContent::ExecuteRequest {
+                code: code.to_string(),
+                silent: false,
+                store_history: Some(true),
+                user_expressions: None,
+                allow_stdin: Some(false),
+                stop_on_error: Some(true),
+            },
+        };
+
+        // Encode and send request on shell channel
+        let request_bytes = self.protocol.encode(&msg, "shell")?;
+        self.transport.send("shell", request_bytes).await?;
+
+        let msg_id = msg.header.msg_id.clone();
+
+        // Listen to both shell and iopub channels
+        loop {
+            // Check IOPub for output messages
+            if let Some(iopub_bytes) = self.transport.recv("iopub").await? {
+                let iopub_msg = self.protocol.decode(iopub_bytes, "iopub")?;
+                
+                // Only process messages related to our execution
+                if let Some(parent) = &iopub_msg.parent_header {
+                    if parent.msg_id == msg_id {
+                        match &iopub_msg.content {
+                            MessageContent::Stream { name, text } => {
+                                // Print stream output to stdout/stderr
+                                match name {
+                                    StreamType::Stdout => print!("{}", text),
+                                    StreamType::Stderr => eprint!("{}", text),
+                                }
+                            }
+                            MessageContent::ExecuteResult { data, .. } => {
+                                // Handle execute results (e.g., returned values)
+                                if let Some(text_plain) = data.get("text/plain") {
+                                    if let Some(text) = text_plain.as_str() {
+                                        print!("{}", text);
+                                    }
+                                }
+                            }
+                            MessageContent::Error { ename, evalue, traceback } => {
+                                // Print errors to stderr
+                                eprintln!("{}: {}", ename, evalue);
+                                for line in traceback {
+                                    eprintln!("{}", line);
+                                }
+                            }
+                            _ => {} // Ignore other IOPub messages
+                        }
+                    }
+                }
+            }
+
+            // Check shell channel for execute reply
+            if let Some(reply_bytes) = self.transport.recv("shell").await? {
+                let reply = self.protocol.decode(reply_bytes, "shell")?;
+                
+                // Check if this is our execute reply
+                if reply.header.msg_type == "execute_reply" {
+                    if reply.header.msg_id == msg_id {
+                        return Ok(reply.content);
+                    }
+                }
+            }
+
+            // Small delay to avoid busy waiting
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Request kernel information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails
+    pub async fn kernel_info(&mut self) -> Result<MessageContent> {
+        // Create kernel info request with empty identity
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("__identities".to_string(), serde_json::json!([""]));
+        
+        let msg = JupyterMessage {
+            header: MessageHeader {
+                msg_id: Uuid::new_v4().to_string(),
+                msg_type: "kernel_info_request".to_string(),
+                username: self.username.clone(),
+                session: self.session_id.clone(),
+                date: Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::Value::Object(metadata),
+            content: MessageContent::KernelInfoRequest {},
+        };
+
+        // Send request on shell channel
+        let request_bytes = self.protocol.encode(&msg, "shell")?;
+        self.transport.send("shell", request_bytes).await?;
+
+        // Wait for reply
+        loop {
+            if let Some(reply_bytes) = self.transport.recv("shell").await? {
+                let reply = self.protocol.decode(reply_bytes, "shell")?;
+                
+                if reply.header.msg_type == "kernel_info_reply" {
+                    return Ok(reply.content);
+                }
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Shutdown the kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if shutdown fails
+    pub async fn shutdown(&mut self, restart: bool) -> Result<()> {
+        // Create shutdown request with empty identity
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("__identities".to_string(), serde_json::json!([""]));
+        
+        let msg = JupyterMessage {
+            header: MessageHeader {
+                msg_id: Uuid::new_v4().to_string(),
+                msg_type: "shutdown_request".to_string(),
+                username: self.username.clone(),
+                session: self.session_id.clone(),
+                date: Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::Value::Object(metadata),
+            content: MessageContent::ShutdownRequest { restart },
+        };
+
+        // Send request on control channel
+        let request_bytes = self.protocol.encode(&msg, "control")?;
+        self.transport.send("control", request_bytes).await?;
+
+        // Wait for reply
+        loop {
+            if let Some(reply_bytes) = self.transport.recv("control").await? {
+                let reply = self.protocol.decode(reply_bytes, "control")?;
+                
+                if reply.header.msg_type == "shutdown_reply" {
+                    return Ok(());
+                }
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+}
+
+// Type alias for Jupyter client
+pub type JupyterClient = GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtocol>;

@@ -24,6 +24,7 @@ chrono = { version = "0.4", features = ["serde"] }
 glob = "0.3"
 dirs = "5.0"
 hex = "0.4"
+whoami = "1.5"
 
 # Internal crates (minimal initial dependencies)
 llmspell-bridge = { path = "../llmspell-bridge" }

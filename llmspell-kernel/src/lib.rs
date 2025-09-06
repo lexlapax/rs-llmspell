@@ -26,6 +26,7 @@ pub mod traits;
 
 // Core modules
 pub mod client;
+pub mod client_handler;
 pub mod comm_handler;
 pub mod connection;
 pub mod discovery;
@@ -40,6 +41,7 @@ pub mod transport;
 // pub mod debug;      // Will be implemented later
 
 // Re-export key types
+pub use client::{GenericClient, JupyterClient};
 pub use connection::ConnectionInfo;
 pub use discovery::KernelDiscovery;
 pub use kernel::{GenericKernel, KernelState};

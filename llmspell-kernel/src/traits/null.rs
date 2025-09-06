@@ -35,6 +35,11 @@ impl Transport for NullTransport {
         Ok(())
     }
 
+    async fn connect(&mut self, config: &TransportConfig) -> Result<()> {
+        self.channels = config.channels.keys().cloned().collect();
+        Ok(())
+    }
+
     async fn recv(&self, _channel: &str) -> Result<Option<Vec<Vec<u8>>>> {
         Ok(None)
     }

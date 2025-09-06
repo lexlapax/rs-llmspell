@@ -15,7 +15,7 @@ use std::sync::Arc;
 use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
-use crate::client::ClientManager;
+use crate::client_handler::ClientManager;
 use crate::comm_handler::CommManager;
 use crate::security::SecurityManager;
 use crate::session_persistence::SessionMapper;
@@ -788,24 +788,31 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     ///
     /// Returns an error if debug is not enabled or if the debug command fails.
     #[allow(clippy::significant_drop_tightening)] // Runtime lock is needed for entire match
-    pub async fn handle_debug_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+    pub async fn handle_debug_request(
+        &self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
         let command = content["command"].as_str().unwrap_or("");
         let args = &content["arguments"];
-        
+
         // Access ExecutionManager through ScriptRuntime
         let runtime = self.runtime.lock().await;
-        let exec_mgr = runtime.get_execution_manager()
+        let exec_mgr = runtime
+            .get_execution_manager()
             .ok_or_else(|| anyhow::anyhow!("Debug not enabled - use --debug flag"))?;
-        
+
         match command {
             "setBreakpoints" => {
                 let source = args["source"]["name"].as_str().unwrap_or("repl");
                 let mut breakpoint_ids = Vec::new();
-                
+
                 if let Some(lines) = args["lines"].as_array() {
                     for line in lines {
                         if let Some(line_num) = line.as_u64() {
-                            let bp = Breakpoint::new(source.to_string(), u32::try_from(line_num).unwrap_or(0));
+                            let bp = Breakpoint::new(
+                                source.to_string(),
+                                u32::try_from(line_num).unwrap_or(0),
+                            );
                             let id = exec_mgr.add_breakpoint(bp).await;
                             breakpoint_ids.push(id);
                         }
@@ -847,7 +854,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     "stackFrames": stack
                 }))
             }
-            _ => Err(anyhow::anyhow!("Unknown debug command: {}", command))
+            _ => Err(anyhow::anyhow!("Unknown debug command: {}", command)),
         }
     }
 

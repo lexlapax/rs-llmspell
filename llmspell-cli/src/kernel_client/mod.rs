@@ -5,10 +5,11 @@
 
 pub mod connection;
 pub mod debug_handler;
+pub mod embedded_kernel;
 
 // Re-export commonly used types
 pub use connection::{
-    CliCircuitBreaker, CliCircuitBreakerTrait,
-    ExecuteResult, KernelClient, KernelConnectionBuilder, KernelConnectionTrait,
-    MonitoredKernelConnection,
+    CliCircuitBreaker, CliCircuitBreakerTrait, ExecuteResult, KernelClient,
+    KernelConnectionBuilder, KernelConnectionTrait, MonitoredKernelConnection,
 };
+pub use embedded_kernel::EmbeddedKernel;

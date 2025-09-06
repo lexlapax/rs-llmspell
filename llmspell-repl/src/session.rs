@@ -374,7 +374,8 @@ pub enum ReplResponse {
 
 impl ReplResponse {
     /// Format response for display
-    #[must_use] pub fn format(&self) -> String {
+    #[must_use]
+    pub fn format(&self) -> String {
         match self {
             Self::Empty => String::new(),
             Self::Exit => String::new(),
@@ -389,7 +390,8 @@ impl ReplResponse {
     }
 
     /// Check if this response should exit the REPL
-    #[must_use] pub const fn should_exit(&self) -> bool {
+    #[must_use]
+    pub const fn should_exit(&self) -> bool {
         matches!(self, Self::Exit)
     }
 }

@@ -7,14 +7,12 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_bridge::{
-    circuit_breaker::CircuitBreaker,
-    hook_profiler::WorkloadClassifier,
+    circuit_breaker::CircuitBreaker, hook_profiler::WorkloadClassifier,
     session_recorder::SessionRecorder,
 };
 use serde_json::Value;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
 
 /// Kernel client entry point
 pub struct KernelClient;
@@ -29,6 +27,7 @@ impl KernelClient {
         Ok(ExecuteResult {
             success: true,
             output: Some(String::new()),
+            console_output: None,
             error: None,
         })
     }
@@ -39,6 +38,7 @@ impl KernelClient {
 pub struct ExecuteResult {
     pub success: bool,
     pub output: Option<String>,
+    pub console_output: Option<Vec<String>>,
     pub error: Option<String>,
 }
 
@@ -102,7 +102,10 @@ impl NullCircuitBreaker {
 }
 
 impl CircuitBreaker for NullCircuitBreaker {
-    fn allow_operation(&self, _context: &llmspell_bridge::circuit_breaker::OperationContext) -> bool {
+    fn allow_operation(
+        &self,
+        _context: &llmspell_bridge::circuit_breaker::OperationContext,
+    ) -> bool {
         true // Always allow
     }
 
@@ -150,7 +153,8 @@ pub struct CliCircuitBreaker {
 
 impl CliCircuitBreaker {
     pub fn new() -> Self {
-        let breaker: Arc<Mutex<dyn CircuitBreaker>> = Arc::new(Mutex::new(NullCircuitBreaker::new()));
+        let breaker: Arc<Mutex<dyn CircuitBreaker>> =
+            Arc::new(Mutex::new(NullCircuitBreaker::new()));
         Self { _breaker: breaker }
     }
 }

@@ -16,6 +16,7 @@ pub mod setup;
 pub mod validate;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
+use crate::kernel_client::KernelConnectionTrait;
 use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
 use std::path::PathBuf;
@@ -172,26 +173,25 @@ pub async fn execute_command(
 }
 
 /// Create a kernel connection based on the connect flag
-/// Always requires external kernel - user must start kernel separately
+/// Uses embedded kernel by default, or connects to external kernel if specified
 pub async fn create_kernel_connection(
-    _config: LLMSpellConfig,
+    config: LLMSpellConfig,
     connect: Option<String>,
 ) -> Result<Box<dyn crate::kernel_client::KernelConnectionTrait>> {
-    // External kernel required - no in-process option
-    // User must start kernel with: llmspell kernel start
-    
-    if connect.is_none() {
+    use std::sync::Arc;
+
+    if let Some(connection) = connect {
+        // TODO: Connect to existing external kernel via ZeroMQ
+        // This will require implementing ZmqKernelClient properly
         anyhow::bail!(
-            "External kernel required. Start a kernel with:\n  \
-            llmspell kernel start\n\n\
-            Then use --connect flag to specify connection"
+            "External kernel connection not yet implemented.\n\
+            Connection string provided: {}",
+            connection
         );
+    } else {
+        // Default: Use embedded kernel (runs in same process)
+        let mut kernel = crate::kernel_client::EmbeddedKernel::new(Arc::new(config)).await?;
+        kernel.connect_or_start().await?;
+        Ok(Box::new(kernel))
     }
-    
-    // TODO: Implement ZeroMQ client connection to external kernel
-    // For now, fail with clear message
-    anyhow::bail!(
-        "External kernel connection not yet implemented.\n\
-        Please start kernel with: llmspell kernel start"
-    )
 }

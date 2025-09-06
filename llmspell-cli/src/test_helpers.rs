@@ -60,7 +60,6 @@ impl KernelConnectionTrait for NullKernelConnection {
         Ok(Value::Null)
     }
 
-
     async fn disconnect(&mut self) -> Result<()> {
         self.connected = false;
         Ok(())

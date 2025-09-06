@@ -47,6 +47,7 @@ zmq = "0.10"
 hmac = "0.12"
 sha2 = "0.10"
 hex = "0.4"
+rand = "0.8"
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.28", features = ["signal", "process"] }

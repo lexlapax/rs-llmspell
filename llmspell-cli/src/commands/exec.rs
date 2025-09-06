@@ -2,9 +2,7 @@
 //! ABOUTME: Executes script code provided directly on the command line
 
 use crate::cli::{OutputFormat, ScriptEngine};
-use crate::output::format_output;
 use anyhow::Result;
-use llmspell_bridge::engine::{ScriptMetadata, ScriptOutput};
 use llmspell_config::LLMSpellConfig;
 
 /// Execute inline script code
@@ -15,7 +13,7 @@ pub async fn execute_inline_script(
     connect: Option<String>, // Connection string for external kernel
     _stream: bool,           // Streaming handled differently in kernel mode
     debug_mode: bool,
-    output_format: OutputFormat,
+    _output_format: OutputFormat,
 ) -> Result<()> {
     tracing::debug!(
         "[9.8.2] execute_inline_script - starting with code: {}",
@@ -41,20 +39,9 @@ pub async fn execute_inline_script(
         result
     );
 
-    // Create ScriptOutput from kernel result
-    let script_output = ScriptOutput {
-        output: serde_json::Value::String(result),
-        console_output: vec![], // TODO: Get console output from kernel
-        metadata: ScriptMetadata {
-            engine: "kernel".to_string(),
-            execution_time_ms: 0, // TODO: Get timing from kernel
-            memory_usage_bytes: None,
-            warnings: vec![],
-        },
-    };
-
-    // Format and display the result
-    println!("{}", format_output(&script_output, output_format)?);
+    // Don't print anything - the kernel already printed to stdout
+    // Only print if there's a return value (not console output)
+    let _ = result; // Result is already handled by kernel
 
     Ok(())
 }
