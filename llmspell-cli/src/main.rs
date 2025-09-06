@@ -17,7 +17,7 @@ async fn main() -> Result<()> {
         } else {
             trace_level.into()
         };
-        
+
         tracing_subscriber::fmt()
             .with_max_level(level)
             .with_target(false)
@@ -47,4 +47,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

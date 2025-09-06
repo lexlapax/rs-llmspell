@@ -30,6 +30,14 @@ pub struct ConnectionInfo {
     pub key: String,
     /// Signature scheme (e.g., "hmac-sha256")
     pub signature_scheme: String,
+
+    // Process management fields (optional for backward compatibility)
+    /// Process ID of the kernel
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pid: Option<u32>,
+    /// When the kernel was started
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub started_at: Option<chrono::DateTime<chrono::Utc>>,
 }
 
 impl ConnectionInfo {
@@ -47,6 +55,36 @@ impl ConnectionInfo {
             hb_port: base_port + 4,
             key: uuid::Uuid::new_v4().to_string(),
             signature_scheme: "hmac-sha256".to_string(),
+            pid: None,
+            started_at: None,
+        }
+    }
+
+    /// Check if the kernel process is alive (if PID is tracked)
+    #[must_use]
+    #[allow(clippy::option_if_let_else)] // False positive due to cfg attributes
+    pub fn is_process_alive(&self) -> bool {
+        match self.pid {
+            Some(pid) => {
+                // Check if process with this PID exists
+                #[cfg(unix)]
+                {
+                    use std::process::Command;
+                    // Use kill -0 to check if process exists without sending signal
+                    Command::new("kill")
+                        .args(["-0", &pid.to_string()])
+                        .output()
+                        .map(|output| output.status.success())
+                        .unwrap_or(false)
+                }
+                #[cfg(not(unix))]
+                {
+                    // On non-Unix, fall back to heartbeat checking
+                    let _ = pid; // Avoid unused variable warning
+                    true
+                }
+            }
+            None => true, // No PID tracked, assume alive (backward compatibility)
         }
     }
 

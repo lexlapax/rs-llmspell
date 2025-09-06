@@ -165,7 +165,16 @@ pub async fn execute_command(
             args,
         } => {
             // Use dedicated DebugBridge architecture for debug command
-            debug::handle_debug_command(script, break_at, port, args, engine, runtime_config, output_format).await
+            debug::handle_debug_command(
+                script,
+                break_at,
+                port,
+                args,
+                engine,
+                runtime_config,
+                output_format,
+            )
+            .await
         }
         Commands::Kernel { command } => {
             kernel::handle_kernel_command(command, engine, runtime_config, output_format).await

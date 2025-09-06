@@ -92,26 +92,80 @@ impl KernelDiscovery {
         Ok(kernels.into_iter().find(|k| k.kernel_id == kernel_id))
     }
 
-    /// Check if a kernel is reachable
+    /// Check if a kernel is reachable using proper ZMQ heartbeat ping
     ///
     /// # Errors
     ///
     /// Returns an error if connection check fails
     pub async fn is_kernel_alive(info: &ConnectionInfo) -> Result<bool> {
-        use tokio::net::TcpStream;
-        use tokio::time::{timeout, Duration};
+        // Use async block to preserve async signature for API compatibility
+        let info_clone = info.clone();
+        tokio::task::spawn_blocking(move || Self::check_heartbeat(&info_clone))
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to check heartbeat: {}", e))?
+    }
 
-        // Try to connect to heartbeat channel
-        let addr = format!("{}:{}", info.ip, info.hb_port);
+    /// Internal synchronous heartbeat check implementation
+    fn check_heartbeat(info: &ConnectionInfo) -> Result<bool> {
+        let addr = format!("tcp://{}:{}", info.ip, info.hb_port);
+        let socket = Self::create_heartbeat_socket()?;
 
-        match timeout(Duration::from_secs(2), TcpStream::connect(&addr)).await {
-            Ok(Ok(_stream)) => {
-                // Connection successful, kernel is alive
-                Ok(true)
+        if !Self::connect_socket(&socket, &addr) {
+            return Ok(false);
+        }
+
+        if !Self::send_ping(&socket) {
+            return Ok(false);
+        }
+
+        Ok(Self::check_ping_response(&socket, &addr))
+    }
+
+    /// Create and configure ZMQ socket for heartbeat
+    fn create_heartbeat_socket() -> Result<zmq::Socket> {
+        let context = zmq::Context::new();
+        let socket = context.socket(zmq::REQ)?;
+        socket.set_rcvtimeo(2000)?; // 2 seconds
+        socket.set_sndtimeo(2000)?; // 2 seconds
+        Ok(socket)
+    }
+
+    /// Connect socket to address
+    fn connect_socket(socket: &zmq::Socket, addr: &str) -> bool {
+        if let Err(e) = socket.connect(addr) {
+            tracing::debug!("Failed to connect heartbeat socket to {}: {}", addr, e);
+            false
+        } else {
+            true
+        }
+    }
+
+    /// Send ping message
+    fn send_ping(socket: &zmq::Socket) -> bool {
+        let ping_data = b"ping";
+        if let Err(e) = socket.send(&ping_data[..], 0) {
+            tracing::debug!("Failed to send heartbeat ping: {}", e);
+            false
+        } else {
+            true
+        }
+    }
+
+    /// Check for ping response
+    fn check_ping_response(socket: &zmq::Socket, addr: &str) -> bool {
+        let ping_data = b"ping";
+        match socket.recv_bytes(0) {
+            Ok(response) if response == ping_data[..] => {
+                tracing::trace!("Heartbeat successful for kernel at {}", addr);
+                true
             }
-            _ => {
-                // Connection failed or timed out
-                Ok(false)
+            Ok(_) => {
+                tracing::warn!("Unexpected heartbeat response from {}", addr);
+                false
+            }
+            Err(e) => {
+                tracing::debug!("No heartbeat response from {}: {}", addr, e);
+                false
             }
         }
     }

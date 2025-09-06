@@ -10,9 +10,12 @@ use anyhow::{Context, Result};
 use hmac::{Hmac, Mac};
 use serde_json::Value;
 use sha2::Sha256;
+use std::collections::HashMap;
 use subtle::ConstantTimeEq;
 
-use super::protocol::{JupyterMessage, MessageContent, MessageHeader};
+use super::protocol::{
+    ExecutionStatus, HelpLink, JupyterMessage, LanguageInfo, MessageContent, MessageHeader,
+};
 
 /// Jupyter wire message format
 ///
@@ -291,6 +294,7 @@ impl WireProtocol {
     }
 
     /// Deserialize content based on message type
+    #[allow(clippy::too_many_lines)]
     fn deserialize_content(msg_type: &str, content_bytes: &[u8]) -> Result<MessageContent> {
         // For most request messages, the content structure varies
         match msg_type {
@@ -369,6 +373,171 @@ impl WireProtocol {
                         .get("target_name")
                         .and_then(|v| v.as_str())
                         .map(std::string::ToString::to_string),
+                })
+            }
+            "kernel_info_reply" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+
+                // Parse language_info
+                #[allow(clippy::option_if_let_else)]
+                let language_info = if let Some(lang_info) = value.get("language_info") {
+                    LanguageInfo {
+                        name: lang_info
+                            .get("name")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("unknown")
+                            .to_string(),
+                        version: lang_info
+                            .get("version")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("0.0.0")
+                            .to_string(),
+                        mimetype: lang_info
+                            .get("mimetype")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or("text/plain")
+                            .to_string(),
+                        file_extension: lang_info
+                            .get("file_extension")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(".txt")
+                            .to_string(),
+                        pygments_lexer: lang_info
+                            .get("pygments_lexer")
+                            .and_then(|v| v.as_str())
+                            .map(std::string::ToString::to_string),
+                        codemirror_mode: lang_info
+                            .get("codemirror_mode")
+                            .and_then(|v| v.as_str())
+                            .map(std::string::ToString::to_string),
+                        nbconvert_exporter: lang_info
+                            .get("nbconvert_exporter")
+                            .and_then(|v| v.as_str())
+                            .map(std::string::ToString::to_string),
+                    }
+                } else {
+                    // Fallback language_info
+                    LanguageInfo {
+                        name: "unknown".to_string(),
+                        version: "0.0.0".to_string(),
+                        mimetype: "text/plain".to_string(),
+                        file_extension: ".txt".to_string(),
+                        pygments_lexer: None,
+                        codemirror_mode: None,
+                        nbconvert_exporter: None,
+                    }
+                };
+
+                // Parse help_links
+                let help_links = value
+                    .get("help_links")
+                    .and_then(|v| v.as_array())
+                    .map(|links| {
+                        links
+                            .iter()
+                            .filter_map(|link| {
+                                Some(HelpLink {
+                                    text: link.get("text")?.as_str()?.to_string(),
+                                    url: link.get("url")?.as_str()?.to_string(),
+                                })
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+
+                Ok(MessageContent::KernelInfoReply {
+                    status: value
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("ok")
+                        .to_string(),
+                    protocol_version: value
+                        .get("protocol_version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("5.3")
+                        .to_string(),
+                    implementation: value
+                        .get("implementation")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("llmspell")
+                        .to_string(),
+                    implementation_version: value
+                        .get("implementation_version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("0.1.0")
+                        .to_string(),
+                    language_info,
+                    banner: value
+                        .get("banner")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("LLMSpell Kernel")
+                        .to_string(),
+                    help_links,
+                    llmspell_session_metadata: value.get("llmspell_session_metadata").cloned(),
+                })
+            }
+            "execute_reply" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+
+                // Parse status
+                let status_str = value.get("status").and_then(|v| v.as_str()).unwrap_or("ok");
+                let status = match status_str {
+                    "error" => ExecutionStatus::Error,
+                    "abort" | "aborted" => ExecutionStatus::Aborted,
+                    _ => ExecutionStatus::Ok,
+                };
+
+                // Parse user_expressions if present
+                let user_expressions = value
+                    .get("user_expressions")
+                    .and_then(|v| v.as_object())
+                    .map(|obj| {
+                        obj.iter()
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .collect::<HashMap<String, Value>>()
+                    });
+
+                Ok(MessageContent::ExecuteReply {
+                    status,
+                    execution_count: value
+                        .get("execution_count")
+                        .and_then(serde_json::Value::as_u64)
+                        .and_then(|n| u32::try_from(n).ok())
+                        .unwrap_or(0),
+                    user_expressions,
+                    payload: value.get("payload").and_then(|v| v.as_array()).cloned(),
+                    // Error fields - only present when status is error
+                    ename: value
+                        .get("ename")
+                        .and_then(|v| v.as_str())
+                        .map(std::string::ToString::to_string),
+                    evalue: value
+                        .get("evalue")
+                        .and_then(|v| v.as_str())
+                        .map(std::string::ToString::to_string),
+                    traceback: value
+                        .get("traceback")
+                        .and_then(|v| v.as_array())
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
+                                .collect()
+                        }),
+                })
+            }
+            "shutdown_reply" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+
+                Ok(MessageContent::ShutdownReply {
+                    status: value
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("ok")
+                        .to_string(),
+                    restart: value
+                        .get("restart")
+                        .and_then(serde_json::Value::as_bool)
+                        .unwrap_or(false),
                 })
             }
             // Add more message types as needed

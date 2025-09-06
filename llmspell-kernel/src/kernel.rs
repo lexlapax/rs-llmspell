@@ -331,6 +331,12 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// Process messages from all channels
     /// Returns true if shutdown was requested
     async fn process_available_messages(&self) -> Result<bool> {
+        // Process control channel first for priority (shutdown/interrupt)
+        if let Some(shutdown_requested) = self.process_channel_message("control").await? {
+            return Ok(shutdown_requested);
+        }
+
+        // Then process other channels
         for channel in self.transport.channels() {
             if Self::should_skip_channel(&channel) {
                 continue;
@@ -344,7 +350,8 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     fn should_skip_channel(channel: &str) -> bool {
-        channel == "iopub" || channel == "heartbeat"
+        // Skip iopub (output only), heartbeat (handled separately), and control (already processed)
+        channel == "iopub" || channel == "heartbeat" || channel == "control"
     }
 
     /// Process a single channel's message

@@ -284,36 +284,37 @@ pub enum KernelCommands {
         /// Port to listen on
         #[arg(short, long, default_value = "9555")]
         port: u16,
-        
+
         /// Run as daemon (background process)
         #[arg(long)]
         daemon: bool,
-        
+
         /// Kernel ID (generated if not provided)
         #[arg(short = 'i', long)]
         id: Option<String>,
-        
+
         /// Connection file path (for Jupyter discovery)
         #[arg(short = 'f', long)]
         connection_file: Option<PathBuf>,
     },
-    
+
     /// Stop a running kernel
     Stop {
         /// Kernel ID to stop (if not provided, stops all kernels)
         id: Option<String>,
     },
-    
+
     /// Show kernel status
     Status {
         /// Kernel ID for detailed status (if not provided, lists all kernels)
         id: Option<String>,
     },
-    
+
     /// Connect to an existing kernel
     Connect {
         /// Kernel address (e.g., "localhost:9555" or "/path/to/connection.json")
-        address: String,
+        /// If not provided, uses the last successful connection
+        address: Option<String>,
     },
 }
 
