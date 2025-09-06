@@ -8,8 +8,7 @@ use async_trait::async_trait;
 use llmspell_bridge::hook_profiler::WorkloadClassifier;
 use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::{
-    connection::ConnectionInfo, 
-    JupyterClient, JupyterKernel, JupyterProtocol, ZmqTransport
+    connection::ConnectionInfo, JupyterClient, JupyterKernel, JupyterProtocol, ZmqTransport,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -56,8 +55,6 @@ pub struct EmbeddedKernel {
     connection_info: ConnectionInfo,
     /// The client for communicating with the kernel
     client: Option<JupyterClient>,
-    /// Configuration
-    config: Arc<LLMSpellConfig>,
     /// Whether the kernel is running
     running: bool,
     /// Shutdown sender
@@ -124,7 +121,6 @@ impl EmbeddedKernel {
             kernel_id,
             connection_info,
             client: Some(client),
-            config,
             running: true,
             shutdown_tx: Some(shutdown_tx),
         })
@@ -181,20 +177,23 @@ impl KernelConnectionTrait for EmbeddedKernel {
 
     async fn execute(&mut self, code: &str) -> Result<String> {
         // Use the client to execute code via ZeroMQ
-        let client = self.client.as_mut()
+        let client = self
+            .client
+            .as_mut()
             .ok_or_else(|| anyhow::anyhow!("Client not initialized"))?;
-        
+
         let result = client.execute(code).await?;
-        
+
         // The kernel already printed to stdout via ScriptRuntime
         // Return empty string to avoid double printing
         // Check if there was an error in the execution
-        if let llmspell_kernel::jupyter::protocol::MessageContent::ExecuteReply { 
-            status, 
-            ename, 
-            evalue, 
-            .. 
-        } = result {
+        if let llmspell_kernel::jupyter::protocol::MessageContent::ExecuteReply {
+            status,
+            ename,
+            evalue,
+            ..
+        } = result
+        {
             use llmspell_kernel::jupyter::protocol::ExecutionStatus;
             match status {
                 ExecutionStatus::Ok => Ok(String::new()),
@@ -290,9 +289,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_embedded_kernel_execution() {
-        let mut config = LLMSpellConfig::default();
-        config.default_engine = "lua".to_string();
-        let config = Arc::new(config);
+        let config = Arc::new(LLMSpellConfig {
+            default_engine: "lua".to_string(),
+            ..LLMSpellConfig::default()
+        });
 
         let mut kernel = EmbeddedKernel::new(config).await.unwrap();
 

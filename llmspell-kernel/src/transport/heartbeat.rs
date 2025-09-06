@@ -46,18 +46,14 @@ impl HeartbeatHandler {
     /// Returns an error if the heartbeat service encounters a fatal error.
     pub async fn start(&mut self) -> Result<()> {
         self.is_running = true;
-        let mut heartbeat_interval = interval(Duration::from_millis(100));
-
         tracing::debug!("Starting heartbeat handler");
+
+        let mut heartbeat_interval = interval(Duration::from_millis(100));
 
         if self.is_running {
             loop {
                 heartbeat_interval.tick().await;
-
-                if let Err(e) = self.handle_heartbeat() {
-                    tracing::warn!("Heartbeat error: {}", e);
-                    // Continue running on heartbeat errors
-                }
+                self.process_heartbeat_tick();
 
                 if !self.is_running {
                     break;
@@ -67,6 +63,13 @@ impl HeartbeatHandler {
 
         tracing::debug!("Heartbeat handler stopped");
         Ok(())
+    }
+
+    fn process_heartbeat_tick(&self) {
+        if let Err(e) = self.handle_heartbeat() {
+            tracing::warn!("Heartbeat error: {}", e);
+            // Continue running on heartbeat errors
+        }
     }
 
     /// Stop heartbeat service

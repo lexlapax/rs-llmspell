@@ -62,86 +62,20 @@ impl HookHandler for LuaDebugBridge {
             return Ok(());
         }
 
-        let line = ar.curr_line();
-        if line <= 0 {
+        let Some((source, line_num)) = Self::extract_location_info(ar) else {
             return Ok(());
-        }
-
-        let source_info = ar.source();
-        let source = source_info.short_src.as_deref().unwrap_or("<unknown>");
-
-        // Convert line to u32 safely
-        let line_num = u32::try_from(line).unwrap_or(0);
+        };
 
         tracing::trace!("LuaDebugBridge: Line event at {}:{}", source, line_num);
 
         // FAST PATH: Check if we might break
-        if !self.coordinator.might_break_at_sync(source, line_num) {
-            tracing::trace!(
-                "LuaDebugBridge: No breakpoint possible at {}:{}",
-                source,
-                line_num
-            );
-            return Ok(()); // Early exit - no breakpoint here
+        if !self.should_check_breakpoint(&source, line_num) {
+            return Ok(());
         }
 
-        tracing::debug!(
-            "LuaDebugBridge: Potential breakpoint at {}:{}, checking slow path",
-            source,
-            line_num
-        );
-
-        // SLOW PATH: We might need to break, check with LuaExecutionHook
-        let should_break = {
-            let hook = self.lua_hook.lock();
-            hook.should_break_slow(source, line_num, lua)
-        };
-
-        tracing::debug!(
-            "LuaDebugBridge: should_break = {} at {}:{}",
-            should_break,
-            source,
-            line_num
-        );
-
-        if should_break {
-            tracing::info!(
-                "LuaDebugBridge: BREAKPOINT HIT at {}:{}, pausing execution",
-                source,
-                line_num
-            );
-            // Extract Lua variables using actual context
-            let variables = Self::extract_lua_variables(lua, line_num, source);
-            let location = ExecutionLocation {
-                source: source.to_string(),
-                line: line_num,
-                column: None,
-            };
-
-            // Use block_on_async to coordinate pause
-            let coordinator = self.coordinator.clone();
-            let pause_source = source.to_string();
-            // Task 9.8.9: Remove timeout to allow proper blocking until resume() is called
-            // The 100ms timeout was preventing actual pause functionality
-            if let Err(e) = block_on_async(
-                "coordinate_breakpoint_pause",
-                async move {
-                    coordinator
-                        .coordinate_breakpoint_pause(location, variables)
-                        .await;
-                    Ok::<(), std::io::Error>(())
-                },
-                None, // No timeout - block until resume() is called
-            ) {
-                // Log error with layer identification for debugging
-                tracing::error!(
-                    "Layer 2 (LuaDebugBridge) failed to coordinate pause at {}:{}: {:?}",
-                    pause_source,
-                    line_num,
-                    e
-                );
-                // Graceful degradation: continue execution instead of crashing
-            }
+        // SLOW PATH: Check if we actually need to break
+        if self.check_and_handle_breakpoint(lua, &source, line_num) {
+            self.handle_breakpoint_hit(lua, &source, line_num);
         }
 
         Ok(())
@@ -160,8 +94,108 @@ impl HookHandler for LuaDebugBridge {
     }
 }
 
-/// Extract Lua variables from current context
+/// Helper methods for `LuaDebugBridge`
 impl LuaDebugBridge {
+    fn extract_location_info(ar: &Debug) -> Option<(String, u32)> {
+        let line = ar.curr_line();
+        if line <= 0 {
+            return None;
+        }
+
+        let source_info = ar.source();
+        let source = source_info
+            .short_src
+            .as_deref()
+            .unwrap_or("<unknown>")
+            .to_string();
+        let line_num = u32::try_from(line).unwrap_or(0);
+
+        Some((source, line_num))
+    }
+
+    fn should_check_breakpoint(&self, source: &str, line_num: u32) -> bool {
+        if !self.coordinator.might_break_at_sync(source, line_num) {
+            tracing::trace!(
+                "LuaDebugBridge: No breakpoint possible at {}:{}",
+                source,
+                line_num
+            );
+            return false;
+        }
+
+        tracing::debug!(
+            "LuaDebugBridge: Potential breakpoint at {}:{}, checking slow path",
+            source,
+            line_num
+        );
+        true
+    }
+
+    fn check_and_handle_breakpoint(&self, lua: &Lua, source: &str, line_num: u32) -> bool {
+        let should_break = {
+            let hook = self.lua_hook.lock();
+            hook.should_break_slow(source, line_num, lua)
+        };
+
+        tracing::debug!(
+            "LuaDebugBridge: should_break = {} at {}:{}",
+            should_break,
+            source,
+            line_num
+        );
+
+        should_break
+    }
+
+    fn handle_breakpoint_hit(&self, lua: &Lua, source: &str, line_num: u32) {
+        tracing::info!(
+            "LuaDebugBridge: BREAKPOINT HIT at {}:{}, pausing execution",
+            source,
+            line_num
+        );
+
+        let variables = Self::extract_lua_variables(lua, line_num, source);
+        let location = ExecutionLocation {
+            source: source.to_string(),
+            line: line_num,
+            column: None,
+        };
+
+        self.coordinate_pause(location, variables, source, line_num);
+    }
+
+    fn coordinate_pause(
+        &self,
+        location: ExecutionLocation,
+        variables: HashMap<String, serde_json::Value>,
+        source: &str,
+        line_num: u32,
+    ) {
+        let coordinator = self.coordinator.clone();
+        let pause_source = source.to_string();
+
+        // Task 9.8.9: Remove timeout to allow proper blocking until resume() is called
+        if let Err(e) = block_on_async(
+            "coordinate_breakpoint_pause",
+            async move {
+                coordinator
+                    .coordinate_breakpoint_pause(location, variables)
+                    .await;
+                Ok::<(), std::io::Error>(())
+            },
+            None, // No timeout - block until resume() is called
+        ) {
+            // Log error with layer identification for debugging
+            tracing::error!(
+                "Layer 2 (LuaDebugBridge) failed to coordinate pause at {}:{}: {:?}",
+                pause_source,
+                line_num,
+                e
+            );
+            // Graceful degradation: continue execution instead of crashing
+        }
+    }
+
     fn extract_lua_variables(
         lua: &Lua,
         line: u32,

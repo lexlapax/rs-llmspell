@@ -315,4 +315,4 @@ pub use debug_runtime::{DebugControl, DebugHook, DebugRuntime};
 pub use llmspell_config::LLMSpellConfig;
 pub use providers::ProviderManager;
 pub use registry::ComponentRegistry;
-pub use runtime::ScriptRuntime;
+pub use runtime::{OutputEvent, ScriptRuntime};

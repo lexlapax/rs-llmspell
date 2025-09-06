@@ -55,6 +55,10 @@ pub struct ReplSession {
 
 impl ReplSession {
     /// Create a new REPL session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the kernel is not connected.
     pub async fn new(kernel: Box<dyn KernelConnection>, config: ReplConfig) -> Result<Self> {
         let mut session = Self {
             kernel,
@@ -71,6 +75,10 @@ impl ReplSession {
     }
 
     /// Handle user input - main entry point
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if command execution fails.
     pub async fn handle_input(&mut self, input: &str) -> Result<ReplResponse> {
         let input = input.trim();
 
@@ -113,7 +121,7 @@ impl ReplSession {
         // Check performance
         if let Some(start_time) = start {
             let duration = start_time.elapsed();
-            self.check_performance(workload, duration);
+            Self::check_performance(workload, duration);
         }
 
         Ok(ReplResponse::ExecutionResult {
@@ -130,10 +138,10 @@ impl ReplSession {
         match cmd {
             ".help" => Ok(ReplResponse::Help(self.get_help_text())),
             ".exit" | ".quit" => Ok(ReplResponse::Exit),
-            ".vars" => self.handle_vars_command(),
-            ".clear" => self.handle_clear_command(),
-            ".history" => self.handle_history_command(),
-            ".info" => self.handle_info_command().await,
+            ".vars" => Ok(self.handle_vars_command()),
+            ".clear" => Ok(self.handle_clear_command()),
+            ".history" => Ok(self.handle_history_command()),
+            ".info" => Ok(self.handle_info_command()),
 
             // Debug commands (if enabled)
             ".break" if self.config.enable_debug_commands => {
@@ -143,11 +151,9 @@ impl ReplSession {
             ".continue" if self.config.enable_debug_commands => {
                 self.handle_continue_command().await
             }
-            ".locals" if self.config.enable_debug_commands => self.handle_locals_command().await,
+            ".locals" if self.config.enable_debug_commands => Ok(self.handle_locals_command()),
             ".stack" if self.config.enable_debug_commands => self.handle_stack_command().await,
-            ".watch" if self.config.enable_debug_commands => {
-                self.handle_watch_command(&parts).await
-            }
+            ".watch" if self.config.enable_debug_commands => Ok(Self::handle_watch_command(&parts)),
 
             _ => Ok(ReplResponse::Error(format!("Unknown command: {cmd}"))),
         }
@@ -208,17 +214,14 @@ impl ReplSession {
     }
 
     /// Handle locals command
-    async fn handle_locals_command(&mut self) -> Result<ReplResponse> {
-        if let Some(_exec_mgr) = self.kernel.execution_manager() {
-            // TODO: Get variables from execution manager
-            Ok(ReplResponse::Info(
-                "Local variables: (not yet implemented)".to_string(),
-            ))
-        } else {
-            Ok(ReplResponse::Error(
-                "Execution manager not available".to_string(),
-            ))
-        }
+    fn handle_locals_command(&self) -> ReplResponse {
+        self.kernel.execution_manager().map_or_else(
+            || ReplResponse::Error("Execution manager not available".to_string()),
+            |_exec_mgr| {
+                // TODO: Get variables from execution manager
+                ReplResponse::Info("Local variables: (not yet implemented)".to_string())
+            },
+        )
     }
 
     /// Handle stack command
@@ -237,43 +240,39 @@ impl ReplSession {
     }
 
     /// Handle watch command
-    async fn handle_watch_command(&mut self, parts: &[&str]) -> Result<ReplResponse> {
+    fn handle_watch_command(parts: &[&str]) -> ReplResponse {
         if parts.len() < 2 {
-            return Ok(ReplResponse::Error(
-                "Usage: .watch <expression>".to_string(),
-            ));
+            return ReplResponse::Error("Usage: .watch <expression>".to_string());
         }
 
         let expression = parts[1..].join(" ");
-        Ok(ReplResponse::Info(format!(
-            "Watching expression: {expression}"
-        )))
+        ReplResponse::Info(format!("Watching expression: {expression}"))
     }
 
     /// Handle vars command - show variables
-    fn handle_vars_command(&self) -> Result<ReplResponse> {
+    fn handle_vars_command(&self) -> ReplResponse {
         if self.variables.is_empty() {
-            Ok(ReplResponse::Info("No variables defined".to_string()))
+            ReplResponse::Info("No variables defined".to_string())
         } else {
             let vars: Vec<String> = self
                 .variables
                 .iter()
                 .map(|(k, v)| format!("{k}: {v}"))
                 .collect();
-            Ok(ReplResponse::Info(vars.join("\n")))
+            ReplResponse::Info(vars.join("\n"))
         }
     }
 
     /// Handle clear command
-    fn handle_clear_command(&mut self) -> Result<ReplResponse> {
+    fn handle_clear_command(&mut self) -> ReplResponse {
         self.variables.clear();
-        Ok(ReplResponse::Info("Variables cleared".to_string()))
+        ReplResponse::Info("Variables cleared".to_string())
     }
 
     /// Handle history command
-    fn handle_history_command(&self) -> Result<ReplResponse> {
+    fn handle_history_command(&self) -> ReplResponse {
         if self.command_history.is_empty() {
-            Ok(ReplResponse::Info("No command history".to_string()))
+            ReplResponse::Info("No command history".to_string())
         } else {
             let history: Vec<String> = self
                 .command_history
@@ -281,12 +280,12 @@ impl ReplSession {
                 .enumerate()
                 .map(|(i, cmd)| format!("{:4}: {}", i + 1, cmd))
                 .collect();
-            Ok(ReplResponse::Info(history.join("\n")))
+            ReplResponse::Info(history.join("\n"))
         }
     }
 
     /// Handle info command
-    async fn handle_info_command(&mut self) -> Result<ReplResponse> {
+    fn handle_info_command(&self) -> ReplResponse {
         let connected = if self.kernel.is_connected() {
             "Connected"
         } else {
@@ -300,7 +299,7 @@ impl ReplSession {
             self.command_history.len()
         );
 
-        Ok(ReplResponse::Info(info))
+        ReplResponse::Info(info)
     }
 
     /// Get help text
@@ -333,7 +332,7 @@ impl ReplSession {
     }
 
     /// Check performance against workload expectations
-    fn check_performance(&self, workload: WorkloadType, duration: std::time::Duration) {
+    fn check_performance(workload: WorkloadType, duration: std::time::Duration) {
         let threshold = match workload {
             WorkloadType::Micro => std::time::Duration::from_millis(10),
             WorkloadType::Light => std::time::Duration::from_millis(100),
@@ -352,6 +351,10 @@ impl ReplSession {
     }
 
     /// Disconnect from kernel on drop
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kernel disconnection fails.
     pub async fn disconnect(&mut self) -> Result<()> {
         self.kernel.disconnect().await
     }
@@ -377,10 +380,8 @@ impl ReplResponse {
     #[must_use]
     pub fn format(&self) -> String {
         match self {
-            Self::Empty => String::new(),
-            Self::Exit => String::new(),
-            Self::Help(text) => text.clone(),
-            Self::Info(text) => text.clone(),
+            Self::Empty | Self::Exit => String::new(),
+            Self::Help(text) | Self::Info(text) => text.clone(),
             Self::Error(msg) => format!("Error: {msg}"),
             Self::ExecutionResult { output, .. } => output.clone(),
             Self::DebugResponse(value) => {

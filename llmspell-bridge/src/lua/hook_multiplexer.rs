@@ -38,6 +38,7 @@ pub trait HookHandler: Send + Sync {
 }
 
 type HandlerMap = HashMap<String, (HookPriority, Box<dyn HookHandler>)>;
+type HandlersArc = Arc<RwLock<HandlerMap>>;
 
 /// Hook multiplexer that manages multiple debug hooks
 pub struct HookMultiplexer {
@@ -156,81 +157,110 @@ impl HookMultiplexer {
             handler_count, triggers.every_line, triggers.on_calls, triggers.on_returns);
 
         lua.set_hook(triggers, move |lua, ar| {
-            // Determine event type - check actual event first, not line number
-            let line = ar.curr_line();
-            let mlua_event = ar.event();
-
-            let event = if mlua_event == mlua::DebugEvent::Call {
-                DebugEvent::Call
-            } else if mlua_event == mlua::DebugEvent::TailCall {
-                DebugEvent::TailCall
-            } else if mlua_event == mlua::DebugEvent::Ret {
-                DebugEvent::Ret
-            } else if line != -1 {
-                DebugEvent::Line
-            } else {
-                tracing::trace!(
-                    "Unknown event type, mlua_event={:?}, line={}",
-                    mlua_event,
-                    line
-                );
+            // Determine event type
+            let Ok(event) = Self::determine_event_type(&ar) else {
                 return Ok(());
             };
 
-            // Log the event (only log line events at trace level to avoid spam)
-            if event == DebugEvent::Line {
-                tracing::trace!(
-                    "HookMultiplexer: Hook triggered for {:?} event at line {}",
-                    event,
-                    ar.curr_line()
-                );
-            } else {
-                tracing::debug!("HookMultiplexer: Hook triggered for {:?} event", event);
-            }
+            // Log the event
+            Self::log_event(event, &ar);
 
             // Get handlers sorted by priority
-            let mut sorted_handlers: Vec<_> = {
-                let handlers = handlers.read();
-                handlers
-                    .iter()
-                    .filter(|(_, (_, h))| h.is_active())
-                    .map(|(id, (priority, _))| (id.clone(), *priority))
-                    .collect()
-            };
-            sorted_handlers.sort_by_key(|(_, p)| *p);
+            let sorted_handlers = Self::get_sorted_active_handlers(&handlers);
 
             // Execute handlers in priority order
-            tracing::trace!("Processing {} handlers", sorted_handlers.len());
-            for (id, _) in sorted_handlers {
-                if let Some((_, handler)) = handlers.write().get_mut(&id) {
-                    // Check if this handler is interested in this event
-                    let triggers = handler.interested_events();
-                    let interested = match event {
-                        DebugEvent::Line => triggers.every_line,
-                        DebugEvent::Call | DebugEvent::TailCall => triggers.on_calls,
-                        DebugEvent::Ret => triggers.on_returns,
-                        _ => false,
-                    };
-
-                    tracing::trace!(
-                        "Handler '{}' interested={} for event {:?}",
-                        id,
-                        interested,
-                        event
-                    );
-
-                    if interested {
-                        tracing::trace!("Calling handle_event for handler '{}'", id);
-                        handler.handle_event(lua, &ar, event)?;
-                    }
-                }
-            }
+            Self::execute_handlers(lua, &ar, event, &handlers, sorted_handlers)?;
 
             Ok(())
         });
 
         *self.installed.write() = true;
         Ok(())
+    }
+
+    fn determine_event_type(ar: &mlua::Debug) -> Result<DebugEvent, mlua::Error> {
+        let line = ar.curr_line();
+        let mlua_event = ar.event();
+
+        let event = if mlua_event == mlua::DebugEvent::Call {
+            DebugEvent::Call
+        } else if mlua_event == mlua::DebugEvent::TailCall {
+            DebugEvent::TailCall
+        } else if mlua_event == mlua::DebugEvent::Ret {
+            DebugEvent::Ret
+        } else if line != -1 {
+            DebugEvent::Line
+        } else {
+            tracing::trace!(
+                "Unknown event type, mlua_event={:?}, line={}",
+                mlua_event,
+                line
+            );
+            return Err(mlua::Error::RuntimeError("Unknown event type".to_string()));
+        };
+
+        Ok(event)
+    }
+
+    fn log_event(event: DebugEvent, ar: &mlua::Debug) {
+        if event == DebugEvent::Line {
+            tracing::trace!(
+                "HookMultiplexer: Hook triggered for {:?} event at line {}",
+                event,
+                ar.curr_line()
+            );
+        } else {
+            tracing::debug!("HookMultiplexer: Hook triggered for {:?} event", event);
+        }
+    }
+
+    fn get_sorted_active_handlers(handlers: &HandlersArc) -> Vec<(String, HookPriority)> {
+        let mut sorted_handlers: Vec<_> = {
+            let handlers_guard = handlers.read();
+            handlers_guard
+                .iter()
+                .filter(|(_, (_, h))| h.is_active())
+                .map(|(id, (priority, _))| (id.clone(), *priority))
+                .collect()
+        };
+        sorted_handlers.sort_by_key(|(_, p)| p.0);
+        sorted_handlers
+    }
+
+    fn execute_handlers(
+        lua: &Lua,
+        ar: &mlua::Debug,
+        event: DebugEvent,
+        handlers: &HandlersArc,
+        sorted_handlers: Vec<(String, HookPriority)>,
+    ) -> Result<(), mlua::Error> {
+        tracing::trace!("Processing {} handlers", sorted_handlers.len());
+
+        for (id, _) in sorted_handlers {
+            if let Some((_, handler)) = handlers.write().get_mut(&id) {
+                // Check if this handler is interested in this event
+                if Self::is_handler_interested(handler.as_ref(), event) {
+                    tracing::trace!("Calling handle_event for handler '{}'", id);
+                    handler.handle_event(lua, ar, event)?;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn is_handler_interested(handler: &dyn HookHandler, event: DebugEvent) -> bool {
+        let triggers = handler.interested_events();
+        let interested = match event {
+            DebugEvent::Line => triggers.every_line,
+            DebugEvent::Call | DebugEvent::TailCall => triggers.on_calls,
+            DebugEvent::Ret => triggers.on_returns,
+            _ => false,
+        };
+
+        tracing::trace!("Handler interested={} for event {:?}", interested, event);
+
+        interested
     }
 
     /// Uninstall the multiplexer

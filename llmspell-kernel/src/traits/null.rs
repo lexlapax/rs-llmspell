@@ -77,9 +77,13 @@ impl Default for NullProtocol {
     }
 }
 
+/// Null output context - does nothing
+pub struct NullOutputContext;
+
 #[async_trait]
 impl Protocol for NullProtocol {
     type Message = NullMessage;
+    type OutputContext = NullOutputContext;
 
     fn decode(&self, _parts: Vec<Vec<u8>>, _channel: &str) -> Result<Self::Message> {
         Ok(NullMessage::new("null".to_string(), Value::Null))
@@ -125,6 +129,10 @@ impl Protocol for NullProtocol {
         _kernel_id: &str,
     ) -> Result<Self::Message> {
         Ok(NullMessage::new(msg_type.to_string(), content))
+    }
+
+    fn create_output_context(&self) -> Self::OutputContext {
+        NullOutputContext
     }
 }
 

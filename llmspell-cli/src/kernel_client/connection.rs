@@ -17,8 +17,15 @@ use std::time::Duration;
 /// Kernel client entry point
 pub struct KernelClient;
 
+impl Default for KernelClient {
+    fn default() -> Self {
+        Self
+    }
+}
+
 impl KernelClient {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 

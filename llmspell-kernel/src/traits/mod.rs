@@ -10,10 +10,16 @@
 
 pub mod message;
 pub mod null;
+pub mod output;
 pub mod protocol;
 pub mod transport;
 
 pub use message::KernelMessage;
 pub use null::{NullMessage, NullProtocol, NullTransport};
-pub use protocol::Protocol;
+pub use output::OutputCapture;
+pub use protocol::{
+    ChannelPattern, ChannelTopology, ExecutionError, ExecutionFlow, ExecutionResult,
+    ExpectedMessage, KernelStatus, OutputChunk, Protocol, ResponseCollector, ResponseFlow,
+    StreamData, StreamType,
+};
 pub use transport::{Transport, TransportConfig};

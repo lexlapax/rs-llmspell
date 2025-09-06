@@ -526,6 +526,13 @@ impl KernelMessage for JupyterMessage {
         // Convert header to JSON for parent tracking
         serde_json::to_value(&self.header).ok()
     }
+
+    fn set_parent_from_json(&mut self, parent_header: Value) {
+        // Try to deserialize the JSON into a MessageHeader
+        if let Ok(header) = serde_json::from_value::<MessageHeader>(parent_header) {
+            self.parent_header = Some(header);
+        }
+    }
 }
 
 impl Default for LanguageInfo {
@@ -566,9 +573,23 @@ impl JupyterProtocol {
     }
 }
 
+/// Output context for Jupyter protocol - buffers output for efficient messaging
+#[derive(Debug, Default)]
+pub struct JupyterOutputContext {
+    /// Buffered stdout output
+    pub stdout_buffer: Vec<String>,
+    /// Buffered stderr output
+    pub stderr_buffer: Vec<String>,
+    /// Execution results
+    pub results: Vec<serde_json::Value>,
+    /// Errors encountered
+    pub errors: Vec<(String, String, Vec<String>)>, // (name, message, traceback)
+}
+
 #[async_trait]
 impl Protocol for JupyterProtocol {
     type Message = JupyterMessage;
+    type OutputContext = JupyterOutputContext;
 
     fn decode(&self, parts: Vec<Vec<u8>>, channel: &str) -> Result<Self::Message, anyhow::Error> {
         self.wire.decode_message(&parts, channel)
@@ -759,6 +780,288 @@ impl Protocol for JupyterProtocol {
             metadata: serde_json::json!({}),
             content: message_content,
         })
+    }
+
+    fn create_output_context(&self) -> Self::OutputContext {
+        JupyterOutputContext::default()
+    }
+
+    // === Message Lifecycle Methods ===
+
+    fn create_execution_flow(
+        &self,
+        request: &Self::Message,
+    ) -> crate::traits::ExecutionFlow<Self::Message> {
+        use crate::traits::{ExecutionFlow, KernelStatus};
+
+        // Only create execution flow for execute_request messages
+        if request.header.msg_type != "execute_request" {
+            return ExecutionFlow {
+                pre_execution: Vec::new(),
+                capture_output: false,
+                post_execution: Vec::new(),
+            };
+        }
+
+        // Extract execution count from request or use 0
+        let execution_count = if let MessageContent::ExecuteRequest { .. } = &request.content {
+            // TODO: Get actual execution count from kernel state
+            1
+        } else {
+            0
+        };
+
+        // Pre-execution messages
+        let mut pre_execution = Vec::new();
+
+        // Send status: busy on IOPub
+        if let Ok(status_msg) = self.create_status_message(KernelStatus::Busy) {
+            if let Some(parent) = Some(request.header.clone()) {
+                let mut msg = status_msg;
+                msg.parent_header = Some(parent);
+                pre_execution.push(("iopub".to_string(), msg));
+            }
+        }
+
+        // Send execute_input on IOPub
+        if let MessageContent::ExecuteRequest { code, .. } = &request.content {
+            if let Ok(input_msg) = self.create_execute_input_message(code, execution_count) {
+                if let Some(parent) = Some(request.header.clone()) {
+                    let mut msg = input_msg;
+                    msg.parent_header = Some(parent);
+                    pre_execution.push(("iopub".to_string(), msg));
+                }
+            }
+        }
+
+        // Post-execution messages (status: idle will be sent after reply)
+        let post_execution = Vec::new();
+
+        ExecutionFlow {
+            pre_execution,
+            capture_output: true, // Capture output during execution
+            post_execution,
+        }
+    }
+
+    fn create_status_message(
+        &self,
+        status: crate::traits::KernelStatus,
+    ) -> anyhow::Result<Self::Message> {
+        use crate::traits::KernelStatus;
+
+        let execution_state = match status {
+            KernelStatus::Idle => ExecutionState::Idle,
+            KernelStatus::Busy => ExecutionState::Busy,
+            KernelStatus::Starting => ExecutionState::Starting,
+        };
+
+        let content = MessageContent::Status { execution_state };
+
+        Ok(JupyterMessage {
+            header: MessageHeader {
+                msg_id: uuid::Uuid::new_v4().to_string(),
+                msg_type: "status".to_string(),
+                username: "kernel".to_string(),
+                session: uuid::Uuid::new_v4().to_string(), // TODO: Use actual session
+                date: chrono::Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::json!({}),
+            content,
+        })
+    }
+
+    fn create_execute_input_message(
+        &self,
+        code: &str,
+        count: u32,
+    ) -> anyhow::Result<Self::Message> {
+        let content = MessageContent::ExecuteInput {
+            code: code.to_string(),
+            execution_count: count,
+        };
+
+        Ok(JupyterMessage {
+            header: MessageHeader {
+                msg_id: uuid::Uuid::new_v4().to_string(),
+                msg_type: "execute_input".to_string(),
+                username: "kernel".to_string(),
+                session: uuid::Uuid::new_v4().to_string(), // TODO: Use actual session
+                date: chrono::Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::json!({}),
+            content,
+        })
+    }
+
+    fn create_stream_message(
+        &self,
+        stream: crate::traits::StreamData,
+    ) -> anyhow::Result<Self::Message> {
+        use crate::traits::StreamType as TraitStreamType;
+
+        let name = match stream.stream_type {
+            TraitStreamType::Stdout => StreamType::Stdout,
+            TraitStreamType::Stderr => StreamType::Stderr,
+        };
+
+        let content = MessageContent::Stream {
+            name,
+            text: stream.text,
+        };
+
+        Ok(JupyterMessage {
+            header: MessageHeader {
+                msg_id: uuid::Uuid::new_v4().to_string(),
+                msg_type: "stream".to_string(),
+                username: "kernel".to_string(),
+                session: uuid::Uuid::new_v4().to_string(), // TODO: Use actual session
+                date: chrono::Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::json!({}),
+            content,
+        })
+    }
+
+    fn create_execute_result(
+        &self,
+        result: crate::traits::ExecutionResult,
+    ) -> anyhow::Result<Self::Message> {
+        // Create data dict with text/plain representation
+        let mut data = HashMap::new();
+        if let Some(value) = result.result_value {
+            data.insert("text/plain".to_string(), value);
+        }
+
+        let content = MessageContent::ExecuteResult {
+            execution_count: result.execution_count,
+            data,
+            metadata: HashMap::new(),
+        };
+
+        Ok(JupyterMessage {
+            header: MessageHeader {
+                msg_id: uuid::Uuid::new_v4().to_string(),
+                msg_type: "execute_result".to_string(),
+                username: "kernel".to_string(),
+                session: uuid::Uuid::new_v4().to_string(), // TODO: Use actual session
+                date: chrono::Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::json!({}),
+            content,
+        })
+    }
+
+    fn create_error_message(
+        &self,
+        error: crate::traits::ExecutionError,
+    ) -> anyhow::Result<Self::Message> {
+        let content = MessageContent::Error {
+            ename: error.name,
+            evalue: error.message,
+            traceback: error.traceback,
+        };
+
+        Ok(JupyterMessage {
+            header: MessageHeader {
+                msg_id: uuid::Uuid::new_v4().to_string(),
+                msg_type: "error".to_string(),
+                username: "kernel".to_string(),
+                session: uuid::Uuid::new_v4().to_string(), // TODO: Use actual session
+                date: chrono::Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::json!({}),
+            content,
+        })
+    }
+
+    fn handle_output(&self, ctx: &mut Self::OutputContext, output: crate::traits::OutputChunk) {
+        use crate::traits::OutputChunk;
+
+        match output {
+            OutputChunk::Stdout(text) => {
+                ctx.stdout_buffer.push(text);
+            }
+            OutputChunk::Stderr(text) => {
+                ctx.stderr_buffer.push(text);
+            }
+            OutputChunk::Result(value) => {
+                ctx.results.push(value);
+            }
+            OutputChunk::Error(error) => {
+                ctx.errors
+                    .push((error.name, error.message, error.traceback));
+            }
+        }
+    }
+
+    fn flush_output(&self, ctx: Self::OutputContext) -> Vec<(String, Self::Message)> {
+        use crate::traits::{StreamData, StreamType as TraitStreamType};
+
+        let mut messages = Vec::new();
+
+        // Flush stdout buffer
+        if !ctx.stdout_buffer.is_empty() {
+            let text = ctx.stdout_buffer.join("");
+            if !text.is_empty() {
+                if let Ok(msg) = self.create_stream_message(StreamData {
+                    stream_type: TraitStreamType::Stdout,
+                    text,
+                }) {
+                    messages.push(("iopub".to_string(), msg));
+                }
+            }
+        }
+
+        // Flush stderr buffer
+        if !ctx.stderr_buffer.is_empty() {
+            let text = ctx.stderr_buffer.join("");
+            if !text.is_empty() {
+                if let Ok(msg) = self.create_stream_message(StreamData {
+                    stream_type: TraitStreamType::Stderr,
+                    text,
+                }) {
+                    messages.push(("iopub".to_string(), msg));
+                }
+            }
+        }
+
+        // Send any results
+        for (i, value) in ctx.results.into_iter().enumerate() {
+            // Use saturating conversion to avoid overflow on 64-bit systems
+            let count = u32::try_from(i).unwrap_or(u32::MAX).saturating_add(1);
+            if let Ok(msg) = self.create_execute_result(crate::traits::ExecutionResult {
+                output: Vec::new(),
+                errors: Vec::new(),
+                result_value: Some(value),
+                execution_count: count, // TODO: Get actual count
+            }) {
+                messages.push(("iopub".to_string(), msg));
+            }
+        }
+
+        // Send any errors
+        for (name, message, traceback) in ctx.errors {
+            if let Ok(msg) = self.create_error_message(crate::traits::ExecutionError {
+                name,
+                message,
+                traceback,
+            }) {
+                messages.push(("iopub".to_string(), msg));
+            }
+        }
+
+        messages
     }
 }
 

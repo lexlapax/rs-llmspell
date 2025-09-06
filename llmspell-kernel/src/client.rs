@@ -9,8 +9,8 @@ use uuid::Uuid;
 
 use crate::connection::ConnectionInfo;
 use crate::jupyter::protocol::{JupyterMessage, MessageContent, MessageHeader, StreamType};
-use crate::traits::{Protocol, Transport, TransportConfig};
 use crate::traits::transport::ChannelConfig;
+use crate::traits::{Protocol, Transport, TransportConfig};
 
 /// Generic client for connecting to kernels
 pub struct GenericClient<T: Transport, P: Protocol> {
@@ -84,7 +84,7 @@ impl<T: Transport, P: Protocol> GenericClient<T, P> {
         config.channels.insert(
             "stdin".to_string(),
             ChannelConfig {
-                pattern: "req".to_string(),  // Use REQ for request-reply
+                pattern: "req".to_string(), // Use REQ for request-reply
                 endpoint: conn_info.stdin_port.to_string(),
             },
         );
@@ -92,7 +92,7 @@ impl<T: Transport, P: Protocol> GenericClient<T, P> {
         config.channels.insert(
             "control".to_string(),
             ChannelConfig {
-                pattern: "req".to_string(),  // Use REQ for request-reply
+                pattern: "req".to_string(), // Use REQ for request-reply
                 endpoint: conn_info.control_port.to_string(),
             },
         );
@@ -127,7 +127,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
         let mut metadata = serde_json::Map::new();
         // Add empty identity for client-initiated messages (REQ socket doesn't need routing)
         metadata.insert("__identities".to_string(), serde_json::json!([""]));
-        
+
         let msg = JupyterMessage {
             header: MessageHeader {
                 msg_id: Uuid::new_v4().to_string(),
@@ -155,36 +155,54 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
 
         let msg_id = msg.header.msg_id.clone();
 
-        // Listen to both shell and iopub channels
-        loop {
+        // Track execution state
+        let mut reply_received = false;
+        let mut idle_received = false;
+        let mut execute_reply = None;
+
+        // Listen to both shell and iopub channels until execution is complete
+        while !reply_received || !idle_received {
             // Check IOPub for output messages
             if let Some(iopub_bytes) = self.transport.recv("iopub").await? {
                 let iopub_msg = self.protocol.decode(iopub_bytes, "iopub")?;
-                
+
                 // Only process messages related to our execution
                 if let Some(parent) = &iopub_msg.parent_header {
                     if parent.msg_id == msg_id {
                         match &iopub_msg.content {
+                            MessageContent::Status { execution_state } => {
+                                // Check for idle status to know execution is complete
+                                if matches!(
+                                    execution_state,
+                                    crate::jupyter::protocol::ExecutionState::Idle
+                                ) {
+                                    idle_received = true;
+                                }
+                            }
                             MessageContent::Stream { name, text } => {
                                 // Print stream output to stdout/stderr
                                 match name {
-                                    StreamType::Stdout => print!("{}", text),
-                                    StreamType::Stderr => eprint!("{}", text),
+                                    StreamType::Stdout => print!("{text}"),
+                                    StreamType::Stderr => eprint!("{text}"),
                                 }
                             }
                             MessageContent::ExecuteResult { data, .. } => {
                                 // Handle execute results (e.g., returned values)
                                 if let Some(text_plain) = data.get("text/plain") {
                                     if let Some(text) = text_plain.as_str() {
-                                        print!("{}", text);
+                                        print!("{text}");
                                     }
                                 }
                             }
-                            MessageContent::Error { ename, evalue, traceback } => {
+                            MessageContent::Error {
+                                ename,
+                                evalue,
+                                traceback,
+                            } => {
                                 // Print errors to stderr
-                                eprintln!("{}: {}", ename, evalue);
+                                eprintln!("{ename}: {evalue}");
                                 for line in traceback {
-                                    eprintln!("{}", line);
+                                    eprintln!("{line}");
                                 }
                             }
                             _ => {} // Ignore other IOPub messages
@@ -194,13 +212,18 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
             }
 
             // Check shell channel for execute reply
-            if let Some(reply_bytes) = self.transport.recv("shell").await? {
-                let reply = self.protocol.decode(reply_bytes, "shell")?;
-                
-                // Check if this is our execute reply
-                if reply.header.msg_type == "execute_reply" {
-                    if reply.header.msg_id == msg_id {
-                        return Ok(reply.content);
+            if !reply_received {
+                if let Some(reply_bytes) = self.transport.recv("shell").await? {
+                    let reply = self.protocol.decode(reply_bytes, "shell")?;
+
+                    // Check if this is our execute reply
+                    if reply.header.msg_type == "execute_reply" {
+                        if let Some(parent) = &reply.parent_header {
+                            if parent.msg_id == msg_id {
+                                execute_reply = Some(reply.content.clone());
+                                reply_received = true;
+                            }
+                        }
                     }
                 }
             }
@@ -208,6 +231,9 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
             // Small delay to avoid busy waiting
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
+
+        // Return the execute reply content
+        execute_reply.ok_or_else(|| anyhow::anyhow!("No execute reply received"))
     }
 
     /// Request kernel information
@@ -219,7 +245,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
         // Create kernel info request with empty identity
         let mut metadata = serde_json::Map::new();
         metadata.insert("__identities".to_string(), serde_json::json!([""]));
-        
+
         let msg = JupyterMessage {
             header: MessageHeader {
                 msg_id: Uuid::new_v4().to_string(),
@@ -242,7 +268,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
         loop {
             if let Some(reply_bytes) = self.transport.recv("shell").await? {
                 let reply = self.protocol.decode(reply_bytes, "shell")?;
-                
+
                 if reply.header.msg_type == "kernel_info_reply" {
                     return Ok(reply.content);
                 }
@@ -261,7 +287,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
         // Create shutdown request with empty identity
         let mut metadata = serde_json::Map::new();
         metadata.insert("__identities".to_string(), serde_json::json!([""]));
-        
+
         let msg = JupyterMessage {
             header: MessageHeader {
                 msg_id: Uuid::new_v4().to_string(),
@@ -284,7 +310,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
         loop {
             if let Some(reply_bytes) = self.transport.recv("control").await? {
                 let reply = self.protocol.decode(reply_bytes, "control")?;
-                
+
                 if reply.header.msg_type == "shutdown_reply" {
                     return Ok(());
                 }
@@ -296,4 +322,5 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
 }
 
 // Type alias for Jupyter client
-pub type JupyterClient = GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtocol>;
+pub type JupyterClient =
+    GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtocol>;

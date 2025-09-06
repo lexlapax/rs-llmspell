@@ -17,9 +17,23 @@ use crate::{
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
 use llmspell_state_persistence::manager::StateManager;
+use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use tokio::sync::RwLock as TokioRwLock;
+
+/// Output event from script execution
+#[derive(Debug, Clone)]
+pub enum OutputEvent {
+    /// Standard output text
+    Stdout(String),
+    /// Standard error text
+    Stderr(String),
+    /// Execution result value
+    Result(Value),
+    /// Execution error
+    Error { name: String, message: String },
+}
 
 /// Central script runtime that uses `ScriptEngineBridge` abstraction
 ///
@@ -227,29 +241,86 @@ impl ScriptRuntime {
         Option<Arc<DiagnosticsBridge>>,
         Option<Arc<TokioRwLock<SharedExecutionContext>>>,
     ) {
-        tracing::info!(
-            "init_debug_infrastructure called with debug.enabled = {}, debug.mode = {}",
-            config.debug.enabled,
-            config.debug.mode
-        );
+        Self::log_debug_init_start(config);
 
         if !config.debug.enabled {
             tracing::info!("Debug not enabled, skipping debug infrastructure initialization");
             return (None, None, None, None);
         }
 
+        let components = Self::create_and_setup_debug_components(config, engine).await;
+        Self::log_debug_init_complete(&config.debug.mode);
+
+        components
+    }
+
+    fn log_debug_init_start(config: &LLMSpellConfig) {
+        tracing::info!(
+            "init_debug_infrastructure called with debug.enabled = {}, debug.mode = {}",
+            config.debug.enabled,
+            config.debug.mode
+        );
+    }
+
+    fn log_debug_init_complete(mode: &str) {
+        tracing::info!(
+            "Debug mode enabled ({}) - initialized DiagnosticsBridge, ExecutionManager, and DebugCoordinator",
+            mode
+        );
+    }
+
+    async fn create_and_setup_debug_components(
+        config: &LLMSpellConfig,
+        engine: &mut Box<dyn ScriptEngineBridge>,
+    ) -> (
+        Option<Arc<ExecutionManager>>,
+        Option<Arc<DebugCoordinator>>,
+        Option<Arc<DiagnosticsBridge>>,
+        Option<Arc<TokioRwLock<SharedExecutionContext>>>,
+    ) {
         tracing::info!("Debug enabled, initializing debug infrastructure");
 
-        // Create DiagnosticsBridge for debug output
+        // Create core debug components
+        let (diagnostics, shared_context, exec_manager) = Self::create_debug_components();
+
+        // Create and configure debug coordinator
+        let coordinator = Self::create_debug_coordinator(&exec_manager, &shared_context).await;
+
+        // Install debug hooks based on mode
+        Self::setup_and_install_debug_hooks(
+            config,
+            engine,
+            &exec_manager,
+            &coordinator,
+            &shared_context,
+            &diagnostics,
+        );
+
+        (
+            Some(exec_manager),
+            Some(coordinator),
+            Some(diagnostics),
+            Some(shared_context),
+        )
+    }
+
+    fn create_debug_components() -> (
+        Arc<DiagnosticsBridge>,
+        Arc<TokioRwLock<SharedExecutionContext>>,
+        Arc<ExecutionManager>,
+    ) {
         let diagnostics = Arc::new(DiagnosticsBridge::builder().build());
-
-        // Create SharedExecutionContext for debug state
         let shared_context = Arc::new(TokioRwLock::new(SharedExecutionContext::new()));
-
-        // Create ExecutionManager with LuaDebugStateCache
         let debug_cache = Arc::new(LuaDebugStateCache::new());
         let exec_manager = Arc::new(ExecutionManager::new(debug_cache));
 
+        (diagnostics, shared_context, exec_manager)
+    }
+
+    async fn create_debug_coordinator(
+        exec_manager: &Arc<ExecutionManager>,
+        shared_context: &Arc<TokioRwLock<SharedExecutionContext>>,
+    ) -> Arc<DebugCoordinator> {
         // Create capabilities for DebugCoordinator
         let capabilities: Arc<
             TokioRwLock<HashMap<String, Arc<dyn llmspell_core::debug::DebugCapability>>>,
@@ -267,15 +338,49 @@ impl ScriptRuntime {
             .insert("execution_manager".to_string(), adapter);
 
         // Create DebugCoordinator with ExecutionManager
-        let coordinator = Arc::new(DebugCoordinator::new(
+        Arc::new(DebugCoordinator::new(
             shared_context.clone(),
-            capabilities.clone(),
+            capabilities,
             exec_manager.clone(),
-        ));
+        ))
+    }
 
+    fn setup_and_install_debug_hooks(
+        config: &LLMSpellConfig,
+        engine: &mut Box<dyn ScriptEngineBridge>,
+        exec_manager: &Arc<ExecutionManager>,
+        coordinator: &Arc<DebugCoordinator>,
+        shared_context: &Arc<TokioRwLock<SharedExecutionContext>>,
+        diagnostics: &Arc<DiagnosticsBridge>,
+    ) {
         // Select debug hook based on mode
-        let debug_hook: Arc<dyn crate::debug_runtime::DebugHook> = match config.debug.mode.as_str()
-        {
+        let debug_hook = Self::create_debug_hook(
+            &config.debug.mode,
+            exec_manager,
+            coordinator,
+            shared_context,
+            diagnostics,
+        );
+
+        tracing::info!(
+            "Runtime: Installing debug hooks for mode: {}",
+            config.debug.mode
+        );
+        if let Err(e) = engine.install_debug_hooks(debug_hook) {
+            tracing::error!("Runtime: Failed to install debug hooks: {}", e);
+        } else {
+            tracing::info!("Runtime: Successfully installed debug hooks");
+        }
+    }
+
+    fn create_debug_hook(
+        mode: &str,
+        exec_manager: &Arc<ExecutionManager>,
+        coordinator: &Arc<DebugCoordinator>,
+        shared_context: &Arc<TokioRwLock<SharedExecutionContext>>,
+        diagnostics: &Arc<DiagnosticsBridge>,
+    ) -> Arc<dyn crate::debug_runtime::DebugHook> {
+        match mode {
             "interactive" => {
                 // Use LuaDebugHookAdapter for interactive debugging (breakpoints, stepping)
                 // This bridges Layer 1 (DebugHook) to Layer 3 (HookHandler)
@@ -292,30 +397,7 @@ impl ScriptRuntime {
                     diagnostics.clone(),
                 ))
             }
-        };
-
-        tracing::info!(
-            "Runtime: Installing debug hooks for mode: {}",
-            config.debug.mode
-        );
-        if let Err(e) = engine.install_debug_hooks(debug_hook) {
-            tracing::error!("Runtime: Failed to install debug hooks: {}", e);
-        } else {
-            tracing::info!("Runtime: Successfully installed debug hooks");
         }
-
-        // Log debug initialization
-        tracing::info!(
-            "Debug mode enabled ({}) - initialized DiagnosticsBridge, ExecutionManager, and DebugCoordinator",
-            config.debug.mode
-        );
-
-        (
-            Some(exec_manager),
-            Some(coordinator),
-            Some(diagnostics),
-            Some(shared_context),
-        )
     }
 
     /// Core initialization with any engine
@@ -399,6 +481,36 @@ impl ScriptRuntime {
     /// Returns an error if script execution fails
     pub async fn execute_script(&self, script: &str) -> Result<ScriptOutput, LLMSpellError> {
         self.engine.execute_script(script).await
+    }
+
+    /// Execute a script with output capture callback
+    ///
+    /// This method executes a script and sends output through the provided callback.
+    /// This is primarily used by the kernel to route output through the protocol layer.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if script execution fails
+    pub async fn execute_script_with_callback<F>(
+        &self,
+        script: &str,
+        mut output_callback: F,
+    ) -> Result<ScriptOutput, LLMSpellError>
+    where
+        F: FnMut(OutputEvent),
+    {
+        // Execute the script normally
+        let result = self.engine.execute_script(script).await?;
+
+        // Send console output as stdout events
+        for line in &result.console_output {
+            output_callback(OutputEvent::Stdout(line.clone()));
+        }
+
+        // Send the result value
+        output_callback(OutputEvent::Result(result.output.clone()));
+
+        Ok(result)
     }
 
     /// Execute a script with streaming output

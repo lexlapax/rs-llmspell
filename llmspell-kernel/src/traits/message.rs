@@ -52,4 +52,10 @@ pub trait KernelMessage: Send + Sync + Debug + Clone {
     fn is_event(&self) -> bool {
         !self.is_request() && !self.is_reply()
     }
+
+    /// Set parent header from JSON value
+    /// Default implementation does nothing - protocols can override
+    fn set_parent_from_json(&mut self, _parent_header: Value) {
+        // Default: no-op
+    }
 }

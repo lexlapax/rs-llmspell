@@ -564,9 +564,9 @@ impl EventFilter for RateLimitFilter {
         let now = Utc::now();
         let mut counts = self.counts.write().unwrap();
 
-        // Remove old entries
+        // Remove old entries (more than 1 second old)
         while let Some(front) = counts.front() {
-            if (now - *front).num_seconds() >= 1 {
+            if (now - *front).num_milliseconds() >= 1000 {
                 counts.pop_front();
             } else {
                 break;

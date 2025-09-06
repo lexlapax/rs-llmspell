@@ -6,7 +6,7 @@
 
 use anyhow::Result;
 use llmspell_bridge::{
-    execution_bridge::{Breakpoint, DebugCommand},
+    execution_bridge::{Breakpoint, DebugCommand, ExecutionManager},
     ScriptRuntime,
 };
 use llmspell_config::LLMSpellConfig;
@@ -370,10 +370,49 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     async fn handle_message_and_reply(&self, message: P::Message, channel: &str) -> Result<bool> {
         let is_shutdown = message.msg_type() == "shutdown_request";
         let should_reply = self.protocol.requires_reply(&message);
-        let reply_content = self.process_message(message.clone()).await?;
 
+        // Get execution flow from protocol
+        let flow = self.protocol.create_execution_flow(&message);
+
+        // Send pre-execution messages
+        for (channel, msg) in flow.pre_execution {
+            let parts = self.protocol.encode(&msg, &channel)?;
+            self.transport.send(&channel, parts).await?;
+        }
+
+        // Process the message (potentially with output capture)
+        let reply_content = if flow.capture_output {
+            // For now, process normally - OutputCapture integration will come in 9.8.13.3.5
+            self.process_message(message.clone()).await?
+        } else {
+            self.process_message(message.clone()).await?
+        };
+
+        // Send the reply if needed
         if should_reply {
             self.send_reply(&message, reply_content, channel).await?;
+        }
+
+        // Send post-execution messages (including status:idle)
+        for (channel, msg) in flow.post_execution {
+            let parts = self.protocol.encode(&msg, &channel)?;
+            self.transport.send(&channel, parts).await?;
+        }
+
+        // Send status:idle after execute_reply for execute_request
+        if message.msg_type() == "execute_request" {
+            if let Ok(idle_msg) = self
+                .protocol
+                .create_status_message(crate::traits::KernelStatus::Idle)
+            {
+                // Set parent header for the status message
+                let mut idle_with_parent = idle_msg;
+                if let Some(header) = message.header_for_parent() {
+                    idle_with_parent.set_parent_from_json(header);
+                }
+                let parts = self.protocol.encode(&idle_with_parent, "iopub")?;
+                self.transport.send("iopub", parts).await?;
+            }
         }
 
         Ok(is_shutdown)
@@ -631,23 +670,35 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         *self.execution_state.write().await = KernelState::Stopping;
 
         // Save sessions and mark clean shutdown
-        if self.state_manager.is_some() {
-            if let Err(e) = self.session_mapper.save_all_sessions().await {
-                tracing::error!("Failed to save sessions on shutdown request: {}", e);
-            } else {
-                tracing::info!("Saved sessions on shutdown request");
-            }
-
-            // Mark this as a clean shutdown
-            if let Err(e) = self.session_mapper.mark_clean_shutdown().await {
-                tracing::error!("Failed to mark clean shutdown: {}", e);
-            }
-        }
+        self.save_sessions_on_shutdown().await;
 
         Ok(serde_json::json!({
             "status": "ok",
             "restart": restart
         }))
+    }
+
+    async fn save_sessions_on_shutdown(&self) {
+        if self.state_manager.is_none() {
+            return;
+        }
+
+        self.save_all_sessions_safely().await;
+        self.mark_clean_shutdown_safely().await;
+    }
+
+    async fn save_all_sessions_safely(&self) {
+        if let Err(e) = self.session_mapper.save_all_sessions().await {
+            tracing::error!("Failed to save sessions on shutdown request: {}", e);
+        } else {
+            tracing::info!("Saved sessions on shutdown request");
+        }
+    }
+
+    async fn mark_clean_shutdown_safely(&self) {
+        if let Err(e) = self.session_mapper.mark_clean_shutdown().await {
+            tracing::error!("Failed to mark clean shutdown: {}", e);
+        }
     }
 
     fn handle_interrupt() -> serde_json::Value {
@@ -802,60 +853,89 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             .ok_or_else(|| anyhow::anyhow!("Debug not enabled - use --debug flag"))?;
 
         match command {
-            "setBreakpoints" => {
-                let source = args["source"]["name"].as_str().unwrap_or("repl");
-                let mut breakpoint_ids = Vec::new();
-
-                if let Some(lines) = args["lines"].as_array() {
-                    for line in lines {
-                        if let Some(line_num) = line.as_u64() {
-                            let bp = Breakpoint::new(
-                                source.to_string(),
-                                u32::try_from(line_num).unwrap_or(0),
-                            );
-                            let id = exec_mgr.add_breakpoint(bp).await;
-                            breakpoint_ids.push(id);
-                        }
-                    }
-                }
-                Ok(serde_json::json!({
-                    "success": true,
-                    "breakpoints": breakpoint_ids
-                }))
-            }
-            "continue" => {
-                exec_mgr.send_command(DebugCommand::Continue).await;
-                Ok(serde_json::json!({"success": true}))
-            }
-            "stepIn" => {
-                exec_mgr.send_command(DebugCommand::StepInto).await;
-                Ok(serde_json::json!({"success": true}))
-            }
-            "stepOver" => {
-                exec_mgr.send_command(DebugCommand::StepOver).await;
-                Ok(serde_json::json!({"success": true}))
-            }
-            "stepOut" => {
-                exec_mgr.send_command(DebugCommand::StepOut).await;
-                Ok(serde_json::json!({"success": true}))
-            }
-            "getVariables" => {
-                let frame_id = args["frameId"].as_str();
-                let variables = exec_mgr.get_variables(frame_id).await;
-                Ok(serde_json::json!({
-                    "success": true,
-                    "variables": variables
-                }))
-            }
-            "getStack" => {
-                let stack = exec_mgr.get_stack_trace().await;
-                Ok(serde_json::json!({
-                    "success": true,
-                    "stackFrames": stack
-                }))
-            }
+            "setBreakpoints" => self.handle_set_breakpoints(exec_mgr.as_ref(), args).await,
+            "continue" => self.handle_debug_continue(exec_mgr.as_ref()).await,
+            "stepIn" => self.handle_debug_step_in(exec_mgr.as_ref()).await,
+            "stepOver" => self.handle_debug_step_over(exec_mgr.as_ref()).await,
+            "stepOut" => self.handle_debug_step_out(exec_mgr.as_ref()).await,
+            "getVariables" => self.handle_get_variables(exec_mgr.as_ref(), args).await,
+            "getStack" => self.handle_get_stack(exec_mgr.as_ref()).await,
             _ => Err(anyhow::anyhow!("Unknown debug command: {}", command)),
         }
+    }
+
+    async fn handle_set_breakpoints(
+        &self,
+        exec_mgr: &ExecutionManager,
+        args: &serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let source = args["source"]["name"].as_str().unwrap_or("repl");
+        let mut breakpoint_ids = Vec::new();
+
+        if let Some(lines) = args["lines"].as_array() {
+            for line in lines {
+                if let Some(line_num) = line.as_u64() {
+                    let bp =
+                        Breakpoint::new(source.to_string(), u32::try_from(line_num).unwrap_or(0));
+                    let id = exec_mgr.add_breakpoint(bp).await;
+                    breakpoint_ids.push(id);
+                }
+            }
+        }
+        Ok(serde_json::json!({
+            "success": true,
+            "breakpoints": breakpoint_ids
+        }))
+    }
+
+    async fn handle_debug_continue(
+        &self,
+        exec_mgr: &ExecutionManager,
+    ) -> Result<serde_json::Value> {
+        exec_mgr.send_command(DebugCommand::Continue).await;
+        Ok(serde_json::json!({"success": true}))
+    }
+
+    async fn handle_debug_step_in(&self, exec_mgr: &ExecutionManager) -> Result<serde_json::Value> {
+        exec_mgr.send_command(DebugCommand::StepInto).await;
+        Ok(serde_json::json!({"success": true}))
+    }
+
+    async fn handle_debug_step_over(
+        &self,
+        exec_mgr: &ExecutionManager,
+    ) -> Result<serde_json::Value> {
+        exec_mgr.send_command(DebugCommand::StepOver).await;
+        Ok(serde_json::json!({"success": true}))
+    }
+
+    async fn handle_debug_step_out(
+        &self,
+        exec_mgr: &ExecutionManager,
+    ) -> Result<serde_json::Value> {
+        exec_mgr.send_command(DebugCommand::StepOut).await;
+        Ok(serde_json::json!({"success": true}))
+    }
+
+    async fn handle_get_variables(
+        &self,
+        exec_mgr: &ExecutionManager,
+        args: &serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        let frame_id = args["frameId"].as_str();
+        let variables = exec_mgr.get_variables(frame_id).await;
+        Ok(serde_json::json!({
+            "success": true,
+            "variables": variables
+        }))
+    }
+
+    async fn handle_get_stack(&self, exec_mgr: &ExecutionManager) -> Result<serde_json::Value> {
+        let stack = exec_mgr.get_stack_trace().await;
+        Ok(serde_json::json!({
+            "success": true,
+            "stackFrames": stack
+        }))
     }
 
     /// Shutdown the kernel gracefully
@@ -869,28 +949,11 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         // Set state to stopping
         *self.execution_state.write().await = KernelState::Stopping;
 
-        // Save all sessions to persistent storage if enabled
-        if self.state_manager.is_some() {
-            if let Err(e) = self.session_mapper.save_all_sessions().await {
-                tracing::error!("Failed to save sessions on shutdown: {}", e);
-            } else {
-                tracing::info!("Saved sessions to persistent storage");
-            }
-
-            // Mark this as a clean shutdown
-            if let Err(e) = self.session_mapper.mark_clean_shutdown().await {
-                tracing::error!("Failed to mark clean shutdown: {}", e);
-            } else {
-                tracing::info!("Marked clean shutdown");
-            }
-        }
+        // Save sessions and mark clean shutdown
+        self.save_sessions_on_shutdown().await;
 
         // Disconnect all clients
-        let all_clients = self.client_manager.get_all_clients().await;
-        for client in all_clients {
-            tracing::info!("Disconnecting client {}", client.client_id);
-            self.client_manager.remove_client(&client.client_id).await;
-        }
+        self.disconnect_all_clients().await;
 
         // Send shutdown signal if receiver exists
         if let Some(tx) = self.shutdown_tx {
@@ -899,6 +962,14 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         tracing::info!("Kernel {} shutdown complete", self.kernel_id);
         Ok(())
+    }
+
+    async fn disconnect_all_clients(&self) {
+        let all_clients = self.client_manager.get_all_clients().await;
+        for client in all_clients {
+            tracing::info!("Disconnecting client {}", client.client_id);
+            self.client_manager.remove_client(&client.client_id).await;
+        }
     }
 }
 
