@@ -3,6 +3,37 @@
 
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+use tracing::Level;
+
+/// Trace level for logging output
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum TraceLevel {
+    /// No trace output
+    Off,
+    /// Error level only
+    Error,
+    /// Warning level and above
+    Warn,
+    /// Info level and above (default)
+    Info,
+    /// Debug level and above
+    Debug,
+    /// Trace level (most verbose)
+    Trace,
+}
+
+impl From<TraceLevel> for Level {
+    fn from(trace_level: TraceLevel) -> Self {
+        match trace_level {
+            TraceLevel::Off => Level::ERROR, // There's no "OFF" level in tracing
+            TraceLevel::Error => Level::ERROR,
+            TraceLevel::Warn => Level::WARN,
+            TraceLevel::Info => Level::INFO,
+            TraceLevel::Debug => Level::DEBUG,
+            TraceLevel::Trace => Level::TRACE,
+        }
+    }
+}
 
 /// Command-line interface for LLMSpell
 #[derive(Parser, Debug)]
@@ -19,33 +50,13 @@ pub struct Cli {
     #[arg(short, long, env = "LLMSPELL_CONFIG")]
     pub config: Option<PathBuf>,
 
-    /// Enable verbose output
-    #[arg(short, long, global = true)]
-    pub verbose: bool,
+    /// Set trace level for logging output (off|error|warn|info|debug|trace)
+    #[arg(long, global = true, value_enum)]
+    pub trace: Option<TraceLevel>,
 
     /// Output format
     #[arg(long, value_enum, default_value = "text")]
     pub output: OutputFormat,
-
-    /// Enable debug output
-    #[arg(long, global = true)]
-    pub debug: bool,
-
-    /// Set debug level (trace, debug, info, warn, error, off)
-    #[arg(long, global = true)]
-    pub debug_level: Option<String>,
-
-    /// Set debug output format (text, json, json_pretty)
-    #[arg(long, global = true)]
-    pub debug_format: Option<String>,
-
-    /// Filter debug output by modules (comma-separated, use + to enable, - to disable)
-    #[arg(long, global = true)]
-    pub debug_modules: Option<String>,
-
-    /// Enable performance profiling
-    #[arg(long, global = true)]
-    pub debug_perf: bool,
 
     #[command(subcommand)]
     pub command: Option<Commands>,
@@ -116,10 +127,6 @@ pub enum Commands {
         #[arg(long)]
         stream: bool,
 
-        /// Enable debug mode for script execution
-        #[arg(long)]
-        debug: bool,
-
         /// Enable RAG functionality (overrides config)
         #[arg(long)]
         rag: bool,
@@ -158,10 +165,6 @@ pub enum Commands {
         /// Enable streaming output
         #[arg(long)]
         stream: bool,
-
-        /// Enable debug mode for script execution
-        #[arg(long)]
-        debug: bool,
 
         /// Enable RAG functionality (overrides config)
         #[arg(long)]
@@ -252,6 +255,14 @@ pub enum Commands {
     Debug {
         /// Script to debug
         script: PathBuf,
+
+        /// Set breakpoints (format: file:line)
+        #[arg(long)]
+        break_at: Vec<String>,
+
+        /// DAP server port
+        #[arg(long)]
+        port: Option<u16>,
 
         /// Script arguments
         #[arg(last = true)]

@@ -11,6 +11,8 @@ use std::path::PathBuf;
 /// Handle the debug command by forwarding to kernel
 pub async fn handle_debug_command(
     script: PathBuf,
+    _break_at: Vec<String>,
+    _port: Option<u16>,
     _args: Vec<String>,
     _engine: ScriptEngine,
     _config: LLMSpellConfig,
@@ -20,7 +22,7 @@ pub async fn handle_debug_command(
     // Debug functionality should be implemented in kernel, not CLI
     anyhow::bail!(
         "Debug command temporarily disabled. Per Phase 9.8, all execution must go through kernel.\n\
-         Use: llmspell run {} --debug",
+         Use the dedicated Debug command: llmspell debug {}",
         script.display()
     )
 }

@@ -79,7 +79,6 @@ pub async fn execute_command(
             script,
             connect,
             stream,
-            debug,
             rag,
             no_rag,
             rag_config,
@@ -106,7 +105,7 @@ pub async fn execute_command(
                 stream,
                 args,
                 output_format,
-                debug,
+                false, // debug mode removed - use dedicated Debug command
             )
             .await
         }
@@ -114,7 +113,6 @@ pub async fn execute_command(
             code,
             connect,
             stream,
-            debug,
             rag,
             no_rag,
             rag_config,
@@ -138,7 +136,7 @@ pub async fn execute_command(
                 runtime_config,
                 connect,
                 stream,
-                debug,
+                false, // debug mode removed - use dedicated Debug command
                 output_format,
             )
             .await
@@ -160,9 +158,14 @@ pub async fn execute_command(
             apps::execute_apps_command(app, engine, runtime_config, output_format).await
         }
         Commands::Setup { force } => setup::run_interactive_setup(force).await,
-        Commands::Debug { script, args } => {
+        Commands::Debug {
+            script,
+            break_at,
+            port,
+            args,
+        } => {
             // Use dedicated DebugBridge architecture for debug command
-            debug::handle_debug_command(script, args, engine, runtime_config, output_format).await
+            debug::handle_debug_command(script, break_at, port, args, engine, runtime_config, output_format).await
         }
         Commands::Kernel {
             port,

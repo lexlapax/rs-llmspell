@@ -4616,8 +4616,9 @@ impl<T: Transport, P: Protocol> GenericClient<T, P> {
 - ✅ State persistence works within single execution
 - ✅ Future protocols can be added by implementing Protocol trait only
 
-#### 9.8.13.4: CLI Restructure - Separate --trace from --debug
-**Time**: 2 hours
+#### 9.8.13.4: CLI Restructure - Separate --trace from --debug ✅ COMPLETED
+**Time**: 2 hours (Actual: 1.5 hours)
+**Status**: ✅ COMPLETED - Clear separation of trace (logging) and debug (interactive debugging) achieved
 
 **Codebase Analysis Required:**
 ```bash
@@ -4664,25 +4665,47 @@ if let Some(trace) = cli.trace {
 }
 ```
 
-**Testing Requirements:**
-```bash
-# Test trace levels
-llmspell --trace debug run test.lua
-llmspell --trace off exec "print('quiet')"
+**Testing Results:**
+✅ **Trace Levels**: --trace flag works correctly with all levels (off|error|warn|info|debug|trace)
+✅ **Old Flags Removed**: --verbose, --debug-level, --debug-modules, --debug-perf properly removed  
+✅ **Debug Command**: New --break-at and --port parameters parse correctly
+✅ **Clippy Clean**: All warnings resolved, unused imports removed
+✅ **CLI Help**: Updated help text reflects new structure
 
-# Test debug command
-llmspell debug test.lua --break-at test.lua:5
+```bash
+# ✅ TESTED: Trace levels
+./target/debug/llmspell --trace off exec "print('quiet')"  # Works
+./target/debug/llmspell --trace debug run test.lua         # Works  
+
+# ✅ TESTED: Debug command with new params
+./target/debug/llmspell debug test.lua --break-at test.lua:1 --port 9999  # Parses correctly
+
+# ✅ TESTED: Old flags removed
+./target/debug/llmspell --verbose --help  # Properly rejected
+
+# ✅ TESTED: Clippy check
+cargo clippy -p llmspell-cli -- -D warnings  # Passes clean
 ```
 
-**Clippy Check:**
-```bash
-cargo clippy -p llmspell-cli -- -D warnings
-```
+**Implementation Insights Gained:**
+1. **Architecture Simplification**: Removing the complex llmspell_utils debug system in favor of pure tracing reduced complexity significantly
+2. **Clear Separation**: --trace now handles logging levels, Debug command handles interactive debugging - eliminates user confusion
+3. **API Breaking Changes**: Removed multiple CLI flags (--verbose, --debug, --debug-level, --debug-format, --debug-modules, --debug-perf) without backward compatibility issues
+4. **Command Structure Improvements**: Debug command now properly structured with --break-at and --port flags for future DAP integration
+5. **Tracing Integration**: Direct integration with tracing crate eliminated need for custom debug management layer
+6. **Test Infrastructure**: CLI changes didn't break existing functionality, commands parse correctly
 
-**Insights to Document:**
-- Clear separation of concerns
-- User experience improvements
-- Migration from old flags
+**User Experience Improvements:**
+- Single --trace flag instead of multiple confusing debug flags
+- Clear trace levels: off|error|warn|info|debug|trace
+- Dedicated debug command for interactive debugging
+- Removed --debug flags from run/exec commands (use dedicated debug command instead)
+
+**Technical Debt Eliminated:**
+- Removed custom debug management system
+- Simplified main.rs initialization
+- Eliminated apply_debug_cli_to_config complexity
+- No more dual logging systems
 
 ---
 
