@@ -269,19 +269,51 @@ pub enum Commands {
         args: Vec<String>,
     },
 
-    /// Start kernel server for Jupyter protocol
+    /// Manage kernel servers
     Kernel {
+        #[command(subcommand)]
+        command: KernelCommands,
+    },
+}
+
+/// Kernel management subcommands
+#[derive(Subcommand, Debug)]
+pub enum KernelCommands {
+    /// Start a kernel server
+    Start {
         /// Port to listen on
         #[arg(short, long, default_value = "9555")]
         port: u16,
-
+        
+        /// Run as daemon (background process)
+        #[arg(long)]
+        daemon: bool,
+        
         /// Kernel ID (generated if not provided)
         #[arg(short = 'i', long)]
         id: Option<String>,
-
+        
         /// Connection file path (for Jupyter discovery)
         #[arg(short = 'f', long)]
         connection_file: Option<PathBuf>,
+    },
+    
+    /// Stop a running kernel
+    Stop {
+        /// Kernel ID to stop (if not provided, stops all kernels)
+        id: Option<String>,
+    },
+    
+    /// Show kernel status
+    Status {
+        /// Kernel ID for detailed status (if not provided, lists all kernels)
+        id: Option<String>,
+    },
+    
+    /// Connect to an existing kernel
+    Connect {
+        /// Kernel address (e.g., "localhost:9555" or "/path/to/connection.json")
+        address: String,
     },
 }
 
