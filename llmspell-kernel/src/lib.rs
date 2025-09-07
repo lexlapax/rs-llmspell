@@ -29,6 +29,7 @@ pub mod client;
 pub mod client_handler;
 pub mod comm_handler;
 pub mod connection;
+pub mod dap_bridge;
 pub mod discovery;
 pub mod kernel;
 pub mod security;

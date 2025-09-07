@@ -871,14 +871,23 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         &self,
         content: serde_json::Value,
     ) -> Result<serde_json::Value> {
-        let command = content["command"].as_str().unwrap_or("");
-        let args = &content["arguments"];
-
         // Access ExecutionManager through ScriptRuntime
         let runtime = self.runtime.lock().await;
         let exec_mgr = runtime
             .get_execution_manager()
             .ok_or_else(|| anyhow::anyhow!("Debug not enabled - use --debug flag"))?;
+
+        // Use DAP bridge for standard DAP protocol support
+        let dap_bridge = crate::dap_bridge::DAPBridge::new(exec_mgr.clone());
+        
+        // If this looks like a DAP request, use the bridge
+        if content.get("type").and_then(|t| t.as_str()) == Some("request") {
+            return dap_bridge.handle_request(content).await;
+        }
+        
+        // Otherwise fall back to legacy command handling for backward compatibility
+        let command = content["command"].as_str().unwrap_or("");
+        let args = &content["arguments"];
 
         match command {
             "setBreakpoints" => self.handle_set_breakpoints(exec_mgr.as_ref(), args).await,

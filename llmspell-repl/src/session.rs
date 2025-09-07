@@ -151,7 +151,7 @@ impl ReplSession {
             ".continue" if self.config.enable_debug_commands => {
                 self.handle_continue_command().await
             }
-            ".locals" if self.config.enable_debug_commands => Ok(self.handle_locals_command()),
+            ".locals" if self.config.enable_debug_commands => self.handle_locals_command().await,
             ".stack" if self.config.enable_debug_commands => self.handle_stack_command().await,
             ".watch" if self.config.enable_debug_commands => Ok(Self::handle_watch_command(&parts)),
 
@@ -214,14 +214,45 @@ impl ReplSession {
     }
 
     /// Handle locals command
-    fn handle_locals_command(&self) -> ReplResponse {
-        self.kernel.execution_manager().map_or_else(
-            || ReplResponse::Error("Execution manager not available".to_string()),
-            |_exec_mgr| {
-                // TODO: Get variables from execution manager
-                ReplResponse::Info("Local variables: (not yet implemented)".to_string())
-            },
-        )
+    async fn handle_locals_command(&mut self) -> Result<ReplResponse> {
+        // Create DAP request for variables
+        let dap_request = serde_json::json!({
+            "seq": 1,
+            "type": "request",
+            "command": "variables",
+            "arguments": {
+                "variablesReference": 1000,  // 1000 = locals for current frame
+            }
+        });
+        
+        let response = self.kernel.send_debug_command(dap_request).await?;
+        
+        // Check if request was successful
+        if response.get("success").and_then(|s| s.as_bool()) != Some(true) {
+            let error_msg = response.get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Failed to get variables");
+            return Ok(ReplResponse::Error(error_msg.to_string()));
+        }
+        
+        // Extract variables from response
+        let variables = response["body"]["variables"]
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
+        
+        if variables.is_empty() {
+            return Ok(ReplResponse::Info("No local variables in current scope".to_string()));
+        }
+        
+        let mut output = String::from("Local variables:\n");
+        for var in variables {
+            let name = var["name"].as_str().unwrap_or("?");
+            let value = var["value"].as_str().unwrap_or("?");
+            let var_type = var["type"].as_str().unwrap_or("unknown");
+            output.push_str(&format!("  {} = {} ({})\n", name, value, var_type));
+        }
+        
+        Ok(ReplResponse::Info(output))
     }
 
     /// Handle stack command
