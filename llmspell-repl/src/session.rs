@@ -6,6 +6,7 @@
 use anyhow::Result;
 use serde_json::Value;
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::time::Instant;
 
 /// Trait for kernel connections (will be provided by llmspell-cli's `kernel_client`)
@@ -152,6 +153,10 @@ impl ReplSession {
                 self.handle_continue_command().await
             }
             ".locals" if self.config.enable_debug_commands => self.handle_locals_command().await,
+            ".globals" if self.config.enable_debug_commands => self.handle_globals_command().await,
+            ".upvalues" if self.config.enable_debug_commands => {
+                self.handle_upvalues_command().await
+            }
             ".stack" if self.config.enable_debug_commands => self.handle_stack_command().await,
             ".watch" if self.config.enable_debug_commands => Ok(Self::handle_watch_command(&parts)),
 
@@ -224,34 +229,158 @@ impl ReplSession {
                 "variablesReference": 1000,  // 1000 = locals for current frame
             }
         });
-        
+
         let response = self.kernel.send_debug_command(dap_request).await?;
-        
+
         // Check if request was successful
-        if response.get("success").and_then(|s| s.as_bool()) != Some(true) {
-            let error_msg = response.get("message")
+        if response.get("success").and_then(serde_json::Value::as_bool) != Some(true) {
+            let error_msg = response
+                .get("message")
                 .and_then(|m| m.as_str())
                 .unwrap_or("Failed to get variables");
             return Ok(ReplResponse::Error(error_msg.to_string()));
         }
-        
+
         // Extract variables from response
         let variables = response["body"]["variables"]
             .as_array()
             .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
-        
+
         if variables.is_empty() {
-            return Ok(ReplResponse::Info("No local variables in current scope".to_string()));
+            return Ok(ReplResponse::Info(
+                "No local variables in current scope".to_string(),
+            ));
         }
-        
+
         let mut output = String::from("Local variables:\n");
         for var in variables {
             let name = var["name"].as_str().unwrap_or("?");
             let value = var["value"].as_str().unwrap_or("?");
             let var_type = var["type"].as_str().unwrap_or("unknown");
-            output.push_str(&format!("  {} = {} ({})\n", name, value, var_type));
+
+            // Handle special characters in variable names
+            let formatted_name = if name.contains(|c: char| !c.is_alphanumeric() && c != '_')
+                || name.chars().next().is_some_and(char::is_numeric)
+            {
+                // Quote names with special characters or starting with numbers
+                format!("[\"{}\"]", name.replace('\\', "\\\\").replace('"', "\\\""))
+            } else {
+                name.to_string()
+            };
+
+            writeln!(output, "  {formatted_name} = {value} ({var_type})").unwrap();
         }
-        
+
+        Ok(ReplResponse::Info(output))
+    }
+
+    /// Handle globals command
+    async fn handle_globals_command(&mut self) -> Result<ReplResponse> {
+        // Create DAP request for global variables
+        let dap_request = serde_json::json!({
+            "seq": 1,
+            "type": "request",
+            "command": "variables",
+            "arguments": {
+                "variablesReference": 2000,  // 2000 = globals for current frame
+            }
+        });
+
+        let response = self.kernel.send_debug_command(dap_request).await?;
+
+        // Check if request was successful
+        if response.get("success").and_then(serde_json::Value::as_bool) != Some(true) {
+            let error_msg = response
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Failed to get global variables");
+            return Ok(ReplResponse::Error(error_msg.to_string()));
+        }
+
+        // Extract variables from response
+        let variables = response["body"]["variables"]
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
+
+        if variables.is_empty() {
+            return Ok(ReplResponse::Info("No global variables".to_string()));
+        }
+
+        let mut output = String::from("Global variables:\n");
+        for var in variables {
+            let name = var["name"].as_str().unwrap_or("?");
+            let value = var["value"].as_str().unwrap_or("?");
+            let var_type = var["type"].as_str().unwrap_or("unknown");
+
+            // Handle special characters in variable names
+            let formatted_name = if name.contains(|c: char| !c.is_alphanumeric() && c != '_')
+                || name.chars().next().is_some_and(char::is_numeric)
+            {
+                // Quote names with special characters or starting with numbers
+                format!("[\"{}\"]", name.replace('\\', "\\\\").replace('"', "\\\""))
+            } else {
+                name.to_string()
+            };
+
+            writeln!(output, "  {formatted_name} = {value} ({var_type})").unwrap();
+        }
+
+        Ok(ReplResponse::Info(output))
+    }
+
+    /// Handle upvalues command
+    async fn handle_upvalues_command(&mut self) -> Result<ReplResponse> {
+        // Create DAP request for upvalues/closure variables
+        let dap_request = serde_json::json!({
+            "seq": 1,
+            "type": "request",
+            "command": "variables",
+            "arguments": {
+                "variablesReference": 3000,  // 3000 = upvalues for current frame
+            }
+        });
+
+        let response = self.kernel.send_debug_command(dap_request).await?;
+
+        // Check if request was successful
+        if response.get("success").and_then(serde_json::Value::as_bool) != Some(true) {
+            let error_msg = response
+                .get("message")
+                .and_then(|m| m.as_str())
+                .unwrap_or("Failed to get upvalues");
+            return Ok(ReplResponse::Error(error_msg.to_string()));
+        }
+
+        // Extract variables from response
+        let variables = response["body"]["variables"]
+            .as_array()
+            .ok_or_else(|| anyhow::anyhow!("Invalid response format"))?;
+
+        if variables.is_empty() {
+            return Ok(ReplResponse::Info(
+                "No upvalues in current scope".to_string(),
+            ));
+        }
+
+        let mut output = String::from("Upvalues (closure variables):\n");
+        for var in variables {
+            let name = var["name"].as_str().unwrap_or("?");
+            let value = var["value"].as_str().unwrap_or("?");
+            let var_type = var["type"].as_str().unwrap_or("unknown");
+
+            // Handle special characters in variable names
+            let formatted_name = if name.contains(|c: char| !c.is_alphanumeric() && c != '_')
+                || name.chars().next().is_some_and(char::is_numeric)
+            {
+                // Quote names with special characters or starting with numbers
+                format!("[\"{}\"]", name.replace('\\', "\\\\").replace('"', "\\\""))
+            } else {
+                name.to_string()
+            };
+
+            writeln!(output, "  {formatted_name} = {value} ({var_type})").unwrap();
+        }
+
         Ok(ReplResponse::Info(output))
     }
 
@@ -351,6 +480,8 @@ impl ReplSession {
                 "  .step              - Step to next line",
                 "  .continue          - Continue execution",
                 "  .locals            - Show local variables",
+                "  .globals           - Show global variables",
+                "  .upvalues          - Show closure variables",
                 "  .stack             - Show call stack",
                 "  .watch <expr>      - Watch expression",
             ]);

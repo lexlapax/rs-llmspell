@@ -34,8 +34,18 @@ pub struct WireProtocol {
     signing_key: String,
 }
 
-/// Helper struct for message parts
-struct MessageParts {
+/// Helper struct for extracted message parts during decoding
+struct ExtractedParts<'a> {
+    identities: Vec<Vec<u8>>,
+    hmac: &'a [u8],
+    header: &'a [u8],
+    parent_header: &'a [u8],
+    metadata: &'a [u8],
+    content: &'a [u8],
+}
+
+/// Helper struct for serialized message parts during encoding
+struct SerializedParts {
     header: Vec<u8>,
     parent_header: Vec<u8>,
     metadata: Vec<u8>,
@@ -54,9 +64,11 @@ impl WireProtocol {
     /// # Errors
     ///
     /// Returns an error if the message format is invalid or HMAC verification fails.
-    pub fn decode_message(&self, parts: &[Vec<u8>], channel: &str) -> Result<JupyterMessage> {
-        tracing::debug!("Decoding {} parts on {} channel", parts.len(), channel);
-
+    /// Extract message parts from ZMQ multipart message
+    fn extract_message_parts<'a>(
+        parts: &'a [Vec<u8>],
+        channel: &str,
+    ) -> Result<ExtractedParts<'a>> {
         if parts.len() < 4 {
             return Err(anyhow::anyhow!(
                 "Invalid message format on {} channel",
@@ -65,69 +77,44 @@ impl WireProtocol {
         }
 
         // Find the delimiter (<IDS|MSG>)
-        let mut delim_idx = None;
-        for (i, part) in parts.iter().enumerate() {
-            if part == b"<IDS|MSG>" {
-                delim_idx = Some(i);
-                break;
-            }
-        }
-
-        let Some(delim_idx) = delim_idx else {
-            return Err(anyhow::anyhow!(
-                "No delimiter found in message on {} channel",
-                channel
-            ));
-        };
+        let delim_idx = parts
+            .iter()
+            .position(|part| part == b"<IDS|MSG>")
+            .ok_or_else(|| {
+                anyhow::anyhow!("No delimiter found in message on {} channel", channel)
+            })?;
 
         if delim_idx + 5 >= parts.len() {
             return Err(anyhow::anyhow!("Incomplete message on {} channel", channel));
         }
 
-        // Extract identities (everything before delimiter)
-        let identities: Vec<Vec<u8>> = parts[..delim_idx].to_vec();
-
-        // Extract message parts after delimiter
+        let identities = parts[..delim_idx].to_vec();
         let received_hmac = &parts[delim_idx + 1];
         let header = &parts[delim_idx + 2];
         let parent_header = &parts[delim_idx + 3];
         let metadata = &parts[delim_idx + 4];
         let content = &parts[delim_idx + 5];
 
-        // Verify HMAC signature
-        let expected_hmac = self.calculate_hmac(&[header, parent_header, metadata, content]);
-        if !self.verify_hmac_signature(received_hmac, &expected_hmac) {
-            return Err(anyhow::anyhow!(
-                "HMAC signature verification failed on {} channel",
-                channel
-            ));
-        }
+        Ok(ExtractedParts {
+            identities,
+            hmac: received_hmac,
+            header,
+            parent_header,
+            metadata,
+            content,
+        })
+    }
 
-        // Deserialize header
-        let header: MessageHeader =
-            serde_json::from_slice(header).context("Failed to deserialize header")?;
-
-        // Handle parent_header - Jupyter sends {} for empty parent
-        let parent_header: Option<MessageHeader> =
-            if parent_header.is_empty() || parent_header == b"{}" {
-                None
-            } else {
-                Some(
-                    serde_json::from_slice(parent_header)
-                        .context("Failed to deserialize parent_header")?,
-                )
-            };
-
-        // Deserialize metadata
-        let mut metadata: Value =
-            serde_json::from_slice(metadata).context("Failed to deserialize metadata")?;
-
-        // Store identities in metadata for reply routing (temporary hack)
+    /// Process and store routing identities in metadata
+    fn process_identities(identities: &[Vec<u8>], metadata: &mut Value, channel: &str) {
         if identities.is_empty() {
-            tracing::warn!(
-                "No identities found in received message on {} channel",
-                channel
-            );
+            // Only warn for channels that require identities (ROUTER pattern)
+            if channel != "iopub" && channel != "heartbeat" {
+                tracing::warn!(
+                    "No identities found in received message on {} channel",
+                    channel
+                );
+            }
         } else {
             let hex_identities: Vec<String> = identities.iter().map(hex::encode).collect();
             tracing::info!(
@@ -137,9 +124,57 @@ impl WireProtocol {
             );
             metadata["__identities"] = serde_json::json!(hex_identities);
         }
+    }
+
+    /// Decode a ZMQ multipart message into a `JupyterMessage`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message format is invalid or HMAC verification fails.
+    pub fn decode_message(&self, parts: &[Vec<u8>], channel: &str) -> Result<JupyterMessage> {
+        tracing::debug!("Decoding {} parts on {} channel", parts.len(), channel);
+
+        // Extract message parts
+        let extracted = Self::extract_message_parts(parts, channel)?;
+
+        // Verify HMAC signature
+        let expected_hmac = self.calculate_hmac(&[
+            extracted.header,
+            extracted.parent_header,
+            extracted.metadata,
+            extracted.content,
+        ]);
+        if !self.verify_hmac_signature(extracted.hmac, &expected_hmac) {
+            return Err(anyhow::anyhow!(
+                "HMAC signature verification failed on {} channel",
+                channel
+            ));
+        }
+
+        // Deserialize header
+        let header: MessageHeader =
+            serde_json::from_slice(extracted.header).context("Failed to deserialize header")?;
+
+        // Handle parent_header - Jupyter sends {} for empty parent
+        let parent_header: Option<MessageHeader> =
+            if extracted.parent_header.is_empty() || extracted.parent_header == b"{}" {
+                None
+            } else {
+                Some(
+                    serde_json::from_slice(extracted.parent_header)
+                        .context("Failed to deserialize parent_header")?,
+                )
+            };
+
+        // Deserialize metadata
+        let mut metadata: Value =
+            serde_json::from_slice(extracted.metadata).context("Failed to deserialize metadata")?;
+
+        // Process and store identities
+        Self::process_identities(&extracted.identities, &mut metadata, channel);
 
         // Deserialize content based on msg_type
-        let content = Self::deserialize_content(&header.msg_type, content)
+        let content = Self::deserialize_content(&header.msg_type, extracted.content)
             .context("Failed to deserialize content")?;
 
         Ok(JupyterMessage {
@@ -222,7 +257,7 @@ impl WireProtocol {
         }
     }
 
-    fn serialize_message_components(msg: &JupyterMessage) -> Result<MessageParts> {
+    fn serialize_message_components(msg: &JupyterMessage) -> Result<SerializedParts> {
         let header = serde_json::to_vec(&msg.header).context("Failed to serialize header")?;
 
         let parent_header = match &msg.parent_header {
@@ -233,7 +268,7 @@ impl WireProtocol {
         let metadata = Self::serialize_clean_metadata(&msg.metadata)?;
         let content = serde_json::to_vec(&msg.content).context("Failed to serialize content")?;
 
-        Ok(MessageParts {
+        Ok(SerializedParts {
             header,
             parent_header,
             metadata,

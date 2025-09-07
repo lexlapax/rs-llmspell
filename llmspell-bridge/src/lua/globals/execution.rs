@@ -434,17 +434,12 @@ impl LuaExecutionHook {
             column: None,
         };
 
-        // Capture stack trace
-        let stack_options = StackTraceOptions {
-            max_depth: 20,
-            capture_locals: true,
-            capture_upvalues: false,
-            include_source: true,
-        };
+        // Capture comprehensive debug information
+        let stack_options = StackTraceOptions::for_debug();
         let stack_trace = capture_stack_trace(lua, &stack_options);
         let stack_frames = stack_trace.frames.clone();
 
-        // Extract variables
+        // Extract local variables from first frame
         let mut variables = HashMap::new();
         if let Some(first_frame) = stack_trace.frames.first() {
             for local in &first_frame.locals {
@@ -452,6 +447,19 @@ impl LuaExecutionHook {
                 variables.insert(local.name.clone(), json_value);
             }
         }
+
+        // Capture globals and upvalues separately for proper caching
+        let globals = if stack_options.capture.globals {
+            crate::lua::output::capture_globals(lua).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+
+        let upvalues = if stack_options.capture.upvalues {
+            crate::lua::output::capture_upvalues(lua, 2).unwrap_or_default() // Level 2 for current function
+        } else {
+            Vec::new()
+        };
 
         // Update context and set paused state
         let shared_ctx = self.shared_context.clone();
@@ -491,6 +499,22 @@ impl LuaExecutionHook {
                 });
                 drop(ctx);
 
+                // Cache all variable types in ExecutionManager
+                // This is language-specific caching done by Lua engine
+                exec_mgr.cache_global_variables(globals).await;
+
+                // Cache locals for each frame
+                for frame in &stack_frames {
+                    exec_mgr
+                        .cache_variables(frame.id.clone(), frame.locals.clone())
+                        .await;
+                }
+
+                // Cache upvalues for current frame
+                if let Some(frame) = stack_frames.first() {
+                    exec_mgr.cache_upvalues(frame.id.clone(), upvalues).await;
+                }
+
                 // Set paused state with Step reason
                 exec_mgr
                     .set_state(DebugState::Paused {
@@ -521,13 +545,8 @@ impl LuaExecutionHook {
             column: None,
         };
 
-        // Capture comprehensive stack trace using output.rs
-        let stack_options = StackTraceOptions {
-            max_depth: 20,
-            capture_locals: true,
-            capture_upvalues: false,
-            include_source: true,
-        };
+        // Capture comprehensive debug information
+        let stack_options = StackTraceOptions::for_debug();
         let stack_trace = capture_stack_trace(lua, &stack_options);
 
         // Use stack frames directly from capture_stack_trace
@@ -542,6 +561,10 @@ impl LuaExecutionHook {
                 variables.insert(local.name.clone(), json_value);
             }
         }
+
+        // Capture globals and upvalues separately for proper caching
+        let globals = crate::lua::output::capture_globals(lua).unwrap_or_default();
+        let upvalues = crate::lua::output::capture_upvalues(lua, 2).unwrap_or_default();
 
         // Update shared context and suspend (but don't block waiting for resume)
         let shared_ctx = self.shared_context.clone();
@@ -584,6 +607,21 @@ impl LuaExecutionHook {
 
                 let context_clone = ctx.clone();
                 drop(ctx); // Release the lock before suspension
+
+                // Cache all variable types in ExecutionManager (language-specific caching)
+                exec_mgr.cache_global_variables(globals).await;
+
+                // Cache locals for each frame
+                for frame in &stack_frames {
+                    exec_mgr
+                        .cache_variables(frame.id.clone(), frame.locals.clone())
+                        .await;
+                }
+
+                // Cache upvalues for current frame
+                if let Some(frame) = stack_frames.first() {
+                    exec_mgr.cache_upvalues(frame.id.clone(), upvalues).await;
+                }
 
                 // Suspend with enriched context (sets paused state but doesn't block)
                 exec_mgr

@@ -354,6 +354,49 @@ impl ExecutionManager {
         }
     }
 
+    /// Get global variables from the current execution context
+    ///
+    /// This is language-neutral - it simply returns whatever was cached
+    /// as "globals" by the language-specific implementation
+    pub async fn get_global_variables(&self) -> Vec<Variable> {
+        // Return whatever the language implementation cached as globals
+        // The language engine is responsible for determining what constitutes a global
+        self.get_cached_variables("globals")
+            .await
+            .unwrap_or_default()
+    }
+
+    /// Get upvalues (closure variables) for a specific frame
+    pub async fn get_upvalues(&self, frame_id: Option<&str>) -> Vec<Variable> {
+        // Construct upvalues frame ID
+        let upvalues_frame_id = frame_id.map_or_else(
+            || "current_upvalues".to_string(),
+            |frame| format!("{frame}_upvalues"),
+        );
+
+        // Get cached upvalues for this frame
+        self.get_cached_variables(&upvalues_frame_id)
+            .await
+            .unwrap_or_default()
+    }
+
+    /// Cache global variables separately
+    pub async fn cache_global_variables(&self, globals: Vec<Variable>) {
+        self.variables
+            .write()
+            .await
+            .insert("globals".to_string(), globals);
+    }
+
+    /// Cache upvalues for a specific frame
+    pub async fn cache_upvalues(&self, frame_id: String, upvalues: Vec<Variable>) {
+        let upvalues_frame_id = format!("{frame_id}_upvalues");
+        self.variables
+            .write()
+            .await
+            .insert(upvalues_frame_id, upvalues);
+    }
+
     /// Evaluate expression (interactive debugging support)
     #[must_use]
     pub fn evaluate(&self, expression: &str, _frame_id: Option<&str>) -> Variable {

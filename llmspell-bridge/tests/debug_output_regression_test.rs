@@ -117,8 +117,11 @@ fn test_stack_trace_quality() {
     // Capture current stack trace
     let stack_options = StackTraceOptions {
         max_depth: 10,
-        capture_locals: true,
-        capture_upvalues: false,
+        capture: llmspell_bridge::lua::output::CaptureConfig {
+            locals: true,
+            upvalues: false,
+            globals: false,
+        },
         include_source: true,
     };
     let stack_trace = capture_stack_trace(&lua, &stack_options);

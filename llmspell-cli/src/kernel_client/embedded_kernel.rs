@@ -245,10 +245,40 @@ impl KernelConnectionTrait for EmbeddedKernel {
         }))
     }
 
-    async fn send_debug_command(&mut self, _command: Value) -> Result<Value> {
-        // Debug commands not yet supported in embedded kernel
-        // Would need to be routed through ZeroMQ
-        anyhow::bail!("Debug commands not yet supported in embedded kernel")
+    async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
+        // Route debug command through the Jupyter client
+        let client = self
+            .client
+            .as_mut()
+            .ok_or_else(|| anyhow::anyhow!("Kernel client not connected"))?;
+
+        // Send debug request and get reply
+        let reply = client.debug_request(command).await?;
+
+        // Convert MessageContent to Value
+        // The debug_reply content should already be the DAP response
+        match reply {
+            llmspell_kernel::jupyter::protocol::MessageContent::DebugReply {
+                body,
+                success,
+                command: _,
+                request_seq: _,
+                seq: _,
+                message,
+            } => {
+                if !success {
+                    if let Some(msg) = message {
+                        anyhow::bail!("Debug request failed: {}", msg);
+                    } else {
+                        anyhow::bail!("Debug request failed");
+                    }
+                }
+                Ok(body.unwrap_or_else(|| serde_json::json!({})))
+            }
+            _ => {
+                anyhow::bail!("Unexpected reply type from debug request")
+            }
+        }
     }
 
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {

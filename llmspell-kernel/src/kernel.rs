@@ -454,6 +454,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "comm_msg" => self.handle_comm_msg(content).await,
             "comm_close" => self.handle_comm_close(content).await,
             "comm_info_request" => self.handle_comm_info_request(content).await,
+            "debug_request" => self.handle_debug_request_message(content).await,
             _ => {
                 tracing::warn!("Unknown message type: {}", msg_type);
                 Ok(serde_json::json!({
@@ -859,6 +860,35 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     /// Handle debug requests via existing `ExecutionManager` API
+    /// Handle `debug_request` message from Jupyter protocol
+    ///
+    /// This method is called when a `debug_request` message is received via `ZeroMQ`.
+    /// It extracts the DAP command and routes it through the DAP bridge.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if debug is not enabled or if the debug command fails.
+    async fn handle_debug_request_message(
+        &self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        // Extract the DAP command from the debug_request content
+        let dap_command = serde_json::json!({
+            "seq": content.get("seq").cloned().unwrap_or_else(|| serde_json::json!(1)),
+            "type": "request",
+            "command": content.get("command").cloned().unwrap_or_else(|| serde_json::json!("unknown")),
+            "arguments": content.get("arguments").cloned().unwrap_or_else(|| serde_json::json!({})),
+        });
+
+        // Route through the existing debug handler which uses DAP bridge
+        let result = self.handle_debug_request(dap_command).await?;
+
+        // Wrap result in debug_reply format
+        Ok(serde_json::json!({
+            "body": result
+        }))
+    }
+
     ///
     /// Routes debug commands to the `ScriptRuntime`'s `ExecutionManager`, providing
     /// a unified interface for debugging functionality regardless of kernel type.
@@ -879,12 +909,12 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         // Use DAP bridge for standard DAP protocol support
         let dap_bridge = crate::dap_bridge::DAPBridge::new(exec_mgr.clone());
-        
+
         // If this looks like a DAP request, use the bridge
         if content.get("type").and_then(|t| t.as_str()) == Some("request") {
             return dap_bridge.handle_request(content).await;
         }
-        
+
         // Otherwise fall back to legacy command handling for backward compatibility
         let command = content["command"].as_str().unwrap_or("");
         let args = &content["arguments"];

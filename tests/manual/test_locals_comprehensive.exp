@@ -1,0 +1,317 @@
+#!/usr/bin/expect -f
+# Comprehensive testing of .locals, .globals, .upvalues commands
+# Tests all manual verification items from Task 9.8.13.8
+
+set timeout 10
+set test_passed 0
+set test_failed 0
+
+# Color codes for output
+set RED "\033\[0;31m"
+set GREEN "\033\[0;32m"
+set YELLOW "\033\[1;33m"
+set NC "\033\[0m"
+
+proc test_case {name} {
+    global YELLOW NC
+    puts "\n${YELLOW}TEST: $name${NC}"
+}
+
+proc pass {msg} {
+    global GREEN NC test_passed
+    puts "${GREEN}✓ $msg${NC}"
+    incr test_passed
+}
+
+proc fail {msg} {
+    global RED NC test_failed
+    puts "${RED}✗ $msg${NC}"
+    incr test_failed
+}
+
+# Start REPL with debug mode
+test_case "Starting REPL with debug mode"
+spawn ./target/release/llmspell repl --debug
+expect {
+    "llmspell>" { pass "REPL started successfully" }
+    timeout { fail "REPL failed to start"; exit 1 }
+}
+
+# Test 1: 100+ local variables
+test_case "Test with 100+ local variables"
+
+# Create a Lua script with 100+ locals
+send "local code = 'local x0 = 0\\n'\r"
+expect "llmspell>"
+for {set i 1} {$i <= 110} {incr i} {
+    send "code = code .. 'local x$i = $i\\n'\r"
+    expect "llmspell>"
+}
+send "code = code .. 'print(\"Created 110 locals\")'\r"
+expect "llmspell>"
+
+# Execute the code
+send "load(code)()\r"
+expect {
+    "Created 110 locals" { pass "Created 110 local variables" }
+    timeout { fail "Failed to create 110 locals" }
+}
+expect "llmspell>"
+
+# Check locals command
+send ".locals\r"
+expect {
+    -re "Local variables:.*x0 = 0.*x50 = 50.*x100 = 100.*x109 = 109" {
+        pass "All 110 locals displayed correctly"
+    }
+    "No local variables" { fail "Locals not captured" }
+    timeout { fail "Timeout waiting for locals" }
+}
+expect "llmspell>"
+
+# Test 2: Deeply nested tables
+test_case "Test with deeply nested tables"
+
+send "local nested = {a = {b = {c = {d = {e = {f = 'deep'}}}}}}\r"
+expect "llmspell>"
+send "local array = {{{{{{1, 2, 3}}}}}}\r"
+expect "llmspell>"
+send "local mixed = {x = 1, y = {z = 2, w = {v = 3}}}\r"
+expect "llmspell>"
+
+send ".locals\r"
+expect {
+    -re "nested = \\{.*\\}.*table.*array = \\{.*\\}.*table.*mixed = \\{.*\\}.*table" {
+        pass "Nested tables displayed as table type"
+    }
+    timeout { fail "Failed to display nested tables" }
+}
+expect "llmspell>"
+
+# Test 3: Functions and closures with upvalues
+test_case "Test with functions and closures"
+
+# Create closure with upvalues
+send "local outer_var = 42\r"
+expect "llmspell>"
+send "local function make_counter()\r"
+expect "...>"
+send "  local count = 0\r"
+expect "...>"
+send "  return function()\r"
+expect "...>"
+send "    count = count + 1\r"
+expect "...>"
+send "    return count + outer_var\r"
+expect "...>"
+send "  end\r"
+expect "...>"
+send "end\r"
+expect "llmspell>"
+
+send "local counter = make_counter()\r"
+expect "llmspell>"
+
+# Set breakpoint inside closure
+send ".break 5\r"
+expect {
+    -re "Breakpoint.*set" { pass "Breakpoint set in closure" }
+    timeout { fail "Failed to set breakpoint" }
+}
+expect "llmspell>"
+
+# Execute closure and check upvalues
+send "counter()\r"
+expect {
+    "Paused at breakpoint" { pass "Paused at breakpoint in closure" }
+    timeout { fail "Failed to pause at breakpoint" }
+}
+
+send ".upvalues\r"
+expect {
+    -re "Upvalues.*count.*outer_var = 42" {
+        pass "Upvalues captured correctly"
+    }
+    "No upvalues" { fail "Upvalues not captured" }
+    timeout { fail "Timeout waiting for upvalues" }
+}
+
+send ".continue\r"
+expect "llmspell>"
+
+# Test 4: Special Lua types (userdata, thread)
+test_case "Test with special Lua types"
+
+send "local file = io.open('/tmp/test.txt', 'w')\r"
+expect "llmspell>"
+send "local co = coroutine.create(function() print('coroutine') end)\r"
+expect "llmspell>"
+send "local func = function() return 'test' end\r"
+expect "llmspell>"
+
+send ".locals\r"
+expect {
+    -re "file = .*userdata.*co = .*thread.*func = .*function" {
+        pass "Special types displayed correctly"
+    }
+    timeout { fail "Failed to display special types" }
+}
+expect "llmspell>"
+
+send "file:close()\r"
+expect "llmspell>"
+
+# Test 5: Test during breakpoint pause
+test_case "Test during breakpoint pause"
+
+# Create test function with locals
+send "function test_pause()\r"
+expect "...>"
+send "  local pause_var1 = 'test1'\r"
+expect "...>"
+send "  local pause_var2 = 123\r"
+expect "...>"
+send "  print('At breakpoint')  -- line 3\r"
+expect "...>"
+send "  local pause_var3 = {a=1, b=2}\r"
+expect "...>"
+send "  return pause_var1 .. pause_var2\r"
+expect "...>"
+send "end\r"
+expect "llmspell>"
+
+send ".break 3\r"
+expect "Breakpoint"
+expect "llmspell>"
+
+send "test_pause()\r"
+expect {
+    "Paused at breakpoint" { pass "Paused at function breakpoint" }
+    timeout { fail "Failed to pause" }
+}
+
+# Check locals while paused
+send ".locals\r"
+expect {
+    -re "pause_var1 = .*test1.*pause_var2 = 123" {
+        pass "Locals visible during pause"
+    }
+    timeout { fail "Failed to show locals during pause" }
+}
+
+# Check globals while paused
+send ".globals\r"
+expect {
+    -re "Global variables:.*test_pause.*function" {
+        pass "Globals visible during pause"
+    }
+    timeout { fail "Failed to show globals during pause" }
+}
+
+send ".continue\r"
+expect "llmspell>"
+
+# Test 6: Unicode variable names
+test_case "Test with Unicode variable names"
+
+send "local 你好 = 'Chinese'\r"
+expect "llmspell>"
+send "local мир = 'Russian'\r"
+expect "llmspell>"
+send "local 🚀 = 'emoji'\r"
+expect "llmspell>"
+send "local café = 'French'\r"
+expect "llmspell>"
+
+send ".locals\r"
+expect {
+    -re "你好 = .*Chinese.*мир = .*Russian.*🚀 = .*emoji.*café = .*French" {
+        pass "Unicode variable names handled correctly"
+    }
+    timeout { fail "Failed to handle Unicode names" }
+}
+expect "llmspell>"
+
+# Test 7: Variable names with special characters
+test_case "Test variable names with special characters"
+
+send "_G['var-with-dash'] = 'dashed'\r"
+expect "llmspell>"
+send "_G['var.with.dots'] = 'dotted'\r"
+expect "llmspell>"
+send "_G['var with spaces'] = 'spaced'\r"
+expect "llmspell>"
+send "_G['123numeric'] = 'numeric start'\r"
+expect "llmspell>"
+
+send ".globals\r"
+expect {
+    -re "\\\[\"var-with-dash\"\\\].*dashed.*\\\[\"var.with.dots\"\\\].*dotted.*\\\[\"var with spaces\"\\\].*spaced.*\\\[\"123numeric\"\\\].*numeric start" {
+        pass "Special character variable names formatted correctly"
+    }
+    timeout { fail "Failed to format special character names" }
+}
+expect "llmspell>"
+
+# Test 8: Large data structures
+test_case "Test with large data structures"
+
+send "local big_table = {}\r"
+expect "llmspell>"
+send "for i = 1, 1000 do big_table\[i\] = i * 2 end\r"
+expect "llmspell>"
+send "local big_string = string.rep('x', 10000)\r"
+expect "llmspell>"
+
+send ".locals\r"
+expect {
+    -re "big_table = \\{.*\\}.*table.*big_string = .*string" {
+        pass "Large data structures handled"
+    }
+    timeout { fail "Failed with large data structures" }
+}
+expect "llmspell>"
+
+# Test 9: Stack frames with .stack command
+test_case "Test stack frames during nested calls"
+
+send "function level3() print('level3'); return debug.getinfo(1) end\r"
+expect "llmspell>"
+send "function level2() return level3() end\r"
+expect "llmspell>"
+send "function level1() return level2() end\r"
+expect "llmspell>"
+
+send ".break 1\r"
+expect "llmspell>"
+send "level1()\r"
+expect "Paused at breakpoint"
+
+send ".stack\r"
+expect {
+    -re "Call stack:.*level3.*level2.*level1" {
+        pass "Stack frames displayed correctly"
+    }
+    timeout { fail "Failed to display stack frames" }
+}
+
+send ".continue\r"
+expect "llmspell>"
+
+# Clean up and exit
+test_case "Cleanup"
+send ".exit\r"
+expect eof
+
+# Print summary
+puts "\n======================================"
+puts "Test Summary:"
+puts "  Passed: $test_passed"
+puts "  Failed: $test_failed"
+puts "======================================"
+
+if {$test_failed > 0} {
+    exit 1
+} else {
+    exit 0
+}

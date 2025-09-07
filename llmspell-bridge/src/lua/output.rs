@@ -579,15 +579,24 @@ pub struct StackTrace {
     pub error: Option<String>,
 }
 
+/// Variable capture configuration
+#[derive(Debug, Clone, Default)]
+pub struct CaptureConfig {
+    /// Whether to capture local variables
+    pub locals: bool,
+    /// Whether to capture upvalues
+    pub upvalues: bool,
+    /// Whether to capture global variables
+    pub globals: bool,
+}
+
 /// Stack trace collection options
 #[derive(Debug, Clone)]
 pub struct StackTraceOptions {
     /// Maximum stack depth to capture
     pub max_depth: usize,
-    /// Whether to capture local variables
-    pub capture_locals: bool,
-    /// Whether to capture upvalues
-    pub capture_upvalues: bool,
+    /// Variable capture configuration
+    pub capture: CaptureConfig,
     /// Whether to include source information
     pub include_source: bool,
 }
@@ -596,8 +605,11 @@ impl Default for StackTraceOptions {
     fn default() -> Self {
         Self {
             max_depth: 50,
-            capture_locals: false, // Only at trace level
-            capture_upvalues: false,
+            capture: CaptureConfig {
+                locals: false, // Only at trace level
+                upvalues: false,
+                globals: false,
+            },
             include_source: true,
         }
     }
@@ -609,8 +621,11 @@ impl StackTraceOptions {
     pub const fn for_error() -> Self {
         Self {
             max_depth: 20,
-            capture_locals: false,
-            capture_upvalues: false,
+            capture: CaptureConfig {
+                locals: false,
+                upvalues: false,
+                globals: false,
+            },
             include_source: true,
         }
     }
@@ -620,8 +635,25 @@ impl StackTraceOptions {
     pub const fn for_trace() -> Self {
         Self {
             max_depth: 50,
-            capture_locals: true,
-            capture_upvalues: true,
+            capture: CaptureConfig {
+                locals: true,
+                upvalues: true,
+                globals: false,
+            },
+            include_source: true,
+        }
+    }
+
+    /// Create options for debugging (full capture including globals)
+    #[must_use]
+    pub const fn for_debug() -> Self {
+        Self {
+            max_depth: 100,
+            capture: CaptureConfig {
+                locals: true,
+                upvalues: true,
+                globals: true,
+            },
             include_source: true,
         }
     }
@@ -698,7 +730,7 @@ fn extract_frame_info(
         .unwrap_or_else(|_| "unknown".to_string());
 
     // Capture local variables if requested
-    let locals = if options.capture_locals {
+    let locals = if options.capture.locals {
         capture_locals(lua, level)?
     } else {
         Vec::new()
@@ -759,6 +791,137 @@ fn capture_locals(lua: &Lua, level: i32) -> LuaResult<Vec<Variable>> {
     }
 
     Ok(locals)
+}
+
+/// Capture upvalues (closure variables) for a function at the given stack level
+///
+/// # Errors
+///
+/// Returns an error if the Lua debug API calls fail or if the function info cannot be retrieved.
+pub fn capture_upvalues(lua: &Lua, level: i32) -> LuaResult<Vec<Variable>> {
+    let debug_table: Table = lua.globals().get("debug")?;
+
+    // First get the function at this level
+    let getinfo_fn: Function = debug_table.get("getinfo")?;
+    let info: Table = getinfo_fn.call((level, "f"))?;
+    let func: Option<Function> = info.get("func").ok();
+
+    let Some(func) = func else {
+        return Ok(Vec::new());
+    };
+
+    let getupvalue_fn: Function = debug_table.get("getupvalue")?;
+    let mut upvalues = Vec::new();
+    let mut upvalue_index = 1;
+
+    loop {
+        let result: LuaResult<(Option<String>, Value)> = getupvalue_fn.call((&func, upvalue_index));
+
+        match result {
+            Ok((Some(name), value)) if !name.starts_with('(') => {
+                // Skip internal upvalues starting with '('
+                upvalues.push(Variable {
+                    name,
+                    value: format_simple(&value),
+                    var_type: match value {
+                        Value::Nil => "nil".to_string(),
+                        Value::Boolean(_) => "boolean".to_string(),
+                        Value::Integer(_) => "integer".to_string(),
+                        Value::Number(_) => "number".to_string(),
+                        Value::String(_) => "string".to_string(),
+                        Value::Table(_) => "table".to_string(),
+                        Value::Function(_) => "function".to_string(),
+                        Value::Thread(_) => "thread".to_string(),
+                        Value::UserData(_) | Value::LightUserData(_) => "userdata".to_string(),
+                        Value::Error(_) => "error".to_string(),
+                    },
+                    has_children: matches!(value, Value::Table(_) | Value::UserData(_)),
+                    reference: None,
+                });
+            }
+            Ok((None, _)) | Err(_) => break, // No more upvalues
+            _ => {}                          // Skip internal upvalues
+        }
+
+        upvalue_index += 1;
+    }
+
+    Ok(upvalues)
+}
+
+/// Capture global variables from the Lua environment
+///
+/// # Errors
+///
+/// Returns an error if accessing the Lua globals table fails or if iterating through the table encounters an error.
+pub fn capture_globals(lua: &Lua) -> LuaResult<Vec<Variable>> {
+    let globals_table = lua.globals();
+    let mut globals = Vec::new();
+
+    // Iterate through all global variables
+    for (name, value) in globals_table.pairs::<String, Value>().flatten() {
+        // Filter to common Lua globals and user-defined globals
+        if name.starts_with('_')
+            || !name.starts_with("package.")
+            || [
+                "print",
+                "require",
+                "module",
+                "string",
+                "table",
+                "math",
+                "io",
+                "os",
+                "debug",
+                "coroutine",
+                "bit",
+                "jit",
+                "load",
+                "loadfile",
+                "dofile",
+                "pcall",
+                "xpcall",
+                "error",
+                "assert",
+                "type",
+                "next",
+                "pairs",
+                "ipairs",
+                "getmetatable",
+                "setmetatable",
+                "rawget",
+                "rawset",
+                "rawequal",
+                "tonumber",
+                "tostring",
+                "select",
+                "unpack",
+                "collectgarbage",
+            ]
+            .contains(&name.as_str())
+        {
+            globals.push(Variable {
+                name: name.clone(),
+                value: format_simple(&value),
+                var_type: match value {
+                    Value::Nil => "nil".to_string(),
+                    Value::Boolean(_) => "boolean".to_string(),
+                    Value::Integer(_) => "integer".to_string(),
+                    Value::Number(_) => "number".to_string(),
+                    Value::String(_) => "string".to_string(),
+                    Value::Table(_) => "table".to_string(),
+                    Value::Function(_) => "function".to_string(),
+                    Value::Thread(_) => "thread".to_string(),
+                    Value::UserData(_) | Value::LightUserData(_) => "userdata".to_string(),
+                    Value::Error(_) => "error".to_string(),
+                },
+                has_children: matches!(value, Value::Table(_) | Value::UserData(_)),
+                reference: None,
+            });
+        }
+    }
+
+    Ok(globals)
 }
 
 impl StackTrace {

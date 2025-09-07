@@ -124,24 +124,51 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
         self.execute_with_args(code, vec![]).await
     }
 
-    /// Execute code on the kernel with script arguments
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if execution fails
-    pub async fn execute_with_args(
-        &mut self,
-        code: &str,
-        args: Vec<String>,
-    ) -> Result<MessageContent> {
-        self.execution_count += 1;
+    /// Process `IOPub` message for our execution
+    fn process_iopub_message(msg: &JupyterMessage, msg_id: &str) {
+        // Check if this message is for our execution
+        let is_our_message = msg
+            .parent_header
+            .as_ref()
+            .is_some_and(|parent| parent.msg_id == msg_id);
 
-        // Create execute request message with empty identity for REQ socket
+        if is_our_message {
+            match &msg.content {
+                MessageContent::Status { execution_state } => {
+                    tracing::debug!("Execution state: {:?}", execution_state);
+                }
+                MessageContent::Stream { name, text } => match name {
+                    StreamType::Stdout => print!("{text}"),
+                    StreamType::Stderr => eprint!("{text}"),
+                },
+                MessageContent::ExecuteResult { data, .. } => {
+                    if let Some(text_plain) = data.get("text/plain") {
+                        if let Some(text) = text_plain.as_str() {
+                            print!("{text}");
+                        }
+                    }
+                }
+                MessageContent::Error {
+                    ename,
+                    evalue,
+                    traceback,
+                } => {
+                    eprintln!("{ename}: {evalue}");
+                    for line in traceback {
+                        eprintln!("{line}");
+                    }
+                }
+                _ => {} // Ignore other IOPub messages
+            }
+        }
+    }
+
+    /// Create an execute request message
+    fn create_execute_request(&self, code: &str, args: Vec<String>) -> JupyterMessage {
         let mut metadata = serde_json::Map::new();
-        // Add empty identity for client-initiated messages (REQ socket doesn't need routing)
         metadata.insert("__identities".to_string(), serde_json::json!([""]));
 
-        let msg = JupyterMessage {
+        JupyterMessage {
             header: MessageHeader {
                 msg_id: Uuid::new_v4().to_string(),
                 msg_type: "execute_request".to_string(),
@@ -161,93 +188,84 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                 stop_on_error: Some(true),
                 script_args: if args.is_empty() { None } else { Some(args) },
             },
-        };
+        }
+    }
 
-        // Encode and send request on shell channel
-        let request_bytes = self.protocol.encode(&msg, "shell")?;
-        self.transport.send("shell", request_bytes).await?;
+    /// Process `IOPub` messages during execution
+    async fn process_iopub_during_execution(&self, msg_id: &str) -> Result<()> {
+        if let Some(iopub_bytes) = self.transport.recv("iopub").await? {
+            match self.protocol.decode(iopub_bytes, "iopub") {
+                Ok(iopub_msg) => {
+                    Self::process_iopub_message(&iopub_msg, msg_id);
+                }
+                Err(e) => {
+                    tracing::debug!("Failed to decode IOPub message: {}", e);
+                }
+            }
+        }
+        Ok(())
+    }
 
-        let msg_id = msg.header.msg_id.clone();
+    /// Check for execute reply on shell channel
+    async fn check_for_execute_reply(&self, msg_id: &str) -> Result<Option<MessageContent>> {
+        if let Some(reply_bytes) = self.transport.recv("shell").await? {
+            let reply = self.protocol.decode(reply_bytes, "shell")?;
+            tracing::debug!("Received shell message: {}", reply.header.msg_type);
 
-        // Track execution state
-        let mut reply_received = false;
-        let mut idle_received = false;
-        let mut execute_reply = None;
-
-        // Listen to both shell and iopub channels until execution is complete
-        while !reply_received || !idle_received {
-            // Check IOPub for output messages
-            if let Some(iopub_bytes) = self.transport.recv("iopub").await? {
-                let iopub_msg = self.protocol.decode(iopub_bytes, "iopub")?;
-
-                // Only process messages related to our execution
-                if let Some(parent) = &iopub_msg.parent_header {
+            if reply.header.msg_type == "execute_reply" {
+                if let Some(parent) = &reply.parent_header {
                     if parent.msg_id == msg_id {
-                        match &iopub_msg.content {
-                            MessageContent::Status { execution_state } => {
-                                // Check for idle status to know execution is complete
-                                if matches!(
-                                    execution_state,
-                                    crate::jupyter::protocol::ExecutionState::Idle
-                                ) {
-                                    idle_received = true;
-                                }
-                            }
-                            MessageContent::Stream { name, text } => {
-                                // Print stream output to stdout/stderr
-                                match name {
-                                    StreamType::Stdout => print!("{text}"),
-                                    StreamType::Stderr => eprint!("{text}"),
-                                }
-                            }
-                            MessageContent::ExecuteResult { data, .. } => {
-                                // Handle execute results (e.g., returned values)
-                                if let Some(text_plain) = data.get("text/plain") {
-                                    if let Some(text) = text_plain.as_str() {
-                                        print!("{text}");
-                                    }
-                                }
-                            }
-                            MessageContent::Error {
-                                ename,
-                                evalue,
-                                traceback,
-                            } => {
-                                // Print errors to stderr
-                                eprintln!("{ename}: {evalue}");
-                                for line in traceback {
-                                    eprintln!("{line}");
-                                }
-                            }
-                            _ => {} // Ignore other IOPub messages
-                        }
+                        tracing::debug!("Got our execute_reply!");
+                        return Ok(Some(reply.content.clone()));
                     }
                 }
             }
+        }
+        Ok(None)
+    }
 
-            // Check shell channel for execute reply
-            if !reply_received {
-                if let Some(reply_bytes) = self.transport.recv("shell").await? {
-                    let reply = self.protocol.decode(reply_bytes, "shell")?;
+    /// Execute code on the kernel with script arguments
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution fails
+    pub async fn execute_with_args(
+        &mut self,
+        code: &str,
+        args: Vec<String>,
+    ) -> Result<MessageContent> {
+        self.execution_count += 1;
 
-                    // Check if this is our execute reply
-                    if reply.header.msg_type == "execute_reply" {
-                        if let Some(parent) = &reply.parent_header {
-                            if parent.msg_id == msg_id {
-                                execute_reply = Some(reply.content.clone());
-                                reply_received = true;
-                            }
-                        }
-                    }
-                }
+        // Create and send execute request
+        let msg = self.create_execute_request(code, args);
+        let msg_id = msg.header.msg_id.clone();
+        let request_bytes = self.protocol.encode(&msg, "shell")?;
+        self.transport.send("shell", request_bytes).await?;
+
+        // Wait for execution to complete
+        let timeout_duration = tokio::time::Duration::from_secs(2);
+        let start_time = tokio::time::Instant::now();
+
+        loop {
+            // Check for timeout
+            if start_time.elapsed() > timeout_duration {
+                tracing::warn!("Execution timed out waiting for completion");
+                break;
+            }
+
+            // Process IOPub messages
+            self.process_iopub_during_execution(&msg_id).await?;
+
+            // Check for execute reply
+            if let Some(reply) = self.check_for_execute_reply(&msg_id).await? {
+                return Ok(reply);
             }
 
             // Small delay to avoid busy waiting
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
 
-        // Return the execute reply content
-        execute_reply.ok_or_else(|| anyhow::anyhow!("No execute reply received"))
+        Err(anyhow::anyhow!("No execute reply received"))
     }
 
     /// Request kernel information
@@ -284,6 +302,70 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                 let reply = self.protocol.decode(reply_bytes, "shell")?;
 
                 if reply.header.msg_type == "kernel_info_reply" {
+                    return Ok(reply.content);
+                }
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Send a debug request to the kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the debug request fails
+    pub async fn debug_request(&mut self, command: serde_json::Value) -> Result<MessageContent> {
+        // Extract command details from the Value
+        let command_str = command
+            .get("command")
+            .and_then(|c| c.as_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        let arguments = command
+            .get("arguments")
+            .cloned()
+            .unwrap_or_else(|| serde_json::json!({}));
+
+        let seq = command
+            .get("seq")
+            .and_then(serde_json::Value::as_u64)
+            .and_then(|s| u32::try_from(s).ok())
+            .unwrap_or(1);
+
+        // Create debug request with empty identity
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("__identities".to_string(), serde_json::json!([""]));
+
+        let msg = JupyterMessage {
+            header: MessageHeader {
+                msg_id: Uuid::new_v4().to_string(),
+                msg_type: "debug_request".to_string(),
+                username: self.username.clone(),
+                session: self.session_id.clone(),
+                date: Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::Value::Object(metadata),
+            content: MessageContent::DebugRequest {
+                command: command_str,
+                arguments,
+                seq,
+            },
+        };
+
+        // Send request on control channel (debug uses control channel)
+        let request_bytes = self.protocol.encode(&msg, "control")?;
+        self.transport.send("control", request_bytes).await?;
+
+        // Wait for reply
+        loop {
+            if let Some(reply_bytes) = self.transport.recv("control").await? {
+                let reply = self.protocol.decode(reply_bytes, "control")?;
+
+                if reply.header.msg_type == "debug_reply" {
                     return Ok(reply.content);
                 }
             }

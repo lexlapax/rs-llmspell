@@ -407,8 +407,11 @@ pub fn inject_diagnostics_global(
             || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()),
             |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
-                capture_locals: opts.get("capture_locals").unwrap_or(false),
-                capture_upvalues: opts.get("capture_upvalues").unwrap_or(false),
+                capture: crate::lua::output::CaptureConfig {
+                    locals: opts.get("capture_locals").unwrap_or(false),
+                    upvalues: opts.get("capture_upvalues").unwrap_or(false),
+                    globals: opts.get("capture_globals").unwrap_or(false),
+                },
                 include_source: opts.get("include_source").unwrap_or(true),
             },
         );
@@ -425,8 +428,11 @@ pub fn inject_diagnostics_global(
             || bridge_clone.stack_trace_options_for_level(&bridge_clone.get_level()),
             |opts| StackTraceOptions {
                 max_depth: opts.get("max_depth").unwrap_or(50),
-                capture_locals: opts.get("capture_locals").unwrap_or(false),
-                capture_upvalues: opts.get("capture_upvalues").unwrap_or(false),
+                capture: crate::lua::output::CaptureConfig {
+                    locals: opts.get("capture_locals").unwrap_or(false),
+                    upvalues: opts.get("capture_upvalues").unwrap_or(false),
+                    globals: opts.get("capture_globals").unwrap_or(false),
+                },
                 include_source: opts.get("include_source").unwrap_or(true),
             },
         );
