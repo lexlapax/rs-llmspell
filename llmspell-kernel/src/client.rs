@@ -121,6 +121,19 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
     ///
     /// Returns an error if execution fails
     pub async fn execute(&mut self, code: &str) -> Result<MessageContent> {
+        self.execute_with_args(code, vec![]).await
+    }
+
+    /// Execute code on the kernel with script arguments
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution fails
+    pub async fn execute_with_args(
+        &mut self,
+        code: &str,
+        args: Vec<String>,
+    ) -> Result<MessageContent> {
         self.execution_count += 1;
 
         // Create execute request message with empty identity for REQ socket
@@ -146,6 +159,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                 user_expressions: None,
                 allow_stdin: Some(false),
                 stop_on_error: Some(true),
+                script_args: if args.is_empty() { None } else { Some(args) },
             },
         };
 

@@ -313,6 +313,14 @@ impl WireProtocol {
                 let stop_on_error = value
                     .get("stop_on_error")
                     .and_then(serde_json::Value::as_bool);
+                let script_args = value
+                    .get("script_args")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    });
 
                 Ok(MessageContent::ExecuteRequest {
                     code,
@@ -321,6 +329,7 @@ impl WireProtocol {
                     user_expressions,
                     allow_stdin,
                     stop_on_error,
+                    script_args,
                 })
             }
             "shutdown_request" => {

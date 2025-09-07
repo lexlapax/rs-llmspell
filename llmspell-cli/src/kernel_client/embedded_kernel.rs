@@ -176,13 +176,21 @@ impl KernelConnectionTrait for EmbeddedKernel {
     }
 
     async fn execute(&mut self, code: &str) -> Result<String> {
+        self.execute_with_args(code, vec![]).await
+    }
+
+    async fn execute_with_args(&mut self, code: &str, args: Vec<String>) -> Result<String> {
         // Use the client to execute code via ZeroMQ
         let client = self
             .client
             .as_mut()
             .ok_or_else(|| anyhow::anyhow!("Client not initialized"))?;
 
-        let result = client.execute(code).await?;
+        let result = if args.is_empty() {
+            client.execute(code).await?
+        } else {
+            client.execute_with_args(code, args).await?
+        };
 
         // The kernel already printed to stdout via ScriptRuntime
         // Return empty string to avoid double printing

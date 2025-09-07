@@ -1,0 +1,27 @@
+# LLMSpell configuration with state persistence enabled
+
+[runtime]
+engine = "lua"
+sandbox_level = "safe"
+
+[runtime.state_persistence]
+enabled = true
+backend_type = "sled"  # Persistent file-based backend
+path = "/tmp/llmspell-state"
+sync_interval_ms = 1000
+
+[runtime.sessions]
+enabled = true
+persistence_enabled = true
+
+[runtime.hooks]
+enabled = false
+
+[runtime.events]
+enabled = false
+
+[debug]
+enabled = false
+
+[rag]
+enabled = false

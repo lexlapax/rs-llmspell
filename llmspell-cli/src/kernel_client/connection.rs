@@ -64,6 +64,12 @@ pub trait KernelConnectionTrait: Send + Sync {
     /// Execute code
     async fn execute(&mut self, code: &str) -> Result<String>;
 
+    /// Execute code with script arguments
+    async fn execute_with_args(&mut self, code: &str, _args: Vec<String>) -> Result<String> {
+        // Default implementation: just execute without args for backward compatibility
+        self.execute(code).await
+    }
+
     /// Execute inline code
     async fn execute_inline(&mut self, code: &str) -> Result<String>;
 

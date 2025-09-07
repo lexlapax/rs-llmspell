@@ -78,18 +78,21 @@ pub async fn execute_script_file(
     }
 
     // Unified execution path via kernel - no longer need separate debug/non-debug paths
-    // Parse script arguments
-    let parsed_args = parse_script_args(args, &script_path);
-    if !parsed_args.is_empty() {
-        tracing::debug!("Parsed script arguments: {:?}", parsed_args);
+    // Keep args as Vec<String> for passing to kernel
+    // The kernel/runtime will handle parsing into HashMap for Lua
+    if !args.is_empty() {
+        tracing::debug!("Script arguments: {:?}", args);
     }
 
     // Create kernel connection instead of direct runtime
     let mut kernel = super::create_kernel_connection(runtime_config, connect).await?;
 
-    // Execute script via kernel
-    // TODO: Add support for script arguments in kernel protocol
-    let result = kernel.execute(&script_content).await?;
+    // Execute script via kernel with arguments
+    let result = if args.is_empty() {
+        kernel.execute(&script_content).await?
+    } else {
+        kernel.execute_with_args(&script_content, args).await?
+    };
 
     // Don't print anything - the kernel already printed to stdout
     let _ = result; // Result is already handled by kernel

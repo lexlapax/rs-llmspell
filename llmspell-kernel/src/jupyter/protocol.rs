@@ -63,6 +63,8 @@ pub enum MessageContent {
         user_expressions: Option<HashMap<String, String>>,
         allow_stdin: Option<bool>,
         stop_on_error: Option<bool>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        script_args: Option<Vec<String>>,
     },
 
     #[serde(rename = "execute_reply")]
@@ -457,6 +459,7 @@ impl KernelMessage for JupyterMessage {
                 user_expressions,
                 allow_stdin,
                 stop_on_error,
+                script_args,
             } => {
                 let mut obj = serde_json::json!({
                     "code": code,
@@ -473,6 +476,9 @@ impl KernelMessage for JupyterMessage {
                 }
                 if let Some(soe) = stop_on_error {
                     obj["stop_on_error"] = serde_json::json!(soe);
+                }
+                if let Some(args) = script_args {
+                    obj["script_args"] = serde_json::to_value(args).unwrap_or(Value::Null);
                 }
                 obj
             }

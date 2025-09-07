@@ -507,14 +507,14 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     async fn handle_execute(&self, content: serde_json::Value) -> Result<serde_json::Value> {
-        let (code, silent, execution_count) = self.setup_execution(&content).await?;
+        let (code, silent, script_args, execution_count) = self.setup_execution(&content).await?;
 
         if !silent {
             self.publish_execution_start(code, execution_count).await;
         }
 
         let output = self
-            .execute_code_streaming(code, silent, execution_count)
+            .execute_code_streaming(code, silent, script_args, execution_count)
             .await?;
 
         self.finalize_execution(silent, execution_count, output)
@@ -525,9 +525,14 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     async fn setup_execution<'a>(
         &self,
         content: &'a serde_json::Value,
-    ) -> Result<(&'a str, bool, u32)> {
+    ) -> Result<(&'a str, bool, Option<Vec<String>>, u32)> {
         let code = content["code"].as_str().unwrap_or("");
         let silent = content["silent"].as_bool().unwrap_or(false);
+        let script_args = content["script_args"].as_array().map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        });
 
         // Get session ID from the message metadata (if available)
         let session_id = content["metadata"]["session_id"]
@@ -551,7 +556,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             .store_execution_count(&llmspell_session_id, execution_count)
             .await?;
 
-        Ok((code, silent, execution_count))
+        Ok((code, silent, script_args, execution_count))
     }
 
     /// Publish execution start notifications
@@ -571,11 +576,27 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         &self,
         code: &str,
         silent: bool,
+        script_args: Option<Vec<String>>,
         execution_count: u32,
     ) -> Result<String> {
         let mut output = String::new();
         let result = {
-            let runtime = self.runtime.lock().await;
+            let mut runtime = self.runtime.lock().await;
+            // Set script arguments if provided
+            if let Some(args) = script_args {
+                // Convert Vec<String> to HashMap<String, String> for runtime
+                let mut args_map = std::collections::HashMap::new();
+                // Set script name as arg[0]
+                args_map.insert("0".to_string(), "script".to_string());
+                // Add positional arguments starting from 1
+                for (i, arg) in args.iter().enumerate() {
+                    args_map.insert((i + 1).to_string(), arg.clone());
+                }
+
+                if let Err(e) = runtime.set_script_args(args_map).await {
+                    tracing::warn!("Failed to set script arguments: {}", e);
+                }
+            }
             runtime.execute_script_streaming(code).await
         };
 

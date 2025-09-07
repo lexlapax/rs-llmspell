@@ -338,6 +338,43 @@ impl ScriptEngineBridge for LuaEngine {
                     }
                 }
 
+                // Inject state global if external state manager is available
+                if let Some(ref state_manager) = self.external_state_manager {
+                    use crate::globals::state_global::StateGlobal;
+                    use crate::globals::GlobalContext;
+                    use crate::lua::globals::state::inject_state_global;
+                    use crate::{ComponentRegistry, ProviderManager};
+                    use llmspell_config::providers::ProviderManagerConfig;
+
+                    let state_global = StateGlobal::with_state_manager(state_manager.clone());
+                    // Create minimal GlobalContext for state injection
+                    let registry = Arc::new(ComponentRegistry::new());
+                    let provider_config = ProviderManagerConfig::default();
+                    let providers =
+                        futures::executor::block_on(async {
+                            Arc::new(ProviderManager::new(provider_config).await.unwrap_or_else(
+                                |e| {
+                                    tracing::warn!(
+                                        "Failed to create ProviderManager for state injection: {}",
+                                        e
+                                    );
+                                    // Create with empty config as fallback
+                                    let empty_config = ProviderManagerConfig::default();
+                                    futures::executor::block_on(ProviderManager::new(empty_config))
+                                        .unwrap()
+                                },
+                            ))
+                        });
+                    let global_context = GlobalContext::new(registry, providers);
+
+                    if let Err(e) = inject_state_global(&lua, &global_context, &state_global) {
+                        tracing::warn!("Failed to inject state global: {}", e);
+                        // Don't fail the execution, just warn
+                    } else {
+                        tracing::debug!("Successfully injected state global into Lua runtime");
+                    }
+                }
+
                 let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
 
                 // Run garbage collection after script execution to prevent memory accumulation
@@ -408,51 +445,19 @@ impl ScriptEngineBridge for LuaEngine {
             // Create a single chunk with the result
             let chunk = {
                 let lua = self.lua.lock();
-                let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
 
-                // Run garbage collection after script execution
-                let _ = lua.gc_collect();
-
-                match lua_result {
-                    Ok(value) => {
-                        // Convert Lua value to JSON
-                        let output =
-                            crate::lua::conversion::lua_value_to_json(value).map_err(|e| {
-                                LLMSpellError::Script {
-                                    message: e.to_string(),
-                                    language: Some("lua".to_string()),
-                                    line: None,
-                                    source: None,
-                                }
-                            })?;
-                        llmspell_core::types::AgentChunk {
-                            stream_id: "lua-stream".to_string(),
-                            chunk_index: 0,
-                            content: llmspell_core::types::ChunkContent::Text(
-                                serde_json::to_string(&output)
-                                    .unwrap_or_else(|_| "null".to_string()),
-                            ),
-                            metadata: llmspell_core::types::ChunkMetadata {
-                                is_final: true,
-                                token_count: None,
-                                model: None,
-                                reasoning_step: None,
-                            },
-                            timestamp: chrono::Utc::now(),
-                        }
+                // Inject ARGS global if script arguments were provided
+                if let Some(ref args) = self.script_args {
+                    if let Err(e) = inject_args_global(&lua, args) {
+                        tracing::warn!("Failed to inject ARGS global in streaming: {}", e);
                     }
-                    Err(e) => llmspell_core::types::AgentChunk {
-                        stream_id: "lua-stream".to_string(),
-                        chunk_index: 0,
-                        content: llmspell_core::types::ChunkContent::Control(
-                            llmspell_core::types::ControlMessage::StreamCancelled {
-                                reason: format!("Script execution failed: {e}"),
-                            },
-                        ),
-                        metadata: llmspell_core::types::ChunkMetadata::default(),
-                        timestamp: chrono::Utc::now(),
-                    },
                 }
+
+                // Inject state global if external state manager is available
+                self.inject_state_for_streaming(&lua);
+
+                // Execute script and create chunk
+                self.execute_and_create_chunk(&lua, script)?
             };
 
             // Create a stream from a single chunk
@@ -684,6 +689,98 @@ impl ScriptEngineBridge for LuaEngine {
 }
 
 impl LuaEngine {
+    /// Inject state global into Lua environment for streaming execution
+    #[cfg(feature = "lua")]
+    fn inject_state_for_streaming(&self, lua: &mlua::Lua) {
+        if let Some(ref state_manager) = self.external_state_manager {
+            use crate::globals::state_global::StateGlobal;
+            use crate::globals::GlobalContext;
+            use crate::lua::globals::state::inject_state_global;
+            use crate::{ComponentRegistry, ProviderManager};
+            use llmspell_config::providers::ProviderManagerConfig;
+
+            let state_global = StateGlobal::with_state_manager(state_manager.clone());
+            // Create minimal GlobalContext for state injection
+            let registry = Arc::new(ComponentRegistry::new());
+            let provider_config = ProviderManagerConfig::default();
+            let providers = futures::executor::block_on(async {
+                Arc::new(
+                    ProviderManager::new(provider_config)
+                        .await
+                        .unwrap_or_else(|e| {
+                            tracing::warn!(
+                                "Failed to create ProviderManager for state injection: {}",
+                                e
+                            );
+                            // Create with empty config as fallback
+                            let empty_config = ProviderManagerConfig::default();
+                            futures::executor::block_on(ProviderManager::new(empty_config)).unwrap()
+                        }),
+                )
+            });
+            let global_context = GlobalContext::new(registry, providers);
+
+            if let Err(e) = inject_state_global(lua, &global_context, &state_global) {
+                tracing::warn!("Failed to inject state global in streaming: {}", e);
+            } else {
+                tracing::debug!("Successfully injected state global into Lua runtime (streaming)");
+            }
+        }
+    }
+
+    /// Execute script and create result chunk
+    #[cfg(feature = "lua")]
+    #[allow(clippy::unused_self)]
+    fn execute_and_create_chunk(
+        &self,
+        lua: &mlua::Lua,
+        script: &str,
+    ) -> Result<llmspell_core::types::AgentChunk, LLMSpellError> {
+        let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
+
+        // Run garbage collection after script execution
+        let _ = lua.gc_collect();
+
+        match lua_result {
+            Ok(value) => {
+                // Convert Lua value to JSON
+                let output = crate::lua::conversion::lua_value_to_json(value).map_err(|e| {
+                    LLMSpellError::Script {
+                        message: e.to_string(),
+                        language: Some("lua".to_string()),
+                        line: None,
+                        source: None,
+                    }
+                })?;
+                Ok(llmspell_core::types::AgentChunk {
+                    stream_id: "lua-stream".to_string(),
+                    chunk_index: 0,
+                    content: llmspell_core::types::ChunkContent::Text(
+                        serde_json::to_string(&output).unwrap_or_else(|_| "null".to_string()),
+                    ),
+                    metadata: llmspell_core::types::ChunkMetadata {
+                        is_final: true,
+                        token_count: None,
+                        model: None,
+                        reasoning_step: None,
+                    },
+                    timestamp: chrono::Utc::now(),
+                })
+            }
+            Err(e) => Ok(llmspell_core::types::AgentChunk {
+                stream_id: "lua-stream".to_string(),
+                chunk_index: 0,
+                content: llmspell_core::types::ChunkContent::Control(
+                    llmspell_core::types::ControlMessage::StreamCancelled {
+                        reason: format!("Script execution failed: {e}"),
+                    },
+                ),
+                metadata: llmspell_core::types::ChunkMetadata::default(),
+                timestamp: chrono::Utc::now(),
+            }),
+        }
+    }
+
     /// Install fallback debug hook for non-adapter hook types
     #[cfg(feature = "lua")]
     fn install_fallback_debug_hook(&self, hook: &Arc<dyn crate::debug_runtime::DebugHook>) {

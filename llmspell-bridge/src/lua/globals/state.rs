@@ -607,31 +607,13 @@ fn setup_backup_methods(
     Ok(())
 }
 
-/// Inject State global into Lua environment
-///
-/// # Errors
-///
-/// Returns an error if:
-/// - Lua table creation fails
-/// - Function binding fails
-pub fn inject_state_global(
+/// Register basic state operations (save, load, get, set, delete, `list_keys`)
+fn register_basic_operations(
     lua: &Lua,
-    _context: &GlobalContext,
-    state_global: &StateGlobal,
+    state_table: &mlua::Table,
+    state_access: Option<Arc<dyn StateAccess>>,
+    fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 ) -> mlua::Result<()> {
-    tracing::info!("inject_state_global called");
-    let state_table = lua.create_table()?;
-
-    // Clone references for the closures
-    let state_access = state_global.state_access.clone();
-    let _state_manager = state_global.state_manager.clone(); // Keep for migration/backup features
-    let fallback_state = state_global.fallback_state.clone();
-
-    tracing::info!(
-        "inject_state_global: state_access is_some: {}",
-        state_access.is_some()
-    );
-
     // Basic operations
     state_table.set(
         "save",
@@ -647,6 +629,33 @@ pub fn inject_state_global(
             fallback_state.clone(),
         ))?,
     )?;
+
+    // Convenience aliases for get/set matching the documentation
+    // State.set(key, value) maps to State.save("user", key, value)
+    state_table.set(
+        "set",
+        lua.create_function({
+            let state_access = state_access.clone();
+            let fallback_state = fallback_state.clone();
+            move |lua, (key, value): (String, Value)| {
+                let handler = create_save_handler(state_access.clone(), fallback_state.clone());
+                handler(lua, ("user".to_string(), key, value))
+            }
+        })?,
+    )?;
+
+    // State.get(key) maps to State.load("user", key)
+    state_table.set(
+        "get",
+        lua.create_function({
+            let state_access = state_access.clone();
+            let fallback_state = fallback_state.clone();
+            move |lua, key: String| {
+                let handler = create_load_handler(state_access.clone(), fallback_state.clone());
+                handler(lua, ("user".to_string(), key))
+            }
+        })?,
+    )?;
     state_table.set(
         "delete",
         lua.create_function(create_delete_handler(
@@ -656,12 +665,18 @@ pub fn inject_state_global(
     )?;
     state_table.set(
         "list_keys",
-        lua.create_function(create_list_keys_handler(
-            state_access.clone(),
-            fallback_state.clone(),
-        ))?,
+        lua.create_function(create_list_keys_handler(state_access, fallback_state))?,
     )?;
+    Ok(())
+}
 
+/// Register domain-specific helpers (workflow, agent, tool)
+fn register_domain_helpers(
+    lua: &Lua,
+    state_table: &mlua::Table,
+    state_access: Option<Arc<dyn StateAccess>>,
+    fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
+) -> mlua::Result<()> {
     // Workflow helpers
     state_table.set(
         "workflow_get",
@@ -704,11 +719,46 @@ pub fn inject_state_global(
     )?;
     state_table.set(
         "tool_set",
-        lua.create_function(create_tool_set_handler(
-            state_access.clone(),
-            fallback_state,
-        ))?,
+        lua.create_function(create_tool_set_handler(state_access, fallback_state))?,
     )?;
+    Ok(())
+}
+
+/// Inject state global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
+/// - Global registration fails
+pub fn inject_state_global(
+    lua: &Lua,
+    _context: &GlobalContext,
+    state_global: &StateGlobal,
+) -> mlua::Result<()> {
+    tracing::info!("inject_state_global called");
+    let state_table = lua.create_table()?;
+
+    // Clone references for the closures
+    let state_access = state_global.state_access.clone();
+    let fallback_state = state_global.fallback_state.clone();
+
+    tracing::info!(
+        "inject_state_global: state_access is_some: {}",
+        state_access.is_some()
+    );
+
+    // Register basic operations
+    register_basic_operations(
+        lua,
+        &state_table,
+        state_access.clone(),
+        fallback_state.clone(),
+    )?;
+
+    // Register domain-specific helpers
+    register_domain_helpers(lua, &state_table, state_access, fallback_state)?;
 
     // Migration methods (available when migration support is present in state_global)
     if let (Some(migration_engine), Some(schema_registry)) = (

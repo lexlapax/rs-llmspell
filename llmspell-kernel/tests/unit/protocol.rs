@@ -105,6 +105,7 @@ async fn test_execute_request_encoding() -> Result<()> {
             user_expressions: None,
             allow_stdin: Some(false),
             stop_on_error: Some(true),
+            script_args: None,
         },
     };
 
