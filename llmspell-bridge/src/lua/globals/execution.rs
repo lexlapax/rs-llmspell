@@ -50,11 +50,26 @@ impl LuaExecutionHook {
         execution_manager: Arc<ExecutionManager>,
         shared_context: Arc<RwLock<SharedExecutionContext>>,
     ) -> Self {
+        Self::new_with_mode(execution_manager, shared_context, None)
+    }
+
+    /// Create a new Lua execution hook with specified initial debug mode
+    #[must_use]
+    pub fn new_with_mode(
+        execution_manager: Arc<ExecutionManager>,
+        shared_context: Arc<RwLock<SharedExecutionContext>>,
+        initial_mode: Option<DebugMode>,
+    ) -> Self {
         let debug_cache = Arc::new(LuaDebugStateCache::new());
         let variable_inspector = Arc::new(LuaVariableInspector::new(
             debug_cache.clone(),
             shared_context.clone(),
         ));
+
+        // Set initial debug mode if provided
+        if let Some(mode) = initial_mode {
+            debug_cache.set_debug_mode(mode);
+        }
 
         Self {
             execution_manager,
@@ -671,17 +686,28 @@ impl LuaExecutionHook {
 /// Returns an error if debug hook installation fails
 pub fn install_interactive_debug_hooks(
     lua: &Lua,
-    execution_manager: Arc<ExecutionManager>,
+    execution_manager: &Arc<ExecutionManager>,
     shared_context: Arc<RwLock<SharedExecutionContext>>,
 ) -> LuaResult<Arc<parking_lot::Mutex<LuaExecutionHook>>> {
-    let hook = Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new(
-        execution_manager.clone(),
-        shared_context,
-    )));
+    install_interactive_debug_hooks_with_mode(lua, execution_manager, shared_context, None)
+}
 
-    // FAST PATH: Check if we can determine the mode without expensive async operations
-    // Most common case: no breakpoints = Disabled mode (zero-cost abstraction)
-    let initial_mode = {
+/// Install interactive debug hooks with specified initial mode
+///
+/// # Errors
+///
+/// Returns an error if debug hook installation fails
+pub fn install_interactive_debug_hooks_with_mode(
+    lua: &Lua,
+    execution_manager: &Arc<ExecutionManager>,
+    shared_context: Arc<RwLock<SharedExecutionContext>>,
+    override_mode: Option<DebugMode>,
+) -> LuaResult<Arc<parking_lot::Mutex<LuaExecutionHook>>> {
+    // Determine the initial mode - use override if provided, otherwise check breakpoints
+    let initial_mode = override_mode.unwrap_or_else(|| {
+        // Clone execution_manager for the closure
+        let execution_manager_clone = execution_manager.clone();
+
         // Try fast synchronous check first
         let fast_mode = match execution_manager.try_get_breakpoint_count_sync() {
             Some(0) => Some(DebugMode::Disabled), // No breakpoints - fast path
@@ -696,7 +722,7 @@ pub fn install_interactive_debug_hooks(
             block_on_async(
                 "check_initial_mode",
                 async move {
-                    let breakpoints = execution_manager.get_breakpoints().await;
+                    let breakpoints = execution_manager_clone.get_breakpoints().await;
                     if breakpoints.is_empty() {
                         Ok::<DebugMode, std::io::Error>(DebugMode::Disabled)
                     } else {
@@ -709,10 +735,14 @@ pub fn install_interactive_debug_hooks(
             )
             .unwrap_or(DebugMode::Disabled)
         })
-    };
+    });
 
-    // Set the debug mode in the cache
-    hook.lock().debug_cache.set_debug_mode(initial_mode);
+    // Create hook with the determined mode
+    let hook = Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new_with_mode(
+        execution_manager.clone(),
+        shared_context,
+        Some(initial_mode),
+    )));
 
     // Install hooks based on mode
     install_hooks_for_mode(lua, &hook, initial_mode);

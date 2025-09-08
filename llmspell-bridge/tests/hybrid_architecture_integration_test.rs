@@ -88,10 +88,25 @@ async fn test_architecture_flow_delegation() {
         ),
     ]);
 
-    // This should complete without error
-    coordinator
-        .coordinate_breakpoint_pause(location, variables)
-        .await;
+    // Spawn pause in background since it blocks until resume
+    let coordinator_clone = coordinator.clone();
+    let pause_handle = tokio::spawn(async move {
+        coordinator_clone
+            .coordinate_breakpoint_pause(location, variables)
+            .await;
+    });
+
+    // Wait briefly for pause to be set
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    // Resume so the task can complete
+    coordinator.resume().await;
+
+    // Ensure the pause task completes
+    tokio::time::timeout(Duration::from_secs(1), pause_handle)
+        .await
+        .expect("Pause task should complete after resume")
+        .expect("Pause task should not panic");
 }
 
 /// Test 2: Existing Functionality Preservation
@@ -226,9 +241,26 @@ async fn test_error_handling_through_layers() {
         line: 1,
         column: None,
     };
-    coordinator
-        .coordinate_breakpoint_pause(location, HashMap::new())
-        .await;
+
+    // Spawn pause in background since it blocks until resume
+    let coordinator_clone = coordinator.clone();
+    let pause_handle = tokio::spawn(async move {
+        coordinator_clone
+            .coordinate_breakpoint_pause(location, HashMap::new())
+            .await;
+    });
+
+    // Wait briefly for pause to be set
+    tokio::time::sleep(Duration::from_millis(10)).await;
+
+    // Resume so the task can complete
+    coordinator.resume().await;
+
+    // Ensure the pause task completes without crashing
+    tokio::time::timeout(Duration::from_secs(1), pause_handle)
+        .await
+        .expect("Pause task should complete after resume")
+        .expect("Pause task should not panic");
 
     // Test: LuaDebugBridge handles Lua errors gracefully
     let lua = Lua::new();
@@ -373,13 +405,31 @@ async fn test_breakpoint_hit_continue_cycles() {
             column: None,
         };
 
-        // Should pause at breakpoint
-        coordinator
-            .coordinate_breakpoint_pause(location, HashMap::new())
-            .await;
+        // Spawn pause in background since it blocks until resume
+        let coordinator_clone = coordinator.clone();
+        let pause_handle = tokio::spawn(async move {
+            coordinator_clone
+                .coordinate_breakpoint_pause(location, HashMap::new())
+                .await;
+        });
 
-        // Continue execution would be handled by ExecutionManager
-        // (no direct resume method, handled via state machine)
+        // Wait briefly for pause to be set
+        tokio::time::sleep(Duration::from_millis(5)).await;
+
+        // Verify we're paused
+        assert!(
+            coordinator.is_paused().await,
+            "Should be paused at breakpoint {line}",
+        );
+
+        // Resume to continue the cycle
+        coordinator.resume().await;
+
+        // Wait for pause task to complete
+        tokio::time::timeout(Duration::from_secs(1), pause_handle)
+            .await
+            .expect("Pause task should complete")
+            .expect("Pause task should not panic");
     }
 
     // Clear breakpoints

@@ -43,12 +43,9 @@ test_var = "at_breakpoint"  -- Line 2: breakpoint here
 test_var = "after_breakpoint"
 return test_var"#;
 
-    // Add breakpoint at line 2 - Lua script loaded from string typically uses source name like "[string \"...\"]"
-    // For now, let's try the source name that Lua actually reports for loaded strings
-    let breakpoint = Breakpoint::new(
-        "[string \"llmspell-bridge/src/lua/engine.rs:341:65\"]".to_string(),
-        2,
-    );
+    // Add breakpoint at line 2 - Lua script loaded with set_name("script")
+    // results in the source name "[string \"script\"]" in debug info
+    let breakpoint = Breakpoint::new("[string \"script\"]".to_string(), 2);
     coordinator.add_breakpoint(breakpoint).await.unwrap();
 
     // Verify breakpoint was added
@@ -146,19 +143,13 @@ async fn test_multiple_breakpoints_work_correctly() {
         .get_debug_coordinator()
         .expect("Debug coordinator should be available");
 
-    // Add breakpoints at lines 2 and 4
+    // Add breakpoints at lines 2 and 4 - use "[string \"script\"]" to match set_name("script")
     coordinator
-        .add_breakpoint(Breakpoint::new(
-            "[string \"llmspell-bridge/src/lua/engine.rs:341:65\"]".to_string(),
-            2,
-        ))
+        .add_breakpoint(Breakpoint::new("[string \"script\"]".to_string(), 2))
         .await
         .unwrap();
     coordinator
-        .add_breakpoint(Breakpoint::new(
-            "[string \"llmspell-bridge/src/lua/engine.rs:341:65\"]".to_string(),
-            4,
-        ))
+        .add_breakpoint(Breakpoint::new("[string \"script\"]".to_string(), 4))
         .await
         .unwrap();
 
@@ -214,12 +205,9 @@ async fn test_step_debugging_controls_execution() {
         .get_debug_coordinator()
         .expect("Debug coordinator should be available");
 
-    // Add initial breakpoint
+    // Add initial breakpoint - use "[string \"script\"]" to match set_name("script")
     coordinator
-        .add_breakpoint(Breakpoint::new(
-            "[string \"llmspell-bridge/src/lua/engine.rs:341:65\"]".to_string(),
-            2,
-        ))
+        .add_breakpoint(Breakpoint::new("[string \"script\"]".to_string(), 2))
         .await
         .unwrap();
 

@@ -50,7 +50,7 @@ async fn test_disabled_mode_allows_other_hooks() {
 
     // Now install debug hooks in Disabled mode
     let debug_hook =
-        install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
 
     // Verify debug hooks are in Disabled mode
     assert_eq!(
@@ -105,7 +105,7 @@ async fn test_debug_hook_lifecycle() {
 
     // Install debug hooks
     let debug_hook =
-        install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
 
     // Test code
     let test_code = "local x = 1\nlocal y = 2\nlocal z = x + y";
@@ -155,8 +155,7 @@ async fn test_debug_functionality_still_works() {
 
     // Install debug hooks - should auto-detect Minimal mode due to breakpoint
     let debug_hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     // Should be in Minimal mode now
     assert!(matches!(
@@ -219,7 +218,7 @@ async fn test_disabled_mode_performance_with_other_hooks() {
 
     // Install debug hooks in Disabled mode
     let debug_hook =
-        install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
 
     assert_eq!(
         debug_hook.lock().debug_cache().get_debug_mode(),

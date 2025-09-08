@@ -77,17 +77,18 @@ async fn test_state_persistence_basic() {
 async fn test_state_persistence_across_runtimes() {
     // Using in-memory state storage for tests
 
+    // Create shared StateManager that will persist across runtimes
+    let state_manager = Arc::new(
+        StateManager::new()
+            .await
+            .expect("Failed to create StateManager"),
+    );
+
     // Create first runtime and set state
     {
-        let state_manager = Arc::new(
-            StateManager::new()
-                .await
-                .expect("Failed to create StateManager"),
-        );
-
         let config = LLMSpellConfig::default();
         let runtime =
-            ScriptRuntime::new_with_engine_and_state_manager("lua", config, state_manager)
+            ScriptRuntime::new_with_engine_and_state_manager("lua", config, state_manager.clone())
                 .await
                 .expect("Failed to create runtime");
 
@@ -104,17 +105,11 @@ async fn test_state_persistence_across_runtimes() {
         assert_eq!(result.output.as_str().unwrap_or(""), "state saved");
     }
 
-    // Create second runtime and read state
+    // Create second runtime with SAME state manager and read state
     {
-        let state_manager = Arc::new(
-            StateManager::new()
-                .await
-                .expect("Failed to create StateManager"),
-        );
-
         let config = LLMSpellConfig::default();
         let runtime =
-            ScriptRuntime::new_with_engine_and_state_manager("lua", config, state_manager)
+            ScriptRuntime::new_with_engine_and_state_manager("lua", config, state_manager.clone())
                 .await
                 .expect("Failed to create runtime");
 

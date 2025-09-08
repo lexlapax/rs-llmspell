@@ -55,10 +55,13 @@ impl LuaDebugHookAdapter {
         let multiplexer = Arc::new(HookMultiplexer::new());
 
         // Create Layer 3 component: LuaExecutionHook (has Lua-specific breakpoint logic)
-        let lua_execution_hook = Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new(
-            execution_manager,
-            shared_context,
-        )));
+        // Initialize with Interactive mode since this adapter is for interactive debugging
+        let lua_execution_hook =
+            Arc::new(parking_lot::Mutex::new(LuaExecutionHook::new_with_mode(
+                execution_manager,
+                shared_context,
+                Some(crate::debug_state_cache::DebugMode::Full),
+            )));
 
         // Create Layer 3 component: LuaDebugBridge (Lua-specific coordination)
         // Note: LuaDebugBridge implements HookHandler and wraps LuaExecutionHook

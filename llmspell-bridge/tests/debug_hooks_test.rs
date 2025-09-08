@@ -20,8 +20,7 @@ async fn test_hook_installation() {
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install hooks - should start in Disabled mode since no breakpoints
-    let hook_handle =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context);
+    let hook_handle = install_interactive_debug_hooks(&lua, &execution_manager, shared_context);
     assert!(hook_handle.is_ok());
 
     let hook = hook_handle.unwrap();
@@ -51,8 +50,7 @@ async fn test_line_tracking() {
 
     // Install hooks - should be in Minimal mode now
     let hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     // Switch to Full mode for line tracking
     llmspell_bridge::lua::globals::execution::update_debug_mode(
@@ -97,8 +95,7 @@ async fn test_breakpoint_hit() {
 
     // Install hooks
     let _hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     // Execute code that should hit breakpoint
     let code = r"
@@ -136,8 +133,7 @@ async fn test_function_tracking() {
 
     // Install hooks and enable Full mode for function tracking
     let hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
@@ -179,8 +175,7 @@ async fn test_shared_context_enrichment() {
 
     // Install hooks and enable Full mode
     let hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     llmspell_bridge::lua::globals::execution::update_debug_mode(
         &lua,
@@ -320,7 +315,7 @@ async fn test_disabled_mode_performance() {
     let without_hooks = start.elapsed();
 
     // Install hooks in Disabled mode (no breakpoints, so should auto-select Disabled)
-    let hook = install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+    let hook = install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
     assert_eq!(
         hook.lock().debug_cache().get_debug_mode(),
         llmspell_bridge::debug_state_cache::DebugMode::Disabled
@@ -363,7 +358,7 @@ async fn test_performance_impact() {
     let without_hooks = start.elapsed();
 
     // Install hooks - should be in Disabled mode (no breakpoints)
-    let hook = install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+    let hook = install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
 
     // Verify we're in Disabled mode for maximum performance
     assert_eq!(

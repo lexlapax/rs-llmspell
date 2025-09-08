@@ -21,8 +21,7 @@ async fn test_step_debugging_mode_transitions() {
 
     // Install debug hooks
     let _hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     // Initially should be in Disabled mode
     assert_eq!(execution_manager.get_debug_mode(), DebugMode::Disabled);
@@ -52,8 +51,7 @@ async fn test_step_in() {
 
     // Install debug hooks
     let _hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     // Start in Minimal mode
     execution_manager.set_debug_mode(DebugMode::Minimal {
@@ -209,8 +207,7 @@ async fn test_step_execution_flow() {
 
     // Install hooks
     let _hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     // Create a simple Lua script
     let script = r"

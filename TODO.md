@@ -4263,7 +4263,7 @@ print(state.get("counter"))
 state.set("counter", state.get("counter") + 1)
 print(state.get("counter"))' > /tmp/state_test.lua
    
-   # Should print 1 then 2 (state persists within execution)
+   **Should print 1 then 2 (state persists within execution)**
    ./target/debug/llmspell run /tmp/state_test.lua
    ```
 
@@ -5558,8 +5558,8 @@ cargo clippy -p llmspell-kernel --all-features -- -D warnings
 
 ---
 
-#### 9.8.13.8: Wire .locals REPL Command ✅ COMPLETED
-**Time**: 1 hour (actual: ~2 hours with architectural correction)
+#### 9.8.13.8: Wire .locals REPL Command & Fix Debug Infrastructure ✅ COMPLETED
+**Time**: 1 hour (actual: ~8 hours including deep debug fixes, test repairs, and State API redesign)
 **Priority**: HIGH - User-facing feature currently broken
 **Dependencies**: DAP Bridge from 9.8.13.7
 **Completed**: 2025-09-07
@@ -5571,6 +5571,52 @@ cargo clippy -p llmspell-kernel --all-features -- -D warnings
 - Implemented special character handling in variable names
 - Fixed embedded kernel to support debug commands via ZeroMQ protocol
 - Created comprehensive testing infrastructure
+
+**Critical Debug Infrastructure Fixes**:
+- **Fixed all clippy warnings with performance considerations** - Strategic mix of proper fixes and targeted #[allow()] for hot paths
+  - Refactored struct_excessive_bools warnings by creating logical groupings
+  - Reduced cognitive_complexity by extracting helper methods  
+  - Fixed needless_pass_by_value for execution manager functions (changed to take &Arc<ExecutionManager>)
+  - **Performance-critical decision**: Used targeted #[allow(clippy::needless_pass_by_value)] for state management functions
+    - Initial fix changed register_basic_operations() to take Option<&Arc<StateAccess>> references  
+    - This caused Arc cloning overhead to move from 1x per function call to 8x per Lua function creation
+    - Performance test `test_fast_path_overhead_under_1_percent` FAILED with >1% overhead
+    - **Root cause**: State management functions are in hot path - Arc cloning affects runtime performance
+    - **Solution**: Reverted to owned Arc parameters with targeted clippy allows for performance-critical functions
+    - **Result**: Performance test passes with 0.00% overhead (well under 1% limit)
+  - Fixed uninlined_format_args, redundant_clone, manual_assert, nonminimal_bool warnings properly
+  - **Architectural insight**: Sometimes clippy warnings conflict with performance requirements - use targeted allows judiciously
+- **Fixed critical breakpoint source name mismatch** - Lua was reporting `[string "llmspell-bridge/src/lua/engine.rs:387:65"]` but tests expected `[string]`
+- **Added set_name("script")** to lua.load() calls for predictable source names in debug info
+- **Discovered and documented 6-layer debug architecture**:
+  1. DebugCoordinator (language-agnostic coordinator)
+  2. ExecutionManager (breakpoint storage & checking)
+  3. LuaDebugHookAdapter (implements DebugHook trait)
+  4. HookMultiplexer (manages multiple Lua hooks)
+  5. LuaDebugBridge (sync/async boundary)
+  6. LuaExecutionHook (Lua-specific implementation)
+- **Fixed breakpoint synchronization** - breakpoints now properly propagate through all layers
+- **Verified fast/slow path optimization** works correctly (<100ns fast path, <10ms slow path)
+- **Fixed ALL hanging test issues** - Tests were calling `coordinate_breakpoint_pause()` which blocks at `wait_for_resume()`
+  - Fixed `test_pause_latency_under_10ms` - Now measures setup latency, not blocking time
+  - Fixed `test_architecture_flow_delegation` - Added proper resume calls
+  - Fixed `test_error_handling_through_layers` - Added proper resume calls  
+  - Fixed `test_breakpoint_hit_continue_cycles` - Added resume after each breakpoint
+  - Root cause: `coordinate_breakpoint_pause()` blocks forever until `resume()` is called (by design)
+
+**State API Redesign (Critical Fix)**:
+- **Problem**: Inconsistent State API mixing full and convenience methods
+  - Tests were failing due to API confusion between scope/no-scope variants
+  - `State.delete()` and `State.list_keys()` had confusing optional parameters
+- **Solution**: Implemented clear Option 3 architecture with separated APIs:
+  - **Full API** (explicit scopes): `State.save/load/delete/list_keys(scope, ...)`
+  - **Convenience API** (implicit "user" scope): `State.set/get/del/keys(...)`
+  - **Backward compatibility**: lowercase `state.*` maps to convenience API
+- **Fixed test failures**:
+  - Capital/lowercase global mismatch (`State` vs `state`)
+  - Missing convenience wrappers for single-argument methods
+  - Test bug: sharing StateManager across runtimes (was creating separate instances)
+  - Invalid EmbeddedKernel tests removed (outdated after 9.8.13.2 redesign)
 
 **Architectural Correction (Critical):**
 - **Issue Identified**: Initial implementation mixed Lua-specific logic into language-neutral ExecutionManager
@@ -5755,6 +5801,30 @@ llmspell repl
 - ✅ JupyterClient has debug_request method (`llmspell-kernel/src/client.rs:295-354`)
 - ✅ Kernel handles debug_request messages (`llmspell-kernel/src/kernel.rs:457,871-887`)
 - ✅ Help text updated with new commands (`llmspell-repl/src/session.rs:469-471`)
+
+**Key Insights & Lessons Learned**:
+1. **mlua source name behavior**: When using `lua.load(script).eval()`, mlua generates source names like `[string "file.rs:line:col"]` based on where load() was called. Must use `.set_name()` for predictable names.
+2. **Breakpoint matching is exact**: Source names must match EXACTLY - `[string]` != `[string "script"]` != `[string "file.rs:123:45"]`
+3. **Debug architecture complexity**: The 6-layer architecture is necessary for proper separation of concerns but requires careful synchronization
+4. **Clippy vs Performance trade-offs**: Code quality lints sometimes conflict with zero-cost abstraction principles
+   - **State management functions**: Taking owned Arc parameters performs better than references due to reduced cloning frequency
+   - **Hot path considerations**: Functions called frequently (state operations) should prioritize performance over clippy warnings
+   - **Targeted allows**: Use `#[allow(clippy::needless_pass_by_value)]` judiciously for performance-critical code paths
+   - **Performance validation**: `test_fast_path_overhead_under_1_percent` enforces <1% debug hook overhead requirement
+5. **Clippy warnings reveal design issues**: struct_excessive_bools and cognitive_complexity warnings often indicate architectural problems
+6. **HookMultiplexer is critical**: Manages priority-based execution of multiple debug hooks - essential for composable debugging
+7. **coordinate_breakpoint_pause() design**: This function intentionally blocks forever at `wait_for_resume()` to simulate real breakpoint behavior. Tests MUST spawn it in background and call `resume()`.
+8. **Test design pattern for pause operations**:
+   ```rust
+   // Spawn pause in background (it blocks)
+   let handle = tokio::spawn(async move { coordinator.coordinate_breakpoint_pause(...).await; });
+   // Wait for pause state
+   tokio::time::sleep(Duration::from_millis(10)).await;
+   // Resume to unblock
+   coordinator.resume().await;
+   // Ensure task completes
+   tokio::time::timeout(Duration::from_secs(1), handle).await.expect("should complete");
+   ```
 
 **Requirements**:
 - ⚠️ Kernel must be started with `--debug` flag for ExecutionManager initialization

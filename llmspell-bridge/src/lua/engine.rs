@@ -165,23 +165,30 @@ impl LuaEngine {
 
     /// Set a debugger for the engine
     #[cfg(feature = "lua")]
+    #[allow(clippy::needless_pass_by_value)]
     pub fn set_debugger(
         &mut self,
         execution_manager: Arc<crate::execution_bridge::ExecutionManager>,
     ) {
         self.execution_manager = Some(execution_manager.clone());
 
-        // Install execution hooks in Lua
-        let lua_guard = self.lua.lock();
-        let shared_context = Arc::new(tokio::sync::RwLock::new(
-            crate::execution_context::SharedExecutionContext::new(),
-        ));
-        if let Ok(hook) = crate::lua::globals::execution::install_interactive_debug_hooks(
-            &lua_guard,
-            execution_manager,
-            shared_context,
-        ) {
-            self.execution_hook = Some(hook);
+        // Only install execution hooks if we don't already have a LuaDebugHookAdapter
+        // The adapter installs its own hooks with the correct debug mode
+        if self.lua_debug_adapter.is_none() && self.execution_hook.is_none() {
+            // Install execution hooks in Lua
+            let lua_guard = self.lua.lock();
+            let shared_context = Arc::new(tokio::sync::RwLock::new(
+                crate::execution_context::SharedExecutionContext::new(),
+            ));
+            if let Ok(hook) = crate::lua::globals::execution::install_interactive_debug_hooks(
+                &lua_guard,
+                &execution_manager,
+                shared_context,
+            ) {
+                self.execution_hook = Some(hook);
+            }
+        } else {
+            tracing::debug!("Skipping hook installation in set_debugger - hooks already installed");
         }
     }
 
@@ -232,16 +239,19 @@ impl LuaEngine {
         // Create SharedDebugContext for trait-based operations (9.2.7b pattern)
         let debug_context = SharedDebugContext::new(shared_context.clone());
 
-        // Install enhanced debug hooks with trait-based evaluators if needed
+        // Only install debug hooks if we don't already have them
+        // This prevents overwriting hooks that were properly configured during initialization
         if let Some(execution_manager) = &self.execution_manager {
-            let lua_guard = self.lua.lock();
-            if let Ok(_hook) = crate::lua::globals::execution::install_interactive_debug_hooks(
-                &lua_guard,
-                execution_manager.clone(),
-                shared_context.clone(),
-            ) {
-                // Store hook temporarily (note: this would need to be handled better in production)
-                drop(lua_guard); // Release lock before async operations
+            if self.lua_debug_adapter.is_none() && self.execution_hook.is_none() {
+                let lua_guard = self.lua.lock();
+                if let Ok(_hook) = crate::lua::globals::execution::install_interactive_debug_hooks(
+                    &lua_guard,
+                    execution_manager,
+                    shared_context.clone(),
+                ) {
+                    // Store hook temporarily (note: this would need to be handled better in production)
+                    drop(lua_guard); // Release lock before async operations
+                }
             }
         }
 
@@ -375,7 +385,10 @@ impl ScriptEngineBridge for LuaEngine {
                     }
                 }
 
-                let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
+                // Set a predictable name for the chunk to enable reliable breakpoint matching
+                // Using "script" as the name makes the source "[string \"script\"]" in debug info
+                let lua_result: mlua::Result<mlua::Value> =
+                    lua.load(script).set_name("script").eval();
 
                 // Run garbage collection after script execution to prevent memory accumulation
                 // This is especially important when running many scripts in sequence

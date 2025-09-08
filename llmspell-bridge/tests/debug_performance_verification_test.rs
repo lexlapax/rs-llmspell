@@ -83,8 +83,9 @@ async fn test_fast_path_overhead_under_1_percent() {
     );
 }
 
-/// Test 2: Pause Latency < 10ms
-/// Verifies that pausing at a breakpoint completes within 10ms
+/// Test 2: Pause Setup Latency < 10ms
+/// Verifies that transitioning to paused state completes within 10ms
+/// (Does NOT measure the blocking wait time, just the setup time)
 #[tokio::test]
 async fn test_pause_latency_under_10ms() {
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
@@ -113,18 +114,44 @@ async fn test_pause_latency_under_10ms() {
         ),
     ]);
 
-    // Measure pause latency
-    let start = Instant::now();
-    coordinator
-        .coordinate_breakpoint_pause(location, variables)
-        .await;
-    let pause_latency = start.elapsed();
+    let coordinator_clone = coordinator.clone();
 
-    println!("Pause latency: {pause_latency:?}");
+    // Spawn the pause operation in a background task (it will block waiting for resume)
+    let pause_handle = tokio::spawn(async move {
+        coordinator_clone
+            .coordinate_breakpoint_pause(location, variables)
+            .await;
+    });
+
+    // Measure how long it takes to transition to Paused state
+    let start = Instant::now();
+
+    // Poll until we're paused (with timeout to prevent infinite wait)
+    let timeout = Duration::from_millis(100);
+    let poll_start = Instant::now();
+
+    while !coordinator.is_paused().await {
+        assert!(
+            poll_start.elapsed() <= timeout,
+            "Coordinator never transitioned to paused state"
+        );
+        tokio::time::sleep(Duration::from_micros(100)).await;
+    }
+
+    let pause_setup_latency = start.elapsed();
+    println!("Pause setup latency: {pause_setup_latency:?}");
+
+    // Resume so the background task can complete
+    coordinator.resume().await;
+
+    // Wait for the pause task to complete
+    let _ = tokio::time::timeout(Duration::from_secs(1), pause_handle)
+        .await
+        .expect("Pause task should complete after resume");
 
     assert!(
-        pause_latency < Duration::from_millis(10),
-        "Pause latency was {pause_latency:?}, expected < 10ms"
+        pause_setup_latency < Duration::from_millis(10),
+        "Pause setup latency was {pause_setup_latency:?}, expected < 10ms"
     );
 }
 

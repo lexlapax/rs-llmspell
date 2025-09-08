@@ -215,7 +215,7 @@ async fn test_execution_hook_integration() {
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     // Install debug hooks
-    let hook = install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+    let hook = install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
 
     // Access the debug cache through the hook (it's locked with a Mutex)
     let cache = {

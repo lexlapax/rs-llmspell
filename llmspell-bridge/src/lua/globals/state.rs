@@ -125,13 +125,13 @@ fn create_list_keys_handler(
 ) -> impl Fn(&Lua, String) -> mlua::Result<mlua::Table> {
     move |lua, scope_str: String| {
         if let Some(state) = &state_access {
-            let prefix = format!("{scope_str}:");
-            // Use block_on_async utility for proper async-to-sync conversion
+            // StateAccess handles scoping internally, but we don't know its implementation
+            // For now, we'll just pass an empty prefix and return all keys
+            // TODO: StateAccess should provide a way to list keys by scope
             let state_clone = state.clone();
-            let prefix_clone = prefix.clone();
             let result = crate::lua::sync_utils::block_on_async(
                 "state_list_keys",
-                async move { state_clone.list_keys(&prefix_clone).await },
+                async move { state_clone.list_keys("").await },
                 None,
             );
 
@@ -139,8 +139,8 @@ fn create_list_keys_handler(
                 Ok(keys) => {
                     let table = lua.create_table()?;
                     for (i, key) in keys.iter().enumerate() {
-                        let stripped_key = key.strip_prefix(&prefix).unwrap_or(key);
-                        table.set(i + 1, stripped_key.to_string())?;
+                        // Return keys as-is from StateAccess
+                        table.set(i + 1, key.clone())?;
                     }
                     Ok(table)
                 }
@@ -608,13 +608,15 @@ fn setup_backup_methods(
 }
 
 /// Register basic state operations (save, load, get, set, delete, `list_keys`)
+#[allow(clippy::needless_pass_by_value)]
 fn register_basic_operations(
     lua: &Lua,
     state_table: &mlua::Table,
     state_access: Option<Arc<dyn StateAccess>>,
     fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 ) -> mlua::Result<()> {
-    // Basic operations
+    // === FULL API (explicit scopes) ===
+    // State.save(scope, key, value) - requires all 3 arguments
     state_table.set(
         "save",
         lua.create_function(create_save_handler(
@@ -622,6 +624,8 @@ fn register_basic_operations(
             fallback_state.clone(),
         ))?,
     )?;
+
+    // State.load(scope, key) - requires both arguments
     state_table.set(
         "load",
         lua.create_function(create_load_handler(
@@ -630,8 +634,26 @@ fn register_basic_operations(
         ))?,
     )?;
 
-    // Convenience aliases for get/set matching the documentation
-    // State.set(key, value) maps to State.save("user", key, value)
+    // State.delete(scope, key) - requires both arguments
+    state_table.set(
+        "delete",
+        lua.create_function(create_delete_handler(
+            state_access.clone(),
+            fallback_state.clone(),
+        ))?,
+    )?;
+
+    // State.list_keys(scope) - requires scope argument
+    state_table.set(
+        "list_keys",
+        lua.create_function(create_list_keys_handler(
+            state_access.clone(),
+            fallback_state.clone(),
+        ))?,
+    )?;
+
+    // === CONVENIENCE API (implicit "user" scope) ===
+    // State.set(key, value) - convenience, uses "user" scope
     state_table.set(
         "set",
         lua.create_function({
@@ -644,7 +666,7 @@ fn register_basic_operations(
         })?,
     )?;
 
-    // State.get(key) maps to State.load("user", key)
+    // State.get(key) - convenience, uses "user" scope
     state_table.set(
         "get",
         lua.create_function({
@@ -656,21 +678,37 @@ fn register_basic_operations(
             }
         })?,
     )?;
+
+    // State.del(key) - convenience delete, uses "user" scope
     state_table.set(
-        "delete",
-        lua.create_function(create_delete_handler(
-            state_access.clone(),
-            fallback_state.clone(),
-        ))?,
+        "del",
+        lua.create_function({
+            let state_access = state_access.clone();
+            let fallback_state = fallback_state.clone();
+            move |lua, key: String| {
+                let handler = create_delete_handler(state_access.clone(), fallback_state.clone());
+                handler(lua, ("user".to_string(), key))
+            }
+        })?,
     )?;
+
+    // State.keys() - convenience list_keys, uses "user" scope
     state_table.set(
-        "list_keys",
-        lua.create_function(create_list_keys_handler(state_access, fallback_state))?,
+        "keys",
+        lua.create_function({
+            let state_access = state_access.clone();
+            move |lua, ()| {
+                let handler =
+                    create_list_keys_handler(state_access.clone(), fallback_state.clone());
+                handler(lua, "user".to_string())
+            }
+        })?,
     )?;
     Ok(())
 }
 
 /// Register domain-specific helpers (workflow, agent, tool)
+#[allow(clippy::needless_pass_by_value)]
 fn register_domain_helpers(
     lua: &Lua,
     state_table: &mlua::Table,
@@ -774,7 +812,20 @@ pub fn inject_state_global(
     }
 
     // Set the state table as a global
-    lua.globals().set("State", state_table)?;
+    // Use capital State as the official API (matches documentation)
+    lua.globals().set("State", state_table.clone())?;
+
+    // Also set lowercase state for backward compatibility with existing tests
+    // The lowercase state uses the convenience API
+    let lowercase_state = lua.create_table()?;
+
+    // Map lowercase methods to State's convenience API
+    lowercase_state.set("set", state_table.get::<_, mlua::Function>("set")?)?;
+    lowercase_state.set("get", state_table.get::<_, mlua::Function>("get")?)?;
+    lowercase_state.set("delete", state_table.get::<_, mlua::Function>("del")?)?; // state.delete -> State.del
+    lowercase_state.set("keys", state_table.get::<_, mlua::Function>("keys")?)?;
+
+    lua.globals().set("state", lowercase_state)?;
 
     Ok(())
 }

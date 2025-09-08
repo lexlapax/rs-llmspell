@@ -45,7 +45,7 @@ impl InteractiveDebugger {
         let _hook_handle =
             llmspell_bridge::lua::globals::execution::install_interactive_debug_hooks(
                 lua,
-                self.execution_manager.clone(),
+                &self.execution_manager,
                 self.shared_context.clone(),
             )
             .map_err(|e| anyhow::anyhow!("Failed to install debug hooks: {}", e))?;

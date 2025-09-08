@@ -60,7 +60,7 @@ async fn test_llmspell_hooks_work_with_debug_hooks() {
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
 
     let _debug_hook =
-        install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
 
     // llmspell hooks should still work - they don't use debug hooks
     lua.load(
@@ -107,8 +107,7 @@ async fn test_both_hook_systems_in_same_script() {
     execution_manager.add_breakpoint(bp).await;
 
     let debug_hook =
-        install_interactive_debug_hooks(&lua, execution_manager.clone(), shared_context.clone())
-            .unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context.clone()).unwrap();
 
     // Switch to Full mode
     llmspell_bridge::lua::globals::execution::update_debug_mode(
@@ -190,7 +189,7 @@ async fn test_llmspell_hooks_performance() {
     let execution_manager = Arc::new(ExecutionManager::new(Arc::new(LuaDebugStateCache::new())));
     let shared_context = Arc::new(RwLock::new(SharedExecutionContext::new()));
     let _debug_hook =
-        install_interactive_debug_hooks(&lua, execution_manager, shared_context).unwrap();
+        install_interactive_debug_hooks(&lua, &execution_manager, shared_context).unwrap();
 
     // Measure again with debug hooks
     let start = std::time::Instant::now();
