@@ -127,25 +127,9 @@ pub enum Commands {
         #[arg(long)]
         stream: bool,
 
-        /// Enable RAG functionality (overrides config)
-        #[arg(long)]
-        rag: bool,
-
-        /// Disable RAG functionality (overrides config)
-        #[arg(long)]
-        no_rag: bool,
-
-        /// Custom RAG configuration file
-        #[arg(long, value_name = "FILE")]
-        rag_config: Option<PathBuf>,
-
-        /// Override vector storage dimensions
-        #[arg(long, value_name = "SIZE")]
-        rag_dims: Option<usize>,
-
-        /// Override vector storage backend (hnsw, mock)
-        #[arg(long, value_name = "BACKEND")]
-        rag_backend: Option<String>,
+        /// RAG profile to use (e.g., "production", "development")
+        #[arg(long, value_name = "PROFILE")]
+        rag_profile: Option<String>,
 
         /// Script arguments
         #[arg(last = true)]
@@ -166,25 +150,9 @@ pub enum Commands {
         #[arg(long)]
         stream: bool,
 
-        /// Enable RAG functionality (overrides config)
-        #[arg(long)]
-        rag: bool,
-
-        /// Disable RAG functionality (overrides config)
-        #[arg(long)]
-        no_rag: bool,
-
-        /// Custom RAG configuration file
-        #[arg(long, value_name = "FILE")]
-        rag_config: Option<PathBuf>,
-
-        /// Override vector storage dimensions
-        #[arg(long, value_name = "SIZE")]
-        rag_dims: Option<usize>,
-
-        /// Override vector storage backend (hnsw, mock)
-        #[arg(long, value_name = "BACKEND")]
-        rag_backend: Option<String>,
+        /// RAG profile to use (e.g., "production", "development")
+        #[arg(long, value_name = "PROFILE")]
+        rag_profile: Option<String>,
     },
 
     /// Start interactive REPL
@@ -196,6 +164,10 @@ pub enum Commands {
         /// History file path
         #[arg(long)]
         history: Option<PathBuf>,
+
+        /// RAG profile to use (e.g., "production", "development")
+        #[arg(long, value_name = "PROFILE")]
+        rag_profile: Option<String>,
     },
 
     /// Available Providers
@@ -205,29 +177,11 @@ pub enum Commands {
         detailed: bool,
     },
 
-    /// Validate configuration
-    Validate {
-        /// Configuration file to validate
-        #[arg(short, long)]
-        config: Option<PathBuf>,
-    },
-
     /// Show engine information
     Info {
         /// Show all engines (including unavailable)
         #[arg(long)]
         all: bool,
-    },
-
-    /// Initialize configuration file
-    Init {
-        /// Output path for configuration file
-        #[arg(short, long, default_value = "llmspell.toml")]
-        output: PathBuf,
-
-        /// Force overwrite existing file
-        #[arg(short, long)]
-        force: bool,
     },
 
     /// Manage API keys for external services
@@ -251,6 +205,24 @@ pub enum Commands {
         force: bool,
     },
 
+    /// Manage persistent state
+    State {
+        #[command(subcommand)]
+        command: StateCommands,
+    },
+
+    /// Manage sessions and replay
+    Session {
+        #[command(subcommand)]
+        command: SessionCommands,
+    },
+
+    /// Configuration management
+    Config {
+        #[command(subcommand)]
+        command: ConfigCommands,
+    },
+
     /// Debug a script with interactive debugging
     Debug {
         /// Script to debug
@@ -263,6 +235,10 @@ pub enum Commands {
         /// DAP server port
         #[arg(long)]
         port: Option<u16>,
+
+        /// RAG profile to use (e.g., "production", "development")
+        #[arg(long, value_name = "PROFILE")]
+        rag_profile: Option<String>,
 
         /// Script arguments
         #[arg(last = true)]
@@ -316,6 +292,135 @@ pub enum KernelCommands {
         /// If not provided, uses the last successful connection
         address: Option<String>,
     },
+}
+
+/// State management subcommands
+#[derive(Subcommand, Debug)]
+pub enum StateCommands {
+    /// Show state value(s)
+    Show {
+        /// Specific state key to show (if not provided, shows all)
+        key: Option<String>,
+    },
+
+    /// Clear state value(s)
+    Clear {
+        /// Specific state key to clear (if not provided, clears all)
+        key: Option<String>,
+    },
+
+    /// Export state to file
+    Export {
+        /// Output file path
+        file: PathBuf,
+        /// Export format
+        #[arg(long, value_enum, default_value = "json")]
+        format: ExportFormat,
+    },
+
+    /// Import state from file
+    Import {
+        /// Input file path
+        file: PathBuf,
+        /// Merge with existing state instead of replacing
+        #[arg(long)]
+        merge: bool,
+    },
+}
+
+/// Session management subcommands
+#[derive(Subcommand, Debug)]
+pub enum SessionCommands {
+    /// List all sessions
+    List {
+        /// Show detailed session information
+        #[arg(long)]
+        detailed: bool,
+    },
+
+    /// Replay session history
+    Replay {
+        /// Session ID to replay
+        id: String,
+        /// Start from specific step
+        #[arg(long)]
+        from_step: Option<usize>,
+        /// Stop at specific step
+        #[arg(long)]
+        to_step: Option<usize>,
+    },
+
+    /// Delete session
+    Delete {
+        /// Session ID to delete
+        id: String,
+        /// Delete all sessions
+        #[arg(long)]
+        all: bool,
+    },
+
+    /// Export session to file
+    Export {
+        /// Session ID to export
+        id: String,
+        /// Output file path
+        file: PathBuf,
+        /// Export format
+        #[arg(long, value_enum, default_value = "json")]
+        format: ExportFormat,
+    },
+}
+
+/// Configuration management subcommands
+#[derive(Subcommand, Debug)]
+pub enum ConfigCommands {
+    /// Initialize configuration file
+    Init {
+        /// Output path for configuration file
+        #[arg(short, long, default_value = "llmspell.toml")]
+        output: PathBuf,
+        /// Force overwrite existing file
+        #[arg(short, long)]
+        force: bool,
+    },
+
+    /// Validate configuration
+    Validate {
+        /// Configuration file to validate
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+    },
+
+    /// Show current configuration
+    Show {
+        /// Show specific config section
+        section: Option<String>,
+        /// Output format
+        #[arg(long, value_enum, default_value = "toml")]
+        format: ConfigFormat,
+    },
+}
+
+/// Export/import format options
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ExportFormat {
+    /// JSON format
+    Json,
+    /// YAML format
+    Yaml,
+    /// TOML format
+    Toml,
+}
+
+/// Config format options
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum ConfigFormat {
+    /// TOML format (default for configs)
+    Toml,
+    /// JSON format
+    Json,
+    /// YAML format
+    Yaml,
 }
 
 /// Available example applications

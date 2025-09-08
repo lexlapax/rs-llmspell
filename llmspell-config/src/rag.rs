@@ -22,6 +22,52 @@ pub struct RAGConfig {
     pub multi_tenant: bool,
     /// Cache configuration
     pub cache: RAGCacheConfig,
+    /// Named RAG profiles for simplified command-line usage
+    #[serde(default)]
+    pub profiles: std::collections::HashMap<String, RAGProfile>,
+}
+
+/// RAG profile for simplified command-line usage
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct RAGProfile {
+    /// Enable RAG functionality for this profile
+    pub enabled: bool,
+    /// Vector storage backend (optional override)
+    pub backend: Option<VectorBackend>,
+    /// Vector dimensions (optional override)
+    pub dimensions: Option<usize>,
+    /// Custom configuration file (optional override)
+    pub config_file: Option<PathBuf>,
+    /// Description of this profile
+    pub description: Option<String>,
+}
+
+impl Default for RAGProfile {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            backend: None,
+            dimensions: None,
+            config_file: None,
+            description: None,
+        }
+    }
+}
+
+impl RAGProfile {
+    /// Apply this profile's overrides to a base RAG config
+    pub fn apply_to_config(&self, config: &mut RAGConfig) {
+        config.enabled = self.enabled;
+        
+        if let Some(backend) = &self.backend {
+            config.vector_storage.backend = backend.clone();
+        }
+        
+        if let Some(dimensions) = self.dimensions {
+            config.vector_storage.dimensions = dimensions;
+        }
+    }
 }
 
 /// Vector storage backend configuration

@@ -16,7 +16,7 @@ pub use crate::env::{EnvCategory, EnvRegistry, EnvVarDef, EnvVarDefBuilder, Isol
 pub use crate::providers::{ProviderConfig, ProviderManagerConfig, ProviderManagerConfigBuilder};
 pub use crate::rag::{
     ChunkingConfig, ChunkingStrategy, DistanceMetric, EmbeddingConfig, HNSWConfig, RAGCacheConfig,
-    RAGConfig, RAGConfigBuilder, VectorBackend, VectorStorageConfig,
+    RAGConfig, RAGConfigBuilder, RAGProfile, VectorBackend, VectorStorageConfig,
 };
 pub use crate::tools::{FileOperationsConfig, ToolsConfig};
 

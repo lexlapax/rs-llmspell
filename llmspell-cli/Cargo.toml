@@ -18,7 +18,10 @@ llmspell-bridge = { path = "../llmspell-bridge" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-sessions = { path = "../llmspell-sessions" }
 llmspell-storage = { path = "../llmspell-storage" }
+llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-events = { path = "../llmspell-events" }
 llmspell-repl = { path = "../llmspell-repl" }
 llmspell-debug = { path = "../llmspell-debug" }
 llmspell-kernel = { path = "../llmspell-kernel" }
@@ -35,6 +38,7 @@ indicatif = "0.17"
 tokio-stream = { workspace = true }
 chrono = { workspace = true }
 toml = { workspace = true }
+serde_yaml = { workspace = true }
 once_cell = { workspace = true }
 uuid = { workspace = true }
 dialoguer = "0.11"
