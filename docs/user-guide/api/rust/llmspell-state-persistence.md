@@ -1,6 +1,6 @@
 # llmspell-state-persistence
 
-**State management with automatic persistence and migration**
+**State management with automatic persistence and migration** **🔄 UPDATED Phase 9**
 
 **🔗 Navigation**: [← Rust API](README.md) | [Crate Docs](https://docs.rs/llmspell-state-persistence) | [Source](../../../../llmspell-state-persistence)
 
@@ -8,10 +8,11 @@
 
 ## Overview
 
-`llmspell-state-persistence` provides comprehensive state management with automatic persistence, versioning, migration, and multi-tenant isolation. It extends the basic state traits with production-ready persistence capabilities including backup/restore, schema evolution, and transaction support.
+`llmspell-state-persistence` provides comprehensive state management with automatic persistence, now integrated with the kernel architecture in Phase 9. State persistence works through the kernel's embedded StateManager, ensuring state consistency across script executions.
 
 **Key Features:**
 - 🔄 Automatic state persistence to disk/database
+- 🎯 Kernel-integrated state management (NEW Phase 9)
 - 📦 Schema versioning and migration
 - 🏢 Multi-tenant state isolation  
 - 💾 Backup and restore capabilities
@@ -19,6 +20,7 @@
 - 🔍 State querying and indexing
 - 🛡️ Encryption at rest
 - 📊 State metrics and monitoring
+- 🔗 Session persistence across kernel restarts (NEW Phase 9)
 
 ## Core Components
 
@@ -70,6 +72,63 @@ pub trait StateManager: Send + Sync {
 }
 ```
 
+### Kernel Integration (NEW Phase 9)
+
+State persistence now integrates with the kernel architecture:
+
+```rust
+use llmspell_kernel::{JupyterKernel, ConnectionInfo};
+use llmspell_state_persistence::{StateManager, StateFactory};
+use llmspell_config::LLMSpellConfig;
+
+// Kernel automatically creates and manages StateManager
+let config = Arc::new(LLMSpellConfig::default());
+let kernel = JupyterKernel::from_config(config).await?;
+
+// State manager is created inside kernel
+// Access through kernel's runtime
+let runtime = kernel.runtime.lock().await;
+let state_manager = runtime.state_manager();
+
+// State persists across script executions
+state_manager.set("counter", json!(0)).await?;
+
+// Execute script that modifies state
+kernel.execute("State.set('counter', State.get('counter') + 1)").await?;
+
+// State is automatically persisted
+let counter = state_manager.get("counter").await?;
+assert_eq!(counter, Some(json!(1)));
+```
+
+### StateFactory for Kernel Integration
+
+```rust
+pub struct StateFactory;
+
+impl StateFactory {
+    /// Create state manager from config (used by kernel)
+    pub async fn create_from_config(
+        config: &LLMSpellConfig
+    ) -> Result<Option<Arc<StateManager>>> {
+        if !config.storage.enabled {
+            return Ok(None);
+        }
+        
+        let state_config = StateConfig {
+            backend: config.storage.backend.clone(),
+            path: config.storage.path.clone(),
+            encryption: config.storage.encryption,
+            tenant_id: config.tenancy.as_ref()
+                .and_then(|t| t.default_tenant.clone()),
+        };
+        
+        let manager = PersistentStateManager::new(state_config).await?;
+        Ok(Some(Arc::new(manager)))
+    }
+}
+```
+
 ### PersistentStateManager Implementation
 
 Production-ready state manager with SQLite backend:
@@ -81,6 +140,7 @@ pub struct PersistentStateManager {
     tenant_id: Option<TenantId>,
     encryption: Option<Box<dyn Encryptor>>,
     metrics: Arc<StateMetrics>,
+    session_cache: Arc<RwLock<HashMap<String, SessionState>>>, // NEW
 }
 
 impl PersistentStateManager {
@@ -98,6 +158,7 @@ impl PersistentStateManager {
             tenant_id: None,
             encryption: None,
             metrics: Arc::new(StateMetrics::default()),
+            session_cache: Arc::new(RwLock::new(HashMap::new())),
         })
     }
     
@@ -111,6 +172,26 @@ impl PersistentStateManager {
     pub fn with_tenant(mut self, tenant_id: TenantId) -> Self {
         self.tenant_id = Some(tenant_id);
         self
+    }
+    
+    /// Get or create session state (NEW Phase 9)
+    pub async fn get_session_state(&self, session_id: &str) -> Result<SessionState> {
+        // Check cache first
+        if let Some(state) = self.session_cache.read().await.get(session_id) {
+            return Ok(state.clone());
+        }
+        
+        // Load from database
+        let state = self.load_session_from_db(session_id).await?
+            .unwrap_or_else(|| SessionState::new(session_id));
+        
+        // Cache it
+        self.session_cache.write().await.insert(
+            session_id.to_string(),
+            state.clone()
+        );
+        
+        Ok(state)
     }
 }
 ```

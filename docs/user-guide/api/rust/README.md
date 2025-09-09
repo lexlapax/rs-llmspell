@@ -8,9 +8,9 @@
 
 ## Overview
 
-> **🦀 Rust API**: Comprehensive documentation for all 19 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components.
+> **🦀 Rust API**: Comprehensive documentation for all 23 LLMSpell crates, covering traits, implementations, and extension patterns for building custom components with kernel architecture and debug support.
 
-**Version**: 0.8.0 | **Status**: Phase 8 Complete | **Last Updated**: December 2024
+**Version**: 0.9.0 | **Status**: Phase 9 Complete | **Last Updated**: December 2025
 
 ## 📚 Crate Documentation
 
@@ -19,9 +19,10 @@
 #### 1. [llmspell-core](llmspell-core.md)
 **Foundation traits and types**
 - `BaseAgent` trait - Foundation for all components
-- `ExecutionContext` - Runtime context management
+- `ExecutionContext` - Runtime context management with debug support
 - Error handling with `LLMSpellError`
 - Component metadata and lifecycle
+- Debug capability traits
 
 #### 2. [llmspell-utils](llmspell-utils.md)
 **Shared utilities and helpers**
@@ -38,45 +39,82 @@
 - Property-based test generators
 - Fixtures and benchmarking
 
+### Kernel and Execution (4 crates) ⭐ **Phase 9**
+
+#### 4. [llmspell-kernel](llmspell-kernel.md) ⭐ **NEW Phase 9**
+**Jupyter-compatible execution kernel**
+- `GenericKernel<T, P>` trait-based architecture
+- Jupyter protocol implementation with ZeroMQ
+- EmbeddedKernel (background thread model)
+- DAP Bridge for IDE debugging (10 essential commands)
+- Connection discovery and auto-spawn
+- Session persistence across executions
+
+#### 5. [llmspell-repl](llmspell-repl.md) ⭐ **NEW Phase 9**
+**REPL session management**
+- Interactive REPL with debug commands
+- `.break`, `.step`, `.locals`, `.stack` commands
+- Session state management
+- Kernel connection handling
+- Command history and completion
+
+#### 6. [llmspell-debug](llmspell-debug.md) ⭐ **NEW Phase 9**
+**Debug infrastructure**
+- `InteractiveDebugger` with breakpoint management
+- Conditional breakpoints with hit/ignore counts
+- Variable inspection with lazy expansion
+- Call stack navigation
+- Debug session recording and replay
+
+#### 7. [llmspell-bridge](llmspell-bridge.md) **UPDATED Phase 9**
+**Script language bridges with debug support**
+- Lua integration with debug hooks
+- `ExecutionManager` for breakpoint control
+- `DiagnosticsBridge` for logging/profiling
+- Type conversion and global injection
+- Performance optimization with <3% debug overhead
+
 ### State and Storage (4 crates)
 
-#### 4. [llmspell-storage](llmspell-storage.md) ⭐ **Phase 8**
+#### 8. [llmspell-storage](llmspell-storage.md)
 **Vector and key-value storage**
 - HNSW vector storage for RAG
 - Multiple backend implementations
 - Multi-tenant data isolation
 - Collection management
 
-#### 5. [llmspell-state-persistence](llmspell-state-persistence.md)
+#### 9. [llmspell-state-persistence](llmspell-state-persistence.md)
 **State management with persistence**
 - `StateManager` trait
 - Scoped state operations
 - Migration and versioning
 - Backup and restore
+- Integration with kernel architecture
 
-#### 6. [llmspell-state-traits](llmspell-state-traits.md)
+#### 10. [llmspell-state-traits](llmspell-state-traits.md)
 **State trait definitions**
 - Core state interfaces
 - Persistence traits
 - Scope and isolation traits
 
-#### 7. [llmspell-sessions](llmspell-sessions.md)
+#### 11. [llmspell-sessions](llmspell-sessions.md)
 **Session management**
 - Session lifecycle
 - Artifact storage
 - Session replay
 - Security contexts
+- Debug session support
 
-### Security and Multi-Tenancy (3 crates)
+### Security and Multi-Tenancy (2 crates)
 
-#### 8. [llmspell-security](llmspell-security.md)
+#### 12. [llmspell-security](llmspell-security.md)
 **Security framework**
 - Access control policies
 - Authentication/authorization
 - Input validation
 - Audit logging
 
-#### 9. [llmspell-tenancy](llmspell-tenancy.md) ⭐ **Phase 8**
+#### 13. [llmspell-tenancy](llmspell-tenancy.md)
 **Multi-tenant isolation**
 - Tenant management
 - Resource quotas
@@ -85,15 +123,16 @@
 
 ### AI and RAG Components (3 crates)
 
-#### 10. [llmspell-rag](llmspell-rag.md) ⭐ **Phase 8**
+#### 14. [llmspell-rag](llmspell-rag.md)
 **Retrieval-Augmented Generation**
 - Document ingestion pipeline
 - Chunking strategies
 - Embedding providers
 - Vector search integration
 - Multi-tenant RAG
+- RAG profiles for simplified configuration
 
-#### 11. [llmspell-agents](llmspell-agents.md)
+#### 15. [llmspell-agents](llmspell-agents.md)
 **Agent framework**
 - Agent trait and builders
 - Context management
@@ -101,7 +140,7 @@
 - Agent composition
 - Templates and discovery
 
-#### 12. [llmspell-providers](llmspell-providers.md)
+#### 16. [llmspell-providers](llmspell-providers.md)
 **LLM provider integrations**
 - Provider trait
 - OpenAI, Anthropic, Ollama
@@ -110,216 +149,231 @@
 
 ### Execution and Orchestration (4 crates)
 
-#### 13. [llmspell-workflows](llmspell-workflows.md)
+#### 17. [llmspell-workflows](llmspell-workflows.md)
 **Workflow orchestration**
 - Sequential, parallel, conditional flows
 - Step definitions
 - Error handling
 - State management
 
-#### 14. [llmspell-tools](llmspell-tools.md)
+#### 18. [llmspell-tools](llmspell-tools.md)
 **Tool system**
 - Tool trait and registry
 - Built-in tools (100+)
 - Security levels
 - Tool composition
 
-#### 15. [llmspell-hooks](llmspell-hooks.md)
+#### 19. [llmspell-hooks](llmspell-hooks.md)
 **Hook system**
 - Lifecycle hooks
 - Event interception
 - Hook priorities
 - Replay support
+- Debug hook integration
 
-#### 16. [llmspell-events](llmspell-events.md)
+#### 20. [llmspell-events](llmspell-events.md)
 **Event system**
 - Event bus
 - Pub/sub patterns
 - Event correlation
 - Persistence
 
-### Integration and Runtime (3 crates)
+### Integration and CLI (3 crates)
 
-#### 17. [llmspell-bridge](llmspell-bridge.md)
-**Script language bridges**
-- Lua integration
-- Type conversion
-- Global injection
-- Performance optimization
-
-#### 18. [llmspell-config](llmspell-config.md)
+#### 21. [llmspell-config](llmspell-config.md) **UPDATED Phase 9**
 **Configuration system**
-- Config schema
+- Config schema with RAG profiles
 - Environment variables
 - Provider configs
 - Validation
+- Kernel configuration
 
-#### 19. [llmspell-cli](llmspell-cli.md)
-**CLI application**
-- Command parsing
-- Runtime initialization
-- Script execution
-- Output formatting
+#### 22. [llmspell-cli](llmspell-cli.md) **BREAKING CHANGES Phase 9**
+**CLI application with new command structure**
+- Subcommand architecture: `kernel`, `state`, `session`, `config`, `debug`
+- `--trace` flag replaces `--debug` for logging
+- `--rag-profile` replaces 5 RAG flags
+- Dual-mode design: `--kernel` vs `--config`
+- Script argument handling with `--` separator
+
+#### 23. [llmspell-engine](llmspell-engine.md) **DEPRECATED**
+**Legacy protocol engine (being phased out)**
+- Replaced by llmspell-kernel
+- Maintained for migration compatibility
 
 ## 🎯 Quick Start Patterns
 
-### Creating a Custom Component
+### Connecting to a Kernel
 
 ```rust
-use llmspell_core::{
-    BaseAgent, ComponentMetadata, ExecutionContext,
-    Result, LLMSpellError,
-    types::{AgentInput, AgentOutput}
-};
-use async_trait::async_trait;
+use llmspell_kernel::{JupyterKernel, ConnectionInfo, KernelDiscovery};
+use llmspell_kernel::traits::{Transport, Protocol};
 
-pub struct MyComponent {
-    metadata: ComponentMetadata,
+async fn connect_to_kernel() -> Result<JupyterKernel> {
+    // Auto-discover running kernel
+    let discovery = KernelDiscovery::new();
+    if let Some(info) = discovery.find_running_kernel().await? {
+        return JupyterKernel::connect(info).await;
+    }
+    
+    // Or spawn new kernel
+    let kernel = JupyterKernel::spawn_embedded().await?;
+    Ok(kernel)
 }
+```
 
-#[async_trait]
-impl BaseAgent for MyComponent {
-    fn metadata(&self) -> &ComponentMetadata {
-        &self.metadata
-    }
+### Creating a Debug Session
+
+```rust
+use llmspell_debug::{InteractiveDebugger, DebugSession};
+use llmspell_bridge::execution_bridge::{Breakpoint, ExecutionManager};
+
+async fn setup_debugging() -> Result<InteractiveDebugger> {
+    let manager = ExecutionManager::new();
+    let debugger = InteractiveDebugger::new(manager);
     
-    async fn execute_impl(
-        &self,
-        input: AgentInput,
-        context: ExecutionContext,
-    ) -> Result<AgentOutput> {
-        // Your logic here
-        Ok(AgentOutput::text("Result"))
-    }
+    // Set breakpoint
+    debugger.add_breakpoint(
+        Breakpoint::new("script.lua", 10)
+            .with_condition("x > 5")
+            .with_hit_count(3)
+    ).await?;
     
-    async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-        // Validation logic
-        Ok(())
-    }
+    Ok(debugger)
+}
+```
+
+### Using the New CLI Structure
+
+```rust
+use llmspell_cli::{Cli, Commands, KernelCommands, StateCommands};
+use clap::Parser;
+
+fn main() {
+    let cli = Cli::parse();
     
-    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Err(error)
+    match cli.command {
+        Commands::Debug { script, break_at, port, .. } => {
+            // Interactive debugging with DAP support
+        }
+        Commands::Kernel { command } => match command {
+            KernelCommands::Start { port, daemon } => {
+                // Start kernel server
+            }
+            KernelCommands::Status { id } => {
+                // Show kernel status
+            }
+        }
+        Commands::State { command } => {
+            // State management commands
+        }
+        // ... other commands
     }
 }
 ```
 
-### Implementing a Custom Tool
+## 🆕 What's New in Phase 9
 
-```rust
-use llmspell_core::traits::Tool;
-use llmspell_tools::{ToolCategory, SecurityLevel, ToolSchema};
+### Kernel Architecture Revolution
+- **EmbeddedKernel**: Kernel runs in background thread, not standalone process
+- **Jupyter Protocol**: Industry-standard messaging with ZeroMQ transport
+- **Unified Execution**: All scripts execute through kernel (no dual paths)
+- **Connection Reuse**: ~1ms overhead after first run (connection caching)
+- **Auto-Spawn**: Transparent kernel management for users
 
-pub struct CustomTool {
-    metadata: ComponentMetadata,
-}
+### Debug Infrastructure Complete
+- **DAP Bridge**: 10 essential Debug Adapter Protocol commands
+- **REPL Debug Commands**: `.break`, `.step`, `.locals`, `.stack`, `.watch`
+- **ExecutionManager**: Central debug state management
+- **VS Code Integration**: Full debugging support via DAP
+- **Performance**: <3% overhead when no breakpoints set
 
-#[async_trait]
-impl Tool for CustomTool {
-    fn category(&self) -> ToolCategory {
-        ToolCategory::Custom
-    }
-    
-    fn security_level(&self) -> SecurityLevel {
-        SecurityLevel::Safe
-    }
-    
-    fn schema(&self) -> ToolSchema {
-        ToolSchema::new("custom_tool", "Description")
-            .with_parameter("input", ParameterType::String, true)
-            .with_returns(ParameterType::String)
-    }
-}
-```
+### CLI Breaking Changes
+- **Command Structure**: Clean subcommands replace flat commands
+- **Flag Consolidation**: `--trace` for logging (replaces ambiguous `--debug`)
+- **RAG Simplification**: Single `--rag-profile` replaces 5 flags
+- **No Backward Compatibility**: Clean break for simplicity
+- **Dual-Mode Operations**: `--kernel` (online) vs `--config` (offline)
 
-### Building a RAG Application
-
-```rust
-use llmspell_rag::{RAGPipeline, RAGConfig};
-use llmspell_storage::vector::HNSWVectorStorage;
-
-async fn setup_rag() -> Result<RAGPipeline> {
-    let config = RAGConfig::default()
-        .with_collection("knowledge_base")
-        .with_embedding_model("text-embedding-3-small");
-    
-    RAGPipeline::new(config).await
-}
-```
-
-## 🆕 What's New in Phase 8.10.6
-
-### Enhanced RAG Capabilities
-- **Cost Optimization**: 70% reduction in embedding costs through intelligent caching
-- **Multi-Dimensional Support**: HNSW indices for 384, 768, 1536, and 3072 dimensions
-- **Session Collections**: Temporary RAG collections for conversational memory
-- **Bi-temporal Queries**: Support for both event time and ingestion time
-- **TTL Management**: Automatic document expiration for compliance
-
-### Multi-Tenancy Improvements
-- **Complete Isolation**: Guaranteed data separation between tenants
-- **Resource Quotas**: Per-tenant limits on storage, compute, and API calls
-- **Billing Integration**: Usage tracking for tenant-based billing
-- **Cross-Tenant Admin**: Secure operations across tenant boundaries
-
-### Storage Enhancements
-- **HNSW Optimization**: Faster similarity search for millions of vectors
-- **Collection Management**: Named collections with metadata
-- **Hybrid Search**: Combine vector similarity with keyword filtering
-- **Incremental Indexing**: Add documents without rebuilding
+### Performance Achievements
+| Metric | Target | Phase 9 Actual | Status |
+|--------|--------|----------------|--------|
+| Kernel startup | <100ms | 95ms | ✅ |
+| ZeroMQ round-trip | <1ms | 0.8ms | ✅ |
+| Debug overhead | <5% | 3% | ✅ |
+| Connection reuse | Enabled | ✅ | ✅ |
+| State persistence | Working | ✅ | ✅ |
 
 ## 📊 Architecture Overview
 
 ```mermaid
 graph TD
-    A[llmspell-core] --> B[llmspell-agents]
-    A --> C[llmspell-tools]
-    A --> D[llmspell-workflows]
+    subgraph "Kernel Layer (Phase 9)"
+        K[llmspell-kernel] --> KP[Jupyter Protocol]
+        K --> ZMQ[ZeroMQ Transport]
+        K --> DAP[DAP Bridge]
+    end
     
-    B --> E[llmspell-providers]
-    C --> F[llmspell-bridge]
-    D --> F
+    subgraph "Debug Layer (Phase 9)"
+        D[llmspell-debug] --> EM[ExecutionManager]
+        D --> ID[InteractiveDebugger]
+        R[llmspell-repl] --> D
+    end
     
-    G[llmspell-storage] --> H[llmspell-rag]
-    I[llmspell-state-persistence] --> J[llmspell-sessions]
+    subgraph "Core Layer"
+        A[llmspell-core] --> B[llmspell-agents]
+        A --> C[llmspell-tools]
+        A --> W[llmspell-workflows]
+    end
     
-    K[llmspell-security] --> L[llmspell-tenancy]
+    subgraph "Bridge Layer"
+        BR[llmspell-bridge] --> K
+        BR --> EM
+        BR --> DB[DiagnosticsBridge]
+    end
     
-    F --> M[llmspell-cli]
-    N[llmspell-config] --> M
+    subgraph "CLI Layer"
+        CLI[llmspell-cli] --> K
+        CLI --> R
+        CLI --> ST[State Commands]
+        CLI --> SE[Session Commands]
+    end
     
-    H --> L[Multi-tenant RAG]
-    G --> L[Tenant Storage]
+    K --> BR
+    D --> BR
+    R --> K
 ```
 
 ## 🔧 Development Guidelines
 
-### Trait Implementation
+### Kernel Integration
 
-1. **Always implement `BaseAgent`** for executable components
-2. **Use async-trait** for async trait methods
-3. **Provide meaningful metadata** in `ComponentMetadata`
-4. **Handle errors gracefully** in `handle_error()`
-5. **Validate inputs thoroughly** in `validate_input()`
+1. **Always use kernel for execution** - No direct ScriptRuntime creation
+2. **Handle connection lifecycle** - Auto-spawn or connect to existing
+3. **Use Protocol traits** - Enable future protocol support
+4. **Implement Transport trait** - For custom communication layers
+5. **Cache connections** - Reuse for performance
 
-### Performance Best Practices
+### Debug Development
 
-- Use `Arc` for shared components
-- Implement streaming for large responses
-- Cache expensive computations
-- Batch operations when possible
-- Profile with `llmspell-testing` benchmarks
+1. **Use ExecutionManager** - Central debug state management
+2. **Implement DebugHook** - For language-specific debugging
+3. **Support DAP commands** - Enable IDE integration
+4. **Keep overhead low** - <5% when not debugging
+5. **Test with REPL commands** - Verify interactive debugging
 
-### Security Requirements
+### CLI Migration
 
-- Validate all external inputs
-- Use `llmspell-security` for path validation
-- Implement rate limiting for external calls
-- Never expose sensitive data in errors
-- Follow multi-tenant isolation patterns
+1. **Update to new command structure** - Use subcommands
+2. **Replace old flags** - `--debug` → `--trace`, RAG flags → `--rag-profile`
+3. **Handle script arguments** - Use `--` separator
+4. **Support dual-mode** - `--kernel` vs `--config` operations
+5. **No backward compatibility** - Clean break is intentional
 
 ## 📦 Crate Organization Summary
 
 ### By Layer
+- **Kernel**: llmspell-kernel, llmspell-repl, llmspell-debug
 - **Core**: llmspell-core, llmspell-utils, llmspell-testing
 - **Storage**: llmspell-storage, llmspell-state-persistence, llmspell-state-traits, llmspell-sessions
 - **Security**: llmspell-security, llmspell-tenancy
@@ -328,6 +382,7 @@ graph TD
 - **Integration**: llmspell-bridge, llmspell-config, llmspell-cli
 
 ### By Phase
+- **Phase 9 (Kernel/Debug)**: llmspell-kernel, llmspell-repl, llmspell-debug
 - **Phase 8 (RAG)**: llmspell-rag, llmspell-storage, llmspell-tenancy
 - **Phase 7 (Hooks/Events)**: llmspell-hooks, llmspell-events, llmspell-sessions
 - **Phase 6 (Workflows)**: llmspell-workflows, llmspell-tools
@@ -338,26 +393,45 @@ graph TD
 - [Lua API Reference](../lua/) - Script-level API documentation
 - [Configuration Guide](../../configuration.md) - Detailed configuration options
 - [Examples](../../../../examples/) - Working code examples
-- [Architecture](../../../technical/master-architecture-vision.md) - System design
+- [Kernel Architecture](../../../technical/kernel-protocol-architecture.md) - Kernel design
+- [Debug Architecture](../../../technical/debug-dap-architecture.md) - Debug system
+- [CLI Architecture](../../../technical/cli-command-architecture.md) - Command structure
 
 ## 🤝 Contributing
 
 When extending LLMSpell with Rust:
 
 1. Follow the trait patterns in `llmspell-core`
-2. Add comprehensive tests using `llmspell-testing`
-3. Document public APIs with examples
-4. Ensure Phase 8 compatibility (RAG, multi-tenancy)
-5. Run quality checks: `./scripts/quality-check.sh`
+2. Use kernel for all script execution
+3. Add comprehensive tests using `llmspell-testing`
+4. Document public APIs with examples
+5. Ensure Phase 9 compatibility (kernel, debug, new CLI)
+6. Run quality checks: `./scripts/quality-check.sh`
 
 ## Version Compatibility
 
 | LLMSpell Version | Rust Version | Key Features |
 |-----------------|--------------|--------------|
-| 0.8.10 | 1.75+ | Phase 8.10.6: Enhanced RAG with cost optimization |
+| 0.9.0 | 1.75+ | Phase 9: Kernel architecture, DAP debugging, CLI restructure |
 | 0.8.x | 1.75+ | Phase 8: RAG, HNSW, Multi-tenancy |
 | 0.7.x | 1.70+ | Phase 7: Hooks, Events, Sessions |
 | 0.6.x | 1.70+ | Phase 6: Workflows, Tools |
+
+## Breaking Changes in 0.9.0
+
+### CLI Changes
+- **Commands**: Now use subcommand structure (`kernel start`, `state show`, etc.)
+- **Flags**: `--debug` removed, use `--trace` for logging levels
+- **RAG**: `--rag-profile` replaces `--rag`, `--rag-config`, `--rag-dims`, `--rag-backend`, `--no-rag`
+- **Script Args**: Must use `--` separator: `llmspell run script.lua -- arg1 arg2`
+
+### API Changes
+- **Kernel Required**: All execution must go through kernel (no direct ScriptRuntime)
+- **Debug Integration**: ExecutionContext now includes debug support
+- **State Access**: State persistence only works through kernel
+
+### Migration Guide
+See [Migration Guide](../../migration-0.9.0.md) for detailed upgrade instructions.
 
 ---
 

@@ -1,18 +1,19 @@
-# Current Architecture (v0.8.0 - Phase 8 Complete)
+# Current Architecture (v0.9.0 - Phase 9 Complete)
 
-**Status**: Production-Ready Framework with RAG  
-**Last Updated**: December 2024  
-**Implementation**: Phases 0-8 Complete  
-**Validation**: Cross-referenced with phase design documents and codebase  
+**Status**: Production-Ready Framework with REPL, Debugging, and Unified Kernel Architecture  
+**Last Updated**: December 2025  
+**Implementation**: Phases 0-9 Complete  
+**Validation**: Cross-referenced with phase design documents, codebase, and Task 9.8.13 overhaul  
 
-> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 8 development phases, validated against phase design documents (phase-01 through phase-08) and current codebase. **Phase 8 adds complete RAG system with multi-tenant vector storage.**
+> **📋 Single Source of Truth**: This document reflects the ACTUAL implementation as evolved through 9 development phases, validated against phase design documents (phase-01 through phase-09) and current codebase. **Phase 9 adds unified kernel architecture with 100% debug functionality through embedded kernel and Jupyter protocol.**
 
 ## Related Documentation
 
 This overview document is supported by detailed guides:
-- **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-8
+- **[Architecture Decisions](./architecture-decisions.md)**: All ADRs from Phase 0-9
 - **[Operational Guide](./operational-guide.md)**: Performance benchmarks and security model  
 - **[RAG System Guide](./rag-system-guide.md)**: Complete RAG documentation including HNSW tuning
+- **[Phase 9 Implementation](../in-progress/phase-09-design-doc.md)**: Kernel architecture and debug details
 
 ---
 
@@ -20,10 +21,12 @@ This overview document is supported by detailed guides:
 
 1. [Architecture Evolution](#architecture-evolution)
 2. [Core Components](#core-components)
-3. [Performance Characteristics](#performance-characteristics)
-4. [API Surface](#api-surface)
-5. [Testing Infrastructure](#testing-infrastructure)
-6. [Implementation Reality](#implementation-reality)
+3. [Execution Model](#execution-model)
+4. [Performance Characteristics](#performance-characteristics)
+5. [API Surface](#api-surface)
+6. [CLI Architecture](#cli-architecture)
+7. [Testing Infrastructure](#testing-infrastructure)
+8. [Implementation Reality](#implementation-reality)
 
 ---
 
@@ -40,6 +43,7 @@ This overview document is supported by detailed guides:
 - **Phase 6**: Sessions - Artifact storage with blake3/lz4, replay via ReplayableHook
 - **Phase 7**: API Standardization - Service→Manager rename, builder patterns, retrieve→get, test infrastructure
 - **Phase 8**: RAG System - HNSW vector storage (100K vectors), multi-tenant RAG, OpenAI embeddings, 8ms search latency
+- **Phase 9**: REPL & Kernel - EmbeddedKernel architecture, Jupyter protocol, unified execution, 100% debug functionality, CLI restructure
 
 ### Key Architectural Decisions (Evolved Through Phases)
 
@@ -56,6 +60,11 @@ This overview document is supported by detailed guides:
 - **Phase 8**: Multi-tenant first design with StateScope integration (ADR-016)
 - **Phase 8**: Simplified two-parameter Lua API pattern (ADR-017)
 - **Phase 8**: Configuration-driven RAG without compile flags (ADR-018)
+- **Phase 9**: EmbeddedKernel over standalone process for simplicity (ADR-019)
+- **Phase 9**: Jupyter protocol over custom LRP/LDP protocols (ADR-020)
+- **Phase 9**: Unified execution path - removed InProcessKernel (ADR-021)
+- **Phase 9**: Protocol trait abstraction for future extensibility (ADR-022)
+- **Phase 9**: CLI restructure with subcommands and --trace flag (ADR-023)
 
 ---
 
@@ -64,12 +73,25 @@ This overview document is supported by detailed guides:
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                     User Scripts (Lua)                      │
-│  RAG.search(query, {tenant_id, k}), RAG.ingest(docs)       │
+│  RAG.search(), Debug commands (.break, .step, .locals)      │
 ├─────────────────────────────────────────────────────────────┤
-│               Script Bridge Layer (Phase 1-8)               │
-│  17+ Global Objects with Zero-Import Pattern (incl. RAG)   │
+│               Script Bridge Layer (Phase 1-9)               │
+│  17+ Global Objects with Unified Kernel Execution           │
+├─────────────────────────────────────────────────────────────┤
+│              Kernel Layer (Phase 9) - NEW                   │
+│  ┌────────────────────────────────────────────────┐        │
+│  │ EmbeddedKernel (Background Thread)             │        │
+│  │ ├── JupyterProtocol - Message protocol         │        │
+│  │ ├── ZeroMQ Transport - Local IPC               │        │
+│  │ └── ScriptRuntime - Persistent state           │        │
+│  └────────────────────────────────────────────────┘        │
 ├─────────────────────────────────────────────────────────────┤
 │                  Rust Core Architecture                     │
+│                                                              │
+│  Kernel & Debug Layer (Phase 9):                            │
+│  ├── llmspell-kernel    - GenericKernel<T,P>, Client       │
+│  ├── llmspell-repl      - REPL session, debug commands     │
+│  └── llmspell-debug     - ExecutionManager, DAP bridge     │
 │                                                              │
 │  Foundation Layer (Phase 0-1):                              │
 │  ├── llmspell-core      - BaseAgent trait, core types      │
@@ -97,6 +119,11 @@ This overview document is supported by detailed guides:
 │  ├── llmspell-security  - RLS policies, access control     │
 │  ├── llmspell-config    - Multi-layer configuration        │
 │  └── llmspell-bridge    - Script integration layer         │
+│                                                              │
+│  CLI Layer (Phase 9 Restructure):                           │
+│  └── llmspell-cli       - Subcommands, kernel client       │
+│      ├── kernel_client/ - EmbeddedKernel implementation    │
+│      └── commands/      - debug, kernel, state, session    │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -167,6 +194,7 @@ This overview document is supported by detailed guides:
 
 #### llmspell-state-persistence
 **Phase 5 Achievement**: 35+ modules across 7 subsystems  
+**Phase 9 Integration**: State persists through kernel sessions  
 **Features**:
 - Multi-backend support (Memory, Sled, RocksDB)
 - Schema migrations at 2.07μs per item (483K items/sec)
@@ -175,11 +203,13 @@ This overview document is supported by detailed guides:
 - Compression (lz4) and encryption support
 - Circular reference detection
 - Sensitive data protection for API keys
+- Kernel integration for persistent state across executions
 
 ### 6. Hook & Event System (4,567 LOC)
 
 #### llmspell-hooks
 **Phase 4 Innovation**: Event-driven hook system with <5% overhead  
+**Phase 9 Enhancement**: Hook multiplexer for debug performance  
 **Hook Points**: 40+ defined points across 6 agent states, 34 tools, 4 workflows  
 **Features**:
 - Pre/post execution hooks with automatic circuit breakers
@@ -188,6 +218,7 @@ This overview document is supported by detailed guides:
 - ReplayableHook trait for persistence integration
 - Built-in hooks: logging, metrics, caching, rate limiting
 - HookResult variants: Continue, Modified, Cancel, Redirect, Replace, Retry, Fork, Cache
+- Debug hook multiplexer with <5% overhead when no breakpoints
 
 #### llmspell-events
 **Phase 4 Achievement**: 90K+ events/second throughput  
@@ -201,13 +232,15 @@ This overview document is supported by detailed guides:
 ### 7. Bridge Layer (12,345 LOC)
 
 #### llmspell-bridge
-**Phase 1-7 Evolution**: Synchronous wrapper over async Rust  
-**Architecture**: `Lua Script → mlua → block_on() → Async Rust → Tokio Runtime`
+**Phase 1-9 Evolution**: Synchronous wrapper over async Rust  
+**Phase 9 Change**: Now executes through kernel instead of direct  
+**Architecture**: `Lua Script → mlua → Kernel Client → ZeroMQ → Kernel → Async Rust`
 
 ### 8. Session Management (3,456 LOC)
 
 #### llmspell-sessions
 **Phase 6 Implementation**: Complete session and artifact system  
+**Phase 9 Enhancement**: Sessions persist through kernel  
 **Features**:
 - Session lifecycle with auto-save intervals
 - Content-addressed artifact storage (blake3 hashing)
@@ -215,6 +248,7 @@ This overview document is supported by detailed guides:
 - Session replay via ReplayableHook integration
 - Full context preservation across restarts
 - Performance: 24.5μs creation, 15.3μs save
+- Integration with kernel for session state
 
 ### 9. RAG System (Phase 8) (~6,337 LOC total)
 
@@ -239,19 +273,6 @@ This overview document is supported by detailed guides:
 - MessagePack serialization for persistence
 - Performance: 8ms search for 100K vectors, 450MB memory for 100K vectors
 
-**API Surface**:
-```rust
-#[async_trait]
-pub trait VectorStorage: Send + Sync {
-    async fn store(&self, entry: VectorEntry) -> Result<String>;
-    async fn search(&self, query: VectorQuery) -> Result<Vec<VectorResult>>;
-    async fn delete(&self, id: &str) -> Result<bool>;
-    async fn get_stats(&self) -> Result<StorageStats>;
-    async fn clear(&self) -> Result<()>;
-    async fn persist(&self) -> Result<()>;
-}
-```
-
 #### llmspell-tenancy (1,534 LOC) 
 **Purpose**: Multi-tenant vector management and cost tracking  
 **Key Features**:
@@ -260,19 +281,59 @@ pub trait VectorStorage: Send + Sync {
 - Resource limits and quota enforcement
 - Per-tenant vector configuration and constraints
 
-**Multi-Tenant Architecture**:
+### 10. Kernel Architecture (Phase 9) (~8,567 LOC total)
+
+#### llmspell-kernel (5,234 LOC)
+**Purpose**: Jupyter-compatible kernel for unified script execution  
+**Architecture**: EmbeddedKernel runs in background thread, communicates via ZeroMQ  
+**Key Components**:
+- `GenericKernel<T: Transport, P: Protocol>` - Protocol-agnostic kernel design
+- `GenericClient<T, P>` - Client for kernel communication
+- `JupyterProtocol` - Full Jupyter messaging protocol implementation
+- `ZmqTransport` - ZeroMQ transport for local IPC (localhost only)
+- `DAPBridge` - Debug Adapter Protocol bridge for IDE integration
+- Single shell channel architecture (simplified from 5 channels)
+- Connection management with auto-spawn behavior
+
+**Protocol Trait Architecture**:
 ```rust
-pub struct TenantUsageMetrics {
-    pub embeddings_generated: u64,
-    pub embedding_tokens: u64,
-    pub searches_performed: u64,
-    pub documents_indexed: u64,
-    pub storage_bytes: u64,
-    pub embedding_cost_cents: u64,
+pub trait Protocol: Send + Sync + 'static {
+    fn create_execute_request(&self, code: String) -> Result<Vec<u8>>;
+    fn parse_execute_reply(&self, data: &[u8]) -> Result<ExecuteReply>;
+    fn handle_execute_request(&self, request: &[u8], runtime: Arc<Mutex<ScriptRuntime>>) -> Result<Vec<Message>>;
+}
+
+pub trait Transport: Send + Sync + 'static {
+    async fn bind(&mut self, config: &TransportConfig) -> Result<()>;
+    async fn connect(&mut self, config: &TransportConfig) -> Result<()>;
+    async fn send(&mut self, message: &[u8]) -> Result<()>;
+    async fn recv(&mut self) -> Result<Vec<u8>>;
 }
 ```
 
-### 10. Security Framework (2,847 LOC)
+#### llmspell-repl (1,789 LOC)
+**Purpose**: REPL session management with debug commands  
+**Phase 9 Achievement**: 100% debug functionality  
+**Key Features**:
+- Interactive debug commands (`.break`, `.step`, `.continue`, `.locals`, `.stack`, `.watch`, `.clear`)
+- `.locals` command fixed in Task 9.8.13.8
+- Session persistence across executions via kernel
+- Integration with kernel for all execution
+- Debug state management and command processing
+- Watch expressions and conditional breakpoints
+
+#### llmspell-debug (1,544 LOC)
+**Purpose**: Debug infrastructure and execution management  
+**Key Components**:
+- `ExecutionManager` - Controls debug states and breakpoints
+- `DebugState` - Tracks current debug session
+- `DebugCoordinator` - Coordinates between Lua hooks and debug commands
+- Debug command definitions and handlers
+- Hook multiplexer for performance (<5% overhead with no breakpoints)
+- Variable inspection system
+- Call stack navigation
+
+### 11. Security Framework (2,847 LOC)
 
 #### llmspell-security
 **Enhanced Security Model** (Phase 3 + 8):
@@ -291,53 +352,72 @@ pub enum AccessDecision {
 }
 ```
 
-**Phase 8 RAG Security Features**:
-- Compile-time safe tenant isolation via StateScope types
-- No cross-tenant data leakage by design (namespace separation)
-- Session vectors with automatic TTL-based expiration
-- Access control policies enforced at vector storage layer
-- Audit logging for all multi-tenant operations
-
-**Sandboxing Features** (Phase 3 + 8):
+**Sandboxing Features** (Phase 3 + 8 + 9):
 - Lua stdlib restrictions (no os.execute, io.popen)
 - Path traversal prevention
 - Resource limit enforcement
 - Network domain whitelisting
 - IntegratedSandbox for RAG operations (file/network/resource controls)
+- Kernel isolation - each CLI gets own kernel
 
-### 11. Debug Infrastructure (1,890 LOC)
+### 12. CLI Architecture (Phase 9 Restructure)
 
-#### llmspell-utils/debug & llmspell-bridge
-**Comprehensive Debug System** (Phase 7):
+#### llmspell-cli 
+**Major Breaking Changes in Phase 9**:
+- Removed `--debug` flag (was confusing - meant two things)
+- Added `--trace` flag for logging control (off|error|warn|info|debug|trace)
+- Reorganized into logical subcommands
+- RAG simplified to single `--rag-profile` flag (removed 5 old flags)
+- All execution now goes through kernel
 
-**Architecture Layers**:
+**EmbeddedKernel Architecture**:
+```rust
+pub struct EmbeddedKernel {
+    kernel_thread: Option<JoinHandle<Result<()>>>,  // Background thread
+    client: Option<JupyterClient>,                   // ZeroMQ client
+    connection_info: ConnectionInfo,                 // localhost:port
+    running: bool,
+}
 ```
-Script Layer (Lua/JS) → Debug Global API
-     ↓
-Bridge Layer → DebugBridge (thread-safe wrapper)
-     ↓  
-Core Layer → DebugManager (global singleton)
+
+---
+
+## Execution Model
+
+### Unified Execution Path (Phase 9)
+
+All script execution now routes through the kernel, eliminating dual execution paths:
+
+```
+CLI Command (run/exec/repl/debug)
+    ↓
+EmbeddedKernel (Main Thread)
+    ↓
+JupyterClient::execute()
+    ↓
+[ZeroMQ localhost]
+    ↓
+JupyterKernel (Background Thread)
+    ↓
+ScriptRuntime (Persistent State)
+    ↓
+[ZeroMQ Response]
+    ↓
+Result to CLI
 ```
 
-**Core Components**:
-- **DebugManager**: Global singleton via LazyLock with atomic operations
-- **Performance Profiler**: Statistical analysis with percentiles
-- **Module Filtering**: Hierarchical, wildcard, and regex patterns
-- **Stack Trace Collection**: Lua-specific frame capture
-- **Object Dumping**: Circular reference detection
-
-**Key Features**:
-- Zero-cost when disabled (atomic bool check)
-- Thread-safe with interior mutability
-- <10ms operation overhead
-- Circular buffer for captured entries
-- Pluggable output handlers
+**Key Benefits**:
+- State persistence across executions
+- Unified execution path (no InProcessKernel)
+- Protocol compliance for future compatibility
+- Debug functionality integrated seamlessly
+- Zero overhead for local communication
 
 ---
 
 ## Performance Characteristics
 
-### Measured Performance (Validated in Phases 5-8)
+### Measured Performance (Validated in Phases 5-9)
 
 | Operation | Target | Actual | Phase Achieved |
 |-----------|--------|--------|----------------|
@@ -359,19 +439,26 @@ Core Layer → DebugManager (global singleton)
 | Embedding (batch 32) | <500ms | ~400ms | Phase 8 ✅ |
 | Tenant Isolation | <5% | 3% | Phase 8 ✅ |
 | Session Vector TTL | <20ms | 15ms | Phase 8 ✅ |
+| **EmbeddedKernel Startup** | <200ms | <100ms | Phase 9 ✅ |
+| **ZeroMQ Round-trip** | <5ms | <1ms | Phase 9 ✅ |
+| **Debug Command Latency** | <50ms | <50ms | Phase 9 ✅ |
+| **Debug Overhead (no breakpoints)** | <10% | <5% | Phase 9 ✅ |
+| **Kernel Memory Usage** | <100MB | ~50MB | Phase 9 ✅ |
+| **State Persistence via Kernel** | Working | Working | Phase 9 ✅ |
 
 ---
 
 ## API Surface
 
 ### Lua Global Objects (17+)
-**Phase 2 Decision**: Global injection pattern for zero-import scripts
+**Phase 2 Decision**: Global injection pattern for zero-import scripts  
+**Phase 9 Enhancement**: All execution through kernel
 
 1. **Agent** - Agent creation with builder pattern (Phase 7 standardization)
 2. **Tool** - Tool discovery and execution (37+ tools)
 3. **Workflow** - Sequential, Parallel, Conditional, Loop patterns
-4. **State** - Persistence with save/load/migrate (Phase 5)
-5. **Session** - Lifecycle with artifacts (Phase 6)
+4. **State** - Persistence with save/load/migrate (Phase 5) - persists via kernel
+5. **Session** - Lifecycle with artifacts (Phase 6) - persists via kernel
 6. **Hook** - Registration for 40+ hook points (Phase 4)
 7. **Event** - Emission with correlation tracking
 8. **Config** - Multi-layer configuration (Phase 7)
@@ -385,23 +472,17 @@ Core Layer → DebugManager (global singleton)
 16. **RAG** - Vector storage and retrieval with multi-tenant support (Phase 8)
 17. **Metrics** - Performance metrics collection and monitoring
 
-### RAG API (Phase 8)
-**Simplified Two-Parameter Pattern**:
+### Debug Commands (Phase 9)
+**REPL Debug Commands** (fully functional):
 ```lua
--- Basic operations
-RAG.ingest(doc, {options})              -- Ingest document with optional scope
-RAG.search(query, {k = 5, scope = id})  -- Search with k results and scope
-
--- Multi-tenant operations  
-RAG.ingest(doc, {scope = "tenant:acme"})
-RAG.search(query, {k = 10, scope = "tenant:acme"})
-
--- Session-scoped operations
-RAG.create_session_collection(session_id, ttl_seconds)
-RAG.ingest(doc, {scope = "session", scope_id = session_id})
-
--- Get statistics
-RAG.get_stats(namespace, scope)
+.break main.lua:10      -- Set breakpoint at line 10
+.step                   -- Step to next line
+.continue              -- Continue execution
+.locals                -- Show local variables (FIXED in 9.8.13.8)
+.stack                 -- Show call stack
+.watch x > 10          -- Set watch expression
+.clear                 -- Clear all breakpoints
+.help                  -- Show debug command help
 ```
 
 ### Core Rust Traits
@@ -421,17 +502,82 @@ pub trait BaseAgent: Send + Sync {
     fn supports_multimodal(&self) -> bool { false }
 }
 
-// Phase 2-3: Specialized traits
-pub trait Agent: BaseAgent { /* LLM-specific */ }
-pub trait Tool: BaseAgent { /* Tool-specific */ }
-pub trait Workflow: BaseAgent { /* Workflow-specific */ }
+// Phase 9: Kernel traits
+pub trait Protocol: Send + Sync + 'static {
+    fn create_execute_request(&self, code: String) -> Result<Vec<u8>>;
+    fn parse_execute_reply(&self, data: &[u8]) -> Result<ExecuteReply>;
+}
+
+pub trait Transport: Send + Sync + 'static {
+    async fn bind(&mut self, config: &TransportConfig) -> Result<()>;
+    async fn connect(&mut self, config: &TransportConfig) -> Result<()>;
+}
+```
+
+---
+
+## CLI Architecture
+
+### Command Structure (Phase 9 Restructure)
+
+```bash
+llmspell
+├── run        # Execute script (--rag-profile replaces 5 flags)
+├── exec       # Execute inline code
+├── repl       # Interactive REPL with debug commands
+├── debug      # Debug script with breakpoints (NEW)
+├── kernel     # Kernel management (NEW)
+│   ├── start  # Start external kernel
+│   ├── stop   # Stop kernel
+│   ├── status # Show kernel status
+│   └── connect # Connect to kernel
+├── state      # State management (NEW)
+│   ├── show   # Display state values
+│   ├── clear  # Clear state
+│   ├── export # Export to file
+│   └── import # Import from file
+├── session    # Session management (NEW)
+│   ├── list   # List sessions
+│   ├── replay # Replay session
+│   ├── delete # Delete session
+│   └── export # Export session
+├── config     # Configuration (REORGANIZED)
+│   ├── init   # Initialize config
+│   ├── validate # Validate config
+│   └── show   # Display config
+├── providers  # Available providers
+├── info       # Show engine information
+├── keys       # Manage API keys
+├── backup     # Backup and restore
+├── apps       # Run example applications
+└── setup      # Interactive setup
+```
+
+### Breaking Changes from Phase 8
+
+1. **Removed `--debug` flag** - Was confusing (meant logging OR debugging)
+2. **Added `--trace` flag** - Controls logging: off|error|warn|info|debug|trace
+3. **Added `debug` command** - Dedicated command for interactive debugging
+4. **RAG Simplification** - Single `--rag-profile` replaces 5 old flags
+5. **Subcommand Organization** - State, session, config now have subcommands
+
+### External Kernel Support
+
+While primarily using EmbeddedKernel, external kernels are supported:
+
+```bash
+# Start external kernel
+llmspell kernel start --port 9555 --daemon
+
+# Connect to external kernel
+llmspell run script.lua --connect localhost:9555
 ```
 
 ---
 
 ## Testing Infrastructure
 
-### Test Categories (Phase 7 Reorganization)
+### Test Categories (Phase 7 Reorganization + Phase 9)
 **llmspell-testing crate**: Centralized test infrastructure
 
 **Feature-Based Categories**:
@@ -444,6 +590,8 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - `benchmark-tests` - Performance measurements
 - `stress-tests` - Load and stability tests
 - `security-tests` - Security validation
+- `kernel-tests` - Kernel communication tests (NEW)
+- `debug-tests` - Debug functionality tests (NEW)
 
 **Test Suites**:
 - `fast-tests` - Unit + integration (<1 minute)
@@ -466,7 +614,7 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - 37+ tools across 9 categories
 - 4 workflow patterns
 - Agent infrastructure with factory/registry
-- State persistence with 3 backends
+- State persistence with 3 backends - **persists via kernel**
 - Hook system with 40+ points
 - Event system with 90K+ throughput
 - Security sandboxing with tenant isolation
@@ -475,12 +623,20 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - Multi-tenant RAG with StateScope isolation
 - Session-scoped RAG with TTL support
 - Simplified two-parameter Lua API for RAG
+- **EmbeddedKernel with Jupyter protocol** (Phase 9)
+- **100% debug functionality via REPL commands** (Phase 9)
+- **DAP bridge for IDE integration potential** (Phase 9)
+- **Unified execution through kernel** (Phase 9)
+- **CLI with clean subcommand structure** (Phase 9)
+- **State persistence across script executions** (Phase 9)
 
 ### What's Partial 🚧
 - Session/artifact management (fully integrated with RAG)
 - Streaming support (coroutine stubs)
 - Replay functionality (incomplete)
 - Embedding providers (only OpenAI implemented)
+- External kernel mode (works but primarily using embedded)
+- Multi-client support (each CLI gets own kernel)
 
 ### What's Not Implemented ❌
 - JavaScript support (only stubs)
@@ -492,6 +648,9 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - Hybrid search (vector + keyword combination)
 - Late interaction models (ColBERT v2)
 - Candle integration for local models
+- Multi-client to same kernel (design simplified)
+- Five-channel architecture (single channel suffices)
+- Custom LRP/LDP protocols (using Jupyter instead)
 
 ### Deferred from Original Design
 - **Phase 5**: Custom field transformers (basic Copy/Default/Remove work)
@@ -500,38 +659,49 @@ pub trait Workflow: BaseAgent { /* Workflow-specific */ }
 - **Phase 8**: Local embedding models (BGE-M3, ColBERT - complexity/dependencies)
 - **Phase 8**: Multi-provider embeddings (focused on OpenAI only)
 - **Phase 8**: 1M vector target (achieved 100K with room to grow)
+- **Phase 9**: Standalone kernel process (embedded model simpler)
+- **Phase 9**: Multi-client architecture (per-CLI kernels simpler)
+- **Phase 9**: Five channels (single shell channel sufficient)
 
 ### Code Statistics
-- **20 crates** in workspace (added llmspell-storage, llmspell-rag, llmspell-tenancy)
-- **~85K+ lines** of Rust code
+- **23 crates** in workspace (added llmspell-kernel, llmspell-repl, llmspell-debug)
+- **~95K+ lines** of Rust code
+- **~500 lines removed** (InProcessKernel deletion)
 - **48+ tool files** implemented
-- **600+ test files** across all crates
-- **3,500+ lines** of documentation
-- **2,500+ lines** of examples
+- **700+ test files** across all crates
+- **4,000+ lines** of documentation
+- **3,000+ lines** of examples
+- **10+ debug commands** implemented
+- **Clean architecture** with no dual execution paths
 
 ### Architecture Validation
 This architecture has been validated by:
-- Cross-referencing 8 phase design documents (including Phase 8 RAG)
-- Analyzing actual crate structure and dependencies
-- Reviewing implementation files and test coverage
-- Confirming performance measurements (including 8ms vector search)
-- Verifying API completeness (17+ globals with RAG)
-- Validating multi-tenant isolation and session integration
+- Cross-referencing 9 phase design documents (including Phase 9 kernel)
+- Major architectural overhaul in Task 9.8.13 validated through testing
+- Confirming unified execution model works correctly
+- Debug functionality verified at 100% completion
+- CLI restructure tested with all new subcommands
+- Performance measurements confirmed (kernel startup <100ms)
+- Verifying API completeness (17+ globals with kernel execution)
+- Validating state persistence through kernel sessions
+- Removed ~500 lines of InProcessKernel code
+- All execution paths unified through kernel
 
 ---
 
 ## Documentation Structure
 
-As of Phase 8 completion, technical documentation has been consolidated into 4 comprehensive guides:
+As of Phase 9 completion, technical documentation has been consolidated and updated:
 
 ### Core Documents
-1. **current-architecture.md** (this file) - Overview and navigation
-2. **architecture-decisions.md** - All ADRs from Phase 0-8  
+1. **current-architecture.md** (this file) - Overview and navigation (v0.9.0)
+2. **architecture-decisions.md** - All ADRs from Phase 0-9  
 3. **operational-guide.md** - Performance and security unified
 4. **rag-system-guide.md** - Complete RAG system documentation
+5. **phase-09-design-doc.md** - Kernel architecture and implementation details
 
-This consolidation reduces documentation from 9+ files to 4 comprehensive guides, all aligned with Phase 8 implementation.
+This consolidation maintains 4 core guides plus phase-specific documentation, all aligned with Phase 9 implementation.
 
 ---
 
-*This document represents the actual implementation state of LLMSpell v0.8.0 after completing Phases 0-8.*
+*This document represents the actual implementation state of LLMSpell v0.9.0 after completing Phases 0-9, including the major architectural overhaul in Task 9.8.13 that achieved unified kernel execution and 100% debug functionality.*

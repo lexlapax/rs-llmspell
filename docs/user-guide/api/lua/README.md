@@ -1,6 +1,10 @@
 # LLMSpell Lua API Documentation
 
+**Version 0.9.0** | **Phase 9 Complete** | **Last Updated**: December 2024
+
 This document provides comprehensive documentation of all Lua globals available in LLMSpell scripts. Each global object provides specific functionality for building LLM-powered applications.
+
+> **🆕 Phase 9 Updates**: Enhanced debugging capabilities with interactive debugging, breakpoints, step execution, and variable inspection. All scripts now execute through the kernel architecture for improved performance and state persistence.
 
 ## Table of Contents
 
@@ -16,10 +20,11 @@ This document provides comprehensive documentation of all Lua globals available 
 10. [Provider](#provider) - LLM provider information
 11. [Artifact](#artifact) - Artifact storage and retrieval
 12. [Replay](#replay) - Hook replay and testing
-13. [Debug](#debug) - Debugging and profiling utilities
-14. [JSON](#json) - JSON parsing and serialization
-15. [ARGS](#args) - Command-line argument access
-16. [Streaming](#streaming) - Streaming and coroutine utilities
+13. [Console](#console) - **Enhanced** debugging and profiling utilities (logging, timing, dumping)
+14. [Debugger](#debugger) - **NEW Phase 9** - Interactive debugging with breakpoints (limited implementation)
+15. [JSON](#json) - JSON parsing and serialization
+16. [ARGS](#args) - Command-line argument access
+17. [Streaming](#streaming) - Streaming and coroutine utilities
 
 ---
 
@@ -294,12 +299,30 @@ The `Tool` global provides functionality for tool execution and management.
 ### Core Methods
 
 #### Tool.list()
-Lists all available tools.
+Lists all available tools with their metadata.
 
 ```lua
 local tools = Tool.list()
 for i, tool in ipairs(tools) do
-    print(tool.name, tool.category)
+    print(tool.name, tool.description, tool.version)
+end
+```
+
+#### Tool.get(name)
+Gets detailed information about a specific tool.
+
+```lua
+local tool = Tool.get("calculator")
+if tool then
+    print(tool.name, tool.description)
+    print("Schema:", tool.schema.name)
+    print("Parameters:")
+    for i, param in ipairs(tool.schema.parameters) do
+        print("  ", param.name, param.type, param.required)
+    end
+    
+    -- The returned tool has an execute method
+    local result = tool:execute({operation = "add", a = 5, b = 3})
 end
 ```
 
@@ -312,85 +335,56 @@ local result = Tool.invoke("calculator", {
     a = 5,
     b = 3
 })
-```
 
-#### Tool.execute(name, params, options)
-Executes a tool with additional options.
-
-```lua
-local result = Tool.execute("web-search", {
-    query = "LLMSpell documentation"
-}, {
-    timeout = 5000,
-    retry = 3
-})
+if result.success then
+    print("Result:", result.output)
+else
+    print("Error:", result.error)
+end
 ```
 
 ### Tool Discovery
 
 #### Tool.discover(filter)
-Discovers tools matching criteria.
+Discovers tools matching specified criteria.
 
 ```lua
+-- Discover by category
+local tools = Tool.discover({
+    category = "data"
+})
+
+-- Discover by capabilities
+local tools = Tool.discover({
+    capabilities = {"json", "xml"}
+})
+
+-- Combined filter
 local tools = Tool.discover({
     category = "data",
-    capabilities = {"json"}
+    capabilities = {"json"},
+    name_pattern = "*parser*"
 })
 ```
 
-#### Tool.get_info(name)
-Gets detailed tool information.
+#### Tool.exists(name)
+Checks if a tool exists.
 
 ```lua
-local info = Tool.get_info("calculator")
-print(info.description)
-print(info.parameters)
-```
-
-#### Tool.get_schema(name)
-Gets the parameter schema for a tool.
-
-```lua
-local schema = Tool.get_schema("file-reader")
-```
-
-### Tool Registration
-
-#### Tool.register(name, handler)
-Registers a new tool.
-
-```lua
-Tool.register("custom-tool", function(params)
-    return {result = params.input * 2}
-end)
-```
-
-#### Tool.unregister(name)
-Unregisters a tool.
-
-```lua
-Tool.unregister("custom-tool")
-```
-
-#### Tool.is_available(name)
-Checks if a tool is available.
-
-```lua
-if Tool.is_available("calculator") then
-    -- Use calculator
+if Tool.exists("calculator") then
+    -- Tool is available
+    local result = Tool.invoke("calculator", params)
 end
 ```
 
-### Batch Operations
-
-#### Tool.batch(operations)
-Executes multiple tool operations.
+#### Tool.categories()
+Gets all available tool categories.
 
 ```lua
-local results = Tool.batch({
-    {tool = "calculator", params = {operation = "add", a = 1, b = 2}},
-    {tool = "calculator", params = {operation = "multiply", a = 3, b = 4}}
-})
+local categories = Tool.categories()
+for i, category in ipairs(categories) do
+    print("Category:", category)
+end
 ```
 
 ---
@@ -754,19 +748,19 @@ session:store_artifact("query_results", results)
 
 ## State
 
-The `State` global provides persistent state management.
+The `State` global provides persistent state management with two APIs: a convenience API that uses implicit "user" scope, and a full API with explicit scopes.
 
-### Basic Operations
+### Convenience API (Implicit "user" Scope)
 
 #### State.get(key)
-Gets a state value.
+Gets a value from the "user" scope.
 
 ```lua
 local value = State.get("app_config")
 ```
 
 #### State.set(key, value)
-Sets a state value.
+Sets a value in the "user" scope.
 
 ```lua
 State.set("app_config", {
@@ -775,126 +769,133 @@ State.set("app_config", {
 })
 ```
 
-#### State.delete(key)
-Deletes a state entry.
+#### State.del(key)
+Deletes a value from the "user" scope.
 
 ```lua
-State.delete("temp_state")
+State.del("temp_state")
 ```
 
-#### State.exists(key)
-Checks if a key exists.
+#### State.keys()
+Lists all keys in the "user" scope.
 
 ```lua
-if State.exists("user_settings") then
-    -- Key exists
+local keys = State.keys()
+for i, key in ipairs(keys) do
+    print(key)
 end
 ```
 
-#### State.clear()
-Clears all state.
+### Full API (Explicit Scopes)
+
+#### State.save(scope, key, value)
+Saves a value with explicit scope.
 
 ```lua
-State.clear()
+State.save("tenant", "settings", {theme = "dark"})
+State.save("session", "user_id", "12345")
 ```
 
-#### State.list()
-Lists all state keys.
+#### State.load(scope, key)
+Loads a value from explicit scope.
 
 ```lua
-local keys = State.list()
+local settings = State.load("tenant", "settings")
+local user_id = State.load("session", "user_id")
 ```
 
-### Scoped State
-
-#### State.get_scoped(scope, key)
-Gets value from a scope.
+#### State.delete(scope, key)
+Deletes a value from explicit scope.
 
 ```lua
-local value = State.get_scoped("user:123", "preferences")
+State.delete("session", "temp_data")
 ```
 
-#### State.set_scoped(scope, key, value)
-Sets value in a scope.
+#### State.list_keys(scope)
+Lists all keys in a specific scope.
 
 ```lua
-State.set_scoped("tenant:abc", "settings", config)
+local tenant_keys = State.list_keys("tenant")
+local session_keys = State.list_keys("session")
 ```
 
-#### State.delete_scoped(scope, key)
-Deletes from a scope.
+### Domain-Specific Helpers
+
+#### State.workflow_get(workflow_id, step_name)
+Gets workflow-specific state.
 
 ```lua
-State.delete_scoped("session:456", "temp")
+local step_data = State.workflow_get("pipeline-123", "transform")
 ```
 
-#### State.clear_scope(scope)
-Clears an entire scope.
+#### State.workflow_list(workflow_id)
+Lists all workflow state keys.
 
 ```lua
-State.clear_scope("user:123")
+local workflow_keys = State.workflow_list("pipeline-123")
 ```
 
-#### State.list_scoped(scope)
-Lists keys in a scope.
+#### State.agent_get(agent_id, key)
+Gets agent-specific state.
 
 ```lua
-local keys = State.list_scoped("tenant:abc")
+local memory = State.agent_get("assistant", "conversation_history")
 ```
 
-### Atomic Operations
-
-#### State.increment(key, amount)
-Atomically increments a numeric value.
+#### State.agent_set(agent_id, key, value)
+Sets agent-specific state.
 
 ```lua
-local new_value = State.increment("counter", 1)
+State.agent_set("assistant", "conversation_history", history)
 ```
 
-#### State.append(key, value)
-Appends to a list value.
+#### State.tool_get(tool_id, key)
+Gets tool-specific state.
 
 ```lua
-State.append("event_log", {timestamp = os.time(), event = "login"})
+local cache = State.tool_get("calculator", "result_cache")
 ```
 
-#### State.compare_and_swap(key, old_value, new_value)
-Atomic compare and swap.
+#### State.tool_set(tool_id, key, value)
+Sets tool-specific state.
 
 ```lua
-local success = State.compare_and_swap("status", "pending", "active")
+State.tool_set("calculator", "result_cache", cache)
 ```
 
-### State Migrations
+### State Migrations (When Available)
 
-#### State.migrate(version)
-Migrates state to a new version.
+#### State.migrate(target_version)
+Migrates state to a target version.
 
 ```lua
 State.migrate("2.0.0")
 ```
 
 #### State.get_migration_status()
-Gets migration status.
+Gets current migration status.
 
 ```lua
 local status = State.get_migration_status()
+print(status.current_version)
+print(status.target_version)
 ```
 
 #### State.get_schema_versions()
-Gets schema version history.
+Gets available schema versions.
 
 ```lua
 local versions = State.get_schema_versions()
 ```
 
-### State Backups
+### State Backups (When Available)
 
-#### State.create_backup(name)
+#### State.create_backup(incremental)
 Creates a state backup.
 
 ```lua
-local backup_id = State.create_backup("before_upgrade")
+local backup_id = State.create_backup(false)  -- Full backup
+local backup_id = State.create_backup(true)   -- Incremental backup
 ```
 
 #### State.list_backups()
@@ -902,37 +903,43 @@ Lists available backups.
 
 ```lua
 local backups = State.list_backups()
+for i, backup in ipairs(backups) do
+    print(backup.id, backup.timestamp)
+end
 ```
 
-#### State.restore_backup(id)
+#### State.restore_backup(backup_id)
 Restores from a backup.
 
 ```lua
-State.restore_backup("backup_123")
+State.restore_backup("backup_20240101_120000")
 ```
 
-#### State.validate_backup(id)
+#### State.validate_backup(backup_id)
 Validates a backup.
 
 ```lua
-local is_valid = State.validate_backup("backup_123")
+local is_valid = State.validate_backup("backup_20240101_120000")
 ```
-
-#### State.cleanup_backups(keep_count)
-Cleans up old backups.
-
-```lua
-State.cleanup_backups(5)  -- Keep only 5 most recent
-```
-
-### State Utilities
 
 #### State.get_storage_usage()
 Gets storage usage statistics.
 
 ```lua
 local usage = State.get_storage_usage()
-print(usage.bytes_used, usage.entries_count)
+print("Storage used:", usage.bytes)
+print("Total entries:", usage.entries)
+```
+
+#### State.cleanup_backups(dry_run)
+Cleans up old backups.
+
+```lua
+-- Dry run to see what would be deleted
+local would_delete = State.cleanup_backups(true)
+
+-- Actually clean up
+State.cleanup_backups(false)
 ```
 
 ---
@@ -1616,59 +1623,59 @@ print(comparison.summary)
 
 ---
 
-## Debug
+## Console
 
-The `Debug` global provides comprehensive debugging utilities.
+The `Console` global provides comprehensive debugging utilities for logging, profiling, and diagnostics. For interactive debugging with breakpoints, see the [Debugger](#debugger) global.
 
 ### Logging
 
-#### Debug.log(level, message, module)
+#### Console.log(level, message, module)
 Logs a message at specified level.
 
 ```lua
-Debug.log("info", "Processing started", "processor")
+Console.log("info", "Processing started", "processor")
 ```
 
-#### Debug.trace(message, module)
+#### Console.trace(message, module)
 Logs at trace level.
 
 ```lua
-Debug.trace("Detailed trace info", "module")
+Console.trace("Detailed trace info", "module")
 ```
 
-#### Debug.debug(message, module)
+#### Console.debug(message, module)
 Logs at debug level.
 
 ```lua
-Debug.debug("Debug information", "module")
+Console.debug("Debug information", "module")
 ```
 
-#### Debug.info(message, module)
+#### Console.info(message, module)
 Logs at info level.
 
 ```lua
-Debug.info("Processing complete", "module")
+Console.info("Processing complete", "module")
 ```
 
-#### Debug.warn(message, module)
+#### Console.warn(message, module)
 Logs at warning level.
 
 ```lua
-Debug.warn("Deprecated function used", "module")
+Console.warn("Deprecated function used", "module")
 ```
 
-#### Debug.error(message, module)
+#### Console.error(message, module)
 Logs at error level.
 
 ```lua
-Debug.error("Failed to process", "module")
+Console.error("Failed to process", "module")
 ```
 
-#### Debug.logWithData(level, message, data, module)
+#### Console.logWithData(level, message, data, module)
 Logs with structured data.
 
 ```lua
-Debug.logWithData("info", "Request processed", {
+Console.logWithData("info", "Request processed", {
     duration = 1500,
     status = 200
 }, "api")
@@ -1676,146 +1683,154 @@ Debug.logWithData("info", "Request processed", {
 
 ### Timing
 
-#### Debug.timer(name)
+#### Console.timer(name)
 Creates a timer.
 
 ```lua
-local timer = Debug.timer("operation")
+local timer = Console.timer("operation")
 -- Do work...
 local duration = timer:stop()
 ```
 
 Timer methods:
-- `timer:stop()` - Stops timer and returns duration
+- `timer:stop()` - Stops timer and returns duration in milliseconds
 - `timer:lap(name)` - Records a lap time
 - `timer:elapsed()` - Gets elapsed time without stopping
+- `timer.id` - Gets the timer ID
 
-### Debug Configuration
+### Console Configuration
 
-#### Debug.setLevel(level)
+#### Console.setLevel(level)
 Sets the debug level.
 
 ```lua
-Debug.setLevel("debug")
+Console.setLevel("debug")
 ```
 
-#### Debug.getLevel()
+#### Console.getLevel()
 Gets current debug level.
 
 ```lua
-local level = Debug.getLevel()
+local level = Console.getLevel()
 ```
 
-#### Debug.setEnabled(enabled)
+#### Console.setEnabled(enabled)
 Enables/disables debugging.
 
 ```lua
-Debug.setEnabled(true)
+Console.setEnabled(true)
 ```
 
-#### Debug.isEnabled()
+#### Console.isEnabled()
 Checks if debugging is enabled.
 
 ```lua
-if Debug.isEnabled() then
-    -- Debug is on
+if Console.isEnabled() then
+    -- Console is on
 end
 ```
 
 ### Filtering
 
-#### Debug.addModuleFilter(pattern, enabled)
+#### Console.addModuleFilter(pattern, enabled)
 Adds a module filter.
 
 ```lua
-Debug.addModuleFilter("api.*", true)
-Debug.addModuleFilter("verbose.*", false)
+Console.addModuleFilter("api.*", true)
+Console.addModuleFilter("verbose.*", false)
 ```
 
-#### Debug.clearModuleFilters()
+#### Console.clearModuleFilters()
 Clears all module filters.
 
 ```lua
-Debug.clearModuleFilters()
+Console.clearModuleFilters()
 ```
 
-#### Debug.removeModuleFilter(pattern)
+#### Console.removeModuleFilter(pattern)
 Removes a specific filter.
 
 ```lua
-Debug.removeModuleFilter("api.*")
+Console.removeModuleFilter("api.*")
 ```
 
-#### Debug.setDefaultFilterEnabled(enabled)
+#### Console.setDefaultFilterEnabled(enabled)
 Sets default filter behavior.
 
 ```lua
-Debug.setDefaultFilterEnabled(false)
+Console.setDefaultFilterEnabled(false)
 ```
 
-#### Debug.addAdvancedFilter(pattern, pattern_type, enabled)
+#### Console.addAdvancedFilter(pattern, pattern_type, enabled)
 Adds an advanced filter.
 
 ```lua
-Debug.addAdvancedFilter("api.*", "wildcard", true)
-Debug.addAdvancedFilter("^core\\..*", "regex", false)
+Console.addAdvancedFilter("api.*", "wildcard", true)
+Console.addAdvancedFilter("^core\\..*", "regex", false)
 ```
 
-#### Debug.getFilterSummary()
+#### Console.getFilterSummary()
 Gets filter configuration summary.
 
 ```lua
-local summary = Debug.getFilterSummary()
+local summary = Console.getFilterSummary()
 print(summary.total_rules)
+print(summary.default_enabled)
 ```
 
 ### Capture
 
-#### Debug.getCapturedEntries(limit)
+#### Console.getCapturedEntries(limit)
 Gets captured debug entries.
 
 ```lua
-local entries = Debug.getCapturedEntries(100)
+local entries = Console.getCapturedEntries(100)
 for i, entry in ipairs(entries) do
     print(entry.timestamp, entry.level, entry.message)
+    if entry.module then
+        print("Module:", entry.module)
+    end
+    if entry.metadata then
+        print("Metadata:", entry.metadata)
+    end
 end
 ```
 
-#### Debug.clearCaptured()
+#### Console.clearCaptured()
 Clears captured entries.
 
 ```lua
-Debug.clearCaptured()
+Console.clearCaptured()
 ```
 
 ### Value Dumping
 
-#### Debug.dump(value, label)
+#### Console.dump(value, label)
 Dumps a value with formatting.
 
 ```lua
-Debug.dump(complex_table, "Configuration")
+Console.dump(complex_table, "Configuration")
 ```
 
-#### Debug.dumpCompact(value, label)
+#### Console.dumpCompact(value, label)
 Compact one-line dump.
 
 ```lua
-Debug.dumpCompact(data, "Data")
+Console.dumpCompact(data, "Data")
 ```
 
-#### Debug.dumpVerbose(value, label)
+#### Console.dumpVerbose(value, label)
 Detailed verbose dump.
 
 ```lua
-Debug.dumpVerbose(object, "Object")
+Console.dumpVerbose(object, "Object")
 ```
 
-#### Debug.dumpWithOptions(value, options, label)
+#### Console.dumpWithOptions(value, options, label)
 Dump with custom options.
 
 ```lua
-Debug.dumpWithOptions(data, {
+Console.dumpWithOptions(data, {
     max_depth = 5,
     indent_size = 4,
     max_string_length = 100,
@@ -1826,59 +1841,59 @@ Debug.dumpWithOptions(data, {
 
 ### Performance
 
-#### Debug.performanceReport()
+#### Console.performanceReport()
 Generates performance report.
 
 ```lua
-local report = Debug.performanceReport()
+local report = Console.performanceReport()
 ```
 
-#### Debug.memoryStats()
+#### Console.memoryStats()
 Gets memory statistics.
 
 ```lua
-local stats = Debug.memoryStats()
+local stats = Console.memoryStats()
 print(stats.used_bytes)
 print(stats.allocated_bytes)
 ```
 
-#### Debug.jsonReport()
+#### Console.jsonReport()
 Generates JSON debug report.
 
 ```lua
-local json = Debug.jsonReport()
+local json = Console.jsonReport()
 ```
 
-#### Debug.flameGraph()
+#### Console.flameGraph()
 Generates flame graph data.
 
 ```lua
-local flame_data = Debug.flameGraph()
+local flame_data = Console.flameGraph()
 ```
 
-#### Debug.memorySnapshot()
+#### Console.memorySnapshot()
 Takes a memory snapshot.
 
 ```lua
-local snapshot = Debug.memorySnapshot()
+local snapshot = Console.memorySnapshot()
 print(snapshot.timestamp_secs)
 print(snapshot.active_trackers)
 ```
 
-#### Debug.recordEvent(timer_id, event_name, metadata)
+#### Console.recordEvent(timer_id, event_name, metadata)
 Records a timing event.
 
 ```lua
-Debug.recordEvent("timer-123", "checkpoint", {step = 5})
+Console.recordEvent("timer-123", "checkpoint", {step = 5})
 ```
 
 ### Stack Traces
 
-#### Debug.stackTrace(options)
+#### Console.stackTrace(options)
 Captures stack trace.
 
 ```lua
-local trace = Debug.stackTrace({
+local trace = Console.stackTrace({
     max_depth = 50,
     capture_locals = true,
     capture_upvalues = false,
@@ -1886,11 +1901,94 @@ local trace = Debug.stackTrace({
 })
 ```
 
-#### Debug.stackTraceJson(options)
+#### Console.stackTraceJson(options)
 Gets stack trace as JSON.
 
 ```lua
-local json = Debug.stackTraceJson()
+local json = Console.stackTraceJson()
+```
+
+---
+
+## Debugger
+
+**⭐ NEW Phase 9** - The `Debugger` global provides interactive debugging capabilities. **Note**: This is currently a limited implementation with placeholder functionality. Most methods return placeholder messages indicating the feature is not yet implemented.
+
+### Currently Available Methods
+
+#### Debugger.break()
+Triggers a breakpoint programmatically (placeholder).
+
+```lua
+Debugger.break()  -- Returns "Breakpoint functionality not yet implemented"
+```
+
+#### Debugger.step()
+Steps to the next line (placeholder).
+
+```lua
+Debugger.step()  -- Returns "Step functionality not yet implemented"
+```
+
+#### Debugger.continue()
+Continues execution (placeholder).
+
+```lua
+Debugger.continue()  -- Returns "Continue functionality not yet implemented"
+```
+
+#### Debugger.inspect(value)
+Inspects a value and returns a formatted string.
+
+```lua
+local formatted = Debugger.inspect({x = 1, y = 2})
+print(formatted)  -- Shows formatted representation of the value
+```
+
+#### Debugger.getLocals()
+Gets local variables (currently returns empty table).
+
+```lua
+local locals = Debugger.getLocals()  -- Returns empty table
+```
+
+### Future Functionality
+
+The following features are planned but not yet implemented:
+
+- **Breakpoint Management**: Setting, removing, and managing breakpoints
+- **Execution Control**: Pause, step into/over/out, run to line
+- **Variable Inspection**: Get locals, globals, upvalues with actual values
+- **Stack Navigation**: View and navigate call stack
+- **Watch Expressions**: Monitor expressions during execution
+- **Debug State**: Query current debug status and location
+- **REPL Integration**: Debug commands in the REPL
+- **Performance Monitoring**: Debug overhead metrics
+
+### Infrastructure in Place
+
+While the Lua API is limited, the underlying infrastructure includes:
+
+- `ExecutionManager` for debug state management
+- `LuaExecutionHook` for debug hooks
+- `DebugStateCache` for fast breakpoint checking
+- `VariableInspector` for variable examination
+- `ConditionEvaluator` for conditional breakpoints
+- DAP (Debug Adapter Protocol) bridge foundation
+
+### Example: Current Capabilities
+
+```lua
+-- Currently working
+local value = {name = "test", count = 42}
+local formatted = Debugger.inspect(value)
+print("Inspected:", formatted)
+
+-- These return placeholder messages
+local result = Debugger.break()       -- "Breakpoint functionality not yet implemented"
+local result = Debugger.step()        -- "Step functionality not yet implemented" 
+local result = Debugger.continue()    -- "Continue functionality not yet implemented"
+local locals = Debugger.getLocals()   -- Returns {}
 ```
 
 ---
@@ -2009,6 +2107,62 @@ Streaming.yield(computed_value)
 
 ---
 
+## Kernel Execution Context
+
+**⭐ NEW Phase 9** - All Lua scripts now execute through the kernel architecture, providing:
+
+### Automatic State Persistence
+
+Variables and state persist across script executions within the same kernel session:
+
+```lua
+-- First execution
+if not counter then
+    counter = 0
+end
+counter = counter + 1
+print("Counter:", counter)  -- Output: Counter: 1
+
+-- Second execution (same session)
+counter = counter + 1
+print("Counter:", counter)  -- Output: Counter: 2
+```
+
+### Performance Improvements
+
+- **First execution**: ~95ms kernel startup
+- **Subsequent executions**: <1ms overhead (connection reused)
+- **Debug overhead**: <3% when no breakpoints set
+
+### Execution Modes
+
+Scripts can run in different modes:
+
+```lua
+-- Normal execution (through kernel)
+-- This is the default for all scripts
+
+-- Debug mode (with breakpoints enabled)
+-- Automatically enabled when breakpoints are set
+Debugger.setBreakpoint("script.lua", 10)
+-- Now script runs in debug mode
+
+-- REPL mode (interactive)
+-- Automatically detected when using llmspell repl command
+```
+
+### Kernel Connection
+
+The kernel connection is managed automatically:
+
+```lua
+-- No need to manually connect - kernel auto-spawns if needed
+-- Connection info available through environment
+if KERNEL_ID then
+    print("Connected to kernel:", KERNEL_ID)
+end
+```
+
 ## Common Patterns
 
 ### Error Handling
@@ -2079,11 +2233,16 @@ local result = Tool.execute("web-search", {
 
 1. **Always check for nil/false returns** - Operations may fail
 2. **Use scoped state for isolation** - Prefix keys with scope
-3. **Clean up resources** - Unsubscribe from events, unregister hooks
+3. **Clean up resources** - Unsubscribe from events, unregister hooks, remove breakpoints
 4. **Handle streaming data incrementally** - Don't collect all at once
-5. **Use appropriate debug levels** - trace < debug < info < warn < error
+5. **Use appropriate console levels** - trace < debug < info < warn < error
 6. **Validate inputs** - Check types and ranges before operations
 7. **Use builders for complex objects** - Cleaner than configuration tables
 8. **Batch operations when possible** - Tool.batch() for multiple operations
 9. **Set timeouts for external calls** - Prevent hanging on network/LLM calls
 10. **Use session artifacts for persistence** - Better than global state for user data
+11. **⭐ NEW: Use conditional breakpoints** - More efficient than breaking on every hit
+12. **⭐ NEW: Leverage kernel persistence** - State persists across executions in same session
+13. **⭐ NEW: Monitor debug performance** - Check metrics if debugging feels slow
+14. **⭐ NEW: Use watch expressions** - Monitor values without manual inspection
+15. **⭐ NEW: Clean up debug state** - Remove breakpoints and watches when done

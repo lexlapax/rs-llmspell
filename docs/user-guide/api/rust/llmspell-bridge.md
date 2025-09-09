@@ -1,6 +1,6 @@
 # llmspell-bridge
 
-**Script language integration and Lua bridge**
+**Script language integration with debug infrastructure** **🆕 ENHANCED Phase 9**
 
 **🔗 Navigation**: [← Rust API](README.md) | [Crate Docs](https://docs.rs/llmspell-bridge) | [Source](../../../../llmspell-bridge)
 
@@ -8,17 +8,122 @@
 
 ## Overview
 
-`llmspell-bridge` provides the integration layer between Rust components and scripting languages, primarily Lua. It handles type conversion, global injection, and performance optimization.
+`llmspell-bridge` provides the integration layer between Rust components and scripting languages, with comprehensive debug support added in Phase 9. It now includes ExecutionManager, DebugCoordinator, variable inspection, and breakpoint management.
 
 **Key Features:**
 - 🌉 Lua <-> Rust bridging
+- 🐛 Interactive debugging with ExecutionManager
+- 🎯 Breakpoint management with conditions
+- 🔍 Variable inspection and stack navigation
+- 📊 Performance metrics (<3% debug overhead)
 - 🔄 Automatic type conversion
 - 📦 Global object injection
-- ⚡ <1% performance overhead
-- 🎯 Error propagation
-- 📊 Bridge metrics
-- 🔐 Sandboxed execution
-- 🧩 Extensible for other languages
+- 🧩 Extensible for multiple languages
+
+## Debug Infrastructure (NEW Phase 9)
+
+### ExecutionManager
+
+Central debug state management:
+
+```rust
+use llmspell_bridge::execution_bridge::{ExecutionManager, Breakpoint, DebugCommand};
+
+// Create execution manager
+let exec_manager = Arc::new(ExecutionManager::new());
+
+// Add breakpoint
+let bp = Breakpoint::new("script.lua", 10)
+    .with_condition("x > 5")
+    .with_hit_count(3);
+let bp_id = exec_manager.add_breakpoint(bp).await;
+
+// Send debug command
+exec_manager.send_command(DebugCommand::StepInto).await;
+
+// Get debug state
+let state = exec_manager.get_state().await;
+match state {
+    DebugState::Paused(reason) => println!("Paused: {:?}", reason),
+    DebugState::Running => println!("Running"),
+    _ => {}
+}
+```
+
+### DebugCoordinator
+
+Coordinates debugging across languages:
+
+```rust
+use llmspell_bridge::debug_coordinator::DebugCoordinator;
+
+// Create coordinator
+let coordinator = DebugCoordinator::new(
+    exec_manager.clone(),
+    shared_context.clone()
+);
+
+// Install language-specific hooks
+coordinator.install_lua_hooks(&lua)?;
+coordinator.install_js_hooks(&js_runtime)?;  // Future
+
+// Coordinate multi-language debugging
+coordinator.synchronize_breakpoints().await?;
+```
+
+### Variable Inspector
+
+```rust
+use llmspell_bridge::variable_inspector::{VariableInspector, Variable};
+
+// Get variables at current scope
+let locals = inspector.get_local_variables().await;
+let globals = inspector.get_global_variables().await;
+let upvalues = inspector.get_upvalues().await;
+
+// Inspect complex variable
+let var = inspector.inspect_variable("myTable").await?;
+if let Some(ref_id) = var.reference {
+    // Expand complex type
+    let children = inspector.get_children(ref_id).await?;
+}
+
+// Evaluate expression
+let result = inspector.evaluate_expression("x * 2 + y").await?;
+```
+
+### Condition Evaluator
+
+```rust
+use llmspell_bridge::condition_evaluator::ConditionEvaluator;
+
+// Compile and cache condition
+let evaluator = ConditionEvaluator::new();
+let compiled = evaluator.compile_condition("x > 5 and y < 10")?;
+
+// Evaluate with context
+let context = HashMap::from([
+    ("x", 7),
+    ("y", 3),
+]);
+let should_break = evaluator.evaluate(&compiled, &context)?;
+```
+
+### Stack Navigator
+
+```rust
+use llmspell_bridge::stack_navigator::{StackNavigator, StackFrame};
+
+// Get call stack
+let stack = navigator.get_stack_trace().await;
+for frame in stack {
+    println!("{}:{} in {}", frame.source, frame.line, frame.name);
+}
+
+// Navigate frames
+navigator.set_current_frame(2).await?;
+let frame_locals = navigator.get_frame_locals(2).await?;
+```
 
 ## ScriptEngine Trait
 
@@ -59,6 +164,57 @@ let result = engine.execute(r#"
     
     return agent:execute({prompt = "Hello!"})
 "#).await?;
+```
+
+## Debug Modules Architecture
+
+### Module Organization
+
+Phase 9 added extensive debug infrastructure:
+
+```rust
+// Core debug modules
+pub mod execution_bridge;      // ExecutionManager, Breakpoint, DebugState
+pub mod debug_coordinator;     // Multi-language debug coordination
+pub mod debug_runtime;         // Debug runtime management
+pub mod debug_state_cache;     // Fast-path debug state caching
+pub mod variable_inspector;    // Variable inspection with lazy expansion
+pub mod condition_evaluator;   // Breakpoint condition evaluation
+pub mod stack_navigator;       // Call stack navigation
+pub mod execution_context;     // SharedExecutionContext for enrichment
+
+// Language-specific implementations
+pub mod lua {
+    pub mod lua_debug_bridge;         // Lua debug hook integration
+    pub mod debug_hook_adapter;       // Hook adaptation layer
+    pub mod debug_state_cache_impl;   // Lua-specific cache
+    pub mod variable_inspector_impl;  // Lua variable inspection
+    pub mod condition_evaluator_impl; // Lua condition evaluation
+}
+```
+
+### SharedExecutionContext
+
+Enriches debugging with performance metrics:
+
+```rust
+use llmspell_bridge::execution_context::SharedExecutionContext;
+
+let context = Arc::new(RwLock::new(SharedExecutionContext::new()));
+
+// Update context during execution
+context.write().await.update_location(SourceLocation {
+    file: "script.lua".to_string(),
+    line: 10,
+    column: Some(5),
+});
+
+// Add performance metric
+context.write().await.add_metric("breakpoint_checks", 42);
+
+// Get execution statistics
+let stats = context.read().await.get_statistics();
+println!("Total hook time: {}μs", stats.total_hook_time_us);
 ```
 
 ## Global Registration
@@ -135,13 +291,25 @@ match result {
 }
 ```
 
-## Performance Optimization
+## Performance Optimization (Enhanced Phase 9)
 
+### Execution Performance
 - **JIT Compilation**: LuaJIT for native performance
 - **Lazy Loading**: Globals loaded on-demand
 - **Memory Pooling**: Reuse Lua states
 - **Type Caching**: Cache converted types
 - **Minimal Overhead**: <1% vs native Rust
+
+### Debug Performance (NEW Phase 9)
+- **Debug State Cache**: Fast path for breakpoint checks
+- **Condition Compilation**: Pre-compiled breakpoint conditions
+- **Lazy Variable Inspection**: On-demand expansion
+- **Context Batching**: Batch updates to reduce overhead
+- **Achieved Metrics**:
+  - <3% overhead when debugging enabled
+  - <0.1% overhead when no breakpoints set
+  - ~10μs per breakpoint check
+  - ~100μs for full variable inspection
 
 ## RAG Bridge with Temporal Support
 
