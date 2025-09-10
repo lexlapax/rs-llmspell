@@ -64,11 +64,12 @@ impl<T: Transport, P: Protocol> GenericClient<T, P> {
             channels: std::collections::HashMap::new(),
         };
 
-        // Configure channels for client mode (opposite patterns from server)
+        // Configure channels for client mode (matching Jupyter protocol)
+        // Client uses DEALER to talk to kernel's ROUTER sockets
         config.channels.insert(
             "shell".to_string(),
             ChannelConfig {
-                pattern: "req".to_string(), // Client uses REQ for request-reply
+                pattern: "dealer".to_string(), // DEALER for async request-reply
                 endpoint: conn_info.shell_port.to_string(),
             },
         );
@@ -76,7 +77,7 @@ impl<T: Transport, P: Protocol> GenericClient<T, P> {
         config.channels.insert(
             "iopub".to_string(),
             ChannelConfig {
-                pattern: "sub".to_string(), // Client subscribes
+                pattern: "sub".to_string(), // SUB to receive broadcasts
                 endpoint: conn_info.iopub_port.to_string(),
             },
         );
@@ -84,7 +85,7 @@ impl<T: Transport, P: Protocol> GenericClient<T, P> {
         config.channels.insert(
             "stdin".to_string(),
             ChannelConfig {
-                pattern: "req".to_string(), // Use REQ for request-reply
+                pattern: "dealer".to_string(), // DEALER for async request-reply
                 endpoint: conn_info.stdin_port.to_string(),
             },
         );
@@ -92,7 +93,7 @@ impl<T: Transport, P: Protocol> GenericClient<T, P> {
         config.channels.insert(
             "control".to_string(),
             ChannelConfig {
-                pattern: "req".to_string(), // Use REQ for request-reply
+                pattern: "dealer".to_string(), // DEALER for async request-reply
                 endpoint: conn_info.control_port.to_string(),
             },
         );
@@ -137,14 +138,26 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                 MessageContent::Status { execution_state } => {
                     tracing::debug!("Execution state: {:?}", execution_state);
                 }
-                MessageContent::Stream { name, text } => match name {
-                    StreamType::Stdout => print!("{text}"),
-                    StreamType::Stderr => eprint!("{text}"),
-                },
+                MessageContent::Stream { name, text } => {
+                    use std::io::Write;
+                    match name {
+                        StreamType::Stdout => {
+                            print!("{text}");
+                            // Flush stdout to ensure output is visible immediately
+                            let _ = std::io::stdout().flush();
+                        }
+                        StreamType::Stderr => {
+                            eprint!("{text}");
+                            let _ = std::io::stderr().flush();
+                        }
+                    }
+                }
                 MessageContent::ExecuteResult { data, .. } => {
                     if let Some(text_plain) = data.get("text/plain") {
                         if let Some(text) = text_plain.as_str() {
                             print!("{text}");
+                            use std::io::Write;
+                            let _ = std::io::stdout().flush();
                         }
                     }
                 }
@@ -192,18 +205,24 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
     }
 
     /// Process `IOPub` messages during execution
-    async fn process_iopub_during_execution(&self, msg_id: &str) -> Result<()> {
+    /// Returns true if a message was received
+    async fn process_iopub_during_execution(&self, msg_id: &str) -> Result<bool> {
         if let Some(iopub_bytes) = self.transport.recv("iopub").await? {
+            tracing::debug!("Received IOPub message, decoding...");
             match self.protocol.decode(iopub_bytes, "iopub") {
                 Ok(iopub_msg) => {
+                    tracing::debug!("IOPub message type: {}", iopub_msg.header.msg_type);
                     Self::process_iopub_message(&iopub_msg, msg_id);
                 }
                 Err(e) => {
                     tracing::debug!("Failed to decode IOPub message: {}", e);
                 }
             }
+            Ok(true)
+        } else {
+            tracing::trace!("No IOPub message available");
+            Ok(false)
         }
-        Ok(())
     }
 
     /// Check for execute reply on shell channel
@@ -217,9 +236,15 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                     if parent.msg_id == msg_id {
                         tracing::debug!("Got our execute_reply!");
                         return Ok(Some(reply.content.clone()));
+                    } else {
+                        tracing::debug!("Execute reply for different message: {} != {}", parent.msg_id, msg_id);
                     }
+                } else {
+                    tracing::debug!("Execute reply has no parent header");
                 }
             }
+        } else {
+            tracing::trace!("No shell message available");
         }
         Ok(None)
     }
@@ -243,29 +268,42 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
         self.transport.send("shell", request_bytes).await?;
 
         // Wait for execution to complete
-        let timeout_duration = tokio::time::Duration::from_secs(2);
+        let timeout_duration = tokio::time::Duration::from_secs(30); // Increased timeout
         let start_time = tokio::time::Instant::now();
+        let mut consecutive_empty_polls = 0;
 
         loop {
             // Check for timeout
             if start_time.elapsed() > timeout_duration {
-                tracing::warn!("Execution timed out waiting for completion");
+                tracing::warn!("Execution timed out after 30 seconds");
                 break;
             }
 
             // Process IOPub messages
-            self.process_iopub_during_execution(&msg_id).await?;
+            let had_iopub = self.process_iopub_during_execution(&msg_id).await?;
 
             // Check for execute reply
             if let Some(reply) = self.check_for_execute_reply(&msg_id).await? {
                 return Ok(reply);
             }
 
-            // Small delay to avoid busy waiting
-            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+            // If we got messages, reset the empty poll counter
+            if had_iopub {
+                consecutive_empty_polls = 0;
+            } else {
+                consecutive_empty_polls += 1;
+            }
+
+            // Adaptive delay - wait longer if no messages are coming
+            let delay = if consecutive_empty_polls > 10 {
+                tokio::time::Duration::from_millis(100) // Longer delay if quiet
+            } else {
+                tokio::time::Duration::from_millis(20) // Short delay when active
+            };
+            tokio::time::sleep(delay).await;
         }
 
-        Err(anyhow::anyhow!("No execute reply received"))
+        Err(anyhow::anyhow!("No execute reply received after 30 seconds"))
     }
 
     /// Request kernel information

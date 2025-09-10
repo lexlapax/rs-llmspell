@@ -19,7 +19,6 @@ pub mod state;
 pub mod validate;
 
 use crate::cli::{Commands, OutputFormat, ScriptEngine};
-use crate::kernel_client::KernelConnectionTrait;
 use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
 
@@ -174,20 +173,16 @@ pub async fn create_kernel_connection(
     config: LLMSpellConfig,
     connect: Option<String>,
 ) -> Result<Box<dyn crate::kernel_client::KernelConnectionTrait>> {
+    use crate::kernel_client::UnifiedKernelClient;
     use std::sync::Arc;
 
-    if let Some(connection) = connect {
-        // TODO: Connect to existing external kernel via ZeroMQ
-        // This will require implementing ZmqKernelClient properly
-        anyhow::bail!(
-            "External kernel connection not yet implemented.\n\
-            Connection string provided: {}",
-            connection
-        );
+    let kernel = if let Some(connection) = connect {
+        // Connect to external kernel
+        UnifiedKernelClient::connect_external(connection).await?
     } else {
-        // Default: Use embedded kernel (runs in same process)
-        let mut kernel = crate::kernel_client::EmbeddedKernel::new(Arc::new(config)).await?;
-        kernel.connect_or_start().await?;
-        Ok(Box::new(kernel))
-    }
+        // Start embedded kernel
+        UnifiedKernelClient::start_embedded(Arc::new(config)).await?
+    };
+    
+    Ok(Box::new(kernel))
 }
