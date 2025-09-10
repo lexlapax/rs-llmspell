@@ -1,6 +1,7 @@
 //! ABOUTME: Enhanced `ExecutionContext` with hierarchical support and service bundle architecture
 //! ABOUTME: Provides comprehensive runtime services for agents, tools, and workflows
 
+use crate::io::IOContext;
 use crate::traits::event::EventEmitter;
 use crate::traits::state::StateAccess;
 use crate::types::{ComponentId, EventMetadata};
@@ -168,6 +169,10 @@ pub struct ExecutionContext {
 
     /// Security context (placeholder for Phase 3.2 integration)
     pub security_context: Option<SecurityContext>,
+
+    /// IO context for routing input/output (Task 9.8.15)
+    #[serde(skip)]
+    pub io_context: Option<Arc<IOContext>>,
 }
 
 /// Security context placeholder
@@ -197,6 +202,7 @@ impl ExecutionContext {
             events: None,
             metadata: EventMetadata::default(),
             security_context: None,
+            io_context: None,
         }
     }
 
@@ -225,6 +231,7 @@ impl ExecutionContext {
             events: self.events.clone(),               // Events are shared across hierarchy
             metadata: self.metadata.clone(),
             security_context: self.security_context.clone(),
+            io_context: self.io_context.clone(), // IO context is shared across hierarchy
         };
 
         // Apply inheritance policy
@@ -293,6 +300,12 @@ impl ExecutionContext {
     /// Set the scope
     pub fn with_scope(mut self, scope: ContextScope) -> Self {
         self.scope = scope;
+        self
+    }
+
+    /// Set the IO context
+    pub fn with_io_context(mut self, io_context: Arc<IOContext>) -> Self {
+        self.io_context = Some(io_context);
         self
     }
 
@@ -419,6 +432,12 @@ impl ExecutionContextBuilder {
     /// Set event emitter provider
     pub fn events(mut self, events: Arc<dyn EventEmitter>) -> Self {
         self.context.events = Some(events);
+        self
+    }
+
+    /// Set IO context
+    pub fn io_context(mut self, io_context: Arc<IOContext>) -> Self {
+        self.context.io_context = Some(io_context);
         self
     }
 

@@ -379,7 +379,7 @@ impl HookBridge {
                 .await
             {
                 // Log error but don't fail hook execution
-                eprintln!("Failed to publish before hook event: {e}");
+                tracing::error!("Failed to publish before hook event: {}", e);
             }
         }
 
@@ -405,7 +405,7 @@ impl HookBridge {
                 .publish_correlated_event(after_event, correlation_id)
                 .await
             {
-                eprintln!("Failed to publish after hook event: {e}");
+                tracing::error!("Failed to publish after hook event: {}", e);
             }
         }
 

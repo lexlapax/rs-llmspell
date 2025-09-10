@@ -9,6 +9,7 @@ use uuid::Uuid;
 
 use crate::connection::ConnectionInfo;
 use crate::jupyter::protocol::{JupyterMessage, MessageContent, MessageHeader, StreamType};
+use crate::output_formatter::{OutputChannel, OutputFormatter};
 use crate::traits::transport::ChannelConfig;
 use crate::traits::{Protocol, Transport, TransportConfig};
 
@@ -134,30 +135,22 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
             .is_some_and(|parent| parent.msg_id == msg_id);
 
         if is_our_message {
+            let formatter = OutputFormatter::new();
             match &msg.content {
                 MessageContent::Status { execution_state } => {
                     tracing::debug!("Execution state: {:?}", execution_state);
                 }
                 MessageContent::Stream { name, text } => {
-                    use std::io::Write;
-                    match name {
-                        StreamType::Stdout => {
-                            print!("{text}");
-                            // Flush stdout to ensure output is visible immediately
-                            let _ = std::io::stdout().flush();
-                        }
-                        StreamType::Stderr => {
-                            eprint!("{text}");
-                            let _ = std::io::stderr().flush();
-                        }
-                    }
+                    let channel = match name {
+                        StreamType::Stdout => OutputChannel::Stdout,
+                        StreamType::Stderr => OutputChannel::Stderr,
+                    };
+                    let _ = formatter.write(channel, text);
                 }
                 MessageContent::ExecuteResult { data, .. } => {
                     if let Some(text_plain) = data.get("text/plain") {
                         if let Some(text) = text_plain.as_str() {
-                            use std::io::Write;
-                            print!("{text}");
-                            let _ = std::io::stdout().flush();
+                            let _ = formatter.write(OutputChannel::Stdout, text);
                         }
                     }
                 }
@@ -166,9 +159,9 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                     evalue,
                     traceback,
                 } => {
-                    eprintln!("{ename}: {evalue}");
+                    let _ = formatter.error(&format!("{}: {}", ename, evalue));
                     for line in traceback {
-                        eprintln!("{line}");
+                        let _ = formatter.write_line(OutputChannel::Stderr, line);
                     }
                 }
                 _ => {} // Ignore other IOPub messages

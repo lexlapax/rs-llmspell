@@ -34,6 +34,7 @@ pub mod dap_bridge;
 pub mod discovery;
 pub mod kernel;
 pub mod kernel_io;
+pub mod output_formatter;
 pub mod security;
 pub mod session_persistence;
 

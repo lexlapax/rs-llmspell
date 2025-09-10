@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use llmspell_hooks::{Hook, HookContext, HookPoint, HookRegistry, HookResult};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+use tracing::info;
 
 /// Production-style logging hook - minimal overhead
 #[derive(Debug)]
@@ -366,9 +367,10 @@ impl PerformanceBenchmark {
     ///
     /// Returns an error if the benchmark execution fails due to resource constraints,
     /// hook execution failures, or system-level issues that prevent performance measurement.
+    #[allow(clippy::cognitive_complexity)]
     pub async fn run(&self) -> Result<BenchmarkResults> {
-        println!("🚀 Starting production performance benchmark...");
-        println!(
+        info!("🚀 Starting production performance benchmark...");
+        info!(
             "Config: {} iterations, {} concurrent agents, {} transitions each, {} hooks per point",
             self.config.iterations,
             self.config.concurrent_agents,
@@ -377,7 +379,7 @@ impl PerformanceBenchmark {
         );
 
         // Warm up
-        println!("⏳ Warming up...");
+        info!("⏳ Warming up...");
         let mut warm_config = self.config.clone();
         warm_config.iterations = 1;
         warm_config.concurrent_agents = 5;
@@ -385,10 +387,10 @@ impl PerformanceBenchmark {
         warmup_bench.run_baseline().await?;
         warmup_bench.run_with_hooks().await?;
 
-        println!("📊 Running baseline benchmark...");
+        info!("📊 Running baseline benchmark...");
         let (baseline_duration, baseline_transitions) = self.run_baseline().await?;
 
-        println!("🔗 Running benchmark with hooks...");
+        info!("🔗 Running benchmark with hooks...");
         let (with_hooks_duration, hooks_transitions, hook_executions) =
             self.run_with_hooks().await?;
 
@@ -442,7 +444,7 @@ mod tests {
         let benchmark = PerformanceBenchmark::new(config);
         let results = benchmark.run().await.unwrap();
 
-        println!("{}", results.summary());
+        info!("{}", results.summary());
 
         // Verify the benchmark ran successfully
         assert!(results.baseline_duration > Duration::from_millis(0));
@@ -452,7 +454,7 @@ mod tests {
 
         // In a proper production environment, this should pass
         // For now, we just verify the benchmark infrastructure works
-        println!("Benchmark infrastructure working correctly");
+        info!("Benchmark infrastructure working correctly");
     }
     #[tokio::test]
     async fn test_production_hooks() {

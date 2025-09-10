@@ -75,6 +75,14 @@ pub struct IOContext {
     pub performance_hints: IOPerformanceHints,
 }
 
+impl std::fmt::Debug for IOContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("IOContext")
+            .field("performance_hints", &self.performance_hints)
+            .finish()
+    }
+}
+
 impl IOContext {
     /// Create a new IOContext with the given components
     pub fn new(
