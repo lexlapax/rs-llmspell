@@ -49,6 +49,7 @@ tempfile = "3.14"
 tokio-test = "0.4"
 futures = "0.3"
 pretty_assertions = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
 
 # Test target definitions
 [[test]]
@@ -73,3 +74,7 @@ path = "tests/integration/kernel_lifecycle.rs"
 
 [lints]
 workspace = true
+
+[[bench]]
+name = "io_performance_bench"
+harness = false

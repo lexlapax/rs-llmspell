@@ -10,9 +10,11 @@
 
 use crate::error::LLMSpellError;
 use async_trait::async_trait;
+use std::collections::VecDeque;
 use std::io::{self, Write as StdWrite};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant};
 
 /// Performance hints for IO operations
 #[derive(Debug, Clone)]
@@ -317,32 +319,64 @@ impl SignalHandler for NoOpSignalHandler {
     }
 }
 
-/// Buffered output stream for performance
+/// Buffered output stream for performance with time-based flushing
 pub struct BufferedStream {
     inner: Arc<dyn IOStream>,
-    buffer: Mutex<Vec<String>>,
+    buffer: Mutex<BufferState>,
     batch_size: usize,
+    flush_interval: Duration,
+}
+
+struct BufferState {
+    lines: Vec<String>,
+    last_flush: Instant,
 }
 
 impl BufferedStream {
     pub fn new(inner: Arc<dyn IOStream>, batch_size: usize) -> Self {
+        Self::with_interval(inner, batch_size, Duration::from_millis(100))
+    }
+
+    pub fn with_interval(inner: Arc<dyn IOStream>, batch_size: usize, flush_interval: Duration) -> Self {
         Self {
             inner,
-            buffer: Mutex::new(Vec::with_capacity(batch_size)),
+            buffer: Mutex::new(BufferState {
+                lines: Vec::with_capacity(batch_size),
+                last_flush: Instant::now(),
+            }),
             batch_size,
+            flush_interval,
         }
     }
 
-    fn flush_if_needed(&self) -> Result<(), LLMSpellError> {
-        let mut buffer = self.buffer.lock().unwrap();
-        if buffer.len() >= self.batch_size {
-            for line in buffer.drain(..) {
-                self.inner.write_line(&line)?;
+    fn should_flush(&self, state: &BufferState) -> bool {
+        state.lines.len() >= self.batch_size ||
+        state.last_flush.elapsed() >= self.flush_interval
+    }
+
+    fn flush_internal(&self, state: &mut BufferState) -> Result<(), LLMSpellError> {
+        if !state.lines.is_empty() {
+            // Build a single string with all lines to minimize write calls
+            let mut batch = String::with_capacity(
+                state.lines.iter().map(|s| s.len() + 1).sum()
+            );
+            for (i, line) in state.lines.iter().enumerate() {
+                if i > 0 {
+                    batch.push('\n');
+                }
+                batch.push_str(line);
             }
+            batch.push('\n');
+            
+            // Single write call for the entire batch
+            self.inner.write(&batch)?;
+            state.lines.clear();
             self.inner.flush()?;
         }
+        state.last_flush = Instant::now();
         Ok(())
     }
+
 }
 
 impl IOStream for BufferedStream {
@@ -352,19 +386,19 @@ impl IOStream for BufferedStream {
     }
 
     fn write_line(&self, line: &str) -> Result<(), LLMSpellError> {
-        {
-            let mut buffer = self.buffer.lock().unwrap();
-            buffer.push(line.to_string());
+        let mut state = self.buffer.lock().unwrap();
+        state.lines.push(line.to_string());
+        
+        // Check if we should flush
+        if self.should_flush(&state) {
+            self.flush_internal(&mut state)?;
         }
-        self.flush_if_needed()
+        Ok(())
     }
 
     fn flush(&self) -> Result<(), LLMSpellError> {
-        let mut buffer = self.buffer.lock().unwrap();
-        for line in buffer.drain(..) {
-            self.inner.write_line(&line)?;
-        }
-        self.inner.flush()
+        let mut state = self.buffer.lock().unwrap();
+        self.flush_internal(&mut state)
     }
 }
 
@@ -394,10 +428,31 @@ impl Default for MockStream {
 impl IOStream for MockStream {
     fn write(&self, data: &str) -> Result<(), LLMSpellError> {
         let mut lines = self.lines.lock().unwrap();
-        if let Some(last) = lines.last_mut() {
-            last.push_str(data);
-        } else {
-            lines.push(data.to_string());
+        
+        // Split by newlines but keep track of whether we end with a newline
+        let ends_with_newline = data.ends_with('\n');
+        let parts: Vec<&str> = data.split('\n').collect();
+        
+        for (i, part) in parts.iter().enumerate() {
+            if i == 0 {
+                // First part - append to last line if exists and not empty
+                if !part.is_empty() {
+                    if lines.is_empty() {
+                        lines.push(part.to_string());
+                    } else {
+                        // Start a new line since the batch format has newlines between lines
+                        lines.push(part.to_string());
+                    }
+                }
+            } else if i < parts.len() - 1 || (i == parts.len() - 1 && ends_with_newline) {
+                // Complete lines (has newline after them)
+                if !part.is_empty() || i < parts.len() - 1 {
+                    lines.push(part.to_string());
+                }
+            } else if !part.is_empty() {
+                // Last part without trailing newline - incomplete line
+                lines.push(part.to_string());
+            }
         }
         Ok(())
     }
@@ -448,6 +503,119 @@ impl SignalHandler for InterruptibleSignalHandler {
 
     fn is_interrupted(&self) -> bool {
         self.interrupted.load(Ordering::Relaxed)
+    }
+}
+
+/// IOContext pool for reducing allocation overhead
+pub struct IOContextPool {
+    pool: RwLock<VecDeque<Arc<IOContext>>>,
+    max_size: usize,
+    factory: Arc<dyn Fn() -> IOContext + Send + Sync>,
+}
+
+impl IOContextPool {
+    /// Create a new pool with default factory (stdio contexts)
+    pub fn new(max_size: usize) -> Self {
+        Self::with_factory(max_size, Arc::new(|| IOContext::stdio()))
+    }
+
+    /// Create a new pool with custom factory
+    pub fn with_factory(
+        max_size: usize,
+        factory: Arc<dyn Fn() -> IOContext + Send + Sync>,
+    ) -> Self {
+        Self {
+            pool: RwLock::new(VecDeque::with_capacity(max_size)),
+            max_size,
+            factory,
+        }
+    }
+
+    /// Get an IOContext from the pool or create a new one
+    pub fn acquire(&self) -> Arc<IOContext> {
+        // Try to get from pool first
+        {
+            let mut pool = self.pool.write().unwrap();
+            if let Some(context) = pool.pop_front() {
+                return context;
+            }
+        }
+        
+        // Create new if pool is empty
+        Arc::new((self.factory)())
+    }
+
+    /// Return an IOContext to the pool for reuse
+    pub fn release(&self, context: Arc<IOContext>) {
+        // Only add back to pool if we have space and it's the only reference
+        if Arc::strong_count(&context) == 1 {
+            let mut pool = self.pool.write().unwrap();
+            if pool.len() < self.max_size {
+                pool.push_back(context);
+            }
+        }
+    }
+
+    /// Clear all cached contexts
+    pub fn clear(&self) {
+        let mut pool = self.pool.write().unwrap();
+        pool.clear();
+    }
+
+    /// Get current pool size
+    pub fn size(&self) -> usize {
+        let pool = self.pool.read().unwrap();
+        pool.len()
+    }
+}
+
+/// Buffered IOContext that automatically batches output
+pub struct BufferedIOContext;
+
+impl BufferedIOContext {
+    /// Create a new buffered IOContext with specified performance hints
+    pub fn new(hints: IOPerformanceHints) -> IOContext {
+        let batch_size = hints.batch_size;
+        let flush_interval = Duration::from_millis(hints.flush_interval_ms);
+        
+        // Create buffered streams wrapping the standard streams
+        let stdout = Arc::new(BufferedStream::with_interval(
+            Arc::new(StdoutStream::new()),
+            batch_size,
+            flush_interval,
+        ));
+        
+        let stderr = Arc::new(BufferedStream::with_interval(
+            Arc::new(StderrStream::new()),
+            batch_size,
+            flush_interval,
+        ));
+        
+        IOContext {
+            stdout,
+            stderr,
+            stdin: Arc::new(StdinInput::new()),
+            signal_handler: Arc::new(NoOpSignalHandler),
+            performance_hints: hints,
+        }
+    }
+
+    /// Create with default performance hints optimized for high throughput
+    pub fn high_throughput() -> IOContext {
+        Self::new(IOPerformanceHints {
+            batch_size: 100,
+            flush_interval_ms: 50,
+            async_capable: true,
+        })
+    }
+
+    /// Create with hints optimized for low latency
+    pub fn low_latency() -> IOContext {
+        Self::new(IOPerformanceHints {
+            batch_size: 1,
+            flush_interval_ms: 10,
+            async_capable: true,
+        })
     }
 }
 
