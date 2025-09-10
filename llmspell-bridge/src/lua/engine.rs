@@ -14,6 +14,7 @@ use crate::lua::output::{install_output_capture, ConsoleCapture};
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::io::IOContext;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -43,6 +44,8 @@ pub struct LuaEngine {
     lua_debug_adapter: Option<Arc<crate::lua::debug_hook_adapter::LuaDebugHookAdapter>>,
     /// External `StateManager` for shared state access
     external_state_manager: Option<Arc<llmspell_state_persistence::manager::StateManager>>,
+    /// IO context for routing all IO operations
+    _io_context: Arc<IOContext>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -56,10 +59,25 @@ unsafe impl Sync for LuaEngine {}
 impl LuaEngine {
     /// Create a new Lua engine with the given configuration
     ///
+    /// Uses stdio IO context by default. For custom IO routing,
+    /// use `new_with_io_context` instead.
+    ///
     /// # Errors
     ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
     pub fn new(config: &LuaConfig) -> Result<Self, LLMSpellError> {
+        Self::new_with_io_context(config, Arc::new(IOContext::stdio()))
+    }
+
+    /// Create a new Lua engine with the given configuration and IO context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua feature is not enabled or engine creation fails
+    pub fn new_with_io_context(
+        config: &LuaConfig,
+        io_context: Arc<IOContext>,
+    ) -> Result<Self, LLMSpellError> {
         #[cfg(feature = "lua")]
         {
             use mlua::Lua;
@@ -68,8 +86,8 @@ impl LuaEngine {
             // TODO: restrict stdlib for Safe level
             let lua = Lua::new();
 
-            // Install output capture (without debug bridge for now)
-            let console_capture = install_output_capture(&lua, None).ok();
+            // Install output capture with IO context
+            let console_capture = install_output_capture(&lua, io_context.clone(), None).ok();
 
             Ok(Self {
                 lua: Arc::new(parking_lot::Mutex::new(lua)),
@@ -82,6 +100,7 @@ impl LuaEngine {
                 execution_manager: None,
                 lua_debug_adapter: None,
                 external_state_manager: None,
+                _io_context: io_context,
             })
         }
 
@@ -94,6 +113,7 @@ impl LuaEngine {
                 script_args: None,
                 execution_manager: None,
                 external_state_manager: None,
+                _io_context: io_context,
             })
         }
     }
@@ -114,8 +134,11 @@ impl LuaEngine {
             // Create Lua instance (async is enabled via feature flag)
             let lua = Lua::new();
 
-            // Install output capture (without debug bridge for now)
-            let console_capture = install_output_capture(&lua, None).ok();
+            // Use stdio IO context by default
+            let io_context = Arc::new(IOContext::stdio());
+
+            // Install output capture with IO context
+            let console_capture = install_output_capture(&lua, io_context.clone(), None).ok();
 
             Ok(Self {
                 lua: Arc::new(parking_lot::Mutex::new(lua)),
@@ -128,6 +151,7 @@ impl LuaEngine {
                 execution_manager: None,
                 lua_debug_adapter: None,
                 external_state_manager: Some(state_manager),
+                _io_context: io_context,
             })
         }
 
@@ -140,6 +164,7 @@ impl LuaEngine {
                 script_args: None,
                 execution_manager: None,
                 external_state_manager: Some(state_manager),
+                io_context: Arc::new(IOContext::stdio()),
             })
         }
     }
@@ -487,6 +512,130 @@ impl ScriptEngineBridge for LuaEngine {
                     warnings: vec![],
                 },
             })
+        }
+
+        #[cfg(not(feature = "lua"))]
+        {
+            Err(LLMSpellError::Component {
+                message: "Lua feature not enabled".to_string(),
+                source: None,
+            })
+        }
+    }
+
+    async fn execute_script_with_io(
+        &self,
+        script: &str,
+        io_context: Arc<IOContext>,
+    ) -> Result<ScriptOutput, LLMSpellError> {
+        #[cfg(feature = "lua")]
+        {
+            let start_time = Instant::now();
+
+            // Clear any previous console output
+            if let Some(capture) = &self.console_capture {
+                capture.clear();
+            }
+
+            // Create a new console capture with the provided IO context
+            let temporary_capture = {
+                let lua = self.lua.lock();
+                install_output_capture(&lua, io_context.clone(), None).ok()
+            };
+
+            let result = {
+                let lua = self.lua.lock();
+
+                // Set up interrupt hook to check for interrupts periodically
+                lua.set_hook(
+                    mlua::HookTriggers {
+                        every_line: false,
+                        every_nth_instruction: Some(1000), // Check every 1000 instructions
+                        on_returns: false,
+                        on_calls: false,
+                    },
+                    move |_lua, _debug| {
+                        // Check if execution was interrupted
+                        if io_context.signal_handler.is_interrupted() {
+                            Err(mlua::Error::RuntimeError(
+                                "Execution interrupted by user".to_string(),
+                            ))
+                        } else {
+                            Ok(())
+                        }
+                    },
+                );
+
+                // Inject ARGS global if script arguments were provided
+                if let Some(ref args) = self.script_args {
+                    if let Err(e) = inject_args_global(&lua, args) {
+                        // Remove hook before returning
+                        lua.remove_hook();
+                        return Err(LLMSpellError::Component {
+                            message: format!("Failed to inject ARGS global: {e}"),
+                            source: None,
+                        });
+                    }
+                }
+
+                // Execute the script
+                let lua_result: mlua::Result<mlua::Value> =
+                    lua.load(script).set_name("script").eval();
+
+                // Always remove the hook after execution
+                lua.remove_hook();
+
+                match lua_result {
+                    Ok(value) => {
+                        // Convert Lua value to JSON
+                        let output =
+                            crate::lua::conversion::lua_value_to_json(value).map_err(|e| {
+                                LLMSpellError::Script {
+                                    message: e.to_string(),
+                                    language: Some("lua".to_string()),
+                                    line: None,
+                                    source: None,
+                                }
+                            })?;
+                        Ok(output)
+                    }
+                    Err(e) => {
+                        // Check if this was an interruption
+                        if e.to_string().contains("Execution interrupted") {
+                            Err(ScriptEngineError::ExecutionInterrupted {
+                                location: Some("lua script execution".to_string()),
+                            })
+                        } else {
+                            Err(ScriptEngineError::ExecutionError {
+                                engine: "lua".to_string(),
+                                details: e.to_string(),
+                            })
+                        }
+                    }
+                }
+            };
+
+            match result {
+                Ok(output) => {
+                    // Get captured console output from temporary capture
+                    let console_output = temporary_capture
+                        .as_ref()
+                        .map_or_else(Vec::new, |capture| capture.get_lines());
+
+                    Ok(ScriptOutput {
+                        output,
+                        console_output,
+                        metadata: ScriptMetadata {
+                            engine: "lua".to_string(),
+                            #[allow(clippy::cast_possible_truncation)]
+                            execution_time_ms: start_time.elapsed().as_millis() as u64,
+                            memory_usage_bytes: None,
+                            warnings: vec![],
+                        },
+                    })
+                }
+                Err(e) => Err(e.into()),
+            }
         }
 
         #[cfg(not(feature = "lua"))]

@@ -38,6 +38,9 @@ pub enum ScriptEngineError {
         resource: String,
         limit: String,
     },
+
+    /// Execution was interrupted (e.g., by user signal)
+    ExecutionInterrupted { location: Option<String> },
 }
 
 impl From<ScriptEngineError> for llmspell_core::error::LLMSpellError {
@@ -62,6 +65,10 @@ impl From<ScriptEngineError> for llmspell_core::error::LLMSpellError {
             ScriptEngineError::UnsupportedFeature { engine, feature } => Self::Component {
                 message: format!("Feature '{feature}' not supported by {engine} engine"),
                 source: None,
+            },
+            ScriptEngineError::ExecutionInterrupted { location } => Self::ExecutionInterrupted {
+                message: "Script execution interrupted by user".to_string(),
+                location,
             },
             _ => Self::Component {
                 message: format!("Script engine error: {err:?}"),

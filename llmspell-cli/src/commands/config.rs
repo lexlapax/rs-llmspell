@@ -1,9 +1,9 @@
 //! Configuration management commands  
 //!
-//! Consolidates init, validate, and show config functionality into 
+//! Consolidates init, validate, and show config functionality into
 //! config subcommands.
 
-use crate::cli::{ConfigFormat, ConfigCommands, OutputFormat};
+use crate::cli::{ConfigCommands, ConfigFormat, OutputFormat};
 use anyhow::Result;
 use std::path::PathBuf;
 
@@ -40,10 +40,10 @@ async fn show_config(
     output_format: OutputFormat,
 ) -> Result<()> {
     use crate::config;
-    
+
     // Load the current configuration
     let runtime_config = config::load_runtime_config(None).await?;
-    
+
     // Convert to the desired configuration format
     let config_data = if let Some(ref section_name) = section {
         // Show specific section

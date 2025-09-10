@@ -11,12 +11,14 @@ use llmspell_bridge::{
 };
 use llmspell_config::LLMSpellConfig;
 use llmspell_state_persistence::{StateFactory, StateManager};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::{oneshot, Mutex, RwLock};
 use uuid::Uuid;
 
+use crate::callback_io::create_callback_io_context;
 use crate::client_handler::ClientManager;
 use crate::comm_handler::CommManager;
+use crate::kernel_io::KernelSignalHandler;
 use crate::security::SecurityManager;
 use crate::session_persistence::SessionMapper;
 use crate::traits::{KernelMessage, Protocol, Transport};
@@ -98,6 +100,9 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
 
     /// Shutdown signal sender
     shutdown_tx: Option<oneshot::Sender<()>>,
+
+    /// Signal handler for interrupt propagation
+    signal_handler: Arc<KernelSignalHandler>,
 
     /// Current request header for `IOPub` parent tracking
     current_request_header: Arc<RwLock<Option<serde_json::Value>>>,
@@ -200,6 +205,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             session_mapper,
             comm_manager,
             shutdown_tx: None,
+            signal_handler: Arc::new(KernelSignalHandler::new()),
             current_request_header: Arc::new(RwLock::new(None)),
         })
     }
@@ -209,7 +215,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// # Errors
     ///
     /// Returns an error if message publishing fails
-    async fn publish_iopub(&self, msg_type: &str, content: serde_json::Value) -> Result<()> {
+    pub async fn publish_iopub(&self, msg_type: &str, content: serde_json::Value) -> Result<()> {
         tracing::debug!("publish_iopub: Publishing {} message", msg_type);
 
         // Both conditions return None, so simplify
@@ -246,7 +252,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     /// Publish stream output to `IOPub`
-    async fn publish_stream(&self, name: &str, text: &str) -> Result<()> {
+    pub async fn publish_stream(&self, name: &str, text: &str) -> Result<()> {
         self.publish_iopub(
             "stream",
             serde_json::json!({
@@ -449,7 +455,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "kernel_info_request" => Ok(self.handle_kernel_info()),
             "execute_request" => self.handle_execute(content).await,
             "shutdown_request" => self.handle_shutdown(content).await,
-            "interrupt_request" => Ok(Self::handle_interrupt()),
+            "interrupt_request" => Ok(self.handle_interrupt()),
             "comm_open" => self.handle_comm_open(content).await,
             "comm_msg" => self.handle_comm_msg(content).await,
             "comm_close" => self.handle_comm_close(content).await,
@@ -580,7 +586,40 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         script_args: Option<Vec<String>>,
         execution_count: u32,
     ) -> Result<String> {
-        let mut output = String::new();
+        // Create callback-based IO context
+        let output_buffer = Arc::new(StdMutex::new(String::new()));
+        let output_buffer_clone = output_buffer.clone();
+
+        let silent_flag = silent;
+        let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
+            // Collect output
+            let mut buffer = output_buffer_clone.lock().unwrap();
+            buffer.push_str(text);
+
+            // Also publish to IOPub if not silent
+            if !silent_flag {
+                // Note: We can't easily call async methods from here
+                // For now, just collect the output
+                // TODO: Implement proper async callback mechanism
+            }
+            Ok(())
+        };
+
+        let stderr_callback = |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
+            // For now, treat stderr same as stdout
+            tracing::warn!("Script stderr: {}", text);
+            Ok(())
+        };
+
+        let io_context = create_callback_io_context(
+            stdout_callback,
+            stderr_callback,
+            self.signal_handler.clone(),
+        );
+
+        // Reset interrupt flag before execution
+        self.signal_handler.reset();
+
         let result = {
             let mut runtime = self.runtime.lock().await;
             // Set script arguments if provided
@@ -598,40 +637,29 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     tracing::warn!("Failed to set script arguments: {}", e);
                 }
             }
-            runtime.execute_script_streaming(code).await
+
+            // Use execute_script_with_io to route output through our callbacks
+            runtime.execute_script_with_io(code, io_context).await
         };
 
         match result {
-            Ok(mut script_stream) => {
-                use futures::StreamExt;
-                while let Some(chunk) = script_stream.stream.next().await {
-                    match chunk {
-                        Ok(agent_chunk) => {
-                            // Extract text content from the chunk
-                            let chunk_text = agent_chunk.content.to_string();
-                            output.push_str(&chunk_text);
+            Ok(script_output) => {
+                // Get the collected output
+                let collected = output_buffer.lock().unwrap().clone();
 
-                            // Stream output to IOPub in real-time if not silent
-                            if !silent && !chunk_text.is_empty() {
-                                let _ = self.publish_stream("stdout", &chunk_text).await;
-                            }
-                        }
-                        Err(e) => {
-                            return self
-                                .handle_execution_error(e.into(), silent, execution_count)
-                                .await;
-                        }
-                    }
+                // Publish all output to IOPub if not silent
+                if !silent && !collected.is_empty() {
+                    let _ = self.publish_stream("stdout", &collected).await;
                 }
+
+                // Return the result value as string
+                Ok(script_output.output.to_string())
             }
             Err(e) => {
-                return self
-                    .handle_execution_error(e.into(), silent, execution_count)
-                    .await;
+                self.handle_execution_error(e.into(), silent, execution_count)
+                    .await
             }
         }
-
-        Ok(output)
     }
 
     /// Handle execution errors consistently
@@ -730,9 +758,14 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         }
     }
 
-    fn handle_interrupt() -> serde_json::Value {
-        // Interrupt execution if possible
-        tracing::info!("Interrupt requested");
+    fn handle_interrupt(&self) -> serde_json::Value {
+        // Set the interrupt flag in the signal handler
+        tracing::info!("Interrupt requested, signaling execution to stop");
+        self.signal_handler.interrupt();
+
+        // Also set kernel state to indicate interruption
+        // Note: We can't make this async, so we just set the flag
+        // The running execution will check this flag and stop
 
         serde_json::json!({
             "status": "ok"

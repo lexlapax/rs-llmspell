@@ -155,8 +155,8 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                 MessageContent::ExecuteResult { data, .. } => {
                     if let Some(text_plain) = data.get("text/plain") {
                         if let Some(text) = text_plain.as_str() {
-                            print!("{text}");
                             use std::io::Write;
+                            print!("{text}");
                             let _ = std::io::stdout().flush();
                         }
                     }
@@ -207,22 +207,22 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
     /// Process `IOPub` messages during execution
     /// Returns true if a message was received
     async fn process_iopub_during_execution(&self, msg_id: &str) -> Result<bool> {
-        if let Some(iopub_bytes) = self.transport.recv("iopub").await? {
-            tracing::debug!("Received IOPub message, decoding...");
-            match self.protocol.decode(iopub_bytes, "iopub") {
-                Ok(iopub_msg) => {
-                    tracing::debug!("IOPub message type: {}", iopub_msg.header.msg_type);
-                    Self::process_iopub_message(&iopub_msg, msg_id);
-                }
-                Err(e) => {
-                    tracing::debug!("Failed to decode IOPub message: {}", e);
-                }
-            }
-            Ok(true)
-        } else {
+        let Some(iopub_bytes) = self.transport.recv("iopub").await? else {
             tracing::trace!("No IOPub message available");
-            Ok(false)
+            return Ok(false);
+        };
+
+        tracing::debug!("Received IOPub message, decoding...");
+        match self.protocol.decode(iopub_bytes, "iopub") {
+            Ok(iopub_msg) => {
+                tracing::debug!("IOPub message type: {}", iopub_msg.header.msg_type);
+                Self::process_iopub_message(&iopub_msg, msg_id);
+            }
+            Err(e) => {
+                tracing::debug!("Failed to decode IOPub message: {}", e);
+            }
         }
+        Ok(true)
     }
 
     /// Check for execute reply on shell channel
@@ -236,9 +236,12 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                     if parent.msg_id == msg_id {
                         tracing::debug!("Got our execute_reply!");
                         return Ok(Some(reply.content.clone()));
-                    } else {
-                        tracing::debug!("Execute reply for different message: {} != {}", parent.msg_id, msg_id);
                     }
+                    tracing::debug!(
+                        "Execute reply for different message: {} != {}",
+                        parent.msg_id,
+                        msg_id
+                    );
                 } else {
                     tracing::debug!("Execute reply has no parent header");
                 }
@@ -303,7 +306,9 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
             tokio::time::sleep(delay).await;
         }
 
-        Err(anyhow::anyhow!("No execute reply received after 30 seconds"))
+        Err(anyhow::anyhow!(
+            "No execute reply received after 30 seconds"
+        ))
     }
 
     /// Request kernel information

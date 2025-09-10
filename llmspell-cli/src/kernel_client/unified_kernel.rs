@@ -37,7 +37,7 @@ impl UnifiedKernelClient {
     pub async fn connect_external(connection_string: String) -> Result<Self> {
         // Resolve the connection string to ConnectionInfo
         let connection_info = resolve_connection_string(&connection_string).await?;
-        
+
         // Check if kernel is alive
         if !KernelDiscovery::is_kernel_alive(&connection_info).await? {
             anyhow::bail!(
@@ -45,14 +45,14 @@ impl UnifiedKernelClient {
                 connection_info.kernel_id
             );
         }
-        
+
         // Create client and connect
         let transport = ZmqTransport::new()?;
         let protocol = JupyterProtocol::new(connection_info.clone());
         let client = JupyterClient::connect(transport, protocol, connection_info.clone())
             .await
             .context("Failed to connect to external kernel")?;
-        
+
         Ok(Self {
             client,
             connection_info,
@@ -61,28 +61,29 @@ impl UnifiedKernelClient {
             is_embedded: false,
         })
     }
-    
+
     /// Start an embedded kernel and connect to it
     pub async fn start_embedded(config: Arc<LLMSpellConfig>) -> Result<Self> {
         // Generate kernel ID
         let kernel_id = uuid::Uuid::new_v4().to_string();
-        
+
         // Find an available port
         let port = find_available_port().await?;
-        
+
         // Create connection info
-        let mut connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
+        let mut connection_info =
+            ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
         connection_info.pid = Some(std::process::id());
         connection_info.started_at = Some(chrono::Utc::now());
-        
+
         // Create shutdown channel
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
-        
+
         // Clone for the thread
         let thread_kernel_id = kernel_id.clone();
         let thread_config = config.clone();
         let thread_conn_info = connection_info.clone();
-        
+
         // Spawn kernel in background
         let kernel_thread = tokio::spawn(async move {
             tracing::info!(
@@ -90,20 +91,16 @@ impl UnifiedKernelClient {
                 thread_kernel_id,
                 port
             );
-            
+
             // Create transport and protocol
             let transport = ZmqTransport::new()?;
             let protocol = JupyterProtocol::new(thread_conn_info.clone());
-            
+
             // Create and run kernel
-            let mut kernel = JupyterKernel::new(
-                thread_kernel_id.clone(),
-                thread_config,
-                transport,
-                protocol,
-            )
-            .await?;
-            
+            let mut kernel =
+                JupyterKernel::new(thread_kernel_id.clone(), thread_config, transport, protocol)
+                    .await?;
+
             // Run kernel with shutdown signal
             tokio::select! {
                 result = kernel.serve() => {
@@ -116,17 +113,17 @@ impl UnifiedKernelClient {
                 }
             }
         });
-        
+
         // Wait for kernel to start
         tokio::time::sleep(Duration::from_millis(500)).await;
-        
+
         // Create client and connect
         let transport = ZmqTransport::new()?;
         let protocol = JupyterProtocol::new(connection_info.clone());
         let client = JupyterClient::connect(transport, protocol, connection_info.clone())
             .await
             .context("Failed to connect to embedded kernel")?;
-        
+
         Ok(Self {
             client,
             connection_info,
@@ -135,11 +132,11 @@ impl UnifiedKernelClient {
             is_embedded: true,
         })
     }
-    
+
     /// Execute code on the kernel
     pub async fn execute(&mut self, code: &str) -> Result<String> {
         let result = self.client.execute(code).await?;
-        
+
         // Convert MessageContent to Result<String>
         if let llmspell_kernel::jupyter::protocol::MessageContent::ExecuteReply {
             status,
@@ -164,7 +161,7 @@ impl UnifiedKernelClient {
             Ok(String::new())
         }
     }
-    
+
     /// Execute code with arguments
     pub async fn execute_with_args(&mut self, code: &str, args: Vec<String>) -> Result<String> {
         let result = if args.is_empty() {
@@ -172,7 +169,7 @@ impl UnifiedKernelClient {
         } else {
             self.client.execute_with_args(code, args).await?
         };
-        
+
         // Convert MessageContent to Result<String>
         if let llmspell_kernel::jupyter::protocol::MessageContent::ExecuteReply {
             status,
@@ -197,11 +194,11 @@ impl UnifiedKernelClient {
             Ok(String::new())
         }
     }
-    
+
     /// Send a debug command
     pub async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
         let reply = self.client.debug_request(command).await?;
-        
+
         // Convert MessageContent to Value
         match reply {
             llmspell_kernel::jupyter::protocol::MessageContent::DebugReply {
@@ -222,27 +219,27 @@ impl UnifiedKernelClient {
             _ => anyhow::bail!("Unexpected reply type from debug request"),
         }
     }
-    
+
     /// Check if connected
     pub fn is_connected(&self) -> bool {
         // For now, assume we're connected if we have a client
         // In the future, could add heartbeat check
         true
     }
-    
+
     /// Disconnect from kernel
     pub async fn disconnect(&mut self) -> Result<()> {
         if self.is_embedded {
             // For embedded kernel, send shutdown and wait for thread
-            
+
             // Try to send shutdown request (ignore errors)
             let _ = self.client.shutdown(false).await;
-            
+
             // Send shutdown signal to kernel thread
             if let Some(shutdown_tx) = self.shutdown_tx.take() {
                 let _ = shutdown_tx.send(());
             }
-            
+
             // Wait for kernel thread to finish
             if let Some(handle) = self.kernel_thread.take() {
                 match tokio::time::timeout(Duration::from_secs(5), handle).await {
@@ -264,7 +261,7 @@ impl UnifiedKernelClient {
         // For external kernel, we don't shut it down, just disconnect
         Ok(())
     }
-    
+
     /// Get kernel info
     pub async fn info(&mut self) -> Result<Value> {
         Ok(serde_json::json!({
@@ -295,7 +292,7 @@ impl Drop for UnifiedKernelClient {
 }
 
 /// Resolve a connection string to ConnectionInfo
-/// 
+///
 /// Supports:
 /// - Kernel ID: Looks up via KernelDiscovery
 /// - host:port: Finds kernel with matching port
@@ -307,24 +304,29 @@ pub async fn resolve_connection_string(connection: &str) -> Result<ConnectionInf
         if parts.len() != 2 {
             anyhow::bail!("Invalid address format. Expected host:port");
         }
-        
+
         let host = parts[0];
         let port: u16 = parts[1]
             .parse()
             .map_err(|_| anyhow::anyhow!("Invalid port number"))?;
-        
+
         // Must discover the kernel to get the connection info with HMAC key
         let discovery = KernelDiscovery::new();
         let kernels = discovery.discover_kernels().await?;
-        
+
         // Find kernel with matching port
         let matching_kernel = kernels.iter().find(|k| {
             k.shell_port == port && (k.ip == host || (host == "localhost" && k.ip == "127.0.0.1"))
         });
-        
+
         match matching_kernel {
             Some(kernel_info) => {
-                tracing::info!("Found kernel {} at {}:{}", kernel_info.kernel_id, host, port);
+                tracing::info!(
+                    "Found kernel {} at {}:{}",
+                    kernel_info.kernel_id,
+                    host,
+                    port
+                );
                 Ok(kernel_info.clone())
             }
             None => {
@@ -358,7 +360,7 @@ async fn find_available_port() -> Result<u16> {
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await?;
     let port = listener.local_addr()?.port();
     drop(listener); // Release the port
-    
+
     // Add 5 to avoid conflicts with the 5 ZMQ ports
     Ok(port + 5)
 }
@@ -370,41 +372,41 @@ impl KernelConnectionTrait for UnifiedKernelClient {
         // Already connected in constructor
         Ok(())
     }
-    
+
     fn is_connected(&self) -> bool {
         self.is_connected()
     }
-    
+
     async fn disconnect(&mut self) -> Result<()> {
         self.disconnect().await
     }
-    
+
     async fn execute(&mut self, code: &str) -> Result<String> {
         self.execute(code).await
     }
-    
+
     async fn execute_with_args(&mut self, code: &str, args: Vec<String>) -> Result<String> {
         self.execute_with_args(code, args).await
     }
-    
+
     async fn execute_inline(&mut self, code: &str) -> Result<String> {
         // Same as execute
         self.execute(code).await
     }
-    
+
     async fn repl(&mut self) -> Result<()> {
         // REPL is handled by CLI layer
         anyhow::bail!("REPL should be handled by CLI layer, not kernel connection")
     }
-    
+
     async fn info(&mut self) -> Result<Value> {
         self.info().await
     }
-    
+
     async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
         self.send_debug_command(command).await
     }
-    
+
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
         match operation {
             "execute_line" | "tab_complete" => WorkloadClassifier::Light,
@@ -413,7 +415,7 @@ impl KernelConnectionTrait for UnifiedKernelClient {
             _ => WorkloadClassifier::Light,
         }
     }
-    
+
     fn execution_manager(&self) -> Option<&dyn std::any::Any> {
         // No direct access to execution manager in kernel client
         None
@@ -431,28 +433,28 @@ mod tests {
         let mut kernel = UnifiedKernelClient::start_embedded(config)
             .await
             .expect("Failed to start embedded kernel");
-        
+
         assert!(kernel.is_connected());
         assert!(kernel.is_embedded);
-        
+
         // Test execution
         let result = kernel.execute("print('test')").await;
         assert!(result.is_ok());
-        
+
         // Clean disconnect
         assert!(kernel.disconnect().await.is_ok());
     }
-    
+
     #[tokio::test]
     async fn test_connection_string_parsing() {
         // Test kernel ID format
         let result = resolve_connection_string("test-kernel-id").await;
         assert!(result.is_err()); // Should fail without actual kernel
-        
-        // Test host:port format  
+
+        // Test host:port format
         let result = resolve_connection_string("localhost:9555").await;
         assert!(result.is_err()); // Should fail without actual kernel
-        
+
         // Test file path format
         let result = resolve_connection_string("/tmp/connection.json").await;
         assert!(result.is_err()); // Should fail without actual file

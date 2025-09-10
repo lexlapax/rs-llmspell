@@ -25,6 +25,7 @@
 pub mod traits;
 
 // Core modules
+pub mod callback_io;
 pub mod client;
 pub mod client_handler;
 pub mod comm_handler;
@@ -32,6 +33,7 @@ pub mod connection;
 pub mod dap_bridge;
 pub mod discovery;
 pub mod kernel;
+pub mod kernel_io;
 pub mod security;
 pub mod session_persistence;
 

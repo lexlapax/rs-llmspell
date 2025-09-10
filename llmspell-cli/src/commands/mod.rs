@@ -35,7 +35,7 @@ impl RagOptions {
         if let Some(profile_name) = &self.rag_profile {
             if let Some(profile) = config.rag.profiles.get(profile_name).cloned() {
                 profile.apply_to_config(&mut config.rag);
-                
+
                 // Load custom config file if profile specifies one
                 if let Some(config_file) = &profile.config_file {
                     let rag_config_str = tokio::fs::read_to_string(config_file).await?;
@@ -108,7 +108,11 @@ pub async fn execute_command(
             )
             .await
         }
-        Commands::Repl { connect, history, rag_profile } => {
+        Commands::Repl {
+            connect,
+            history,
+            rag_profile,
+        } => {
             // Apply RAG options to config
             let mut runtime_config = runtime_config;
             let rag_options = RagOptions { rag_profile };
@@ -134,9 +138,7 @@ pub async fn execute_command(
         Commands::Session { command } => {
             session::handle_session_command(command, runtime_config, output_format).await
         }
-        Commands::Config { command } => {
-            config::handle_config_command(command, output_format).await
-        }
+        Commands::Config { command } => config::handle_config_command(command, output_format).await,
         Commands::Debug {
             script,
             break_at,
@@ -148,7 +150,7 @@ pub async fn execute_command(
             let mut runtime_config = runtime_config;
             let rag_options = RagOptions { rag_profile };
             rag_options.apply_to_config(&mut runtime_config).await?;
-            
+
             // Use dedicated DebugBridge architecture for debug command
             debug::handle_debug_command(
                 script,
@@ -183,6 +185,6 @@ pub async fn create_kernel_connection(
         // Start embedded kernel
         UnifiedKernelClient::start_embedded(Arc::new(config)).await?
     };
-    
+
     Ok(Box::new(kernel))
 }

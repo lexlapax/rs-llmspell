@@ -2,7 +2,7 @@
 //! ABOUTME: Foundation for multi-language script execution (Lua, JavaScript, Python, etc.)
 
 use async_trait::async_trait;
-use llmspell_core::{error::LLMSpellError, types::AgentStream};
+use llmspell_core::{error::LLMSpellError, io::IOContext, types::AgentStream};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -18,6 +18,25 @@ pub trait ScriptEngineBridge: Send + Sync {
 
     /// Execute a script with streaming output support
     async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream, LLMSpellError>;
+
+    /// Execute a script with explicit IO context
+    ///
+    /// This method allows scripts to execute with a specific IO context,
+    /// enabling proper IO routing through the kernel orchestration layer.
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - The script to execute
+    /// * `io_context` - The IO context to use for all script IO operations
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if script execution fails
+    async fn execute_script_with_io(
+        &self,
+        script: &str,
+        io_context: Arc<IOContext>,
+    ) -> Result<ScriptOutput, LLMSpellError>;
 
     /// Inject language-agnostic APIs into the engine
     ///

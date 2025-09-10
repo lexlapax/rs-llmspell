@@ -144,6 +144,12 @@ pub enum LLMSpellError {
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    #[error("Execution interrupted: {message}")]
+    ExecutionInterrupted {
+        message: String,
+        location: Option<String>,
+    },
+
     #[error("Tool execution error: {message}")]
     Tool {
         message: String,
@@ -201,6 +207,13 @@ pub enum LLMSpellError {
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    #[error("IO error: {operation}")]
+    Io {
+        operation: String,
+        #[source]
+        source: std::io::Error,
+    },
+
     #[error("Rate limit error: {message}")]
     RateLimit {
         message: String,
@@ -236,10 +249,13 @@ impl LLMSpellError {
             }
             Self::Security { .. } => ErrorCategory::Security,
             Self::Validation { .. } | Self::Component { .. } => ErrorCategory::Logic,
-            Self::Tool { .. } | Self::Script { .. } | Self::Workflow { .. } => {
-                ErrorCategory::External
+            Self::Tool { .. }
+            | Self::Script { .. }
+            | Self::Workflow { .. }
+            | Self::ExecutionInterrupted { .. } => ErrorCategory::External,
+            Self::Storage { .. } | Self::Internal { .. } | Self::Io { .. } => {
+                ErrorCategory::Internal
             }
-            Self::Storage { .. } | Self::Internal { .. } => ErrorCategory::Internal,
         }
     }
 
@@ -270,6 +286,14 @@ impl LLMSpellError {
                     .as_ref()
                     .is_some_and(|op| op == "read" || op == "write" || op == "lock")
             }
+            Self::Io { source, .. } => {
+                // Some IO errors are retryable
+                use std::io::ErrorKind;
+                matches!(
+                    source.kind(),
+                    ErrorKind::Interrupted | ErrorKind::WouldBlock | ErrorKind::TimedOut
+                )
+            }
             Self::Security { .. }
             | Self::Configuration { .. }
             | Self::Validation { .. }
@@ -278,7 +302,8 @@ impl LLMSpellError {
             | Self::Component { .. }
             | Self::Tool { .. }
             | Self::Script { .. }
-            | Self::Workflow { .. } => false,
+            | Self::Workflow { .. }
+            | Self::ExecutionInterrupted { .. } => false,
         }
     }
 
@@ -297,6 +322,7 @@ impl LLMSpellError {
             Self::Provider { .. } => Some(2000), // 2 seconds
             Self::Resource { .. } => Some(500),  // 500ms
             Self::Storage { .. } => Some(100),   // 100ms
+            Self::Io { .. } => Some(100),        // 100ms
             Self::Network { .. } | Self::RateLimit { .. } => Some(1000), // 1 second
             // These errors are not retryable so shouldn't reach here
             Self::Security { .. }
@@ -307,7 +333,8 @@ impl LLMSpellError {
             | Self::Component { .. }
             | Self::Tool { .. }
             | Self::Script { .. }
-            | Self::Workflow { .. } => None,
+            | Self::Workflow { .. }
+            | Self::ExecutionInterrupted { .. } => None,
         }
     }
 

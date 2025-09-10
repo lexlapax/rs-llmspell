@@ -17,17 +17,22 @@ pub async fn handle_session_command(
 ) -> Result<()> {
     // Create session manager using the configuration
     let session_config = SessionManagerConfig::default();
-    
+
     // Create required dependencies for SessionManager
-    let state_manager = std::sync::Arc::new(llmspell_state_persistence::StateManager::new().await.map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?);
-    let storage_backend = std::sync::Arc::new(llmspell_storage::MemoryBackend::new()) as std::sync::Arc<dyn llmspell_storage::StorageBackend>;
+    let state_manager = std::sync::Arc::new(
+        llmspell_state_persistence::StateManager::new()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?,
+    );
+    let storage_backend = std::sync::Arc::new(llmspell_storage::MemoryBackend::new())
+        as std::sync::Arc<dyn llmspell_storage::StorageBackend>;
     let hook_registry = std::sync::Arc::new(llmspell_hooks::registry::HookRegistry::new());
     let hook_executor = std::sync::Arc::new(llmspell_hooks::executor::HookExecutor::new());
     let event_bus = std::sync::Arc::new(llmspell_events::bus::EventBus::new());
-    
+
     let session_manager = SessionManager::new(
         state_manager,
-        storage_backend, 
+        storage_backend,
         hook_registry,
         hook_executor,
         &event_bus,
@@ -57,10 +62,10 @@ async fn list_sessions(
     _output_format: OutputFormat,
 ) -> Result<()> {
     println!("Session listing not yet fully implemented");
-    
+
     // TODO: Implement session listing when SessionManager supports it
     // let sessions = session_manager.list_sessions().await?;
-    
+
     // match output_format {
     //     OutputFormat::Json => {
     //         println!("{}", serde_json::to_string_pretty(&sessions)?);
@@ -96,22 +101,22 @@ async fn replay_session(
 ) -> Result<()> {
     println!("Session replay not yet fully implemented");
     println!("Would replay session: {}", id);
-    
+
     if let Some(from) = from_step {
         println!("From step: {}", from);
     }
-    
+
     if let Some(to) = to_step {
         println!("To step: {}", to);
     }
-    
+
     // TODO: Implement session replay when SessionManager supports it
     // let session = session_manager.get_session(&id).await?;
     // let replay_engine = session_manager.create_replay_engine(session).await?;
-    // 
+    //
     // let start = from_step.unwrap_or(0);
     // let end = to_step.unwrap_or(session.steps.len());
-    // 
+    //
     // for step in start..end {
     //     println!("Replaying step {}: {}", step, session.steps[step].description);
     //     replay_engine.execute_step(step).await?;
@@ -121,11 +126,7 @@ async fn replay_session(
 }
 
 /// Delete session
-async fn delete_session(
-    _session_manager: &SessionManager,
-    id: String,
-    all: bool,
-) -> Result<()> {
+async fn delete_session(_session_manager: &SessionManager, id: String, all: bool) -> Result<()> {
     if all {
         println!("Delete all sessions not yet implemented");
         // TODO: Implement delete all when SessionManager supports it
@@ -134,7 +135,7 @@ async fn delete_session(
     } else {
         println!("Session deletion not yet fully implemented");
         println!("Would delete session: {}", id);
-        
+
         // TODO: Implement session deletion when SessionManager supports it
         // session_manager.delete_session(&id).await?;
         // println!("✓ Deleted session: {}", id);
@@ -151,8 +152,13 @@ async fn export_session(
     format: ExportFormat,
 ) -> Result<()> {
     println!("Session export not yet fully implemented");
-    println!("Would export session {} to: {} (format: {:?})", id, file.display(), format);
-    
+    println!(
+        "Would export session {} to: {} (format: {:?})",
+        id,
+        file.display(),
+        format
+    );
+
     // TODO: Implement session export when SessionManager supports it
     // let session = session_manager.get_session(&id).await?;
     // let content = match format {

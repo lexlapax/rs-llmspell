@@ -16,6 +16,7 @@ use crate::{
 };
 use llmspell_config::LLMSpellConfig;
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::io::IOContext;
 use llmspell_state_persistence::manager::StateManager;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -532,6 +533,29 @@ impl ScriptRuntime {
             });
         }
         self.engine.execute_script_streaming(script).await
+    }
+
+    /// Execute a script with explicit IO context
+    ///
+    /// This method allows scripts to execute with a specific IO context,
+    /// enabling proper IO routing through the kernel orchestration layer.
+    /// This is the primary method used by the kernel to ensure all script
+    /// IO flows through the messaging protocol.
+    ///
+    /// # Arguments
+    ///
+    /// * `script` - The script to execute
+    /// * `io_context` - The IO context to use for all script IO operations
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if script execution fails
+    pub async fn execute_script_with_io(
+        &self,
+        script: &str,
+        io_context: Arc<IOContext>,
+    ) -> Result<ScriptOutput, LLMSpellError> {
+        self.engine.execute_script_with_io(script, io_context).await
     }
 
     /// Set script arguments to be passed to the script

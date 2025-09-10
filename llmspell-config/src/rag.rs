@@ -59,11 +59,11 @@ impl RAGProfile {
     /// Apply this profile's overrides to a base RAG config
     pub fn apply_to_config(&self, config: &mut RAGConfig) {
         config.enabled = self.enabled;
-        
+
         if let Some(backend) = &self.backend {
             config.vector_storage.backend = backend.clone();
         }
-        
+
         if let Some(dimensions) = self.dimensions {
             config.vector_storage.dimensions = dimensions;
         }

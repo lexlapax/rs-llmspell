@@ -7,6 +7,7 @@ use crate::engine::{
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
+use llmspell_core::io::IOContext;
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -57,6 +58,19 @@ impl ScriptEngineBridge for JSEngine {
         // TODO: Implement streaming execution
         Err(LLMSpellError::Component {
             message: "JavaScript streaming not implemented yet - will be added in Phase 5"
+                .to_string(),
+            source: None,
+        })
+    }
+
+    async fn execute_script_with_io(
+        &self,
+        _script: &str,
+        _io_context: Arc<IOContext>,
+    ) -> Result<ScriptOutput, LLMSpellError> {
+        // TODO: Implement script execution with IO context
+        Err(LLMSpellError::Component {
+            message: "JavaScript execution with IO context not implemented yet - will be added in Phase 5"
                 .to_string(),
             source: None,
         })

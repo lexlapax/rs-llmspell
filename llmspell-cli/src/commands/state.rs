@@ -22,9 +22,7 @@ pub async fn handle_state_command(
     match command {
         StateCommands::Show { key } => show_state(&state_manager, key, output_format).await,
         StateCommands::Clear { key } => clear_state(&state_manager, key).await,
-        StateCommands::Export { file, format } => {
-            export_state(&state_manager, file, format).await
-        }
+        StateCommands::Export { file, format } => export_state(&state_manager, file, format).await,
         StateCommands::Import { file, merge } => import_state(&state_manager, file, merge).await,
     }
 }
@@ -40,17 +38,15 @@ async fn show_state(
             // Show specific key
             let value = state_manager.get(StateScope::Global, &key).await?;
             match value {
-                Some(value) => {
-                    match output_format {
-                        OutputFormat::Json => {
-                            println!("{}", serde_json::to_string_pretty(&value)?);
-                        }
-                        OutputFormat::Text | OutputFormat::Pretty => {
-                            println!("Key: {}", key);
-                            println!("Value: {}", value);
-                        }
+                Some(value) => match output_format {
+                    OutputFormat::Json => {
+                        println!("{}", serde_json::to_string_pretty(&value)?);
                     }
-                }
+                    OutputFormat::Text | OutputFormat::Pretty => {
+                        println!("Key: {}", key);
+                        println!("Value: {}", value);
+                    }
+                },
                 None => {
                     if matches!(output_format, OutputFormat::Text | OutputFormat::Pretty) {
                         println!("Key '{}' not found", key);
@@ -94,7 +90,7 @@ async fn export_state(
 ) -> Result<()> {
     println!("State export not yet fully implemented");
     println!("Would export to: {} (format: {:?})", file.display(), format);
-    
+
     // TODO: Implement state export when StateManager supports listing all keys
     // let all_state = state_manager.export_all(StateScope::Global).await?;
     // let content = match format {
@@ -109,14 +105,10 @@ async fn export_state(
 }
 
 /// Import state from file
-async fn import_state(
-    state_manager: &StateManager,
-    file: PathBuf,
-    merge: bool,
-) -> Result<()> {
+async fn import_state(state_manager: &StateManager, file: PathBuf, merge: bool) -> Result<()> {
     let content = tokio::fs::read_to_string(&file).await?;
-    
-    // Parse the file content based on extension  
+
+    // Parse the file content based on extension
     let data: Value = if file.extension().and_then(|s| s.to_str()) == Some("yaml") {
         serde_yaml::from_str(&content)?
     } else if file.extension().and_then(|s| s.to_str()) == Some("toml") {
@@ -138,7 +130,7 @@ async fn import_state(
                 state_manager.set(StateScope::Global, &key, value).await?;
             }
         }
-        
+
         let action = if merge { "merged" } else { "imported" };
         println!("✓ {} state from {}", action, file.display());
     } else {

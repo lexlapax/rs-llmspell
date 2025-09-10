@@ -5,6 +5,7 @@
 //! output operations.
 
 use crate::diagnostics_bridge::DiagnosticsBridge;
+use llmspell_core::io::IOContext;
 use mlua::{Lua, MultiValue, Result as LuaResult, Table, Value};
 use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
@@ -17,30 +18,37 @@ use std::sync::Arc;
 // ============================================================================
 
 /// Console output collector for capturing Lua `print()` and `io.write()` output
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct ConsoleCapture {
     /// Captured output lines
     lines: Arc<Mutex<Vec<String>>>,
     /// Optional diagnostics bridge for routing to diagnostics system
     diagnostics_bridge: Option<Arc<DiagnosticsBridge>>,
+    /// IO context for routing output through kernel orchestration
+    io_context: Arc<IOContext>,
 }
 
 impl ConsoleCapture {
-    /// Create a new console capture
+    /// Create a new console capture with IO context
     #[must_use]
-    pub fn new() -> Self {
+    pub fn new(io_context: Arc<IOContext>) -> Self {
         Self {
             lines: Arc::new(Mutex::new(Vec::new())),
             diagnostics_bridge: None,
+            io_context,
         }
     }
 
-    /// Create a console capture with diagnostics bridge
+    /// Create a console capture with diagnostics bridge and IO context
     #[must_use]
-    pub fn with_diagnostics_bridge(bridge: Arc<DiagnosticsBridge>) -> Self {
+    pub fn with_diagnostics_bridge(
+        bridge: Arc<DiagnosticsBridge>,
+        io_context: Arc<IOContext>,
+    ) -> Self {
         Self {
             lines: Arc::new(Mutex::new(Vec::new())),
             diagnostics_bridge: Some(bridge),
+            io_context,
         }
     }
 
@@ -62,14 +70,11 @@ impl ConsoleCapture {
             bridge.log("info", &line, Some("lua.print"));
         }
 
-        // Also capture locally
-        self.lines.lock().push(line);
-    }
-}
+        // Route through IO context for proper kernel orchestration
+        let _ = self.io_context.stdout.write_line(&line);
 
-impl Default for ConsoleCapture {
-    fn default() -> Self {
-        Self::new()
+        // Also capture locally for retrieval
+        self.lines.lock().push(line);
     }
 }
 
@@ -111,11 +116,8 @@ pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> 
         // Join with tabs like Lua's print
         let line = output.join("\t");
 
-        // Capture the output
-        capture.add_line(line.clone());
-
-        // Also print to stdout for immediate feedback
-        println!("{line}");
+        // Capture the output (add_line now handles IO routing)
+        capture.add_line(line);
 
         Ok(())
     })?;
@@ -151,8 +153,10 @@ pub fn override_io_functions(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResu
 
         // io.write doesn't add newline
         if !output.is_empty() {
-            capture.add_line(output.clone());
-            print!("{output}");
+            // Write without newline through IO context
+            let _ = capture.io_context.stdout.write(&output);
+            // Also capture for retrieval
+            capture.lines.lock().push(output);
         }
 
         // Return io.stdout as Lua does
@@ -173,12 +177,14 @@ pub fn override_io_functions(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResu
 /// Returns an error if output capture installation fails
 pub fn install_output_capture(
     lua: &Lua,
+    io_context: Arc<IOContext>,
     diagnostics_bridge: Option<Arc<DiagnosticsBridge>>,
 ) -> LuaResult<Arc<ConsoleCapture>> {
-    let capture = diagnostics_bridge.map_or_else(
-        || Arc::new(ConsoleCapture::new()),
-        |bridge| Arc::new(ConsoleCapture::with_diagnostics_bridge(bridge)),
-    );
+    let capture = if let Some(bridge) = diagnostics_bridge {
+        Arc::new(ConsoleCapture::with_diagnostics_bridge(bridge, io_context))
+    } else {
+        Arc::new(ConsoleCapture::new(io_context))
+    };
 
     override_print(lua, capture.clone())?;
     override_io_functions(lua, capture.clone())?;
@@ -1010,7 +1016,8 @@ mod tests {
 
     #[test]
     fn test_console_capture() {
-        let capture = ConsoleCapture::new();
+        let io_context = Arc::new(IOContext::null());
+        let capture = ConsoleCapture::new(io_context);
 
         capture.add_line("Line 1".to_string());
         capture.add_line("Line 2".to_string());
@@ -1027,7 +1034,8 @@ mod tests {
     #[test]
     fn test_print_override() -> LuaResult<()> {
         let lua = Lua::new();
-        let capture = Arc::new(ConsoleCapture::new());
+        let io_context = Arc::new(IOContext::null());
+        let capture = Arc::new(ConsoleCapture::new(io_context));
 
         override_print(&lua, capture.clone())?;
 
