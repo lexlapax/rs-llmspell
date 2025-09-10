@@ -13113,7 +13113,7 @@ llmspell repl --connect ~/.llmspell/kernels/<kernel-id>/connection.json
 - [x] Manual testing confirms all connection string formats work ✅
 - [x] `cargo clippy` passes with no warnings ✅
 
-## Implementation Summary (Option B - Proper Fix): ✅ COMPLETE
+##### Implementation Summary (Option B - Proper Fix): ✅ COMPLETE
 
 **What was implemented:**
 1. Created `UnifiedKernelClient` in `llmspell-cli/src/kernel_client/unified_kernel.rs` that:
@@ -13166,6 +13166,298 @@ REQ sockets add extra framing and expect strict request-reply ordering that does
 - Integrate ConsoleCapture into kernel's script execution to send print output as Stream messages
 - Consider removing KernelConnectionTrait entirely in future refactor
 - Add integration tests for external kernel connections
+
+---
+
+### Task 9.8.15: Holistic IO Architecture Refactor ⚠️ CRITICAL
+
+**Problem Statement:**
+Current IO architecture violates fundamental principles:
+1. **2,389 println! statements** bypass kernel orchestration - scripts print directly to process stdout
+2. **No stdin support** - scripts cannot read user input through kernel
+3. **No signal propagation** - Ctrl+C doesn't interrupt script execution
+4. **No stderr separation** - errors mixed with regular output
+5. **Protocol coupling** - ConsoleCapture assumes direct stdout, not protocol-agnostic
+
+**Architectural Violations:**
+- **Single Responsibility**: Components handle their own IO instead of delegating to kernel
+- **Testability**: Can't mock/capture IO in tests due to direct println! usage
+- **Protocol Independence**: Hardcoded stdout prevents LSP/DAP/custom protocol support
+- **Performance**: Unbuffered println! calls cause syscall overhead
+- **Modularity**: No clear IO interface boundaries between layers
+
+**Root Cause Analysis:**
+The kernel and bridge layers evolved independently:
+- Bridge was designed for direct CLI execution (println! for "immediate feedback")
+- Kernel was added later with proper IOPub channels
+- No unified IO context flows through the execution stack
+- Environment-based detection is fragile and non-performant
+
+**Solution: IOContext-Driven Architecture**
+
+**Core Principle**: Every execution carries an IOContext that defines how ALL IO operations are handled.
+
+```rust
+// llmspell-core/src/io.rs (NEW)
+pub struct IOContext {
+    stdout: Box<dyn IOStream>,
+    stderr: Box<dyn IOStream>,
+    stdin: Box<dyn IOInput>,
+    signal_handler: Box<dyn SignalHandler>,
+    performance_hints: IOPerformanceHints,
+}
+
+pub trait IOStream: Send + Sync {
+    fn write(&self, data: &str) -> Result<()>;
+    fn write_line(&self, line: &str) -> Result<()>;
+    fn flush(&self) -> Result<()>;
+}
+
+pub trait IOInput: Send + Sync {
+    async fn read_line(&self, prompt: &str) -> Result<String>;
+    async fn read_password(&self, prompt: &str) -> Result<String>;
+}
+
+pub trait SignalHandler: Send + Sync {
+    fn handle_interrupt(&self) -> bool; // true = handled
+    fn is_interrupted(&self) -> bool;
+}
+
+pub struct IOPerformanceHints {
+    pub batch_size: usize,      // Buffer this many lines before flushing
+    pub flush_interval_ms: u64, // Force flush after this many ms
+    pub async_capable: bool,     // Can handle async IO operations
+}
+```
+
+**Implementation Plan**
+
+####  9.8.15.1 Phase 1: Core IO Infrastructure (Breaking Change)
+1. **Create `llmspell-core/src/io.rs`**
+   - Define IOContext, IOStream, IOInput, SignalHandler traits
+   - Provide default implementations (StdoutStream, StderrStream, StdinInput)
+   - Add NullIO for testing, BufferedIO for performance
+
+2. **Update ScriptEngineBridge trait**
+   ```rust
+   trait ScriptEngineBridge {
+       fn execute_script_with_io(&self, script: &str, io: Arc<IOContext>) -> Result<ScriptOutput>;
+   }
+   ```
+
+3. **Update ConsoleCapture to use IOContext**
+   - Remove ALL println!/print! statements
+   - Route through IOContext.stdout/stderr
+   - Make ConsoleCapture creation require IOContext
+
+####  9.8.15.2 Phase 2: Kernel Integration
+1. **Create KernelIOContext**
+   ```rust
+   struct KernelIOStream {
+       kernel: Weak<GenericKernel>,
+       stream_type: StreamType,
+   }
+   
+   impl IOStream for KernelIOStream {
+       fn write_line(&self, line: &str) -> Result<()> {
+           if let Some(kernel) = self.kernel.upgrade() {
+               kernel.publish_stream(self.stream_type, line).await?;
+           }
+           Ok(())
+       }
+   }
+   ```
+
+2. **Wire IOContext through execution**
+   - Kernel creates IOContext with KernelIOStream implementations
+   - Passes to ScriptRuntime.execute_script_with_io()
+   - Runtime passes to Engine
+   - Engine passes to ConsoleCapture
+
+3. **Implement stdin support**
+   ```rust
+   impl IOInput for KernelIOInput {
+       async fn read_line(&self, prompt: &str) -> Result<String> {
+           // Send input_request on stdin channel
+           // Wait for input_reply
+       }
+   }
+   ```
+
+####  9.8.15.3 Phase 3: Signal Handling
+1. **Add interrupt propagation**
+   ```rust
+   struct KernelSignalHandler {
+       interrupt_flag: Arc<AtomicBool>,
+   }
+   
+   impl SignalHandler for KernelSignalHandler {
+       fn handle_interrupt(&self) -> bool {
+           self.interrupt_flag.store(true, Ordering::Relaxed);
+           true
+       }
+   }
+   ```
+
+2. **Check interrupts in script execution loops**
+   - LuaEngine checks IOContext.signal_handler.is_interrupted()
+   - Propagates as ExecutionInterrupted error
+
+####  9.8.15.4 Phase 4: Migration of println! Statements
+1. **Core/Bridge/Kernel println! → tracing**
+   - llmspell-core: 6 println! → tracing::info!
+   - llmspell-bridge: 7 println! → use IOContext
+   - llmspell-kernel: 5 println! → tracing::debug!
+
+2. **CLI println! → OutputFormatter**
+   - Create OutputFormatter that uses IOContext
+   - CLI creates StdoutIOContext for user-facing output
+   - Tests create MockIOContext for assertions
+
+3. **Tool/Agent/Workflow println! → IOContext**
+   - Pass IOContext through execute() methods
+   - ~200 println! in tools → context.stdout.write_line()
+
+4. **Keep println! in:**
+   - Test assertions (need direct output)
+   - Examples (standalone demos)
+   - Documentation (not executed)
+
+####  9.8.15.5 Phase 5: Performance Optimization
+1. **Implement BufferedIOContext**
+   - Batch lines until batch_size or flush_interval
+   - Reduce syscalls for high-throughput output
+   - Automatic flush on newline for interactive mode
+
+2. **Add IOContext pooling**
+   - Reuse IOContext instances across executions
+   - Reduce allocation overhead
+
+3. **Benchmark results target**
+   - Direct println!: ~1μs per call
+   - IOContext with batching: ~100ns amortized
+   - 10x improvement for script with heavy output
+
+####  9.8.15.6 ### Testing Requirements
+
+1. **Unit Tests**
+   ```rust
+   #[test]
+   fn test_io_context_routing() {
+       let mock_io = MockIOContext::new();
+       let engine = LuaEngine::new();
+       engine.execute_script_with_io("print('test')", mock_io.clone());
+       assert_eq!(mock_io.stdout_lines(), vec!["test"]);
+   }
+   ```
+
+2. **Integration Tests**
+   ```bash
+   # Start kernel
+   llmspell kernel start --port 9555
+   
+   # Test stdout routing
+   llmspell exec --connect localhost:9555 'print("stdout test")'
+   # Should see in client output, not kernel process
+   
+   # Test stdin support
+   llmspell exec --connect localhost:9555 'local input = io.read(); print("Got: " .. input)'
+   # Should prompt for input
+   
+   # Test signal handling
+   llmspell exec --connect localhost:9555 'while true do end'
+   # Ctrl+C should interrupt
+   ```
+
+3. **Performance Tests**
+   ```rust
+   #[bench]
+   fn bench_io_context_throughput(b: &mut Bencher) {
+       let io = BufferedIOContext::new();
+       b.iter(|| {
+           for _ in 0..1000 {
+               io.stdout.write_line("test");
+           }
+       });
+   }
+   ```
+
+####  9.8.15.7 ### Acceptance Criteria
+
+**Architecture:**
+- [ ] IOContext trait system in llmspell-core
+- [ ] All script execution uses IOContext
+- [ ] Zero direct println!/print! in core/bridge/kernel
+- [ ] Protocol-agnostic IO routing
+
+**Functionality:**
+- [ ] Script output appears in client, not kernel process
+- [ ] stdin/io.read() works through kernel
+- [ ] Ctrl+C interrupts script execution
+- [ ] stderr separated from stdout
+
+**Performance:**
+- [ ] Buffered IO reduces syscalls by 10x
+- [ ] No performance regression for single-line output
+- [ ] Benchmark suite validates targets
+
+**Code Quality:**
+- [ ] 2,389 println! reduced to <500 (tests/examples only)
+- [ ] All IO testable with MockIOContext
+- [ ] Clean module boundaries
+- [ ] Zero clippy warnings
+
+####  9.8.15.8  Definition of Done
+
+1. **Core Implementation**
+   - [ ] IOContext traits defined in llmspell-core
+   - [ ] KernelIOContext implementation complete
+   - [ ] ConsoleCapture refactored to use IOContext
+   - [ ] ScriptEngineBridge updated with execute_script_with_io
+
+2. **Integration**
+   - [ ] Kernel creates and passes IOContext
+   - [ ] Runtime propagates IOContext to engines
+   - [ ] All script output flows through IOContext
+   - [ ] No direct stdout printing in execution path
+
+3. **Features**
+   - [ ] stdout routing through IOPub works
+   - [ ] stderr separation implemented
+   - [ ] stdin support with input_request/reply
+   - [ ] Signal handling with interrupts
+
+4. **Migration**
+   - [ ] Core/bridge/kernel println! eliminated
+   - [ ] CLI uses OutputFormatter
+   - [ ] Tools/agents use IOContext
+   - [ ] Migration guide documented
+
+5. **Testing & Performance**
+   - [ ] Unit tests with MockIOContext
+   - [ ] Integration tests pass
+   - [ ] Performance benchmarks meet targets
+   - [ ] No regressions in existing tests
+
+### Implementation Notes
+
+**Why IOContext over Environment Variables:**
+- Type safety and compile-time checking
+- Testability with dependency injection
+- Performance (no env var lookups)
+- Flexibility for different protocols
+- Clear architectural boundaries
+
+**Why Not Keep println! for Tests:**
+- Tests should use same IO path as production
+- Enables testing of IO behavior itself
+- Consistent architecture throughout
+
+**Migration Strategy:**
+- Start with kernel→bridge connection (Phase 1-2)
+- Add features incrementally (Phase 3)
+- Migrate println! systematically (Phase 4)
+- Optimize after correctness (Phase 5)
 
 ---
 
