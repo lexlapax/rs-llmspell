@@ -86,10 +86,13 @@ use crate::execution_bridge::{
 };
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
 use llmspell_core::debug::{DebugCapability, DebugRequest, DebugResponse};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
+
+/// Map from (`source_file`, `line_number`) to set of breakpoint IDs at that location
+type BreakpointLocationMap = HashMap<(String, u32), HashSet<String>>;
 
 /// Language-agnostic debug coordinator
 ///
@@ -102,8 +105,16 @@ pub struct DebugCoordinator {
     /// Debug capabilities registry (variable inspector, etc.)
     capabilities: Arc<RwLock<HashMap<String, Arc<dyn DebugCapability>>>>,
 
-    /// Breakpoints managed by coordinator
-    breakpoints: Arc<RwLock<HashMap<String, Breakpoint>>>,
+    /// Breakpoints indexed by ID for management operations
+    breakpoints_by_id: Arc<RwLock<HashMap<String, Breakpoint>>>,
+
+    /// Breakpoint IDs indexed by location for O(1) lookup in hot path
+    /// Key: `(source_file, line_number)`, Value: Set of breakpoint IDs at that location
+    breakpoints_by_location: Arc<RwLock<BreakpointLocationMap>>,
+
+    /// Set of source files that have at least one breakpoint
+    /// Used for fast early-exit in hot path when source has no breakpoints
+    sources_with_breakpoints: Arc<RwLock<HashSet<String>>>,
 
     /// Current debug state
     debug_state: Arc<RwLock<DebugState>>,
@@ -123,7 +134,9 @@ impl DebugCoordinator {
         Self {
             shared_context,
             capabilities,
-            breakpoints: Arc::new(RwLock::new(HashMap::new())),
+            breakpoints_by_id: Arc::new(RwLock::new(HashMap::new())),
+            breakpoints_by_location: Arc::new(RwLock::new(HashMap::new())),
+            sources_with_breakpoints: Arc::new(RwLock::new(HashSet::new())),
             debug_state: Arc::new(RwLock::new(DebugState::Running)),
             execution_manager,
         }
@@ -139,18 +152,45 @@ impl DebugCoordinator {
     /// Uses synchronous breakpoint lookup, no async operations.
     ///
     /// # Performance
-    /// - Uses local cache for synchronous access
-    /// - No async operations on hot path
+    /// - Two-level check: first source file, then specific line
+    /// - O(1) `HashSet` lookup for source, then O(1) `HashMap` lookup for line
+    /// - No string allocations in common case (source not in set)
     /// - <100ns average case performance
     #[must_use]
     pub fn might_break_at_sync(&self, source: &str, line: u32) -> bool {
-        // Fast sync check - try to acquire read lock without blocking
-        // NOTE: ExecutionManager doesn't have sync methods, so we maintain our own cache
-        self.breakpoints.try_read().is_ok_and(|breakpoints| {
-            breakpoints
-                .values()
-                .any(|bp| bp.enabled && bp.source == source && bp.line == line)
-        })
+        // Level 1: Super fast check - does this source file have ANY breakpoints?
+        let Ok(sources) = self.sources_with_breakpoints.try_read() else {
+            return false;
+        };
+
+        // Fast path: if this source has no breakpoints at all, exit immediately
+        // This avoids string allocation for the HashMap key in 99% of cases
+        if !sources.contains(source) {
+            return false;
+        }
+
+        drop(sources); // Release lock early
+
+        // Level 2: This source has breakpoints, check the specific line
+        let Ok(locations) = self.breakpoints_by_location.try_read() else {
+            return false;
+        };
+
+        // Now we need to build the key, but only for sources that have breakpoints
+        let key = (source.to_string(), line);
+
+        // O(1) lookup
+        if let Some(bp_ids) = locations.get(&key) {
+            if !bp_ids.is_empty() {
+                // Found potential breakpoints, now check if any are enabled
+                if let Ok(bps) = self.breakpoints_by_id.try_read() {
+                    return bp_ids
+                        .iter()
+                        .any(|id| bps.get(id).is_some_and(|bp| bp.enabled));
+                }
+            }
+        }
+        false
     }
 
     /// Check if we're currently paused (FAST PATH)
@@ -252,11 +292,27 @@ impl DebugCoordinator {
             bp.line
         );
         let id = bp.id.clone();
+        let location_key = (bp.source.clone(), bp.line);
 
-        // Add to DebugCoordinator's collection (for fast path checking)
+        // Add to ID index
         {
-            let mut breakpoints = self.breakpoints.write().await;
+            let mut breakpoints = self.breakpoints_by_id.write().await;
             breakpoints.insert(id.clone(), bp.clone());
+        }
+
+        // Add to location index for O(1) lookup
+        {
+            let mut locations = self.breakpoints_by_location.write().await;
+            locations
+                .entry(location_key)
+                .or_insert_with(HashSet::new)
+                .insert(id.clone());
+        }
+
+        // Add source to the set of sources with breakpoints
+        {
+            let mut sources = self.sources_with_breakpoints.write().await;
+            sources.insert(bp.source.clone());
         }
 
         // CRITICAL FIX for Task 9.8.9: Also add to ExecutionManager's collection
@@ -275,9 +331,40 @@ impl DebugCoordinator {
     pub async fn remove_breakpoint(&self, id: &str) -> Result<(), String> {
         trace!("Removing breakpoint through coordinator: {}", id);
 
-        // Remove from DebugCoordinator's collection
-        let mut breakpoints = self.breakpoints.write().await;
-        if breakpoints.remove(id).is_some() {
+        // Remove from ID index and get the breakpoint info for location cleanup
+        let bp_info = {
+            let mut breakpoints = self.breakpoints_by_id.write().await;
+            breakpoints.remove(id)
+        };
+
+        if let Some(bp) = bp_info {
+            // Remove from location index
+            {
+                let mut locations = self.breakpoints_by_location.write().await;
+                let location_key = (bp.source.clone(), bp.line);
+                if let Some(bp_ids) = locations.get_mut(&location_key) {
+                    bp_ids.remove(id);
+                    // Clean up empty entries
+                    if bp_ids.is_empty() {
+                        locations.remove(&location_key);
+                    }
+                }
+            }
+
+            // Check if this source still has any breakpoints
+            {
+                let still_has_breakpoints = {
+                    let locations = self.breakpoints_by_location.read().await;
+                    locations.keys().any(|(src, _)| src == &bp.source)
+                };
+
+                // If no more breakpoints for this source, remove it from the set
+                if !still_has_breakpoints {
+                    let mut sources = self.sources_with_breakpoints.write().await;
+                    sources.remove(&bp.source);
+                }
+            }
+
             // Also remove from ExecutionManager's collection to keep them synchronized
             self.execution_manager.remove_breakpoint(id).await;
             Ok(())
@@ -323,7 +410,7 @@ impl DebugCoordinator {
 
     /// Get breakpoints
     pub async fn get_breakpoints(&self) -> Vec<Breakpoint> {
-        let breakpoints = self.breakpoints.read().await;
+        let breakpoints = self.breakpoints_by_id.read().await;
         breakpoints.values().cloned().collect()
     }
 

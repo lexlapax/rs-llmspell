@@ -378,6 +378,55 @@ impl HNSWVectorStorage {
         Ok(())
     }
 
+    /// Load all namespaces from disk (internal mutable version)
+    pub async fn load_from_disk(&mut self) -> Result<()> {
+        let Some(ref base_dir) = self.persistence_dir else {
+            info!("No persistence directory configured");
+            return Ok(());
+        };
+
+        if !base_dir.exists() {
+            info!("No persistence directory found at {:?}", base_dir);
+            return Ok(());
+        }
+
+        info!("Loading HNSW data from directory: {:?}", base_dir);
+
+        // Clear existing namespaces before loading
+        self.namespaces.clear();
+        self.metadata.clear();
+
+        // Load each namespace directory
+        for entry in std::fs::read_dir(base_dir)? {
+            let entry = entry?;
+            if entry.file_type()?.is_dir() {
+                let namespace = entry.file_name().to_string_lossy().to_string();
+
+                match self.load_namespace(&namespace).await {
+                    Ok(data) => {
+                        let vector_count = data.container.vectors.len();
+                        info!(
+                            "Successfully loaded namespace '{}' with {} vectors",
+                            namespace, vector_count
+                        );
+                        self.namespaces
+                            .insert(namespace.clone(), Arc::new(RwLock::new(data)));
+                    }
+                    Err(e) => {
+                        error!("Failed to load namespace '{}': {}", namespace, e);
+                    }
+                }
+            }
+        }
+
+        info!(
+            "Finished loading HNSW data, total namespaces: {}",
+            self.namespaces.len()
+        );
+
+        Ok(())
+    }
+
     /// Load a namespace from disk and rebuild index
     async fn load_namespace(&self, namespace: &str) -> Result<NamespaceData> {
         let Some(ref base_dir) = self.persistence_dir else {
@@ -386,12 +435,16 @@ impl HNSWVectorStorage {
 
         let namespace_dir = base_dir.join(namespace);
         if !namespace_dir.exists() {
-            anyhow::bail!("Namespace directory does not exist");
+            anyhow::bail!("Namespace directory does not exist: {:?}", namespace_dir);
         }
 
         // Load serialized data using MessagePack
         let data_file = namespace_dir.join("vectors.msgpack");
-        let data = std::fs::read(data_file)?;
+        if !data_file.exists() {
+            anyhow::bail!("Vectors file does not exist: {:?}", data_file);
+        }
+
+        let data = std::fs::read(&data_file)?;
         let persistence: NamespacePersistence = rmp_serde::from_slice(&data)
             .map_err(|e| anyhow::anyhow!("Failed to deserialize namespace data: {}", e))?;
 
@@ -424,7 +477,10 @@ impl HNSWVectorStorage {
             );
         }
 
-        info!("Loaded namespace {} from disk and rebuilt index", namespace);
+        info!(
+            "Loaded namespace '{}' from disk and rebuilt index",
+            namespace
+        );
 
         Ok(NamespaceData {
             container,
@@ -871,36 +927,24 @@ impl HNSWVectorStorage {
     /// - For 100K vectors, expect load times under 5 seconds
     /// - Memory usage during loading may temporarily spike during index reconstruction
     pub async fn from_path(path: &Path, dimensions: usize, config: HNSWConfig) -> Result<Self> {
-        let storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
-        // Don't call load() on an immutable storage - load() mutates self
-        // Instead, manually load namespaces
-        let Some(ref base_dir) = storage.persistence_dir else {
-            return Ok(storage);
-        };
+        let mut storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
 
-        if !base_dir.exists() {
-            return Ok(storage);
-        }
-
-        // Load each namespace directory
-        for entry in std::fs::read_dir(base_dir)? {
-            let entry = entry?;
-            if entry.file_type()?.is_dir() {
-                let namespace = entry.file_name().to_string_lossy().to_string();
-                match storage.load_namespace(&namespace).await {
-                    Ok(data) => {
-                        storage
-                            .namespaces
-                            .insert(namespace.clone(), Arc::new(RwLock::new(data)));
-                    }
-                    Err(e) => {
-                        error!("Failed to load namespace {}: {}", namespace, e);
-                    }
+        // Load existing data from disk if it exists
+        if storage
+            .persistence_dir
+            .as_ref()
+            .is_some_and(|dir| dir.exists())
+        {
+            match storage.load_from_disk().await {
+                Ok(()) => {
+                    info!("Successfully loaded existing HNSW data from {:?}", path);
+                }
+                Err(e) => {
+                    warn!("Failed to load existing HNSW data: {}, starting fresh", e);
                 }
             }
         }
 
-        info!("Loaded {} namespaces from disk", storage.namespaces.len());
         Ok(storage)
     }
 }

@@ -66,6 +66,7 @@ pub mod event_helpers;
 pub mod fixtures;
 pub mod generators;
 pub mod hook_helpers;
+pub mod kernel_helpers;
 pub mod macros;
 pub mod mocks;
 pub mod state_helpers;

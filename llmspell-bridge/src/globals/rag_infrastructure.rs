@@ -252,6 +252,7 @@ async fn create_hnsw_storage_with_persistence(
     path: &std::path::Path,
     dimensions: usize,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
+    context: &GlobalContext,
 ) -> Arc<dyn VectorStorage> {
     debug!(
         "Loading or creating HNSW storage with persistence at: {:?}",
@@ -260,12 +261,18 @@ async fn create_hnsw_storage_with_persistence(
 
     // Try to load existing data first
     if let Some(storage) = try_load_hnsw_from_path(path, dimensions, hnsw_config.clone()).await {
-        return Arc::new(storage);
+        let storage_arc = Arc::new(storage);
+        // Store the concrete HNSW storage in context for save operations
+        context.set_bridge("hnsw_storage", storage_arc.clone());
+        return storage_arc;
     }
 
     // Create new storage with persistence
     let storage = create_new_hnsw_storage(dimensions, hnsw_config, Some(path));
-    Arc::new(storage)
+    let storage_arc = Arc::new(storage);
+    // Store the concrete HNSW storage in context for save operations
+    context.set_bridge("hnsw_storage", storage_arc.clone());
+    storage_arc
 }
 
 /// Create HNSW storage without persistence
@@ -282,6 +289,7 @@ fn create_hnsw_storage_without_persistence(
 async fn create_hnsw_storage(
     config: &RAGConfig,
     hnsw_config: llmspell_storage::vector_storage::HNSWConfig,
+    context: &GlobalContext,
 ) -> Arc<dyn VectorStorage> {
     debug!("Creating HNSW vector storage for RAG");
 
@@ -291,6 +299,7 @@ async fn create_hnsw_storage(
                 path,
                 config.vector_storage.dimensions,
                 hnsw_config,
+                context,
             )
             .await
         }
@@ -303,13 +312,13 @@ async fn create_hnsw_storage(
 /// Create vector storage based on RAG configuration
 async fn create_vector_storage(
     config: &RAGConfig,
-    _context: &GlobalContext,
+    context: &GlobalContext,
 ) -> Arc<dyn VectorStorage> {
     match config.vector_storage.backend {
         llmspell_config::VectorBackend::HNSW => {
             debug!("Creating HNSW vector storage for RAG");
             let hnsw_config = convert_hnsw_config(&config.vector_storage.hnsw);
-            create_hnsw_storage(config, hnsw_config).await
+            create_hnsw_storage(config, hnsw_config, context).await
         }
     }
 }

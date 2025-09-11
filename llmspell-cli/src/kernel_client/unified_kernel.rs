@@ -422,41 +422,5 @@ impl KernelConnectionTrait for UnifiedKernelClient {
     }
 }
 
-// Tests moved from embedded_kernel.rs
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_unified_kernel_embedded() {
-        let config = Arc::new(LLMSpellConfig::default());
-        let mut kernel = UnifiedKernelClient::start_embedded(config)
-            .await
-            .expect("Failed to start embedded kernel");
-
-        assert!(kernel.is_connected());
-        assert!(kernel.is_embedded);
-
-        // Test execution
-        let result = kernel.execute("print('test')").await;
-        assert!(result.is_ok());
-
-        // Clean disconnect
-        assert!(kernel.disconnect().await.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_connection_string_parsing() {
-        // Test kernel ID format
-        let result = resolve_connection_string("test-kernel-id").await;
-        assert!(result.is_err()); // Should fail without actual kernel
-
-        // Test host:port format
-        let result = resolve_connection_string("localhost:9555").await;
-        assert!(result.is_err()); // Should fail without actual kernel
-
-        // Test file path format
-        let result = resolve_connection_string("/tmp/connection.json").await;
-        assert!(result.is_err()); // Should fail without actual file
-    }
-}
+// Note: Integration tests for UnifiedKernelClient are in tests/kernel_integration.rs
+// These require actual kernel infrastructure and should not be unit tests

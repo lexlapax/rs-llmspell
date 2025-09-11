@@ -4,7 +4,7 @@
 //! `DebugHook` trait) and Layer 3 (Lua-specific `HookHandler` implementations).
 //!
 //! Architecture:
-//! ```
+//! ```text
 //! Layer 1: `DebugHook` trait (language-agnostic)
 //!     ↓
 //! Layer 2: `LuaDebugHookAdapter` (this file) - bridges traits

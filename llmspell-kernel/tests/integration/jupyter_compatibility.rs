@@ -5,12 +5,13 @@ use anyhow::Result;
 use llmspell_config::{DebugConfig, GlobalRuntimeConfig, KernelSettings, LLMSpellConfig};
 use llmspell_kernel::kernel::{GenericKernel, KernelState};
 use llmspell_kernel::ConnectionInfo;
+use llmspell_testing::kernel_helpers::create_test_kernel_config;
 use std::sync::Arc;
 
 /// Test kernel creation with factory method
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_factory_creation() -> Result<()> {
-    let kernel_id = "test-kernel-lifecycle".to_string();
+    let (kernel_id, port) = create_test_kernel_config().await?;
     let config = Arc::new(
         LLMSpellConfig::builder()
             .default_engine("lua")
@@ -26,7 +27,7 @@ async fn test_kernel_factory_creation() -> Result<()> {
             .build(),
     );
 
-    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9000);
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
 
     // Test factory method
     let result =
@@ -38,14 +39,14 @@ async fn test_kernel_factory_creation() -> Result<()> {
 
     let kernel = result?;
     // Kernel channels are already bound in new() - just verify it was created
-    assert_eq!(kernel.kernel_id, "test-kernel-lifecycle");
+    assert!(kernel.kernel_id.starts_with("test-kernel-"));
     Ok(())
 }
 
 /// Test kernel state management
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_state_management() -> Result<()> {
-    let kernel_id = "test-kernel-state".to_string();
+    let (kernel_id, port) = create_test_kernel_config().await?;
     let config = Arc::new(
         LLMSpellConfig::builder()
             .default_engine("lua")
@@ -61,7 +62,7 @@ async fn test_kernel_state_management() -> Result<()> {
             .build(),
     );
 
-    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9100);
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
 
     let kernel =
         GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;
@@ -131,8 +132,8 @@ async fn test_kernel_state_management() -> Result<()> {
 /// Test kernel with multiple client support
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_multiple_clients() -> Result<()> {
-    let kernel1_id = "test-multi-client-1".to_string();
-    let kernel2_id = "test-multi-client-2".to_string();
+    let (kernel1_id, port1) = create_test_kernel_config().await?;
+    let (kernel2_id, port2) = create_test_kernel_config().await?;
 
     let config1 = Arc::new(
         LLMSpellConfig::builder()
@@ -164,9 +165,9 @@ async fn test_kernel_multiple_clients() -> Result<()> {
             .build(),
     );
 
-    let connection1 = ConnectionInfo::new(kernel1_id.clone(), "127.0.0.1".to_string(), 9200);
+    let connection1 = ConnectionInfo::new(kernel1_id.clone(), "127.0.0.1".to_string(), port1);
 
-    let connection2 = ConnectionInfo::new(kernel2_id.clone(), "127.0.0.1".to_string(), 9300);
+    let connection2 = ConnectionInfo::new(kernel2_id.clone(), "127.0.0.1".to_string(), port2);
 
     let kernel1 =
         GenericKernel::from_config_with_connection(kernel1_id, config1, connection1).await?;
@@ -198,7 +199,7 @@ async fn test_kernel_multiple_clients() -> Result<()> {
 /// Test kernel with debug mode enabled
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_debug_mode() -> Result<()> {
-    let kernel_id = "test-debug-kernel".to_string();
+    let (kernel_id, port) = create_test_kernel_config().await?;
     let config = Arc::new(
         LLMSpellConfig::builder()
             .default_engine("lua")
@@ -218,7 +219,7 @@ async fn test_kernel_debug_mode() -> Result<()> {
             .build(),
     );
 
-    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9400);
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
 
     let kernel =
         GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;
@@ -229,7 +230,7 @@ async fn test_kernel_debug_mode() -> Result<()> {
 /// Test kernel with authentication enabled
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_with_authentication() -> Result<()> {
-    let kernel_id = "test-auth-kernel".to_string();
+    let (kernel_id, port) = create_test_kernel_config().await?;
     let config = Arc::new(
         LLMSpellConfig::builder()
             .default_engine("lua")
@@ -245,7 +246,7 @@ async fn test_kernel_with_authentication() -> Result<()> {
             .build(),
     );
 
-    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9500);
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
 
     let kernel =
         GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;
@@ -263,7 +264,7 @@ async fn test_kernel_with_authentication() -> Result<()> {
 /// Test invalid engine configuration
 #[tokio::test(flavor = "multi_thread")]
 async fn test_invalid_engine_config() -> Result<()> {
-    let kernel_id = "test-invalid-engine".to_string();
+    let (kernel_id, port) = create_test_kernel_config().await?;
     let invalid_config = Arc::new(
         LLMSpellConfig::builder()
             .default_engine("invalid_engine")
@@ -279,7 +280,7 @@ async fn test_invalid_engine_config() -> Result<()> {
             .build(),
     );
 
-    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9600);
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
 
     let result =
         GenericKernel::from_config_with_connection(kernel_id, invalid_config, connection_info)
@@ -306,7 +307,7 @@ async fn test_invalid_engine_config() -> Result<()> {
 /// Test kernel resource limits configuration
 #[tokio::test(flavor = "multi_thread")]
 async fn test_kernel_resource_limits() -> Result<()> {
-    let kernel_id = "test-resource-limits".to_string();
+    let (kernel_id, port) = create_test_kernel_config().await?;
     let config = Arc::new(
         LLMSpellConfig::builder()
             .default_engine("lua")
@@ -324,7 +325,7 @@ async fn test_kernel_resource_limits() -> Result<()> {
             .build(),
     );
 
-    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), 9700);
+    let connection_info = ConnectionInfo::new(kernel_id.clone(), "127.0.0.1".to_string(), port);
 
     let kernel =
         GenericKernel::from_config_with_connection(kernel_id, config, connection_info).await?;

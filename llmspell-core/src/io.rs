@@ -429,28 +429,33 @@ impl IOStream for MockStream {
     fn write(&self, data: &str) -> Result<(), LLMSpellError> {
         let mut lines = self.lines.lock().unwrap();
 
+        // If data doesn't contain newlines, append to the last line
+        if !data.contains('\n') {
+            if let Some(last) = lines.last_mut() {
+                last.push_str(data);
+            } else {
+                lines.push(data.to_string());
+            }
+            return Ok(());
+        }
+
         // Split by newlines but keep track of whether we end with a newline
         let ends_with_newline = data.ends_with('\n');
         let parts: Vec<&str> = data.split('\n').collect();
 
         for (i, part) in parts.iter().enumerate() {
             if i == 0 {
-                // First part - append to last line if exists and not empty
-                if !part.is_empty() {
-                    if lines.is_empty() {
-                        lines.push(part.to_string());
-                    } else {
-                        // Start a new line since the batch format has newlines between lines
-                        lines.push(part.to_string());
-                    }
+                // First part - append to last line if exists
+                if let Some(last) = lines.last_mut() {
+                    last.push_str(part);
+                } else if !part.is_empty() {
+                    lines.push(part.to_string());
                 }
             } else if i < parts.len() - 1 || (i == parts.len() - 1 && ends_with_newline) {
                 // Complete lines (has newline after them)
-                if !part.is_empty() || i < parts.len() - 1 {
-                    lines.push(part.to_string());
-                }
+                lines.push(part.to_string());
             } else if !part.is_empty() {
-                // Last part without trailing newline - incomplete line
+                // Last part without trailing newline - start new incomplete line
                 lines.push(part.to_string());
             }
         }
@@ -632,7 +637,7 @@ mod tests {
         stream.write(" data").unwrap();
 
         let lines = stream.get_lines();
-        // Note: partial writes are appended to the last line if it exists
+        // Note: partial writes are appended to the last line
         assert_eq!(lines, vec!["line 1", "line 2partial data"]);
     }
 

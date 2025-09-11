@@ -45,6 +45,7 @@ futures = "0.3"
 # Note: hex already included above, jupyter-protocol types implemented manually
 
 [dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
 tempfile = "3.14"
 tokio-test = "0.4"
 futures = "0.3"

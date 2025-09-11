@@ -5,7 +5,7 @@
 //! marshalling.
 //!
 //! Architecture:
-//! ```
+//! ```text
 //! Layer 1: DebugCoordinator (language-agnostic coordinator)
 //!     ↓
 //! Layer 2: LuaDebugBridge (this file) - sync/async boundary + Lua adaptation  
