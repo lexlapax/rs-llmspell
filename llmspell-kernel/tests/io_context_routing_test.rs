@@ -5,6 +5,27 @@ use llmspell_config::LLMSpellConfig;
 use llmspell_core::io::{IOContext, IOStream};
 use std::sync::Arc;
 
+// Test helper struct for capturing IO output
+struct TestStream {
+    buffer: Arc<std::sync::Mutex<Vec<String>>>,
+}
+
+impl IOStream for TestStream {
+    fn write(&self, data: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
+        self.buffer.lock().unwrap().push(data.to_string());
+        Ok(())
+    }
+
+    fn write_line(&self, line: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
+        self.buffer.lock().unwrap().push(format!("{line}\n"));
+        Ok(())
+    }
+
+    fn flush(&self) -> Result<(), llmspell_core::error::LLMSpellError> {
+        Ok(())
+    }
+}
+
 #[tokio::test(flavor = "multi_thread")]
 async fn test_io_context_routing() {
     // Create test IO collectors
@@ -15,26 +36,6 @@ async fn test_io_context_routing() {
     let stderr_clone = stderr_buffer.clone();
 
     // Create custom IO streams that collect output
-    struct TestStream {
-        buffer: Arc<std::sync::Mutex<Vec<String>>>,
-    }
-
-    impl IOStream for TestStream {
-        fn write(&self, data: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-            self.buffer.lock().unwrap().push(data.to_string());
-            Ok(())
-        }
-
-        fn write_line(&self, line: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-            self.buffer.lock().unwrap().push(format!("{line}\n"));
-            Ok(())
-        }
-
-        fn flush(&self) -> Result<(), llmspell_core::error::LLMSpellError> {
-            Ok(())
-        }
-    }
-
     let io_context = Arc::new(IOContext::new(
         Arc::new(TestStream {
             buffer: stdout_clone,
@@ -63,8 +64,7 @@ async fn test_io_context_routing() {
     assert!(result.is_ok(), "Script execution should succeed");
 
     // Verify stdout output
-    let stdout_lines = stdout_buffer.lock().unwrap();
-    let stdout_text = stdout_lines.join("");
+    let stdout_text = stdout_buffer.lock().unwrap().join("");
     assert!(
         stdout_text.contains("Hello from Lua"),
         "Should capture print output"
@@ -80,25 +80,6 @@ async fn test_io_context_routing() {
 #[tokio::test(flavor = "multi_thread")]
 async fn test_io_context_isolation() {
     // Test that each execution gets its own IO context
-    struct TestStream {
-        buffer: Arc<std::sync::Mutex<Vec<String>>>,
-    }
-
-    impl IOStream for TestStream {
-        fn write(&self, data: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-            self.buffer.lock().unwrap().push(data.to_string());
-            Ok(())
-        }
-
-        fn write_line(&self, line: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-            self.buffer.lock().unwrap().push(format!("{line}\n"));
-            Ok(())
-        }
-
-        fn flush(&self) -> Result<(), llmspell_core::error::LLMSpellError> {
-            Ok(())
-        }
-    }
 
     let config = LLMSpellConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -142,8 +123,7 @@ async fn test_io_context_isolation() {
     assert!(result2.is_ok());
 
     // Verify isolation - io1 should not have execution 2's output
-    let io1_lines = buffer1.lock().unwrap();
-    let io1_text = io1_lines.join("");
+    let io1_text = buffer1.lock().unwrap().join("");
     assert!(
         io1_text.contains("execution 1"),
         "IO1 should have execution 1 output"
@@ -205,8 +185,7 @@ async fn test_io_context_error_handling() {
     assert!(result.is_err(), "Script with error should fail");
 
     // Verify output before error was captured
-    let stdout_lines = stdout_buffer.lock().unwrap();
-    let stdout_text = stdout_lines.join("");
+    let stdout_text = stdout_buffer.lock().unwrap().join("");
     assert!(
         stdout_text.contains("Before error"),
         "Should capture output before error"
@@ -272,8 +251,7 @@ async fn test_io_context_with_return_value() {
         "Should return the correct value"
     );
 
-    let stdout_lines = stdout_buffer.lock().unwrap();
-    let stdout_text = stdout_lines.join("");
+    let stdout_text = stdout_buffer.lock().unwrap().join("");
     assert!(
         stdout_text.contains("Computing result"),
         "Should capture print statements"
@@ -331,8 +309,7 @@ async fn test_io_context_multiline_output() {
     let result = runtime.execute_script_with_io(script, io_context).await;
     assert!(result.is_ok());
 
-    let stdout_lines = stdout_buffer.lock().unwrap();
-    let stdout_text = stdout_lines.join("");
+    let stdout_text = stdout_buffer.lock().unwrap().join("");
 
     for i in 1..=5 {
         assert!(
@@ -390,8 +367,7 @@ async fn test_io_context_flush_behavior() {
     let result = runtime.execute_script_with_io(script, io_context).await;
     assert!(result.is_ok());
 
-    let stdout_lines = stdout_buffer.lock().unwrap();
-    let full_output = stdout_lines.join("");
+    let full_output = stdout_buffer.lock().unwrap().join("");
     assert!(
         full_output.contains("Part 1") && full_output.contains("Part 2"),
         "Should capture both parts with explicit flush"

@@ -246,7 +246,7 @@ pub struct CommInfo {
 }
 
 /// Execution status for `execute_reply` messages
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionStatus {
     Ok,

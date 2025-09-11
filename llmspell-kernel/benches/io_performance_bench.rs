@@ -2,14 +2,11 @@
 //!
 //! Measures the performance improvements from buffered IO:
 //! - Direct println!: ~1μs per call
-//! - IOContext with batching: ~100ns amortized
+//! - `IOContext` with batching: ~100ns amortized
 //! - Target: 10x improvement for script with heavy output
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
-use llmspell_core::io::{
-    BufferedIOContext, BufferedStream, IOContext, IOPerformanceHints, IOStream, MockStream,
-};
-use std::io::{self, Write};
+use llmspell_core::io::{BufferedStream, IOContext, IOPerformanceHints, IOStream, MockStream};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -19,13 +16,13 @@ fn bench_direct_println(c: &mut Criterion) {
         b.iter(|| {
             for i in 0..100 {
                 // Using print! to avoid actual console output during benchmarks
-                let _ = black_box(format!("Line {}", i));
+                let _ = black_box(format!("Line {i}"));
             }
         });
     });
 }
 
-/// Measure unbuffered IOContext performance
+/// Measure unbuffered `IOContext` performance
 fn bench_unbuffered_io_context(c: &mut Criterion) {
     c.bench_function("unbuffered_io_context", |b| {
         let mock = Arc::new(MockStream::new());
@@ -39,7 +36,7 @@ fn bench_unbuffered_io_context(c: &mut Criterion) {
 
         b.iter(|| {
             for i in 0..100 {
-                let _ = io_context.stdout.write_line(&format!("Line {}", i));
+                let _ = io_context.stdout.write_line(&format!("Line {i}"));
             }
             let _ = io_context.stdout.flush();
         });
@@ -49,7 +46,7 @@ fn bench_unbuffered_io_context(c: &mut Criterion) {
     });
 }
 
-/// Measure buffered IOContext performance with different batch sizes
+/// Measure buffered `IOContext` performance with different batch sizes
 fn bench_buffered_io_context(c: &mut Criterion) {
     let mut group = c.benchmark_group("buffered_io_context");
 
@@ -67,7 +64,7 @@ fn bench_buffered_io_context(c: &mut Criterion) {
 
                 b.iter(|| {
                     for i in 0..100 {
-                        let _ = buffered.write_line(&format!("Line {}", i));
+                        let _ = buffered.write_line(&format!("Line {i}"));
                     }
                     let _ = buffered.flush();
                 });
@@ -81,7 +78,7 @@ fn bench_buffered_io_context(c: &mut Criterion) {
     group.finish();
 }
 
-/// Measure IOContext pool performance
+/// Measure `IOContext` pool performance
 fn bench_io_context_pool(c: &mut Criterion) {
     use llmspell_core::io::IOContextPool;
 
@@ -105,10 +102,8 @@ fn bench_heavy_output_throughput(c: &mut Criterion) {
         b.iter(|| {
             let mut output = Vec::with_capacity(10000);
             for i in 0..1000 {
-                let line = format!(
-                    "Line {}: Some longer output text that simulates real log data\n",
-                    i
-                );
+                let line =
+                    format!("Line {i}: Some longer output text that simulates real log data\n");
                 output.extend_from_slice(line.as_bytes());
             }
             black_box(output);
@@ -129,8 +124,7 @@ fn bench_heavy_output_throughput(c: &mut Criterion) {
         b.iter(|| {
             for i in 0..1000 {
                 let _ = io_context.stdout.write_line(&format!(
-                    "Line {}: Some longer output text that simulates real log data",
-                    i
+                    "Line {i}: Some longer output text that simulates real log data"
                 ));
             }
             let _ = io_context.stdout.flush();
@@ -150,8 +144,7 @@ fn bench_heavy_output_throughput(c: &mut Criterion) {
         b.iter(|| {
             for i in 0..1000 {
                 let _ = buffered.write_line(&format!(
-                    "Line {}: Some longer output text that simulates real log data",
-                    i
+                    "Line {i}: Some longer output text that simulates real log data"
                 ));
             }
             let _ = buffered.flush();
@@ -217,7 +210,7 @@ fn bench_memory_usage(c: &mut Criterion) {
 
                     // Simulate workload
                     for i in 0..batch_size {
-                        let _ = buffered.write_line(&format!("Line {}", i));
+                        let _ = buffered.write_line(&format!("Line {i}"));
                     }
                     let _ = buffered.flush();
 

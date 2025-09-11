@@ -1,7 +1,7 @@
 //! Kernel-specific IO implementations that route through the messaging protocol
 //!
-//! This module provides IOContext implementations that route all IO operations
-//! through the kernel's messaging channels (IOPub for output, stdin for input).
+//! This module provides `IOContext` implementations that route all IO operations
+//! through the kernel's messaging channels (`IOPub` for output, stdin for input).
 
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
@@ -21,7 +21,7 @@ pub enum StreamType {
 }
 
 impl StreamType {
-    fn as_str(&self) -> &'static str {
+    const fn as_str(self) -> &'static str {
         match self {
             Self::Stdout => "stdout",
             Self::Stderr => "stderr",
@@ -29,7 +29,7 @@ impl StreamType {
     }
 }
 
-/// Kernel IO stream that routes output through IOPub channel
+/// Kernel IO stream that routes output through `IOPub` channel
 pub struct KernelIOStream<T: Transport, P: Protocol> {
     /// Weak reference to the kernel to avoid circular dependencies
     kernel: Weak<Mutex<GenericKernel<T, P>>>,
@@ -38,7 +38,8 @@ pub struct KernelIOStream<T: Transport, P: Protocol> {
 }
 
 impl<T: Transport, P: Protocol> KernelIOStream<T, P> {
-    pub fn new(kernel: Weak<Mutex<GenericKernel<T, P>>>, stream_type: StreamType) -> Self {
+    #[must_use]
+    pub const fn new(kernel: Weak<Mutex<GenericKernel<T, P>>>, stream_type: StreamType) -> Self {
         Self {
             kernel,
             stream_type,
@@ -54,7 +55,7 @@ impl<T: Transport + 'static, P: Protocol + 'static> IOStream for KernelIOStream<
     }
 
     fn write_line(&self, line: &str) -> Result<(), LLMSpellError> {
-        if let Some(kernel) = self.kernel.upgrade() {
+        self.kernel.upgrade().map_or(Ok(()), |kernel| {
             // Use tokio's block_in_place to safely run async code
             tokio::task::block_in_place(|| {
                 let rt = tokio::runtime::Handle::current();
@@ -65,14 +66,11 @@ impl<T: Transport + 'static, P: Protocol + 'static> IOStream for KernelIOStream<
                         .await
                         .map_err(|e| LLMSpellError::Io {
                             operation: format!("publish to {}", self.stream_type.as_str()),
-                            source: std::io::Error::new(std::io::ErrorKind::Other, e.to_string()),
+                            source: std::io::Error::other(e.to_string()),
                         })
                 })
             })
-        } else {
-            // Kernel has been dropped, silently ignore
-            Ok(())
-        }
+        })
     }
 
     fn flush(&self) -> Result<(), LLMSpellError> {
@@ -81,7 +79,7 @@ impl<T: Transport + 'static, P: Protocol + 'static> IOStream for KernelIOStream<
     }
 }
 
-/// Kernel IO input that handles stdin through input_request/input_reply
+/// Kernel IO input that handles stdin through `input_request`/`input_reply`
 pub struct KernelIOInput<T: Transport, P: Protocol> {
     /// Weak reference to the kernel
     kernel: Weak<Mutex<GenericKernel<T, P>>>,
@@ -90,6 +88,7 @@ pub struct KernelIOInput<T: Transport, P: Protocol> {
 }
 
 impl<T: Transport, P: Protocol> KernelIOInput<T, P> {
+    #[must_use]
     pub fn new(kernel: Weak<Mutex<GenericKernel<T, P>>>) -> Self {
         Self {
             kernel,
@@ -98,6 +97,7 @@ impl<T: Transport, P: Protocol> KernelIOInput<T, P> {
     }
 
     /// Set up the input receiver channel
+    #[must_use]
     pub async fn setup_input_channel(&self) -> mpsc::Sender<String> {
         let (tx, rx) = mpsc::channel(1);
         *self.input_receiver.lock().await = Some(rx);
@@ -123,7 +123,7 @@ impl<T: Transport + 'static, P: Protocol + 'static> IOInput for KernelIOInput<T,
                 .await
                 .map_err(|e| LLMSpellError::Io {
                     operation: "send input_request".to_string(),
-                    source: std::io::Error::new(std::io::ErrorKind::Other, e.to_string()),
+                    source: std::io::Error::other(e.to_string()),
                 })?;
 
             // Drop kernel lock before waiting for input
@@ -172,7 +172,7 @@ impl<T: Transport + 'static, P: Protocol + 'static> IOInput for KernelIOInput<T,
                 .await
                 .map_err(|e| LLMSpellError::Io {
                     operation: "send input_request".to_string(),
-                    source: std::io::Error::new(std::io::ErrorKind::Other, e.to_string()),
+                    source: std::io::Error::other(e.to_string()),
                 })?;
 
             // Drop kernel lock before waiting for input
@@ -213,20 +213,25 @@ pub struct KernelSignalHandler {
 }
 
 impl KernelSignalHandler {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             interrupt_flag: Arc::new(AtomicBool::new(false)),
         }
     }
 
+    /// Trigger an interrupt
     pub fn interrupt(&self) {
         self.interrupt_flag.store(true, Ordering::Relaxed);
     }
 
+    /// Reset the interrupt flag
     pub fn reset(&self) {
         self.interrupt_flag.store(false, Ordering::Relaxed);
     }
 
+    /// Clone the interrupt flag for sharing
+    #[must_use]
     pub fn clone_flag(&self) -> Arc<AtomicBool> {
         self.interrupt_flag.clone()
     }
@@ -250,6 +255,7 @@ impl SignalHandler for KernelSignalHandler {
 }
 
 /// Create a kernel IO context for script execution
+#[must_use]
 pub fn create_kernel_io_context<T: Transport + 'static, P: Protocol + 'static>(
     kernel: Weak<Mutex<GenericKernel<T, P>>>,
     signal_handler: Arc<KernelSignalHandler>,

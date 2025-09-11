@@ -1,8 +1,8 @@
-//! Tests for kernel IO routing through IOPub channel
+//! Tests for kernel IO routing through `IOPub` channel
 //!
 //! Verifies Task 9.8.15.2: Kernel Integration
 //! - Script output is captured via callbacks
-//! - Output is published to IOPub channel
+//! - Output is published to `IOPub` channel
 //! - Multiple streams (stdout/stderr) are handled correctly
 
 use llmspell_bridge::ScriptRuntime;
@@ -18,8 +18,7 @@ async fn test_callback_io_captures_output() {
     let output_buffer_clone = output_buffer.clone();
 
     let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = output_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        output_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
@@ -27,8 +26,7 @@ async fn test_callback_io_captures_output() {
     let stderr_buffer_clone = stderr_buffer.clone();
 
     let stderr_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = stderr_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        stderr_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
@@ -49,15 +47,18 @@ async fn test_callback_io_captures_output() {
     assert!(result.is_ok());
 
     // Check captured output
-    let captured = output_buffer.lock().unwrap();
-    assert!(
-        captured.contains("Hello from Lua"),
-        "Should capture first print"
-    );
-    assert!(
-        captured.contains("This is line 2"),
-        "Should capture second print"
-    );
+    {
+        let captured = output_buffer.lock().unwrap();
+        assert!(
+            captured.contains("Hello from Lua"),
+            "Should capture first print"
+        );
+        assert!(
+            captured.contains("This is line 2"),
+            "Should capture second print"
+        );
+        drop(captured);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -80,8 +81,7 @@ async fn test_execute_with_io_preserves_return_value() {
     let output_buffer_clone = output_buffer.clone();
 
     let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = output_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        output_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
@@ -108,8 +108,7 @@ async fn test_execute_with_io_preserves_return_value() {
     assert_eq!(result.output.to_string(), "42");
 
     // Check captured output
-    let captured = output_buffer.lock().unwrap();
-    assert!(captured.contains("Side effect output"));
+    assert!(output_buffer.lock().unwrap().contains("Side effect output"));
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -119,15 +118,13 @@ async fn test_error_handling_with_io_context() {
 
     let output_buffer_clone = output_buffer.clone();
     let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = output_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        output_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
     let stderr_buffer_clone = stderr_buffer.clone();
     let stderr_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = stderr_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        stderr_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
@@ -148,7 +145,10 @@ async fn test_error_handling_with_io_context() {
     assert!(result.is_err());
 
     // Check that output before error was captured
-    let captured = output_buffer.lock().unwrap();
-    assert!(captured.contains("Before error"));
-    assert!(!captured.contains("After error"));
+    {
+        let captured = output_buffer.lock().unwrap();
+        assert!(captured.contains("Before error"));
+        assert!(!captured.contains("After error"));
+        drop(captured);
+    }
 }

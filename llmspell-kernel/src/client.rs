@@ -199,6 +199,8 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
 
     /// Process `IOPub` messages during execution
     /// Returns true if a message was received
+    // This function processes multiple message types and requires complex control flow
+    #[allow(clippy::cognitive_complexity)]
     async fn process_iopub_during_execution(&self, msg_id: &str) -> Result<bool> {
         let Some(iopub_bytes) = self.transport.recv("iopub").await? else {
             tracing::trace!("No IOPub message available");
@@ -219,6 +221,8 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
     }
 
     /// Check for execute reply on shell channel
+    // This function handles various reply types with necessary control flow complexity
+    #[allow(clippy::cognitive_complexity)]
     async fn check_for_execute_reply(&self, msg_id: &str) -> Result<Option<MessageContent>> {
         if let Some(reply_bytes) = self.transport.recv("shell").await? {
             let reply = self.protocol.decode(reply_bytes, "shell")?;

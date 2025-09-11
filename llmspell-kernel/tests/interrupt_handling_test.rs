@@ -2,7 +2,7 @@
 //!
 //! Verifies Task 9.8.15.3: Signal Handling
 //! - Interrupt requests stop script execution
-//! - ExecutionInterrupted error is properly propagated
+//! - `ExecutionInterrupted` error is properly propagated
 //! - Signal handler state is correctly managed
 
 use llmspell_bridge::ScriptRuntime;
@@ -20,8 +20,7 @@ async fn test_interrupt_stops_execution() {
     let output_buffer_clone = output_buffer.clone();
 
     let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = output_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        output_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
@@ -79,15 +78,18 @@ async fn test_interrupt_stops_execution() {
         llmspell_core::error::LLMSpellError::ExecutionInterrupted { .. } => {
             // Expected error type
         }
-        _ => panic!("Expected ExecutionInterrupted error, got: {:?}", error),
+        _ => panic!("Expected ExecutionInterrupted error, got: {error:?}"),
     }
 
     // Check that some output was captured before interruption
-    let captured = output_buffer.lock().unwrap();
-    assert!(
-        captured.contains("Still running") || captured.is_empty(),
-        "Should have captured some output or been interrupted immediately"
-    );
+    {
+        let captured = output_buffer.lock().unwrap();
+        assert!(
+            captured.contains("Still running") || captured.is_empty(),
+            "Should have captured some output or been interrupted immediately"
+        );
+        drop(captured);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -116,8 +118,7 @@ async fn test_normal_execution_not_affected() {
     let output_buffer_clone = output_buffer.clone();
 
     let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = output_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        output_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
@@ -154,9 +155,12 @@ async fn test_normal_execution_not_affected() {
     );
 
     // Check output was captured
-    let captured = output_buffer.lock().unwrap();
-    assert!(captured.contains("Starting"));
-    assert!(captured.contains("Sum: 5050"));
+    {
+        let captured = output_buffer.lock().unwrap();
+        assert!(captured.contains("Starting"));
+        assert!(captured.contains("Sum: 5050"));
+        drop(captured);
+    }
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
@@ -165,8 +169,7 @@ async fn test_interrupt_timing() {
     let output_buffer_clone = output_buffer.clone();
 
     let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
-        let mut buffer = output_buffer_clone.lock().unwrap();
-        buffer.push_str(text);
+        output_buffer_clone.lock().unwrap().push_str(text);
         Ok(())
     };
 
@@ -213,15 +216,18 @@ async fn test_interrupt_timing() {
     assert!(execution_result.is_err(), "Should be interrupted");
 
     // Verify output shows start but not completion
-    let captured = output_buffer.lock().unwrap();
-    if !captured.is_empty() {
-        assert!(
-            captured.contains("Loop started"),
-            "Should have started the loop"
-        );
-        assert!(
-            !captured.contains("Loop completed"),
-            "Should not have completed the loop"
-        );
+    {
+        let captured = output_buffer.lock().unwrap();
+        if !captured.is_empty() {
+            assert!(
+                captured.contains("Loop started"),
+                "Should have started the loop"
+            );
+            assert!(
+                !captured.contains("Loop completed"),
+                "Should not have completed the loop"
+            );
+        }
+        drop(captured);
     }
 }

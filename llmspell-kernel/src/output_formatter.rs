@@ -19,7 +19,7 @@ pub enum OutputChannel {
 
 /// Output formatter for CLI applications
 ///
-/// Provides structured output handling that can be redirected to IOContext
+/// Provides structured output handling that can be redirected to `IOContext`
 /// or standard streams depending on the execution context.
 pub struct OutputFormatter {
     io_context: Option<Arc<IOContext>>,
@@ -43,8 +43,10 @@ impl OutputFormatter {
         std::env::var("NO_COLOR").is_err() && !cfg!(windows)
     }
 
-    /// Create a new formatter that routes through IOContext
+    /// Create a new formatter that routes through `IOContext`
     #[must_use]
+    // Cannot be const fn because Arc is not const-constructible
+    #[allow(clippy::missing_const_for_fn)]
     pub fn with_io_context(io_context: Arc<IOContext>) -> Self {
         Self {
             io_context: Some(io_context),
@@ -53,109 +55,134 @@ impl OutputFormatter {
     }
 
     /// Write output to the specified channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the channel fails
     pub fn write(&self, channel: OutputChannel, text: &str) -> io::Result<()> {
-        if let Some(ref io_context) = self.io_context {
-            // Route through IOContext
-            match channel {
-                OutputChannel::Stdout => io_context
-                    .stdout
-                    .write(text)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string())),
-                OutputChannel::Stderr => io_context
-                    .stderr
-                    .write(text)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string())),
-            }
-        } else {
-            // Direct output to standard streams
-            match channel {
-                OutputChannel::Stdout => {
-                    print!("{}", text);
-                    io::stdout().flush()
+        self.io_context.as_ref().map_or_else(
+            || {
+                // Direct output to standard streams
+                match channel {
+                    OutputChannel::Stdout => {
+                        print!("{text}");
+                        io::stdout().flush()
+                    }
+                    OutputChannel::Stderr => {
+                        eprint!("{text}");
+                        io::stderr().flush()
+                    }
                 }
-                OutputChannel::Stderr => {
-                    eprint!("{}", text);
-                    io::stderr().flush()
+            },
+            |io_context| {
+                // Route through IOContext
+                match channel {
+                    OutputChannel::Stdout => io_context
+                        .stdout
+                        .write(text)
+                        .map_err(|e| io::Error::other(e.to_string())),
+                    OutputChannel::Stderr => io_context
+                        .stderr
+                        .write(text)
+                        .map_err(|e| io::Error::other(e.to_string())),
                 }
-            }
-        }
+            },
+        )
     }
 
     /// Write a line to the specified channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to the channel fails
     pub fn write_line(&self, channel: OutputChannel, line: &str) -> io::Result<()> {
-        if let Some(ref io_context) = self.io_context {
-            // Route through IOContext
-            match channel {
-                OutputChannel::Stdout => io_context
-                    .stdout
-                    .write_line(line)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string())),
-                OutputChannel::Stderr => io_context
-                    .stderr
-                    .write_line(line)
-                    .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string())),
-            }
-        } else {
-            // Direct output to standard streams
-            match channel {
-                OutputChannel::Stdout => writeln!(io::stdout(), "{}", line),
-                OutputChannel::Stderr => writeln!(io::stderr(), "{}", line),
-            }
-        }
+        self.io_context.as_ref().map_or_else(
+            || {
+                // Direct output to standard streams
+                match channel {
+                    OutputChannel::Stdout => writeln!(io::stdout(), "{line}"),
+                    OutputChannel::Stderr => writeln!(io::stderr(), "{line}"),
+                }
+            },
+            |io_context| {
+                // Route through IOContext
+                match channel {
+                    OutputChannel::Stdout => io_context
+                        .stdout
+                        .write_line(line)
+                        .map_err(|e| io::Error::other(e.to_string())),
+                    OutputChannel::Stderr => io_context
+                        .stderr
+                        .write_line(line)
+                        .map_err(|e| io::Error::other(e.to_string())),
+                }
+            },
+        )
     }
 
     /// Write an error message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to stderr fails
     pub fn error(&self, message: &str) -> io::Result<()> {
         if self.use_color {
-            self.write_line(
-                OutputChannel::Stderr,
-                &format!("\x1b[31m{}\x1b[0m", message),
-            )
+            self.write_line(OutputChannel::Stderr, &format!("\x1b[31m{message}\x1b[0m"))
         } else {
             self.write_line(OutputChannel::Stderr, message)
         }
     }
 
     /// Write a warning message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to stderr fails
     pub fn warning(&self, message: &str) -> io::Result<()> {
         if self.use_color {
-            self.write_line(
-                OutputChannel::Stderr,
-                &format!("\x1b[33m{}\x1b[0m", message),
-            )
+            self.write_line(OutputChannel::Stderr, &format!("\x1b[33m{message}\x1b[0m"))
         } else {
             self.write_line(OutputChannel::Stderr, message)
         }
     }
 
     /// Write an info message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to stdout fails
     pub fn info(&self, message: &str) -> io::Result<()> {
         self.write_line(OutputChannel::Stdout, message)
     }
 
     /// Write a success message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if writing to stdout fails
     pub fn success(&self, message: &str) -> io::Result<()> {
         if self.use_color {
-            self.write_line(
-                OutputChannel::Stdout,
-                &format!("\x1b[32m{}\x1b[0m", message),
-            )
+            self.write_line(OutputChannel::Stdout, &format!("\x1b[32m{message}\x1b[0m"))
         } else {
             self.write_line(OutputChannel::Stdout, message)
         }
     }
 
     /// Flush all output streams
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if flushing either stream fails
     pub fn flush(&self) -> io::Result<()> {
         if let Some(ref io_context) = self.io_context {
             io_context
                 .stdout
                 .flush()
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| io::Error::other(e.to_string()))?;
             io_context
                 .stderr
                 .flush()
-                .map_err(|e| io::Error::new(io::ErrorKind::Other, e.to_string()))?;
+                .map_err(|e| io::Error::other(e.to_string()))?;
         } else {
             io::stdout().flush()?;
             io::stderr().flush()?;
@@ -175,7 +202,7 @@ pub struct StdoutIOStream;
 
 impl IOStream for StdoutIOStream {
     fn write(&self, data: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-        print!("{}", data);
+        print!("{data}");
         io::stdout()
             .flush()
             .map_err(|e| llmspell_core::error::LLMSpellError::Io {
@@ -185,7 +212,7 @@ impl IOStream for StdoutIOStream {
     }
 
     fn write_line(&self, line: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-        println!("{}", line);
+        println!("{line}");
         Ok(())
     }
 
@@ -204,7 +231,7 @@ pub struct StderrIOStream;
 
 impl IOStream for StderrIOStream {
     fn write(&self, data: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-        eprint!("{}", data);
+        eprint!("{data}");
         io::stderr()
             .flush()
             .map_err(|e| llmspell_core::error::LLMSpellError::Io {
@@ -214,7 +241,7 @@ impl IOStream for StderrIOStream {
     }
 
     fn write_line(&self, line: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
-        eprintln!("{}", line);
+        eprintln!("{line}");
         Ok(())
     }
 

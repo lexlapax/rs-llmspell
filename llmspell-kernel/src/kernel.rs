@@ -252,6 +252,10 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     /// Publish stream output to `IOPub`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if publishing to the `IOPub` channel fails
     pub async fn publish_stream(&self, name: &str, text: &str) -> Result<()> {
         self.publish_iopub(
             "stream",
@@ -593,8 +597,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         let silent_flag = silent;
         let stdout_callback = move |text: &str| -> Result<(), llmspell_core::error::LLMSpellError> {
             // Collect output
-            let mut buffer = output_buffer_clone.lock().unwrap();
-            buffer.push_str(text);
+            output_buffer_clone.lock().unwrap().push_str(text);
 
             // Also publish to IOPub if not silent
             if !silent_flag {
@@ -1036,6 +1039,11 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "success": true,
             "stackFrames": stack
         }))
+    }
+
+    /// Trigger an interrupt signal to the kernel
+    pub fn interrupt(&self) {
+        self.signal_handler.interrupt();
     }
 
     /// Shutdown the kernel gracefully

@@ -13,6 +13,8 @@ struct FileStream {
 }
 
 impl FileStream {
+    // Cannot be const fn because Mutex::new is not const
+    #[allow(clippy::missing_const_for_fn)]
     fn new(file: File) -> Self {
         Self {
             file: Mutex::new(file),
@@ -32,7 +34,7 @@ impl IOStream for FileStream {
 
     fn write_line(&self, line: &str) -> Result<(), llmspell_core::error::LLMSpellError> {
         let mut file = self.file.lock().unwrap();
-        writeln!(file, "{}", line).map_err(|e| llmspell_core::error::LLMSpellError::Io {
+        writeln!(file, "{line}").map_err(|e| llmspell_core::error::LLMSpellError::Io {
             operation: "write_line".to_string(),
             source: e,
         })
@@ -49,7 +51,7 @@ impl IOStream for FileStream {
 }
 
 #[test]
-#[ignore] // Ignore by default as it creates temp files
+#[ignore = "Performance test - run explicitly with --ignored"] // Ignore by default as it creates temp files
 fn test_real_io_performance_improvement() {
     let dir = tempdir().unwrap();
     let iterations = 10000;
@@ -62,10 +64,7 @@ fn test_real_io_performance_improvement() {
     let start = Instant::now();
     for i in 0..iterations {
         unbuffered_stream
-            .write_line(&format!(
-                "Line {}: This is a test line with some content",
-                i
-            ))
+            .write_line(&format!("Line {i}: This is a test line with some content"))
             .unwrap();
     }
     unbuffered_stream.flush().unwrap();
@@ -84,10 +83,7 @@ fn test_real_io_performance_improvement() {
     let start = Instant::now();
     for i in 0..iterations {
         buffered_stream
-            .write_line(&format!(
-                "Line {}: This is a test line with some content",
-                i
-            ))
+            .write_line(&format!("Line {i}: This is a test line with some content"))
             .unwrap();
     }
     buffered_stream.flush().unwrap();
@@ -97,15 +93,14 @@ fn test_real_io_performance_improvement() {
     let improvement = unbuffered_duration.as_secs_f64() / buffered_duration.as_secs_f64();
 
     println!("Real I/O Performance Test Results:");
-    println!("Unbuffered: {:?}", unbuffered_duration);
-    println!("Buffered: {:?}", buffered_duration);
-    println!("Improvement: {:.2}x faster", improvement);
+    println!("Unbuffered: {unbuffered_duration:?}");
+    println!("Buffered: {buffered_duration:?}");
+    println!("Improvement: {improvement:.2}x faster");
 
     // With real I/O, buffering should provide significant improvement
     assert!(
         improvement >= 2.0,
-        "Buffered I/O should be at least 2x faster with real files, got {:.2}x",
-        improvement
+        "Buffered I/O should be at least 2x faster with real files, got {improvement:.2}x"
     );
 
     // Verify both files have the same content
@@ -161,7 +156,7 @@ fn test_buffering_reduces_syscalls() {
     // Test unbuffered - each write_line is a separate operation
     let unbuffered = Arc::new(CountingStream::new());
     for i in 0..100 {
-        unbuffered.write_line(&format!("Line {}", i)).unwrap();
+        unbuffered.write_line(&format!("Line {i}")).unwrap();
     }
     let unbuffered_ops = unbuffered.total_operations();
 
@@ -174,25 +169,24 @@ fn test_buffering_reduces_syscalls() {
     );
 
     for i in 0..100 {
-        buffered.write_line(&format!("Line {}", i)).unwrap();
+        buffered.write_line(&format!("Line {i}")).unwrap();
     }
     buffered.flush().unwrap();
 
     let buffered_ops = counting.total_operations();
 
     println!("Syscall reduction test:");
-    println!("Unbuffered operations: {}", unbuffered_ops);
-    println!("Buffered operations: {}", buffered_ops);
-    println!(
-        "Reduction: {:.2}x",
-        unbuffered_ops as f64 / buffered_ops as f64
-    );
+    println!("Unbuffered operations: {unbuffered_ops}");
+    println!("Buffered operations: {buffered_ops}");
+    // Note: Casting usize to f64 loses precision, but for comparing operation counts
+    // the loss is acceptable as we only need approximate ratios
+    #[allow(clippy::cast_precision_loss)]
+    let reduction_ratio = unbuffered_ops as f64 / buffered_ops as f64;
+    println!("Reduction: {reduction_ratio:.2}x");
 
     // Buffering should significantly reduce the number of operations
     assert!(
         buffered_ops < unbuffered_ops / 5,
-        "Buffering should reduce operations by at least 5x, got {} vs {}",
-        buffered_ops,
-        unbuffered_ops
+        "Buffering should reduce operations by at least 5x, got {buffered_ops} vs {unbuffered_ops}"
     );
 }
