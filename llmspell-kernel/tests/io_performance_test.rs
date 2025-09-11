@@ -1,8 +1,6 @@
 //! Integration tests for IO performance optimization
 
-use llmspell_core::io::{
-    BufferedIOContext, BufferedStream, IOContextPool, IOStream, MockStream,
-};
+use llmspell_core::io::{BufferedIOContext, BufferedStream, IOContextPool, IOStream, MockStream};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -29,7 +27,10 @@ fn test_buffered_stream_batching() {
         buffered.write_line(&format!("Line {}", i)).unwrap();
     }
     let lines_after_batch = mock.get_lines();
-    println!("Lines after writing 11 (batch_size=10): {:?}", lines_after_batch);
+    println!(
+        "Lines after writing 11 (batch_size=10): {:?}",
+        lines_after_batch
+    );
     assert!(
         lines_after_batch.len() >= 10,
         "Should auto-flush when batch size exceeded: got {} lines",
@@ -40,7 +41,11 @@ fn test_buffered_stream_batching() {
     buffered.flush().unwrap();
     let final_lines = mock.get_lines();
     println!("Lines after manual flush: {:?}", final_lines);
-    assert!(final_lines.len() >= 11, "All lines should be present after flush: got {} lines", final_lines.len());
+    assert!(
+        final_lines.len() >= 11,
+        "All lines should be present after flush: got {} lines",
+        final_lines.len()
+    );
 }
 
 #[test]
@@ -48,7 +53,7 @@ fn test_buffered_stream_time_based_flush() {
     let mock = Arc::new(MockStream::new());
     let buffered = BufferedStream::with_interval(
         mock.clone(),
-        100, // large batch size
+        100,                       // large batch size
         Duration::from_millis(50), // short flush interval
     );
 
@@ -91,7 +96,11 @@ fn test_io_context_pool_reuse() {
 
     // Acquire again - should reuse
     let _ctx3 = pool.acquire();
-    assert_eq!(pool.size(), 1, "Pool should have 1 context after reacquiring");
+    assert_eq!(
+        pool.size(),
+        1,
+        "Pool should have 1 context after reacquiring"
+    );
 
     // Clear pool
     pool.clear();
@@ -104,7 +113,7 @@ fn test_io_context_pool_max_size() {
 
     // Create and release more than max_size contexts
     let contexts: Vec<_> = (0..5).map(|_| pool.acquire()).collect();
-    
+
     for ctx in contexts {
         pool.release(ctx);
     }
@@ -136,7 +145,7 @@ fn test_buffered_io_context_creation() {
 fn test_performance_improvement() {
     // Measure performance improvement with buffering
     let iterations = 1000;
-    
+
     // Unbuffered timing
     let mock_unbuffered = Arc::new(MockStream::new());
     let start = Instant::now();
@@ -145,7 +154,7 @@ fn test_performance_improvement() {
     }
     mock_unbuffered.flush().unwrap();
     let unbuffered_duration = start.elapsed();
-    
+
     // Buffered timing
     let mock_buffered = Arc::new(MockStream::new());
     let buffered = BufferedStream::with_interval(
@@ -153,21 +162,22 @@ fn test_performance_improvement() {
         100, // batch size
         Duration::from_millis(50),
     );
-    
+
     let start = Instant::now();
     for i in 0..iterations {
         buffered.write_line(&format!("Line {}", i)).unwrap();
     }
     buffered.flush().unwrap();
     let buffered_duration = start.elapsed();
-    
+
     // Calculate improvement ratio
-    let improvement_ratio = unbuffered_duration.as_nanos() as f64 / buffered_duration.as_nanos() as f64;
-    
+    let improvement_ratio =
+        unbuffered_duration.as_nanos() as f64 / buffered_duration.as_nanos() as f64;
+
     println!("Unbuffered: {:?}", unbuffered_duration);
     println!("Buffered: {:?}", buffered_duration);
     println!("Improvement ratio: {:.2}x", improvement_ratio);
-    
+
     // MockStream is already very fast (just Vec operations), so buffering adds overhead
     // The real performance benefit comes with actual I/O operations (syscalls)
     // For MockStream, we just verify that buffering doesn't make it significantly worse
@@ -176,7 +186,7 @@ fn test_performance_improvement() {
         "Buffered should not be more than 2x slower than unbuffered for MockStream, got {:.2}x",
         improvement_ratio
     );
-    
+
     // The actual benefit is in reduced number of write calls
     // which matters for real I/O but not for MockStream
 }
@@ -187,25 +197,22 @@ fn test_batch_write_efficiency() {
     let mock = Arc::new(MockStream::new());
     let buffered = BufferedStream::with_interval(
         mock.clone(),
-        10, // batch size
+        10,                     // batch size
         Duration::from_secs(1), // long interval to avoid time-based flush
     );
-    
+
     // Write exactly batch_size lines
     for i in 0..10 {
         buffered.write_line(&format!("Line {}", i)).unwrap();
     }
-    
+
     // Should have triggered exactly one batch write
     let lines = mock.get_lines();
-    
+
     // The lines should be combined into a single write
     // (BufferedStream joins them with newlines)
-    assert!(
-        lines.len() > 0,
-        "Batch write should have occurred"
-    );
-    
+    assert!(lines.len() > 0, "Batch write should have occurred");
+
     // Verify all content is present
     buffered.flush().unwrap();
     let final_lines = mock.get_lines();
@@ -222,14 +229,14 @@ fn test_batch_write_efficiency() {
 fn test_concurrent_access() {
     use std::sync::Arc;
     use std::thread;
-    
+
     let mock = Arc::new(MockStream::new());
     let buffered = Arc::new(BufferedStream::with_interval(
         mock.clone(),
         50,
         Duration::from_millis(100),
     ));
-    
+
     // Spawn multiple threads writing concurrently
     let mut handles = vec![];
     for thread_id in 0..5 {
@@ -243,16 +250,16 @@ fn test_concurrent_access() {
         });
         handles.push(handle);
     }
-    
+
     // Wait for all threads
     for handle in handles {
         handle.join().unwrap();
     }
-    
+
     // Flush and verify all lines are present
     buffered.flush().unwrap();
     let lines = mock.get_lines();
-    
+
     // Should have 100 lines total (5 threads * 20 lines each)
     let content = lines.join("\n");
     for thread_id in 0..5 {

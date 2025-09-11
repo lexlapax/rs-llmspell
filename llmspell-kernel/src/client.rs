@@ -159,7 +159,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                     evalue,
                     traceback,
                 } => {
-                    let _ = formatter.error(&format!("{}: {}", ename, evalue));
+                    let _ = formatter.error(&format!("{ename}: {evalue}"));
                     for line in traceback {
                         let _ = formatter.write_line(OutputChannel::Stderr, line);
                     }

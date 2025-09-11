@@ -337,7 +337,11 @@ impl BufferedStream {
         Self::with_interval(inner, batch_size, Duration::from_millis(100))
     }
 
-    pub fn with_interval(inner: Arc<dyn IOStream>, batch_size: usize, flush_interval: Duration) -> Self {
+    pub fn with_interval(
+        inner: Arc<dyn IOStream>,
+        batch_size: usize,
+        flush_interval: Duration,
+    ) -> Self {
         Self {
             inner,
             buffer: Mutex::new(BufferState {
@@ -350,16 +354,13 @@ impl BufferedStream {
     }
 
     fn should_flush(&self, state: &BufferState) -> bool {
-        state.lines.len() >= self.batch_size ||
-        state.last_flush.elapsed() >= self.flush_interval
+        state.lines.len() >= self.batch_size || state.last_flush.elapsed() >= self.flush_interval
     }
 
     fn flush_internal(&self, state: &mut BufferState) -> Result<(), LLMSpellError> {
         if !state.lines.is_empty() {
             // Build a single string with all lines to minimize write calls
-            let mut batch = String::with_capacity(
-                state.lines.iter().map(|s| s.len() + 1).sum()
-            );
+            let mut batch = String::with_capacity(state.lines.iter().map(|s| s.len() + 1).sum());
             for (i, line) in state.lines.iter().enumerate() {
                 if i > 0 {
                     batch.push('\n');
@@ -367,7 +368,7 @@ impl BufferedStream {
                 batch.push_str(line);
             }
             batch.push('\n');
-            
+
             // Single write call for the entire batch
             self.inner.write(&batch)?;
             state.lines.clear();
@@ -376,7 +377,6 @@ impl BufferedStream {
         state.last_flush = Instant::now();
         Ok(())
     }
-
 }
 
 impl IOStream for BufferedStream {
@@ -388,7 +388,7 @@ impl IOStream for BufferedStream {
     fn write_line(&self, line: &str) -> Result<(), LLMSpellError> {
         let mut state = self.buffer.lock().unwrap();
         state.lines.push(line.to_string());
-        
+
         // Check if we should flush
         if self.should_flush(&state) {
             self.flush_internal(&mut state)?;
@@ -428,11 +428,11 @@ impl Default for MockStream {
 impl IOStream for MockStream {
     fn write(&self, data: &str) -> Result<(), LLMSpellError> {
         let mut lines = self.lines.lock().unwrap();
-        
+
         // Split by newlines but keep track of whether we end with a newline
         let ends_with_newline = data.ends_with('\n');
         let parts: Vec<&str> = data.split('\n').collect();
-        
+
         for (i, part) in parts.iter().enumerate() {
             if i == 0 {
                 // First part - append to last line if exists and not empty
@@ -516,7 +516,7 @@ pub struct IOContextPool {
 impl IOContextPool {
     /// Create a new pool with default factory (stdio contexts)
     pub fn new(max_size: usize) -> Self {
-        Self::with_factory(max_size, Arc::new(|| IOContext::stdio()))
+        Self::with_factory(max_size, Arc::new(IOContext::stdio))
     }
 
     /// Create a new pool with custom factory
@@ -540,7 +540,7 @@ impl IOContextPool {
                 return context;
             }
         }
-        
+
         // Create new if pool is empty
         Arc::new((self.factory)())
     }
@@ -573,24 +573,24 @@ impl IOContextPool {
 pub struct BufferedIOContext;
 
 impl BufferedIOContext {
-    /// Create a new buffered IOContext with specified performance hints
-    pub fn new(hints: IOPerformanceHints) -> IOContext {
+    /// Create a buffered IOContext with specified performance hints
+    pub fn create(hints: IOPerformanceHints) -> IOContext {
         let batch_size = hints.batch_size;
         let flush_interval = Duration::from_millis(hints.flush_interval_ms);
-        
+
         // Create buffered streams wrapping the standard streams
         let stdout = Arc::new(BufferedStream::with_interval(
             Arc::new(StdoutStream::new()),
             batch_size,
             flush_interval,
         ));
-        
+
         let stderr = Arc::new(BufferedStream::with_interval(
             Arc::new(StderrStream::new()),
             batch_size,
             flush_interval,
         ));
-        
+
         IOContext {
             stdout,
             stderr,
@@ -602,7 +602,7 @@ impl BufferedIOContext {
 
     /// Create with default performance hints optimized for high throughput
     pub fn high_throughput() -> IOContext {
-        Self::new(IOPerformanceHints {
+        Self::create(IOPerformanceHints {
             batch_size: 100,
             flush_interval_ms: 50,
             async_capable: true,
@@ -611,7 +611,7 @@ impl BufferedIOContext {
 
     /// Create with hints optimized for low latency
     pub fn low_latency() -> IOContext {
-        Self::new(IOPerformanceHints {
+        Self::create(IOPerformanceHints {
             batch_size: 1,
             flush_interval_ms: 10,
             async_capable: true,
