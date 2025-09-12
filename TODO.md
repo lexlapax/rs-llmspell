@@ -13640,99 +13640,169 @@ pub struct IOPerformanceHints {
 
 ## Phase 9.9: Final Integration, Testing and Documentation (Days 17-18)
 
-**Purpose**: Comprehensive validation, testing, and documentation of the complete Phase 9 implementation (9.1-9.8), ensuring all debug functionality works at 100% and preparing for Phase 10.
+**Purpose**: Comprehensive validation of ALL Phase 9 accomplishments including kernel architecture, debug infrastructure, RAG system, CLI commands, state/session management, and example applications.
 
-### Task 9.9.1: Complete Phase 9 Integration Testing
+### Task 9.9.1: Core Systems Integration Testing
 **Priority**: CRITICAL  
-**Estimated Time**: 6 hours  
+**Estimated Time**: 8 hours  
 **Assignee**: QA Team
 
-**Description**: Validate ALL Phase 9 components work together as an integrated system.
+**Description**: Validate ALL Phase 9 components including features added during implementation.
 
-**Phase 9 Components to Validate:**
-- **9.1-9.2**: UnifiedProtocolEngine and kernel protocol infrastructure
-- **9.3**: Enhanced error reporting and debug bridge layer
-- **9.4**: LSP protocol foundation
-- **9.5**: CLI debug integration with kernel
-- **9.6**: Debug infrastructure wiring
-- **9.7**: Debug functionality completion (was 85%)
-- **9.8**: Kernel as execution hub (should bring to 100%)
+**Major Systems to Validate:**
+- **Kernel Architecture** (9.8.1-9.8.15): External kernel, IO routing, client connections
+- **Debug Infrastructure** (9.7): DebugCoordinator, fast path optimization, .locals command
+- **RAG System** (9.8.13.10): Vector storage, HNSW persistence, multi-tenant support
+- **State Management** (9.8.13.9): State persistence, state commands
+- **Session Management** (9.8.13.9): Session creation, artifact storage
+- **CLI Commands** (9.8.13.9-10): rag, state, session, config, debug commands
+- **REPL Features**: .locals, .help, .state, .session commands
 
-**Integration Test Suite:**
+**Comprehensive Test Suite:**
 ```bash
-# Test 1: Basic REPL functionality
-llmspell repl
-> print("Hello")  # Should work
-> .exit
+# Test 1: Kernel Architecture
+llmspell kernel start --port 9577 --id test-kernel
+llmspell kernel list  # Should show running kernel
+llmspell kernel status test-kernel  # Should show details
+llmspell exec --connect test-kernel "print('External kernel works')"
+llmspell kernel stop test-kernel
 
-# Test 2: Debug session with breakpoints
+# Test 2: Debug Infrastructure  
 llmspell debug examples/script-users/features/debug-showcase.lua
 > .break 7
 > .continue  # Should pause at line 7
-> .locals    # Should show variables
+> .locals    # Should show local variables (fixed in 9.8.13.8)
 > .step      # Should advance one line
 > .continue  # Should complete
 
-# Test 3: Multi-client test
-# Terminal 1:
-llmspell kernel start
-# Terminal 2:
-llmspell run script.lua  # Uses kernel
-# Terminal 3:
-llmspell debug script.lua  # Same kernel
+# Test 3: RAG System (NEW - 9.8.13.10)
+echo "Test document about Lua programming" > /tmp/test.txt
+llmspell rag ingest /tmp/test.txt --metadata '{"source": "test"}'
+llmspell rag search "Lua programming" --k 5
+llmspell rag clear --confirm  # Clean up
+
+# Test 4: State Management (NEW - 9.8.13.9)
+llmspell state set mykey "myvalue"
+llmspell state get mykey  # Should return "myvalue"
+llmspell state list  # Should show all keys
+llmspell state delete mykey
+
+# Test 5: Session Management (NEW - 9.8.13.9)
+llmspell session create test-session
+llmspell session list  # Should show test-session
+llmspell session info test-session
+llmspell session delete test-session
+
+# Test 6: REPL with all commands
+llmspell repl
+> print("Hello from REPL")
+> .state  # Show state info
+> .session  # Show session info
+> .locals  # Should work without timeout
+> .help  # Show all commands
+> .exit
+
+# Test 7: Configuration Management (NEW)
+llmspell config get rag.enabled
+llmspell config set debug.breakpoint_limit 100
+llmspell config list
 ```
 
 **Definition of Done:**
-- [ ] All Phase 9.1-9.8 components integrated
-- [ ] REPL commands work (.help, .break, .step, etc.)
-- [ ] Debug functionality at 100% (breakpoints pause)
-- [ ] Multi-client scenarios work
-- [ ] Performance targets met (<5ms kernel overhead)
+- [ ] All kernel commands functional (start/stop/list/status)
+- [ ] Debug infrastructure works with .locals command
+- [ ] RAG system ingests and searches correctly
+- [ ] State persists across kernel restarts
+- [ ] Session management tracks artifacts
+- [ ] All CLI commands execute without errors
+- [ ] REPL commands respond within 100ms
 
-### Task 9.9.2: Performance Validation and Benchmarking
+### Task 9.9.2: Example Applications Validation
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: Application Team
+**Description**: Test all example applications to ensure they work with the new architecture.
+
+**Applications to Test:**
+```bash
+# Test each example application
+for app in examples/script-users/applications/*/main.lua; do
+    echo "Testing: $app"
+    timeout 30 llmspell run "$app" < /dev/null
+    if [ $? -eq 0 ]; then
+        echo "✅ PASS: $app"
+    else
+        echo "❌ FAIL: $app"
+    fi
+done
+```
+
+**Specific Applications:**
+1. **code-review-assistant**: Test with sample code files
+2. **content-creator**: Test content generation
+3. **webapp-creator**: Test with minimal-input.lua
+4. **research-collector**: Test research gathering
+5. **personal-assistant**: Test task management
+6. **knowledge-base**: Test information storage/retrieval
+7. **file-organizer**: Test file operations
+8. **process-orchestrator**: Test workflow execution
+9. **communication-manager**: Test message handling
+
+**Definition of Done:**
+- [ ] All 9 example applications execute without errors
+- [ ] Applications that require LLM integration marked/documented
+- [ ] Performance baseline established for each app
+- [ ] Any failures documented with workarounds
+
+### Task 9.9.3: Performance Validation and Benchmarking
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Performance Team
 
 **Description**: Comprehensive performance validation of Phase 9 implementation.
 
-**Performance Targets to Validate:**
-- **Kernel Overhead**: <5ms for local execution (Phase 9.8)
-- **Debug Overhead**: <100x with hooks in interactive mode (Phase 9.7)
+**Performance Targets:**
+- **Kernel Overhead**: <5ms for local execution
+- **Debug Fast Path**: <1% overhead when no breakpoints (verified in 9.7)
+- **RAG Operations**: <100ms for search, <500ms for ingestion
+- **State Operations**: <5ms write, <1ms read
+- **Session Creation**: <50ms
 - **REPL Response**: <50ms for commands
 - **Memory Usage**: <100MB for kernel + runtime
-- **Hook Performance**: <1% overhead when no breakpoints
 
 **Benchmark Suite:**
 ```bash
-# Benchmark 1: Kernel vs Direct execution
-time llmspell run script.lua           # Via kernel
-time llmspell run --direct script.lua  # Direct (if supported)
+# Benchmark 1: Kernel overhead
+cargo bench -p llmspell-testing --bench kernel_overhead
 
-# Benchmark 2: Debug overhead
-llmspell bench --debug-overhead
+# Benchmark 2: Debug fast path (already passes)
+cargo test -p llmspell-bridge --test debug_performance_verification_test
 
-# Benchmark 3: Multi-client scalability
-llmspell bench --multi-client --clients 10
+# Benchmark 3: RAG performance
+cargo bench -p llmspell-rag --bench vector_operations
 
-# Benchmark 4: Memory usage
-llmspell bench --memory-profile
+# Benchmark 4: State persistence
+cargo bench -p llmspell-state-persistence --bench state_operations
+
+# Benchmark 5: End-to-end script execution
+time llmspell exec "for i=1,1000000 do local x = i * 2 end; print('done')"
+
+# Benchmark 6: Memory profiling
+valgrind --tool=massif llmspell run examples/script-users/features/memory-test.lua
 ```
 
 **Definition of Done:**
-- [ ] Kernel overhead <5ms confirmed
-- [ ] Debug mode overhead acceptable (<100x)
-- [ ] REPL commands <50ms round-trip
-- [ ] Memory usage within targets
-- [ ] Performance regression tests pass
-- [ ] Benchmarks documented
+- [ ] All performance targets met
+- [ ] No regressions from Phase 8
+- [ ] Benchmark results documented
+- [ ] Performance tests added to CI
 
-### Task 9.9.3: Comprehensive Documentation
+### Task 9.9.4: Comprehensive Documentation Update
 **Priority**: HIGH  
-**Estimated Time**: 4 hours  
+**Estimated Time**: 6 hours  
 **Assignee**: Documentation Team
 
-**Description**: Complete documentation for entire Phase 9 implementation.
+**Description**: Document all Phase 9 features comprehensively.
 
 **Documentation Requirements:**
 1. **User Guide Updates**:
@@ -13760,84 +13830,129 @@ llmspell bench --memory-profile
 - [ ] Examples updated for kernel architecture
 - [ ] Migration guide published
 
-### Task 9.9.4: Final Quality Assurance and Code Cleanup
+### Task 9.9.5: Quality Assurance and Code Cleanup
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: QA Team
 
-**Description**: Final quality checks and cleanup for Phase 9.
+**Description**: Final quality checks including all Phase 9 code.
 
 **Quality Checklist:**
 ```bash
-# 1. Code Quality
-./scripts/quality-check-minimal.sh  # Format, clippy, compile
-./scripts/quality-check-fast.sh     # Unit tests & docs
-./scripts/quality-check.sh          # Full validation
+# 1. Code Quality (should all pass based on our work)
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features
+cargo test --workspace --all-features
 
 # 2. Test Coverage
-cargo tarpaulin --workspace --exclude llmspell-cli
+cargo tarpaulin --workspace --all-features --exclude llmspell-cli
 
 # 3. Dead Code Removal
-cargo +nightly udeps
+cargo +nightly udeps --workspace
 
 # 4. Security Audit
 cargo audit
 
-# 5. Dependency Updates
-cargo update --dry-run
+# 5. Dependency Check
+cargo outdated
+
+# 6. License Check
+cargo license
 ```
 
 **Cleanup Tasks:**
-- [ ] Remove deprecated direct execution code
+- [ ] Remove InProcessKernel remnants (completed in 9.8.13.9)
 - [ ] Clean up TODO comments from Phase 9
 - [ ] Remove unused dependencies
-- [ ] Optimize imports
 - [ ] Fix any remaining clippy warnings
+- [ ] Optimize imports across workspace
 
 **Definition of Done:**
-- [ ] Zero clippy warnings
-- [ ] Zero formatting issues  
-- [ ] Test coverage >90% for Phase 9 components
+- [ ] Zero clippy warnings (achieved)
+- [ ] Zero formatting issues (achieved)
+- [ ] Test coverage >85% for new code
 - [ ] No security vulnerabilities
 - [ ] Dead code removed
-- [ ] Quality scripts pass
+- [ ] All quality scripts pass
 
-### Task 9.9.5: Phase 9 Retrospective and Phase 10 Planning
+### Task 9.9.6: RAG System End-to-End Validation
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Assignee**: RAG Team
+**Description**: Comprehensive testing of RAG system including persistence.
+
+**Test Scenarios:**
+```bash
+# Scenario 1: Basic RAG workflow
+llmspell rag ingest examples/data/*.txt --recursive
+llmspell rag search "test query" --k 10
+llmspell rag stats
+
+# Scenario 2: Persistence test
+llmspell rag ingest /tmp/doc1.txt
+llmspell kernel stop
+llmspell kernel start
+llmspell rag search "content from doc1"  # Should still find it
+
+# Scenario 3: Multi-tenant isolation
+llmspell rag ingest doc.txt --tenant tenant1
+llmspell rag ingest doc.txt --tenant tenant2
+llmspell rag search "query" --tenant tenant1  # Only tenant1 results
+
+# Scenario 4: Performance at scale
+# Create 1000 test documents
+for i in {1..1000}; do
+    echo "Document $i with unique content $RANDOM" > /tmp/doc$i.txt
+done
+time llmspell rag ingest /tmp/doc*.txt
+time llmspell rag search "unique content" --k 100
+```
+
+**Definition of Done:**
+- [ ] RAG ingestion handles various file types
+- [ ] Search returns relevant results
+- [ ] Persistence survives kernel restarts
+- [ ] Multi-tenant isolation verified
+- [ ] Performance acceptable at scale
+
+### Task 9.9.7: Phase 9 Retrospective and Closure
 **Priority**: CRITICAL  
-**Estimated Time**: 3 hours  
+**Estimated Time**: 2 hours  
 **Assignee**: Project Lead
 
-**Description**: Official Phase 9 completion, retrospective, and Phase 10 preparation.
+**Description**: Official Phase 9 completion and lessons learned.
 
-**Phase 9 Achievements to Document:**
-- ✅ REPL implementation complete
-- ✅ Debug infrastructure at 100% (was 85%)
-- ✅ Kernel as execution hub implemented
-- ✅ Multi-client support working
-- ✅ Performance targets met
-- ✅ All Phase 9.1-9.8 tasks complete
+**Phase 9 Achievements:**
+- ✅ Kernel as execution hub (9.8)
+- ✅ Complete debug infrastructure (9.7)
+- ✅ RAG system implementation (9.8.13.10)
+- ✅ State/session management (9.8.13.9)
+- ✅ CLI restructuring (9.8.13)
+- ✅ REPL with .locals command (9.8.13.8)
+- ✅ Performance optimization (<1% debug overhead)
+- ✅ Example applications (9 working demos)
 
 **Retrospective Questions:**
-1. What worked well in Phase 9?
-2. What challenges did we face?
-3. What would we do differently?
-4. What technical debt remains?
-5. What can we improve for Phase 10?
+1. What exceeded expectations? (RAG system, debug performance)
+2. What took longer than expected? (Kernel architecture pivot)
+3. What technical debt remains? (Jupyter protocol incomplete)
+4. What should we prioritize in Phase 10?
+5. Team feedback and suggestions?
 
-**Phase 10 Preparation:**
-- [ ] Review Phase 10 (Adaptive Memory System) requirements
-- [ ] Identify dependencies on Phase 9 components
-- [ ] Create Phase 10 task breakdown
-- [ ] Assign initial Phase 10 resources
-- [ ] Schedule Phase 10 kickoff
+**Metrics to Document:**
+- Lines of code added/modified
+- Test coverage achieved
+- Performance improvements
+- Bug count and resolution time
+- Documentation coverage
 
 **Definition of Done:**
 - [ ] Phase 9 officially complete
+- [ ] All tasks marked complete in TODO.md
 - [ ] Retrospective documented
-- [ ] Lessons learned captured
-- [ ] Phase 10 plan reviewed
-- [ ] Team ready for Phase 10
-- [ ] Success metrics documented
+- [ ] Metrics collected and analyzed
+- [ ] Phase 10 kick-off scheduled
+- [ ] Team celebration completed! 🎉
 
 ---
 
