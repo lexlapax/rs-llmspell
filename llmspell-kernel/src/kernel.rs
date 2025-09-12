@@ -387,7 +387,32 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     async fn handle_message_and_reply(&self, message: P::Message, channel: &str) -> Result<bool> {
-        let is_shutdown = message.msg_type() == "shutdown_request";
+        let msg_type = message.msg_type();
+        let is_shutdown = msg_type == "shutdown_request";
+        
+        // Debug logging to understand why kernel is shutting down
+        tracing::info!("Kernel {} received message: {} on channel: {}", 
+            self.kernel_id, msg_type, channel);
+        
+        if is_shutdown {
+            tracing::info!("Kernel {} shutdown requested via {}", self.kernel_id, msg_type);
+        }
+        
+        // CRITICAL FIX: For debug mode, be extra careful about shutdowns
+        // Only shutdown on explicit shutdown_request from control channel
+        let is_debug_mode = self.config.debug.enabled;
+        let should_shutdown = if is_debug_mode {
+            // In debug mode, only shutdown on explicit shutdown_request from control channel
+            is_shutdown && channel == "control"
+        } else {
+            // Normal mode: shutdown on any shutdown_request
+            is_shutdown
+        };
+        
+        if should_shutdown && !is_shutdown {
+            tracing::info!("Kernel {} ignoring potential shutdown (debug mode protection)", self.kernel_id);
+        }
+        
         let should_reply = self.protocol.requires_reply(&message);
 
         // Get execution flow from protocol
@@ -434,7 +459,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             }
         }
 
-        Ok(is_shutdown)
+        Ok(should_shutdown)
     }
 
     async fn send_reply(
