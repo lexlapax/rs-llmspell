@@ -774,9 +774,57 @@ impl Protocol for JupyterProtocol {
                     execution_state: state,
                 }
             }
+            "stream" => MessageContent::Stream {
+                name: match content["name"].as_str().unwrap_or("stdout") {
+                    "stderr" => StreamType::Stderr,
+                    _ => StreamType::Stdout,
+                },
+                text: content["text"].as_str().unwrap_or("").to_string(),
+            },
+            "execute_input" => MessageContent::ExecuteInput {
+                code: content["code"].as_str().unwrap_or("").to_string(),
+                execution_count: content["execution_count"].as_u64().unwrap_or(0) as u32,
+            },
+            "execute_result" => MessageContent::ExecuteResult {
+                execution_count: content["execution_count"].as_u64().unwrap_or(0) as u32,
+                data: content["data"]
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                    .unwrap_or_default(),
+                metadata: content["metadata"]
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                    .unwrap_or_default(),
+            },
+            "error" => MessageContent::Error {
+                ename: content["ename"].as_str().unwrap_or("Error").to_string(),
+                evalue: content["evalue"].as_str().unwrap_or("").to_string(),
+                traceback: content["traceback"]
+                    .as_array()
+                    .map(|arr| {
+                        arr.iter()
+                            .filter_map(|v| v.as_str().map(String::from))
+                            .collect()
+                    })
+                    .unwrap_or_default(),
+            },
+            "display_data" => MessageContent::DisplayData {
+                data: content["data"]
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                    .unwrap_or_default(),
+                metadata: content["metadata"]
+                    .as_object()
+                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                    .unwrap_or_default(),
+                transient: content.get("transient").cloned(),
+            },
             _ => {
-                // For other message types, try generic deserialization
-                serde_json::from_value(content)?
+                // Unknown message type - this should be an error in production
+                return Err(anyhow::anyhow!(
+                    "Unknown IOPub message type '{}' in create_broadcast",
+                    msg_type
+                ));
             }
         };
 

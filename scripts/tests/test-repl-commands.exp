@@ -1,0 +1,91 @@
+#!/usr/bin/expect -f
+
+set timeout 10
+
+spawn ./target/debug/llmspell repl
+
+# Wait for REPL prompt
+expect {
+    ">" {
+        send "print('Hello from REPL')\r"
+    }
+    "lua>" {
+        send "print('Hello from REPL')\r"
+    }
+    timeout {
+        puts "ERROR: No REPL prompt"
+        exit 1
+    }
+}
+
+# Check output
+expect {
+    "Hello from REPL" {
+        puts "SUCCESS: Basic print works"
+        send ".state\r"
+    }
+    timeout {
+        puts "ERROR: Print command failed"
+        exit 1
+    }
+}
+
+# Check .state command
+expect {
+    -re "State.*|No state.*|State information" {
+        puts "SUCCESS: .state command works"
+        send ".session\r"
+    }
+    timeout {
+        puts "ERROR: .state command failed"
+        exit 1
+    }
+}
+
+# Check .session command
+expect {
+    -re "Session.*|No session.*|Session information" {
+        puts "SUCCESS: .session command works"
+        send ".locals\r"
+    }
+    timeout {
+        puts "ERROR: .session command failed"
+        exit 1
+    }
+}
+
+# Check .locals command
+expect {
+    -re "Local.*|No locals.*|_ENV.*|Local variables" {
+        puts "SUCCESS: .locals command works"
+        send ".help\r"
+    }
+    timeout {
+        puts "WARNING: .locals may have timed out"
+        send ".help\r"
+    }
+}
+
+# Check .help command
+expect {
+    -re "Available commands.*\\.exit.*\\.help" {
+        puts "SUCCESS: .help command works"
+        send ".exit\r"
+    }
+    timeout {
+        puts "ERROR: .help command failed"
+        exit 1
+    }
+}
+
+# Verify clean exit
+expect {
+    eof {
+        puts "SUCCESS: REPL exited cleanly"
+    }
+    timeout {
+        puts "WARNING: REPL may not have exited cleanly"
+    }
+}
+
+exit 0

@@ -14,7 +14,8 @@ use std::collections::HashMap;
 use subtle::ConstantTimeEq;
 
 use super::protocol::{
-    ExecutionStatus, HelpLink, JupyterMessage, LanguageInfo, MessageContent, MessageHeader,
+    ExecutionState, ExecutionStatus, HelpLink, JupyterMessage, LanguageInfo, MessageContent,
+    MessageHeader, StreamType,
 };
 
 /// Jupyter wire message format
@@ -584,11 +585,86 @@ impl WireProtocol {
                         .unwrap_or(false),
                 })
             }
+            // IOPub message types
+            "status" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                let state = match value["execution_state"].as_str().unwrap_or("idle") {
+                    "busy" => ExecutionState::Busy,
+                    "starting" => ExecutionState::Starting,
+                    _ => ExecutionState::Idle,
+                };
+                Ok(MessageContent::Status {
+                    execution_state: state,
+                })
+            }
+            "stream" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                let name = match value["name"].as_str().unwrap_or("stdout") {
+                    "stderr" => StreamType::Stderr,
+                    _ => StreamType::Stdout,
+                };
+                Ok(MessageContent::Stream {
+                    name,
+                    text: value["text"].as_str().unwrap_or("").to_string(),
+                })
+            }
+            "execute_input" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::ExecuteInput {
+                    code: value["code"].as_str().unwrap_or("").to_string(),
+                    execution_count: value["execution_count"].as_u64().unwrap_or(0) as u32,
+                })
+            }
+            "execute_result" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::ExecuteResult {
+                    execution_count: value["execution_count"].as_u64().unwrap_or(0) as u32,
+                    data: value["data"]
+                        .as_object()
+                        .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                        .unwrap_or_default(),
+                    metadata: value["metadata"]
+                        .as_object()
+                        .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                        .unwrap_or_default(),
+                })
+            }
+            "error" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::Error {
+                    ename: value["ename"].as_str().unwrap_or("Error").to_string(),
+                    evalue: value["evalue"].as_str().unwrap_or("").to_string(),
+                    traceback: value["traceback"]
+                        .as_array()
+                        .map(|arr| {
+                            arr.iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect()
+                        })
+                        .unwrap_or_default(),
+                })
+            }
+            "display_data" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::DisplayData {
+                    data: value["data"]
+                        .as_object()
+                        .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                        .unwrap_or_default(),
+                    metadata: value["metadata"]
+                        .as_object()
+                        .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+                        .unwrap_or_default(),
+                    transient: value.get("transient").cloned(),
+                })
+            }
             // Add more message types as needed
             _ => {
-                // For unknown types, try generic deserialization
-                serde_json::from_slice(content_bytes)
-                    .with_context(|| format!("Unknown message type: {msg_type}"))
+                // For unknown types, log and return error
+                Err(anyhow::anyhow!(
+                    "Unsupported message type '{}' in deserialize_content",
+                    msg_type
+                ))
             }
         }
     }

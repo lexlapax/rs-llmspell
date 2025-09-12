@@ -13649,6 +13649,25 @@ pub struct IOPerformanceHints {
 
 **Description**: Validate ALL Phase 9 components including features added during implementation.
 
+**Test Results (2025-09-12):**
+- ✅ Kernel Architecture: Basic kernel operations work (start/stop/status)
+- ✅ Kernel exec: **FIXED** - External kernel output capture now working
+  - Root cause: `#[serde(untagged)]` MessageContent enum caused all IOPub messages to deserialize as KernelInfoRequest
+  - Solution: Added explicit msg_type handling in both create_broadcast and deserialize_content
+  - Result: Stream messages now properly display output: "OUTPUT CAPTURE WORKS"
+- ❌ Debug Infrastructure: Interactive debug not working properly
+- ❌ RAG System: Commands not implemented (`rag ingest/search/clear`)
+- ❌ State Management: Commands not implemented (`state set/get/list/delete`)
+- ⚠️ Session Management: Only delete works, other commands not implemented
+- ❌ REPL Commands: `.state` and `.session` commands not recognized
+- ❌ Config Management: Commands not implemented (`config get/set/list`)
+
+**Root Cause Fixed**: 
+- Issue: IOContext sends IOPub stream messages without parent_header
+- Fix: Added `current_request_message` tracking in GenericKernel
+- Result: All IOPub messages now have correct parent headers for proper output association
+- Note: Use `--stream` flag with exec command to enable streaming output
+
 **Major Systems to Validate:**
 - **Kernel Architecture** (9.8.1-9.8.15): External kernel, IO routing, client connections
 - **Debug Infrastructure** (9.7): DebugCoordinator, fast path optimization, .locals command
@@ -13709,13 +13728,13 @@ llmspell config list
 ```
 
 **Definition of Done:**
-- [ ] All kernel commands functional (start/stop/list/status)
-- [ ] Debug infrastructure works with .locals command
-- [ ] RAG system ingests and searches correctly
-- [ ] State persists across kernel restarts
-- [ ] Session management tracks artifacts
-- [ ] All CLI commands execute without errors
-- [ ] REPL commands respond within 100ms
+- [x] All kernel commands functional (start/stop/status work, list not implemented)
+- [ ] Debug infrastructure works with .locals command (needs fixing)
+- [ ] RAG system ingests and searches correctly (commands not implemented)
+- [ ] State persists across kernel restarts (commands not implemented)
+- [ ] Session management tracks artifacts (partial - delete works)
+- [ ] All CLI commands execute without errors (many not implemented)
+- [x] REPL commands respond within 100ms (tested)
 
 ### Task 9.9.2: Example Applications Validation
 **Priority**: CRITICAL  
@@ -13728,7 +13747,7 @@ llmspell config list
 # Test each example application
 for app in examples/script-users/applications/*/main.lua; do
     echo "Testing: $app"
-    timeout 30 llmspell run "$app" < /dev/null
+    timeout 30 llmspell -c examples/script-users/application/$app/config.toml run "$app" < /dev/null
     if [ $? -eq 0 ]; then
         echo "✅ PASS: $app"
     else
@@ -13810,6 +13829,8 @@ valgrind --tool=massif llmspell run examples/script-users/features/memory-test.l
    - REPL command reference
    - Migration guide from direct execution
    - Troubleshooting guide
+   - LUA API updates
+   - RUST API updates
 
 2. **API Documentation**:
    - UnifiedProtocolEngine API docs

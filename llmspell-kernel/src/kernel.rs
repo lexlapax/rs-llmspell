@@ -104,8 +104,8 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
     /// Signal handler for interrupt propagation
     signal_handler: Arc<KernelSignalHandler>,
 
-    /// Current request header for `IOPub` parent tracking
-    current_request_header: Arc<RwLock<Option<serde_json::Value>>>,
+    /// Current request message for `IOPub` parent tracking
+    current_request_message: Arc<RwLock<Option<P::Message>>>,
 }
 
 impl<T: Transport, P: Protocol> GenericKernel<T, P> {
@@ -206,7 +206,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             comm_manager,
             shutdown_tx: None,
             signal_handler: Arc::new(KernelSignalHandler::new()),
-            current_request_header: Arc::new(RwLock::new(None)),
+            current_request_message: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -218,15 +218,18 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     pub async fn publish_iopub(&self, msg_type: &str, content: serde_json::Value) -> Result<()> {
         tracing::debug!("publish_iopub: Publishing {} message", msg_type);
 
-        // Both conditions return None, so simplify
-        let parent_msg = None;
+        // Get the current request message for parent tracking
+        let parent_msg = self.current_request_message.read().await.as_ref().cloned();
 
         tracing::debug!("publish_iopub: Creating broadcast message with parent tracking");
 
         // Use protocol's create_broadcast method (protocol-agnostic)
-        let msg = self
-            .protocol
-            .create_broadcast(msg_type, content, parent_msg, &self.kernel_id)?;
+        let msg = self.protocol.create_broadcast(
+            msg_type,
+            content,
+            parent_msg.as_ref(),
+            &self.kernel_id,
+        )?;
 
         // Encode the message for sending
         let parts = self.protocol.encode(&msg, "iopub")?;
@@ -378,9 +381,8 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     async fn store_request_header(&self, message: &P::Message) -> Result<()> {
-        if let Some(header) = message.header_for_parent() {
-            *self.current_request_header.write().await = Some(header);
-        }
+        // Store the entire message for parent tracking
+        *self.current_request_message.write().await = Some(message.clone());
         Ok(())
     }
 
@@ -714,6 +716,9 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         if !silent {
             let _ = self.publish_status("idle").await;
         }
+
+        // Clear the current request message now that execution is complete
+        *self.current_request_message.write().await = None;
 
         Ok(serde_json::json!({
             "status": "ok",

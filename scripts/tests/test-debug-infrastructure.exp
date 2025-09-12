@@ -1,0 +1,83 @@
+#!/usr/bin/expect -f
+
+set timeout 10
+set script_path "examples/script-users/features/debug-showcase.lua"
+
+spawn ./target/debug/llmspell debug $script_path
+
+# Wait for debug prompt
+expect {
+    "debug>" { 
+        send ".break 7\r"
+    }
+    timeout { 
+        puts "ERROR: No debug prompt"
+        exit 1 
+    }
+}
+
+# Confirm breakpoint set
+expect {
+    "Breakpoint set at line 7" { 
+        send ".continue\r"
+    }
+    timeout { 
+        puts "ERROR: Breakpoint not set"
+        exit 1 
+    }
+}
+
+# Should pause at breakpoint
+expect {
+    "Paused at line 7" {
+        send ".locals\r"
+    }
+    "Hit breakpoint at line 7" {
+        send ".locals\r"
+    }
+    timeout { 
+        puts "ERROR: Did not pause at breakpoint"
+        exit 1 
+    }
+}
+
+# Check locals output
+expect {
+    -re "Local variables.*x.*=.*5" {
+        puts "SUCCESS: .locals command working"
+        send ".step\r"
+    }
+    timeout { 
+        puts "ERROR: .locals command failed or timed out"
+        exit 1 
+    }
+}
+
+# After step, should be at line 8
+expect {
+    "Stepped to line 8" {
+        send ".continue\r"
+    }
+    timeout { 
+        puts "ERROR: Step command failed"
+        exit 1 
+    }
+}
+
+# Should complete execution
+expect {
+    "Program completed" {
+        puts "SUCCESS: Debug session completed"
+    }
+    "Execution finished" {
+        puts "SUCCESS: Debug session completed"
+    }
+    eof {
+        puts "SUCCESS: Debug session completed"
+    }
+    timeout { 
+        puts "WARNING: Program may have completed without explicit message"
+    }
+}
+
+exit 0

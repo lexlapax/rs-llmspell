@@ -141,11 +141,15 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                     tracing::debug!("Execution state: {:?}", execution_state);
                 }
                 MessageContent::Stream { name, text } => {
+                    tracing::info!("IOPub Stream message ({:?}): {}", name, text);
                     let channel = match name {
                         StreamType::Stdout => OutputChannel::Stdout,
                         StreamType::Stderr => OutputChannel::Stderr,
                     };
-                    let _ = formatter.write(channel, text);
+                    let result = formatter.write(channel, text);
+                    if let Err(e) = result {
+                        tracing::error!("Failed to write to {:?}: {}", channel, e);
+                    }
                 }
                 MessageContent::ExecuteResult { data, .. } => {
                     if let Some(text_plain) = data.get("text/plain") {
@@ -164,7 +168,9 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                         let _ = formatter.write_line(OutputChannel::Stderr, line);
                     }
                 }
-                _ => {} // Ignore other IOPub messages
+                _other => {
+                    // Ignore other IOPub messages
+                }
             }
         }
     }
@@ -207,10 +213,16 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
             return Ok(false);
         };
 
+        tracing::info!("Received IOPub message with {} parts", iopub_bytes.len());
         tracing::debug!("Received IOPub message, decoding...");
         match self.protocol.decode(iopub_bytes, "iopub") {
             Ok(iopub_msg) => {
-                tracing::debug!("IOPub message type: {}", iopub_msg.header.msg_type);
+                tracing::info!(
+                    "IOPub message type: {}, parent: {:?}",
+                    iopub_msg.header.msg_type,
+                    iopub_msg.parent_header.as_ref().map(|p| &p.msg_id)
+                );
+                tracing::info!("Expected msg_id: {}", msg_id);
                 Self::process_iopub_message(&iopub_msg, msg_id);
             }
             Err(e) => {
@@ -279,16 +291,24 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
                 break;
             }
 
-            // Process IOPub messages
-            let had_iopub = self.process_iopub_during_execution(&msg_id).await?;
+            // Process ALL available IOPub messages
+            let mut had_any_iopub = false;
+            while self.process_iopub_during_execution(&msg_id).await? {
+                had_any_iopub = true;
+                // Keep processing while messages are available
+            }
 
             // Check for execute reply
             if let Some(reply) = self.check_for_execute_reply(&msg_id).await? {
+                // Process any remaining IOPub messages before returning
+                while self.process_iopub_during_execution(&msg_id).await? {
+                    // Drain remaining messages
+                }
                 return Ok(reply);
             }
 
             // If we got messages, reset the empty poll counter
-            if had_iopub {
+            if had_any_iopub {
                 consecutive_empty_polls = 0;
             } else {
                 consecutive_empty_polls += 1;
