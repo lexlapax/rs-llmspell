@@ -89,7 +89,7 @@ pub use manager::SessionManager;
 pub use session::Session;
 pub use types::{
     CreateSessionOptions, CreateSessionOptionsBuilder, SessionConfig, SessionId, SessionMetadata,
-    SessionStatus,
+    SessionQuery, SessionStatus,
 };
 
 /// Prelude module for convenient imports

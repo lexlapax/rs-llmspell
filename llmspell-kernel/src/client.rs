@@ -127,6 +127,7 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
     }
 
     /// Process `IOPub` message for our execution
+    #[allow(clippy::cognitive_complexity)]
     fn process_iopub_message(msg: &JupyterMessage, msg_id: &str) {
         // Check if this message is for our execution
         let is_our_message = msg

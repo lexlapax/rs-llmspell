@@ -386,6 +386,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         Ok(())
     }
 
+    #[allow(clippy::cognitive_complexity)]
     async fn handle_message_and_reply(&self, message: P::Message, channel: &str) -> Result<bool> {
         let msg_type = message.msg_type();
         let is_shutdown = msg_type == "shutdown_request";

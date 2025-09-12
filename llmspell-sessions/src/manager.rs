@@ -195,7 +195,34 @@ impl SessionManager {
     ///
     /// Returns an error if the maximum number of active sessions is reached
     pub async fn create_session(&self, options: CreateSessionOptions) -> Result<SessionId> {
-        // Check session limits
+        self.check_session_limits().await?;
+
+        let session = Session::new(options.clone());
+        let session_id = session.id().await;
+
+        let session_event = self
+            .setup_correlation_tracking(&session_id, &options)
+            .await?;
+
+        self.fire_session_start_hooks(&session, &session_id).await;
+
+        self.register_new_session(&session_id, session.clone())
+            .await?;
+
+        self.publish_session_created_events(&session_id, &session_event)
+            .await;
+
+        if self.config.auto_persist {
+            if let Err(e) = self.save_session(&session).await {
+                warn!("Failed to persist new session: {e}");
+            }
+        }
+
+        info!("Created new session: {session_id}");
+        Ok(session_id)
+    }
+
+    async fn check_session_limits(&self) -> Result<()> {
         let active_count = self.active_sessions.read().await.len();
         if active_count >= self.config.max_active_sessions {
             return Err(SessionError::ResourceLimitExceeded {
@@ -206,14 +233,16 @@ impl SessionManager {
                 ),
             });
         }
+        Ok(())
+    }
 
-        // Create new session
-        let session = Session::new(options.clone());
-        let session_id = session.id().await;
-
-        // Create session created event with correlation
+    async fn setup_correlation_tracking(
+        &self,
+        session_id: &SessionId,
+        options: &CreateSessionOptions,
+    ) -> Result<crate::events::SessionEvent> {
         let session_event = create_session_event(
-            session_id,
+            *session_id,
             SessionEventType::Created,
             serde_json::json!({
                 "name": options.name.clone(),
@@ -222,13 +251,11 @@ impl SessionManager {
             }),
         );
 
-        // Track the event and add correlation context
         self.correlation_tracker
             .track_event(session_event.event.clone());
         self.correlation_tracker
             .add_context(session_event.correlation_context.clone());
 
-        // Store the correlation ID for the session (for replay)
         let session_correlation_key = format!("session_correlation:{}", session_id);
         let correlation_data = serde_json::json!({
             "session_id": session_id.to_string(),
@@ -243,44 +270,46 @@ impl SessionManager {
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
-        // Fire session start hooks
-        if self.config.hook_config.enable_lifecycle_hooks {
-            let hooks = self.hook_registry.get_hooks(&HookPoint::SessionStart);
+        Ok(session_event)
+    }
 
-            for hook in hooks {
-                let mut hook_ctx = SessionHookContextHelper::create_lifecycle_context(
-                    HookPoint::SessionStart,
-                    &session,
-                    "session-manager",
-                )
-                .await;
+    async fn fire_session_start_hooks(&self, session: &Session, session_id: &SessionId) {
+        if !self.config.hook_config.enable_lifecycle_hooks {
+            return;
+        }
 
-                if let Err(e) = hook.execute(&mut hook_ctx).await {
-                    warn!("Session start hook failed: {e}");
-                }
+        let hooks = self.hook_registry.get_hooks(&HookPoint::SessionStart);
+        for hook in hooks {
+            let mut hook_ctx = SessionHookContextHelper::create_lifecycle_context(
+                HookPoint::SessionStart,
+                session,
+                "session-manager",
+            )
+            .await;
 
-                // Process any collected artifacts
-                if let Some(ref collector) = self.artifact_collector {
-                    if ArtifactCollectionProcessor::should_process_hook_point(&hook_ctx.point) {
-                        let _ = collector.process_hook_context(&hook_ctx, &session_id).await;
-                    }
+            if let Err(e) = hook.execute(&mut hook_ctx).await {
+                warn!("Session start hook failed: {e}");
+            }
+
+            if let Some(ref collector) = self.artifact_collector {
+                if ArtifactCollectionProcessor::should_process_hook_point(&hook_ctx.point) {
+                    let _ = collector.process_hook_context(&hook_ctx, session_id).await;
                 }
             }
         }
+    }
 
-        // Store in active sessions
+    async fn register_new_session(&self, session_id: &SessionId, session: Session) -> Result<()> {
         self.active_sessions
             .write()
             .await
-            .insert(session_id, session.clone());
+            .insert(*session_id, session);
 
-        // Register session with security manager
         self.security_manager
             .write()
             .await
-            .register_session(&session_id);
+            .register_session(session_id);
 
-        // Initialize state scope
         self.state_manager
             .set(
                 StateScope::Session(session_id.to_string()),
@@ -290,35 +319,39 @@ impl SessionManager {
             .await
             .map_err(SessionError::State)?;
 
-        // Publish session created event with correlation
-        if self.config.event_config.enable_session_events {
-            // Create started event as child of created event
-            let started_event = create_correlated_event(
-                session_id,
-                SessionEventType::Started,
-                serde_json::json!({
-                    "hook_count": self.hook_registry.get_hooks(&HookPoint::SessionStart).len(),
-                }),
-                &session_event,
-            );
+        Ok(())
+    }
 
-            self.correlation_tracker
-                .track_event(started_event.event.clone());
-
-            // Add link between created and started events
-            let link = session_event.link_to(
-                &started_event,
-                llmspell_events::correlation::EventRelationship::CausedBy,
-            );
-            self.correlation_tracker.add_link(link);
-
-            if let Err(e) = self.event_bus.publish(started_event.event).await {
-                warn!("Failed to publish session started event: {e}");
-            }
+    async fn publish_session_created_events(
+        &self,
+        session_id: &SessionId,
+        session_event: &crate::events::SessionEvent,
+    ) {
+        if !self.config.event_config.enable_session_events {
+            return;
         }
 
-        info!("Created new session: {session_id}");
-        Ok(session_id)
+        let started_event = create_correlated_event(
+            *session_id,
+            SessionEventType::Started,
+            serde_json::json!({
+                "hook_count": self.hook_registry.get_hooks(&HookPoint::SessionStart).len(),
+            }),
+            session_event,
+        );
+
+        self.correlation_tracker
+            .track_event(started_event.event.clone());
+
+        let link = session_event.link_to(
+            &started_event,
+            llmspell_events::correlation::EventRelationship::CausedBy,
+        );
+        self.correlation_tracker.add_link(link);
+
+        if let Err(e) = self.event_bus.publish(started_event.event).await {
+            warn!("Failed to publish session started event: {e}");
+        }
     }
 
     /// Get an active session
@@ -341,13 +374,17 @@ impl SessionManager {
     ///
     /// # Errors
     ///
-    /// Currently always succeeds, but returns Result for future error cases
+    /// Returns an error if storage operations fail
+    #[allow(clippy::too_many_lines)]
     pub async fn list_sessions(&self, query: SessionQuery) -> Result<Vec<SessionMetadata>> {
-        let sessions = self.active_sessions.read().await;
         let mut results = Vec::new();
+        let mut seen_ids = std::collections::HashSet::new();
 
+        // First, add active sessions from memory
+        let sessions = self.active_sessions.read().await;
         for session in sessions.values() {
             let metadata = session.metadata.read().await;
+            seen_ids.insert(metadata.id);
 
             // Apply filters
             if let Some(status) = query.status {
@@ -402,6 +439,165 @@ impl SessionManager {
             }
 
             results.push(metadata.clone());
+        }
+
+        // Also check storage for persisted sessions not in memory
+        // Load metadata only (not full sessions) for efficiency
+        let metadata_keys = self
+            .storage_backend
+            .list_keys("session_metadata:")
+            .await
+            .map_err(|e| SessionError::Storage(e.to_string()))?;
+
+        for key in metadata_keys {
+            // Extract session ID from key (format: "session_metadata:{id}")
+            if let Some(session_id_str) = key.strip_prefix("session_metadata:") {
+                if let Ok(session_id) = SessionId::from_str(session_id_str) {
+                    // Skip if we already have it from active sessions
+                    if seen_ids.contains(&session_id) {
+                        continue;
+                    }
+
+                    // Load just the metadata JSON (much faster than loading full session)
+                    if let Ok(Some(metadata_bytes)) = self.storage_backend.get(&key).await {
+                        if let Ok(metadata_json) =
+                            serde_json::from_slice::<serde_json::Value>(&metadata_bytes)
+                        {
+                            // Parse the metadata from JSON
+                            let metadata = SessionMetadata {
+                                id: session_id,
+                                name: metadata_json
+                                    .get("name")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from),
+                                status: metadata_json
+                                    .get("status")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| serde_json::from_value(serde_json::json!(s)).ok())
+                                    .unwrap_or(crate::SessionStatus::Active),
+                                created_at: metadata_json
+                                    .get("created_at")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                                    .unwrap_or_else(chrono::Utc::now),
+                                updated_at: metadata_json
+                                    .get("updated_at")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                                    .map(|dt| dt.with_timezone(&chrono::Utc))
+                                    .unwrap_or_else(chrono::Utc::now),
+                                description: metadata_json
+                                    .get("description")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from),
+                                tags: metadata_json
+                                    .get("tags")
+                                    .and_then(|v| v.as_array())
+                                    .map(|arr| {
+                                        arr.iter()
+                                            .filter_map(|v| v.as_str().map(String::from))
+                                            .collect()
+                                    })
+                                    .unwrap_or_default(),
+                                created_by: metadata_json
+                                    .get("created_by")
+                                    .and_then(|v| v.as_str())
+                                    .map(String::from),
+                                parent_session_id: metadata_json
+                                    .get("parent_session_id")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| SessionId::from_str(s).ok()),
+                                artifact_count: metadata_json
+                                    .get("artifact_count")
+                                    .and_then(|v| v.as_u64())
+                                    .and_then(|v| usize::try_from(v).ok())
+                                    .unwrap_or(0),
+                                operation_count: metadata_json
+                                    .get("operation_count")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(0),
+                                started_at: metadata_json
+                                    .get("started_at")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                                    .map(|dt| dt.with_timezone(&chrono::Utc)),
+                                ended_at: metadata_json
+                                    .get("ended_at")
+                                    .and_then(|v| v.as_str())
+                                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                                    .map(|dt| dt.with_timezone(&chrono::Utc)),
+                                total_artifact_size: metadata_json
+                                    .get("total_artifact_size")
+                                    .and_then(|v| v.as_u64())
+                                    .unwrap_or(0),
+                                custom_metadata: metadata_json
+                                    .get("custom_metadata")
+                                    .and_then(|v| v.as_object())
+                                    .map(|obj| {
+                                        obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect()
+                                    })
+                                    .unwrap_or_default(),
+                            };
+
+                            // Apply filters
+                            if let Some(status) = query.status {
+                                if metadata.status != status {
+                                    continue;
+                                }
+                            }
+
+                            if let Some(ref created_by) = query.created_by {
+                                if metadata.created_by.as_ref() != Some(created_by) {
+                                    continue;
+                                }
+                            }
+
+                            if !query.tags.is_empty() {
+                                let has_all_tags =
+                                    query.tags.iter().all(|tag| metadata.tags.contains(tag));
+                                if !has_all_tags {
+                                    continue;
+                                }
+                            }
+
+                            if let Some(ref parent_id) = query.parent_session_id {
+                                if metadata.parent_session_id.as_ref() != Some(parent_id) {
+                                    continue;
+                                }
+                            }
+
+                            if let Some(created_after) = query.created_after {
+                                if metadata.created_at < created_after {
+                                    continue;
+                                }
+                            }
+
+                            if let Some(created_before) = query.created_before {
+                                if metadata.created_at > created_before {
+                                    continue;
+                                }
+                            }
+
+                            if let Some(ref search_text) = query.search_text {
+                                let name_match = metadata
+                                    .name
+                                    .as_ref()
+                                    .is_some_and(|n| n.contains(search_text));
+                                let desc_match = metadata
+                                    .description
+                                    .as_ref()
+                                    .is_some_and(|d| d.contains(search_text));
+                                if !name_match && !desc_match {
+                                    continue;
+                                }
+                            }
+
+                            results.push(metadata);
+                        }
+                    }
+                }
+            }
         }
 
         // Sort results
@@ -728,10 +924,20 @@ impl SessionManager {
                     let metadata = serde_json::json!({
                         "id": session_id.to_string(),
                         "name": snapshot.metadata.name,
+                        "description": snapshot.metadata.description,
                         "status": snapshot.metadata.status,
                         "correlation_id": correlation_id_str,
                         "created_at": snapshot.metadata.created_at,
                         "updated_at": snapshot.metadata.updated_at,
+                        "started_at": snapshot.metadata.started_at,
+                        "ended_at": snapshot.metadata.ended_at,
+                        "tags": snapshot.metadata.tags,
+                        "created_by": snapshot.metadata.created_by,
+                        "parent_session_id": snapshot.metadata.parent_session_id,
+                        "artifact_count": snapshot.metadata.artifact_count,
+                        "total_artifact_size": snapshot.metadata.total_artifact_size,
+                        "operation_count": snapshot.metadata.operation_count,
+                        "custom_metadata": snapshot.metadata.custom_metadata,
                     });
                     let metadata_bytes = serde_json::to_vec(&metadata)?;
                     self.storage_backend

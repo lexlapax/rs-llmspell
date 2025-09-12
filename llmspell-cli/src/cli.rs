@@ -331,11 +331,26 @@ pub enum StateCommands {
 /// Session management subcommands
 #[derive(Subcommand, Debug)]
 pub enum SessionCommands {
+    /// Create a new session
+    Create {
+        /// Session name/ID
+        name: String,
+        /// Session description
+        #[arg(long)]
+        description: Option<String>,
+    },
+
     /// List all sessions
     List {
         /// Show detailed session information
         #[arg(long)]
         detailed: bool,
+    },
+
+    /// Show session details
+    Show {
+        /// Session ID to show
+        id: String,
     },
 
     /// Replay session history

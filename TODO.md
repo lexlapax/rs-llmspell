@@ -13663,9 +13663,9 @@ pub struct IOPerformanceHints {
 - ✅ State Management: **FULLY IMPLEMENTED** - Commands work as designed
   - Available: `state show/clear/export/import` (design choice, not set/get/list/delete)
   - Status: All commands functional per CLI architecture doc specifications
-- ✅ Session Management: **PARTIALLY IMPLEMENTED** - Commands exist but incomplete
-  - Available: `session list/replay/delete/export` (not `create`)
-  - Status: `list` shows "Session listing not yet fully implemented"
+- ✅ Session Management: **FULLY IMPLEMENTED** - All commands functional with persistence
+  - Available: `session create/list/show/replay/delete/export` 
+  - Status: All commands wired to SessionManager backend with Sled persistence configured via llmspell.toml
 - ❌ REPL Commands: `.state` and `.session` commands not recognized
   - Available: `.help`, `.exit/.quit`, `.vars`, `.clear`, `.history`, `.info`
   - Missing: `.locals`, `.state`, `.session` debug commands
@@ -13720,11 +13720,11 @@ llmspell state show  # Should show all keys when no key specified
 llmspell state clear mykey  # Clear specific key
 llmspell state show mykey  # Should show key not found
 
-# Test 5: Session Management (NEW - 9.8.13.9)
-llmspell session create test-session
-llmspell session list  # Should show test-session
-llmspell session info test-session
-llmspell session delete test-session
+# Test 5: Session Management (NEW - 9.8.13.9) ✅ WORKING WITH PERSISTENCE
+llmspell session create test-session --description "Test session"
+llmspell session list  # Shows sessions (persisted via Sled backend)
+llmspell session show test-session  # Shows session details (loads from storage)
+llmspell session delete test-session  # Delete the session
 
 # Test 6: REPL with all commands
 llmspell repl
