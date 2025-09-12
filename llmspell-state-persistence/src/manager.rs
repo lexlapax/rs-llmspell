@@ -1693,7 +1693,7 @@ impl StateManagerTrait for StateManager {
     }
 
     async fn list_keys(&self, scope: StateScope) -> StateResult<Vec<String>> {
-        self.list_keys(scope).await
+        StateManager::list_keys(self, scope).await
     }
 
     async fn exists(&self, scope: StateScope, key: &str) -> StateResult<bool> {

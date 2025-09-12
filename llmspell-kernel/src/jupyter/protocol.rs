@@ -745,88 +745,8 @@ impl Protocol for JupyterProtocol {
         // Set parent header if provided
         let parent_header = parent_msg.map(|p| p.header.clone());
 
-        // Convert content to MessageContent enum based on msg_type
-        let message_content = match msg_type {
-            "comm_open" => MessageContent::CommOpen {
-                comm_id: content["comm_id"].as_str().unwrap_or("").to_string(),
-                target_name: content["target_name"].as_str().unwrap_or("").to_string(),
-                data: content
-                    .get("data")
-                    .cloned()
-                    .unwrap_or_else(|| serde_json::json!({})),
-                metadata: None,
-            },
-            "comm_msg" => MessageContent::CommMsg {
-                comm_id: content["comm_id"].as_str().unwrap_or("").to_string(),
-                data: content
-                    .get("data")
-                    .cloned()
-                    .unwrap_or_else(|| serde_json::json!({})),
-                metadata: None,
-            },
-            "status" => {
-                let state = match content["execution_state"].as_str().unwrap_or("idle") {
-                    "busy" => ExecutionState::Busy,
-                    "starting" => ExecutionState::Starting,
-                    _ => ExecutionState::Idle,
-                };
-                MessageContent::Status {
-                    execution_state: state,
-                }
-            }
-            "stream" => MessageContent::Stream {
-                name: match content["name"].as_str().unwrap_or("stdout") {
-                    "stderr" => StreamType::Stderr,
-                    _ => StreamType::Stdout,
-                },
-                text: content["text"].as_str().unwrap_or("").to_string(),
-            },
-            "execute_input" => MessageContent::ExecuteInput {
-                code: content["code"].as_str().unwrap_or("").to_string(),
-                execution_count: content["execution_count"].as_u64().unwrap_or(0) as u32,
-            },
-            "execute_result" => MessageContent::ExecuteResult {
-                execution_count: content["execution_count"].as_u64().unwrap_or(0) as u32,
-                data: content["data"]
-                    .as_object()
-                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default(),
-                metadata: content["metadata"]
-                    .as_object()
-                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default(),
-            },
-            "error" => MessageContent::Error {
-                ename: content["ename"].as_str().unwrap_or("Error").to_string(),
-                evalue: content["evalue"].as_str().unwrap_or("").to_string(),
-                traceback: content["traceback"]
-                    .as_array()
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v.as_str().map(String::from))
-                            .collect()
-                    })
-                    .unwrap_or_default(),
-            },
-            "display_data" => MessageContent::DisplayData {
-                data: content["data"]
-                    .as_object()
-                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default(),
-                metadata: content["metadata"]
-                    .as_object()
-                    .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
-                    .unwrap_or_default(),
-                transient: content.get("transient").cloned(),
-            },
-            _ => {
-                // Unknown message type - this should be an error in production
-                return Err(anyhow::anyhow!(
-                    "Unknown IOPub message type '{}' in create_broadcast",
-                    msg_type
-                ));
-            }
-        };
+        // Convert content to MessageContent
+        let message_content = Self::parse_message_content(msg_type, &content)?;
 
         Ok(JupyterMessage {
             header,
@@ -1120,6 +1040,128 @@ impl Protocol for JupyterProtocol {
 }
 
 impl JupyterProtocol {
+    /// Parse JSON content into `MessageContent` based on message type
+    fn parse_message_content(
+        msg_type: &str,
+        content: &serde_json::Value,
+    ) -> Result<MessageContent, anyhow::Error> {
+        match msg_type {
+            "comm_open" => Ok(Self::parse_comm_open(content)),
+            "comm_msg" => Ok(Self::parse_comm_msg(content)),
+            "status" => Ok(Self::parse_status(content)),
+            "stream" => Ok(Self::parse_stream(content)),
+            "execute_input" => Ok(Self::parse_execute_input(content)),
+            "execute_result" => Ok(Self::parse_execute_result(content)),
+            "error" => Ok(Self::parse_error(content)),
+            "display_data" => Ok(Self::parse_display_data(content)),
+            _ => Err(anyhow::anyhow!(
+                "Unknown IOPub message type '{}' in create_broadcast",
+                msg_type
+            )),
+        }
+    }
+
+    fn parse_comm_open(content: &serde_json::Value) -> MessageContent {
+        MessageContent::CommOpen {
+            comm_id: content["comm_id"].as_str().unwrap_or("").to_string(),
+            target_name: content["target_name"].as_str().unwrap_or("").to_string(),
+            data: content
+                .get("data")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({})),
+            metadata: None,
+        }
+    }
+
+    fn parse_comm_msg(content: &serde_json::Value) -> MessageContent {
+        MessageContent::CommMsg {
+            comm_id: content["comm_id"].as_str().unwrap_or("").to_string(),
+            data: content
+                .get("data")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({})),
+            metadata: None,
+        }
+    }
+
+    fn parse_status(content: &serde_json::Value) -> MessageContent {
+        let state = match content["execution_state"].as_str().unwrap_or("idle") {
+            "busy" => ExecutionState::Busy,
+            "starting" => ExecutionState::Starting,
+            _ => ExecutionState::Idle,
+        };
+        MessageContent::Status {
+            execution_state: state,
+        }
+    }
+
+    fn parse_stream(content: &serde_json::Value) -> MessageContent {
+        MessageContent::Stream {
+            name: match content["name"].as_str().unwrap_or("stdout") {
+                "stderr" => StreamType::Stderr,
+                _ => StreamType::Stdout,
+            },
+            text: content["text"].as_str().unwrap_or("").to_string(),
+        }
+    }
+
+    fn parse_execute_input(content: &serde_json::Value) -> MessageContent {
+        MessageContent::ExecuteInput {
+            code: content["code"].as_str().unwrap_or("").to_string(),
+            execution_count: content["execution_count"]
+                .as_u64()
+                .unwrap_or(0)
+                .try_into()
+                .unwrap_or(0),
+        }
+    }
+
+    fn parse_execute_result(content: &serde_json::Value) -> MessageContent {
+        MessageContent::ExecuteResult {
+            execution_count: content["execution_count"]
+                .as_u64()
+                .unwrap_or(0)
+                .try_into()
+                .unwrap_or(0),
+            data: Self::extract_object_map(content, "data"),
+            metadata: Self::extract_object_map(content, "metadata"),
+        }
+    }
+
+    fn parse_error(content: &serde_json::Value) -> MessageContent {
+        MessageContent::Error {
+            ename: content["ename"].as_str().unwrap_or("Error").to_string(),
+            evalue: content["evalue"].as_str().unwrap_or("").to_string(),
+            traceback: content["traceback"]
+                .as_array()
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect()
+                })
+                .unwrap_or_default(),
+        }
+    }
+
+    fn parse_display_data(content: &serde_json::Value) -> MessageContent {
+        MessageContent::DisplayData {
+            data: Self::extract_object_map(content, "data"),
+            metadata: Self::extract_object_map(content, "metadata"),
+            transient: content.get("transient").cloned(),
+        }
+    }
+
+    /// Helper to extract an object field as a `HashMap`
+    fn extract_object_map(
+        content: &serde_json::Value,
+        field: &str,
+    ) -> HashMap<String, serde_json::Value> {
+        content[field]
+            .as_object()
+            .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())
+            .unwrap_or_default()
+    }
+
     fn create_kernel_info_reply_content(content: &Value) -> MessageContent {
         // Extract llmspell_session_metadata if present
         let session_metadata = content.get("llmspell_session_metadata").cloned();

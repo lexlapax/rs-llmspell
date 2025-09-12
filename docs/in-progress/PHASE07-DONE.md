@@ -8380,7 +8380,7 @@ OPENAI_API_KEY=xxx ANTHROPIC_API_KEY=xxx \
 ls -la examples/script-users/applications/webapp-creator/generated/shopeasy/
 
 # Check state persistence
-./target/debug/llmspell state list | grep workflow
+./target/debug/llmspell state show | grep workflow
 ```
 
 ---

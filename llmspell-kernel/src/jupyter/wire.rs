@@ -612,13 +612,21 @@ impl WireProtocol {
                 let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
                 Ok(MessageContent::ExecuteInput {
                     code: value["code"].as_str().unwrap_or("").to_string(),
-                    execution_count: value["execution_count"].as_u64().unwrap_or(0) as u32,
+                    execution_count: value["execution_count"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        .try_into()
+                        .unwrap_or(0),
                 })
             }
             "execute_result" => {
                 let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
                 Ok(MessageContent::ExecuteResult {
-                    execution_count: value["execution_count"].as_u64().unwrap_or(0) as u32,
+                    execution_count: value["execution_count"]
+                        .as_u64()
+                        .unwrap_or(0)
+                        .try_into()
+                        .unwrap_or(0),
                     data: value["data"]
                         .as_object()
                         .map(|obj| obj.iter().map(|(k, v)| (k.clone(), v.clone())).collect())

@@ -55,9 +55,34 @@ async fn show_state(
             }
         }
         None => {
-            // Show all state
-            println!("State listing not yet implemented - please specify a key");
-            // TODO: Implement list_all functionality when StateManager supports it
+            // Show all state keys
+            let keys = state_manager.list_keys(StateScope::Global).await?;
+            if keys.is_empty() {
+                if matches!(output_format, OutputFormat::Text | OutputFormat::Pretty) {
+                    println!("No state keys found");
+                }
+            } else {
+                match output_format {
+                    OutputFormat::Json => {
+                        let mut all_values = serde_json::Map::new();
+                        for key in keys {
+                            if let Some(value) = state_manager.get(StateScope::Global, &key).await?
+                            {
+                                all_values.insert(key, value);
+                            }
+                        }
+                        println!("{}", serde_json::to_string_pretty(&all_values)?);
+                    }
+                    OutputFormat::Text | OutputFormat::Pretty => {
+                        println!("State keys ({} total):", keys.len());
+                        for key in &keys {
+                            if let Some(value) = state_manager.get(StateScope::Global, key).await? {
+                                println!("  {} = {}", key, value);
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -84,22 +109,30 @@ async fn clear_state(state_manager: &StateManager, key: Option<String>) -> Resul
 
 /// Export state to file
 async fn export_state(
-    _state_manager: &StateManager,
+    state_manager: &StateManager,
     file: PathBuf,
     format: ExportFormat,
 ) -> Result<()> {
-    println!("State export not yet fully implemented");
-    println!("Would export to: {} (format: {:?})", file.display(), format);
+    // Get all state from Global scope
+    let all_state = state_manager.get_all_in_scope(StateScope::Global).await?;
 
-    // TODO: Implement state export when StateManager supports listing all keys
-    // let all_state = state_manager.export_all(StateScope::Global).await?;
-    // let content = match format {
-    //     ExportFormat::Json => serde_json::to_string_pretty(&all_state)?,
-    //     ExportFormat::Yaml => serde_yaml::to_string(&all_state)?,
-    //     ExportFormat::Toml => toml::to_string(&all_state)?,
-    // };
-    // tokio::fs::write(&file, content).await?;
-    // println!("✓ Exported state to {}", file.display());
+    if all_state.is_empty() {
+        println!("No state to export");
+        return Ok(());
+    }
+
+    let content = match format {
+        ExportFormat::Json => serde_json::to_string_pretty(&all_state)?,
+        ExportFormat::Yaml => serde_yaml::to_string(&all_state)?,
+        ExportFormat::Toml => toml::to_string_pretty(&all_state)?,
+    };
+
+    tokio::fs::write(&file, content).await?;
+    println!(
+        "✓ Exported {} state keys to {}",
+        all_state.len(),
+        file.display()
+    );
 
     Ok(())
 }
