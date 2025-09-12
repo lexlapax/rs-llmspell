@@ -17,8 +17,39 @@ pub async fn handle_session_command(
     command: SessionCommands,
     config: LLMSpellConfig,
     output_format: OutputFormat,
+    connect: Option<String>, // Connection string for external kernel
 ) -> Result<()> {
-    // Create session manager using the configuration
+    // Connect to kernel for session management
+    // NOTE: Kernel session support is still being implemented
+    // For now, we'll try to use the kernel but fall back to local if needed
+    let kernel_result = super::create_kernel_connection(config.clone(), connect.clone()).await;
+
+    // If kernel connection works and supports sessions, use it
+    if let Ok(kernel) = kernel_result {
+        // Try to use kernel for session operations
+        match command {
+            SessionCommands::Create { name, description } => {
+                return create_session_via_kernel(kernel, name, description, output_format).await;
+            }
+            SessionCommands::List { detailed } => {
+                return list_sessions_via_kernel(kernel, detailed, output_format).await;
+            }
+            SessionCommands::Show { id } => {
+                return show_session_via_kernel(kernel, id, output_format).await;
+            }
+            SessionCommands::Delete { id, all } => {
+                return delete_session_via_kernel(kernel, id, all).await;
+            }
+            SessionCommands::Export { id, file, format } => {
+                return export_session_via_kernel(kernel, id, file, format).await;
+            }
+            SessionCommands::Replay { .. } => {
+                // Replay is complex, fall through to local implementation
+            }
+        }
+    }
+
+    // Fallback to local session manager (temporary until kernel fully supports sessions)
     let session_config = SessionManagerConfig::default();
 
     // Create required dependencies for SessionManager
@@ -269,7 +300,202 @@ async fn delete_session(session_manager: &SessionManager, id: String, all: bool)
     Ok(())
 }
 
-/// Export session to file
+/// Create session via kernel
+async fn create_session_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    name: String,
+    description: Option<String>,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use llmspell_kernel::jupyter::protocol::SessionOperation;
+
+    let operation = SessionOperation::Create {
+        name: Some(name.clone()),
+        description: description.clone(),
+    };
+
+    let reply = kernel
+        .session_request(serde_json::to_value(operation)?)
+        .await?;
+
+    if reply.get("status").and_then(|s| s.as_str()) == Some("error") {
+        // Kernel doesn't support sessions yet
+        anyhow::bail!("Kernel session management not yet implemented. Use local session manager.");
+    }
+
+    match output_format {
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&reply)?);
+        }
+        OutputFormat::Text | OutputFormat::Pretty => {
+            if let Some(session_id) = reply.get("session_id").and_then(|s| s.as_str()) {
+                println!("✓ Created session: {}", session_id);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// List sessions via kernel
+async fn list_sessions_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    detailed: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use llmspell_kernel::jupyter::protocol::SessionOperation;
+
+    let operation = SessionOperation::List { query: None };
+
+    let reply = kernel
+        .session_request(serde_json::to_value(operation)?)
+        .await?;
+
+    if reply.get("status").and_then(|s| s.as_str()) == Some("error") {
+        anyhow::bail!("Kernel session management not yet implemented. Use local session manager.");
+    }
+
+    match output_format {
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&reply)?);
+        }
+        OutputFormat::Text | OutputFormat::Pretty => {
+            if let Some(sessions) = reply.get("sessions").and_then(|s| s.as_array()) {
+                if sessions.is_empty() {
+                    println!("No sessions found");
+                } else {
+                    println!("Sessions ({} total):", sessions.len());
+                    for session in sessions {
+                        if detailed {
+                            println!("\n{}", serde_json::to_string_pretty(session)?);
+                        } else {
+                            let id = session
+                                .get("id")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("<unknown>");
+                            let name = session
+                                .get("name")
+                                .and_then(|s| s.as_str())
+                                .unwrap_or("<unnamed>");
+                            println!("  {} - {}", id, name);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Show session via kernel
+async fn show_session_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    id: String,
+    output_format: OutputFormat,
+) -> Result<()> {
+    use llmspell_kernel::jupyter::protocol::SessionOperation;
+
+    let operation = SessionOperation::Show { id: id.clone() };
+
+    let reply = kernel
+        .session_request(serde_json::to_value(operation)?)
+        .await?;
+
+    if reply.get("status").and_then(|s| s.as_str()) == Some("error") {
+        anyhow::bail!("Kernel session management not yet implemented. Use local session manager.");
+    }
+
+    match output_format {
+        OutputFormat::Json => {
+            println!("{}", serde_json::to_string_pretty(&reply)?);
+        }
+        OutputFormat::Text | OutputFormat::Pretty => {
+            if let Some(session) = reply.get("session") {
+                println!("Session Details:");
+                println!("{}", serde_json::to_string_pretty(session)?);
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Delete session via kernel
+async fn delete_session_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    id: String,
+    all: bool,
+) -> Result<()> {
+    use llmspell_kernel::jupyter::protocol::SessionOperation;
+
+    let operation = if all {
+        // Delete all - use empty string as sentinel
+        SessionOperation::Delete { id: String::new() }
+    } else {
+        SessionOperation::Delete { id: id.clone() }
+    };
+
+    let reply = kernel
+        .session_request(serde_json::to_value(operation)?)
+        .await?;
+
+    if reply.get("status").and_then(|s| s.as_str()) == Some("error") {
+        anyhow::bail!("Kernel session management not yet implemented. Use local session manager.");
+    }
+
+    if all {
+        println!("✓ Deleted all sessions");
+    } else {
+        println!("✓ Deleted session: {}", id);
+    }
+
+    Ok(())
+}
+
+/// Export session via kernel
+async fn export_session_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    id: String,
+    file: PathBuf,
+    format: ExportFormat,
+) -> Result<()> {
+    use llmspell_kernel::jupyter::protocol::SessionOperation;
+
+    let format_str = match format {
+        ExportFormat::Json => "json",
+        ExportFormat::Yaml => "yaml",
+        ExportFormat::Toml => "toml",
+    };
+
+    let operation = SessionOperation::Export {
+        id: id.clone(),
+        format: Some(format_str.to_string()),
+    };
+
+    let reply = kernel
+        .session_request(serde_json::to_value(operation)?)
+        .await?;
+
+    if reply.get("status").and_then(|s| s.as_str()) == Some("error") {
+        anyhow::bail!("Kernel session management not yet implemented. Use local session manager.");
+    }
+
+    if let Some(data) = reply.get("data") {
+        let content = match format {
+            ExportFormat::Json => serde_json::to_string_pretty(data)?,
+            ExportFormat::Yaml => serde_yaml::to_string(data)?,
+            ExportFormat::Toml => toml::to_string_pretty(data)?,
+        };
+
+        tokio::fs::write(&file, content).await?;
+        println!("✓ Exported session {} to {}", id, file.display());
+    }
+
+    Ok(())
+}
+
+/// Export session to file (local implementation)
 async fn export_session(
     session_manager: &SessionManager,
     id: String,

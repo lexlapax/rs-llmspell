@@ -11,6 +11,9 @@
 pub mod client; // Legacy client connection handling (to be removed)
 pub mod session; // Core REPL session management
 
+#[cfg(test)]
+mod tests;
+
 // Re-export main types
 pub use session::{KernelConnection, ReplConfig, ReplResponse, ReplSession, WorkloadType};
 

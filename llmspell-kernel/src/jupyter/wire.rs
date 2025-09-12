@@ -420,6 +420,30 @@ impl WireProtocol {
                         .map(std::string::ToString::to_string),
                 })
             }
+            "state_request" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                let operation = value
+                    .get("operation")
+                    .ok_or_else(|| anyhow::anyhow!("Missing operation field"))?
+                    .clone();
+                Ok(MessageContent::StateRequest {
+                    operation: serde_json::from_value(operation)?,
+                    scope: value
+                        .get("scope")
+                        .and_then(|v| v.as_str())
+                        .map(std::string::ToString::to_string),
+                })
+            }
+            "session_request" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                let operation = value
+                    .get("operation")
+                    .ok_or_else(|| anyhow::anyhow!("Missing operation field"))?
+                    .clone();
+                Ok(MessageContent::SessionRequest {
+                    operation: serde_json::from_value(operation)?,
+                })
+            }
             "kernel_info_reply" => {
                 let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
 
@@ -583,6 +607,36 @@ impl WireProtocol {
                         .get("restart")
                         .and_then(serde_json::Value::as_bool)
                         .unwrap_or(false),
+                })
+            }
+            "state_reply" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::StateReply {
+                    status: value
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("error")
+                        .to_string(),
+                    data: value.get("data").cloned(),
+                    error: value
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .map(std::string::ToString::to_string),
+                })
+            }
+            "session_reply" => {
+                let value: serde_json::Value = serde_json::from_slice(content_bytes)?;
+                Ok(MessageContent::SessionReply {
+                    status: value
+                        .get("status")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("error")
+                        .to_string(),
+                    data: value.get("data").cloned(),
+                    error: value
+                        .get("error")
+                        .and_then(|v| v.as_str())
+                        .map(std::string::ToString::to_string),
                 })
             }
             // IOPub message types

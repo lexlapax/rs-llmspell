@@ -476,6 +476,106 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
     }
+
+    /// Send a state management request to the kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails
+    pub async fn state_request(
+        &mut self,
+        operation: serde_json::Value,
+        scope: Option<String>,
+    ) -> Result<MessageContent> {
+        use crate::jupyter::protocol::MessageContent;
+
+        // Create state request with empty identity
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("__identities".to_string(), serde_json::json!([""]));
+
+        let msg = JupyterMessage {
+            header: MessageHeader {
+                msg_id: Uuid::new_v4().to_string(),
+                msg_type: "state_request".to_string(),
+                username: self.username.clone(),
+                session: self.session_id.clone(),
+                date: Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::Value::Object(metadata),
+            content: MessageContent::StateRequest {
+                operation: serde_json::from_value(operation)?,
+                scope,
+            },
+        };
+
+        // Send request on shell channel
+        let request_bytes = self.protocol.encode(&msg, "shell")?;
+        self.transport.send("shell", request_bytes).await?;
+
+        // Wait for reply
+        loop {
+            if let Some(reply_bytes) = self.transport.recv("shell").await? {
+                let reply = self.protocol.decode(reply_bytes, "shell")?;
+
+                if reply.header.msg_type == "state_reply" {
+                    return Ok(reply.content);
+                }
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
+
+    /// Send a session management request to the kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request fails
+    pub async fn session_request(
+        &mut self,
+        operation: serde_json::Value,
+    ) -> Result<MessageContent> {
+        use crate::jupyter::protocol::MessageContent;
+
+        // Create session request with empty identity
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("__identities".to_string(), serde_json::json!([""]));
+
+        let msg = JupyterMessage {
+            header: MessageHeader {
+                msg_id: Uuid::new_v4().to_string(),
+                msg_type: "session_request".to_string(),
+                username: self.username.clone(),
+                session: self.session_id.clone(),
+                date: Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::Value::Object(metadata),
+            content: MessageContent::SessionRequest {
+                operation: serde_json::from_value(operation)?,
+            },
+        };
+
+        // Send request on shell channel
+        let request_bytes = self.protocol.encode(&msg, "shell")?;
+        self.transport.send("shell", request_bytes).await?;
+
+        // Wait for reply
+        loop {
+            if let Some(reply_bytes) = self.transport.recv("shell").await? {
+                let reply = self.protocol.decode(reply_bytes, "shell")?;
+
+                if reply.header.msg_type == "session_reply" {
+                    return Ok(reply.content);
+                }
+            }
+
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
 }
 
 // Type alias for Jupyter client

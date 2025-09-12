@@ -209,12 +209,20 @@ pub enum Commands {
     State {
         #[command(subcommand)]
         command: StateCommands,
+
+        /// Connect to external kernel (e.g., "localhost:9555" or "/path/to/connection.json")
+        #[arg(long)]
+        connect: Option<String>,
     },
 
     /// Manage sessions and replay
     Session {
         #[command(subcommand)]
         command: SessionCommands,
+
+        /// Connect to external kernel (e.g., "localhost:9555" or "/path/to/connection.json")
+        #[arg(long)]
+        connect: Option<String>,
     },
 
     /// Configuration management

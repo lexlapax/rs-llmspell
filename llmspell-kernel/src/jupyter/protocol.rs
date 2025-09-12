@@ -237,6 +237,91 @@ pub enum MessageContent {
         status: String,
         comms: HashMap<String, CommInfo>,
     },
+
+    // === STATE MANAGEMENT (LLMSpell Extension) ===
+    #[serde(rename = "state_request")]
+    StateRequest {
+        operation: StateOperation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        scope: Option<String>, // global, session, workflow, component
+    },
+
+    #[serde(rename = "state_reply")]
+    StateReply {
+        status: String, // "ok" or "error"
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<Value>, // Result data for show/export operations
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>, // Error message if status is "error"
+    },
+
+    // === SESSION MANAGEMENT (LLMSpell Extension) ===
+    #[serde(rename = "session_request")]
+    SessionRequest { operation: SessionOperation },
+
+    #[serde(rename = "session_reply")]
+    SessionReply {
+        status: String, // "ok" or "error"
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<Value>, // Result data for list/show operations
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>, // Error message if status is "error"
+    },
+}
+
+/// State management operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum StateOperation {
+    Show {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        key: Option<String>,
+    },
+    Clear {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        key: Option<String>,
+    },
+    Export {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        format: Option<String>, // json, yaml, toml
+    },
+    Import {
+        data: Value,
+        #[serde(default)]
+        merge: bool,
+    },
+}
+
+/// Session management operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum SessionOperation {
+    Create {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        name: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        description: Option<String>,
+    },
+    List {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        query: Option<Value>, // SessionQuery as JSON
+    },
+    Show {
+        id: String,
+    },
+    Replay {
+        id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        config: Option<Value>, // ReplayConfig as JSON
+    },
+    Delete {
+        id: String,
+    },
+    Export {
+        id: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        format: Option<String>, // json, yaml
+    },
 }
 
 /// Information about an open comm channel

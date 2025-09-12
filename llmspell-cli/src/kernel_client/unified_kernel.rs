@@ -407,6 +407,64 @@ impl KernelConnectionTrait for UnifiedKernelClient {
         self.send_debug_command(command).await
     }
 
+    async fn state_request(&mut self, operation: Value, scope: Option<String>) -> Result<Value> {
+        use llmspell_kernel::jupyter::protocol::MessageContent;
+
+        // Send state request through the client
+        let reply = self.client.state_request(operation, scope).await?;
+
+        // Convert MessageContent to Value
+        match reply {
+            MessageContent::StateReply {
+                status,
+                data,
+                error,
+            } => {
+                if status == "ok" {
+                    Ok(serde_json::json!({
+                        "status": "ok",
+                        "data": data
+                    }))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "State operation failed: {}",
+                        error.unwrap_or_else(|| "Unknown error".to_string())
+                    ))
+                }
+            }
+            _ => Err(anyhow::anyhow!("Unexpected reply from kernel")),
+        }
+    }
+
+    async fn session_request(&mut self, operation: Value) -> Result<Value> {
+        use llmspell_kernel::jupyter::protocol::MessageContent;
+
+        // Send session request through the client
+        let reply = self.client.session_request(operation).await?;
+
+        // Convert MessageContent to Value
+        match reply {
+            MessageContent::SessionReply {
+                status,
+                data,
+                error,
+            } => {
+                if status == "ok" {
+                    Ok(serde_json::json!({
+                        "status": "ok",
+                        "data": data
+                    }))
+                } else {
+                    Err(anyhow::anyhow!(
+                        "Session operation failed: {}",
+                        error.unwrap_or_else(|| "Unknown error".to_string())
+                    ))
+                }
+            }
+            _ => Err(anyhow::anyhow!("Unexpected reply from kernel")),
+        }
+    }
+
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
         match operation {
             "execute_line" | "tab_complete" => WorkloadClassifier::Light,

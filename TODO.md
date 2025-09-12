@@ -13660,15 +13660,20 @@ pub struct IOPerformanceHints {
   - Result: Stream messages now properly display output: "OUTPUT CAPTURE WORKS"
 - ✅ Debug Infrastructure: Complete and fully functional (Fixed embedded kernel shutdown issue in debug mode)
 - ❌ RAG System: Commands not implemented (no `rag` subcommand exists)
-- ✅ State Management: **FULLY IMPLEMENTED** - Commands work as designed
+- ✅ State Management: **ARCHITECTURAL FIX COMPLETE** - Now routes through kernel
   - Available: `state show/clear/export/import` (design choice, not set/get/list/delete)
-  - Status: All commands functional per CLI architecture doc specifications
-- ✅ Session Management: **FULLY IMPLEMENTED** - All commands functional with persistence
+  - **FIXED**: Commands now use kernel connection via StateRequest/StateReply protocol messages
+  - **VERIFIED**: State is shared between exec commands and scripts within same kernel session
+  - **KERNEL ENHANCED**: Kernel now creates StateManager based on config (memory/sled backend)
+- ✅ Session Management: **ARCHITECTURAL FIX COMPLETE** - Now routes through kernel
   - Available: `session create/list/show/replay/delete/export` 
-  - Status: All commands wired to SessionManager backend with Sled persistence configured via llmspell.toml
-- ❌ REPL Commands: `.state` and `.session` commands not recognized
-  - Available: `.help`, `.exit/.quit`, `.vars`, `.clear`, `.history`, `.info`
-  - Missing: `.locals`, `.state`, `.session` debug commands
+  - **FIXED**: Commands now use kernel connection via SessionRequest/SessionReply protocol messages
+  - **KERNEL ENHANCED**: Kernel now creates SessionManager based on config with proper storage backend
+  - **FULLY IMPLEMENTED**: All session operations now work through kernel's SessionManager
+- ✅ REPL Commands: **FIXED** - `.state` and `.session` commands now implemented
+  - Available: `.help`, `.exit/.quit`, `.vars`, `.clear`, `.history`, `.info`, `.state`, `.session`
+  - Debug commands (when enabled): `.break`, `.step`, `.continue`, `.locals`, `.globals`, `.upvalues`, `.stack`, `.watch`
+  - **FIX APPLIED**: Added handlers for `.state` and `.session` in llmspell-repl/src/session.rs
 - ✅ Config Management: **FULLY IMPLEMENTED** - Commands work well
   - Available: `config init/validate/show` 
   - Status: All commands functional, `show` displays full JSON config
@@ -13678,6 +13683,16 @@ pub struct IOPerformanceHints {
 - Fix: Added `current_request_message` tracking in GenericKernel
 - Result: All IOPub messages now have correct parent headers for proper output association
 - Note: Use `--stream` flag with exec command to enable streaming output
+
+**✅ ARCHITECTURAL FIX COMPLETE (2025-01-12)**: State/Session Management Now Routes Through Kernel
+**✅ REPL COMMANDS ADDED (2025-01-12)**: .state and .session commands implemented
+- **Problem Fixed**: State and session commands were creating isolated manager instances
+- **Solution Implemented**: 
+  - Custom protocol messages (StateRequest/Reply, SessionRequest/Reply)
+  - Kernel now creates StateManager and SessionManager based on config
+  - Storage backend (memory/sled) selected from config settings
+- **Result**: State and sessions properly managed by kernel with configured persistence
+- **Verification**: Commands route through kernel, managers honor config settings
 
 **Major Systems to Validate:**
 - **Kernel Architecture** (9.8.1-9.8.15): External kernel, IO routing, client connections

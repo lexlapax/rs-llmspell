@@ -82,6 +82,12 @@ pub trait KernelConnectionTrait: Send + Sync {
     /// Send debug command
     async fn send_debug_command(&mut self, command: Value) -> Result<Value>;
 
+    /// Send state management request
+    async fn state_request(&mut self, operation: Value, scope: Option<String>) -> Result<Value>;
+
+    /// Send session management request
+    async fn session_request(&mut self, operation: Value) -> Result<Value>;
+
     /// Classify workload
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier;
 
@@ -294,6 +300,14 @@ impl<T: KernelConnectionTrait> KernelConnectionTrait for MonitoredKernelConnecti
 
     async fn send_debug_command(&mut self, command: Value) -> Result<Value> {
         self.inner.send_debug_command(command).await
+    }
+
+    async fn state_request(&mut self, operation: Value, scope: Option<String>) -> Result<Value> {
+        self.inner.state_request(operation, scope).await
+    }
+
+    async fn session_request(&mut self, operation: Value) -> Result<Value> {
+        self.inner.session_request(operation).await
     }
 
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {

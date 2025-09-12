@@ -10,6 +10,7 @@ use llmspell_bridge::{
     ScriptRuntime,
 };
 use llmspell_config::LLMSpellConfig;
+use llmspell_sessions::{SessionManager, SessionManagerConfig};
 use llmspell_state_persistence::{StateFactory, StateManager};
 use std::sync::{Arc, Mutex as StdMutex};
 use tokio::sync::{oneshot, Mutex, RwLock};
@@ -82,6 +83,8 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
 
     /// Shared state manager
     pub state_manager: Option<Arc<StateManager>>,
+    /// Shared session manager
+    pub session_manager: Option<Arc<SessionManager>>,
 
     /// Security manager
     pub security_manager: Arc<SecurityManager>,
@@ -109,6 +112,68 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
 }
 
 impl<T: Transport, P: Protocol> GenericKernel<T, P> {
+    /// Create a session manager based on configuration
+    async fn create_session_manager(
+        config: &Arc<LLMSpellConfig>,
+        state_manager: &Option<Arc<StateManager>>,
+    ) -> Result<Option<Arc<SessionManager>>> {
+        if !config.runtime.sessions.enabled {
+            return Ok(None);
+        }
+
+        // Create storage backend based on configuration
+        let storage_backend: Arc<dyn llmspell_storage::StorageBackend> =
+            match config.runtime.sessions.storage_backend.as_str() {
+                "sled" => {
+                    let sled_backend = llmspell_storage::SledBackend::new()
+                        .map_err(|e| anyhow::anyhow!("Failed to create sled backend: {}", e))?;
+                    Arc::new(sled_backend)
+                }
+                _ => Arc::new(llmspell_storage::MemoryBackend::new()),
+            };
+
+        // Create required dependencies
+        let hook_registry = Arc::new(llmspell_hooks::registry::HookRegistry::new());
+        let hook_executor = Arc::new(llmspell_hooks::executor::HookExecutor::new());
+        let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+        let session_config = SessionManagerConfig::default();
+
+        // Create SessionManager with state_manager if available
+        let sm = if let Some(ref state_mgr) = state_manager {
+            SessionManager::new(
+                state_mgr.clone(),
+                storage_backend,
+                hook_registry,
+                hook_executor,
+                &event_bus,
+                session_config,
+            )?
+        } else {
+            // Create a temporary StateManager for SessionManager
+            let temp_state = StateFactory::create_from_config(config).await?;
+            let state_mgr = match temp_state {
+                Some(sm) => sm,
+                None => {
+                    // Create a default in-memory StateManager
+                    Arc::new(
+                        StateManager::new()
+                            .await
+                            .map_err(|e| anyhow::anyhow!("Failed to create StateManager: {}", e))?,
+                    )
+                }
+            };
+            SessionManager::new(
+                state_mgr,
+                storage_backend,
+                hook_registry,
+                hook_executor,
+                &event_bus,
+                session_config,
+            )?
+        };
+        Ok(Some(Arc::new(sm)))
+    }
+
     /// Create a new kernel with given transport and protocol
     ///
     /// # Errors
@@ -190,6 +255,9 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         // Create comm manager for session communication
         let comm_manager = Arc::new(CommManager::new(session_mapper.clone())?);
 
+        // Create SessionManager based on config
+        let session_manager = Self::create_session_manager(&config, &state_manager).await?;
+
         Ok(Self {
             kernel_id,
             transport,
@@ -199,6 +267,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             execution_state: Arc::new(RwLock::new(KernelState::Starting)),
             config,
             state_manager,
+            session_manager,
             security_manager,
             resource_limits: ClientResourceLimits::default(),
             execution_count: Arc::new(Mutex::new(0)),
@@ -504,6 +573,8 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "comm_close" => self.handle_comm_close(content).await,
             "comm_info_request" => self.handle_comm_info_request(content).await,
             "debug_request" => self.handle_debug_request_message(content).await,
+            "state_request" => self.handle_state_request(content).await,
+            "session_request" => self.handle_session_request(content).await,
             _ => {
                 tracing::warn!("Unknown message type: {}", msg_type);
                 Ok(serde_json::json!({
@@ -1119,6 +1190,289 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         for client in all_clients {
             tracing::info!("Disconnecting client {}", client.client_id);
             self.client_manager.remove_client(&client.client_id).await;
+        }
+    }
+
+    /// Handle state management requests using the kernel's `StateManager`
+    async fn handle_state_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        use crate::jupyter::protocol::StateOperation;
+        use llmspell_state_persistence::StateScope;
+
+        // Check if state manager is available
+        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("State management not available - no StateManager configured")
+        })?;
+
+        // Parse the operation from the request
+        let operation: StateOperation = serde_json::from_value(
+            content
+                .get("operation")
+                .ok_or_else(|| anyhow::anyhow!("Missing operation field"))?
+                .clone(),
+        )?;
+
+        // Parse scope (default to Global)
+        let scope = if let Some(s) = content.get("scope").and_then(|s| s.as_str()) {
+            match s {
+                "session" => StateScope::Session(String::new()), // Session ID will be managed by StateManager
+                "user" => StateScope::User(String::new()), // User ID will be managed by StateManager
+                _ => StateScope::Global,
+            }
+        } else {
+            StateScope::Global
+        };
+
+        // Handle the operation
+        match operation {
+            StateOperation::Show { key } => {
+                if let Some(key) = key {
+                    // Show specific key
+                    let value = state_manager
+                        .get(scope, &key)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to get state: {}", e))?;
+                    Ok(serde_json::json!({
+                        "status": "ok",
+                        "data": value
+                    }))
+                } else {
+                    // Show all keys for scope
+                    let keys = state_manager
+                        .list_keys(scope.clone())
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to list keys: {}", e))?;
+                    let mut data = serde_json::Map::new();
+                    for key in keys {
+                        if let Ok(Some(value)) = state_manager.get(scope.clone(), &key).await {
+                            data.insert(key, value);
+                        }
+                    }
+                    Ok(serde_json::json!({
+                        "status": "ok",
+                        "data": serde_json::Value::Object(data)
+                    }))
+                }
+            }
+            StateOperation::Clear { key } => {
+                if let Some(key) = key {
+                    // Clear specific key
+                    state_manager
+                        .delete(scope, &key)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to clear state: {}", e))?;
+                } else {
+                    // Clear all keys for scope
+                    state_manager
+                        .clear_scope(scope)
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to clear state: {}", e))?;
+                }
+                Ok(serde_json::json!({
+                    "status": "ok"
+                }))
+            }
+            StateOperation::Export { format } => {
+                let format = format.as_deref().unwrap_or("json");
+                // Use get_all_in_scope to export all values
+                let export_data = state_manager
+                    .get_all_in_scope(scope)
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to export state: {}", e))?;
+
+                // Convert HashMap to JSON Value
+                let data_value = serde_json::to_value(export_data)
+                    .map_err(|e| anyhow::anyhow!("Failed to serialize export data: {}", e))?;
+
+                // Format the export based on requested format
+                let formatted = match format {
+                    "yaml" => {
+                        // For now, just return JSON (YAML support can be added later)
+                        data_value
+                    }
+                    _ => data_value,
+                };
+
+                Ok(serde_json::json!({
+                    "status": "ok",
+                    "data": formatted
+                }))
+            }
+            StateOperation::Import { data, merge } => {
+                // If not merging, clear the scope first
+                if !merge {
+                    state_manager
+                        .clear_scope(scope.clone())
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to clear before import: {}", e))?;
+                }
+
+                // Import each key-value pair
+                if let Some(obj) = data.as_object() {
+                    for (key, value) in obj {
+                        state_manager
+                            .set(scope.clone(), key, value.clone())
+                            .await
+                            .map_err(|e| anyhow::anyhow!("Failed to import key {}: {}", key, e))?;
+                    }
+                } else {
+                    return Err(anyhow::anyhow!("Import data must be an object"));
+                }
+
+                Ok(serde_json::json!({
+                    "status": "ok"
+                }))
+            }
+        }
+    }
+
+    /// Handle session management requests using the kernel's `SessionManager`
+    async fn handle_session_request(
+        &self,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        use crate::jupyter::protocol::SessionOperation;
+        use llmspell_sessions::{CreateSessionOptions, SessionQuery};
+        use std::str::FromStr;
+
+        // Check if session manager is available
+        let session_manager = self.session_manager.as_ref().ok_or_else(|| {
+            anyhow::anyhow!("Session management not available - no SessionManager configured")
+        })?;
+
+        // Parse the operation from the request
+        let operation: SessionOperation = serde_json::from_value(
+            content
+                .get("operation")
+                .ok_or_else(|| anyhow::anyhow!("Missing operation field"))?
+                .clone(),
+        )?;
+
+        // Handle the operation
+        match operation {
+            SessionOperation::Create { name, description } => {
+                let options = CreateSessionOptions::builder()
+                    .name(name.unwrap_or_else(|| "unnamed".to_string()))
+                    .description(description.unwrap_or_else(|| "Created via kernel".to_string()))
+                    .build();
+
+                match session_manager.create_session(options).await {
+                    Ok(session_id) => Ok(serde_json::json!({
+                        "status": "ok",
+                        "session_id": session_id.to_string()
+                    })),
+                    Err(e) => Ok(serde_json::json!({
+                        "status": "error",
+                        "error": format!("Failed to create session: {}", e)
+                    })),
+                }
+            }
+            SessionOperation::List { query } => {
+                let query = if let Some(q) = query {
+                    serde_json::from_value(q).unwrap_or_default()
+                } else {
+                    SessionQuery::default()
+                };
+
+                match session_manager.list_sessions(query).await {
+                    Ok(sessions) => Ok(serde_json::json!({
+                        "status": "ok",
+                        "sessions": sessions
+                    })),
+                    Err(e) => Ok(serde_json::json!({
+                        "status": "error",
+                        "error": format!("Failed to list sessions: {}", e)
+                    })),
+                }
+            }
+            SessionOperation::Show { id } => {
+                let session_id = llmspell_sessions::SessionId::from_str(&id)
+                    .map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
+
+                match session_manager.get_session(&session_id).await {
+                    Ok(session) => {
+                        let metadata = session.metadata.read().await;
+                        Ok(serde_json::json!({
+                            "status": "ok",
+                            "session": *metadata
+                        }))
+                    }
+                    Err(e) => Ok(serde_json::json!({
+                        "status": "error",
+                        "error": format!("Failed to get session: {}", e)
+                    })),
+                }
+            }
+            SessionOperation::Delete { id } => {
+                if id.is_empty() {
+                    // Delete all sessions
+                    let sessions = session_manager
+                        .list_sessions(SessionQuery::default())
+                        .await
+                        .map_err(|e| anyhow::anyhow!("Failed to list sessions: {}", e))?;
+
+                    let mut deleted = 0;
+                    for session in sessions {
+                        if session_manager.delete_session(&session.id).await.is_ok() {
+                            deleted += 1;
+                        }
+                    }
+
+                    Ok(serde_json::json!({
+                        "status": "ok",
+                        "deleted": deleted
+                    }))
+                } else {
+                    // Delete specific session
+                    let session_id = llmspell_sessions::SessionId::from_str(&id)
+                        .map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
+
+                    match session_manager.delete_session(&session_id).await {
+                        Ok(_) => Ok(serde_json::json!({
+                            "status": "ok"
+                        })),
+                        Err(e) => Ok(serde_json::json!({
+                            "status": "error",
+                            "error": format!("Failed to delete session: {}", e)
+                        })),
+                    }
+                }
+            }
+            SessionOperation::Export { id, format: _ } => {
+                let session_id = llmspell_sessions::SessionId::from_str(&id)
+                    .map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
+
+                match session_manager.get_session(&session_id).await {
+                    Ok(session) => {
+                        let metadata = session.metadata.read().await.clone();
+                        let timeline = session_manager
+                            .get_session_timeline(&session_id)
+                            .await
+                            .unwrap_or_default();
+
+                        let export_data = serde_json::json!({
+                            "metadata": metadata,
+                            "timeline": timeline,
+                            "config": session.config,
+                        });
+
+                        Ok(serde_json::json!({
+                            "status": "ok",
+                            "data": export_data
+                        }))
+                    }
+                    Err(e) => Ok(serde_json::json!({
+                        "status": "error",
+                        "error": format!("Failed to export session: {}", e)
+                    })),
+                }
+            }
+            SessionOperation::Replay { .. } => {
+                // Replay is complex and not implemented yet
+                Ok(serde_json::json!({
+                    "status": "error",
+                    "error": "Session replay not yet implemented via kernel"
+                }))
+            }
         }
     }
 }

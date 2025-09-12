@@ -143,6 +143,8 @@ impl ReplSession {
             ".clear" => Ok(self.handle_clear_command()),
             ".history" => Ok(self.handle_history_command()),
             ".info" => Ok(self.handle_info_command()),
+            ".state" => self.handle_state_command(&parts).await,
+            ".session" => self.handle_session_command(&parts).await,
 
             // Debug commands (if enabled)
             ".break" if self.config.enable_debug_commands => {
@@ -472,6 +474,8 @@ impl ReplSession {
             "  .clear             - Clear variables",
             "  .history           - Show command history",
             "  .info              - Show session info",
+            "  .state [key]       - Show persistent state",
+            "  .session           - Show current session info",
         ];
 
         if self.config.enable_debug_commands {
@@ -491,6 +495,65 @@ impl ReplSession {
         help.push("Enter any other text to execute as code");
 
         help.join("\n")
+    }
+
+    /// Handle state command
+    async fn handle_state_command(&mut self, parts: &[&str]) -> Result<ReplResponse> {
+        // Get optional key from command
+        let key = parts.get(1).map(|s| s.to_string());
+
+        // Execute state retrieval code
+        let code = if let Some(ref k) = key {
+            format!(
+                "
+                local value = State.get(\"{}\")
+                if value ~= nil then
+                    print(\"State['{}'] = \" .. tostring(value))
+                else
+                    print(\"State key '{}' not found\")
+                end
+            ",
+                k, k, k
+            )
+        } else {
+            // Show all state keys
+            "
+                local keys = State.keys()
+                if keys and #keys > 0 then
+                    print(\"State keys (\" .. #keys .. \" total):\")
+                    for i, k in ipairs(keys) do
+                        local v = State.get(k)
+                        print(\"  \" .. k .. \" = \" .. tostring(v))
+                    end
+                else
+                    print(\"No state keys found\")
+                end
+            "
+            .to_string()
+        };
+
+        // Execute the code
+        let result = self.kernel.execute(&code).await?;
+        Ok(ReplResponse::Info(result))
+    }
+
+    /// Handle session command
+    async fn handle_session_command(&mut self, _parts: &[&str]) -> Result<ReplResponse> {
+        // Get session info from kernel
+        let code = "
+            if Session and Session.info then
+                local info = Session.info()
+                print(\"Session Info:\")
+                print(\"  ID: \" .. tostring(info.id or 'unknown'))
+                print(\"  Created: \" .. tostring(info.created or 'unknown'))
+                print(\"  Execution Count: \" .. tostring(info.execution_count or 0))
+            else
+                print(\"Session information not available\")
+            end
+        ";
+
+        let result = self.kernel.execute(code).await?;
+        Ok(ReplResponse::Info(result))
     }
 
     /// Check performance against workload expectations

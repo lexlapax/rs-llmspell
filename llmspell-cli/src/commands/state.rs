@@ -1,173 +1,181 @@
 //! State management commands
 //!
-//! Provides CLI commands for managing persistent state using the StateManager
-//! from llmspell-state-persistence crate.
+//! Provides CLI commands for managing persistent state through the kernel
+//! using custom protocol messages (StateRequest/StateReply).
 
 use crate::cli::{ExportFormat, OutputFormat, StateCommands};
 use anyhow::Result;
 use llmspell_config::LLMSpellConfig;
-use llmspell_state_persistence::{StateManager, StateScope};
+use llmspell_kernel::jupyter::protocol::StateOperation;
 use serde_json::Value;
 use std::path::PathBuf;
 
 /// Handle state management commands
 pub async fn handle_state_command(
     command: StateCommands,
-    _config: LLMSpellConfig,
+    config: LLMSpellConfig,
     output_format: OutputFormat,
+    connect: Option<String>, // Connection string for external kernel
 ) -> Result<()> {
-    // Create state manager using the configuration
-    let state_manager = StateManager::new().await?;
+    // Connect to kernel instead of creating local StateManager
+    // This ensures state is shared between CLI and scripts
+    let kernel = super::create_kernel_connection(config, connect).await?;
 
     match command {
-        StateCommands::Show { key } => show_state(&state_manager, key, output_format).await,
-        StateCommands::Clear { key } => clear_state(&state_manager, key).await,
-        StateCommands::Export { file, format } => export_state(&state_manager, file, format).await,
-        StateCommands::Import { file, merge } => import_state(&state_manager, file, merge).await,
+        StateCommands::Show { key } => show_state_via_kernel(kernel, key, output_format).await,
+        StateCommands::Clear { key } => clear_state_via_kernel(kernel, key).await,
+        StateCommands::Export { file, format } => {
+            export_state_via_kernel(kernel, Some(file), format).await
+        }
+        StateCommands::Import { file, merge } => import_state_via_kernel(kernel, file, merge).await,
     }
 }
 
-/// Show state values
-async fn show_state(
-    state_manager: &StateManager,
+/// Show state values via kernel
+async fn show_state_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
     key: Option<String>,
     output_format: OutputFormat,
 ) -> Result<()> {
-    match key {
-        Some(key) => {
-            // Show specific key
-            let value = state_manager.get(StateScope::Global, &key).await?;
-            match value {
-                Some(value) => match output_format {
-                    OutputFormat::Json => {
-                        println!("{}", serde_json::to_string_pretty(&value)?);
-                    }
-                    OutputFormat::Text | OutputFormat::Pretty => {
-                        println!("Key: {}", key);
-                        println!("Value: {}", value);
-                    }
-                },
-                None => {
-                    if matches!(output_format, OutputFormat::Text | OutputFormat::Pretty) {
+    // Create the state operation
+    let operation = StateOperation::Show { key: key.clone() };
+
+    // Send state request to kernel
+    let reply = kernel
+        .state_request(serde_json::to_value(operation)?, Some("global".to_string()))
+        .await?;
+
+    // Process the reply
+    if let Some(data) = reply.get("data") {
+        match output_format {
+            OutputFormat::Json => {
+                println!("{}", serde_json::to_string_pretty(data)?);
+            }
+            OutputFormat::Text | OutputFormat::Pretty => {
+                if let Some(key) = key {
+                    // Single key was requested
+                    if data.is_null() {
                         println!("Key '{}' not found", key);
+                    } else {
+                        println!("Key: {}", key);
+                        println!("Value: {}", data);
                     }
-                }
-            }
-        }
-        None => {
-            // Show all state keys
-            let keys = state_manager.list_keys(StateScope::Global).await?;
-            if keys.is_empty() {
-                if matches!(output_format, OutputFormat::Text | OutputFormat::Pretty) {
-                    println!("No state keys found");
-                }
-            } else {
-                match output_format {
-                    OutputFormat::Json => {
-                        let mut all_values = serde_json::Map::new();
-                        for key in keys {
-                            if let Some(value) = state_manager.get(StateScope::Global, &key).await?
-                            {
-                                all_values.insert(key, value);
-                            }
-                        }
-                        println!("{}", serde_json::to_string_pretty(&all_values)?);
-                    }
-                    OutputFormat::Text | OutputFormat::Pretty => {
-                        println!("State keys ({} total):", keys.len());
-                        for key in &keys {
-                            if let Some(value) = state_manager.get(StateScope::Global, key).await? {
-                                println!("  {} = {}", key, value);
+                } else {
+                    // All keys were requested
+                    if let Some(obj) = data.as_object() {
+                        if obj.is_empty() {
+                            println!("No state keys found");
+                        } else {
+                            println!("State keys ({} total):", obj.len());
+                            for (k, v) in obj {
+                                println!("  {} = {}", k, v);
                             }
                         }
                     }
                 }
             }
         }
+    } else {
+        println!("No data returned");
     }
 
     Ok(())
 }
 
-/// Clear state values
-async fn clear_state(state_manager: &StateManager, key: Option<String>) -> Result<()> {
+/// Clear state values via kernel
+async fn clear_state_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    key: Option<String>,
+) -> Result<()> {
+    // Create the state operation
+    let operation = StateOperation::Clear { key: key.clone() };
+
+    // Send state request to kernel
+    kernel
+        .state_request(serde_json::to_value(operation)?, Some("global".to_string()))
+        .await?;
+
     match key {
-        Some(key) => {
-            // Clear specific key
-            state_manager.delete(StateScope::Global, &key).await?;
-            println!("✓ Cleared state key: {}", key);
-        }
-        None => {
-            // Clear all state
-            println!("Clear all state not yet implemented - please specify a key");
-            // TODO: Implement clear_all functionality when StateManager supports it
-        }
+        Some(key) => println!("✓ Cleared state key: {}", key),
+        None => println!("✓ Cleared all state keys"),
     }
 
     Ok(())
 }
 
-/// Export state to file
-async fn export_state(
-    state_manager: &StateManager,
-    file: PathBuf,
+/// Export state to file via kernel
+async fn export_state_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    file: Option<PathBuf>,
     format: ExportFormat,
 ) -> Result<()> {
-    // Get all state from Global scope
-    let all_state = state_manager.get_all_in_scope(StateScope::Global).await?;
-
-    if all_state.is_empty() {
-        println!("No state to export");
-        return Ok(());
-    }
-
-    let content = match format {
-        ExportFormat::Json => serde_json::to_string_pretty(&all_state)?,
-        ExportFormat::Yaml => serde_yaml::to_string(&all_state)?,
-        ExportFormat::Toml => toml::to_string_pretty(&all_state)?,
+    // Create the state operation
+    let format_str = match format {
+        ExportFormat::Json => "json",
+        ExportFormat::Yaml => "yaml",
+        ExportFormat::Toml => "toml",
+    };
+    let operation = StateOperation::Export {
+        format: Some(format_str.to_string()),
     };
 
-    tokio::fs::write(&file, content).await?;
-    println!(
-        "✓ Exported {} state keys to {}",
-        all_state.len(),
-        file.display()
-    );
+    // Send state request to kernel
+    let reply = kernel
+        .state_request(serde_json::to_value(operation)?, Some("global".to_string()))
+        .await?;
+
+    // Process the reply
+    if let Some(data) = reply.get("data") {
+        // Format the data
+        let formatted = match format {
+            ExportFormat::Json => serde_json::to_string_pretty(data)?,
+            ExportFormat::Yaml => {
+                // For now, just use JSON (YAML support can be added later)
+                serde_json::to_string_pretty(data)?
+            }
+            ExportFormat::Toml => {
+                // For now, just use JSON (TOML support can be added later)
+                serde_json::to_string_pretty(data)?
+            }
+        };
+
+        // Write to file or stdout
+        if let Some(file) = file {
+            std::fs::write(&file, formatted)?;
+            println!("✓ Exported state to {}", file.display());
+        } else {
+            println!("{}", formatted);
+        }
+    } else {
+        println!("No state to export");
+    }
 
     Ok(())
 }
 
-/// Import state from file
-async fn import_state(state_manager: &StateManager, file: PathBuf, merge: bool) -> Result<()> {
-    let content = tokio::fs::read_to_string(&file).await?;
+/// Import state from file via kernel
+async fn import_state_via_kernel(
+    mut kernel: Box<dyn crate::kernel_client::KernelConnectionTrait>,
+    file: PathBuf,
+    merge: bool,
+) -> Result<()> {
+    // Read the file
+    let content = std::fs::read_to_string(&file)?;
+    let data: Value = serde_json::from_str(&content)?;
 
-    // Parse the file content based on extension
-    let data: Value = if file.extension().and_then(|s| s.to_str()) == Some("yaml") {
-        serde_yaml::from_str(&content)?
-    } else if file.extension().and_then(|s| s.to_str()) == Some("toml") {
-        toml::from_str(&content)?
+    // Create the state operation
+    let operation = StateOperation::Import { data, merge };
+
+    // Send state request to kernel
+    kernel
+        .state_request(serde_json::to_value(operation)?, Some("global".to_string()))
+        .await?;
+
+    println!("✓ Imported state from {}", file.display());
+    if merge {
+        println!("  (merged with existing state)");
     } else {
-        serde_json::from_str(&content)?
-    };
-
-    // Import the data
-    if let Value::Object(map) = data {
-        for (key, value) in map {
-            if merge {
-                // Only set if key doesn't exist
-                if state_manager.get(StateScope::Global, &key).await?.is_none() {
-                    state_manager.set(StateScope::Global, &key, value).await?;
-                }
-            } else {
-                // Always set (overwrite existing)
-                state_manager.set(StateScope::Global, &key, value).await?;
-            }
-        }
-
-        let action = if merge { "merged" } else { "imported" };
-        println!("✓ {} state from {}", action, file.display());
-    } else {
-        anyhow::bail!("State file must contain an object at root level");
+        println!("  (replaced existing state)");
     }
 
     Ok(())

@@ -60,6 +60,26 @@ impl KernelConnectionTrait for NullKernelConnection {
         Ok(Value::Null)
     }
 
+    async fn state_request(&mut self, _operation: Value, _scope: Option<String>) -> Result<Value> {
+        Ok(serde_json::json!({
+            "status": "ok",
+            "data": serde_json::json!({
+                "test_key": "test_value"
+            })
+        }))
+    }
+
+    async fn session_request(&mut self, _operation: Value) -> Result<Value> {
+        Ok(serde_json::json!({
+            "status": "ok",
+            "session": serde_json::json!({
+                "id": "test-session-id",
+                "created": "2025-01-12T12:00:00Z",
+                "execution_count": 5
+            })
+        }))
+    }
+
     async fn disconnect(&mut self) -> Result<()> {
         self.connected = false;
         Ok(())

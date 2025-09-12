@@ -31,8 +31,11 @@ llmspell-bridge = { path = "../llmspell-bridge" }
 llmspell-config = { path = "../llmspell-config" }
 llmspell-core = { path = "../llmspell-core" }
 llmspell-debug = { path = "../llmspell-debug" }
+llmspell-events = { path = "../llmspell-events" }
+llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-sessions = { path = "../llmspell-sessions" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-storage = { path = "../llmspell-storage" }
 llmspell-utils = { path = "../llmspell-utils" }
 
 # ZeroMQ and Jupyter dependencies  

@@ -132,11 +132,11 @@ pub async fn execute_command(
             apps::execute_apps_command(app, engine, runtime_config, output_format).await
         }
         Commands::Setup { force } => setup::run_interactive_setup(force).await,
-        Commands::State { command } => {
-            state::handle_state_command(command, runtime_config, output_format).await
+        Commands::State { command, connect } => {
+            state::handle_state_command(command, runtime_config, output_format, connect).await
         }
-        Commands::Session { command } => {
-            session::handle_session_command(command, runtime_config, output_format).await
+        Commands::Session { command, connect } => {
+            session::handle_session_command(command, runtime_config, output_format, connect).await
         }
         Commands::Config { command } => config::handle_config_command(command, output_format).await,
         Commands::Debug {
