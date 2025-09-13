@@ -13659,7 +13659,12 @@ pub struct IOPerformanceHints {
   - Solution: Added explicit msg_type handling in both create_broadcast and deserialize_content
   - Result: Stream messages now properly display output: "OUTPUT CAPTURE WORKS"
 - ✅ Debug Infrastructure: Complete and fully functional (Fixed embedded kernel shutdown issue in debug mode)
-- ❌ RAG System: Commands not implemented (no `rag` subcommand exists)
+- ✅ RAG System: **IMPLEMENTED** - Commands route through kernel (2025-09-13)
+  - Available: `rag ingest/search/stats/clear/index`
+  - **FIXED**: Added RagRequest/RagReply protocol messages to kernel
+  - **REFACTORED**: handle_rag_request split into smaller helper functions  
+  - **CONFIG FIX**: Vector dimensions now read from config (was hardcoded to 384)
+  - **VERIFIED**: Ingest and stats work, search returns results (may need threshold tuning)
 - ✅ State Management: **ARCHITECTURAL FIX COMPLETE** - Now routes through kernel
   - Available: `state show/clear/export/import` (design choice, not set/get/list/delete)
   - **FIXED**: Commands now use kernel connection via StateRequest/StateReply protocol messages

@@ -85,6 +85,8 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
     pub state_manager: Option<Arc<StateManager>>,
     /// Shared session manager
     pub session_manager: Option<Arc<SessionManager>>,
+    /// RAG pipeline
+    pub rag_pipeline: Option<Arc<llmspell_rag::pipeline::RAGPipeline>>,
 
     /// Security manager
     pub security_manager: Arc<SecurityManager>,
@@ -112,6 +114,56 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
 }
 
 impl<T: Transport, P: Protocol> GenericKernel<T, P> {
+    /// Create RAG pipeline based on configuration
+    async fn create_rag_pipeline(
+        config: &Arc<LLMSpellConfig>,
+        _state_manager: &Option<Arc<StateManager>>,
+    ) -> Result<Option<Arc<llmspell_rag::pipeline::RAGPipeline>>> {
+        if !config.rag.enabled {
+            return Ok(None);
+        }
+
+        use llmspell_rag::{
+            embeddings::{CacheConfig, EmbeddingCache, EmbeddingFactory, EmbeddingProviderConfig},
+            pipeline::{config::RAGConfig, RAGPipeline},
+        };
+        use llmspell_storage::{
+            backends::vector::HNSWVectorStorage,
+            vector_storage::{HNSWConfig, VectorStorage},
+        };
+
+        // Create vector storage based on config
+        let storage: Arc<dyn VectorStorage> = match config.rag.vector_storage.backend {
+            llmspell_config::VectorBackend::HNSW => {
+                let dimensions = config.rag.vector_storage.dimensions;
+                let hnsw_config = HNSWConfig::default();
+                Arc::new(HNSWVectorStorage::new(dimensions, hnsw_config)) as Arc<dyn VectorStorage>
+            }
+            _ => {
+                // Default to in-memory storage
+                // Use HNSW with small config as fallback
+                let dimensions = config.rag.vector_storage.dimensions;
+                let hnsw_config = HNSWConfig::default();
+                Arc::new(HNSWVectorStorage::new(dimensions, hnsw_config)) as Arc<dyn VectorStorage>
+            }
+        };
+
+        // Create embedding factory
+        let embedding_config = EmbeddingProviderConfig::default();
+        let embedding_factory = Arc::new(EmbeddingFactory::new(embedding_config));
+
+        // Create embedding cache
+        let cache_config = CacheConfig::default();
+        let embedding_cache = Arc::new(EmbeddingCache::new(cache_config));
+
+        // Create RAG pipeline
+        let rag_config = RAGConfig::default();
+        let pipeline = RAGPipeline::new(rag_config, storage, embedding_factory, embedding_cache)
+            .map_err(|e| anyhow::anyhow!("Failed to create RAG pipeline: {}", e))?;
+
+        Ok(Some(Arc::new(pipeline)))
+    }
+
     /// Create a session manager based on configuration
     async fn create_session_manager(
         config: &Arc<LLMSpellConfig>,
@@ -258,6 +310,9 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         // Create SessionManager based on config
         let session_manager = Self::create_session_manager(&config, &state_manager).await?;
 
+        // Create RAG pipeline based on config
+        let rag_pipeline = Self::create_rag_pipeline(&config, &state_manager).await?;
+
         Ok(Self {
             kernel_id,
             transport,
@@ -268,6 +323,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             config,
             state_manager,
             session_manager,
+            rag_pipeline,
             security_manager,
             resource_limits: ClientResourceLimits::default(),
             execution_count: Arc::new(Mutex::new(0)),
@@ -575,6 +631,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             "debug_request" => self.handle_debug_request_message(content).await,
             "state_request" => self.handle_state_request(content).await,
             "session_request" => self.handle_session_request(content).await,
+            "rag_request" => self.handle_rag_request(content).await,
             _ => {
                 tracing::warn!("Unknown message type: {}", msg_type);
                 Ok(serde_json::json!({
@@ -1473,6 +1530,264 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     "error": "Session replay not yet implemented via kernel"
                 }))
             }
+        }
+    }
+
+    /// Handle RAG system requests using the kernel's `RAGPipeline`
+    async fn handle_rag_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
+        use crate::jupyter::protocol::RagOperation;
+        use llmspell_state_traits::StateScope;
+
+        tracing::debug!("handle_rag_request called with content: {:?}", content);
+
+        // Check if RAG pipeline is available
+        let rag_pipeline = match self.check_rag_pipeline()? {
+            Some(pipeline) => pipeline,
+            None => {
+                return Ok(self.create_rag_error(
+                    "RAG system not available - RAG is disabled in configuration",
+                ))
+            }
+        };
+
+        // Parse the operation from the request
+        let operation = self.parse_rag_operation(&content)?;
+
+        // Parse optional scope for multi-tenant isolation
+        let scope = self.parse_rag_scope(&content);
+
+        // Handle the specific operation
+        match operation {
+            RagOperation::Ingest {
+                path,
+                content,
+                metadata,
+                chunk_size: _,
+                recursive: _,
+            } => {
+                self.handle_rag_ingest(rag_pipeline, path, content, metadata, scope)
+                    .await
+            }
+            RagOperation::Search {
+                query,
+                limit,
+                threshold,
+                metadata_filter: _,
+            } => {
+                self.handle_rag_search(rag_pipeline, query, limit, threshold, scope)
+                    .await
+            }
+            RagOperation::Stats { detailed: _ } => self.handle_rag_stats(rag_pipeline, scope).await,
+            RagOperation::Clear {
+                scope: clear_scope,
+                confirm: _,
+            } => {
+                self.handle_rag_clear(rag_pipeline, clear_scope, scope)
+                    .await
+            }
+            RagOperation::Index { action: _ } => {
+                Ok(self.create_rag_error("Index operation not yet implemented via kernel"))
+            }
+        }
+    }
+
+    /// Check if RAG pipeline is available
+    fn check_rag_pipeline(&self) -> Result<Option<&llmspell_rag::pipeline::RAGPipeline>> {
+        match self.rag_pipeline.as_ref() {
+            Some(pipeline) => {
+                tracing::debug!("RAG pipeline is available");
+                Ok(Some(pipeline))
+            }
+            None => {
+                tracing::warn!("RAG pipeline not available - RAG disabled in config");
+                Ok(None)
+            }
+        }
+    }
+
+    /// Parse RAG operation from request content
+    fn parse_rag_operation(
+        &self,
+        content: &serde_json::Value,
+    ) -> Result<crate::jupyter::protocol::RagOperation> {
+        use crate::jupyter::protocol::RagOperation;
+
+        serde_json::from_value::<RagOperation>(
+            content
+                .get("operation")
+                .ok_or_else(|| anyhow::anyhow!("Missing operation field"))?
+                .clone(),
+        )
+        .map_err(|e| anyhow::anyhow!("Failed to parse RAG operation: {}", e))
+    }
+
+    /// Parse optional scope from request
+    fn parse_rag_scope(
+        &self,
+        content: &serde_json::Value,
+    ) -> Option<llmspell_state_traits::StateScope> {
+        use llmspell_state_traits::StateScope;
+
+        content
+            .get("scope")
+            .and_then(|s| s.as_str())
+            .map(|s| StateScope::User(s.to_string()))
+    }
+
+    /// Create standard error response
+    fn create_rag_error(&self, error_msg: &str) -> serde_json::Value {
+        serde_json::json!({
+            "status": "error",
+            "error": error_msg
+        })
+    }
+
+    /// Handle document ingestion
+    async fn handle_rag_ingest(
+        &self,
+        rag_pipeline: &llmspell_rag::pipeline::RAGPipeline,
+        path: String,
+        content: Option<String>,
+        metadata: Option<serde_json::Value>,
+        scope: Option<llmspell_state_traits::StateScope>,
+    ) -> Result<serde_json::Value> {
+        // Use path as document ID
+        let document_id = path.clone();
+
+        // Get document content
+        let doc_content = content.unwrap_or_else(|| {
+            // If no content provided, try to read from path
+            std::fs::read_to_string(&path).unwrap_or_default()
+        });
+
+        // Ingest the document
+        match rag_pipeline
+            .ingest_document(document_id.clone(), doc_content, metadata, scope)
+            .await
+        {
+            Ok(result) => {
+                let reply = serde_json::json!({
+                    "status": "ok",
+                    "data": {
+                        "document_id": document_id,
+                        "chunks_stored": result.chunks_stored,
+                        "storage_time_ms": 0 // Field doesn't exist, use placeholder
+                    }
+                });
+                tracing::debug!("Ingest successful, returning: {:?}", reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                tracing::error!("Ingest failed: {}", e);
+                Ok(self.create_rag_error(&format!("Failed to ingest document: {}", e)))
+            }
+        }
+    }
+
+    /// Handle document search
+    async fn handle_rag_search(
+        &self,
+        rag_pipeline: &llmspell_rag::pipeline::RAGPipeline,
+        query: String,
+        limit: usize,
+        threshold: Option<f32>,
+        scope: Option<llmspell_state_traits::StateScope>,
+    ) -> Result<serde_json::Value> {
+        // Build query configuration
+        let query_config = llmspell_rag::pipeline::config::QueryConfig {
+            max_results: Some(limit),
+            min_score: threshold,
+            hybrid_weights: None,
+            metadata_filters: std::collections::HashMap::new(),
+            reranking: None,
+        };
+
+        // Execute search
+        match rag_pipeline
+            .search(query.clone(), scope, Some(query_config))
+            .await
+        {
+            Ok(result) => {
+                let results: Vec<serde_json::Value> = result
+                    .results
+                    .into_iter()
+                    .map(|r| {
+                        serde_json::json!({
+                            "content": r.content,
+                            "score": r.score,
+                            "metadata": r.metadata
+                        })
+                    })
+                    .collect();
+
+                Ok(serde_json::json!({
+                    "status": "ok",
+                    "data": {
+                        "query": query,
+                        "results": results,
+                        "search_time_ms": result.retrieval_time_ms
+                    }
+                }))
+            }
+            Err(e) => Ok(self.create_rag_error(&format!("Search failed: {}", e))),
+        }
+    }
+
+    /// Handle statistics request
+    async fn handle_rag_stats(
+        &self,
+        rag_pipeline: &llmspell_rag::pipeline::RAGPipeline,
+        scope: Option<llmspell_state_traits::StateScope>,
+    ) -> Result<serde_json::Value> {
+        tracing::debug!("Getting RAG stats for scope: {:?}", scope);
+
+        match rag_pipeline.stats(scope).await {
+            Ok(stats) => {
+                let reply = serde_json::json!({
+                    "status": "ok",
+                    "data": {
+                        "stats": {
+                            "vectors_stored": stats.vectors_stored,
+                            "memory_usage_bytes": stats.memory_usage_bytes,
+                            "cache_hits": stats.cache_hits,
+                            "cache_misses": stats.cache_misses,
+                            "cache_hit_rate": stats.cache_hit_rate,
+                            "estimated_cost_usd": stats.estimated_cost_usd
+                        }
+                    }
+                });
+                tracing::debug!("Stats retrieved successfully: {:?}", reply);
+                Ok(reply)
+            }
+            Err(e) => {
+                tracing::error!("Failed to get stats: {}", e);
+                Ok(self.create_rag_error(&format!("Failed to get stats: {}", e)))
+            }
+        }
+    }
+
+    /// Handle clear operation
+    async fn handle_rag_clear(
+        &self,
+        rag_pipeline: &llmspell_rag::pipeline::RAGPipeline,
+        clear_scope: Option<String>,
+        default_scope: Option<llmspell_state_traits::StateScope>,
+    ) -> Result<serde_json::Value> {
+        use llmspell_state_traits::StateScope;
+
+        let scope_to_clear = clear_scope
+            .map(StateScope::User)
+            .or(default_scope)
+            .unwrap_or(StateScope::Global);
+
+        match rag_pipeline.clear_scope(&scope_to_clear).await {
+            Ok(deleted_count) => Ok(serde_json::json!({
+                "status": "ok",
+                "data": {
+                    "vectors_deleted": deleted_count
+                }
+            })),
+            Err(e) => Ok(self.create_rag_error(&format!("Failed to clear scope: {}", e))),
         }
     }
 }

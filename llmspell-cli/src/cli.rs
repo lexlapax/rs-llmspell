@@ -225,6 +225,16 @@ pub enum Commands {
         connect: Option<String>,
     },
 
+    /// Manage RAG (Retrieval-Augmented Generation) system
+    Rag {
+        #[command(subcommand)]
+        command: RagCommands,
+
+        /// Connect to external kernel (e.g., "localhost:9555" or "/path/to/connection.json")
+        #[arg(long)]
+        connect: Option<String>,
+    },
+
     /// Configuration management
     Config {
         #[command(subcommand)]
@@ -391,6 +401,67 @@ pub enum SessionCommands {
         /// Export format
         #[arg(long, value_enum, default_value = "json")]
         format: ExportFormat,
+    },
+}
+
+/// RAG system subcommands
+#[derive(Subcommand, Debug)]
+pub enum RagCommands {
+    /// Ingest a document into the RAG system
+    Ingest {
+        /// Document ID
+        id: String,
+        /// Document content or file path (if prefixed with @)
+        content: String,
+        /// Optional metadata as JSON
+        #[arg(long)]
+        metadata: Option<String>,
+        /// Scope for multi-tenant isolation
+        #[arg(long)]
+        scope: Option<String>,
+    },
+    /// Search for relevant documents
+    Search {
+        /// Search query
+        query: String,
+        /// Maximum number of results
+        #[arg(long, default_value = "10")]
+        limit: usize,
+        /// Minimum score threshold
+        #[arg(long, default_value = "0.5")]
+        threshold: f32,
+        /// Scope for multi-tenant isolation
+        #[arg(long)]
+        scope: Option<String>,
+    },
+    /// Show RAG system statistics
+    Stats {
+        /// Scope for multi-tenant isolation
+        #[arg(long)]
+        scope: Option<String>,
+    },
+    /// Clear RAG data
+    Clear {
+        /// Scope to clear (defaults to global)
+        #[arg(long)]
+        scope: Option<String>,
+        /// Confirm the clear operation
+        #[arg(long)]
+        confirm: bool,
+    },
+    /// Index files or directories
+    Index {
+        /// Path to index
+        path: PathBuf,
+        /// Recursively index directories
+        #[arg(long)]
+        recursive: bool,
+        /// File pattern to match (e.g., "*.md")
+        #[arg(long)]
+        pattern: Option<String>,
+        /// Scope for multi-tenant isolation
+        #[arg(long)]
+        scope: Option<String>,
     },
 }
 

@@ -88,6 +88,9 @@ pub trait KernelConnectionTrait: Send + Sync {
     /// Send session management request
     async fn session_request(&mut self, operation: Value) -> Result<Value>;
 
+    /// Send RAG system request
+    async fn rag_request(&mut self, operation: Value, scope: Option<String>) -> Result<Value>;
+
     /// Classify workload
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier;
 
@@ -308,6 +311,10 @@ impl<T: KernelConnectionTrait> KernelConnectionTrait for MonitoredKernelConnecti
 
     async fn session_request(&mut self, operation: Value) -> Result<Value> {
         self.inner.session_request(operation).await
+    }
+
+    async fn rag_request(&mut self, operation: Value, scope: Option<String>) -> Result<Value> {
+        self.inner.rag_request(operation, scope).await
     }
 
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {

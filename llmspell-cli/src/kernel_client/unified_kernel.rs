@@ -465,6 +465,54 @@ impl KernelConnectionTrait for UnifiedKernelClient {
         }
     }
 
+    async fn rag_request(&mut self, operation: Value, scope: Option<String>) -> Result<Value> {
+        use llmspell_kernel::jupyter::protocol::MessageContent;
+
+        tracing::debug!(
+            "Sending RAG request: operation={:?}, scope={:?}",
+            operation,
+            scope
+        );
+
+        // Send RAG request through the client
+        let reply = self.client.rag_request(operation, scope).await?;
+
+        tracing::debug!("Received RAG reply: {:?}", reply);
+
+        // Convert MessageContent to Value
+        match reply {
+            MessageContent::RagReply {
+                status,
+                data,
+                error,
+            } => {
+                tracing::debug!(
+                    "RagReply: status={}, data={:?}, error={:?}",
+                    status,
+                    data,
+                    error
+                );
+
+                if status == "ok" {
+                    let result = serde_json::json!({
+                        "status": "ok",
+                        "data": data
+                    });
+                    tracing::debug!("Returning successful result: {:?}", result);
+                    Ok(result)
+                } else {
+                    let err_msg = error.unwrap_or_else(|| "Unknown error".to_string());
+                    tracing::error!("RAG operation failed: {}", err_msg);
+                    Err(anyhow::anyhow!("RAG operation failed: {}", err_msg))
+                }
+            }
+            _ => {
+                tracing::error!("Unexpected reply type from kernel");
+                Err(anyhow::anyhow!("Unexpected reply from kernel"))
+            }
+        }
+    }
+
     fn classify_workload(&self, operation: &str) -> WorkloadClassifier {
         match operation {
             "execute_line" | "tab_complete" => WorkloadClassifier::Light,

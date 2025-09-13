@@ -80,6 +80,15 @@ impl KernelConnectionTrait for NullKernelConnection {
         }))
     }
 
+    async fn rag_request(&mut self, _operation: Value, _scope: Option<String>) -> Result<Value> {
+        Ok(serde_json::json!({
+            "status": "ok",
+            "data": serde_json::json!({
+                "results": []
+            })
+        }))
+    }
+
     async fn disconnect(&mut self) -> Result<()> {
         self.connected = false;
         Ok(())

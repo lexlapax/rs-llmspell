@@ -267,6 +267,22 @@ pub enum MessageContent {
         #[serde(skip_serializing_if = "Option::is_none")]
         error: Option<String>, // Error message if status is "error"
     },
+
+    // === RAG SYSTEM (LLMSpell Extension) ===
+    #[serde(rename = "rag_request")]
+    RagRequest {
+        operation: RagOperation,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        scope: Option<String>, // For multi-tenant isolation
+    },
+    #[serde(rename = "rag_reply")]
+    RagReply {
+        status: String, // "ok" or "error"
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<Value>, // Result data for operations
+        #[serde(skip_serializing_if = "Option::is_none")]
+        error: Option<String>, // Error message if status is "error"
+    },
 }
 
 /// State management operations
@@ -322,6 +338,64 @@ pub enum SessionOperation {
         #[serde(skip_serializing_if = "Option::is_none")]
         format: Option<String>, // json, yaml
     },
+}
+
+/// RAG system operations
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum RagOperation {
+    /// Ingest document(s)
+    Ingest {
+        path: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        content: Option<String>, // For direct content ingestion
+        #[serde(skip_serializing_if = "Option::is_none")]
+        metadata: Option<Value>,
+        #[serde(default = "default_chunk_size")]
+        chunk_size: usize,
+        #[serde(default)]
+        recursive: bool,
+    },
+    /// Search/query
+    Search {
+        query: String,
+        #[serde(default = "default_limit")]
+        limit: usize,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        threshold: Option<f32>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        metadata_filter: Option<Value>,
+    },
+    /// Get statistics
+    Stats {
+        #[serde(default)]
+        detailed: bool,
+    },
+    /// Clear data
+    Clear {
+        #[serde(skip_serializing_if = "Option::is_none")]
+        scope: Option<String>,
+        #[serde(default)]
+        confirm: bool,
+    },
+    /// Index operations
+    Index { action: IndexAction },
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum IndexAction {
+    List,
+    Optimize,
+    Rebuild,
+}
+
+fn default_chunk_size() -> usize {
+    512
+}
+
+fn default_limit() -> usize {
+    10
 }
 
 /// Information about an open comm channel
@@ -771,6 +845,9 @@ impl Protocol for JupyterProtocol {
         let content_enum = match reply_type.as_str() {
             "kernel_info_reply" => Self::create_kernel_info_reply_content(&content),
             "execute_reply" => Self::create_execute_reply_content(&content),
+            "rag_reply" => Self::create_rag_reply_content(&content),
+            "state_reply" => Self::create_state_reply_content(&content),
+            "session_reply" => Self::create_session_reply_content(&content),
             _ => Self::create_default_reply_content(content, &reply_type),
         };
 
@@ -1329,6 +1406,45 @@ impl JupyterProtocol {
                 evalue: None,
                 traceback: None,
             }
+        }
+    }
+
+    fn create_rag_reply_content(content: &Value) -> MessageContent {
+        tracing::debug!("create_rag_reply_content input: {:?}", content);
+
+        let status = content["status"].as_str().unwrap_or("error").to_string();
+        let data = content.get("data").cloned();
+        let error = content["error"].as_str().map(|s| s.to_string());
+
+        let reply = MessageContent::RagReply {
+            status: status.clone(),
+            data: data.clone(),
+            error: error.clone(),
+        };
+
+        tracing::debug!(
+            "create_rag_reply_content output: status={}, data={:?}, error={:?}",
+            status,
+            data,
+            error
+        );
+
+        reply
+    }
+
+    fn create_state_reply_content(content: &Value) -> MessageContent {
+        MessageContent::StateReply {
+            status: content["status"].as_str().unwrap_or("error").to_string(),
+            data: content.get("data").cloned(),
+            error: content["error"].as_str().map(|s| s.to_string()),
+        }
+    }
+
+    fn create_session_reply_content(content: &Value) -> MessageContent {
+        MessageContent::SessionReply {
+            status: content["status"].as_str().unwrap_or("error").to_string(),
+            data: content.get("data").cloned(),
+            error: content["error"].as_str().map(|s| s.to_string()),
         }
     }
 

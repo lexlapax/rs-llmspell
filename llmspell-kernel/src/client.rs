@@ -576,6 +576,51 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         }
     }
+
+    /// Send a RAG system request to the kernel
+    pub async fn rag_request(
+        &mut self,
+        operation: serde_json::Value,
+        scope: Option<String>,
+    ) -> Result<MessageContent> {
+        use crate::jupyter::protocol::MessageContent;
+
+        // Create RAG request with empty identity
+        let mut metadata = serde_json::Map::new();
+        metadata.insert("__identities".to_string(), serde_json::json!([""]));
+
+        let msg = JupyterMessage {
+            header: MessageHeader {
+                msg_id: Uuid::new_v4().to_string(),
+                msg_type: "rag_request".to_string(),
+                username: self.username.clone(),
+                session: self.session_id.clone(),
+                date: Utc::now(),
+                version: "5.3".to_string(),
+            },
+            parent_header: None,
+            metadata: serde_json::Value::Object(metadata),
+            content: MessageContent::RagRequest {
+                operation: serde_json::from_value(operation)?,
+                scope,
+            },
+        };
+
+        // Send request on shell channel
+        let request_bytes = self.protocol.encode(&msg, "shell")?;
+        self.transport.send("shell", request_bytes).await?;
+
+        // Wait for reply
+        loop {
+            if let Some(reply_bytes) = self.transport.recv("shell").await? {
+                let reply = self.protocol.decode(reply_bytes, "shell")?;
+                if reply.header.msg_type == "rag_reply" {
+                    return Ok(reply.content);
+                }
+            }
+            tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+        }
+    }
 }
 
 // Type alias for Jupyter client

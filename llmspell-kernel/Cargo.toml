@@ -33,8 +33,10 @@ llmspell-core = { path = "../llmspell-core" }
 llmspell-debug = { path = "../llmspell-debug" }
 llmspell-events = { path = "../llmspell-events" }
 llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-rag = { path = "../llmspell-rag" }
 llmspell-sessions = { path = "../llmspell-sessions" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-state-traits = { path = "../llmspell-state-traits" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-utils = { path = "../llmspell-utils" }
 

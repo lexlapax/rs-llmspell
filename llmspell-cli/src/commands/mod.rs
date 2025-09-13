@@ -11,6 +11,7 @@ pub mod init;
 pub mod kernel;
 pub mod keys;
 pub mod providers;
+pub mod rag;
 pub mod repl;
 pub mod run;
 pub mod session;
@@ -137,6 +138,9 @@ pub async fn execute_command(
         }
         Commands::Session { command, connect } => {
             session::handle_session_command(command, runtime_config, output_format, connect).await
+        }
+        Commands::Rag { command, connect } => {
+            rag::handle_rag_command(command, runtime_config, output_format, connect).await
         }
         Commands::Config { command } => config::handle_config_command(command, output_format).await,
         Commands::Debug {
