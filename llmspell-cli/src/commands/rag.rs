@@ -54,8 +54,7 @@ async fn ingest_document(
     output_format: OutputFormat,
 ) -> Result<()> {
     // Read content from file if prefixed with @
-    let doc_content = if content.starts_with('@') {
-        let file_path = &content[1..];
+    let doc_content = if let Some(file_path) = content.strip_prefix('@') {
         fs::read_to_string(file_path)?
     } else {
         content

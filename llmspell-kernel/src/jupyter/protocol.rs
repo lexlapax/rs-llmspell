@@ -390,11 +390,11 @@ pub enum IndexAction {
     Rebuild,
 }
 
-fn default_chunk_size() -> usize {
+const fn default_chunk_size() -> usize {
     512
 }
 
-fn default_limit() -> usize {
+const fn default_limit() -> usize {
     10
 }
 
@@ -1414,7 +1414,9 @@ impl JupyterProtocol {
 
         let status = content["status"].as_str().unwrap_or("error").to_string();
         let data = content.get("data").cloned();
-        let error = content["error"].as_str().map(|s| s.to_string());
+        let error = content["error"]
+            .as_str()
+            .map(std::string::ToString::to_string);
 
         let reply = MessageContent::RagReply {
             status: status.clone(),
@@ -1436,7 +1438,9 @@ impl JupyterProtocol {
         MessageContent::StateReply {
             status: content["status"].as_str().unwrap_or("error").to_string(),
             data: content.get("data").cloned(),
-            error: content["error"].as_str().map(|s| s.to_string()),
+            error: content["error"]
+                .as_str()
+                .map(std::string::ToString::to_string),
         }
     }
 
@@ -1444,7 +1448,9 @@ impl JupyterProtocol {
         MessageContent::SessionReply {
             status: content["status"].as_str().unwrap_or("error").to_string(),
             data: content.get("data").cloned(),
-            error: content["error"].as_str().map(|s| s.to_string()),
+            error: content["error"]
+                .as_str()
+                .map(std::string::ToString::to_string),
         }
     }
 

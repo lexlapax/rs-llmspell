@@ -578,6 +578,14 @@ impl GenericClient<crate::transport::ZmqTransport, crate::jupyter::JupyterProtoc
     }
 
     /// Send a RAG system request to the kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The request cannot be serialized
+    /// - Sending the message fails
+    /// - No response is received within the timeout
+    /// - The response cannot be deserialized
     pub async fn rag_request(
         &mut self,
         operation: serde_json::Value,

@@ -115,14 +115,10 @@ pub struct GenericKernel<T: Transport, P: Protocol> {
 
 impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// Create RAG pipeline based on configuration
-    async fn create_rag_pipeline(
+    fn create_rag_pipeline(
         config: &Arc<LLMSpellConfig>,
-        _state_manager: &Option<Arc<StateManager>>,
+        _state_manager: Option<&Arc<StateManager>>,
     ) -> Result<Option<Arc<llmspell_rag::pipeline::RAGPipeline>>> {
-        if !config.rag.enabled {
-            return Ok(None);
-        }
-
         use llmspell_rag::{
             embeddings::{CacheConfig, EmbeddingCache, EmbeddingFactory, EmbeddingProviderConfig},
             pipeline::{config::RAGConfig, RAGPipeline},
@@ -132,21 +128,16 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             vector_storage::{HNSWConfig, VectorStorage},
         };
 
+        if !config.rag.enabled {
+            return Ok(None);
+        }
+
         // Create vector storage based on config
-        let storage: Arc<dyn VectorStorage> = match config.rag.vector_storage.backend {
-            llmspell_config::VectorBackend::HNSW => {
-                let dimensions = config.rag.vector_storage.dimensions;
-                let hnsw_config = HNSWConfig::default();
-                Arc::new(HNSWVectorStorage::new(dimensions, hnsw_config)) as Arc<dyn VectorStorage>
-            }
-            _ => {
-                // Default to in-memory storage
-                // Use HNSW with small config as fallback
-                let dimensions = config.rag.vector_storage.dimensions;
-                let hnsw_config = HNSWConfig::default();
-                Arc::new(HNSWVectorStorage::new(dimensions, hnsw_config)) as Arc<dyn VectorStorage>
-            }
-        };
+        // Currently only HNSW backend is implemented
+        let dimensions = config.rag.vector_storage.dimensions;
+        let hnsw_config = HNSWConfig::default();
+        let storage: Arc<dyn VectorStorage> =
+            Arc::new(HNSWVectorStorage::new(dimensions, hnsw_config)) as Arc<dyn VectorStorage>;
 
         // Create embedding factory
         let embedding_config = EmbeddingProviderConfig::default();
@@ -159,7 +150,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         // Create RAG pipeline
         let rag_config = RAGConfig::default();
         let pipeline = RAGPipeline::new(rag_config, storage, embedding_factory, embedding_cache)
-            .map_err(|e| anyhow::anyhow!("Failed to create RAG pipeline: {}", e))?;
+            .map_err(|e| anyhow::anyhow!("Failed to create RAG pipeline: {e}"))?;
 
         Ok(Some(Arc::new(pipeline)))
     }
@@ -167,7 +158,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// Create a session manager based on configuration
     async fn create_session_manager(
         config: &Arc<LLMSpellConfig>,
-        state_manager: &Option<Arc<StateManager>>,
+        state_manager: Option<&Arc<StateManager>>,
     ) -> Result<Option<Arc<SessionManager>>> {
         if !config.runtime.sessions.enabled {
             return Ok(None);
@@ -191,7 +182,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         let session_config = SessionManagerConfig::default();
 
         // Create SessionManager with state_manager if available
-        let sm = if let Some(ref state_mgr) = state_manager {
+        let sm = if let Some(state_mgr) = state_manager {
             SessionManager::new(
                 state_mgr.clone(),
                 storage_backend,
@@ -210,7 +201,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     Arc::new(
                         StateManager::new()
                             .await
-                            .map_err(|e| anyhow::anyhow!("Failed to create StateManager: {}", e))?,
+                            .map_err(|e| anyhow::anyhow!("Failed to create StateManager: {e}"))?,
                     )
                 }
             };
@@ -308,10 +299,10 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         let comm_manager = Arc::new(CommManager::new(session_mapper.clone())?);
 
         // Create SessionManager based on config
-        let session_manager = Self::create_session_manager(&config, &state_manager).await?;
+        let session_manager = Self::create_session_manager(&config, state_manager.as_ref()).await?;
 
         // Create RAG pipeline based on config
-        let rag_pipeline = Self::create_rag_pipeline(&config, &state_manager).await?;
+        let rag_pipeline = Self::create_rag_pipeline(&config, state_manager.as_ref())?;
 
         Ok(Self {
             kernel_id,
@@ -511,18 +502,40 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         Ok(())
     }
 
-    #[allow(clippy::cognitive_complexity)]
     async fn handle_message_and_reply(&self, message: P::Message, channel: &str) -> Result<bool> {
         let msg_type = message.msg_type();
-        let is_shutdown = msg_type == "shutdown_request";
+        let should_shutdown = self.check_shutdown_conditions(msg_type, channel);
 
-        // Debug logging to understand why kernel is shutting down
-        tracing::info!(
-            "Kernel {} received message: {} on channel: {}",
-            self.kernel_id,
-            msg_type,
-            channel
-        );
+        self.log_message_receipt(msg_type, channel);
+
+        let should_reply = self.protocol.requires_reply(&message);
+        let flow = self.protocol.create_execution_flow(&message);
+
+        // Send pre-execution messages
+        self.send_flow_messages(flow.pre_execution).await?;
+
+        // Process the message
+        let reply_content = self.process_message(message.clone()).await?;
+
+        // Send the reply if needed
+        if should_reply {
+            self.send_reply(&message, reply_content, channel).await?;
+        }
+
+        // Send post-execution messages
+        self.send_flow_messages(flow.post_execution).await?;
+
+        // Handle execute_request specific post-processing
+        if msg_type == "execute_request" {
+            self.send_execute_idle_status(&message).await?;
+        }
+
+        Ok(should_shutdown)
+    }
+
+    /// Check shutdown conditions based on message type and channel
+    fn check_shutdown_conditions(&self, msg_type: &str, channel: &str) -> bool {
+        let is_shutdown = msg_type == "shutdown_request";
 
         if is_shutdown {
             tracing::info!(
@@ -532,71 +545,47 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             );
         }
 
-        // CRITICAL FIX: For debug mode, be extra careful about shutdowns
-        // Only shutdown on explicit shutdown_request from control channel
-        let is_debug_mode = self.config.debug.enabled;
-        let should_shutdown = if is_debug_mode {
-            // In debug mode, only shutdown on explicit shutdown_request from control channel
+        // For debug mode, only shutdown on explicit shutdown_request from control channel
+        if self.config.debug.enabled {
             is_shutdown && channel == "control"
         } else {
-            // Normal mode: shutdown on any shutdown_request
             is_shutdown
-        };
-
-        if should_shutdown && !is_shutdown {
-            tracing::info!(
-                "Kernel {} ignoring potential shutdown (debug mode protection)",
-                self.kernel_id
-            );
         }
+    }
 
-        let should_reply = self.protocol.requires_reply(&message);
+    /// Log message receipt
+    fn log_message_receipt(&self, msg_type: &str, channel: &str) {
+        tracing::info!(
+            "Kernel {} received message: {} on channel: {}",
+            self.kernel_id,
+            msg_type,
+            channel
+        );
+    }
 
-        // Get execution flow from protocol
-        let flow = self.protocol.create_execution_flow(&message);
-
-        // Send pre-execution messages
-        for (channel, msg) in flow.pre_execution {
+    /// Send flow messages (pre or post execution)
+    async fn send_flow_messages(&self, messages: Vec<(String, P::Message)>) -> Result<()> {
+        for (channel, msg) in messages {
             let parts = self.protocol.encode(&msg, &channel)?;
             self.transport.send(&channel, parts).await?;
         }
+        Ok(())
+    }
 
-        // Process the message (potentially with output capture)
-        let reply_content = if flow.capture_output {
-            // For now, process normally - OutputCapture integration will come in 9.8.13.3.5
-            self.process_message(message.clone()).await?
-        } else {
-            self.process_message(message.clone()).await?
-        };
-
-        // Send the reply if needed
-        if should_reply {
-            self.send_reply(&message, reply_content, channel).await?;
-        }
-
-        // Send post-execution messages (including status:idle)
-        for (channel, msg) in flow.post_execution {
-            let parts = self.protocol.encode(&msg, &channel)?;
-            self.transport.send(&channel, parts).await?;
-        }
-
-        // Send status:idle after execute_reply for execute_request
-        if message.msg_type() == "execute_request" {
-            if let Ok(idle_msg) = self
-                .protocol
-                .create_status_message(crate::traits::KernelStatus::Idle)
-            {
-                // Set parent header for the status message
-                let mut idle_with_parent = idle_msg;
-                if let Some(header) = message.header_for_parent() {
-                    idle_with_parent.set_parent_from_json(header);
-                }
-                let parts = self.protocol.encode(&idle_with_parent, "iopub")?;
-                self.transport.send("iopub", parts).await?;
+    /// Send idle status after `execute_reply`
+    async fn send_execute_idle_status(&self, message: &P::Message) -> Result<()> {
+        if let Ok(idle_msg) = self
+            .protocol
+            .create_status_message(crate::traits::KernelStatus::Idle)
+        {
+            let mut idle_with_parent = idle_msg;
+            if let Some(header) = message.header_for_parent() {
+                idle_with_parent.set_parent_from_json(header);
             }
+            let parts = self.protocol.encode(&idle_with_parent, "iopub")?;
+            self.transport.send("iopub", parts).await?;
         }
-
-        Ok(should_shutdown)
+        Ok(())
     }
 
     async fn send_reply(
@@ -618,16 +607,21 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         tracing::debug!("Processing message type: {}", msg_type);
 
-        // Handle common message types in a protocol-agnostic way
+        // Handle control messages
+        if let Some(result) = self
+            .try_handle_control_message(msg_type, content.clone())
+            .await?
+        {
+            return Ok(result);
+        }
+
+        // Handle comm messages
+        if msg_type.starts_with("comm_") {
+            return self.handle_comm_message(msg_type, content).await;
+        }
+
+        // Handle extension messages (state, session, rag)
         match msg_type {
-            "kernel_info_request" => Ok(self.handle_kernel_info()),
-            "execute_request" => self.handle_execute(content).await,
-            "shutdown_request" => self.handle_shutdown(content).await,
-            "interrupt_request" => Ok(self.handle_interrupt()),
-            "comm_open" => self.handle_comm_open(content).await,
-            "comm_msg" => self.handle_comm_msg(content).await,
-            "comm_close" => self.handle_comm_close(content).await,
-            "comm_info_request" => self.handle_comm_info_request(content).await,
             "debug_request" => self.handle_debug_request_message(content).await,
             "state_request" => self.handle_state_request(content).await,
             "session_request" => self.handle_session_request(content).await,
@@ -639,6 +633,39 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     "message": format!("Unknown message type: {}", msg_type)
                 }))
             }
+        }
+    }
+
+    /// Try to handle control messages
+    async fn try_handle_control_message(
+        &self,
+        msg_type: &str,
+        content: serde_json::Value,
+    ) -> Result<Option<serde_json::Value>> {
+        match msg_type {
+            "kernel_info_request" => Ok(Some(self.handle_kernel_info())),
+            "execute_request" => Ok(Some(self.handle_execute(content).await?)),
+            "shutdown_request" => Ok(Some(self.handle_shutdown(content).await?)),
+            "interrupt_request" => Ok(Some(self.handle_interrupt())),
+            _ => Ok(None),
+        }
+    }
+
+    /// Handle comm-related messages
+    async fn handle_comm_message(
+        &self,
+        msg_type: &str,
+        content: serde_json::Value,
+    ) -> Result<serde_json::Value> {
+        match msg_type {
+            "comm_open" => self.handle_comm_open(content).await,
+            "comm_msg" => self.handle_comm_msg(content).await,
+            "comm_close" => self.handle_comm_close(content).await,
+            "comm_info_request" => self.handle_comm_info_request(content).await,
+            _ => Ok(serde_json::json!({
+                "status": "error",
+                "message": format!("Unknown comm message type: {}", msg_type)
+            })),
         }
     }
 
@@ -1253,14 +1280,11 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// Handle state management requests using the kernel's `StateManager`
     async fn handle_state_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
         use crate::jupyter::protocol::StateOperation;
-        use llmspell_state_persistence::StateScope;
 
-        // Check if state manager is available
         let state_manager = self.state_manager.as_ref().ok_or_else(|| {
             anyhow::anyhow!("State management not available - no StateManager configured")
         })?;
 
-        // Parse the operation from the request
         let operation: StateOperation = serde_json::from_value(
             content
                 .get("operation")
@@ -1268,118 +1292,148 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                 .clone(),
         )?;
 
-        // Parse scope (default to Global)
-        let scope = if let Some(s) = content.get("scope").and_then(|s| s.as_str()) {
-            match s {
-                "session" => StateScope::Session(String::new()), // Session ID will be managed by StateManager
-                "user" => StateScope::User(String::new()), // User ID will be managed by StateManager
-                _ => StateScope::Global,
-            }
-        } else {
-            StateScope::Global
-        };
+        let scope = Self::parse_state_scope(&content);
 
-        // Handle the operation
         match operation {
-            StateOperation::Show { key } => {
-                if let Some(key) = key {
-                    // Show specific key
-                    let value = state_manager
-                        .get(scope, &key)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Failed to get state: {}", e))?;
-                    Ok(serde_json::json!({
-                        "status": "ok",
-                        "data": value
-                    }))
-                } else {
-                    // Show all keys for scope
-                    let keys = state_manager
-                        .list_keys(scope.clone())
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Failed to list keys: {}", e))?;
-                    let mut data = serde_json::Map::new();
-                    for key in keys {
-                        if let Ok(Some(value)) = state_manager.get(scope.clone(), &key).await {
-                            data.insert(key, value);
-                        }
-                    }
-                    Ok(serde_json::json!({
-                        "status": "ok",
-                        "data": serde_json::Value::Object(data)
-                    }))
-                }
-            }
+            StateOperation::Show { key } => self.handle_state_show(state_manager, scope, key).await,
             StateOperation::Clear { key } => {
-                if let Some(key) = key {
-                    // Clear specific key
-                    state_manager
-                        .delete(scope, &key)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Failed to clear state: {}", e))?;
-                } else {
-                    // Clear all keys for scope
-                    state_manager
-                        .clear_scope(scope)
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Failed to clear state: {}", e))?;
-                }
-                Ok(serde_json::json!({
-                    "status": "ok"
-                }))
+                self.handle_state_clear(state_manager, scope, key).await
             }
             StateOperation::Export { format } => {
-                let format = format.as_deref().unwrap_or("json");
-                // Use get_all_in_scope to export all values
-                let export_data = state_manager
-                    .get_all_in_scope(scope)
-                    .await
-                    .map_err(|e| anyhow::anyhow!("Failed to export state: {}", e))?;
-
-                // Convert HashMap to JSON Value
-                let data_value = serde_json::to_value(export_data)
-                    .map_err(|e| anyhow::anyhow!("Failed to serialize export data: {}", e))?;
-
-                // Format the export based on requested format
-                let formatted = match format {
-                    "yaml" => {
-                        // For now, just return JSON (YAML support can be added later)
-                        data_value
-                    }
-                    _ => data_value,
-                };
-
-                Ok(serde_json::json!({
-                    "status": "ok",
-                    "data": formatted
-                }))
+                self.handle_state_export(state_manager, scope, format).await
             }
             StateOperation::Import { data, merge } => {
-                // If not merging, clear the scope first
-                if !merge {
-                    state_manager
-                        .clear_scope(scope.clone())
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Failed to clear before import: {}", e))?;
-                }
-
-                // Import each key-value pair
-                if let Some(obj) = data.as_object() {
-                    for (key, value) in obj {
-                        state_manager
-                            .set(scope.clone(), key, value.clone())
-                            .await
-                            .map_err(|e| anyhow::anyhow!("Failed to import key {}: {}", key, e))?;
-                    }
-                } else {
-                    return Err(anyhow::anyhow!("Import data must be an object"));
-                }
-
-                Ok(serde_json::json!({
-                    "status": "ok"
-                }))
+                self.handle_state_import(state_manager, scope, data, merge)
+                    .await
             }
         }
+    }
+
+    /// Parse state scope from request content
+    fn parse_state_scope(content: &serde_json::Value) -> llmspell_state_persistence::StateScope {
+        use llmspell_state_persistence::StateScope;
+        content
+            .get("scope")
+            .and_then(|s| s.as_str())
+            .map_or(StateScope::Global, |s| match s {
+                "session" => StateScope::Session(String::new()),
+                "user" => StateScope::User(String::new()),
+                _ => StateScope::Global,
+            })
+    }
+
+    /// Handle state show operation
+    async fn handle_state_show(
+        &self,
+        state_manager: &Arc<StateManager>,
+        scope: llmspell_state_persistence::StateScope,
+        key: Option<String>,
+    ) -> Result<serde_json::Value> {
+        if let Some(key) = key {
+            let value = state_manager
+                .get(scope, &key)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to get state: {}", e))?;
+            Ok(serde_json::json!({
+                "status": "ok",
+                "data": value
+            }))
+        } else {
+            let keys = state_manager
+                .list_keys(scope.clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to list keys: {}", e))?;
+            let mut data = serde_json::Map::new();
+            for key in keys {
+                if let Ok(Some(value)) = state_manager.get(scope.clone(), &key).await {
+                    data.insert(key, value);
+                }
+            }
+            Ok(serde_json::json!({
+                "status": "ok",
+                "data": serde_json::Value::Object(data)
+            }))
+        }
+    }
+
+    /// Handle state clear operation
+    async fn handle_state_clear(
+        &self,
+        state_manager: &Arc<StateManager>,
+        scope: llmspell_state_persistence::StateScope,
+        key: Option<String>,
+    ) -> Result<serde_json::Value> {
+        if let Some(key) = key {
+            state_manager
+                .delete(scope, &key)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to clear state: {}", e))?;
+        } else {
+            state_manager
+                .clear_scope(scope)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to clear state: {}", e))?;
+        }
+        Ok(serde_json::json!({
+            "status": "ok"
+        }))
+    }
+
+    /// Handle state export operation
+    async fn handle_state_export(
+        &self,
+        state_manager: &Arc<StateManager>,
+        scope: llmspell_state_persistence::StateScope,
+        format: Option<String>,
+    ) -> Result<serde_json::Value> {
+        let _format = format.as_deref().unwrap_or("json");
+        let export_data = state_manager
+            .get_all_in_scope(scope)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to export state: {}", e))?;
+
+        let data_value = serde_json::to_value(export_data)
+            .map_err(|e| anyhow::anyhow!("Failed to serialize export data: {}", e))?;
+
+        // Format the export based on requested format
+        // For now, just return JSON (YAML support can be added later)
+        let formatted = data_value;
+
+        Ok(serde_json::json!({
+            "status": "ok",
+            "data": formatted
+        }))
+    }
+
+    /// Handle state import operation
+    async fn handle_state_import(
+        &self,
+        state_manager: &Arc<StateManager>,
+        scope: llmspell_state_persistence::StateScope,
+        data: serde_json::Value,
+        merge: bool,
+    ) -> Result<serde_json::Value> {
+        if !merge {
+            state_manager
+                .clear_scope(scope.clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to clear before import: {}", e))?;
+        }
+
+        if let Some(obj) = data.as_object() {
+            for (key, value) in obj {
+                state_manager
+                    .set(scope.clone(), key, value.clone())
+                    .await
+                    .map_err(|e| anyhow::anyhow!("Failed to import key {}: {}", key, e))?;
+            }
+        } else {
+            return Err(anyhow::anyhow!("Import data must be an object"));
+        }
+
+        Ok(serde_json::json!({
+            "status": "ok"
+        }))
     }
 
     /// Handle session management requests using the kernel's `SessionManager`
@@ -1388,15 +1442,11 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         content: serde_json::Value,
     ) -> Result<serde_json::Value> {
         use crate::jupyter::protocol::SessionOperation;
-        use llmspell_sessions::{CreateSessionOptions, SessionQuery};
-        use std::str::FromStr;
 
-        // Check if session manager is available
         let session_manager = self.session_manager.as_ref().ok_or_else(|| {
             anyhow::anyhow!("Session management not available - no SessionManager configured")
         })?;
 
-        // Parse the operation from the request
         let operation: SessionOperation = serde_json::from_value(
             content
                 .get("operation")
@@ -1404,157 +1454,213 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                 .clone(),
         )?;
 
-        // Handle the operation
         match operation {
             SessionOperation::Create { name, description } => {
-                let options = CreateSessionOptions::builder()
-                    .name(name.unwrap_or_else(|| "unnamed".to_string()))
-                    .description(description.unwrap_or_else(|| "Created via kernel".to_string()))
-                    .build();
-
-                match session_manager.create_session(options).await {
-                    Ok(session_id) => Ok(serde_json::json!({
-                        "status": "ok",
-                        "session_id": session_id.to_string()
-                    })),
-                    Err(e) => Ok(serde_json::json!({
-                        "status": "error",
-                        "error": format!("Failed to create session: {}", e)
-                    })),
-                }
+                self.handle_session_create(session_manager, name, description)
+                    .await
             }
             SessionOperation::List { query } => {
-                let query = if let Some(q) = query {
-                    serde_json::from_value(q).unwrap_or_default()
-                } else {
-                    SessionQuery::default()
-                };
-
-                match session_manager.list_sessions(query).await {
-                    Ok(sessions) => Ok(serde_json::json!({
-                        "status": "ok",
-                        "sessions": sessions
-                    })),
-                    Err(e) => Ok(serde_json::json!({
-                        "status": "error",
-                        "error": format!("Failed to list sessions: {}", e)
-                    })),
-                }
+                self.handle_session_list(session_manager, query).await
             }
-            SessionOperation::Show { id } => {
-                let session_id = llmspell_sessions::SessionId::from_str(&id)
-                    .map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
-
-                match session_manager.get_session(&session_id).await {
-                    Ok(session) => {
-                        let metadata = session.metadata.read().await;
-                        Ok(serde_json::json!({
-                            "status": "ok",
-                            "session": *metadata
-                        }))
-                    }
-                    Err(e) => Ok(serde_json::json!({
-                        "status": "error",
-                        "error": format!("Failed to get session: {}", e)
-                    })),
-                }
-            }
+            SessionOperation::Show { id } => self.handle_session_show(session_manager, id).await,
             SessionOperation::Delete { id } => {
-                if id.is_empty() {
-                    // Delete all sessions
-                    let sessions = session_manager
-                        .list_sessions(SessionQuery::default())
-                        .await
-                        .map_err(|e| anyhow::anyhow!("Failed to list sessions: {}", e))?;
-
-                    let mut deleted = 0;
-                    for session in sessions {
-                        if session_manager.delete_session(&session.id).await.is_ok() {
-                            deleted += 1;
-                        }
-                    }
-
-                    Ok(serde_json::json!({
-                        "status": "ok",
-                        "deleted": deleted
-                    }))
-                } else {
-                    // Delete specific session
-                    let session_id = llmspell_sessions::SessionId::from_str(&id)
-                        .map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
-
-                    match session_manager.delete_session(&session_id).await {
-                        Ok(_) => Ok(serde_json::json!({
-                            "status": "ok"
-                        })),
-                        Err(e) => Ok(serde_json::json!({
-                            "status": "error",
-                            "error": format!("Failed to delete session: {}", e)
-                        })),
-                    }
-                }
+                self.handle_session_delete(session_manager, id).await
             }
             SessionOperation::Export { id, format: _ } => {
-                let session_id = llmspell_sessions::SessionId::from_str(&id)
-                    .map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
-
-                match session_manager.get_session(&session_id).await {
-                    Ok(session) => {
-                        let metadata = session.metadata.read().await.clone();
-                        let timeline = session_manager
-                            .get_session_timeline(&session_id)
-                            .await
-                            .unwrap_or_default();
-
-                        let export_data = serde_json::json!({
-                            "metadata": metadata,
-                            "timeline": timeline,
-                            "config": session.config,
-                        });
-
-                        Ok(serde_json::json!({
-                            "status": "ok",
-                            "data": export_data
-                        }))
-                    }
-                    Err(e) => Ok(serde_json::json!({
-                        "status": "error",
-                        "error": format!("Failed to export session: {}", e)
-                    })),
-                }
+                self.handle_session_export(session_manager, id).await
             }
-            SessionOperation::Replay { .. } => {
-                // Replay is complex and not implemented yet
+            SessionOperation::Replay { .. } => Ok(serde_json::json!({
+                "status": "error",
+                "error": "Session replay not yet implemented via kernel"
+            })),
+        }
+    }
+
+    /// Handle session create operation
+    async fn handle_session_create(
+        &self,
+        session_manager: &Arc<SessionManager>,
+        name: Option<String>,
+        description: Option<String>,
+    ) -> Result<serde_json::Value> {
+        use llmspell_sessions::CreateSessionOptions;
+
+        let options = CreateSessionOptions::builder()
+            .name(name.unwrap_or_else(|| "unnamed".to_string()))
+            .description(description.unwrap_or_else(|| "Created via kernel".to_string()))
+            .build();
+
+        match session_manager.create_session(options).await {
+            Ok(session_id) => Ok(serde_json::json!({
+                "status": "ok",
+                "session_id": session_id.to_string()
+            })),
+            Err(e) => Ok(serde_json::json!({
+                "status": "error",
+                "error": format!("Failed to create session: {}", e)
+            })),
+        }
+    }
+
+    /// Handle session list operation
+    async fn handle_session_list(
+        &self,
+        session_manager: &Arc<SessionManager>,
+        query: Option<serde_json::Value>,
+    ) -> Result<serde_json::Value> {
+        use llmspell_sessions::SessionQuery;
+
+        let query = query.map_or_else(SessionQuery::default, |q| {
+            serde_json::from_value(q).unwrap_or_default()
+        });
+
+        match session_manager.list_sessions(query).await {
+            Ok(sessions) => Ok(serde_json::json!({
+                "status": "ok",
+                "sessions": sessions
+            })),
+            Err(e) => Ok(serde_json::json!({
+                "status": "error",
+                "error": format!("Failed to list sessions: {}", e)
+            })),
+        }
+    }
+
+    /// Handle session show operation
+    async fn handle_session_show(
+        &self,
+        session_manager: &Arc<SessionManager>,
+        id: String,
+    ) -> Result<serde_json::Value> {
+        use llmspell_sessions::SessionId;
+        use std::str::FromStr;
+
+        let session_id =
+            SessionId::from_str(&id).map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
+
+        match session_manager.get_session(&session_id).await {
+            Ok(session) => {
+                let metadata = session.metadata.read().await;
                 Ok(serde_json::json!({
-                    "status": "error",
-                    "error": "Session replay not yet implemented via kernel"
+                    "status": "ok",
+                    "session": *metadata
                 }))
             }
+            Err(e) => Ok(serde_json::json!({
+                "status": "error",
+                "error": format!("Failed to get session: {}", e)
+            })),
+        }
+    }
+
+    /// Handle session delete operation
+    async fn handle_session_delete(
+        &self,
+        session_manager: &Arc<SessionManager>,
+        id: String,
+    ) -> Result<serde_json::Value> {
+        use llmspell_sessions::SessionId;
+        use std::str::FromStr;
+
+        if id.is_empty() {
+            self.delete_all_sessions(session_manager).await
+        } else {
+            let session_id = SessionId::from_str(&id)
+                .map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
+
+            match session_manager.delete_session(&session_id).await {
+                Ok(()) => Ok(serde_json::json!({
+                    "status": "ok"
+                })),
+                Err(e) => Ok(serde_json::json!({
+                    "status": "error",
+                    "error": format!("Failed to delete session: {}", e)
+                })),
+            }
+        }
+    }
+
+    /// Delete all sessions
+    async fn delete_all_sessions(
+        &self,
+        session_manager: &Arc<SessionManager>,
+    ) -> Result<serde_json::Value> {
+        use llmspell_sessions::SessionQuery;
+
+        let sessions = session_manager
+            .list_sessions(SessionQuery::default())
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to list sessions: {}", e))?;
+
+        let mut deleted = 0;
+        for session in sessions {
+            if session_manager.delete_session(&session.id).await.is_ok() {
+                deleted += 1;
+            }
+        }
+
+        Ok(serde_json::json!({
+            "status": "ok",
+            "deleted": deleted
+        }))
+    }
+
+    /// Handle session export operation
+    async fn handle_session_export(
+        &self,
+        session_manager: &Arc<SessionManager>,
+        id: String,
+    ) -> Result<serde_json::Value> {
+        use llmspell_sessions::SessionId;
+        use std::str::FromStr;
+
+        let session_id =
+            SessionId::from_str(&id).map_err(|e| anyhow::anyhow!("Invalid session ID: {}", e))?;
+
+        match session_manager.get_session(&session_id).await {
+            Ok(session) => {
+                let metadata = session.metadata.read().await.clone();
+                let timeline = session_manager
+                    .get_session_timeline(&session_id)
+                    .await
+                    .unwrap_or_default();
+
+                let export_data = serde_json::json!({
+                    "metadata": metadata,
+                    "timeline": timeline,
+                    "config": session.config,
+                });
+
+                Ok(serde_json::json!({
+                    "status": "ok",
+                    "data": export_data
+                }))
+            }
+            Err(e) => Ok(serde_json::json!({
+                "status": "error",
+                "error": format!("Failed to export session: {}", e)
+            })),
         }
     }
 
     /// Handle RAG system requests using the kernel's `RAGPipeline`
     async fn handle_rag_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
         use crate::jupyter::protocol::RagOperation;
-        use llmspell_state_traits::StateScope;
 
         tracing::debug!("handle_rag_request called with content: {:?}", content);
 
         // Check if RAG pipeline is available
-        let rag_pipeline = match self.check_rag_pipeline()? {
-            Some(pipeline) => pipeline,
-            None => {
-                return Ok(self.create_rag_error(
-                    "RAG system not available - RAG is disabled in configuration",
-                ))
-            }
+        let Some(rag_pipeline) = self.check_rag_pipeline() else {
+            return Ok(Self::create_rag_error(
+                "RAG system not available - RAG is disabled in configuration",
+            ));
         };
 
         // Parse the operation from the request
-        let operation = self.parse_rag_operation(&content)?;
+        let operation = Self::parse_rag_operation(&content)?;
 
         // Parse optional scope for multi-tenant isolation
-        let scope = self.parse_rag_scope(&content);
+        let scope = Self::parse_rag_scope(&content);
 
         // Handle the specific operation
         match operation {
@@ -1585,29 +1691,22 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                 self.handle_rag_clear(rag_pipeline, clear_scope, scope)
                     .await
             }
-            RagOperation::Index { action: _ } => {
-                Ok(self.create_rag_error("Index operation not yet implemented via kernel"))
-            }
+            RagOperation::Index { action: _ } => Ok(Self::create_rag_error(
+                "Index operation not yet implemented via kernel",
+            )),
         }
     }
 
     /// Check if RAG pipeline is available
-    fn check_rag_pipeline(&self) -> Result<Option<&llmspell_rag::pipeline::RAGPipeline>> {
-        match self.rag_pipeline.as_ref() {
-            Some(pipeline) => {
-                tracing::debug!("RAG pipeline is available");
-                Ok(Some(pipeline))
-            }
-            None => {
-                tracing::warn!("RAG pipeline not available - RAG disabled in config");
-                Ok(None)
-            }
-        }
+    fn check_rag_pipeline(&self) -> Option<&llmspell_rag::pipeline::RAGPipeline> {
+        self.rag_pipeline.as_ref().map(|pipeline| {
+            tracing::debug!("RAG pipeline is available");
+            pipeline.as_ref()
+        })
     }
 
     /// Parse RAG operation from request content
     fn parse_rag_operation(
-        &self,
         content: &serde_json::Value,
     ) -> Result<crate::jupyter::protocol::RagOperation> {
         use crate::jupyter::protocol::RagOperation;
@@ -1622,10 +1721,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     /// Parse optional scope from request
-    fn parse_rag_scope(
-        &self,
-        content: &serde_json::Value,
-    ) -> Option<llmspell_state_traits::StateScope> {
+    fn parse_rag_scope(content: &serde_json::Value) -> Option<llmspell_state_traits::StateScope> {
         use llmspell_state_traits::StateScope;
 
         content
@@ -1635,7 +1731,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     }
 
     /// Create standard error response
-    fn create_rag_error(&self, error_msg: &str) -> serde_json::Value {
+    fn create_rag_error(error_msg: &str) -> serde_json::Value {
         serde_json::json!({
             "status": "error",
             "error": error_msg
@@ -1679,7 +1775,9 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             }
             Err(e) => {
                 tracing::error!("Ingest failed: {}", e);
-                Ok(self.create_rag_error(&format!("Failed to ingest document: {}", e)))
+                Ok(Self::create_rag_error(&format!(
+                    "Failed to ingest document: {e}"
+                )))
             }
         }
     }
@@ -1729,7 +1827,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     }
                 }))
             }
-            Err(e) => Ok(self.create_rag_error(&format!("Search failed: {}", e))),
+            Err(e) => Ok(Self::create_rag_error(&format!("Search failed: {e}"))),
         }
     }
 
@@ -1761,7 +1859,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             }
             Err(e) => {
                 tracing::error!("Failed to get stats: {}", e);
-                Ok(self.create_rag_error(&format!("Failed to get stats: {}", e)))
+                Ok(Self::create_rag_error(&format!("Failed to get stats: {e}")))
             }
         }
     }
@@ -1787,7 +1885,9 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
                     "vectors_deleted": deleted_count
                 }
             })),
-            Err(e) => Ok(self.create_rag_error(&format!("Failed to clear scope: {}", e))),
+            Err(e) => Ok(Self::create_rag_error(&format!(
+                "Failed to clear scope: {e}"
+            ))),
         }
     }
 }

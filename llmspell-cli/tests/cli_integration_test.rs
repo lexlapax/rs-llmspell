@@ -222,7 +222,7 @@ fn test_state_persistence_across_commands() {
     let mut cmd1 = Command::cargo_bin("llmspell").unwrap();
     let output1 = cmd1
         .env("LLMSPELL_STATE_PATH", state_path.to_str().unwrap())
-        .args(&[
+        .args([
             "exec",
             "State.set('integration_test', 'test_value'); print('State set')",
         ])
@@ -240,7 +240,7 @@ fn test_state_persistence_across_commands() {
     let mut cmd2 = Command::cargo_bin("llmspell").unwrap();
     let output2 = cmd2
         .env("LLMSPELL_STATE_PATH", state_path.to_str().unwrap())
-        .args(&[
+        .args([
             "exec",
             "print('Value: ' .. tostring(State.get('integration_test')))",
         ])

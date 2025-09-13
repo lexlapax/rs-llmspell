@@ -500,24 +500,12 @@ impl ReplSession {
     /// Handle state command
     async fn handle_state_command(&mut self, parts: &[&str]) -> Result<ReplResponse> {
         // Get optional key from command
-        let key = parts.get(1).map(|s| s.to_string());
+        let key = parts.get(1).map(|s| (*s).to_string());
 
         // Execute state retrieval code
-        let code = if let Some(ref k) = key {
-            format!(
+        let code = key.as_ref().map_or_else(
+            || {
                 "
-                local value = State.get(\"{}\")
-                if value ~= nil then
-                    print(\"State['{}'] = \" .. tostring(value))
-                else
-                    print(\"State key '{}' not found\")
-                end
-            ",
-                k, k, k
-            )
-        } else {
-            // Show all state keys
-            "
                 local keys = State.keys()
                 if keys and #keys > 0 then
                     print(\"State keys (\" .. #keys .. \" total):\")
@@ -529,8 +517,21 @@ impl ReplSession {
                     print(\"No state keys found\")
                 end
             "
-            .to_string()
-        };
+                .to_string()
+            },
+            |k| {
+                format!(
+                    "
+                local value = State.get(\"{k}\")
+                if value ~= nil then
+                    print(\"State['{k}'] = \" .. tostring(value))
+                else
+                    print(\"State key '{k}' not found\")
+                end
+            "
+                )
+            },
+        );
 
         // Execute the code
         let result = self.kernel.execute(&code).await?;

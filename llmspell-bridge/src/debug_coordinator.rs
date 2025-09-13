@@ -87,6 +87,7 @@ use crate::execution_bridge::{
 use crate::execution_context::{SharedExecutionContext, SourceLocation};
 use llmspell_core::debug::{DebugCapability, DebugRequest, DebugResponse};
 use std::collections::{HashMap, HashSet};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, trace};
@@ -121,6 +122,10 @@ pub struct DebugCoordinator {
 
     /// Execution manager for delegating debug operations
     execution_manager: Arc<ExecutionManager>,
+
+    /// Atomic flag for ultra-fast check if ANY breakpoints exist
+    /// This avoids RwLock acquisition in the common case of no breakpoints
+    has_any_breakpoints: Arc<AtomicBool>,
 }
 
 impl DebugCoordinator {
@@ -139,6 +144,7 @@ impl DebugCoordinator {
             sources_with_breakpoints: Arc::new(RwLock::new(HashSet::new())),
             debug_state: Arc::new(RwLock::new(DebugState::Running)),
             execution_manager,
+            has_any_breakpoints: Arc::new(AtomicBool::new(false)),
         }
     }
 
@@ -158,6 +164,11 @@ impl DebugCoordinator {
     /// - <100ns average case performance
     #[must_use]
     pub fn might_break_at_sync(&self, source: &str, line: u32) -> bool {
+        // Level 0: Ultra-fast atomic check - are there ANY breakpoints at all?
+        if !self.has_any_breakpoints.load(Ordering::Relaxed) {
+            return false;
+        }
+
         // Level 1: Super fast check - does this source file have ANY breakpoints?
         let Ok(sources) = self.sources_with_breakpoints.try_read() else {
             return false;
@@ -315,6 +326,9 @@ impl DebugCoordinator {
             sources.insert(bp.source.clone());
         }
 
+        // Update atomic flag - we now have at least one breakpoint
+        self.has_any_breakpoints.store(true, Ordering::Relaxed);
+
         // CRITICAL FIX for Task 9.8.9: Also add to ExecutionManager's collection
         // This ensures get_breakpoint_at() in the slow path can find the breakpoint
         // This was the missing piece preventing breakpoints from actually pausing execution
@@ -362,6 +376,11 @@ impl DebugCoordinator {
                 if !still_has_breakpoints {
                     let mut sources = self.sources_with_breakpoints.write().await;
                     sources.remove(&bp.source);
+
+                    // Check if we have ANY breakpoints left
+                    if sources.is_empty() {
+                        self.has_any_breakpoints.store(false, Ordering::Relaxed);
+                    }
                 }
             }
 

@@ -330,6 +330,7 @@ pub struct BufferedStream {
 struct BufferState {
     lines: Vec<String>,
     last_flush: Instant,
+    line_count: usize, // Track count separately for cheap checking
 }
 
 impl BufferedStream {
@@ -347,6 +348,7 @@ impl BufferedStream {
             buffer: Mutex::new(BufferState {
                 lines: Vec::with_capacity(batch_size),
                 last_flush: Instant::now(),
+                line_count: 0,
             }),
             batch_size,
             flush_interval,
@@ -354,7 +356,28 @@ impl BufferedStream {
     }
 
     fn should_flush(&self, state: &BufferState) -> bool {
-        state.lines.len() >= self.batch_size || state.last_flush.elapsed() >= self.flush_interval
+        // Check batch size first (cheap operation)
+        if state.line_count >= self.batch_size {
+            return true;
+        }
+
+        // For performance: only check time periodically based on line count
+        // This reduces syscall overhead while still enabling time-based flushing
+        if state.line_count > 0 {
+            // Check time more frequently for smaller line counts (for tests)
+            // but less frequently for larger counts (for performance)
+            let should_check_time = match state.line_count {
+                1..=5 => true,                        // Always check for first few lines
+                6..=20 => state.line_count % 2 == 0,  // Every 2 lines
+                21..=50 => state.line_count % 5 == 0, // Every 5 lines
+                _ => state.line_count % 10 == 0,      // Every 10 lines for bulk
+            };
+
+            if should_check_time && state.last_flush.elapsed() >= self.flush_interval {
+                return true;
+            }
+        }
+        false
     }
 
     fn flush_internal(&self, state: &mut BufferState) -> Result<(), LLMSpellError> {
@@ -372,6 +395,7 @@ impl BufferedStream {
             // Single write call for the entire batch
             self.inner.write(&batch)?;
             state.lines.clear();
+            state.line_count = 0;
             self.inner.flush()?;
         }
         state.last_flush = Instant::now();
@@ -388,6 +412,7 @@ impl IOStream for BufferedStream {
     fn write_line(&self, line: &str) -> Result<(), LLMSpellError> {
         let mut state = self.buffer.lock().unwrap();
         state.lines.push(line.to_string());
+        state.line_count += 1;
 
         // Check if we should flush
         if self.should_flush(&state) {
