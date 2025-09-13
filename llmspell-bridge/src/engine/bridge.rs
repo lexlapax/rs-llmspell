@@ -114,6 +114,16 @@ pub trait ScriptEngineBridge: Send + Sync {
             source: None,
         })
     }
+
+    /// Get the session manager if available
+    fn get_session_manager(&self) -> Option<Arc<llmspell_sessions::SessionManager>> {
+        None
+    }
+
+    /// Get the state manager if available
+    fn get_state_manager(&self) -> Option<Arc<llmspell_state_persistence::manager::StateManager>> {
+        None
+    }
 }
 
 /// Output from script execution

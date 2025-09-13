@@ -101,6 +101,8 @@ impl UnifiedKernelClient {
                 JupyterKernel::new(thread_kernel_id.clone(), thread_config, transport, protocol)
                     .await?;
 
+            tracing::trace!("Kernel created, starting serve loop");
+
             // Run kernel with shutdown signal
             tokio::select! {
                 result = kernel.serve() => {

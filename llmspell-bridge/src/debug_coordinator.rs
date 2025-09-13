@@ -124,7 +124,7 @@ pub struct DebugCoordinator {
     execution_manager: Arc<ExecutionManager>,
 
     /// Atomic flag for ultra-fast check if ANY breakpoints exist
-    /// This avoids RwLock acquisition in the common case of no breakpoints
+    /// This avoids `RwLock` acquisition in the common case of no breakpoints
     has_any_breakpoints: Arc<AtomicBool>,
 }
 

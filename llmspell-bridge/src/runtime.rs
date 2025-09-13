@@ -130,6 +130,10 @@ pub struct ScriptRuntime {
     _diagnostics_bridge: Option<Arc<DiagnosticsBridge>>,
     /// Shared execution context for debugging
     _shared_execution_context: Option<Arc<TokioRwLock<SharedExecutionContext>>>,
+    /// Session manager for session operations
+    session_manager: Option<Arc<llmspell_sessions::SessionManager>>,
+    /// State manager for state operations
+    state_manager: Option<Arc<llmspell_state_persistence::manager::StateManager>>,
 }
 
 impl ScriptRuntime {
@@ -197,10 +201,10 @@ impl ScriptRuntime {
         }
     }
 
-    /// Create a new runtime with a specific engine and external `StateManager`
+    /// Create a new runtime with a specific engine and external managers
     ///
-    /// This constructor allows sharing a `StateManager` instance between the kernel
-    /// and the runtime, ensuring they use the same state backend.
+    /// This constructor allows sharing `StateManager` and `SessionManager` instances between the kernel
+    /// and the runtime, ensuring they use the same backend.
     ///
     /// # Errors
     ///
@@ -212,11 +216,15 @@ impl ScriptRuntime {
     ) -> Result<Self, LLMSpellError> {
         match engine_name {
             "lua" => {
+                // Create SessionManager using the provided StateManager
+                let session_manager = Self::create_session_manager(&config, state_manager.clone())?;
+
                 let lua_config = LuaConfig::default();
-                let engine = EngineFactory::create_lua_engine_with_state_manager(
+                let (engine, _, _) = EngineFactory::create_lua_engine_with_managers(
                     &lua_config,
                     Some(Arc::new(config.clone())),
                     state_manager,
+                    session_manager,
                 )?;
                 Self::new_with_engine(engine, config).await
             }
@@ -230,6 +238,65 @@ impl ScriptRuntime {
                 message: format!("Unsupported engine: {engine_name}. Available: lua, javascript"),
             }),
         }
+    }
+
+    /// Create a `SessionManager` with the given configuration and `StateManager`
+    fn create_session_manager(
+        config: &LLMSpellConfig,
+        state_manager: Arc<StateManager>,
+    ) -> Result<Arc<llmspell_sessions::SessionManager>, LLMSpellError> {
+        use llmspell_events::EventBus;
+        use llmspell_hooks::{HookExecutor, HookRegistry};
+        use llmspell_sessions::{SessionManager, SessionManagerConfig};
+        use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend};
+
+        // Create required dependencies
+        let hook_registry = Arc::new(HookRegistry::new());
+        let hook_executor = Arc::new(HookExecutor::new());
+        let event_bus = Arc::new(EventBus::new());
+
+        // Create storage backend based on session configuration
+        let storage_backend: Arc<dyn StorageBackend> =
+            if config.runtime.sessions.storage_backend == "sled" {
+                Arc::new(SledBackend::new().map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create SledBackend: {e}"),
+                    source: None,
+                })?)
+            } else {
+                Arc::new(MemoryBackend::new())
+            };
+
+        // Create SessionManagerConfig from runtime config
+        let session_config = SessionManagerConfig::builder()
+            .max_active_sessions(config.runtime.sessions.max_sessions)
+            .default_session_timeout(chrono::Duration::seconds(
+                i64::try_from(config.runtime.sessions.session_timeout_seconds).unwrap_or(i64::MAX),
+            ))
+            .storage_path(std::path::PathBuf::from("./sessions"))
+            .auto_persist(true)
+            .persist_interval_secs(300)
+            .track_activity(true)
+            .max_storage_size_bytes(10 * 1024 * 1024 * 1024) // 10GB
+            .enable_compression(config.runtime.sessions.artifact_compression_threshold > 0)
+            .compression_level(3)
+            .enable_deduplication(true)
+            .build();
+
+        // Create SessionManager
+        Ok(Arc::new(
+            SessionManager::new(
+                state_manager,
+                storage_backend,
+                hook_registry,
+                hook_executor,
+                &event_bus,
+                session_config,
+            )
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to create SessionManager: {e}"),
+                source: None,
+            })?,
+        ))
     }
 
     /// Initialize debug infrastructure based on configuration
@@ -462,6 +529,10 @@ impl ScriptRuntime {
         let (execution_manager, debug_coordinator, diagnostics_bridge, shared_execution_context) =
             Self::init_debug_infrastructure(&config, &mut engine).await;
 
+        // Get managers from the engine if available
+        let session_manager = engine.get_session_manager();
+        let state_manager = engine.get_state_manager();
+
         Ok(Self {
             engine,
             registry,
@@ -472,6 +543,8 @@ impl ScriptRuntime {
             debug_coordinator,
             _diagnostics_bridge: diagnostics_bridge,
             _shared_execution_context: shared_execution_context,
+            session_manager,
+            state_manager,
         })
     }
 
@@ -838,6 +911,20 @@ impl ScriptRuntime {
     #[must_use]
     pub fn supports_debugging(&self) -> bool {
         self.engine.supported_features().debugging && self.execution_manager.is_some()
+    }
+
+    /// Get the session manager if available
+    #[must_use]
+    pub fn get_session_manager(&self) -> Option<Arc<llmspell_sessions::SessionManager>> {
+        self.session_manager.clone()
+    }
+
+    /// Get the state manager if available
+    #[must_use]
+    pub fn get_state_manager(
+        &self,
+    ) -> Option<Arc<llmspell_state_persistence::manager::StateManager>> {
+        self.state_manager.clone()
     }
 }
 

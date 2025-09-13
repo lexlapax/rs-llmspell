@@ -155,66 +155,177 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         Ok(Some(Arc::new(pipeline)))
     }
 
+    /// Create storage backend based on configuration
+    fn create_storage_backend(
+        backend_type: &str,
+    ) -> Result<Arc<dyn llmspell_storage::StorageBackend>> {
+        tracing::trace!("Creating storage backend: {}", backend_type);
+
+        if backend_type == "sled" {
+            tracing::trace!("Creating sled backend");
+            let sled_backend = llmspell_storage::SledBackend::new()
+                .map_err(|e| anyhow::anyhow!("Failed to create sled backend: {}", e))?;
+            Ok(Arc::new(sled_backend))
+        } else {
+            tracing::trace!("Creating memory backend");
+            Ok(Arc::new(llmspell_storage::MemoryBackend::new()))
+        }
+    }
+
+    /// Create session manager dependencies
+    fn create_session_dependencies() -> (
+        Arc<llmspell_hooks::registry::HookRegistry>,
+        Arc<llmspell_hooks::executor::HookExecutor>,
+        Arc<llmspell_events::bus::EventBus>,
+        SessionManagerConfig,
+    ) {
+        tracing::trace!("Creating hook registry and executor");
+        let hook_registry = Arc::new(llmspell_hooks::registry::HookRegistry::new());
+        let hook_executor = Arc::new(llmspell_hooks::executor::HookExecutor::new());
+        tracing::trace!("Creating event bus");
+        let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
+        let session_config = SessionManagerConfig::default();
+
+        (hook_registry, hook_executor, event_bus, session_config)
+    }
+
+    /// Get or create state manager for session manager
+    async fn get_or_create_state_manager(
+        config: &Arc<LLMSpellConfig>,
+        state_manager: Option<&Arc<StateManager>>,
+    ) -> Result<Arc<StateManager>> {
+        if let Some(state_mgr) = state_manager {
+            tracing::trace!("Using existing state manager");
+            Ok(state_mgr.clone())
+        } else {
+            // Create a temporary StateManager for SessionManager
+            let temp_state = StateFactory::create_from_config(config).await?;
+            match temp_state {
+                Some(sm) => Ok(sm),
+                None => {
+                    // Create a default in-memory StateManager
+                    Ok(Arc::new(StateManager::new().await.map_err(|e| {
+                        anyhow::anyhow!("Failed to create StateManager: {e}")
+                    })?))
+                }
+            }
+        }
+    }
+
     /// Create a session manager based on configuration
+    /// NOTE: Currently unused - `ScriptRuntime` creates its own `SessionManager`
+    #[allow(dead_code)]
     async fn create_session_manager(
         config: &Arc<LLMSpellConfig>,
         state_manager: Option<&Arc<StateManager>>,
     ) -> Result<Option<Arc<SessionManager>>> {
+        tracing::trace!(
+            "create_session_manager: sessions.enabled = {}",
+            config.runtime.sessions.enabled
+        );
+
         if !config.runtime.sessions.enabled {
+            tracing::trace!("Sessions disabled, returning None");
             return Ok(None);
         }
 
-        // Create storage backend based on configuration
-        let storage_backend: Arc<dyn llmspell_storage::StorageBackend> =
-            match config.runtime.sessions.storage_backend.as_str() {
-                "sled" => {
-                    let sled_backend = llmspell_storage::SledBackend::new()
-                        .map_err(|e| anyhow::anyhow!("Failed to create sled backend: {}", e))?;
-                    Arc::new(sled_backend)
-                }
-                _ => Arc::new(llmspell_storage::MemoryBackend::new()),
-            };
+        // Create storage backend
+        let storage_backend =
+            Self::create_storage_backend(&config.runtime.sessions.storage_backend)?;
 
-        // Create required dependencies
-        let hook_registry = Arc::new(llmspell_hooks::registry::HookRegistry::new());
-        let hook_executor = Arc::new(llmspell_hooks::executor::HookExecutor::new());
-        let event_bus = Arc::new(llmspell_events::bus::EventBus::new());
-        let session_config = SessionManagerConfig::default();
+        // Create dependencies
+        let (hook_registry, hook_executor, event_bus, session_config) =
+            Self::create_session_dependencies();
 
-        // Create SessionManager with state_manager if available
-        let sm = if let Some(state_mgr) = state_manager {
-            SessionManager::new(
-                state_mgr.clone(),
-                storage_backend,
-                hook_registry,
-                hook_executor,
-                &event_bus,
-                session_config,
-            )?
-        } else {
-            // Create a temporary StateManager for SessionManager
-            let temp_state = StateFactory::create_from_config(config).await?;
-            let state_mgr = match temp_state {
-                Some(sm) => sm,
-                None => {
-                    // Create a default in-memory StateManager
-                    Arc::new(
-                        StateManager::new()
-                            .await
-                            .map_err(|e| anyhow::anyhow!("Failed to create StateManager: {e}"))?,
-                    )
-                }
-            };
-            SessionManager::new(
-                state_mgr,
-                storage_backend,
-                hook_registry,
-                hook_executor,
-                &event_bus,
-                session_config,
-            )?
-        };
+        // Get or create state manager
+        let state_mgr = Self::get_or_create_state_manager(config, state_manager).await?;
+
+        tracing::trace!(
+            "Creating SessionManager instance, state_manager available: {}",
+            state_manager.is_some()
+        );
+
+        // Create SessionManager
+        let sm = SessionManager::new(
+            state_mgr,
+            storage_backend,
+            hook_registry,
+            hook_executor,
+            &event_bus,
+            session_config,
+        )?;
+
         Ok(Some(Arc::new(sm)))
+    }
+
+    /// Initialize kernel components
+    async fn initialize_kernel_components(
+        config: &Arc<LLMSpellConfig>,
+    ) -> Result<(
+        Option<Arc<StateManager>>,
+        ScriptRuntime,
+        Arc<SessionMapper>,
+        Arc<CommManager>,
+    )> {
+        // Create shared StateManager from config
+        let state_manager = StateFactory::create_from_config(config)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?;
+
+        // Create script runtime
+        let runtime = Self::create_runtime(config, state_manager.as_ref()).await?;
+
+        // Create session mapper
+        let session_mapper = Arc::new(if let Some(ref sm) = state_manager {
+            SessionMapper::with_state_manager(Some(sm.clone())).await?
+        } else {
+            SessionMapper::with_state_manager(None).await?
+        });
+
+        // Create comm manager
+        let comm_manager = Arc::new(CommManager::new(session_mapper.clone())?);
+
+        Ok((state_manager, runtime, session_mapper, comm_manager))
+    }
+
+    /// Create script runtime with optional state manager
+    async fn create_runtime(
+        config: &Arc<LLMSpellConfig>,
+        state_manager: Option<&Arc<StateManager>>,
+    ) -> Result<ScriptRuntime> {
+        if let Some(sm) = state_manager {
+            ScriptRuntime::new_with_engine_and_state_manager(
+                &config.default_engine,
+                (**config).clone(),
+                sm.clone(),
+            )
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))
+        } else {
+            ScriptRuntime::new_with_engine_name(&config.default_engine, (**config).clone())
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))
+        }
+    }
+
+    /// Set up transport and security
+    async fn setup_transport_and_security(
+        transport: &mut T,
+        protocol: &P,
+        config: &Arc<LLMSpellConfig>,
+    ) -> Result<Arc<SecurityManager>> {
+        // Get transport configuration from protocol
+        let transport_config = protocol.transport_config();
+
+        // Bind transport to addresses
+        transport.bind(&transport_config).await?;
+
+        // Create security manager with kernel key
+        let kernel_key = Uuid::new_v4().to_string();
+        Ok(Arc::new(SecurityManager::new(
+            kernel_key,
+            config.runtime.kernel.auth_enabled,
+        )))
     }
 
     /// Create a new kernel with given transport and protocol
@@ -222,10 +333,6 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// # Errors
     ///
     /// Returns an error if kernel initialization fails.
-    ///
-    /// # Panics
-    ///
-    /// Panics if `kernel_id` is None after generation (should never happen).
     pub async fn new(
         kernel_id: String,
         config: Arc<LLMSpellConfig>,
@@ -245,32 +352,13 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             config.default_engine
         );
 
-        // Create shared StateManager from config
-        let state_manager = StateFactory::create_from_config(&config)
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?;
+        // Initialize kernel components
+        let (state_manager, runtime, session_mapper, comm_manager) =
+            Box::pin(Self::initialize_kernel_components(&config)).await?;
 
-        // Create script runtime from llmspell-bridge with shared state manager
-        let runtime = if let Some(ref sm) = state_manager {
-            ScriptRuntime::new_with_engine_and_state_manager(
-                &config.default_engine,
-                (*config).clone(),
-                sm.clone(),
-            )
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?
-        } else {
-            // Fallback to creating runtime without external state manager
-            ScriptRuntime::new_with_engine_name(&config.default_engine, (*config).clone())
-                .await
-                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))?
-        };
-
-        // Get transport configuration from protocol
-        let transport_config = protocol.transport_config();
-
-        // Bind transport to addresses
-        transport.bind(&transport_config).await?;
+        // Setup transport and security
+        let security_manager =
+            Self::setup_transport_and_security(&mut transport, &protocol, &config).await?;
 
         tracing::info!(
             "Kernel {} bound to {} channels",
@@ -278,32 +366,20 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             transport.channels().len()
         );
 
-        // Create security manager with kernel key
-        let kernel_key = Uuid::new_v4().to_string();
-        let security_manager = Arc::new(SecurityManager::new(
-            kernel_key,
-            config.runtime.kernel.auth_enabled,
-        ));
-
         // Create client manager
         let client_manager = Arc::new(ClientManager::new(config.runtime.kernel.max_clients));
 
-        // Create session mapper with shared state manager
-        let session_mapper = Arc::new(if let Some(ref sm) = state_manager {
-            SessionMapper::with_state_manager(Some(sm.clone())).await?
-        } else {
-            SessionMapper::with_state_manager(None).await?
-        });
+        // Get managers from runtime
+        let session_manager = runtime.get_session_manager();
+        let runtime_state_manager = runtime.get_state_manager();
 
-        // Create comm manager for session communication
-        let comm_manager = Arc::new(CommManager::new(session_mapper.clone())?);
+        // Use runtime's state manager if available, otherwise use kernel's
+        let final_state_manager = runtime_state_manager.or(state_manager);
 
-        // Create SessionManager based on config
-        let session_manager = Self::create_session_manager(&config, state_manager.as_ref()).await?;
+        // Create RAG pipeline
+        let rag_pipeline = Self::create_rag_pipeline(&config, final_state_manager.as_ref())?;
 
-        // Create RAG pipeline based on config
-        let rag_pipeline = Self::create_rag_pipeline(&config, state_manager.as_ref())?;
-
+        tracing::trace!("Kernel constructor complete, returning kernel instance");
         Ok(Self {
             kernel_id,
             transport,
@@ -312,7 +388,7 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
             client_manager,
             execution_state: Arc::new(RwLock::new(KernelState::Starting)),
             config,
-            state_manager,
+            state_manager: final_state_manager,
             session_manager,
             rag_pipeline,
             security_manager,
@@ -434,18 +510,38 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     ///
     /// Returns an error if the kernel fails to serve messages or encounters a fatal error.
     pub async fn serve(&mut self) -> Result<()> {
-        self.log_serving_info();
-        *self.execution_state.write().await = KernelState::Idle;
+        self.initialize_serving().await;
+        self.run_message_loop().await
+    }
 
+    /// Initialize kernel for serving
+    async fn initialize_serving(&self) {
+        tracing::trace!("Kernel.serve() called for kernel {}", self.kernel_id);
+        self.log_serving_info();
+        tracing::trace!("Setting execution state to Idle");
+        *self.execution_state.write().await = KernelState::Idle;
+        tracing::trace!("Starting kernel message loop");
+    }
+
+    /// Main message processing loop
+    async fn run_message_loop(&self) -> Result<()> {
         loop {
-            if self.process_available_messages().await? {
-                tracing::info!("Shutdown requested");
+            if self.process_message_cycle().await? {
                 return Ok(());
             }
-
-            self.transport.heartbeat().await?;
-            tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
         }
+    }
+
+    /// Process one cycle of the message loop
+    async fn process_message_cycle(&self) -> Result<bool> {
+        if self.process_available_messages().await? {
+            tracing::info!("Shutdown requested");
+            return Ok(true);
+        }
+
+        self.transport.heartbeat().await?;
+        tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;
+        Ok(false)
     }
 
     fn log_serving_info(&self) {
@@ -460,19 +556,32 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// Process messages from all channels
     /// Returns true if shutdown was requested
     async fn process_available_messages(&self) -> Result<bool> {
-        // Process control channel first for priority (shutdown/interrupt)
-        if let Some(shutdown_requested) = self.process_channel_message("control").await? {
-            return Ok(shutdown_requested);
+        // Process control channel first for priority
+        if self.check_control_channel().await? {
+            return Ok(true);
         }
 
-        // Then process other channels
+        // Process other channels
+        self.check_other_channels().await
+    }
+
+    /// Check control channel for messages
+    async fn check_control_channel(&self) -> Result<bool> {
+        Ok(self
+            .process_channel_message("control")
+            .await?
+            .unwrap_or(false))
+    }
+
+    /// Check non-control channels for messages
+    async fn check_other_channels(&self) -> Result<bool> {
         for channel in self.transport.channels() {
             if Self::should_skip_channel(&channel) {
                 continue;
             }
 
-            if let Some(shutdown_requested) = self.process_channel_message(&channel).await? {
-                return Ok(shutdown_requested);
+            if let Some(shutdown) = self.process_channel_message(&channel).await? {
+                return Ok(shutdown);
             }
         }
         Ok(false)
@@ -486,14 +595,14 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     /// Process a single channel's message
     /// Returns Some(true) if shutdown was requested
     async fn process_channel_message(&self, channel: &str) -> Result<Option<bool>> {
-        if let Some(parts) = self.transport.recv(channel).await? {
-            let message = self.protocol.decode(parts, channel)?;
-            self.store_request_header(&message).await?;
+        let Some(parts) = self.transport.recv(channel).await? else {
+            return Ok(None);
+        };
 
-            let shutdown_requested = self.handle_message_and_reply(message, channel).await?;
-            return Ok(Some(shutdown_requested));
-        }
-        Ok(None)
+        let message = self.protocol.decode(parts, channel)?;
+        self.store_request_header(&message).await?;
+        let shutdown = self.handle_message_and_reply(message, channel).await?;
+        Ok(Some(shutdown))
     }
 
     async fn store_request_header(&self, message: &P::Message) -> Result<()> {
@@ -507,50 +616,48 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         let should_shutdown = self.check_shutdown_conditions(msg_type, channel);
 
         self.log_message_receipt(msg_type, channel);
-
-        let should_reply = self.protocol.requires_reply(&message);
-        let flow = self.protocol.create_execution_flow(&message);
-
-        // Send pre-execution messages
-        self.send_flow_messages(flow.pre_execution).await?;
-
-        // Process the message
-        let reply_content = self.process_message(message.clone()).await?;
-
-        // Send the reply if needed
-        if should_reply {
-            self.send_reply(&message, reply_content, channel).await?;
-        }
-
-        // Send post-execution messages
-        self.send_flow_messages(flow.post_execution).await?;
-
-        // Handle execute_request specific post-processing
-        if msg_type == "execute_request" {
-            self.send_execute_idle_status(&message).await?;
-        }
+        self.execute_message_flow(&message, channel).await?;
+        self.handle_post_execution(msg_type, &message).await?;
 
         Ok(should_shutdown)
     }
 
+    /// Execute the message flow (pre-execution, process, reply, post-execution)
+    async fn execute_message_flow(&self, message: &P::Message, channel: &str) -> Result<()> {
+        let flow = self.protocol.create_execution_flow(message);
+
+        // Send pre-execution messages
+        self.send_flow_messages(flow.pre_execution).await?;
+
+        // Process and optionally reply
+        let reply_content = self.process_message(message.clone()).await?;
+        if self.protocol.requires_reply(message) {
+            self.send_reply(message, reply_content, channel).await?;
+        }
+
+        // Send post-execution messages
+        self.send_flow_messages(flow.post_execution).await?;
+        Ok(())
+    }
+
+    /// Handle post-execution tasks based on message type
+    async fn handle_post_execution(&self, msg_type: &str, message: &P::Message) -> Result<()> {
+        if msg_type == "execute_request" {
+            self.send_execute_idle_status(message).await?;
+        }
+        Ok(())
+    }
+
     /// Check shutdown conditions based on message type and channel
     fn check_shutdown_conditions(&self, msg_type: &str, channel: &str) -> bool {
-        let is_shutdown = msg_type == "shutdown_request";
-
-        if is_shutdown {
-            tracing::info!(
-                "Kernel {} shutdown requested via {}",
-                self.kernel_id,
-                msg_type
-            );
+        if msg_type != "shutdown_request" {
+            return false;
         }
 
-        // For debug mode, only shutdown on explicit shutdown_request from control channel
-        if self.config.debug.enabled {
-            is_shutdown && channel == "control"
-        } else {
-            is_shutdown
-        }
+        tracing::info!("Kernel {} shutdown requested", self.kernel_id);
+
+        // In debug mode, only shutdown from control channel
+        !self.config.debug.enabled || channel == "control"
     }
 
     /// Log message receipt
@@ -1281,7 +1388,14 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     async fn handle_state_request(&self, content: serde_json::Value) -> Result<serde_json::Value> {
         use crate::jupyter::protocol::StateOperation;
 
-        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
+        // Try to get StateManager from runtime first, then fall back to kernel's
+        let state_manager = {
+            let runtime = self.runtime.lock().await;
+            runtime
+                .get_state_manager()
+                .or_else(|| self.state_manager.clone())
+        }
+        .ok_or_else(|| {
             anyhow::anyhow!("State management not available - no StateManager configured")
         })?;
 
@@ -1295,15 +1409,18 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         let scope = Self::parse_state_scope(&content);
 
         match operation {
-            StateOperation::Show { key } => self.handle_state_show(state_manager, scope, key).await,
+            StateOperation::Show { key } => {
+                self.handle_state_show(&state_manager, scope, key).await
+            }
             StateOperation::Clear { key } => {
-                self.handle_state_clear(state_manager, scope, key).await
+                self.handle_state_clear(&state_manager, scope, key).await
             }
             StateOperation::Export { format } => {
-                self.handle_state_export(state_manager, scope, format).await
+                self.handle_state_export(&state_manager, scope, format)
+                    .await
             }
             StateOperation::Import { data, merge } => {
-                self.handle_state_import(state_manager, scope, data, merge)
+                self.handle_state_import(&state_manager, scope, data, merge)
                     .await
             }
         }
@@ -1443,7 +1560,14 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
     ) -> Result<serde_json::Value> {
         use crate::jupyter::protocol::SessionOperation;
 
-        let session_manager = self.session_manager.as_ref().ok_or_else(|| {
+        // Try to get SessionManager from runtime first, then fall back to kernel's
+        let session_manager = {
+            let runtime = self.runtime.lock().await;
+            runtime
+                .get_session_manager()
+                .or_else(|| self.session_manager.clone())
+        }
+        .ok_or_else(|| {
             anyhow::anyhow!("Session management not available - no SessionManager configured")
         })?;
 
@@ -1456,18 +1580,18 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
 
         match operation {
             SessionOperation::Create { name, description } => {
-                self.handle_session_create(session_manager, name, description)
+                self.handle_session_create(&session_manager, name, description)
                     .await
             }
             SessionOperation::List { query } => {
-                self.handle_session_list(session_manager, query).await
+                self.handle_session_list(&session_manager, query).await
             }
-            SessionOperation::Show { id } => self.handle_session_show(session_manager, id).await,
+            SessionOperation::Show { id } => self.handle_session_show(&session_manager, id).await,
             SessionOperation::Delete { id } => {
-                self.handle_session_delete(session_manager, id).await
+                self.handle_session_delete(&session_manager, id).await
             }
             SessionOperation::Export { id, format: _ } => {
-                self.handle_session_export(session_manager, id).await
+                self.handle_session_export(&session_manager, id).await
             }
             SessionOperation::Replay { .. } => Ok(serde_json::json!({
                 "status": "error",

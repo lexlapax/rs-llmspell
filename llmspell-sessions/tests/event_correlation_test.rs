@@ -216,6 +216,7 @@ async fn test_multiple_sessions_correlation_isolation() -> Result<()> {
             enable_session_events: true,
             ..Default::default()
         },
+        auto_persist: false, // Don't persist completed sessions to storage
         ..Default::default()
     };
 

@@ -143,4 +143,14 @@ impl ScriptEngineBridge for JSEngine {
         // self.js_context.set_global("args", convert_to_js_object(args))?;
         Ok(())
     }
+
+    fn get_session_manager(&self) -> Option<Arc<llmspell_sessions::SessionManager>> {
+        // JavaScript engine doesn't support external managers yet
+        None
+    }
+
+    fn get_state_manager(&self) -> Option<Arc<llmspell_state_persistence::manager::StateManager>> {
+        // JavaScript engine doesn't support external managers yet
+        None
+    }
 }

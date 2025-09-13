@@ -44,6 +44,8 @@ pub struct LuaEngine {
     lua_debug_adapter: Option<Arc<crate::lua::debug_hook_adapter::LuaDebugHookAdapter>>,
     /// External `StateManager` for shared state access
     external_state_manager: Option<Arc<llmspell_state_persistence::manager::StateManager>>,
+    /// External `SessionManager` for shared session access
+    external_session_manager: Option<Arc<llmspell_sessions::SessionManager>>,
     /// IO context for routing all IO operations
     _io_context: Arc<IOContext>,
 }
@@ -100,6 +102,7 @@ impl LuaEngine {
                 execution_manager: None,
                 lua_debug_adapter: None,
                 external_state_manager: None,
+                external_session_manager: None,
                 _io_context: io_context,
             })
         }
@@ -113,7 +116,57 @@ impl LuaEngine {
                 script_args: None,
                 execution_manager: None,
                 external_state_manager: None,
+                external_session_manager: None,
                 _io_context: io_context,
+            })
+        }
+    }
+
+    /// Create a new Lua engine with the given configuration and external managers
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua feature is not enabled or engine creation fails
+    pub fn new_with_managers(
+        config: &LuaConfig,
+        state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
+        session_manager: Arc<llmspell_sessions::SessionManager>,
+    ) -> Result<Self, LLMSpellError> {
+        #[cfg(feature = "lua")]
+        {
+            use mlua::Lua;
+            // Create Lua instance (async is enabled via feature flag)
+            let lua = Lua::new();
+            // Use stdio IO context by default
+            let io_context = Arc::new(IOContext::stdio());
+            // Install output capture with IO context
+            let console_capture = install_output_capture(&lua, io_context.clone(), None).ok();
+            Ok(Self {
+                lua: Arc::new(parking_lot::Mutex::new(lua)),
+                _config: config.clone(),
+                execution_context: ExecutionContext::default(),
+                runtime_config: None,
+                script_args: None,
+                console_capture,
+                execution_hook: None,
+                execution_manager: None,
+                lua_debug_adapter: None,
+                external_state_manager: Some(state_manager),
+                external_session_manager: Some(session_manager),
+                _io_context: io_context,
+            })
+        }
+        #[cfg(not(feature = "lua"))]
+        {
+            Ok(Self {
+                _config: config.clone(),
+                execution_context: ExecutionContext::default(),
+                runtime_config: None,
+                script_args: None,
+                execution_manager: None,
+                external_state_manager: Some(state_manager),
+                external_session_manager: Some(session_manager),
+                _io_context: Arc::new(IOContext::stdio()),
             })
         }
     }
@@ -151,6 +204,7 @@ impl LuaEngine {
                 execution_manager: None,
                 lua_debug_adapter: None,
                 external_state_manager: Some(state_manager),
+                external_session_manager: None,
                 _io_context: io_context,
             })
         }
@@ -164,6 +218,7 @@ impl LuaEngine {
                 script_args: None,
                 execution_manager: None,
                 external_state_manager: Some(state_manager),
+                external_session_manager: None,
                 io_context: Arc::new(IOContext::stdio()),
             })
         }
@@ -711,6 +766,13 @@ impl ScriptEngineBridge for LuaEngine {
                 tracing::debug!("Stored external StateManager in GlobalContext bridge refs");
             }
 
+            // If we have an external SessionManager, also store it in bridge refs
+            // so get_or_create_session_infrastructure can find it
+            if let Some(ref external_sess_mgr) = self.external_session_manager {
+                global_context.set_bridge("session_manager", external_sess_mgr.clone());
+                tracing::debug!("Stored external SessionManager in GlobalContext bridge refs");
+            }
+
             // Pass runtime config through global context if available
             if let Some(runtime_config) = &self.runtime_config {
                 global_context.set_bridge("runtime_config", runtime_config.clone());
@@ -847,6 +909,14 @@ impl ScriptEngineBridge for LuaEngine {
     ) -> Result<(), LLMSpellError> {
         self.script_args = Some(args);
         Ok(())
+    }
+
+    fn get_session_manager(&self) -> Option<Arc<llmspell_sessions::SessionManager>> {
+        self.external_session_manager.clone()
+    }
+
+    fn get_state_manager(&self) -> Option<Arc<llmspell_state_persistence::manager::StateManager>> {
+        self.external_state_manager.clone()
     }
 }
 

@@ -7,6 +7,13 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
 
+/// Type alias for the return type of `create_lua_engine_with_managers`
+type EngineWithManagers = (
+    Box<dyn ScriptEngineBridge>,
+    Arc<llmspell_state_persistence::manager::StateManager>,
+    Arc<llmspell_sessions::SessionManager>,
+);
+
 /// Factory for creating script engines
 pub struct EngineFactory;
 
@@ -39,6 +46,40 @@ impl EngineFactory {
                 engine.set_runtime_config(rc);
             }
             Ok(Box::new(engine))
+        }
+        #[cfg(not(feature = "lua"))]
+        {
+            Err(LLMSpellError::Component {
+                message: "Lua engine not enabled. Enable the 'lua' feature.".to_string(),
+                source: None,
+            })
+        }
+    }
+
+    /// Create a Lua engine with the given configuration, runtime config, and external managers
+    /// Returns the engine along with Arc references to the managers
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua feature is not enabled or engine creation fails
+    pub fn create_lua_engine_with_managers(
+        config: &LuaConfig,
+        runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
+        state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
+        session_manager: Arc<llmspell_sessions::SessionManager>,
+    ) -> Result<EngineWithManagers, LLMSpellError> {
+        #[cfg(feature = "lua")]
+        {
+            use crate::lua::LuaEngine;
+            let mut engine = LuaEngine::new_with_managers(
+                config,
+                state_manager.clone(),
+                session_manager.clone(),
+            )?;
+            if let Some(rc) = runtime_config {
+                engine.set_runtime_config(rc);
+            }
+            Ok((Box::new(engine), state_manager, session_manager))
         }
         #[cfg(not(feature = "lua"))]
         {
@@ -90,6 +131,37 @@ impl EngineFactory {
         {
             use crate::javascript::JSEngine;
             Ok(Box::new(JSEngine::new(config)?))
+        }
+        #[cfg(not(feature = "javascript"))]
+        {
+            Err(LLMSpellError::Component {
+                message: "JavaScript engine not enabled. Enable the 'javascript' feature."
+                    .to_string(),
+                source: None,
+            })
+        }
+    }
+
+    /// Create a JavaScript engine with the given configuration and external managers
+    /// Note: JavaScript engine doesn't support external managers yet, but this provides API consistency
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JavaScript feature is not enabled or engine creation fails
+    #[allow(unused_variables)]
+    pub fn create_javascript_engine_with_managers(
+        config: &JSConfig,
+        runtime_config: Option<&Arc<llmspell_config::LLMSpellConfig>>,
+        state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
+        session_manager: Arc<llmspell_sessions::SessionManager>,
+    ) -> Result<EngineWithManagers, LLMSpellError> {
+        #[cfg(feature = "javascript")]
+        {
+            use crate::javascript::JSEngine;
+            // JavaScript engine doesn't use external managers yet
+            // but we return them for API consistency
+            let engine = JSEngine::new(config)?;
+            Ok((Box::new(engine), state_manager, session_manager))
         }
         #[cfg(not(feature = "javascript"))]
         {
