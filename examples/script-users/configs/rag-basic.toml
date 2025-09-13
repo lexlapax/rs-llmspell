@@ -12,7 +12,7 @@ multi_tenant = false
 [rag.vector_storage]
 # Vector dimensions (depends on your embedding model)
 # Common values: 384 (all-MiniLM-L6-v2), 768 (bert-base), 1536 (OpenAI ada-002)
-dimensions = 384
+dimensions = 1536
 
 # Storage backend: "hnsw" for production, "mock" for testing
 backend = "hnsw"
