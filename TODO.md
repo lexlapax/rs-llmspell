@@ -24,7 +24,7 @@
 **🚨 CRITICAL ARCHITECTURE MIGRATION**: This phase consolidates 5 crates (llmspell-kernel, llmspell-debug, llmspell-repl, enhanced bridge, sessions) from Phase-9 branch into unified kernel architecture, fixing "dispatch task is gone" error and establishing foundation for Phases 10-24.
 
 **Success Criteria Summary:**
-- [ ] Global IO runtime eliminates "dispatch task is gone" error
+- [x] Global IO runtime eliminates "dispatch task is gone" error ✅
 - [ ] Complete 5-channel Jupyter protocol implementation
 - [ ] Debug Adapter Protocol (DAP) fully functional with 10 essential commands
 - [ ] REPL with interactive debugging, breakpoints, and variable inspection
@@ -32,27 +32,28 @@
 - [ ] Event correlation system with distributed tracing
 - [ ] Performance targets met: <10ms tool init, <50ms agent creation, <5% hook overhead
 - [ ] Application validation suite passes all 9 test applications
-- [ ] Comprehensive tracing infrastructure with environment control
+- [x] Comprehensive tracing infrastructure with environment control ✅
 - [ ] Code consolidation: 28,000+ lines → ~15,000 lines (46% reduction)
 
 ---
 
 ## Phase 9.1: Core Runtime & Transport Foundation (Days 1-3)
 
-### Task 9.1.1: Create Global IO Runtime Foundation
+### Task 9.1.1: Create Global IO Runtime Foundation ✅
 **Priority**: CRITICAL
-**Estimated Time**: 4 hours
+**Estimated Time**: 4 hours (Actual: 3.5 hours)
 **Assignee**: Runtime Team Lead
 **Dependencies**: None (starting point)
+**Status**: COMPLETE ✅
 
 **Description**: Create the global IO runtime foundation that fixes the "dispatch task is gone" error by ensuring all HTTP clients and I/O operations use the same runtime context.
 
 **Acceptance Criteria:**
-- [ ] `llmspell-kernel/src/runtime/io_runtime.rs` created with global runtime
-- [ ] `create_io_bound_resource<T, F>()` function for safe resource creation
-- [ ] All HTTP clients in llmspell-tools use global runtime
-- [ ] TracingInstrumentation struct for comprehensive tracing
-- [ ] No "dispatch task is gone" errors in 60+ second tests
+- [x] `llmspell-kernel/src/runtime/io_runtime.rs` created with global runtime ✅
+- [x] `create_io_bound_resource<T, F>()` function for safe resource creation ✅
+- [x] All HTTP clients in llmspell-tools use global runtime ✅
+- [x] TracingInstrumentation struct for comprehensive tracing ✅
+- [x] No "dispatch task is gone" errors in 60+ second tests ✅
 
 **Implementation Steps:**
 1. Create `llmspell-kernel/src/runtime/io_runtime.rs`:
@@ -84,13 +85,13 @@
 4. Validate tracing output includes runtime context information
 
 **Definition of Done:**
-- [ ] Global runtime accessible from all crates
-- [ ] HTTP clients survive beyond 30-second timeout
-- [ ] No runtime context mismatches in logs
-- [ ] Tracing shows consistent runtime context usage
-- [ ] All existing provider tests pass
+- [x] Global runtime accessible from all crates ✅
+- [x] HTTP clients survive beyond 30-second timeout ✅
+- [x] No runtime context mismatches in logs ✅
+- [x] Tracing shows consistent runtime context usage ✅
+- [x] All existing provider tests pass ✅
 
-### Task 9.1.2: Implement Multi-Protocol Transport Layer
+### Task 9.1.2: Implement Multi-Protocol Transport Layer ✅
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Assignee**: Transport Team Lead
@@ -101,14 +102,14 @@
 **Reusable Code Migration:**
 - Migrate `/tmp/phase-9-comparison/llmspell-kernel/src/transport/zeromq.rs` (237 lines) ✅
 - Migrate `/tmp/phase-9-comparison/llmspell-kernel/src/jupyter/protocol.rs` (protocol structures) ✅
-- Enhance with 5-channel architecture and message ID tracking
+- Enhance with 5-channel architecture and message ID tracking ✅
 
 **Acceptance Criteria:**
-- [ ] JupyterTransport with 5 channels (shell, iopub, control, stdin, heartbeat)
-- [ ] Connection file parsing from Phase-9 branch preserved
-- [ ] Message ID tracking for distributed tracing
-- [ ] Protocol abstraction supports future LSP/DAP/WebSocket
-- [ ] Transport registration in global runtime
+- [x] JupyterTransport with 5 channels (shell, iopub, control, stdin, heartbeat) ✅
+- [x] Connection file parsing from Phase-9 branch preserved ✅
+- [x] Message ID tracking for distributed tracing ✅
+- [x] Protocol abstraction supports future LSP/DAP/WebSocket ✅
+- [x] Transport registration in global runtime ✅
 
 **Implementation Steps:**
 1. Create `llmspell-kernel/src/transport/` module structure
@@ -134,11 +135,11 @@
 4. Validate protocol abstraction with mock LSP transport
 
 **Definition of Done:**
-- [ ] All 5 Jupyter channels functional
-- [ ] Connection file compatibility with Jupyter ecosystem
-- [ ] Message tracing includes correlation IDs
-- [ ] Protocol abstraction ready for Phase 11 IDE integration
-- [ ] Transport layer has <1ms overhead
+- [x] All 5 Jupyter channels functional ✅
+- [x] Connection file compatibility with Jupyter ecosystem ✅
+- [x] Message tracing includes correlation IDs ✅
+- [x] Protocol abstraction ready for Phase 11 IDE integration ✅
+- [x] Transport layer has <1ms overhead ✅
 
 ### Task 9.1.3: Implement Message Router and I/O Management
 **Priority**: CRITICAL
@@ -146,17 +147,17 @@
 **Assignee**: Messaging Team Lead
 **Dependencies**: Task 9.1.2
 
-**Description**: Migrate I/O management system from Phase-9 branch and implement message routing with parent header tracking and application detection.
+**Description**: Migrate I/O management system from Phase-9 branch and implement message routing with parent header tracking and session detection.
 
 **Reusable Code Migration:**
 - Migrate `/tmp/phase-9-comparison/llmspell-kernel/src/kernel_io.rs` (I/O routing logic) ✅
 - Migrate message handling patterns from jupyter_kernel.rs ✅
-- Add application complexity detection for tracing
+- Add session type detection for tracing (script, exec, repl, debug, state)
 
 **Acceptance Criteria:**
 - [ ] EnhancedIOManager with multi-channel routing
 - [ ] Parent header tracking for message correlation
-- [ ] Application type detection (complexity layers 1-6)
+- [ ] Session type detection (script, exec, repl, debug, state, session)
 - [ ] stdout/stderr capture and routing to iopub channel
 - [ ] Real-time I/O streaming to multiple clients
 
@@ -171,7 +172,7 @@
        parent_headers: HashMap<String, MessageHeader>,
    }
    ```
-3. Add application detection for complexity-aware tracing
+3. Add session detection for operation-aware tracing
 4. Implement message correlation with parent_header tracking
 5. Add real-time streaming capabilities
 6. Integrate with tracing infrastructure
@@ -180,12 +181,12 @@
 1. Test stdout/stderr capture during script execution
 2. Verify messages routed to correct Jupyter channels
 3. Test parent header correlation in multi-client scenarios
-4. Validate application detection across all 9 test applications
+4. Validate session detection across all session types
 
 **Definition of Done:**
 - [ ] I/O properly routed to iopub channel
 - [ ] Message correlation working across all channels
-- [ ] Application complexity detection >95% accurate
+- [ ] Session type detection >95% accurate
 - [ ] Multiple Jupyter clients can receive I/O simultaneously
 - [ ] Message handling latency <5ms
 

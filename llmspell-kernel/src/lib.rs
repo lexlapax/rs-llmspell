@@ -22,10 +22,22 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod runtime;
+pub mod traits;
+pub mod transport;
 
-// Re-export commonly used types
-pub use runtime::io_runtime::{create_io_bound_resource, global_io_runtime};
-pub use runtime::tracing::{TracingInstrumentation, TracingLevel};
+// Re-export commonly used runtime types
+pub use runtime::io_runtime::{
+    block_on_global, create_io_bound_resource, global_io_runtime, spawn_global,
+};
+pub use runtime::tracing::{SessionType, TracingInstrumentation, TracingLevel};
+
+// Re-export transport types
+pub use traits::{ChannelConfig, Transport, TransportConfig};
+
+#[cfg(feature = "zeromq")]
+pub use transport::zeromq::ZmqTransport;
+
+pub use transport::jupyter::{JupyterConnectionInfo, JupyterTransport};
 
 /// Kernel version information
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");

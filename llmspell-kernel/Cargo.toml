@@ -18,6 +18,12 @@ llmspell-utils = { path = "../llmspell-utils", version = "0.8.0" }
 # Async runtime
 tokio = { version = "1.41", features = ["full", "tracing"] }
 tokio-util = { version = "0.7", features = ["codec", "io"] }
+async-trait = "0.1"
+
+# Transport
+zmq = { version = "0.10", optional = true }
+tungstenite = { version = "0.24", optional = true }
+tokio-tungstenite = { version = "0.24", optional = true }
 
 # Tracing and logging
 tracing = "0.1"
@@ -60,8 +66,10 @@ wiremock = "0.6"
 reqwest = { version = "0.12", features = ["json"] }
 
 [features]
-default = ["metrics"]
+default = ["metrics", "zeromq"]
 metrics = ["dep:metrics-exporter-prometheus"]
+zeromq = ["dep:zmq"]
+websocket = ["dep:tungstenite", "dep:tokio-tungstenite"]
 debug = ["tracing-subscriber/fmt"]
 test-utils = []
 

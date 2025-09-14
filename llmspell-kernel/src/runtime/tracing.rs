@@ -1,7 +1,7 @@
 //! Comprehensive Tracing Infrastructure
 //!
 //! This module provides structured tracing for the kernel, enabling detailed
-//! visibility into execution flows, debugging operations, and performance monitoring.
+//! visibility into kernel operations, sessions, and debugging.
 //! Tracing is always present in the code but conditionally enabled via the
 //! RUST_LOG environment variable.
 
@@ -14,34 +14,50 @@ use tracing::{debug, info, instrument, trace, warn, Level, Span};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 use uuid::Uuid;
 
+/// Session type for tracing context
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum SessionType {
+    /// Script execution session (run command)
+    Script,
+    /// Interactive REPL session
+    Repl,
+    /// Single execution session (exec command)
+    Exec,
+    /// Debug session with breakpoints and stepping
+    Debug,
+    /// State management session
+    State,
+    /// Session management operations
+    Session,
+}
+
 /// Tracing instrumentation for kernel operations
 #[derive(Clone)]
 pub struct TracingInstrumentation {
     session_id: String,
     kernel_span: Span,
+    session_span: Arc<RwLock<Option<Span>>>,
     execution_span: Arc<RwLock<Option<Span>>>,
     debug_span: Arc<RwLock<Option<Span>>>,
-    application_span: Arc<RwLock<Option<Span>>>,
+    repl_span: Arc<RwLock<Option<Span>>>,
     metadata: Arc<RwLock<TracingMetadata>>,
 }
 
 /// Metadata for tracing context
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TracingMetadata {
-    /// Type of kernel (e.g., "integrated")
+    /// Type of kernel (e.g., "integrated", "subprocess")
     pub kernel_type: String,
     /// When the session started
     pub start_time: DateTime<Utc>,
-    /// Path to the script being executed
+    /// Type of session being executed
+    pub session_type: Option<SessionType>,
+    /// Path to the script being executed (if applicable)
     pub script_path: Option<String>,
-    /// Number of agents in the script
-    pub agent_count: Option<usize>,
-    /// Type of application being executed
-    pub application_type: Option<String>,
-    /// Complexity layer (1-6) of the application
-    pub complexity_layer: Option<u8>,
-    /// Expected runtime in seconds
-    pub expected_runtime_seconds: Option<u64>,
+    /// Debug mode enabled
+    pub debug_enabled: bool,
+    /// State persistence enabled
+    pub state_persistent: bool,
 }
 
 /// Tracing level configuration
@@ -62,123 +78,150 @@ pub enum TracingLevel {
 impl TracingInstrumentation {
     /// Create a new kernel session with tracing
     #[instrument(level = "info", skip_all)]
-    pub fn new_kernel_session(session_id: Option<String>) -> Self {
+    pub fn new_kernel_session(session_id: Option<String>, kernel_type: &str) -> Self {
         let session_id = session_id.unwrap_or_else(|| Uuid::new_v4().to_string());
 
         let kernel_span = tracing::info_span!(
-            "kernel_session",
+            "kernel",
             session_id = %session_id,
-            kernel_type = "integrated",
+            kernel_type = %kernel_type,
             version = %crate::KERNEL_VERSION,
         );
 
         let metadata = TracingMetadata {
-            kernel_type: "integrated".to_string(),
+            kernel_type: kernel_type.to_string(),
             start_time: Utc::now(),
+            session_type: None,
             script_path: None,
-            agent_count: None,
-            application_type: None,
-            complexity_layer: None,
-            expected_runtime_seconds: None,
+            debug_enabled: false,
+            state_persistent: false,
         };
 
-        info!("Starting kernel session: {}", session_id);
+        info!("Starting kernel session: {} (type: {})", session_id, kernel_type);
 
         Self {
             session_id,
             kernel_span,
+            session_span: Arc::new(RwLock::new(None)),
             execution_span: Arc::new(RwLock::new(None)),
             debug_span: Arc::new(RwLock::new(None)),
-            application_span: Arc::new(RwLock::new(None)),
+            repl_span: Arc::new(RwLock::new(None)),
             metadata: Arc::new(RwLock::new(metadata)),
         }
     }
 
-    /// Start execution tracing
+    /// Start a session of specific type
     #[instrument(level = "debug", skip(self))]
-    pub fn start_execution(&self, script_path: &str, agent_count: usize) {
-        let execution_span = tracing::debug_span!(
-            parent: &self.kernel_span,
-            "script_execution",
-            script = %script_path,
-            agents = agent_count,
-        );
+    pub fn start_session(&self, session_type: SessionType, script_path: Option<&str>) {
+        let session_span = match session_type {
+            SessionType::Script => tracing::debug_span!(
+                parent: &self.kernel_span,
+                "script_session",
+                script = script_path.unwrap_or("<none>"),
+            ),
+            SessionType::Repl => tracing::debug_span!(
+                parent: &self.kernel_span,
+                "repl_session",
+                interactive = true,
+            ),
+            SessionType::Exec => tracing::debug_span!(
+                parent: &self.kernel_span,
+                "exec_session",
+                single_shot = true,
+            ),
+            SessionType::Debug => tracing::debug_span!(
+                parent: &self.kernel_span,
+                "debug_session",
+                breakpoints_enabled = true,
+            ),
+            SessionType::State => tracing::debug_span!(
+                parent: &self.kernel_span,
+                "state_session",
+                persistent = true,
+            ),
+            SessionType::Session => tracing::debug_span!(
+                parent: &self.kernel_span,
+                "session_mgmt",
+            ),
+        };
 
         // Update metadata
         {
             let mut metadata = self.metadata.write();
-            metadata.script_path = Some(script_path.to_string());
-            metadata.agent_count = Some(agent_count);
+            metadata.session_type = Some(session_type);
+            if let Some(path) = script_path {
+                metadata.script_path = Some(path.to_string());
+            }
         }
 
         info!(
             session_id = %self.session_id,
-            "Starting execution: {} agents in {}",
-            agent_count,
-            script_path
+            "Starting {:?} session{}",
+            session_type,
+            script_path.map(|p| format!(" for {}", p)).unwrap_or_default()
         );
 
-        *self.execution_span.write() = Some(execution_span);
+        *self.session_span.write() = Some(session_span);
     }
 
-    /// Start debug operation tracing
+    /// Trace debug operations (breakpoints, stepping, etc.)
     #[instrument(level = "trace", skip(self))]
-    pub fn debug_operation(&self, operation: &str, line: u32) {
-        let execution_span = self.execution_span.read();
-        let parent_span = execution_span.as_ref().unwrap_or(&self.kernel_span);
+    pub fn trace_debug_operation(&self, operation: &str, details: Option<&str>) {
+        let session_span = self.session_span.read();
+        let parent_span = session_span.as_ref().unwrap_or(&self.kernel_span);
 
         if self.debug_span.read().is_none() {
             let debug_span = tracing::trace_span!(
                 parent: parent_span,
-                "debug_session",
+                "debug_ops",
             );
             *self.debug_span.write() = Some(debug_span);
         }
 
         trace!(
             session_id = %self.session_id,
-            "Debug operation: {} at line {}",
+            operation = %operation,
+            "Debug: {}{}",
             operation,
-            line
+            details.map(|d| format!(": {}", d)).unwrap_or_default()
         );
     }
 
-    /// Start application execution tracing
-    #[instrument(level = "info", skip(self))]
-    pub fn start_application(
-        &self,
-        app_type: &str,
-        complexity_layer: u8,
-        expected_agents: usize,
-        expected_runtime: u64,
-    ) {
-        let app_span = tracing::info_span!(
-            parent: &self.kernel_span,
-            "application_execution",
-            app_type = %app_type,
-            expected_agents = expected_agents,
-            expected_runtime = expected_runtime,
-            complexity_layer = complexity_layer,
-        );
+    /// Start REPL command execution
+    #[instrument(level = "debug", skip(self))]
+    pub fn trace_repl_command(&self, command: &str, line_number: usize) {
+        if self.repl_span.read().is_none() {
+            let session_span = self.session_span.read();
+            let parent_span = session_span.as_ref().unwrap_or(&self.kernel_span);
 
-        // Update metadata
-        {
-            let mut metadata = self.metadata.write();
-            metadata.application_type = Some(app_type.to_string());
-            metadata.complexity_layer = Some(complexity_layer);
-            metadata.expected_runtime_seconds = Some(expected_runtime);
+            let repl_span = tracing::debug_span!(
+                parent: parent_span,
+                "repl_commands",
+            );
+            *self.repl_span.write() = Some(repl_span);
         }
 
-        info!(
+        debug!(
             session_id = %self.session_id,
-            "Executing {} application (Layer {}) with {} agents, expected {}s",
-            app_type,
-            complexity_layer,
-            expected_agents,
-            expected_runtime
+            line = line_number,
+            "REPL[{}]: {}",
+            line_number,
+            command
         );
+    }
 
-        *self.application_span.write() = Some(app_span);
+    /// Trace state operations
+    #[instrument(level = "debug", skip(self, value))]
+    pub fn trace_state_operation(&self, operation: &str, key: &str, value: Option<&str>) {
+        debug!(
+            session_id = %self.session_id,
+            operation = %operation,
+            key = %key,
+            has_value = value.is_some(),
+            "State operation: {} on key '{}'",
+            operation,
+            key
+        );
     }
 
     /// Record a performance metric
@@ -202,32 +245,25 @@ impl TracingInstrumentation {
         );
     }
 
-    /// Complete execution with results
+    /// Complete session with results
     #[instrument(level = "info", skip(self))]
-    pub fn complete_execution(&self, success: bool, runtime_ms: u64) {
+    pub fn complete_session(&self, success: bool, runtime_ms: u64) {
         let status = if success { "success" } else { "failure" };
+        let session_type = self.metadata.read().session_type;
 
         info!(
             session_id = %self.session_id,
             status = status,
             runtime_ms = runtime_ms,
-            "Execution completed"
+            session_type = ?session_type,
+            "Session completed"
         );
 
-        // Check against expected runtime
-        if let Some(expected) = self.metadata.read().expected_runtime_seconds {
-            let actual_seconds = runtime_ms / 1000;
-            if actual_seconds > expected * 2 {
-                warn!(
-                    session_id = %self.session_id,
-                    "Application took {}% longer than expected",
-                    (actual_seconds * 100) / expected
-                );
-            }
-        }
-
-        // Clear execution span
+        // Clear session spans
+        *self.session_span.write() = None;
         *self.execution_span.write() = None;
+        *self.debug_span.write() = None;
+        *self.repl_span.write() = None;
     }
 
     /// Get session ID
@@ -312,51 +348,6 @@ pub fn init_tracing_with_filter(filter: &str) -> Result<()> {
         .map_err(|e| anyhow::anyhow!("Failed to initialize tracing: {}", e))
 }
 
-/// Application detection for complexity-aware tracing
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ApplicationDetection {
-    /// Type of application detected
-    pub app_type: String,
-    /// Expected number of agents
-    pub agent_count: usize,
-    /// Estimated runtime in seconds
-    pub estimated_seconds: u64,
-    /// Complexity layer (1-6)
-    pub complexity_layer: u8,
-}
-
-/// Detect application type from script path or content
-pub fn detect_application_type(script_path: &str) -> ApplicationDetection {
-    // Simple detection based on path patterns
-    let app_type = if script_path.contains("file-organizer") {
-        ("file-organizer", 3, 10, 1)
-    } else if script_path.contains("research-collector") {
-        ("research-collector", 2, 60, 1)
-    } else if script_path.contains("content-creator") {
-        ("content-creator", 4, 30, 2)
-    } else if script_path.contains("personal-assistant") {
-        ("personal-assistant", 5, 60, 3)
-    } else if script_path.contains("communication-manager") {
-        ("communication-manager", 5, 60, 3)
-    } else if script_path.contains("code-review-assistant") {
-        ("code-review-assistant", 7, 60, 3)
-    } else if script_path.contains("process-orchestrator") {
-        ("process-orchestrator", 8, 120, 4)
-    } else if script_path.contains("knowledge-base") {
-        ("knowledge-base", 6, 90, 4)
-    } else if script_path.contains("webapp-creator") {
-        ("webapp-creator", 21, 180, 5)
-    } else {
-        ("unknown", 1, 30, 1)
-    };
-
-    ApplicationDetection {
-        app_type: app_type.0.to_string(),
-        agent_count: app_type.1,
-        estimated_seconds: app_type.2,
-        complexity_layer: app_type.3,
-    }
-}
 
 #[cfg(test)]
 mod tests {
@@ -365,7 +356,7 @@ mod tests {
 
     #[test]
     fn test_tracing_instrumentation_creation() {
-        let tracing = TracingInstrumentation::new_kernel_session(None);
+        let tracing = TracingInstrumentation::new_kernel_session(None, "integrated");
         assert!(!tracing.session_id().is_empty());
 
         let metadata = tracing.metadata();
@@ -374,27 +365,27 @@ mod tests {
     }
 
     #[test]
-    fn test_tracing_execution() {
-        let tracing = TracingInstrumentation::new_kernel_session(Some("test-session".to_string()));
+    fn test_tracing_sessions() {
+        let tracing = TracingInstrumentation::new_kernel_session(Some("test-session".to_string()), "integrated");
         assert_eq!(tracing.session_id(), "test-session");
 
-        tracing.start_execution("test_script.lua", 5);
+        tracing.start_session(SessionType::Script, Some("test_script.lua"));
 
         let metadata = tracing.metadata();
         assert_eq!(metadata.script_path, Some("test_script.lua".to_string()));
-        assert_eq!(metadata.agent_count, Some(5));
+        assert_eq!(metadata.session_type, Some(SessionType::Script));
     }
 
     #[test]
-    fn test_tracing_application() {
-        let tracing = TracingInstrumentation::new_kernel_session(None);
+    fn test_session_types() {
+        let tracing = TracingInstrumentation::new_kernel_session(None, "integrated");
 
-        tracing.start_application("content-creator", 2, 4, 30);
+        // Test different session types
+        tracing.start_session(SessionType::Repl, None);
+        assert_eq!(tracing.metadata().session_type, Some(SessionType::Repl));
 
-        let metadata = tracing.metadata();
-        assert_eq!(metadata.application_type, Some("content-creator".to_string()));
-        assert_eq!(metadata.complexity_layer, Some(2));
-        assert_eq!(metadata.expected_runtime_seconds, Some(30));
+        tracing.start_session(SessionType::Debug, Some("debug.lua"));
+        assert_eq!(tracing.metadata().session_type, Some(SessionType::Debug));
     }
 
     #[test]
@@ -412,47 +403,55 @@ mod tests {
     }
 
     #[test]
-    fn test_application_detection() {
-        let detection = detect_application_type("examples/content-creator/main.lua");
-        assert_eq!(detection.app_type, "content-creator");
-        assert_eq!(detection.agent_count, 4);
-        assert_eq!(detection.complexity_layer, 2);
+    fn test_repl_tracing() {
+        let tracing = TracingInstrumentation::new_kernel_session(None, "integrated");
+        tracing.start_session(SessionType::Repl, None);
 
-        let detection = detect_application_type("examples/webapp-creator/main.lua");
-        assert_eq!(detection.app_type, "webapp-creator");
-        assert_eq!(detection.agent_count, 21);
-        assert_eq!(detection.complexity_layer, 5);
+        tracing.trace_repl_command("print('hello')", 1);
+        tracing.trace_repl_command("local x = 42", 2);
 
-        let detection = detect_application_type("random/script.lua");
-        assert_eq!(detection.app_type, "unknown");
-        assert_eq!(detection.complexity_layer, 1);
+        // Should not panic
     }
 
     #[test]
-    fn test_complete_execution() {
-        let tracing = TracingInstrumentation::new_kernel_session(None);
-        tracing.start_application("test-app", 1, 2, 10);
+    fn test_state_tracing() {
+        let tracing = TracingInstrumentation::new_kernel_session(None, "integrated");
+        tracing.start_session(SessionType::State, None);
 
-        // Complete successfully within expected time
-        tracing.complete_execution(true, 8000);
+        tracing.trace_state_operation("set", "user.name", Some("test"));
+        tracing.trace_state_operation("get", "user.name", None);
+        tracing.trace_state_operation("delete", "user.name", None);
 
-        // Complete with longer runtime (should trigger warning in logs)
-        tracing.complete_execution(true, 25000);
+        // Should not panic
     }
 
     #[test]
-    fn test_debug_operation() {
-        let tracing = TracingInstrumentation::new_kernel_session(None);
-        tracing.start_execution("debug_test.lua", 1);
+    fn test_complete_session() {
+        let tracing = TracingInstrumentation::new_kernel_session(None, "integrated");
+        tracing.start_session(SessionType::Exec, None);
 
-        // Should not panic even without debug span
-        tracing.debug_operation("breakpoint", 42);
-        tracing.debug_operation("step", 43);
+        // Complete successfully
+        tracing.complete_session(true, 1500);
+
+        // Start another session and fail it
+        tracing.start_session(SessionType::Script, Some("test.lua"));
+        tracing.complete_session(false, 500);
+    }
+
+    #[test]
+    fn test_debug_operations() {
+        let tracing = TracingInstrumentation::new_kernel_session(None, "integrated");
+        tracing.start_session(SessionType::Debug, Some("debug_test.lua"));
+
+        // Should not panic
+        tracing.trace_debug_operation("breakpoint", Some("line 42"));
+        tracing.trace_debug_operation("step_over", None);
+        tracing.trace_debug_operation("continue", None);
     }
 
     #[test]
     fn test_record_metric() {
-        let tracing = TracingInstrumentation::new_kernel_session(None);
+        let tracing = TracingInstrumentation::new_kernel_session(None, "integrated");
 
         tracing.record_metric("agent_creation_time", 45.5, "ms");
         tracing.record_metric("memory_usage", 1024.0, "MB");
