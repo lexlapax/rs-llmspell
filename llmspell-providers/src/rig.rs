@@ -26,21 +26,17 @@ fn get_shared_io_runtime() -> &'static Arc<Runtime> {
     })
 }
 
-/// Create a client, handling both sync and async contexts
+/// Create a client ALWAYS using the shared IO runtime to isolate from kernel runtime
 fn create_client_safe<F, T>(creator: F) -> T
 where
     F: FnOnce() -> T,
     T: Send + 'static,
 {
-    // Try to get the current runtime handle - if we're in an async context
-    if let Ok(_handle) = tokio::runtime::Handle::try_current() {
-        // We're already in a runtime, just create the client directly
-        creator()
-    } else {
-        // We're not in a runtime, use the shared runtime
-        let runtime = get_shared_io_runtime();
-        runtime.block_on(async { creator() })
-    }
+    // ALWAYS use the shared runtime to isolate HTTP clients from kernel runtime context
+    // This prevents "dispatch task is gone" errors when the kernel task completes
+    let runtime = get_shared_io_runtime();
+    let _guard = runtime.enter();
+    creator()
 }
 
 /// Enum to hold different provider models
