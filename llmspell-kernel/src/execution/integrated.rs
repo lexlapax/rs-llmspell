@@ -20,6 +20,7 @@ type IOHandler = Box<dyn Fn(&str) + Send + Sync>;
 use crate::io::manager::EnhancedIOManager;
 use crate::io::router::MessageRouter;
 use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
+use crate::sessions::{KernelSessionIntegration, SessionConfig, SessionManager};
 use crate::state::{KernelState, MemoryBackend, StorageBackend};
 use crate::traits::Protocol;
 
@@ -158,6 +159,8 @@ pub struct IntegratedKernel<P: Protocol> {
     execution_count: Arc<RwLock<i32>>,
     /// Unified kernel state
     state: Arc<KernelState>,
+    /// Session manager
+    session_manager: SessionManager,
     /// Shutdown signal receiver
     shutdown_rx: Option<mpsc::Receiver<()>>,
 }
@@ -197,6 +200,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             MemoryBackend::new(),
         )))?);
 
+        // Create session manager with default config
+        let mut session_manager = SessionManager::new(SessionConfig::default());
+        session_manager.set_kernel_state(state.clone());
+
+        // Create a session for this kernel instance
+        let _session_id_obj = session_manager.create_session(None)?;
+
         // Initialize session state
         state.update_session(|session| {
             session.set_id(&session_id);
@@ -213,6 +223,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             session_id,
             execution_count: Arc::new(RwLock::new(0)),
             state,
+            session_manager,
             shutdown_rx: None,
         })
     }
@@ -288,6 +299,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             .unwrap_or("unknown");
 
         debug!("Handling message type: {}", msg_type);
+
+        // Convert message to JSON for session handling
+        let json_message = serde_json::to_value(&message)?;
+
+        // Handle message through session manager
+        self.session_manager.handle_kernel_message(json_message)?;
 
         match msg_type {
             "execute_request" => self.handle_execute_request(message).await?,

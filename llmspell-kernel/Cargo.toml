@@ -1,11 +1,11 @@
 [package]
 name = "llmspell-kernel"
-version = "0.9.0"
-edition = "2021"
-authors = ["LLMSpell Contributors"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
 description = "Integrated kernel architecture with REPL and debugging infrastructure"
-license = "MIT OR Apache-2.0"
-repository = "https://github.com/lexlapax/llmspell"
 readme = "README.md"
 keywords = ["llm", "kernel", "repl", "debug", "jupyter"]
 categories = ["development-tools", "command-line-utilities"]
@@ -27,7 +27,11 @@ tokio-tungstenite = { version = "0.24", optional = true }
 
 # Tracing and logging
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter", "json", "fmt"] }
+tracing-subscriber = { version = "0.3", features = [
+    "env-filter",
+    "json",
+    "fmt",
+] }
 tracing-appender = "0.2"
 
 # Serialization
@@ -48,6 +52,12 @@ num_cpus = "1.16"
 
 # Storage
 sled = "0.34"
+
+# Cryptography
+sha2 = "0.10"
+
+# Text processing
+regex = "1.10"
 
 # Performance monitoring
 metrics = "0.24"

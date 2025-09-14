@@ -444,12 +444,12 @@
 - Migrate complete artifact subsystem with version control ✅
 
 **Acceptance Criteria:**
-- [ ] Complete session lifecycle management (create, pause, resume, archive)
-- [ ] Artifact storage with version control and metadata
-- [ ] Session policies (rate limiting, timeouts, resource limits)
-- [ ] Session-level tracing and correlation
-- [ ] TTL management for session expiration
-- [ ] Multi-tenant session isolation
+- [x] Complete session lifecycle management (create, pause, resume, archive)
+- [x] Artifact storage with version control and metadata
+- [x] Session policies (rate limiting, timeouts, resource limits)
+- [x] Session-level tracing and correlation
+- [x] TTL management for session expiration
+- [x] Multi-tenant session isolation
 
 **Implementation Steps:**
 1. Create `llmspell-kernel/src/sessions/` module preserving Phase-9 structure
@@ -483,12 +483,12 @@
 5. Test multi-user session isolation
 
 **Definition of Done:**
-- [ ] All 34 session modules functional
-- [ ] Session artifacts persisted with version control
-- [ ] Policies prevent resource exhaustion
-- [ ] TTL expiration works automatically
-- [ ] Session tracing provides visibility into lifecycle
-- [ ] Multi-tenant isolation verified
+- [x] All 34 session modules functional
+- [x] Session artifacts persisted with version control
+- [x] Policies prevent resource exhaustion
+- [x] TTL expiration works automatically
+- [x] Session tracing provides visibility into lifecycle
+- [x] Multi-tenant isolation verified
 
 ### Task 9.3.3: Implement Event Correlation System
 **Priority**: HIGH

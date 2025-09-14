@@ -25,6 +25,7 @@ pub mod debug;
 pub mod execution;
 pub mod io;
 pub mod runtime;
+pub mod sessions;
 pub mod state;
 pub mod traits;
 pub mod transport;
@@ -61,6 +62,13 @@ pub use state::{
     persistence::StatePersistence,
     DebugState, ExecutionState, KernelState, MemoryBackend, SessionState, SledBackend,
     StorageBackend, VectorBackend,
+};
+
+// Re-export session types
+pub use sessions::{
+    AccessControl, ArtifactStorage, ArtifactType, RateLimitConfig, RateLimitPolicy, Session,
+    SessionArtifact, SessionConfig, SessionEvent, SessionEventType, SessionId, SessionManager,
+    SessionMetadata, SessionMetrics, SessionPolicy, SessionSecurity, SessionStatus, TimeoutPolicy,
 };
 
 // Re-export debug types
