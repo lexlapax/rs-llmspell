@@ -270,7 +270,6 @@ pub async fn create_jupyter_kernel_transport(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use tokio;
 
     #[test]

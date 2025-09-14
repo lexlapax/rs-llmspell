@@ -21,6 +21,8 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod execution;
+pub mod io;
 pub mod runtime;
 pub mod traits;
 pub mod transport;
@@ -29,15 +31,26 @@ pub mod transport;
 pub use runtime::io_runtime::{
     block_on_global, create_io_bound_resource, global_io_runtime, spawn_global,
 };
-pub use runtime::tracing::{SessionType, TracingInstrumentation, TracingLevel};
+pub use runtime::tracing::{
+    OperationCategory, SessionType, TracingInstrumentation, TracingLevel, TracingMetadata,
+};
+
+// Re-export I/O types
+pub use io::{
+    manager::{EnhancedIOManager, IOConfig, IOPubMessage, MessageHeader, StreamType},
+    router::{ClientConnection, MessageDestination, MessageRouter},
+};
 
 // Re-export transport types
-pub use traits::{ChannelConfig, Transport, TransportConfig};
+pub use traits::{ChannelConfig, Transport, TransportConfig, Protocol};
 
 #[cfg(feature = "zeromq")]
 pub use transport::zeromq::ZmqTransport;
 
 pub use transport::jupyter::{JupyterConnectionInfo, JupyterTransport};
+
+// Re-export execution types
+pub use execution::{ExecutionConfig, IntegratedKernel};
 
 /// Kernel version information
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");

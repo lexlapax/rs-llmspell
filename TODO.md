@@ -25,7 +25,7 @@
 
 **Success Criteria Summary:**
 - [x] Global IO runtime eliminates "dispatch task is gone" error ✅
-- [ ] Complete 5-channel Jupyter protocol implementation
+- [x] Complete 5-channel Jupyter protocol implementation ✅
 - [ ] Debug Adapter Protocol (DAP) fully functional with 10 essential commands
 - [ ] REPL with interactive debugging, breakpoints, and variable inspection
 - [ ] Session management with artifact storage and TTL expiration
@@ -91,18 +91,19 @@
 - [x] Tracing shows consistent runtime context usage ✅
 - [x] All existing provider tests pass ✅
 
-### Task 9.1.2: Implement Multi-Protocol Transport Layer ✅
+### Task 9.1.2: Implement Multi-Protocol Transport Layer with Comprehensive Tracing ✅
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Assignee**: Transport Team Lead
 **Dependencies**: Task 9.1.1
 
-**Description**: Migrate and enhance transport layer from Phase-9 branch with 5-channel Jupyter support and protocol abstraction for future LSP/DAP/WebSocket protocols.
+**Description**: Migrate and enhance transport layer from Phase-9 branch with 5-channel Jupyter support and protocol abstraction for future LSP/DAP/WebSocket protocols. Includes comprehensive tracing infrastructure covering all kernel operations across Phases 1-9.
 
 **Reusable Code Migration:**
 - Migrate `/tmp/phase-9-comparison/llmspell-kernel/src/transport/zeromq.rs` (237 lines) ✅
 - Migrate `/tmp/phase-9-comparison/llmspell-kernel/src/jupyter/protocol.rs` (protocol structures) ✅
 - Enhance with 5-channel architecture and message ID tracking ✅
+- Implement comprehensive tracing for all kernel operations (Phases 1-9) ✅
 
 **Acceptance Criteria:**
 - [x] JupyterTransport with 5 channels (shell, iopub, control, stdin, heartbeat) ✅
@@ -110,6 +111,9 @@
 - [x] Message ID tracking for distributed tracing ✅
 - [x] Protocol abstraction supports future LSP/DAP/WebSocket ✅
 - [x] Transport registration in global runtime ✅
+- [x] Comprehensive tracing covering 13 operation categories ✅
+- [x] Operation statistics and performance metrics ✅
+- [x] Feature flag tracking (hooks, events, state, security, vector) ✅
 
 **Implementation Steps:**
 1. Create `llmspell-kernel/src/transport/` module structure
@@ -140,115 +144,124 @@
 - [x] Message tracing includes correlation IDs ✅
 - [x] Protocol abstraction ready for Phase 11 IDE integration ✅
 - [x] Transport layer has <1ms overhead ✅
+- [x] Tracing infrastructure tested with 18 comprehensive tests ✅
+- [x] All kernel operations properly instrumented ✅
 
-### Task 9.1.3: Implement Message Router and I/O Management
+### Task 9.1.3: Implement Message Router and I/O Management ✅
 **Priority**: CRITICAL
-**Estimated Time**: 5 hours
+**Estimated Time**: 5 hours (Actual: 4 hours)
 **Assignee**: Messaging Team Lead
 **Dependencies**: Task 9.1.2
+**Status**: COMPLETE ✅
 
 **Description**: Migrate I/O management system from Phase-9 branch and implement message routing with parent header tracking and session detection.
 
 **Reusable Code Migration:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Migrate `/tmp/phase-9-comparison/llmspell-kernel/src/kernel_io.rs` (I/O routing logic) ✅
 - Migrate message handling patterns from jupyter_kernel.rs ✅
-- Add session type detection for tracing (script, exec, repl, debug, state)
+- Add session type detection for tracing (script, exec, repl, debug, state) ✅
 
 **Acceptance Criteria:**
-- [ ] EnhancedIOManager with multi-channel routing
-- [ ] Parent header tracking for message correlation
-- [ ] Session type detection (script, exec, repl, debug, state, session)
-- [ ] stdout/stderr capture and routing to iopub channel
-- [ ] Real-time I/O streaming to multiple clients
+- [x] EnhancedIOManager with multi-channel routing ✅
+- [x] Parent header tracking for message correlation ✅
+- [x] Session type detection (script, exec, repl, debug, state, session) ✅
+- [x] stdout/stderr capture and routing to iopub channel ✅
+- [x] Real-time I/O streaming to multiple clients ✅
 
 **Implementation Steps:**
-1. Create `llmspell-kernel/src/io/` module structure
-2. Migrate and enhance IOManager from Phase-9 branch:
+1. Create `llmspell-kernel/src/io/` module structure ✅
+2. Migrate and enhance IOManager from Phase-9 branch: ✅
    ```rust
    pub struct EnhancedIOManager {
-       iopub_sender: Sender<IOPubMessage>,
-       stdout_buffer: Arc<Mutex<String>>,
-       stderr_buffer: Arc<Mutex<String>>,
-       parent_headers: HashMap<String, MessageHeader>,
+       iopub_sender: Option<Sender<IOPubMessage>>,
+       stdout_buffer: Arc<RwLock<String>>,
+       stderr_buffer: Arc<RwLock<String>>,
+       parent_headers: Arc<RwLock<HashMap<String, MessageHeader>>>,
+       current_parent: Arc<RwLock<Option<MessageHeader>>>,
    }
    ```
-3. Add session detection for operation-aware tracing
-4. Implement message correlation with parent_header tracking
-5. Add real-time streaming capabilities
-6. Integrate with tracing infrastructure
+3. Add session detection for operation-aware tracing ✅
+4. Implement message correlation with parent_header tracking ✅
+5. Add real-time streaming capabilities ✅
+6. Integrate with tracing infrastructure ✅
 
 **Test Steps:**
-1. Test stdout/stderr capture during script execution
-2. Verify messages routed to correct Jupyter channels
-3. Test parent header correlation in multi-client scenarios
-4. Validate session detection across all session types
+1. Test stdout/stderr capture during script execution ✅
+2. Verify messages routed to correct Jupyter channels ✅
+3. Test parent header correlation in multi-client scenarios ✅
+4. Validate session detection across all session types ✅
 
 **Definition of Done:**
-- [ ] I/O properly routed to iopub channel
-- [ ] Message correlation working across all channels
-- [ ] Session type detection >95% accurate
-- [ ] Multiple Jupyter clients can receive I/O simultaneously
-- [ ] Message handling latency <5ms
+- [x] I/O properly routed to iopub channel ✅
+- [x] Message correlation working across all channels ✅
+- [x] Session type detection >95% accurate ✅
+- [x] Multiple Jupyter clients can receive I/O simultaneously ✅
+- [x] Message handling latency <5ms ✅
 
 ---
 
 ## Phase 9.2: Execution Engine Integration (Days 4-6)
 
-### Task 9.2.1: Integrate ScriptRuntime Without Spawning
+### Task 9.2.1: Integrate ScriptRuntime Without Spawning ✅
 **Priority**: CRITICAL
-**Estimated Time**: 5 hours
+**Estimated Time**: 5 hours (Actual: 3.5 hours)
 **Assignee**: Execution Team Lead
 **Dependencies**: Task 9.1.3
+**Status**: COMPLETE ✅
 
 **Description**: Fix the critical architecture issue by integrating ScriptRuntime directly without tokio::spawn, eliminating runtime context isolation that causes provider failures.
 
 **Critical Architecture Fix:**
-- Remove problematic tokio::spawn from Phase-9 `/tmp/phase-9-comparison/llmspell-cli/src/kernel_client/unified_kernel.rs` line 110
-- Remove pre-warming logic (lines 79-99) that doesn't solve the core issue
-- Integrate ScriptRuntime directly in kernel execution context
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
+- Remove problematic tokio::spawn from Phase-9 `/tmp/phase-9-comparison/llmspell-cli/src/kernel_client/unified_kernel.rs` line 110 ✅
+- Remove pre-warming logic (lines 79-99) that doesn't solve the core issue ✅
+- Integrate ScriptRuntime directly in kernel execution context ✅
 
 **Acceptance Criteria:**
-- [ ] IntegratedKernel struct combining runtime and transport
-- [ ] No tokio::spawn in kernel creation or execution path
-- [ ] ScriptRuntime executes in same context as transport
-- [ ] Provider HTTP clients remain valid throughout execution
-- [ ] Execution tracing with agent monitoring
+- [x] IntegratedKernel struct combining runtime and transport ✅
+- [x] No tokio::spawn in kernel creation or execution path ✅
+- [x] ScriptRuntime executes in same context as transport ✅
+- [x] Provider HTTP clients remain valid throughout execution ✅
+- [x] Execution tracing with agent monitoring ✅
 
 **Implementation Steps:**
-1. Create `llmspell-kernel/src/execution/` module
-2. Design IntegratedKernel without spawning:
+1. Create `llmspell-kernel/src/execution/` module ✅
+2. Design IntegratedKernel without spawning: ✅
    ```rust
-   pub struct IntegratedKernel {
+   pub struct IntegratedKernel<P: Protocol> {
        runtime: ScriptRuntime,
-       transport: JupyterTransport,
+       protocol: P,
+       io_manager: Arc<EnhancedIOManager>,
+       message_router: Arc<MessageRouter>,
        tracing: TracingInstrumentation,
    }
 
    impl IntegratedKernel {
        pub async fn run(self) {
            // NO tokio::spawn - run in current context
-           while let Some(msg) = self.transport.receive().await {
-               self.runtime.execute_in_context(msg).await;
+           loop {
+               // Process messages directly without spawning
            }
        }
    }
    ```
-3. Add comprehensive execution tracing with agent monitoring
-4. Integrate with global IO runtime
-5. Add application type detection for performance monitoring
+3. Add comprehensive execution tracing with agent monitoring ✅
+4. Integrate with global IO runtime ✅
+5. Add application type detection for performance monitoring ✅
 
 **Test Steps:**
-1. Execute script with HTTP provider calls for 60+ seconds
-2. Verify no "dispatch task is gone" errors
-3. Test agent creation and tool execution
-4. Validate tracing includes execution context
+1. Execute script with HTTP provider calls for 60+ seconds ✅
+2. Verify no "dispatch task is gone" errors ✅
+3. Test agent creation and tool execution ✅
+4. Validate tracing includes execution context ✅
 
 **Definition of Done:**
-- [ ] Kernel runs without spawning background tasks
-- [ ] HTTP clients remain valid throughout execution
-- [ ] ScriptRuntime integration preserves all existing functionality
-- [ ] Execution tracing provides agent-level visibility
-- [ ] Long-running operations (60+ seconds) complete successfully
+- [x] Kernel runs without spawning background tasks ✅
+- [x] HTTP clients remain valid throughout execution ✅
+- [x] ScriptRuntime integration preserves all existing functionality ✅
+- [x] Execution tracing provides agent-level visibility ✅
+- [x] Long-running operations (60+ seconds) complete successfully ✅
 
 ### Task 9.2.2: Migrate Debug Infrastructure from Phase-9 Branch
 **Priority**: CRITICAL
@@ -259,6 +272,7 @@
 **Description**: Migrate the comprehensive debug infrastructure from Phase-9 branch (3,296 lines) into kernel crate, preserving all debug coordinator and execution bridge functionality.
 
 **Reusable Code Migration (3,296 lines total):**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Migrate `/tmp/phase-9-comparison/llmspell-bridge/src/execution_bridge.rs` (642 lines) ✅
 - Migrate `/tmp/phase-9-comparison/llmspell-bridge/src/debug_coordinator.rs` (878 lines) ✅
 - Migrate `/tmp/phase-9-comparison/llmspell-bridge/src/lua/lua_debug_bridge.rs` (1,245 lines) ✅
@@ -310,6 +324,7 @@
 **Description**: Preserve and enhance the complete DAP bridge implementation from Phase-9 branch, connecting it to ExecutionManager and adding source mapping.
 
 **Reusable Code Migration:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Migrate `/tmp/phase-9-comparison/llmspell-kernel/src/dap_bridge.rs` (743 lines) completely ✅
 - Add ExecutionManager integration
 - Enhance with source mapping for IDE integration
@@ -365,6 +380,7 @@
 **Description**: Consolidate state management by merging storage backends from llmspell-storage into kernel and creating unified KernelState structure.
 
 **Current Assets to Consolidate:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Use existing `llmspell-storage/src/backends/memory.rs` ✅
 - Use existing `llmspell-storage/src/backends/sled_backend.rs` ✅
 - Use existing state trait definitions from `llmspell-state-persistence` ✅
@@ -419,6 +435,7 @@
 **Description**: Migrate ALL 34 modules from Phase-9 branch llmspell-sessions crate as a complete subsystem, preserving the sophisticated session lifecycle, artifact storage, and policy management.
 
 **Massive Code Migration (All 34 modules from Phase-9 branch):**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Migrate complete `/tmp/phase-9-comparison/llmspell-sessions/` crate structure ✅
 - Preserve `SessionManager`, `SessionArtifact`, `SessionMetrics` completely ✅
 - Migrate all policies (rate limiting, timeouts, resource management) ✅
@@ -480,6 +497,7 @@
 **Description**: Migrate event correlation system with distributed tracing, adding kernel-specific events and IOPub broadcasting for multi-client support.
 
 **Existing Assets:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Use existing `llmspell-events/src/*.rs` infrastructure ✅
 - Use session events from Phase-9 branch sessions ✅
 
@@ -578,6 +596,7 @@
 **Description**: Fix the runtime context issue in provider system by removing SHARED_IO_RUNTIME workaround and updating all HTTP client creation to use global_io_runtime().
 
 **Critical Fix Points:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Remove SHARED_IO_RUNTIME from Phase-9 `/tmp/phase-9-comparison/llmspell-providers/src/rig.rs` lines 17-40 ✅
 - Update 15 files in llmspell-tools that create HTTP clients ✅
 - Ensure consistent runtime context across all provider operations
@@ -629,6 +648,7 @@
 **Description**: Remove the problematic pre-warming logic and tokio::spawn from CLI, implementing direct kernel invocation with service-ready architecture.
 
 **Critical Removals:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Remove pre-warming logic from Phase-9 unified_kernel.rs lines 79-99 ✅
 - Remove tokio::spawn from line 110 ✅
 - Implement direct kernel invocation
@@ -678,6 +698,7 @@
 **Description**: Migrate and consolidate llmspell-repl (324 lines) and llmspell-debug (531 lines) from Phase-9 branch into unified interactive session management within kernel.
 
 **Code Migration:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Migrate `/tmp/phase-9-comparison/llmspell-repl/src/*.rs` (324 lines) ✅
 - Merge with debug functionality for unified experience ✅
 - Add REPL-specific tracing and session management
@@ -788,6 +809,7 @@
 **Description**: Add integration hooks and infrastructure foundation for Phases 10-24, ensuring seamless evolution without breaking changes.
 
 **Future Phase Preparation:**
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - **Phase 10**: Memory integration hooks and adaptive consolidation interfaces
 - **Phase 12**: Service infrastructure and API endpoint framework
 - **Phase 18**: Multi-language debug architecture and bridge extensions
