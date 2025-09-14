@@ -25,6 +25,7 @@ pub mod debug;
 pub mod execution;
 pub mod io;
 pub mod runtime;
+pub mod state;
 pub mod traits;
 pub mod transport;
 
@@ -53,6 +54,14 @@ pub use transport::jupyter::{JupyterConnectionInfo, JupyterTransport};
 
 // Re-export execution types
 pub use execution::{ExecutionConfig, IntegratedKernel};
+
+// Re-export state types
+pub use state::{
+    circuit_breaker::{CircuitBreaker, CircuitBreakerStats, CircuitState},
+    persistence::StatePersistence,
+    DebugState, ExecutionState, KernelState, MemoryBackend, SessionState, SledBackend,
+    StorageBackend, VectorBackend,
+};
 
 // Re-export debug types
 pub use debug::{

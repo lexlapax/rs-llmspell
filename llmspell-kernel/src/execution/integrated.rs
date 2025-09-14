@@ -20,6 +20,7 @@ type IOHandler = Box<dyn Fn(&str) + Send + Sync>;
 use crate::io::manager::EnhancedIOManager;
 use crate::io::router::MessageRouter;
 use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
+use crate::state::{KernelState, MemoryBackend, StorageBackend};
 use crate::traits::Protocol;
 
 /// Simplified `ScriptRuntime` stub for Phase 9.2
@@ -155,6 +156,8 @@ pub struct IntegratedKernel<P: Protocol> {
     session_id: String,
     /// Execution counter
     execution_count: Arc<RwLock<i32>>,
+    /// Unified kernel state
+    state: Arc<KernelState>,
     /// Shutdown signal receiver
     shutdown_rx: Option<mpsc::Receiver<()>>,
 }
@@ -189,6 +192,17 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let tracing =
             TracingInstrumentation::new_kernel_session(Some(session_id.clone()), "integrated");
 
+        // Create unified kernel state with memory backend by default
+        let state = Arc::new(KernelState::new(StorageBackend::Memory(Box::new(
+            MemoryBackend::new(),
+        )))?);
+
+        // Initialize session state
+        state.update_session(|session| {
+            session.set_id(&session_id);
+            Ok(())
+        })?;
+
         Ok(Self {
             runtime,
             protocol,
@@ -198,6 +212,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             config,
             session_id,
             execution_count: Arc::new(RwLock::new(0)),
+            state,
             shutdown_rx: None,
         })
     }
@@ -205,6 +220,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Set shutdown signal receiver
     pub fn set_shutdown_receiver(&mut self, rx: mpsc::Receiver<()>) {
         self.shutdown_rx = Some(rx);
+    }
+
+    /// Get the kernel state
+    pub fn state(&self) -> Arc<KernelState> {
+        self.state.clone()
     }
 
     /// Run the kernel in the current context (NO SPAWNING)
@@ -288,6 +308,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     ///
     /// Returns an error if execution fails
     #[instrument(level = "debug", skip(self, message))]
+    #[allow(clippy::too_many_lines)]
     async fn handle_execute_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
         // Extract code from message
         let code = message
@@ -300,12 +321,20 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             return Ok(());
         }
 
-        // Increment execution counter
+        // Increment execution counter and update state
         let exec_count = {
             let mut count = self.execution_count.write();
             *count += 1;
             *count
         };
+
+        // Start execution in state
+        let execution_id = format!("exec_{exec_count}");
+        self.state.update_execution(|exec| {
+            exec.increment_counter();
+            exec.start_execution(execution_id.clone(), code.to_string());
+            Ok(())
+        })?;
 
         info!("Executing code [{}]: {} bytes", exec_count, code.len());
 
@@ -358,9 +387,15 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             );
         }
 
-        // Handle result
+        // Handle result and update state
         match result {
             Ok(Ok(output)) => {
+                // Update execution state with success
+                self.state.update_execution(|exec| {
+                    exec.complete_execution(Some(output.clone()), None);
+                    Ok(())
+                })?;
+
                 // Publish execute result
                 let mut data = HashMap::new();
                 data.insert("text/plain".to_string(), Value::String(output));
@@ -370,6 +405,13 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             }
             Ok(Err(e)) => {
                 error!("Execution error: {}", e);
+
+                // Update execution state with error
+                self.state.update_execution(|exec| {
+                    exec.complete_execution(None, Some(e.to_string()));
+                    Ok(())
+                })?;
+
                 self.io_manager
                     .write_stderr(&format!("Error: {e}\n"))
                     .await?;
@@ -498,6 +540,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Interrupt the runtime
         self.runtime.interrupt();
+
+        // Update execution state to paused
+        self.state.update_execution(|exec| {
+            exec.pause();
+            Ok(())
+        })?;
 
         // TODO: Send interrupt reply via transport when integrated
         let _response = self
