@@ -24,6 +24,7 @@
 pub mod debug;
 pub mod events;
 pub mod execution;
+pub mod hooks;
 pub mod io;
 pub mod runtime;
 pub mod sessions;
@@ -85,6 +86,37 @@ pub use debug::{
     DapVariable, DebugAdapter, DebugCoordinator, DebugEvent, DebugResponse, DebugSession,
     DebugSessionManager, ExecutionManager, LuaDebugAdapter, MemoryAwareDebugCoordinator,
     SourceBreakpoint, SourceReference, StackFrame, StepMode, Variable, VariableScope,
+};
+
+// Re-export hook types
+pub use hooks::{
+    ComponentId,
+    ComponentType,
+    Condition,
+    ConditionBuilder,
+    ConditionalHook,
+    DebugContext,
+    ExecutionContext,
+    // Re-export core hook infrastructure
+    Hook,
+    HookContext,
+    HookExecutor,
+    HookPerformanceMetrics,
+    HookPoint,
+    HookRegistry,
+    HookResult,
+    KernelHook,
+    KernelHookManager,
+    KernelHookPoint,
+    KernelHookSystem,
+    KernelPerformanceMonitor,
+    PostExecuteHook,
+    PreDebugHook,
+    PreExecuteHook,
+    Priority,
+    RetryHook,
+    StateChangeHook,
+    StateContext,
 };
 
 /// Kernel version information

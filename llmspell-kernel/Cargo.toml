@@ -16,6 +16,7 @@ llmspell-core = { path = "../llmspell-core", version = "0.8.0" }
 llmspell-utils = { path = "../llmspell-utils", version = "0.8.0" }
 llmspell-events = { path = "../llmspell-events", version = "0.8.0" }
 llmspell-sessions = { path = "../llmspell-sessions", version = "0.8.0" }
+llmspell-hooks = { path = "../llmspell-hooks", version = "0.8.0" }
 
 # Async runtime
 tokio = { version = "1.41", features = ["full", "tracing"] }

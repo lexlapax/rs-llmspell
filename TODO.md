@@ -551,11 +551,11 @@
 - Import advanced patterns: CompositeHook, ForkHook, RetryHook ✅
 
 **Acceptance Criteria:**
-- [ ] Advanced hook patterns (CompositeHook, ForkHook, RetryHook, ConditionalHook)
-- [ ] Kernel-specific hooks (PreExecute, PostExecute, PreDebug, StateChange)
-- [ ] Dynamic debug flow modification
-- [ ] Hook performance monitoring <5% overhead
-- [ ] Hook execution in kernel context
+- [x] Advanced hook patterns (CompositeHook, ForkHook, RetryHook, ConditionalHook)
+- [x] Kernel-specific hooks (PreExecute, PostExecute, PreDebug, StateChange)
+- [x] Dynamic debug flow modification
+- [x] Hook performance monitoring <5% overhead
+- [x] Hook execution in kernel context
 
 **Implementation Steps:**
 1. Create `llmspell-kernel/src/hooks/` module
@@ -579,11 +579,11 @@
 4. Validate hook execution with tracing
 
 **Definition of Done:**
-- [ ] Advanced hook patterns work in kernel context
-- [ ] Hook overhead measured and <5%
-- [ ] Dynamic debug flow modification functional
-- [ ] Hook tracing provides execution visibility
-- [ ] Hooks integrate with existing execution engine
+- [x] Advanced hook patterns work in kernel context
+- [x] Hook overhead measured and <5%
+- [x] Dynamic debug flow modification functional
+- [x] Hook tracing provides execution visibility
+- [x] Hooks integrate with existing execution engine
 
 ---
 
@@ -598,7 +598,7 @@
 **Description**: Fix the runtime context issue in provider system by removing SHARED_IO_RUNTIME workaround and updating all HTTP client creation to use global_io_runtime().
 
 **Critical Fix Points:**
-- consult `docs/in-progress/phase-09-design-doc.com` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
+- consult `docs/in-progress/phase-09-design-doc.com` and `docs/technical/cli-command-architecture.md` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Remove SHARED_IO_RUNTIME from Phase-9 `/tmp/phase-9-comparison/llmspell-providers/src/rig.rs` lines 17-40 ✅
 - Update 15 files in llmspell-tools that create HTTP clients ✅
 - Ensure consistent runtime context across all provider operations
@@ -609,6 +609,7 @@
 - [ ] Provider operations survive 60+ second executions
 - [ ] Provider-level cost tracking and tracing
 - [ ] No runtime context mismatches in provider calls
+- [ ] Write code with documentation (no clippy warnings)
 
 **Implementation Steps:**
 1. Update llmspell-providers/src/rig.rs:
@@ -661,6 +662,7 @@
 - [ ] Direct kernel invocation working
 - [ ] Service-ready kernel architecture for Phase 12
 - [ ] CLI tracing integration
+- [ ] Write code with documentation (no clippy warnings)
 
 **Implementation Steps:**
 1. Update llmspell-cli kernel client code:
@@ -711,6 +713,7 @@
 - [ ] Debug commands (.break, .step, .next, .continue, .locals)
 - [ ] Session persistence across REPL interactions
 - [ ] Interactive debug commands with trace correlation
+- [ ] Write code with documentation (no clippy warnings)
 
 **Implementation Steps:**
 1. Create `llmspell-kernel/src/interactive/` module
@@ -772,6 +775,7 @@
 - [ ] Memory stability validation during extended operations
 - [ ] Success rate targets: Simple 100%, Complex ≥90%, Expert ≥80%
 - [ ] Automated regression detection
+- [ ] Write code with documentation (no clippy warnings)
 
 **Implementation Steps:**
 1. Create `llmspell-kernel/src/testing/application_suite.rs`:
@@ -823,6 +827,7 @@
 - [ ] Multi-language debug architecture for Phase 18 JavaScript support
 - [ ] Observability framework for Phase 20 production optimization
 - [ ] Forward compatibility tested with mock implementations
+- [ ] Write code with documentation (no clippy warnings)
 
 **Implementation Steps:**
 1. Add memory integration hooks for Phase 10:
@@ -872,6 +877,7 @@
 - [ ] Application suite validation passes all complexity layers
 - [ ] Memory usage stable during extended operations
 - [ ] Protocol compliance verified with real clients
+- [ ] Write code with documentation (no clippy warnings)
 
 **Implementation Steps:**
 1. Execute forward compatibility test suite
