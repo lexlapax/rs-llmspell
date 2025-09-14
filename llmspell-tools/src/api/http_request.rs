@@ -216,17 +216,26 @@ impl HttpRequestTool {
             None
         };
 
-        let client = Client::builder()
-            .timeout(Duration::from_secs(config.timeout_seconds))
-            .user_agent(&config.user_agent)
-            .redirect(if config.follow_redirects {
-                reqwest::redirect::Policy::limited(config.max_redirects)
-            } else {
-                reqwest::redirect::Policy::none()
-            })
-            .build()
-            .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create HTTP client: {e}"),
+        // Use global IO runtime to create HTTP client - prevents "dispatch task is gone" errors
+        // Clone the values we need to avoid partial move
+        let timeout_seconds = config.timeout_seconds;
+        let user_agent = config.user_agent.clone();
+        let follow_redirects = config.follow_redirects;
+        let max_redirects = config.max_redirects;
+
+        let client = llmspell_kernel::runtime::create_io_bound_resource(move || {
+            Client::builder()
+                .timeout(Duration::from_secs(timeout_seconds))
+                .user_agent(&user_agent)
+                .redirect(if follow_redirects {
+                    reqwest::redirect::Policy::limited(max_redirects)
+                } else {
+                    reqwest::redirect::Policy::none()
+                })
+                .build()
+        })
+        .map_err(|e| LLMSpellError::Internal {
+            message: format!("Failed to create HTTP client: {e}"),
                 source: None,
             })?;
 
