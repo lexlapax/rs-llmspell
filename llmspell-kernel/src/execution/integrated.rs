@@ -172,7 +172,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         let message_router = Arc::new(MessageRouter::new(config.max_history));
 
         // Create tracing instrumentation
-        let mut tracing = TracingInstrumentation::new_kernel_session(
+        let tracing = TracingInstrumentation::new_kernel_session(
             Some(session_id.clone()),
             "integrated",
         );

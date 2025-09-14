@@ -21,6 +21,7 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod debug;
 pub mod execution;
 pub mod io;
 pub mod runtime;
@@ -51,6 +52,12 @@ pub use transport::jupyter::{JupyterConnectionInfo, JupyterTransport};
 
 // Re-export execution types
 pub use execution::{ExecutionConfig, IntegratedKernel};
+
+// Re-export debug types
+pub use debug::{
+    Breakpoint, DebugCoordinator, DebugEvent, DebugResponse, DebugSession, DebugSessionManager,
+    ExecutionManager, MemoryAwareDebugCoordinator, StackFrame, StepMode, Variable, VariableScope,
+};
 
 /// Kernel version information
 pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
