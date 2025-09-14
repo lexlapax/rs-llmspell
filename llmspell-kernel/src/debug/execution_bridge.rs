@@ -53,7 +53,7 @@ impl Breakpoint {
             return false;
         }
         self.hit_count
-            .map_or(true, |hit_count| self.current_hits >= hit_count)
+            .is_none_or(|hit_count| self.current_hits >= hit_count)
     }
 }
 
@@ -128,9 +128,9 @@ pub struct ExecutionManager {
     /// Stack frames
     stack_frames: Arc<RwLock<Vec<StackFrame>>>,
     /// Variable references
-    variable_refs: Arc<RwLock<HashMap<String, Vec<Variable>>>>,
+    _variable_refs: Arc<RwLock<HashMap<String, Vec<Variable>>>>,
     /// Session ID
-    session_id: String,
+    _session_id: String,
 }
 
 impl ExecutionManager {
@@ -141,34 +141,45 @@ impl ExecutionManager {
             paused: Arc::new(RwLock::new(false)),
             step_mode: Arc::new(RwLock::new(None)),
             stack_frames: Arc::new(RwLock::new(Vec::new())),
-            variable_refs: Arc::new(RwLock::new(HashMap::new())),
-            session_id,
+            _variable_refs: Arc::new(RwLock::new(HashMap::new())),
+            _session_id: session_id,
         }
     }
 
     /// Set a breakpoint
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the breakpoint already exists
     #[instrument(level = "debug", skip(self))]
     pub fn set_breakpoint(&self, source: String, line: u32) -> Result<Breakpoint> {
         let breakpoint = Breakpoint::new(source.clone(), line);
-        
+
         let mut breakpoints = self.breakpoints.write();
         breakpoints
             .entry(source)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(breakpoint.clone());
-        
-        debug!("Set breakpoint at {}:{}", breakpoint.source, breakpoint.line);
+
+        debug!(
+            "Set breakpoint at {}:{}",
+            breakpoint.source, breakpoint.line
+        );
         Ok(breakpoint)
     }
 
     /// Remove a breakpoint
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the breakpoint doesn't exist
     pub fn remove_breakpoint(&self, id: &str) -> Result<()> {
         let mut breakpoints = self.breakpoints.write();
-        
+
         for bp_list in breakpoints.values_mut() {
             bp_list.retain(|bp| bp.id != id);
         }
-        
+
         Ok(())
     }
 
@@ -180,12 +191,8 @@ impl ExecutionManager {
         }
 
         // Check step mode
-        if let Some(mode) = *self.step_mode.read() {
-            match mode {
-                StepMode::StepIn | StepMode::StepOver => return true,
-                StepMode::Continue => {},
-                _ => {},
-            }
+        if let Some(StepMode::StepIn | StepMode::StepOver) = *self.step_mode.read() {
+            return true;
         }
 
         // Check breakpoints
@@ -224,7 +231,7 @@ impl ExecutionManager {
     }
 
     /// Get variables for a scope
-    pub fn get_variables(&self, scope: VariableScope, frame_id: Option<&str>) -> Vec<Variable> {
+    pub fn get_variables(&self, scope: &VariableScope, frame_id: Option<&str>) -> Vec<Variable> {
         match scope {
             VariableScope::Local => {
                 if let Some(frame_id) = frame_id {
@@ -264,15 +271,15 @@ mod tests {
     #[test]
     fn test_execution_manager() {
         let manager = ExecutionManager::new("test-session".to_string());
-        
+
         // Set breakpoint
         let bp = manager.set_breakpoint("test.lua".to_string(), 10).unwrap();
         assert!(!bp.id.is_empty());
-        
+
         // Check should pause
         assert!(manager.should_pause("test.lua", 10));
         assert!(!manager.should_pause("test.lua", 11));
-        
+
         // Remove breakpoint
         manager.remove_breakpoint(&bp.id).unwrap();
         assert!(!manager.should_pause("test.lua", 10));
@@ -281,12 +288,12 @@ mod tests {
     #[test]
     fn test_pause_resume() {
         let manager = ExecutionManager::new("test-session".to_string());
-        
+
         assert!(!manager.is_paused());
-        
+
         manager.pause();
         assert!(manager.is_paused());
-        
+
         manager.resume(StepMode::Continue);
         assert!(!manager.is_paused());
     }

@@ -1,6 +1,6 @@
 //! Comprehensive Tracing Infrastructure
 //!
-//! This module provides structured tracing for the entire LLMSpell system,
+//! This module provides structured tracing for the entire `LLMSpell` system,
 //! covering all phases of operation from script execution to infrastructure.
 //!
 //! ## Tracing Hierarchy
@@ -104,6 +104,7 @@ pub struct TracingInstrumentation {
 
 /// Metadata for tracing context
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct TracingMetadata {
     /// Type of kernel (e.g., "integrated", "subprocess", "daemon")
     pub kernel_type: String,
@@ -184,7 +185,10 @@ impl TracingInstrumentation {
             connected_transports: Vec::new(),
         };
 
-        info!("Starting kernel session: {} (type: {})", session_id, kernel_type);
+        info!(
+            "Starting kernel session: {} (type: {})",
+            session_id, kernel_type
+        );
 
         Self {
             session_id,
@@ -286,7 +290,11 @@ impl TracingInstrumentation {
     /// Trace an agent operation
     #[instrument(level = "debug", skip(self))]
     pub fn trace_agent_operation(&self, agent_name: &str, provider: &str, operation: &str) {
-        self.trace_operation(OperationCategory::Agent, &format!("{agent_name}.{operation}"), Some(provider));
+        self.trace_operation(
+            OperationCategory::Agent,
+            &format!("{agent_name}.{operation}"),
+            Some(provider),
+        );
 
         // Track active providers
         let mut metadata = self.metadata.write();
@@ -298,13 +306,21 @@ impl TracingInstrumentation {
     /// Trace a workflow step
     #[instrument(level = "debug", skip(self))]
     pub fn trace_workflow_step(&self, workflow_name: &str, step: &str) {
-        self.trace_operation(OperationCategory::Workflow, &format!("{workflow_name}.{step}"), None);
+        self.trace_operation(
+            OperationCategory::Workflow,
+            &format!("{workflow_name}.{step}"),
+            None,
+        );
     }
 
     /// Trace a hook execution
     #[instrument(level = "trace", skip(self))]
     pub fn trace_hook_execution(&self, hook_type: &str, hook_name: &str, phase: &str) {
-        self.trace_operation(OperationCategory::Hook, &format!("{hook_type}.{hook_name}"), Some(phase));
+        self.trace_operation(
+            OperationCategory::Hook,
+            &format!("{hook_type}.{hook_name}"),
+            Some(phase),
+        );
 
         // Enable hooks flag
         self.metadata.write().hooks_enabled = true;
@@ -369,8 +385,13 @@ impl TracingInstrumentation {
 
         // Track connected transports
         let mut metadata = self.metadata.write();
-        if !metadata.connected_transports.contains(&transport_type.to_string()) {
-            metadata.connected_transports.push(transport_type.to_string());
+        if !metadata
+            .connected_transports
+            .contains(&transport_type.to_string())
+        {
+            metadata
+                .connected_transports
+                .push(transport_type.to_string());
         }
     }
 
@@ -396,7 +417,12 @@ impl TracingInstrumentation {
     }
 
     /// Core operation tracing
-    pub fn trace_operation(&self, category: OperationCategory, operation: &str, details: Option<&str>) {
+    pub fn trace_operation(
+        &self,
+        category: OperationCategory,
+        operation: &str,
+        details: Option<&str>,
+    ) {
         // Get or create the appropriate span
         let span = match category {
             OperationCategory::ScriptRuntime => &self.runtime_span,
@@ -535,7 +561,7 @@ impl TracingLevel {
     }
 
     /// Parse from string
-    pub fn from_str(s: &str) -> Option<Self> {
+    pub fn parse(s: &str) -> Option<Self> {
         match s.to_lowercase().as_str() {
             "error" => Some(Self::Error),
             "warn" => Some(Self::Warn),
@@ -556,8 +582,7 @@ impl TracingLevel {
 ///
 /// Returns an error if the subscriber cannot be initialized.
 pub fn init_tracing() -> Result<()> {
-    let env_filter = EnvFilter::try_from_default_env()
-        .unwrap_or_else(|_| EnvFilter::new("info"));
+    let env_filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
@@ -579,8 +604,8 @@ pub fn init_tracing() -> Result<()> {
 ///
 /// Returns an error if the filter is invalid or subscriber cannot be initialized.
 pub fn init_tracing_with_filter(filter: &str) -> Result<()> {
-    let env_filter = EnvFilter::try_new(filter)
-        .map_err(|e| anyhow::anyhow!("Invalid filter: {}", e))?;
+    let env_filter =
+        EnvFilter::try_new(filter).map_err(|e| anyhow::anyhow!("Invalid filter: {}", e))?;
 
     let fmt_layer = tracing_subscriber::fmt::layer()
         .with_target(true)
@@ -613,7 +638,10 @@ mod tests {
 
     #[test]
     fn test_tracing_sessions() {
-        let tracing = TracingInstrumentation::new_kernel_session(Some("test-session".to_string()), "integrated");
+        let tracing = TracingInstrumentation::new_kernel_session(
+            Some("test-session".to_string()),
+            "integrated",
+        );
         assert_eq!(tracing.session_id(), "test-session");
 
         tracing.start_session(SessionType::Script, Some("test_script.lua"));
@@ -728,7 +756,9 @@ mod tests {
         tracing.trace_transport_operation("lsp", "stdio", "initialize");
 
         let metadata = tracing.metadata();
-        assert!(metadata.connected_transports.contains(&"jupyter".to_string()));
+        assert!(metadata
+            .connected_transports
+            .contains(&"jupyter".to_string()));
         assert!(metadata.connected_transports.contains(&"lsp".to_string()));
     }
 
@@ -809,8 +839,8 @@ mod tests {
 
     #[test]
     fn test_tracing_level_parsing() {
-        assert_eq!(TracingLevel::from_str("error"), Some(TracingLevel::Error));
-        assert_eq!(TracingLevel::from_str("DEBUG"), Some(TracingLevel::Debug));
-        assert_eq!(TracingLevel::from_str("invalid"), None);
+        assert_eq!(TracingLevel::parse("error"), Some(TracingLevel::Error));
+        assert_eq!(TracingLevel::parse("DEBUG"), Some(TracingLevel::Debug));
+        assert_eq!(TracingLevel::parse("invalid"), None);
     }
 }

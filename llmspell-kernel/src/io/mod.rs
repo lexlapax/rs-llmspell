@@ -8,4 +8,4 @@ pub mod manager;
 pub mod router;
 
 pub use manager::{EnhancedIOManager, IOConfig};
-pub use router::{MessageRouter, MessageDestination};
+pub use router::{MessageDestination, MessageRouter};

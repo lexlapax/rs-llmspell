@@ -1,12 +1,12 @@
-//! ZeroMQ transport implementation
+//! `ZeroMQ` transport implementation
 //!
-//! This module provides a clean transport layer for messaging using ZeroMQ.
+//! This module provides a clean transport layer for messaging using `ZeroMQ`.
 //! It knows NOTHING about Jupyter or any other protocol specifics.
-//! It only handles raw multipart message transport over ZeroMQ sockets.
+//! It only handles raw multipart message transport over `ZeroMQ` sockets.
 //!
 //! ## Thread Safety
 //!
-//! ZeroMQ sockets are not thread-safe, so we wrap them in Arc<Mutex<>>.
+//! `ZeroMQ` sockets are not thread-safe, so we wrap them in Arc<Mutex<>>.
 //! All socket operations use the global IO runtime to ensure consistent
 //! runtime context across the system.
 
@@ -21,9 +21,9 @@ use zmq::{Context as ZmqContext, Socket, SocketType};
 use crate::runtime::io_runtime::create_io_bound_resource;
 use crate::traits::{ChannelConfig, Transport, TransportConfig};
 
-/// Thread-safe wrapper for ZeroMQ Socket
+/// Thread-safe wrapper for `ZeroMQ` Socket
 ///
-/// ZeroMQ sockets are actually thread-safe when used correctly,
+/// `ZeroMQ` sockets are actually thread-safe when used correctly,
 /// but the Rust bindings don't mark them as Send/Sync.
 /// We wrap them to provide the necessary safety guarantees.
 struct SafeSocket {
@@ -34,13 +34,13 @@ struct SafeSocket {
 unsafe impl Send for SafeSocket {}
 unsafe impl Sync for SafeSocket {}
 
-/// ZeroMQ transport for multipart messaging
+/// `ZeroMQ` transport for multipart messaging
 ///
 /// Provides high-performance message passing over various patterns
 /// (REQ/REP, PUB/SUB, ROUTER/DEALER, etc.)
 #[derive(Clone)]
 pub struct ZmqTransport {
-    /// ZeroMQ context (thread-safe)
+    /// `ZeroMQ` context (thread-safe)
     context: Arc<ZmqContext>,
     /// Channel name to socket mapping
     sockets: Arc<Mutex<HashMap<String, SafeSocket>>>,
@@ -51,18 +51,20 @@ pub struct ZmqTransport {
 }
 
 impl ZmqTransport {
-    /// Create a new ZeroMQ transport
+    /// Create a new `ZeroMQ` transport
     ///
     /// This creates the transport within the global IO runtime context
     /// to ensure proper runtime consistency.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `ZeroMQ` context cannot be created
     #[instrument(level = "debug")]
     pub fn new() -> Result<Self> {
         debug!("Creating new ZeroMQ transport");
 
         // Create context within the global runtime
-        let context = create_io_bound_resource(|| {
-            ZmqContext::new()
-        });
+        let context = create_io_bound_resource(ZmqContext::new);
 
         Ok(Self {
             context: Arc::new(context),
@@ -72,7 +74,7 @@ impl ZmqTransport {
         })
     }
 
-    /// Convert pattern string to ZeroMQ socket type
+    /// Convert pattern string to `ZeroMQ` socket type
     fn pattern_to_socket_type(pattern: &str) -> Result<SocketType> {
         match pattern.to_lowercase().as_str() {
             "router" => Ok(SocketType::ROUTER),
@@ -90,7 +92,11 @@ impl ZmqTransport {
 
     /// Create and configure a socket
     #[instrument(level = "debug", skip(self))]
-    fn create_socket(&self, channel_name: &str, channel_config: &ChannelConfig) -> Result<SafeSocket> {
+    fn create_socket(
+        &self,
+        channel_name: &str,
+        channel_config: &ChannelConfig,
+    ) -> Result<SafeSocket> {
         let socket_type = Self::pattern_to_socket_type(&channel_config.pattern)?;
 
         // Create socket within IO runtime context
@@ -102,13 +108,13 @@ impl ZmqTransport {
         })?;
 
         // Configure socket options
-        self.configure_socket(&socket, channel_config)?;
+        Self::configure_socket(&socket, channel_config)?;
 
         Ok(SafeSocket { socket })
     }
 
     /// Configure socket with appropriate options
-    fn configure_socket(&self, socket: &Socket, channel_config: &ChannelConfig) -> Result<()> {
+    fn configure_socket(socket: &Socket, channel_config: &ChannelConfig) -> Result<()> {
         // Set receive timeout for non-blocking operation
         socket
             .set_rcvtimeo(100)
@@ -136,7 +142,9 @@ impl ZmqTransport {
                     socket.set_rcvhwm(hwm).context("Failed to set rcvhwm")?;
                 }
                 "identity" => {
-                    socket.set_identity(value.as_bytes()).context("Failed to set identity")?;
+                    socket
+                        .set_identity(value.as_bytes())
+                        .context("Failed to set identity")?;
                 }
                 _ => {
                     warn!("Unknown socket option: {}", key);
@@ -153,7 +161,10 @@ impl ZmqTransport {
             "tcp" => format!("tcp://{}:{}", config.base_address, endpoint),
             "ipc" => format!("ipc://{}{}", config.base_address, endpoint),
             "inproc" => format!("inproc://{}{}", config.base_address, endpoint),
-            _ => format!("{}://{}:{}", config.transport_type, config.base_address, endpoint),
+            _ => format!(
+                "{}://{}:{}",
+                config.transport_type, config.base_address, endpoint
+            ),
         }
     }
 }
@@ -162,7 +173,10 @@ impl ZmqTransport {
 impl Transport for ZmqTransport {
     #[instrument(level = "info", skip(self, config))]
     async fn bind(&mut self, config: &TransportConfig) -> Result<()> {
-        info!("Binding ZeroMQ transport to {} channels", config.channels.len());
+        info!(
+            "Binding ZeroMQ transport to {} channels",
+            config.channels.len()
+        );
 
         // Store configuration
         *self.config.lock() = Some(config.clone());
@@ -172,9 +186,10 @@ impl Transport for ZmqTransport {
             let socket = self.create_socket(channel_name, channel_config)?;
             let addr = Self::build_address(config, &channel_config.endpoint);
 
-            socket.socket
+            socket
+                .socket
                 .bind(&addr)
-                .with_context(|| format!("Failed to bind {} to {}", channel_name, addr))?;
+                .with_context(|| format!("Failed to bind {channel_name} to {addr}"))?;
 
             info!("Bound {} channel to {}", channel_name, addr);
 
@@ -191,7 +206,10 @@ impl Transport for ZmqTransport {
 
     #[instrument(level = "info", skip(self, config))]
     async fn connect(&mut self, config: &TransportConfig) -> Result<()> {
-        info!("Connecting ZeroMQ transport to {} channels", config.channels.len());
+        info!(
+            "Connecting ZeroMQ transport to {} channels",
+            config.channels.len()
+        );
 
         // Store configuration
         *self.config.lock() = Some(config.clone());
@@ -202,13 +220,15 @@ impl Transport for ZmqTransport {
             let addr = Self::build_address(config, &channel_config.endpoint);
 
             // Connect instead of bind
-            socket.socket
+            socket
+                .socket
                 .connect(&addr)
-                .with_context(|| format!("Failed to connect {} to {}", channel_name, addr))?;
+                .with_context(|| format!("Failed to connect {channel_name} to {addr}"))?;
 
             // For SUB sockets, subscribe to all messages by default
             if channel_config.pattern.to_lowercase() == "sub" {
-                socket.socket
+                socket
+                    .socket
                     .set_subscribe(b"")
                     .context("Failed to subscribe to all messages")?;
             }
@@ -230,7 +250,7 @@ impl Transport for ZmqTransport {
     async fn recv(&self, channel: &str) -> Result<Option<Vec<Vec<u8>>>> {
         // Special handling for heartbeat
         if channel == "heartbeat" {
-            return self.recv_heartbeat().await;
+            return self.recv_heartbeat();
         }
 
         let sockets = self.sockets.lock();
@@ -251,7 +271,7 @@ impl Transport for ZmqTransport {
                 Ok(None)
             }
             Err(e) => Err(anyhow::Error::from(e))
-                .context(format!("Failed to receive on {} channel", channel)),
+                .context(format!("Failed to receive on {channel} channel")),
         }
     }
 
@@ -261,7 +281,7 @@ impl Transport for ZmqTransport {
 
         // Special handling for heartbeat
         if channel == "heartbeat" {
-            return self.send_heartbeat(parts).await;
+            return self.send_heartbeat(&parts);
         }
 
         let sockets = self.sockets.lock();
@@ -269,9 +289,10 @@ impl Transport for ZmqTransport {
             .get(channel)
             .ok_or_else(|| anyhow::anyhow!("Channel {} not found", channel))?;
 
-        socket.socket
+        socket
+            .socket
             .send_multipart(parts, 0)
-            .with_context(|| format!("Failed to send on {} channel", channel))?;
+            .with_context(|| format!("Failed to send on {channel} channel"))?;
 
         Ok(())
     }
@@ -283,7 +304,8 @@ impl Transport for ZmqTransport {
             match socket.socket.recv_bytes(zmq::DONTWAIT) {
                 Ok(data) => {
                     // Echo back immediately
-                    socket.socket
+                    socket
+                        .socket
                         .send(&data, 0)
                         .context("Failed to send heartbeat response")?;
                     trace!("Heartbeat echoed");
@@ -335,7 +357,7 @@ impl Transport for ZmqTransport {
 
 impl ZmqTransport {
     /// Receive from heartbeat channel
-    async fn recv_heartbeat(&self) -> Result<Option<Vec<Vec<u8>>>> {
+    fn recv_heartbeat(&self) -> Result<Option<Vec<Vec<u8>>>> {
         let heartbeat = self.heartbeat_socket.lock();
         if let Some(socket) = heartbeat.as_ref() {
             match socket.socket.recv_bytes(zmq::DONTWAIT) {
@@ -349,11 +371,12 @@ impl ZmqTransport {
     }
 
     /// Send to heartbeat channel
-    async fn send_heartbeat(&self, parts: Vec<Vec<u8>>) -> Result<()> {
+    fn send_heartbeat(&self, parts: &[Vec<u8>]) -> Result<()> {
         let heartbeat = self.heartbeat_socket.lock();
         if let Some(socket) = heartbeat.as_ref() {
             if !parts.is_empty() {
-                socket.socket
+                socket
+                    .socket
                     .send(&parts[0], 0)
                     .context("Failed to send heartbeat")?;
             }
@@ -378,9 +401,18 @@ mod tests {
 
     #[test]
     fn test_pattern_to_socket_type() {
-        assert!(matches!(ZmqTransport::pattern_to_socket_type("router"), Ok(SocketType::ROUTER)));
-        assert!(matches!(ZmqTransport::pattern_to_socket_type("REQ"), Ok(SocketType::REQ)));
-        assert!(matches!(ZmqTransport::pattern_to_socket_type("pub"), Ok(SocketType::PUB)));
+        assert!(matches!(
+            ZmqTransport::pattern_to_socket_type("router"),
+            Ok(SocketType::ROUTER)
+        ));
+        assert!(matches!(
+            ZmqTransport::pattern_to_socket_type("REQ"),
+            Ok(SocketType::REQ)
+        ));
+        assert!(matches!(
+            ZmqTransport::pattern_to_socket_type("pub"),
+            Ok(SocketType::PUB)
+        ));
         assert!(ZmqTransport::pattern_to_socket_type("invalid").is_err());
     }
 
@@ -393,7 +425,10 @@ mod tests {
             auth_key: None,
         };
 
-        assert_eq!(ZmqTransport::build_address(&config, "5555"), "tcp://127.0.0.1:5555");
+        assert_eq!(
+            ZmqTransport::build_address(&config, "5555"),
+            "tcp://127.0.0.1:5555"
+        );
 
         let config = TransportConfig {
             transport_type: "ipc".to_string(),
@@ -402,7 +437,10 @@ mod tests {
             auth_key: None,
         };
 
-        assert_eq!(ZmqTransport::build_address(&config, "-shell"), "ipc:///tmp/kernel-shell");
+        assert_eq!(
+            ZmqTransport::build_address(&config, "-shell"),
+            "ipc:///tmp/kernel-shell"
+        );
     }
 
     #[tokio::test]

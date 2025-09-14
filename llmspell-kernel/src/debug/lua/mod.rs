@@ -3,7 +3,7 @@
 //! This module provides Lua-specific debugging capabilities including
 //! hook integration, state inspection, and breakpoint handling.
 //!
-//! Migrated from Phase-9 branch lua_debug_bridge.rs and related files
+//! Migrated from Phase-9 branch `lua_debug_bridge.rs` and related files
 
 use super::execution_bridge::{Breakpoint, StackFrame, Variable};
 use anyhow::Result;
@@ -53,7 +53,7 @@ pub struct LuaDebugBridge {
     /// Cached stack frames
     cached_frames: Arc<RwLock<Vec<StackFrame>>>,
     /// Session ID
-    session_id: String,
+    _session_id: String,
 }
 
 impl LuaDebugBridge {
@@ -64,7 +64,7 @@ impl LuaDebugBridge {
             hook_enabled: Arc::new(RwLock::new(false)),
             current_state: Arc::new(RwLock::new(None)),
             cached_frames: Arc::new(RwLock::new(Vec::new())),
-            session_id,
+            _session_id: session_id,
         }
     }
 
@@ -87,12 +87,17 @@ impl LuaDebugBridge {
 
     /// Handle debug hook callback
     #[instrument(level = "trace", skip(self))]
-    pub fn on_hook(&self, hook_type: LuaHookType, state: LuaDebugState) -> bool {
+    pub fn on_hook(&self, hook_type: LuaHookType, state: &LuaDebugState) -> bool {
         if !self.is_hook_enabled() {
             return false;
         }
 
-        trace!("Lua hook: {:?} at {}:{}", hook_type, state.source, state.line);
+        trace!(
+            "Lua hook: {:?} at {}:{}",
+            hook_type,
+            state.source,
+            state.line
+        );
 
         // Update current state
         *self.current_state.write() = Some(state.clone());
@@ -115,25 +120,32 @@ impl LuaDebugBridge {
     /// Set a breakpoint
     pub fn set_breakpoint(&self, source: String, line: u32) -> Breakpoint {
         let breakpoint = Breakpoint::new(source.clone(), line);
-        
+
         self.breakpoints
             .write()
             .entry(source)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(breakpoint.clone());
-        
-        debug!("Lua breakpoint set at {}:{}", breakpoint.source, breakpoint.line);
+
+        debug!(
+            "Lua breakpoint set at {}:{}",
+            breakpoint.source, breakpoint.line
+        );
         breakpoint
     }
 
     /// Remove a breakpoint
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the breakpoint doesn't exist
     pub fn remove_breakpoint(&self, id: &str) -> Result<()> {
         let mut breakpoints = self.breakpoints.write();
-        
+
         for bp_list in breakpoints.values_mut() {
             bp_list.retain(|bp| bp.id != id);
         }
-        
+
         Ok(())
     }
 
@@ -166,10 +178,14 @@ impl LuaDebugBridge {
     }
 
     /// Evaluate expression in current context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if evaluation fails
     pub fn evaluate(&self, expression: &str) -> Result<String> {
         // Simplified evaluation - would integrate with actual Lua state
         trace!("Evaluating expression: {}", expression);
-        Ok(format!("<evaluated: {}>", expression))
+        Ok(format!("<evaluated: {expression}>"))
     }
 }
 
@@ -191,12 +207,15 @@ impl DebugHookAdapter {
     }
 
     /// Set execution manager
-    pub fn set_execution_manager(&mut self, manager: Arc<super::execution_bridge::ExecutionManager>) {
+    pub fn set_execution_manager(
+        &mut self,
+        manager: Arc<super::execution_bridge::ExecutionManager>,
+    ) {
         self.execution_manager = Some(manager);
     }
 
     /// Handle Lua debug hook
-    pub fn handle_hook(&self, hook_type: LuaHookType, state: LuaDebugState) -> bool {
+    pub fn handle_hook(&self, hook_type: LuaHookType, state: &LuaDebugState) -> bool {
         // Check with execution manager first
         if let Some(ref manager) = self.execution_manager {
             if manager.should_pause(&state.source, state.line) {
@@ -217,16 +236,16 @@ mod tests {
     #[test]
     fn test_lua_debug_bridge() {
         let bridge = LuaDebugBridge::new("test-session".to_string());
-        
+
         assert!(!bridge.is_hook_enabled());
-        
+
         bridge.enable_hook();
         assert!(bridge.is_hook_enabled());
-        
+
         // Set breakpoint
         let bp = bridge.set_breakpoint("test.lua".to_string(), 10);
         assert!(!bp.id.is_empty());
-        
+
         // Create debug state
         let state = LuaDebugState {
             function_name: Some("test_func".to_string()),
@@ -236,24 +255,24 @@ mod tests {
             locals: vec![],
             upvalues: vec![],
         };
-        
+
         // Should pause at breakpoint
-        assert!(bridge.on_hook(LuaHookType::Line, state.clone()));
-        
+        assert!(bridge.on_hook(LuaHookType::Line, &state.clone()));
+
         // Should not pause at different line
         let mut state2 = state;
         state2.line = 11;
-        assert!(!bridge.on_hook(LuaHookType::Line, state2));
+        assert!(!bridge.on_hook(LuaHookType::Line, &state2));
     }
 
     #[test]
     fn test_debug_hook_adapter() {
         let bridge = Arc::new(LuaDebugBridge::new("test-session".to_string()));
         let adapter = DebugHookAdapter::new(bridge.clone());
-        
+
         bridge.enable_hook();
         bridge.set_breakpoint("test.lua".to_string(), 5);
-        
+
         let state = LuaDebugState {
             function_name: None,
             source: "test.lua".to_string(),
@@ -262,8 +281,8 @@ mod tests {
             locals: vec![],
             upvalues: vec![],
         };
-        
+
         // Should pause at breakpoint
-        assert!(adapter.handle_hook(LuaHookType::Line, state));
+        assert!(adapter.handle_hook(LuaHookType::Line, &state));
     }
 }

@@ -31,6 +31,7 @@ pub enum SessionState {
 
 /// Debug session configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct DebugSessionConfig {
     /// Stop on entry
     pub stop_on_entry: bool,
@@ -83,7 +84,7 @@ struct SessionMetadata {
     /// Script path
     script_path: Option<String>,
     /// Start time
-    started_at: Instant,
+    _started_at: Instant,
     /// Last activity time
     last_activity: Instant,
     /// Total breakpoints hit
@@ -106,7 +107,7 @@ impl DebugSession {
             watch_expressions: Arc::new(RwLock::new(Vec::new())),
             metadata: Arc::new(RwLock::new(SessionMetadata {
                 script_path: None,
-                started_at: Instant::now(),
+                _started_at: Instant::now(),
                 last_activity: Instant::now(),
                 breakpoints_hit: 0,
                 steps_executed: 0,
@@ -116,23 +117,31 @@ impl DebugSession {
     }
 
     /// Initialize session with script
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if session initialization fails
     #[instrument(level = "info", skip(self))]
     pub async fn initialize(&mut self, script_path: String) -> Result<()> {
         info!("Initializing debug session for {}", script_path);
-        
+
         self.metadata.write().script_path = Some(script_path.clone());
-        self.coordinator.start_session(script_path)?;
-        
+        self.coordinator.start_session(&script_path)?;
+
         *self.state.write() = SessionState::Running;
-        
+
         if self.config.stop_on_entry {
             self.pause().await?;
         }
-        
+
         Ok(())
     }
 
     /// Run the session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if session execution fails
     pub async fn run(&mut self) -> Result<()> {
         *self.state.write() = SessionState::Running;
         self.coordinator.continue_execution().await?;
@@ -140,6 +149,10 @@ impl DebugSession {
     }
 
     /// Pause the session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if pausing fails
     pub async fn pause(&mut self) -> Result<()> {
         *self.state.write() = SessionState::Paused;
         self.coordinator.pause().await?;
@@ -147,6 +160,10 @@ impl DebugSession {
     }
 
     /// Step into
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if stepping fails
     pub async fn step_into(&mut self) -> Result<()> {
         self.metadata.write().steps_executed += 1;
         self.coordinator.step_into().await?;
@@ -154,6 +171,10 @@ impl DebugSession {
     }
 
     /// Step over
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if stepping fails
     pub async fn step_over(&mut self) -> Result<()> {
         self.metadata.write().steps_executed += 1;
         self.coordinator.step_over().await?;
@@ -161,6 +182,10 @@ impl DebugSession {
     }
 
     /// Step out
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if stepping fails
     pub async fn step_out(&mut self) -> Result<()> {
         self.metadata.write().steps_executed += 1;
         self.coordinator.step_out().await?;
@@ -168,6 +193,10 @@ impl DebugSession {
     }
 
     /// Continue execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if continuation fails
     pub async fn continue_execution(&mut self) -> Result<()> {
         *self.state.write() = SessionState::Running;
         self.coordinator.continue_execution().await?;
@@ -175,13 +204,21 @@ impl DebugSession {
     }
 
     /// Set a breakpoint
-    pub async fn set_breakpoint(&self, source: String, line: u32) -> Result<DebugResponse> {
-        self.coordinator.set_breakpoint(source, line).await
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if breakpoint setting fails
+    pub fn set_breakpoint(&self, source: String, line: u32) -> Result<DebugResponse> {
+        self.coordinator.set_breakpoint(source, line)
     }
 
     /// Remove a breakpoint
-    pub async fn remove_breakpoint(&self, id: &str) -> Result<DebugResponse> {
-        self.coordinator.remove_breakpoint(id).await
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if breakpoint removal fails
+    pub fn remove_breakpoint(&self, id: &str) -> Result<DebugResponse> {
+        self.coordinator.remove_breakpoint(id)
     }
 
     /// Add watch expression
@@ -198,37 +235,49 @@ impl DebugSession {
     }
 
     /// Evaluate watch expressions
-    pub async fn evaluate_watches(&self) -> Vec<Variable> {
+    pub fn evaluate_watches(&self) -> Vec<Variable> {
         let watches = self.watch_expressions.read().clone();
         let mut results = Vec::new();
-        
+
         for (i, expr) in watches.iter().enumerate() {
             results.push(Variable {
-                name: format!("watch_{}", i),
-                value: format!("<{}>", expr), // Simplified
+                name: format!("watch_{i}"),
+                value: format!("<{expr}>"), // Simplified
                 var_type: "watch".to_string(),
                 has_children: false,
                 reference: None,
             });
         }
-        
+
         results
     }
 
     /// Get variables
-    pub async fn get_variables(&self, scope: VariableScope) -> Result<DebugResponse> {
-        self.coordinator.get_variables(scope, None).await
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if variable retrieval fails
+    pub fn get_variables(&self, scope: &VariableScope) -> Result<DebugResponse> {
+        self.coordinator.get_variables(scope, None)
     }
 
     /// Get stack frames
-    pub async fn get_stack_frames(&self) -> Result<DebugResponse> {
-        self.coordinator.get_stack_frames().await
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if stack frame retrieval fails
+    pub fn get_stack_frames(&self) -> Result<DebugResponse> {
+        self.coordinator.get_stack_frames()
     }
 
     /// Handle debug event
-    pub async fn handle_event(&mut self, event: DebugEvent) {
+    pub fn handle_event(&mut self, event: DebugEvent) {
         match event {
-            DebugEvent::Paused { reason, source, line } => {
+            DebugEvent::Paused {
+                reason,
+                source,
+                line,
+            } => {
                 *self.state.write() = SessionState::Paused;
                 info!("Session paused: {} at {}:{}", reason, source, line);
             }
@@ -245,12 +294,16 @@ impl DebugSession {
             }
             _ => {}
         }
-        
+
         self.metadata.write().last_activity = Instant::now();
     }
 
     /// Process events
-    pub async fn process_events(&mut self) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event processing fails
+    pub fn process_events(&mut self) -> Result<()> {
         // Collect events first to avoid borrow conflicts
         let mut events = Vec::new();
         if let Some(ref mut rx) = self.event_rx {
@@ -261,14 +314,18 @@ impl DebugSession {
 
         // Process collected events
         for event in events {
-            self.handle_event(event).await;
+            self.handle_event(event);
         }
 
         Ok(())
     }
 
     /// Terminate session
-    pub async fn terminate(&mut self) -> Result<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if session termination fails
+    pub fn terminate(&mut self) -> Result<()> {
         *self.state.write() = SessionState::Terminated;
         self.coordinator.end_session(&self.id)?;
         Ok(())
@@ -307,9 +364,9 @@ impl DebugSessionManager {
         let session_id = uuid::Uuid::new_v4().to_string();
         let config = config.unwrap_or_else(|| self.default_config.clone());
         let session = Arc::new(RwLock::new(DebugSession::new(session_id.clone(), config)));
-        
+
         self.sessions.write().insert(session_id.clone(), session);
-        
+
         info!("Created debug session: {}", session_id);
         session_id
     }
@@ -320,9 +377,14 @@ impl DebugSessionManager {
     }
 
     /// Remove a session
-    pub async fn remove_session(&self, id: &str) -> Result<()> {
-        if let Some(session) = self.sessions.write().remove(id) {
-            session.write().terminate().await?;
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if session removal fails
+    pub fn remove_session(&self, id: &str) -> Result<()> {
+        let session = self.sessions.write().remove(id);
+        if let Some(session) = session {
+            session.write().terminate()?;
             info!("Removed debug session: {}", id);
         }
         Ok(())
@@ -334,19 +396,24 @@ impl DebugSessionManager {
     }
 
     /// Clean up terminated sessions
-    pub async fn cleanup_terminated(&self) -> Result<()> {
-        let sessions = self.sessions.read();
-        let terminated: Vec<String> = sessions
-            .iter()
-            .filter(|(_, s)| s.read().state() == SessionState::Terminated)
-            .map(|(id, _)| id.clone())
-            .collect();
-        drop(sessions);
-        
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cleanup fails
+    pub fn cleanup_terminated(&self) -> Result<()> {
+        let terminated: Vec<String> = {
+            let sessions = self.sessions.read();
+            sessions
+                .iter()
+                .filter(|(_, s)| s.read().state() == SessionState::Terminated)
+                .map(|(id, _)| id.clone())
+                .collect()
+        };
+
         for id in terminated {
-            self.remove_session(&id).await?;
+            self.remove_session(&id)?;
         }
-        
+
         Ok(())
     }
 }
@@ -365,32 +432,32 @@ mod tests {
     async fn test_debug_session() {
         let config = DebugSessionConfig::default();
         let mut session = DebugSession::new("test-session".to_string(), config);
-        
+
         assert_eq!(session.state(), SessionState::Initialized);
-        
+
         session.initialize("test.lua".to_string()).await.unwrap();
         assert_eq!(session.state(), SessionState::Running);
-        
+
         session.pause().await.unwrap();
         assert_eq!(session.state(), SessionState::Paused);
-        
-        session.terminate().await.unwrap();
+
+        session.terminate().unwrap();
         assert_eq!(session.state(), SessionState::Terminated);
     }
 
     #[tokio::test]
     async fn test_session_manager() {
         let manager = DebugSessionManager::new();
-        
+
         let session_id = manager.create_session(None);
         assert!(!session_id.is_empty());
-        
+
         assert!(manager.get_session(&session_id).is_some());
-        
+
         let sessions = manager.list_sessions();
         assert_eq!(sessions.len(), 1);
-        
-        manager.remove_session(&session_id).await.unwrap();
+
+        manager.remove_session(&session_id).unwrap();
         assert!(manager.get_session(&session_id).is_none());
     }
 }

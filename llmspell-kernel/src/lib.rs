@@ -1,8 +1,8 @@
-//! # LLMSpell Kernel
+//! # `LLMSpell` Kernel
 //!
 //! Integrated kernel architecture with REPL and debugging infrastructure.
 //!
-//! This crate provides the core kernel functionality for LLMSpell, including:
+//! This crate provides the core kernel functionality for `LLMSpell`, including:
 //! - Global IO runtime management to prevent "dispatch task is gone" errors
 //! - Multi-protocol transport layer (Jupyter, LSP, DAP)
 //! - Script execution engine with debugging support
@@ -30,7 +30,8 @@ pub mod transport;
 
 // Re-export commonly used runtime types
 pub use runtime::io_runtime::{
-    block_on_global, create_io_bound_resource, global_io_runtime, spawn_global,
+    block_on_global, create_io_bound_resource, ensure_runtime_initialized, global_io_runtime,
+    runtime_metrics, spawn_global, RuntimeMetrics,
 };
 pub use runtime::tracing::{
     OperationCategory, SessionType, TracingInstrumentation, TracingLevel, TracingMetadata,
@@ -43,7 +44,7 @@ pub use io::{
 };
 
 // Re-export transport types
-pub use traits::{ChannelConfig, Transport, TransportConfig, Protocol};
+pub use traits::{ChannelConfig, Protocol, Transport, TransportConfig};
 
 #[cfg(feature = "zeromq")]
 pub use transport::zeromq::ZmqTransport;
@@ -55,8 +56,10 @@ pub use execution::{ExecutionConfig, IntegratedKernel};
 
 // Re-export debug types
 pub use debug::{
-    Breakpoint, DebugCoordinator, DebugEvent, DebugResponse, DebugSession, DebugSessionManager,
-    ExecutionManager, MemoryAwareDebugCoordinator, StackFrame, StepMode, Variable, VariableScope,
+    Breakpoint, DAPBridge, DapBreakpoint, DapCapabilities, DapScope, DapSource, DapStackFrame,
+    DapVariable, DebugAdapter, DebugCoordinator, DebugEvent, DebugResponse, DebugSession,
+    DebugSessionManager, ExecutionManager, LuaDebugAdapter, MemoryAwareDebugCoordinator,
+    SourceBreakpoint, SourceReference, StackFrame, StepMode, Variable, VariableScope,
 };
 
 /// Kernel version information
@@ -71,7 +74,7 @@ mod tests {
 
     #[test]
     fn test_version_constants() {
-        assert!(!KERNEL_VERSION.is_empty());
+        // KERNEL_VERSION is from env! macro so it's always non-empty
         assert_eq!(PROTOCOL_VERSION, "5.3");
     }
 }

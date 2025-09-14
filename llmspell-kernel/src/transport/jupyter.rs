@@ -3,7 +3,7 @@
 //! This module provides a Jupyter protocol transport that manages the
 //! 5-channel architecture required by Jupyter:
 //! - Shell: Execute requests and replies
-//! - IOPub: Output publishing and status updates
+//! - `IOPub`: Output publishing and status updates
 //! - Stdin: Input requests from kernel to frontend
 //! - Control: Shutdown, interrupt, and daemon management
 //! - Heartbeat: Keepalive mechanism
@@ -29,7 +29,7 @@ pub struct JupyterConnectionInfo {
     pub ip: String,
     /// Shell channel port (REQ/REP for execute requests)
     pub shell_port: u16,
-    /// IOPub channel port (PUB for output broadcasting)
+    /// `IOPub` channel port (PUB for output broadcasting)
     pub iopub_port: u16,
     /// Stdin channel port (REQ/REP for input requests)
     pub stdin_port: u16,
@@ -67,6 +67,10 @@ impl JupyterTransport {
     }
 
     /// Create from a Jupyter connection file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the connection file cannot be read or parsed
     #[instrument(level = "info")]
     pub async fn from_connection_file(path: &Path) -> Result<Self> {
         info!("Loading Jupyter connection from {:?}", path);
@@ -74,10 +78,10 @@ impl JupyterTransport {
         // Read and parse connection file
         let contents = tokio::fs::read_to_string(path)
             .await
-            .with_context(|| format!("Failed to read connection file: {:?}", path))?;
+            .with_context(|| format!("Failed to read connection file: {}", path.display()))?;
 
         let connection_info: JupyterConnectionInfo = serde_json::from_str(&contents)
-            .with_context(|| format!("Failed to parse connection file: {:?}", path))?;
+            .with_context(|| format!("Failed to parse connection file: {}", path.display()))?;
 
         // Create transport based on type
         let transport = crate::traits::create_transport("zeromq")?;
@@ -159,6 +163,10 @@ impl JupyterTransport {
     }
 
     /// Connect as a Jupyter client (for testing or external communication)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if connection fails
     #[instrument(level = "info", skip(self))]
     pub async fn connect_as_client(&mut self, info: &JupyterConnectionInfo) -> Result<()> {
         info!("Connecting as Jupyter client");
@@ -254,6 +262,10 @@ impl Transport for JupyterTransport {
 }
 
 /// Create a standard Jupyter kernel transport
+///
+/// # Errors
+///
+/// Returns an error if transport creation fails
 #[instrument(level = "info")]
 pub async fn create_jupyter_kernel_transport(
     connection_file: Option<&Path>,

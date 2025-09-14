@@ -33,7 +33,7 @@ pub struct ClientConnection {
     pub id: String,
     /// Client session ID
     pub session_id: String,
-    /// IOPub channel sender for this client
+    /// `IOPub` channel sender for this client
     pub iopub_sender: Sender<IOPubMessage>,
     /// Active status
     pub active: bool,
@@ -118,6 +118,10 @@ impl MessageRouter {
     }
 
     /// Route a message to destinations
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message routing fails
     #[instrument(level = "trace", skip(self, message))]
     pub async fn route_message(
         &self,
@@ -145,12 +149,10 @@ impl MessageRouter {
 
     /// Broadcast message to all active clients
     async fn broadcast_message(&self, message: IOPubMessage) -> Result<()> {
-        let clients = self.clients.read();
-        let active_clients: Vec<_> = clients
-            .values()
-            .filter(|c| c.active)
-            .cloned()
-            .collect();
+        let active_clients: Vec<_> = {
+            let clients = self.clients.read();
+            clients.values().filter(|c| c.active).cloned().collect()
+        };
 
         let mut sent = 0;
         let mut failed = 0;
@@ -168,7 +170,7 @@ impl MessageRouter {
         debug!("Broadcast message to {} clients ({} failed)", sent, failed);
 
         if let Some(ref tracing) = self.tracing {
-            tracing.trace_transport_operation("jupyter", "iopub", &format!("broadcast_{}", sent));
+            tracing.trace_transport_operation("jupyter", "iopub", &format!("broadcast_{sent}"));
         }
 
         Ok(())
@@ -176,16 +178,18 @@ impl MessageRouter {
 
     /// Send message to specific client
     async fn send_to_client(&self, client_id: &str, message: IOPubMessage) -> Result<()> {
-        let clients = self.clients.read();
+        let client = {
+            let clients = self.clients.read();
+            clients.get(client_id).cloned()
+        };
 
-        if let Some(client) = clients.get(client_id) {
+        if let Some(client) = client {
             if !client.active {
                 return Err(anyhow::anyhow!("Client {} is inactive", client_id));
             }
 
             if client.iopub_sender.send(message).await.is_err() {
                 warn!("Failed to send to client {}, marking inactive", client_id);
-                drop(clients);
                 self.deactivate_client(client_id);
                 return Err(anyhow::anyhow!("Failed to send to client {}", client_id));
             }
@@ -202,15 +206,20 @@ impl MessageRouter {
     async fn send_to_requester(&self, message: IOPubMessage) -> Result<()> {
         if let Some(ref parent_header) = message.parent_header {
             // Find client with matching session
-            let clients = self.clients.read();
-            let matching_clients: Vec<_> = clients
-                .values()
-                .filter(|c| c.active && c.session_id == parent_header.session)
-                .cloned()
-                .collect();
+            let matching_clients: Vec<_> = {
+                let clients = self.clients.read();
+                clients
+                    .values()
+                    .filter(|c| c.active && c.session_id == parent_header.session)
+                    .cloned()
+                    .collect()
+            };
 
             if matching_clients.is_empty() {
-                debug!("No active clients found for session {}", parent_header.session);
+                debug!(
+                    "No active clients found for session {}",
+                    parent_header.session
+                );
                 return Ok(());
             }
 
@@ -244,18 +253,22 @@ impl MessageRouter {
     }
 
     /// Replay message history to a client
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if replay fails
     #[instrument(level = "debug", skip(self))]
     pub async fn replay_history(&self, client_id: &str, count: usize) -> Result<()> {
-        let history = self.message_history.read();
-        let messages_to_send: Vec<_> = history
-            .iter()
-            .rev()
-            .take(count)
-            .rev()
-            .cloned()
-            .collect();
+        let messages_to_send: Vec<_> = {
+            let history = self.message_history.read();
+            history.iter().rev().take(count).rev().cloned().collect()
+        };
 
-        debug!("Replaying {} messages to client {}", messages_to_send.len(), client_id);
+        debug!(
+            "Replaying {} messages to client {}",
+            messages_to_send.len(),
+            client_id
+        );
 
         for message in messages_to_send {
             self.send_to_client(client_id, message).await?;
@@ -281,7 +294,10 @@ impl MessageRouter {
     }
 
     /// Create a channel for a new client
-    pub fn create_client_channel(&self, session_id: String) -> (String, mpsc::Receiver<IOPubMessage>) {
+    pub fn create_client_channel(
+        &self,
+        session_id: String,
+    ) -> (String, mpsc::Receiver<IOPubMessage>) {
         let (tx, rx) = mpsc::channel(100);
         let client_id = self.register_client(session_id, tx);
         (client_id, rx)
@@ -331,7 +347,10 @@ mod tests {
         };
 
         // Broadcast
-        router.route_message(message.clone(), MessageDestination::Broadcast).await.unwrap();
+        router
+            .route_message(message.clone(), MessageDestination::Broadcast)
+            .await
+            .unwrap();
 
         // Both clients should receive
         let msg1 = rx1.recv().await.unwrap();
@@ -356,7 +375,10 @@ mod tests {
         };
 
         // Send to specific client
-        router.route_message(message, MessageDestination::Client(id1)).await.unwrap();
+        router
+            .route_message(message, MessageDestination::Client(id1))
+            .await
+            .unwrap();
 
         // Only first client should receive
         let msg1 = rx1.recv().await.unwrap();
@@ -382,7 +404,10 @@ mod tests {
                 content,
             };
 
-            router.route_message(message, MessageDestination::Broadcast).await.unwrap();
+            router
+                .route_message(message, MessageDestination::Broadcast)
+                .await
+                .unwrap();
         }
 
         // Register new client

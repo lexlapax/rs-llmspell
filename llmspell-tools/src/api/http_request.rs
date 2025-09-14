@@ -236,8 +236,8 @@ impl HttpRequestTool {
         })
         .map_err(|e| LLMSpellError::Internal {
             message: format!("Failed to create HTTP client: {e}"),
-                source: None,
-            })?;
+            source: None,
+        })?;
 
         Ok(Self {
             metadata: ComponentMetadata::new(

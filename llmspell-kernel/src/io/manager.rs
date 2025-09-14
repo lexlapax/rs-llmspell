@@ -65,7 +65,7 @@ impl MessageHeader {
     }
 }
 
-/// IOPub message for output publishing
+/// `IOPub` message for output publishing
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IOPubMessage {
     /// Parent header for correlation
@@ -104,7 +104,7 @@ impl Default for IOConfig {
 
 /// Enhanced I/O Manager for multi-channel routing
 pub struct EnhancedIOManager {
-    /// IOPub channel sender
+    /// `IOPub` channel sender
     iopub_sender: Option<Sender<IOPubMessage>>,
     /// Stdout buffer
     stdout_buffer: Arc<RwLock<String>>,
@@ -130,8 +130,12 @@ impl EnhancedIOManager {
 
         Self {
             iopub_sender: None,
-            stdout_buffer: Arc::new(RwLock::new(String::with_capacity(config.stdout_buffer_size))),
-            stderr_buffer: Arc::new(RwLock::new(String::with_capacity(config.stderr_buffer_size))),
+            stdout_buffer: Arc::new(RwLock::new(String::with_capacity(
+                config.stdout_buffer_size,
+            ))),
+            stderr_buffer: Arc::new(RwLock::new(String::with_capacity(
+                config.stderr_buffer_size,
+            ))),
             parent_headers: Arc::new(RwLock::new(HashMap::new())),
             current_parent: Arc::new(RwLock::new(None)),
             config,
@@ -145,7 +149,7 @@ impl EnhancedIOManager {
         self.tracing = Some(tracing);
     }
 
-    /// Set the IOPub channel sender
+    /// Set the `IOPub` channel sender
     pub fn set_iopub_sender(&mut self, sender: Sender<IOPubMessage>) {
         self.iopub_sender = Some(sender);
     }
@@ -156,7 +160,9 @@ impl EnhancedIOManager {
         if self.config.track_parent_headers {
             trace!("Setting parent header: msg_id={}", parent.msg_id);
             *self.current_parent.write() = Some(parent.clone());
-            self.parent_headers.write().insert(parent.msg_id.clone(), parent);
+            self.parent_headers
+                .write()
+                .insert(parent.msg_id.clone(), parent);
         }
     }
 
@@ -166,12 +172,20 @@ impl EnhancedIOManager {
     }
 
     /// Write to stdout
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the write operation fails
     #[instrument(level = "trace", skip(self, data))]
     pub async fn write_stdout(&self, data: &str) -> Result<()> {
         self.write_stream(StreamType::Stdout, data).await
     }
 
     /// Write to stderr
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the write operation fails
     #[instrument(level = "trace", skip(self, data))]
     pub async fn write_stderr(&self, data: &str) -> Result<()> {
         self.write_stream(StreamType::Stderr, data).await
@@ -196,6 +210,10 @@ impl EnhancedIOManager {
     }
 
     /// Flush a specific stream
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the flush operation fails
     #[instrument(level = "debug", skip(self))]
     pub async fn flush_stream(&self, stream_type: StreamType) -> Result<()> {
         let buffer = match stream_type {
@@ -216,13 +234,17 @@ impl EnhancedIOManager {
     }
 
     /// Flush all streams
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any flush operation fails
     pub async fn flush_all(&self) -> Result<()> {
         self.flush_stream(StreamType::Stdout).await?;
         self.flush_stream(StreamType::Stderr).await?;
         Ok(())
     }
 
-    /// Publish stream output to IOPub channel
+    /// Publish stream output to `IOPub` channel
     #[instrument(level = "trace", skip(self, text))]
     async fn publish_stream(&self, stream_type: StreamType, text: &str) -> Result<()> {
         if text.is_empty() {
@@ -239,8 +261,14 @@ impl EnhancedIOManager {
         let parent_header = self.current_parent.read().clone();
 
         let mut content = HashMap::new();
-        content.insert("name".to_string(), serde_json::Value::String(stream_type.as_str().to_string()));
-        content.insert("text".to_string(), serde_json::Value::String(text.to_string()));
+        content.insert(
+            "name".to_string(),
+            serde_json::Value::String(stream_type.as_str().to_string()),
+        );
+        content.insert(
+            "text".to_string(),
+            serde_json::Value::String(text.to_string()),
+        );
 
         let message = IOPubMessage {
             parent_header,
@@ -255,15 +283,24 @@ impl EnhancedIOManager {
         }
 
         // Send message
-        sender.send(message).await.map_err(|e| {
-            anyhow::anyhow!("Failed to send to IOPub channel: {}", e)
-        })?;
+        sender
+            .send(message)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send to IOPub channel: {}", e))?;
 
-        trace!("Published {} bytes to {} stream", text.len(), stream_type.as_str());
+        trace!(
+            "Published {} bytes to {} stream",
+            text.len(),
+            stream_type.as_str()
+        );
         Ok(())
     }
 
     /// Publish a status update
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if publishing fails
     #[instrument(level = "debug", skip(self))]
     pub async fn publish_status(&self, status: &str) -> Result<()> {
         let Some(ref sender) = self.iopub_sender else {
@@ -274,7 +311,10 @@ impl EnhancedIOManager {
         let parent_header = self.current_parent.read().clone();
 
         let mut content = HashMap::new();
-        content.insert("execution_state".to_string(), serde_json::Value::String(status.to_string()));
+        content.insert(
+            "execution_state".to_string(),
+            serde_json::Value::String(status.to_string()),
+        );
 
         let message = IOPubMessage {
             parent_header,
@@ -283,17 +323,26 @@ impl EnhancedIOManager {
             content,
         };
 
-        sender.send(message).await.map_err(|e| {
-            anyhow::anyhow!("Failed to send status: {}", e)
-        })?;
+        sender
+            .send(message)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send status: {}", e))?;
 
         debug!("Published status: {}", status);
         Ok(())
     }
 
     /// Publish an execute result
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if publishing fails
     #[instrument(level = "debug", skip(self, data))]
-    pub async fn publish_execute_result(&self, execution_count: i32, data: HashMap<String, serde_json::Value>) -> Result<()> {
+    pub async fn publish_execute_result(
+        &self,
+        execution_count: i32,
+        data: HashMap<String, serde_json::Value>,
+    ) -> Result<()> {
         let Some(ref sender) = self.iopub_sender else {
             return Ok(());
         };
@@ -302,9 +351,18 @@ impl EnhancedIOManager {
         let parent_header = self.current_parent.read().clone();
 
         let mut content = HashMap::new();
-        content.insert("execution_count".to_string(), serde_json::Value::Number(execution_count.into()));
-        content.insert("data".to_string(), serde_json::Value::Object(data.into_iter().collect()));
-        content.insert("metadata".to_string(), serde_json::Value::Object(serde_json::Map::new()));
+        content.insert(
+            "execution_count".to_string(),
+            serde_json::Value::Number(execution_count.into()),
+        );
+        content.insert(
+            "data".to_string(),
+            serde_json::Value::Object(data.into_iter().collect()),
+        );
+        content.insert(
+            "metadata".to_string(),
+            serde_json::Value::Object(serde_json::Map::new()),
+        );
 
         let message = IOPubMessage {
             parent_header,
@@ -313,15 +371,16 @@ impl EnhancedIOManager {
             content,
         };
 
-        sender.send(message).await.map_err(|e| {
-            anyhow::anyhow!("Failed to send execute result: {}", e)
-        })?;
+        sender
+            .send(message)
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to send execute result: {}", e))?;
 
         debug!("Published execute result for execution {}", execution_count);
         Ok(())
     }
 
-    /// Create an IOPub channel
+    /// Create an `IOPub` channel
     pub fn create_iopub_channel(&mut self) -> mpsc::Receiver<IOPubMessage> {
         let (tx, rx) = mpsc::channel(100);
         self.iopub_sender = Some(tx);
@@ -391,8 +450,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_parent_header_tracking() {
-        let mut config = IOConfig::default();
-        config.track_parent_headers = true;
+        let config = IOConfig {
+            track_parent_headers: true,
+            ..Default::default()
+        };
 
         let manager = EnhancedIOManager::new(config, "test-session".to_string());
 
@@ -425,7 +486,11 @@ mod tests {
         let msg = rx.recv().await.unwrap();
         assert_eq!(msg.header.msg_type, "status");
         assert_eq!(
-            msg.content.get("execution_state").unwrap().as_str().unwrap(),
+            msg.content
+                .get("execution_state")
+                .unwrap()
+                .as_str()
+                .unwrap(),
             "busy"
         );
     }

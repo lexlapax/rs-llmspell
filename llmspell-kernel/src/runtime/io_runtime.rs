@@ -1,7 +1,7 @@
 //! Global IO Runtime Foundation
 //!
 //! This module provides the critical global IO runtime that ensures all HTTP clients
-//! and I/O operations across the entire LLMSpell system use the same runtime context.
+//! and I/O operations across the entire `LLMSpell` system use the same runtime context.
 //! This fixes the "dispatch task is gone" error that occurs when HTTP clients are
 //! created in one runtime context and used in another.
 //!
@@ -31,7 +31,7 @@ static RUNTIME_METRICS: OnceCell<Arc<RuntimeMetrics>> = OnceCell::new();
 /// Get the global IO runtime instance
 ///
 /// This function returns the global Tokio runtime that should be used for ALL
-/// I/O operations in the LLMSpell system. It ensures consistent runtime context
+/// I/O operations in the `LLMSpell` system. It ensures consistent runtime context
 /// across all components, preventing "dispatch task is gone" errors.
 ///
 /// # Panics
@@ -69,7 +69,10 @@ pub fn global_io_runtime() -> &'static Arc<Runtime> {
         let metrics = RuntimeMetrics::new();
         RUNTIME_METRICS.set(Arc::new(metrics)).ok();
 
-        info!("Global IO runtime initialized with {} worker threads", num_cpus::get());
+        info!(
+            "Global IO runtime initialized with {} worker threads",
+            num_cpus::get()
+        );
         Arc::new(runtime)
     })
 }
@@ -154,9 +157,10 @@ where
     F::Output: Send,
 {
     // Check if we're already in an async context
-    if tokio::runtime::Handle::try_current().is_ok() {
-        panic!("block_on_global called from within an async context - this would deadlock!");
-    }
+    assert!(
+        tokio::runtime::Handle::try_current().is_err(),
+        "block_on_global called from within an async context - this would deadlock!"
+    );
 
     debug!("Blocking on future using global runtime");
     let start = Instant::now();
@@ -239,7 +243,7 @@ impl RuntimeMetrics {
         histogram!("kernel.runtime.resource_creation_time").record(duration.as_secs_f64());
     }
 
-    /// Record a block_on call
+    /// Record a `block_on` call
     fn record_block_on(&self, duration: Duration) {
         let mut count = self.block_on_calls.write();
         *count += 1;
@@ -259,6 +263,7 @@ impl RuntimeMetrics {
 
         // Emit metrics
         counter!("kernel.runtime.tasks_spawned").increment(1);
+        #[allow(clippy::cast_precision_loss)]
         gauge!("kernel.runtime.active_tasks").set(*count as f64);
     }
 
@@ -341,9 +346,7 @@ mod tests {
     #[should_panic(expected = "block_on_global called from within an async context")]
     fn test_block_on_global_panics_in_async_context() {
         // This should panic because we're calling block_on_global from within block_on_global
-        block_on_global(async {
-            block_on_global(async { 42 })
-        });
+        block_on_global(async { block_on_global(async { 42 }) });
     }
 
     #[test]
@@ -380,9 +383,7 @@ mod tests {
     fn test_long_running_resource() {
         // This test simulates the scenario that was causing "dispatch task is gone"
         // Create a resource that would be used after 30+ seconds
-        let resource = create_io_bound_resource(|| {
-            Arc::new("long_lived_resource".to_string())
-        });
+        let resource = create_io_bound_resource(|| Arc::new("long_lived_resource".to_string()));
 
         // Spawn a task that uses the resource after a delay
         let resource_clone = resource.clone();

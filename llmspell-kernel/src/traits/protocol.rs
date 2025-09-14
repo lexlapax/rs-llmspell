@@ -10,11 +10,23 @@ use std::collections::HashMap;
 /// Protocol trait for handling different messaging protocols
 pub trait Protocol: Send + Sync {
     /// Parse an incoming message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the message cannot be parsed
     fn parse_message(&self, data: &[u8]) -> Result<HashMap<String, Value>>;
 
     /// Create a response message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the response cannot be created
     fn create_response(&self, msg_type: &str, content: Value) -> Result<Vec<u8>>;
 
     /// Create a request message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the request cannot be created
     fn create_request(&self, msg_type: &str, content: Value) -> Result<Vec<u8>>;
 }

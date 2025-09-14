@@ -1,6 +1,6 @@
 //! Transport trait for generic message passing
 //!
-//! This trait abstracts the transport layer (ZeroMQ, TCP, IPC, WebSocket, etc.)
+//! This trait abstracts the transport layer (`ZeroMQ`, TCP, IPC, WebSocket, etc.)
 //! and knows NOTHING about specific protocols (Jupyter, LSP, DAP, etc.).
 //! It provides a clean interface for multipart message passing over various channels.
 
@@ -85,6 +85,10 @@ pub trait Transport: Send + Sync {
 pub type BoxedTransport = Box<dyn Transport>;
 
 /// Create a transport based on the configuration type
+///
+/// # Errors
+///
+/// Returns an error if the transport type is unknown or not compiled in
 pub fn create_transport(transport_type: &str) -> Result<BoxedTransport> {
     match transport_type {
         "zeromq" | "zmq" => {
@@ -98,9 +102,10 @@ pub fn create_transport(transport_type: &str) -> Result<BoxedTransport> {
                 Err(anyhow::anyhow!("ZeroMQ support not compiled in"))
             }
         }
-        "websocket" | "ws" => {
-            Err(anyhow::anyhow!("WebSocket support not yet implemented"))
-        }
-        _ => Err(anyhow::anyhow!("Unknown transport type: {}", transport_type)),
+        "websocket" | "ws" => Err(anyhow::anyhow!("WebSocket support not yet implemented")),
+        _ => Err(anyhow::anyhow!(
+            "Unknown transport type: {}",
+            transport_type
+        )),
     }
 }

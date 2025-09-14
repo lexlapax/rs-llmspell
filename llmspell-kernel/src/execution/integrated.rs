@@ -1,7 +1,7 @@
 //! Integrated Kernel Implementation
 //!
-//! This module provides the IntegratedKernel that runs ScriptRuntime directly
-//! in the current context without tokio::spawn, ensuring all components share
+//! This module provides the `IntegratedKernel` that runs `ScriptRuntime` directly
+//! in the current context without `tokio::spawn`, ensuring all components share
 //! the same runtime context.
 
 use anyhow::Result;
@@ -14,39 +14,54 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, instrument, trace, warn};
 
+/// Type alias for I/O handler functions
+type IOHandler = Box<dyn Fn(&str) + Send + Sync>;
+
 use crate::io::manager::EnhancedIOManager;
 use crate::io::router::MessageRouter;
 use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
 use crate::traits::Protocol;
 
-/// Simplified ScriptRuntime stub for Phase 9.2
-/// Will be replaced with llmspell-bridge::ScriptRuntime in later phases
+/// Simplified `ScriptRuntime` stub for Phase 9.2
+/// Will be replaced with `llmspell-bridge::ScriptRuntime` in later phases
 pub struct ScriptRuntime {
-    config: HashMap<String, Value>,
-    stdout_handler: Option<Box<dyn Fn(&str) + Send + Sync>>,
-    stderr_handler: Option<Box<dyn Fn(&str) + Send + Sync>>,
+    _config: HashMap<String, Value>,
+    stdout_handler: Option<IOHandler>,
+    stderr_handler: Option<IOHandler>,
     interrupted: Arc<RwLock<bool>>,
 }
 
 impl ScriptRuntime {
+    /// Create a new script runtime
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime creation fails
     pub fn new(config: HashMap<String, Value>) -> Result<Self> {
         Ok(Self {
-            config,
+            _config: config,
             stdout_handler: None,
             stderr_handler: None,
             interrupted: Arc::new(RwLock::new(false)),
         })
     }
 
-    pub fn set_stdout_handler(&mut self, handler: Box<dyn Fn(&str) + Send + Sync>) {
+    /// Set stdout handler
+    pub fn set_stdout_handler(&mut self, handler: IOHandler) {
         self.stdout_handler = Some(handler);
     }
 
-    pub fn set_stderr_handler(&mut self, handler: Box<dyn Fn(&str) + Send + Sync>) {
+    /// Set stderr handler
+    pub fn set_stderr_handler(&mut self, handler: IOHandler) {
         self.stderr_handler = Some(handler);
     }
 
-    pub async fn execute(&mut self, code: &str) -> Result<String> {
+    /// Execute code
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution is interrupted
+    pub fn execute(&mut self, code: &str) -> Result<String> {
         // Check if interrupted
         if *self.interrupted.read() {
             *self.interrupted.write() = false;
@@ -55,13 +70,14 @@ impl ScriptRuntime {
 
         // Simulate execution
         if let Some(ref handler) = self.stdout_handler {
-            handler(&format!("Executing: {}\n", code));
+            handler(&format!("Executing: {code}\n"));
         }
 
         // Return a simple result
-        Ok(format!("Result of: {}", code))
+        Ok(format!("Result of: {code}"))
     }
 
+    /// Interrupt the current execution
     pub fn interrupt(&mut self) {
         *self.interrupted.write() = true;
     }
@@ -121,7 +137,7 @@ impl Default for ExecutionConfig {
     }
 }
 
-/// Integrated kernel that runs ScriptRuntime without spawning
+/// Integrated kernel that runs `ScriptRuntime` without spawning
 pub struct IntegratedKernel<P: Protocol> {
     /// Script runtime for execution
     runtime: ScriptRuntime,
@@ -130,7 +146,7 @@ pub struct IntegratedKernel<P: Protocol> {
     /// I/O manager
     io_manager: Arc<EnhancedIOManager>,
     /// Message router for multi-client support
-    message_router: Arc<MessageRouter>,
+    _message_router: Arc<MessageRouter>,
     /// Tracing instrumentation
     tracing: TracingInstrumentation,
     /// Configuration
@@ -143,14 +159,15 @@ pub struct IntegratedKernel<P: Protocol> {
     shutdown_rx: Option<mpsc::Receiver<()>>,
 }
 
+#[allow(dead_code)] // These methods will be used when transport is fully integrated
 impl<P: Protocol + 'static> IntegratedKernel<P> {
     /// Create a new integrated kernel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the script runtime cannot be created
     #[instrument(level = "info", skip_all)]
-    pub fn new(
-        protocol: P,
-        config: ExecutionConfig,
-        session_id: String,
-    ) -> Result<Self> {
+    pub fn new(protocol: P, config: ExecutionConfig, session_id: String) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
 
         // Create script runtime with configuration
@@ -163,25 +180,20 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             flush_interval_ms: config.io_config.flush_interval_ms,
             track_parent_headers: config.io_config.track_parent_headers,
         };
-        let io_manager = Arc::new(EnhancedIOManager::new(
-            io_config,
-            session_id.clone(),
-        ));
+        let io_manager = Arc::new(EnhancedIOManager::new(io_config, session_id.clone()));
 
         // Create message router
         let message_router = Arc::new(MessageRouter::new(config.max_history));
 
         // Create tracing instrumentation
-        let tracing = TracingInstrumentation::new_kernel_session(
-            Some(session_id.clone()),
-            "integrated",
-        );
+        let tracing =
+            TracingInstrumentation::new_kernel_session(Some(session_id.clone()), "integrated");
 
         Ok(Self {
             runtime,
             protocol,
             io_manager,
-            message_router,
+            _message_router: message_router,
             tracing,
             config,
             session_id,
@@ -196,6 +208,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     }
 
     /// Run the kernel in the current context (NO SPAWNING)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if I/O operations fail
     #[instrument(level = "info", skip(self))]
     pub async fn run(mut self) -> Result<()> {
         info!("Starting IntegratedKernel in current context (no spawning)");
@@ -240,6 +256,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     }
 
     /// Handle a parsed message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message handling fails
     #[instrument(level = "debug", skip(self, message))]
     async fn handle_message(&mut self, message: HashMap<String, Value>) -> Result<()> {
         let msg_type = message
@@ -251,9 +271,9 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         match msg_type {
             "execute_request" => self.handle_execute_request(message).await?,
-            "kernel_info_request" => self.handle_kernel_info_request(message).await?,
-            "shutdown_request" => self.handle_shutdown_request(message).await?,
-            "interrupt_request" => self.handle_interrupt_request(message).await?,
+            "kernel_info_request" => self.handle_kernel_info_request(&message)?,
+            "shutdown_request" => self.handle_shutdown_request(&message)?,
+            "interrupt_request" => self.handle_interrupt_request(&message)?,
             _ => {
                 warn!("Unhandled message type: {}", msg_type);
             }
@@ -262,7 +282,11 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         Ok(())
     }
 
-    /// Handle execute_request message
+    /// Handle `execute_request` message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution fails
     #[instrument(level = "debug", skip(self, message))]
     async fn handle_execute_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
         // Extract code from message
@@ -299,7 +323,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         self.tracing.trace_operation(
             OperationCategory::ScriptRuntime,
             "execute_request",
-            Some(&format!("execution_{}", exec_count)),
+            Some(&format!("execution_{exec_count}")),
         );
 
         // Track agent creation if monitoring enabled
@@ -323,15 +347,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Track performance if enabled
         if self.config.track_performance {
-            trace!(
-                "Execution {} completed in {:?}",
-                exec_count,
-                execution_time
-            );
+            trace!("Execution {} completed in {:?}", exec_count, execution_time);
             self.tracing.trace_operation(
                 OperationCategory::ScriptRuntime,
                 "performance",
-                Some(&format!("execution_time_ms: {}", execution_time.as_millis())),
+                Some(&format!(
+                    "execution_time_ms: {}",
+                    execution_time.as_millis()
+                )),
             );
         }
 
@@ -348,11 +371,14 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             Ok(Err(e)) => {
                 error!("Execution error: {}", e);
                 self.io_manager
-                    .write_stderr(&format!("Error: {}\n", e))
+                    .write_stderr(&format!("Error: {e}\n"))
                     .await?;
             }
             Err(_) => {
-                error!("Execution timeout after {} seconds", self.config.execution_timeout_secs);
+                error!(
+                    "Execution timeout after {} seconds",
+                    self.config.execution_timeout_secs
+                );
                 self.io_manager
                     .write_stderr(&format!(
                         "Execution timeout after {} seconds\n",
@@ -381,6 +407,10 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     }
 
     /// Execute code in the current runtime context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if code execution fails
     #[instrument(level = "trace", skip(self, code))]
     async fn execute_code_in_context(&mut self, code: &str) -> Result<String> {
         // This is the critical fix - execute directly without spawning
@@ -393,7 +423,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         // For now, we just capture the output
 
         // Execute code - this now happens in the same runtime context
-        let result = self.runtime.execute(code).await?;
+        let result = self.runtime.execute(code)?;
 
         // Flush I/O buffers
         self.io_manager.flush_all().await?;
@@ -401,8 +431,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         Ok(result)
     }
 
-    /// Handle kernel_info_request
-    async fn handle_kernel_info_request(&mut self, _message: HashMap<String, Value>) -> Result<()> {
+    /// Handle `kernel_info_request`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if response creation fails
+    fn handle_kernel_info_request(&mut self, _message: &HashMap<String, Value>) -> Result<()> {
         debug!("Handling kernel_info_request");
 
         // Create kernel info response
@@ -419,17 +453,23 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         });
 
         // TODO: Send response via transport when integrated
-        let _response = self.protocol.create_response("kernel_info_reply", kernel_info)?;
+        let _response = self
+            .protocol
+            .create_response("kernel_info_reply", kernel_info)?;
 
         Ok(())
     }
 
-    /// Handle shutdown_request
-    async fn handle_shutdown_request(&mut self, message: HashMap<String, Value>) -> Result<()> {
+    /// Handle `shutdown_request`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if response creation fails
+    fn handle_shutdown_request(&mut self, message: &HashMap<String, Value>) -> Result<()> {
         let restart = message
             .get("content")
             .and_then(|c| c.get("restart"))
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(false);
 
         info!("Handling shutdown_request (restart={})", restart);
@@ -448,15 +488,21 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
         Ok(())
     }
 
-    /// Handle interrupt_request
-    async fn handle_interrupt_request(&mut self, _message: HashMap<String, Value>) -> Result<()> {
+    /// Handle `interrupt_request`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if response creation fails
+    fn handle_interrupt_request(&mut self, _message: &HashMap<String, Value>) -> Result<()> {
         info!("Handling interrupt_request");
 
         // Interrupt the runtime
         self.runtime.interrupt();
 
         // TODO: Send interrupt reply via transport when integrated
-        let _response = self.protocol.create_response("interrupt_reply", serde_json::json!({}))?;
+        let _response = self
+            .protocol
+            .create_response("interrupt_reply", serde_json::json!({}))?;
 
         Ok(())
     }
@@ -488,11 +534,7 @@ mod tests {
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
 
-        let kernel = IntegratedKernel::new(
-            protocol,
-            config,
-            "test-session".to_string(),
-        );
+        let kernel = IntegratedKernel::new(protocol, config, "test-session".to_string());
 
         assert!(kernel.is_ok());
     }
@@ -505,12 +547,8 @@ mod tests {
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
 
-        let mut kernel = IntegratedKernel::new(
-            protocol,
-            config,
-            "test-session".to_string(),
-        )
-        .unwrap();
+        let mut kernel =
+            IntegratedKernel::new(protocol, config, "test-session".to_string()).unwrap();
 
         // Set up shutdown signal
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
@@ -538,7 +576,7 @@ mod tests {
         }));
 
         // Execute code
-        let result = runtime.execute("test code").await;
+        let result = runtime.execute("test code");
         assert!(result.is_ok());
 
         // Check output was captured

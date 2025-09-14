@@ -20,30 +20,41 @@ use tracing::{debug, error, info, instrument, trace, warn};
 pub enum DebugEvent {
     /// Execution paused at breakpoint
     Paused {
+        /// Reason for pause
         reason: String,
+        /// Source file
         source: String,
+        /// Line number
         line: u32,
     },
     /// Execution resumed
     Resumed,
     /// Breakpoint hit
     BreakpointHit {
+        /// Breakpoint ID
         id: String,
+        /// Source file
         source: String,
+        /// Line number
         line: u32,
     },
     /// Variable updated
     VariableUpdated {
+        /// Variable name
         name: String,
+        /// Variable value
         value: String,
     },
     /// Output from script
     Output {
+        /// Output category
         category: String,
+        /// Output text
         output: String,
     },
     /// Debug session terminated
     Terminated {
+        /// Termination reason
         reason: Option<String>,
     },
 }
@@ -74,7 +85,7 @@ pub struct DebugCoordinator {
     /// Active debug sessions
     sessions: Arc<RwLock<HashMap<String, DebugSessionInfo>>>,
     /// Session ID
-    session_id: String,
+    _session_id: String,
     /// Debug enabled flag
     debug_enabled: Arc<RwLock<bool>>,
 }
@@ -85,11 +96,11 @@ struct DebugSessionInfo {
     /// Session ID
     id: String,
     /// Script path
-    script_path: String,
+    _script_path: String,
     /// Active status
     active: bool,
     /// Start time
-    started_at: std::time::Instant,
+    _started_at: std::time::Instant,
 }
 
 impl DebugCoordinator {
@@ -103,7 +114,7 @@ impl DebugCoordinator {
             event_tx,
             event_rx: Arc::new(RwLock::new(Some(event_rx))),
             sessions: Arc::new(RwLock::new(HashMap::new())),
-            session_id,
+            _session_id: session_id,
             debug_enabled: Arc::new(RwLock::new(true)),
         }
     }
@@ -111,7 +122,10 @@ impl DebugCoordinator {
     /// Enable or disable debugging
     pub fn set_debug_enabled(&self, enabled: bool) {
         *self.debug_enabled.write() = enabled;
-        info!("Debug mode {}", if enabled { "enabled" } else { "disabled" });
+        info!(
+            "Debug mode {}",
+            if enabled { "enabled" } else { "disabled" }
+        );
     }
 
     /// Check if debugging is enabled
@@ -120,28 +134,36 @@ impl DebugCoordinator {
     }
 
     /// Start a debug session
+    ///
+    /// # Errors
+    /// Returns an error if session creation fails
     #[instrument(level = "info", skip(self))]
-    pub fn start_session(&self, script_path: String) -> Result<String> {
+    pub fn start_session(&self, script_path: &str) -> Result<String> {
         let session_info = DebugSessionInfo {
             id: uuid::Uuid::new_v4().to_string(),
-            script_path: script_path.clone(),
+            _script_path: script_path.to_string(),
             active: true,
-            started_at: std::time::Instant::now(),
+            _started_at: std::time::Instant::now(),
         };
 
         let session_id = session_info.id.clone();
-        self.sessions.write().insert(session_id.clone(), session_info);
+        self.sessions
+            .write()
+            .insert(session_id.clone(), session_info);
 
         info!("Started debug session {} for {}", session_id, script_path);
         Ok(session_id)
     }
 
     /// End a debug session
+    ///
+    /// # Errors
+    /// Returns an error if session termination fails
     pub fn end_session(&self, session_id: &str) -> Result<()> {
         if let Some(session) = self.sessions.write().get_mut(session_id) {
             session.active = false;
             debug!("Ended debug session {}", session_id);
-            
+
             // Send termination event
             let _ = self.event_tx.try_send(DebugEvent::Terminated {
                 reason: Some("Session ended".to_string()),
@@ -151,7 +173,10 @@ impl DebugCoordinator {
     }
 
     /// Set a breakpoint
-    pub async fn set_breakpoint(&self, source: String, line: u32) -> Result<DebugResponse> {
+    ///
+    /// # Errors
+    /// Returns an error if breakpoint cannot be set
+    pub fn set_breakpoint(&self, source: String, line: u32) -> Result<DebugResponse> {
         match self.execution_manager.set_breakpoint(source, line) {
             Ok(bp) => {
                 debug!("Breakpoint set: {}:{}", bp.source, bp.line);
@@ -165,7 +190,10 @@ impl DebugCoordinator {
     }
 
     /// Remove a breakpoint
-    pub async fn remove_breakpoint(&self, id: &str) -> Result<DebugResponse> {
+    ///
+    /// # Errors
+    /// Returns an error if breakpoint cannot be removed
+    pub fn remove_breakpoint(&self, id: &str) -> Result<DebugResponse> {
         match self.execution_manager.remove_breakpoint(id) {
             Ok(()) => {
                 debug!("Breakpoint removed: {}", id);
@@ -179,67 +207,95 @@ impl DebugCoordinator {
     }
 
     /// Continue execution
+    ///
+    /// # Errors
+    /// Returns an error if execution cannot continue
     pub async fn continue_execution(&self) -> Result<DebugResponse> {
         self.execution_manager.resume(StepMode::Continue);
-        
+
         let _ = self.event_tx.send(DebugEvent::Resumed).await;
         trace!("Continuing execution");
-        
+
         Ok(DebugResponse::Success)
     }
 
     /// Step into
+    ///
+    /// # Errors
+    /// Returns an error if step operation fails
     pub async fn step_into(&self) -> Result<DebugResponse> {
         self.execution_manager.resume(StepMode::StepIn);
-        
+
         let _ = self.event_tx.send(DebugEvent::Resumed).await;
         trace!("Stepping into");
-        
+
         Ok(DebugResponse::Success)
     }
 
     /// Step over
+    ///
+    /// # Errors
+    /// Returns an error if step operation fails
     pub async fn step_over(&self) -> Result<DebugResponse> {
         self.execution_manager.resume(StepMode::StepOver);
-        
+
         let _ = self.event_tx.send(DebugEvent::Resumed).await;
         trace!("Stepping over");
-        
+
         Ok(DebugResponse::Success)
     }
 
     /// Step out
+    ///
+    /// # Errors
+    /// Returns an error if step operation fails
     pub async fn step_out(&self) -> Result<DebugResponse> {
         self.execution_manager.resume(StepMode::StepOut);
-        
+
         let _ = self.event_tx.send(DebugEvent::Resumed).await;
         trace!("Stepping out");
-        
+
         Ok(DebugResponse::Success)
     }
 
     /// Pause execution
+    ///
+    /// # Errors
+    /// Returns an error if pause operation fails
     pub async fn pause(&self) -> Result<DebugResponse> {
         self.execution_manager.pause();
-        
-        let _ = self.event_tx.send(DebugEvent::Paused {
-            reason: "Manual pause".to_string(),
-            source: "unknown".to_string(),
-            line: 0,
-        }).await;
-        
+
+        let _ = self
+            .event_tx
+            .send(DebugEvent::Paused {
+                reason: "Manual pause".to_string(),
+                source: "unknown".to_string(),
+                line: 0,
+            })
+            .await;
+
         trace!("Paused execution");
         Ok(DebugResponse::Success)
     }
 
     /// Get variables
-    pub async fn get_variables(&self, scope: VariableScope, frame_id: Option<&str>) -> Result<DebugResponse> {
+    ///
+    /// # Errors
+    /// Returns an error if variables cannot be retrieved
+    pub fn get_variables(
+        &self,
+        scope: &VariableScope,
+        frame_id: Option<&str>,
+    ) -> Result<DebugResponse> {
         let variables = self.execution_manager.get_variables(scope, frame_id);
         Ok(DebugResponse::Variables(variables))
     }
 
     /// Get stack frames
-    pub async fn get_stack_frames(&self) -> Result<DebugResponse> {
+    ///
+    /// # Errors
+    /// Returns an error if stack frames cannot be retrieved
+    pub fn get_stack_frames(&self) -> Result<DebugResponse> {
         let frames = self.execution_manager.get_stack_frames();
         Ok(DebugResponse::StackFrames(frames))
     }
@@ -249,11 +305,14 @@ impl DebugCoordinator {
         self.execution_manager.pause();
 
         let source_clone = source.clone();
-        let _ = self.event_tx.send(DebugEvent::Paused {
-            reason: "Breakpoint hit".to_string(),
-            source,
-            line,
-        }).await;
+        let _ = self
+            .event_tx
+            .send(DebugEvent::Paused {
+                reason: "Breakpoint hit".to_string(),
+                source,
+                line,
+            })
+            .await;
 
         debug!("Breakpoint hit at {}:{}", source_clone, line);
     }
@@ -338,13 +397,15 @@ mod tests {
     #[tokio::test]
     async fn test_debug_coordinator() {
         let coordinator = DebugCoordinator::new("test-session".to_string());
-        
+
         // Start session
-        let session_id = coordinator.start_session("test.lua".to_string()).unwrap();
+        let session_id = coordinator.start_session("test.lua").unwrap();
         assert!(!session_id.is_empty());
-        
+
         // Set breakpoint
-        let response = coordinator.set_breakpoint("test.lua".to_string(), 10).await.unwrap();
+        let response = coordinator
+            .set_breakpoint("test.lua".to_string(), 10)
+            .unwrap();
         match response {
             DebugResponse::Breakpoints(bps) => {
                 assert_eq!(bps.len(), 1);
@@ -352,22 +413,22 @@ mod tests {
             }
             _ => panic!("Expected breakpoints response"),
         }
-        
+
         // Continue execution
         let response = coordinator.continue_execution().await.unwrap();
         assert!(matches!(response, DebugResponse::Success));
-        
+
         // End session
         coordinator.end_session(&session_id).unwrap();
     }
 
     #[tokio::test]
     async fn test_memory_aware_coordinator() {
-        let mut coordinator = MemoryAwareDebugCoordinator::new("test-session".to_string());
-        
+        let coordinator = MemoryAwareDebugCoordinator::new("test-session".to_string());
+
         // Track operation without memory bridge
         coordinator.track_operation("test_op", Some(1024));
-        
+
         // Should work without memory bridge
         assert!(coordinator.memory_bridge.is_none());
     }

@@ -8,4 +8,4 @@ pub mod protocol;
 pub mod transport;
 
 pub use protocol::Protocol;
-pub use transport::{ChannelConfig, Transport, TransportConfig, create_transport};
+pub use transport::{create_transport, ChannelConfig, Transport, TransportConfig};

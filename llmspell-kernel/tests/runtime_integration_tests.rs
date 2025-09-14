@@ -46,9 +46,7 @@ fn test_create_io_bound_resource_basic() {
 #[test]
 fn test_long_running_resource_survival() {
     // Create a resource that simulates an HTTP client
-    let resource = create_io_bound_resource(|| {
-        Arc::new(MockHttpClient::new())
-    });
+    let resource = create_io_bound_resource(|| Arc::new(MockHttpClient::new()));
 
     // Clone for use in async task
     let resource_clone = resource.clone();
@@ -78,9 +76,7 @@ fn test_sixty_second_operation() {
     let start = Instant::now();
 
     // Create a resource at the beginning
-    let client = create_io_bound_resource(|| {
-        Arc::new(MockHttpClient::new())
-    });
+    let client = create_io_bound_resource(|| Arc::new(MockHttpClient::new()));
 
     let client_clone = client.clone();
 
@@ -118,11 +114,7 @@ fn test_sixty_second_operation() {
 #[test]
 fn test_concurrent_long_operations() {
     let clients: Vec<_> = (0..5)
-        .map(|i| {
-            create_io_bound_resource(|| {
-                Arc::new(MockHttpClient::with_id(i))
-            })
-        })
+        .map(|i| create_io_bound_resource(move || Arc::new(MockHttpClient::with_id(i))))
         .collect();
 
     let mut handles = vec![];
