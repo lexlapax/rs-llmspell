@@ -10,6 +10,38 @@ use llmspell_core::{
 use rig::{completion::CompletionModel, providers};
 use serde_json::json;
 use std::collections::HashMap;
+use std::sync::{Arc, OnceLock};
+use tokio::runtime::Runtime;
+use tracing::debug;
+
+/// Global IO runtime that persists for the entire process lifecycle
+/// This prevents "dispatch task is gone" errors when kernel tasks complete
+static SHARED_IO_RUNTIME: OnceLock<Arc<Runtime>> = OnceLock::new();
+
+/// Get or create the shared IO runtime for HTTP clients and other I/O operations
+fn get_shared_io_runtime() -> &'static Arc<Runtime> {
+    SHARED_IO_RUNTIME.get_or_init(|| {
+        debug!("🌐 Initializing SHARED_IO_RUNTIME for HTTP clients");
+        Arc::new(Runtime::new().expect("Failed to create shared IO runtime"))
+    })
+}
+
+/// Create a client, handling both sync and async contexts
+fn create_client_safe<F, T>(creator: F) -> T
+where
+    F: FnOnce() -> T,
+    T: Send + 'static,
+{
+    // Try to get the current runtime handle - if we're in an async context
+    if let Ok(_handle) = tokio::runtime::Handle::try_current() {
+        // We're already in a runtime, just create the client directly
+        creator()
+    } else {
+        // We're not in a runtime, use the shared runtime
+        let runtime = get_shared_io_runtime();
+        runtime.block_on(async { creator() })
+    }
+}
 
 /// Enum to hold different provider models
 enum RigModel {
@@ -41,8 +73,16 @@ impl RigProvider {
                             source: None,
                         })?;
 
-                let client = providers::openai::Client::new(api_key);
+                debug!(
+                    "🔥 CREATING NEW OPENAI HTTP CLIENT for provider: {} (using safe runtime context)",
+                    config.name
+                );
+                let client = create_client_safe(|| providers::openai::Client::new(api_key));
                 let model = client.completion_model(&config.model);
+                debug!(
+                    "✅ OpenAI HTTP client created for provider: {} model: {} (runtime safe)",
+                    config.name, config.model
+                );
                 RigModel::OpenAI(model)
             }
             "anthropic" => {
@@ -62,8 +102,15 @@ impl RigProvider {
                     .unwrap_or("https://api.anthropic.com");
                 let version = "2023-06-01"; // Default API version
 
-                let client = providers::anthropic::Client::new(api_key, base_url, None, version);
+                debug!("🔥 CREATING NEW ANTHROPIC HTTP CLIENT for provider: {} (using safe runtime context)", config.name);
+                let client = create_client_safe(|| {
+                    providers::anthropic::Client::new(api_key, base_url, None, version)
+                });
                 let model = client.completion_model(&config.model);
+                debug!(
+                    "✅ Anthropic HTTP client created for provider: {} model: {} (runtime safe)",
+                    config.name, config.model
+                );
                 RigModel::Anthropic(model)
             }
             "cohere" => {
@@ -76,8 +123,16 @@ impl RigProvider {
                             source: None,
                         })?;
 
-                let client = providers::cohere::Client::new(api_key);
+                debug!(
+                    "🔥 CREATING NEW COHERE HTTP CLIENT for provider: {} (using safe runtime context)",
+                    config.name
+                );
+                let client = create_client_safe(|| providers::cohere::Client::new(api_key));
                 let model = client.completion_model(&config.model);
+                debug!(
+                    "✅ Cohere HTTP client created for provider: {} model: {} (runtime safe)",
+                    config.name, config.model
+                );
                 RigModel::Cohere(model)
             }
             _ => {
@@ -130,27 +185,42 @@ impl RigProvider {
     }
 
     async fn execute_completion(&self, prompt: String) -> Result<String, LLMSpellError> {
+        debug!(
+            "⚡ HTTP_REQUEST: About to send HTTP request to provider '{}' model '{}'",
+            self.config.provider_type, self.config.model
+        );
         match &self.model {
-            RigModel::OpenAI(model) => model
-                .completion_request(&prompt)
-                .max_tokens(self.max_tokens)
-                .send()
-                .await
-                .map_err(|e| LLMSpellError::Provider {
-                    message: format!("OpenAI completion failed: {}", e),
-                    provider: Some(self.config.name.clone()),
-                    source: None,
-                })
-                .and_then(|response| match response.choice {
-                    rig::completion::ModelChoice::Message(text) => Ok(text),
-                    rig::completion::ModelChoice::ToolCall(name, _params) => {
-                        Err(LLMSpellError::Provider {
-                            message: format!("Unexpected tool call response: {}", name),
-                            provider: Some(self.config.name.clone()),
-                            source: None,
-                        })
-                    }
-                }),
+            RigModel::OpenAI(model) => {
+                debug!(
+                    "⚡ OPENAI_REQUEST: Sending completion request for model '{}'",
+                    self.config.model
+                );
+                let result = model
+                    .completion_request(&prompt)
+                    .max_tokens(self.max_tokens)
+                    .send()
+                    .await;
+                debug!(
+                    "⚡ OPENAI_RESPONSE: Request completed with result: {:?}",
+                    result.is_ok()
+                );
+                result
+                    .map_err(|e| LLMSpellError::Provider {
+                        message: format!("OpenAI completion failed: {}", e),
+                        provider: Some(self.config.name.clone()),
+                        source: None,
+                    })
+                    .and_then(|response| match response.choice {
+                        rig::completion::ModelChoice::Message(text) => Ok(text),
+                        rig::completion::ModelChoice::ToolCall(name, _params) => {
+                            Err(LLMSpellError::Provider {
+                                message: format!("Unexpected tool call response: {}", name),
+                                provider: Some(self.config.name.clone()),
+                                source: None,
+                            })
+                        }
+                    })
+            }
             RigModel::Anthropic(model) => model
                 .completion_request(&prompt)
                 .max_tokens(self.max_tokens)

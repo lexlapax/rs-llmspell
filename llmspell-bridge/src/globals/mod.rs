@@ -67,7 +67,7 @@ fn register_session_artifacts(
 }
 
 /// Register RAG global if all dependencies are available
-async fn register_rag_global(
+fn register_rag_global(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
     session_manager_opt: Option<Arc<llmspell_sessions::manager::SessionManager>>,
@@ -91,9 +91,7 @@ async fn register_rag_global(
             session_manager,
             multi_tenant_rag,
             vector_storage,
-        )
-        .await
-        {
+        ) {
             Ok(rag_global) => {
                 builder.register(Arc::new(rag_global));
             }
@@ -122,7 +120,7 @@ fn register_hook_and_tools(
 }
 
 /// Register agent and workflow globals
-async fn register_agent_workflow(
+fn register_agent_workflow(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
 ) -> Result<()> {
@@ -134,10 +132,9 @@ async fn register_agent_workflow(
             context.registry.clone(),
             context.providers.clone(),
             state_manager,
-        )
-        .await?
+        )?
     } else {
-        agent_global::AgentGlobal::new(context.registry.clone(), context.providers.clone()).await?
+        agent_global::AgentGlobal::new(context.registry.clone(), context.providers.clone())?
     };
     builder.register(Arc::new(agent_global));
 
@@ -232,13 +229,13 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     let session_manager_opt = register_session_artifacts(&mut builder, &context);
 
     // Register RAG global if dependencies available
-    register_rag_global(&mut builder, &context, session_manager_opt).await;
+    register_rag_global(&mut builder, &context, session_manager_opt);
 
     // Register hook and tool globals
     register_hook_and_tools(&mut builder, &context)?;
 
     // Register agent and workflow globals
-    register_agent_workflow(&mut builder, &context).await?;
+    register_agent_workflow(&mut builder, &context)?;
 
     builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 

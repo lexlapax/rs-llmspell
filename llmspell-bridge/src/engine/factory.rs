@@ -12,6 +12,7 @@ type EngineWithManagers = (
     Box<dyn ScriptEngineBridge>,
     Arc<llmspell_state_persistence::manager::StateManager>,
     Arc<llmspell_sessions::SessionManager>,
+    Arc<crate::ProviderManager>,
 );
 
 /// Factory for creating script engines
@@ -67,6 +68,7 @@ impl EngineFactory {
         runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
         state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
         session_manager: Arc<llmspell_sessions::SessionManager>,
+        provider_manager: Arc<crate::ProviderManager>,
     ) -> Result<EngineWithManagers, LLMSpellError> {
         #[cfg(feature = "lua")]
         {
@@ -75,11 +77,17 @@ impl EngineFactory {
                 config,
                 state_manager.clone(),
                 session_manager.clone(),
+                provider_manager.clone(),
             )?;
             if let Some(rc) = runtime_config {
                 engine.set_runtime_config(rc);
             }
-            Ok((Box::new(engine), state_manager, session_manager))
+            Ok((
+                Box::new(engine),
+                state_manager,
+                session_manager,
+                provider_manager,
+            ))
         }
         #[cfg(not(feature = "lua"))]
         {
@@ -118,6 +126,12 @@ impl EngineFactory {
         }
     }
 
+    /// Create a Lua engine with managers created from config
+    /// Returns the engine along with Arc references to all created managers
+    ///
+    /// # Errors
+    /// Returns an error if the engine creation fails or managers cannot be created
+    ///
     /// Create a JavaScript engine with the given configuration
     ///
     /// # Errors
@@ -154,6 +168,7 @@ impl EngineFactory {
         runtime_config: Option<&Arc<llmspell_config::LLMSpellConfig>>,
         state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
         session_manager: Arc<llmspell_sessions::SessionManager>,
+        provider_manager: Arc<crate::ProviderManager>,
     ) -> Result<EngineWithManagers, LLMSpellError> {
         #[cfg(feature = "javascript")]
         {
@@ -161,7 +176,12 @@ impl EngineFactory {
             // JavaScript engine doesn't use external managers yet
             // but we return them for API consistency
             let engine = JSEngine::new(config)?;
-            Ok((Box::new(engine), state_manager, session_manager))
+            Ok((
+                Box::new(engine),
+                state_manager,
+                session_manager,
+                provider_manager,
+            ))
         }
         #[cfg(not(feature = "javascript"))]
         {

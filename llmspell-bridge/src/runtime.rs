@@ -219,12 +219,22 @@ impl ScriptRuntime {
                 // Create SessionManager using the provided StateManager
                 let session_manager = Self::create_session_manager(&config, state_manager.clone())?;
 
+                // Create shared ProviderManager (shares HTTP clients)
+                let provider_manager =
+                    Arc::new(ProviderManager::new(config.providers.clone()).await?);
+
                 let lua_config = LuaConfig::default();
-                let (engine, _, _) = EngineFactory::create_lua_engine_with_managers(
+                let (
+                    engine,
+                    _state_manager_shared,
+                    _session_manager_shared,
+                    _provider_manager_shared,
+                ) = EngineFactory::create_lua_engine_with_managers(
                     &lua_config,
                     Some(Arc::new(config.clone())),
                     state_manager,
                     session_manager,
+                    provider_manager,
                 )?;
                 Self::new_with_engine(engine, config).await
             }
@@ -232,6 +242,49 @@ impl ScriptRuntime {
                 // JavaScript engine doesn't support external StateManager yet
                 // Fall back to creating its own
                 Self::new_with_javascript(config).await
+            }
+            _ => Err(LLMSpellError::Validation {
+                field: Some("engine".to_string()),
+                message: format!("Unsupported engine: {engine_name}. Available: lua, javascript"),
+            }),
+        }
+    }
+
+    /// Create runtime with both `StateManager` and `ProviderManager`
+    ///
+    /// This method accepts both a `StateManager` and a `ProviderManager` created externally.
+    /// Used to avoid HTTP client context issues in spawned tasks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine creation fails or if session manager creation fails
+    pub async fn new_with_managers(
+        engine_name: &str,
+        config: LLMSpellConfig,
+        state_manager: Arc<StateManager>,
+        provider_manager: Arc<ProviderManager>,
+    ) -> Result<Self, LLMSpellError> {
+        match engine_name {
+            "lua" => {
+                // Create SessionManager using the provided StateManager
+                let session_manager = Self::create_session_manager(&config, state_manager.clone())?;
+
+                let lua_config = LuaConfig::default();
+                let (engine, _, _, _) = EngineFactory::create_lua_engine_with_managers(
+                    &lua_config,
+                    Some(Arc::new(config.clone())),
+                    state_manager,
+                    session_manager,
+                    provider_manager.clone(),
+                )?;
+                Self::new_with_engine_and_provider_manager(engine, config, provider_manager).await
+            }
+            "javascript" | "js" => {
+                // JavaScript engine doesn't support external StateManager yet
+                // Fall back to creating its own, but still use provided ProviderManager
+                let js_config = JSConfig::default();
+                let engine = EngineFactory::create_javascript_engine(&js_config)?;
+                Self::new_with_engine_and_provider_manager(engine, config, provider_manager).await
             }
             _ => Err(LLMSpellError::Validation {
                 field: Some("engine".to_string()),
@@ -468,6 +521,86 @@ impl ScriptRuntime {
         }
     }
 
+    /// Core initialization with any engine and provided `ProviderManager`
+    async fn new_with_engine_and_provider_manager(
+        mut engine: Box<dyn ScriptEngineBridge>,
+        config: LLMSpellConfig,
+        provider_manager: Arc<ProviderManager>,
+    ) -> Result<Self, LLMSpellError> {
+        // Create component registry with event support based on config
+        let registry = if config.events.enabled {
+            // Create EventBus with default configuration
+            // Note: Buffer size is hardcoded to 10000 in EventBus implementation
+            let event_bus = Arc::new(llmspell_events::EventBus::new());
+
+            // Convert config to EventConfig for llmspell-core
+            let event_config = llmspell_core::traits::event::EventConfig {
+                enabled: config.events.enabled,
+                include_types: config.events.filtering.include_types.clone(),
+                exclude_types: config.events.filtering.exclude_types.clone(),
+                emit_timing_events: config.events.emit_timing_events,
+                emit_state_events: config.events.emit_state_events,
+                emit_debug_events: config.events.emit_debug_events,
+                max_events_per_second: config.events.max_events_per_second,
+            };
+
+            Arc::new(ComponentRegistry::with_event_bus(event_bus, event_config))
+        } else {
+            // Events disabled, create registry without event bus
+            Arc::new(ComponentRegistry::new())
+        };
+
+        // Register all Phase 2 tools with the registry using configuration
+        register_all_tools(&registry, &config.tools).map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to register tools: {e}"),
+            source: None,
+        })?;
+
+        // Use provided ProviderManager instead of creating new one
+
+        // Inject APIs into the engine
+        engine.inject_apis(&registry, &provider_manager)?;
+
+        // Create execution context
+        let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
+            working_directory: std::env::current_dir()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string(),
+            environment: std::env::vars().collect(),
+            state: serde_json::Value::Object(serde_json::Map::new()),
+            security: crate::engine::SecurityContext {
+                allow_file_access: config.runtime.security.allow_file_access,
+                allow_network_access: config.runtime.security.allow_network_access,
+                allow_process_spawn: config.runtime.security.allow_process_spawn,
+                max_memory_bytes: config.runtime.security.max_memory_bytes,
+                max_execution_time_ms: config.runtime.security.max_execution_time_ms,
+            },
+        }));
+
+        // Initialize debug infrastructure if enabled
+        let (execution_manager, debug_coordinator, diagnostics_bridge, shared_execution_context) =
+            Self::init_debug_infrastructure(&config, &mut engine).await;
+
+        // Get managers from the engine if available
+        let session_manager = engine.get_session_manager();
+        let state_manager = engine.get_state_manager();
+
+        Ok(Self {
+            engine,
+            registry,
+            provider_manager,
+            execution_context,
+            _config: config,
+            execution_manager,
+            debug_coordinator,
+            _diagnostics_bridge: diagnostics_bridge,
+            _shared_execution_context: shared_execution_context,
+            session_manager,
+            state_manager,
+        })
+    }
+
     /// Core initialization with any engine
     async fn new_with_engine(
         mut engine: Box<dyn ScriptEngineBridge>,
@@ -502,8 +635,15 @@ impl ScriptRuntime {
             source: None,
         })?;
 
-        // Create provider manager using config from llmspell-config
-        let provider_manager = Arc::new(ProviderManager::new(config.providers.clone()).await?);
+        // Use shared provider manager from engine if available, otherwise create new one
+        let provider_manager = match engine.get_provider_manager() {
+            Some(shared_manager) => shared_manager,
+            None => {
+                // Engine doesn't have shared ProviderManager, create a new one
+                // This happens for JavaScript engines or legacy engine creation paths
+                Arc::new(ProviderManager::new(config.providers.clone()).await?)
+            }
+        };
 
         // Inject APIs into the engine
         engine.inject_apis(&registry, &provider_manager)?;

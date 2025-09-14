@@ -267,13 +267,29 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         Arc<SessionMapper>,
         Arc<CommManager>,
     )> {
+        Box::pin(Self::initialize_kernel_components_with_provider_manager(
+            config, None,
+        ))
+        .await
+    }
+
+    async fn initialize_kernel_components_with_provider_manager(
+        config: &Arc<LLMSpellConfig>,
+        provider_manager: Option<Arc<llmspell_bridge::ProviderManager>>,
+    ) -> Result<(
+        Option<Arc<StateManager>>,
+        ScriptRuntime,
+        Arc<SessionMapper>,
+        Arc<CommManager>,
+    )> {
         // Create shared StateManager from config
         let state_manager = StateFactory::create_from_config(config)
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create state manager: {}", e))?;
 
-        // Create script runtime
-        let runtime = Self::create_runtime(config, state_manager.as_ref()).await?;
+        // Create script runtime with optional provider manager
+        let runtime =
+            Self::create_runtime(config, state_manager.as_ref(), provider_manager.as_ref()).await?;
 
         // Create session mapper
         let session_mapper = Arc::new(if let Some(ref sm) = state_manager {
@@ -288,19 +304,33 @@ impl<T: Transport, P: Protocol> GenericKernel<T, P> {
         Ok((state_manager, runtime, session_mapper, comm_manager))
     }
 
-    /// Create script runtime with optional state manager
+    /// Create script runtime with optional state manager and provider manager
     async fn create_runtime(
         config: &Arc<LLMSpellConfig>,
         state_manager: Option<&Arc<StateManager>>,
+        provider_manager: Option<&Arc<llmspell_bridge::ProviderManager>>,
     ) -> Result<ScriptRuntime> {
         if let Some(sm) = state_manager {
-            ScriptRuntime::new_with_engine_and_state_manager(
-                &config.default_engine,
-                (**config).clone(),
-                sm.clone(),
-            )
-            .await
-            .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))
+            if let Some(pm) = provider_manager {
+                // Both StateManager and ProviderManager provided
+                ScriptRuntime::new_with_managers(
+                    &config.default_engine,
+                    (**config).clone(),
+                    sm.clone(),
+                    pm.clone(),
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))
+            } else {
+                // Only StateManager provided
+                ScriptRuntime::new_with_engine_and_state_manager(
+                    &config.default_engine,
+                    (**config).clone(),
+                    sm.clone(),
+                )
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to create script runtime: {}", e))
+            }
         } else {
             ScriptRuntime::new_with_engine_name(&config.default_engine, (**config).clone())
                 .await
@@ -2088,5 +2118,86 @@ impl GenericKernel<ZmqTransport, JupyterProtocol> {
 
         // Create kernel using the generic constructor
         Box::pin(Self::new(kernel_id, config, transport, protocol)).await
+    }
+
+    /// Create kernel with provided `ProviderManager`
+    ///
+    /// This method allows injecting a `ProviderManager` that was created in the main thread,
+    /// avoiding HTTP client context issues when the kernel runs in a `tokio::spawn` task.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if kernel creation fails.
+    pub async fn new_with_provider_manager(
+        kernel_id: String,
+        config: Arc<LLMSpellConfig>,
+        mut transport: ZmqTransport,
+        protocol: JupyterProtocol,
+        provider_manager: Option<Arc<llmspell_bridge::ProviderManager>>,
+    ) -> Result<Self> {
+        let kernel_id = if kernel_id.is_empty() {
+            Uuid::new_v4().to_string()
+        } else {
+            kernel_id
+        };
+
+        tracing::info!(
+            "Starting kernel {} with {} protocol and engine {} (with ProviderManager: {})",
+            kernel_id,
+            protocol.name(),
+            config.default_engine,
+            provider_manager.is_some()
+        );
+
+        // Initialize kernel components with ProviderManager
+        let (state_manager, runtime, session_mapper, comm_manager) = Box::pin(
+            Self::initialize_kernel_components_with_provider_manager(&config, provider_manager),
+        )
+        .await?;
+
+        // Setup transport and security
+        let security_manager =
+            Self::setup_transport_and_security(&mut transport, &protocol, &config).await?;
+
+        tracing::info!(
+            "Kernel {} bound to {} channels",
+            kernel_id,
+            transport.channels().len()
+        );
+
+        // Create client manager
+        let client_manager = Arc::new(ClientManager::new(config.runtime.kernel.max_clients));
+
+        // Get managers from runtime
+        let session_manager = runtime.get_session_manager();
+        let runtime_state_manager = runtime.get_state_manager();
+
+        // Use runtime's state manager if available, otherwise use kernel's
+        let final_state_manager = runtime_state_manager.or(state_manager);
+
+        // Create RAG pipeline
+        let rag_pipeline = Self::create_rag_pipeline(&config, final_state_manager.as_ref())?;
+
+        tracing::trace!("Kernel constructor complete, returning kernel instance");
+        Ok(Self {
+            kernel_id,
+            transport,
+            protocol,
+            runtime: Arc::new(Mutex::new(runtime)),
+            client_manager,
+            execution_state: Arc::new(RwLock::new(KernelState::Starting)),
+            config,
+            state_manager: final_state_manager,
+            session_manager,
+            rag_pipeline,
+            security_manager,
+            resource_limits: ClientResourceLimits::default(),
+            execution_count: Arc::new(Mutex::new(0)),
+            session_mapper,
+            comm_manager,
+            shutdown_tx: None,
+            signal_handler: Arc::new(KernelSignalHandler::new()),
+            current_request_message: Arc::new(RwLock::new(None)),
+        })
     }
 }

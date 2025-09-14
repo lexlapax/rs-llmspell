@@ -76,6 +76,28 @@ impl UnifiedKernelClient {
         connection_info.pid = Some(std::process::id());
         connection_info.started_at = Some(chrono::Utc::now());
 
+        // Create ProviderManager in main thread to ensure proper runtime context
+        // This follows the same pattern as StateManager and SessionManager
+        // Always create it to avoid HTTP client context issues in spawned tasks
+        tracing::debug!("Creating ProviderManager in main thread for embedded kernel");
+        let provider_manager = Some(Arc::new(
+            llmspell_bridge::ProviderManager::new(config.providers.clone())
+                .await
+                .context("Failed to create ProviderManager")?,
+        ));
+
+        // CRITICAL FIX: Pre-warm HTTP clients in main runtime context
+        // Force creation of a test provider to ensure HTTP clients are created with correct runtime
+        if let Some(ref pm) = provider_manager {
+            tracing::debug!("Pre-warming HTTP clients in main thread runtime context");
+            let spec = llmspell_providers::ModelSpecifier::parse("openai/gpt-3.5-turbo").unwrap();
+            if let Ok(_provider) = pm.create_agent_from_spec(spec, None, None).await {
+                tracing::debug!("✅ HTTP clients pre-warmed successfully");
+            } else {
+                tracing::warn!("Failed to pre-warm HTTP clients - will create lazily");
+            }
+        }
+
         // Create shutdown channel
         let (shutdown_tx, shutdown_rx) = oneshot::channel();
 
@@ -83,6 +105,7 @@ impl UnifiedKernelClient {
         let thread_kernel_id = kernel_id.clone();
         let thread_config = config.clone();
         let thread_conn_info = connection_info.clone();
+        let thread_provider_manager = provider_manager.clone();
 
         // Spawn kernel in background
         let kernel_thread = tokio::spawn(async move {
@@ -96,10 +119,15 @@ impl UnifiedKernelClient {
             let transport = ZmqTransport::new()?;
             let protocol = JupyterProtocol::new(thread_conn_info.clone());
 
-            // Create and run kernel
-            let mut kernel =
-                JupyterKernel::new(thread_kernel_id.clone(), thread_config, transport, protocol)
-                    .await?;
+            // Create kernel with optional ProviderManager
+            let mut kernel = JupyterKernel::new_with_provider_manager(
+                thread_kernel_id.clone(),
+                thread_config,
+                transport,
+                protocol,
+                thread_provider_manager,
+            )
+            .await?;
 
             tracing::trace!("Kernel created, starting serve loop");
 

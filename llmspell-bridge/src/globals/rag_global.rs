@@ -26,7 +26,7 @@ impl RAGGlobal {
     /// # Errors
     ///
     /// Returns an error if dependencies are not available
-    pub async fn new(
+    pub fn new(
         registry: Arc<ComponentRegistry>,
         providers: Arc<ProviderManager>,
         state_manager: Arc<StateManager>,
@@ -34,8 +34,8 @@ impl RAGGlobal {
         multi_tenant_rag: Arc<MultiTenantRAG>,
         vector_storage: Option<Arc<dyn VectorStorage>>,
     ) -> Result<Self> {
-        // Create provider manager for RAG operations
-        let core_providers = providers.create_core_manager_arc().await?;
+        // Use shared core provider manager (shares HTTP clients)
+        let core_providers = providers.core_manager_arc()?;
 
         let bridge = Arc::new(RAGBridge::new(
             state_manager,
@@ -57,7 +57,7 @@ impl RAGGlobal {
     /// # Errors
     ///
     /// Returns an error if dependencies are not available
-    pub async fn with_managers(
+    pub fn with_managers(
         registry: Arc<ComponentRegistry>,
         providers: Arc<ProviderManager>,
         state_manager: Arc<StateManager>,
@@ -65,7 +65,8 @@ impl RAGGlobal {
         multi_tenant_rag: Arc<MultiTenantRAG>,
         vector_storage: Option<Arc<dyn VectorStorage>>,
     ) -> Result<Self> {
-        let core_providers = providers.create_core_manager_arc().await?;
+        // Use shared core provider manager (shares HTTP clients)
+        let core_providers = providers.core_manager_arc()?;
 
         let bridge = Arc::new(RAGBridge::new(
             state_manager,

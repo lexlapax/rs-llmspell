@@ -1,6 +1,6 @@
-use std::time::Instant;
-use std::sync::Arc;
 use llmspell_state_persistence::{StateManager, StateScope};
+use std::sync::Arc;
+use std::time::Instant;
 
 #[tokio::test]
 async fn test_manager_access_under_1ms() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,7 +32,14 @@ async fn test_manager_access_under_1ms() -> Result<(), Box<dyn std::error::Error
     println!("StateManager.get():");
     println!("  Average: {:.3} ms", avg_get);
     println!("  Max: {:.3} ms", max_get);
-    println!("  Status: {}", if avg_get < 1.0 { "✅ PASS (<1ms)" } else { "❌ FAIL (>=1ms)" });
+    println!(
+        "  Status: {}",
+        if avg_get < 1.0 {
+            "✅ PASS (<1ms)"
+        } else {
+            "❌ FAIL (>=1ms)"
+        }
+    );
 
     // Test 2: StateManager.set() operations
     let mut set_times = Vec::new();
@@ -51,7 +58,14 @@ async fn test_manager_access_under_1ms() -> Result<(), Box<dyn std::error::Error
     println!("\nStateManager.set():");
     println!("  Average: {:.3} ms", avg_set);
     println!("  Max: {:.3} ms", max_set);
-    println!("  Status: {}", if avg_set < 1.0 { "✅ PASS (<1ms)" } else { "❌ FAIL (>=1ms)" });
+    println!(
+        "  Status: {}",
+        if avg_set < 1.0 {
+            "✅ PASS (<1ms)"
+        } else {
+            "❌ FAIL (>=1ms)"
+        }
+    );
 
     // Test 3: Arc clone overhead (should be negligible)
     let mut clone_times = Vec::new();
@@ -85,8 +99,16 @@ async fn test_manager_access_under_1ms() -> Result<(), Box<dyn std::error::Error
     }
 
     // Assert for test pass/fail
-    assert!(avg_get < 1.0, "StateManager.get() average time {:.3}ms exceeds 1ms target", avg_get);
-    assert!(avg_set < 1.0, "StateManager.set() average time {:.3}ms exceeds 1ms target", avg_set);
+    assert!(
+        avg_get < 1.0,
+        "StateManager.get() average time {:.3}ms exceeds 1ms target",
+        avg_get
+    );
+    assert!(
+        avg_set < 1.0,
+        "StateManager.set() average time {:.3}ms exceeds 1ms target",
+        avg_set
+    );
 
     // Clean up test keys
     for i in 0..1000 {

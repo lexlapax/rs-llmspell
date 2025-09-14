@@ -76,13 +76,13 @@ mod rag_lua_tests {
             Arc::new(
                 llmspell_rag::state_integration::StateAwareVectorStorage::new(
                     vector_storage,
-                    state_manager.clone(),
+                    state_manager,
                     multi_tenant_rag.clone(),
                 ),
             ),
             session_manager,
             multi_tenant_rag,
-            providers.create_core_manager_arc().await.unwrap(),
+            providers.core_manager_arc().unwrap(),
         );
 
         llmspell_bridge::lua::globals::rag::inject_rag_global(&lua, &context, Arc::new(rag_bridge))

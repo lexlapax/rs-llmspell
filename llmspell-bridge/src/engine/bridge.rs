@@ -124,6 +124,10 @@ pub trait ScriptEngineBridge: Send + Sync {
     fn get_state_manager(&self) -> Option<Arc<llmspell_state_persistence::manager::StateManager>> {
         None
     }
+    /// Get the provider manager if available
+    fn get_provider_manager(&self) -> Option<Arc<crate::ProviderManager>> {
+        None
+    }
 }
 
 /// Output from script execution

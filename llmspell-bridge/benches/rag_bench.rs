@@ -66,7 +66,7 @@ async fn setup_bridge() -> Arc<RAGBridge> {
     // Setup provider manager
     let config = ProviderManagerConfig::default();
     let providers = Arc::new(ProviderManager::new(config).await.unwrap());
-    let core_providers = providers.create_core_manager_arc().await.unwrap();
+    let core_providers = providers.core_manager_arc().unwrap();
 
     Arc::new(RAGBridge::new(
         state_manager,

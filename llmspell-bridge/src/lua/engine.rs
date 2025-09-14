@@ -46,6 +46,8 @@ pub struct LuaEngine {
     external_state_manager: Option<Arc<llmspell_state_persistence::manager::StateManager>>,
     /// External `SessionManager` for shared session access
     external_session_manager: Option<Arc<llmspell_sessions::SessionManager>>,
+    /// External `ProviderManager` for shared HTTP client context
+    external_provider_manager: Option<Arc<crate::ProviderManager>>,
     /// IO context for routing all IO operations
     _io_context: Arc<IOContext>,
 }
@@ -103,6 +105,7 @@ impl LuaEngine {
                 lua_debug_adapter: None,
                 external_state_manager: None,
                 external_session_manager: None,
+                external_provider_manager: None,
                 _io_context: io_context,
             })
         }
@@ -122,12 +125,12 @@ impl LuaEngine {
         }
     }
 
-    /// Create a new Lua engine with the given configuration and external managers
+    /// Create a new Lua engine with state and session managers
     ///
     /// # Errors
     ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
-    pub fn new_with_managers(
+    pub fn new_with_state_and_session_managers(
         config: &LuaConfig,
         state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
         session_manager: Arc<llmspell_sessions::SessionManager>,
@@ -153,6 +156,7 @@ impl LuaEngine {
                 lua_debug_adapter: None,
                 external_state_manager: Some(state_manager),
                 external_session_manager: Some(session_manager),
+                external_provider_manager: None,
                 _io_context: io_context,
             })
         }
@@ -166,6 +170,7 @@ impl LuaEngine {
                 execution_manager: None,
                 external_state_manager: Some(state_manager),
                 external_session_manager: Some(session_manager),
+                external_provider_manager: None,
                 _io_context: Arc::new(IOContext::stdio()),
             })
         }
@@ -205,6 +210,7 @@ impl LuaEngine {
                 lua_debug_adapter: None,
                 external_state_manager: Some(state_manager),
                 external_session_manager: None,
+                external_provider_manager: None,
                 _io_context: io_context,
             })
         }
@@ -219,6 +225,62 @@ impl LuaEngine {
                 execution_manager: None,
                 external_state_manager: Some(state_manager),
                 external_session_manager: None,
+                external_provider_manager: None,
+                _io_context: Arc::new(IOContext::stdio()),
+            })
+        }
+    }
+
+    /// Create a new Lua engine with state, session, and provider managers
+    ///
+    /// This provides shared state access, session management, and HTTP client context
+    /// for optimal performance in multi-agent workflows.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua feature is not enabled or engine creation fails
+    pub fn new_with_managers(
+        config: &LuaConfig,
+        state_manager: Arc<llmspell_state_persistence::manager::StateManager>,
+        session_manager: Arc<llmspell_sessions::SessionManager>,
+        provider_manager: Arc<crate::ProviderManager>,
+    ) -> Result<Self, LLMSpellError> {
+        #[cfg(feature = "lua")]
+        {
+            use mlua::Lua;
+            // Create Lua instance (async is enabled via feature flag)
+            let lua = Lua::new();
+            // Use stdio IO context by default
+            let io_context = Arc::new(IOContext::stdio());
+            // Install output capture with IO context
+            let console_capture = install_output_capture(&lua, io_context.clone(), None).ok();
+            Ok(Self {
+                lua: Arc::new(parking_lot::Mutex::new(lua)),
+                _config: config.clone(),
+                execution_context: ExecutionContext::default(),
+                runtime_config: None,
+                script_args: None,
+                console_capture,
+                execution_hook: None,
+                execution_manager: None,
+                lua_debug_adapter: None,
+                external_state_manager: Some(state_manager),
+                external_session_manager: Some(session_manager),
+                external_provider_manager: Some(provider_manager),
+                _io_context: io_context,
+            })
+        }
+        #[cfg(not(feature = "lua"))]
+        {
+            Ok(Self {
+                _config: config.clone(),
+                execution_context: ExecutionContext::default(),
+                runtime_config: None,
+                script_args: None,
+                execution_manager: None,
+                external_state_manager: Some(state_manager),
+                external_session_manager: Some(session_manager),
+                external_provider_manager: Some(provider_manager),
                 io_context: Arc::new(IOContext::stdio()),
             })
         }
@@ -433,28 +495,33 @@ impl ScriptEngineBridge for LuaEngine {
                     use crate::globals::state_global::StateGlobal;
                     use crate::globals::GlobalContext;
                     use crate::lua::globals::state::inject_state_global;
-                    use crate::{ComponentRegistry, ProviderManager};
-                    use llmspell_config::providers::ProviderManagerConfig;
+                    use crate::ComponentRegistry;
 
                     let state_global = StateGlobal::with_state_manager(state_manager.clone());
-                    // Create minimal GlobalContext for state injection
+                    // Create minimal GlobalContext for state injection using shared ProviderManager
                     let registry = Arc::new(ComponentRegistry::new());
-                    let provider_config = ProviderManagerConfig::default();
-                    let providers =
-                        futures::executor::block_on(async {
-                            Arc::new(ProviderManager::new(provider_config).await.unwrap_or_else(
-                                |e| {
-                                    tracing::warn!(
-                                        "Failed to create ProviderManager for state injection: {}",
-                                        e
-                                    );
-                                    // Create with empty config as fallback
-                                    let empty_config = ProviderManagerConfig::default();
-                                    futures::executor::block_on(ProviderManager::new(empty_config))
-                                        .unwrap()
-                                },
-                            ))
+
+                    // Only inject state if shared ProviderManager is available
+                    let providers = if let Some(shared_provider_manager) =
+                        &self.external_provider_manager
+                    {
+                        shared_provider_manager.clone()
+                    } else {
+                        tracing::warn!("No shared ProviderManager available for state injection, skipping state global injection");
+                        return Ok(ScriptOutput {
+                            output: serde_json::Value::Null,
+                            console_output: vec![],
+                            metadata: ScriptMetadata {
+                                engine: "lua".to_string(),
+                                execution_time_ms: 0,
+                                memory_usage_bytes: None,
+                                warnings: vec![
+                                    "Shared ProviderManager not available for state injection"
+                                        .to_string(),
+                                ],
+                            },
                         });
+                    };
                     let global_context = GlobalContext::new(registry, providers);
 
                     if let Err(e) = inject_state_global(&lua, &global_context, &state_global) {
@@ -918,6 +985,9 @@ impl ScriptEngineBridge for LuaEngine {
     fn get_state_manager(&self) -> Option<Arc<llmspell_state_persistence::manager::StateManager>> {
         self.external_state_manager.clone()
     }
+    fn get_provider_manager(&self) -> Option<Arc<crate::ProviderManager>> {
+        self.external_provider_manager.clone()
+    }
 }
 
 impl LuaEngine {
@@ -928,34 +998,26 @@ impl LuaEngine {
             use crate::globals::state_global::StateGlobal;
             use crate::globals::GlobalContext;
             use crate::lua::globals::state::inject_state_global;
-            use crate::{ComponentRegistry, ProviderManager};
-            use llmspell_config::providers::ProviderManagerConfig;
+            use crate::ComponentRegistry;
 
             let state_global = StateGlobal::with_state_manager(state_manager.clone());
-            // Create minimal GlobalContext for state injection
+            // Create minimal GlobalContext for state injection using shared ProviderManager
             let registry = Arc::new(ComponentRegistry::new());
-            let provider_config = ProviderManagerConfig::default();
-            let providers = futures::executor::block_on(async {
-                Arc::new(
-                    ProviderManager::new(provider_config)
-                        .await
-                        .unwrap_or_else(|e| {
-                            tracing::warn!(
-                                "Failed to create ProviderManager for state injection: {}",
-                                e
-                            );
-                            // Create with empty config as fallback
-                            let empty_config = ProviderManagerConfig::default();
-                            futures::executor::block_on(ProviderManager::new(empty_config)).unwrap()
-                        }),
-                )
-            });
-            let global_context = GlobalContext::new(registry, providers);
 
-            if let Err(e) = inject_state_global(lua, &global_context, &state_global) {
-                tracing::warn!("Failed to inject state global in streaming: {}", e);
+            // Only inject state if shared ProviderManager is available
+            if let Some(ref shared_provider_manager) = self.external_provider_manager {
+                let providers = shared_provider_manager.clone();
+                let global_context = GlobalContext::new(registry, providers);
+
+                if let Err(e) = inject_state_global(lua, &global_context, &state_global) {
+                    tracing::warn!("Failed to inject state global in streaming: {}", e);
+                } else {
+                    tracing::debug!(
+                        "Successfully injected state global into Lua runtime (streaming)"
+                    );
+                }
             } else {
-                tracing::debug!("Successfully injected state global into Lua runtime (streaming)");
+                tracing::warn!("No shared ProviderManager available for streaming state injection, skipping state global injection");
             }
         }
     }

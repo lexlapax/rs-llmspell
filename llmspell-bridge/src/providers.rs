@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 /// Manages LLM providers for script access
 pub struct ProviderManager {
-    core_manager: CoreProviderManager,
+    core_manager: Arc<CoreProviderManager>,
     config: ProviderManagerConfig,
 }
 
@@ -22,7 +22,7 @@ impl ProviderManager {
     ///
     /// Returns an error if provider registration fails
     pub async fn new(config: ProviderManagerConfig) -> Result<Self, LLMSpellError> {
-        let core_manager = CoreProviderManager::new();
+        let core_manager = Arc::new(CoreProviderManager::new());
         let manager = Self {
             core_manager,
             config: config.clone(),
@@ -266,54 +266,19 @@ impl ProviderManager {
 
     /// Get the core provider manager
     #[must_use]
-    pub const fn core_manager(&self) -> &CoreProviderManager {
-        &self.core_manager
+    pub fn core_manager(&self) -> &CoreProviderManager {
+        self.core_manager.as_ref()
     }
 
-    /// Create an Arc to a new core provider manager with the same configuration
-    /// This is needed for components that require ownership of the core manager
+    /// Get shared access to the core provider manager
+    /// This returns the same Arc<CoreProviderManager> instance, sharing HTTP clients
     ///
     /// # Errors
     ///
-    /// Returns an error if provider configuration or initialization fails
-    pub async fn create_core_manager_arc(&self) -> Result<Arc<CoreProviderManager>, LLMSpellError> {
-        // Create a new core manager
-        let core_manager = CoreProviderManager::new();
-
-        // Register the rig provider factory
-        core_manager
-            .register_provider("rig", llmspell_providers::create_rig_provider)
-            .await;
-
-        // Initialize providers from our configuration
-        for (name, config) in &self.config.providers {
-            let provider_config = Self::create_provider_config(name, config)?;
-            core_manager.init_provider(provider_config).await?;
-        }
-
-        // Set default provider if specified
-        if let Some(ref default) = self.config.default_provider {
-            if let Some(provider_config) = self.config.providers.get(default) {
-                let model = provider_config.default_model.as_ref().ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        field: Some("model".to_string()),
-                        message: format!("Model not specified for provider '{default}'"),
-                    }
-                })?;
-                let provider_name = match provider_config.provider_type.as_str() {
-                    "openai" | "anthropic" | "cohere" => "rig",
-                    other => other,
-                };
-                core_manager
-                    .set_default_provider(format!(
-                        "{}/{}/{}",
-                        provider_name, provider_config.provider_type, model
-                    ))
-                    .await?;
-            }
-        }
-
-        Ok(Arc::new(core_manager))
+    /// This function does not currently return errors but maintains Result for API consistency
+    pub fn core_manager_arc(&self) -> Result<Arc<CoreProviderManager>, LLMSpellError> {
+        // Return the shared Arc<CoreProviderManager> instead of creating new ones
+        Ok(self.core_manager.clone())
     }
 }
 

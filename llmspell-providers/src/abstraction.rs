@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::debug;
 
 use crate::ModelSpecifier;
 
@@ -229,6 +230,10 @@ impl ProviderRegistry {
         &self,
         config: ProviderConfig,
     ) -> Result<Box<dyn ProviderInstance>, LLMSpellError> {
+        debug!(
+            "🏭 REGISTRY_CREATE: Looking up factory for provider '{}'",
+            config.name
+        );
         let factory =
             self.factories
                 .get(&config.name)
@@ -237,7 +242,16 @@ impl ProviderRegistry {
                     source: None,
                 })?;
 
-        factory(config)
+        debug!(
+            "🏭 REGISTRY_CREATE: Calling factory for provider '{}' type '{}' model '{}'",
+            config.name, config.provider_type, config.model
+        );
+        let result = factory(config);
+        debug!(
+            "✅ REGISTRY_CREATE: Factory completed for provider '{}'",
+            &result.as_ref().map(|p| p.name()).unwrap_or("ERROR")
+        );
+        result
     }
 
     /// Get list of registered provider names
@@ -286,8 +300,16 @@ impl ProviderManager {
         // Use hierarchical naming: name/provider_type/model
         let instance_name = config.instance_name();
 
+        debug!(
+            "🚀 INIT_PROVIDER: Creating provider instance '{}' for type '{}'",
+            instance_name, config.provider_type
+        );
         let registry = self.registry.read().await;
         let provider = registry.create(config)?;
+        debug!(
+            "✅ INIT_PROVIDER: Provider '{}' created successfully",
+            instance_name
+        );
 
         // Validate the provider
         provider.validate().await?;
@@ -455,8 +477,16 @@ impl ProviderManager {
         }
 
         // Create the provider instance
+        debug!(
+            "🚀 CREATE_AGENT_FROM_SPEC: Creating provider instance '{}' for type '{}' model '{}'",
+            instance_name, provider_name, spec.model
+        );
         let registry = self.registry.read().await;
         let provider = registry.create(config)?;
+        debug!(
+            "✅ CREATE_AGENT_FROM_SPEC: Provider '{}' created successfully",
+            instance_name
+        );
 
         // Validate the provider
         provider.validate().await?;
