@@ -22,6 +22,7 @@
 #![allow(clippy::must_use_candidate)]
 
 pub mod debug;
+pub mod events;
 pub mod execution;
 pub mod io;
 pub mod runtime;
@@ -47,6 +48,13 @@ pub use io::{
 
 // Re-export transport types
 pub use traits::{ChannelConfig, Protocol, Transport, TransportConfig};
+
+// Re-export event correlation types
+pub use events::correlation::{
+    ErrorInfo as KernelErrorInfo, ExecutionState as KernelExecutionState,
+    ExecutionStatus as KernelExecutionStatus, LanguageInfo,
+};
+pub use events::{EventBroadcaster, KernelEvent, KernelEventCorrelator};
 
 #[cfg(feature = "zeromq")]
 pub use transport::zeromq::ZmqTransport;
