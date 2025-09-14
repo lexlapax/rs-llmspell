@@ -6,7 +6,17 @@
 - workflow output collection should be rust code.. are there other things that should be rust code based on webapp-creator?
 - agent, workflow, tool - BaseAgent, should probably have a save output, save output stream function at the rust level.
 - in phase 7 we redid state 
+- add postgres vector store backend in llmspell-storage, https://github.com/tensorchord/pgvecto.rs or https://github.com/tensorchord/VectorChord/ or pgvector
 - remove invoke and just use execute in agent.
 - debug for scripts not working
 - remove custom steps or document it properly
-- agent templates 
+- agent templates - ideally some of the agent templates use rag to embed more correct information for different domains, or even graphs
+- scriptruntime capture stdin, stdout, stderr
+
+
+
+after that, similarly like rust api, ultrathink, now and analyze code because we need to redo the lua api user-guide 
+based on what we've added / changed in Phase 9. look at what we have in docs/user-guide/lua/* analyze what's 
+there, and analyze what we've accomplished in Phase 9 via docs/in-progress/phase-09-design-doc.md and 
+TODO.md and find out what needs to be updated in the lua user guide. do thorough analysis including 
+looking at implementation code and update the lua user-guide. 
