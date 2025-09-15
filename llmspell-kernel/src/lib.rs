@@ -21,11 +21,13 @@
 #![allow(clippy::module_name_repetitions)]
 #![allow(clippy::must_use_candidate)]
 
+pub mod api;
 pub mod debug;
 pub mod events;
 pub mod execution;
 pub mod hooks;
 pub mod io;
+pub mod protocols;
 pub mod runtime;
 pub mod sessions;
 pub mod state;
@@ -124,6 +126,12 @@ pub const KERNEL_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Kernel protocol version (Jupyter protocol 5.3)
 pub const PROTOCOL_VERSION: &str = "5.3";
+
+// Re-export high-level API
+pub use api::{
+    connect_to_kernel, start_embedded_kernel, start_kernel_service, ClientHandle, KernelHandle,
+    ServiceHandle,
+};
 
 #[cfg(test)]
 mod tests {

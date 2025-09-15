@@ -91,6 +91,10 @@ pub type BoxedTransport = Box<dyn Transport>;
 /// Returns an error if the transport type is unknown or not compiled in
 pub fn create_transport(transport_type: &str) -> Result<BoxedTransport> {
     match transport_type {
+        "inprocess" | "embedded" => {
+            use crate::transport::inprocess::InProcessTransport;
+            Ok(Box::new(InProcessTransport::new()))
+        }
         "zeromq" | "zmq" => {
             #[cfg(feature = "zeromq")]
             {

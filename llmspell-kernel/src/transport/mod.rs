@@ -13,10 +13,12 @@
 #[cfg(feature = "zeromq")]
 pub mod zeromq;
 
+pub mod inprocess;
 pub mod jupyter;
 
 // Re-export commonly used types
 #[cfg(feature = "zeromq")]
 pub use zeromq::ZmqTransport;
 
+pub use inprocess::InProcessTransport;
 pub use jupyter::JupyterTransport;

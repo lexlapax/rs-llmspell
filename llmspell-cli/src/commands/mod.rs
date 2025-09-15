@@ -6,6 +6,7 @@ pub mod backup;
 pub mod exec;
 pub mod info;
 pub mod init;
+pub mod kernel;
 pub mod keys;
 pub mod providers;
 pub mod repl;
@@ -134,6 +135,9 @@ pub async fn execute_command(
             apps::execute_apps_command(app, engine, runtime_config, output_format).await
         }
         Commands::Setup { force } => setup::run_interactive_setup(force).await,
+        Commands::Kernel(kernel_cmd) => {
+            kernel::handle_kernel_subcommand(kernel_cmd, runtime_config).await
+        }
     }
 }
 

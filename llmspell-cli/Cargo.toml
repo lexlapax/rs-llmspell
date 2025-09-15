@@ -15,6 +15,7 @@ path = "src/main.rs"
 llmspell-core = { path = "../llmspell-core" }
 llmspell-config = { path = "../llmspell-config" }
 llmspell-bridge = { path = "../llmspell-bridge" }
+llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }

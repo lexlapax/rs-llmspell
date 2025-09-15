@@ -227,6 +227,47 @@ pub enum Commands {
         #[arg(short, long)]
         force: bool,
     },
+
+    /// Kernel management commands
+    #[command(subcommand)]
+    Kernel(KernelSubcommand),
+}
+
+/// Kernel management subcommands
+#[derive(Subcommand, Debug)]
+pub enum KernelSubcommand {
+    /// Start a kernel directly (no spawning)
+    Start {
+        /// Port to listen on
+        #[arg(short, long)]
+        port: Option<u16>,
+
+        /// Run as daemon/service
+        #[arg(short, long)]
+        daemon: bool,
+
+        /// Kernel identifier
+        #[arg(long)]
+        id: Option<String>,
+    },
+
+    /// Stop a running kernel
+    Stop {
+        /// Kernel ID to stop
+        id: String,
+    },
+
+    /// Get kernel status
+    Status {
+        /// Specific kernel ID (or all if not specified)
+        id: Option<String>,
+    },
+
+    /// Connect to an existing kernel
+    Connect {
+        /// Kernel address or connection file
+        address: String,
+    },
 }
 
 /// Available example applications
