@@ -23,7 +23,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use std::time::Instant;
+use tracing::{debug, error, info, trace, warn};
 
 /// File operation types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -131,6 +132,12 @@ pub struct FileOperationsTool {
 impl FileOperationsTool {
     #[must_use]
     pub fn new(config: FileOperationsConfig, sandbox: Arc<FileSandbox>) -> Self {
+        debug!(
+            allowed_paths = ?config.allowed_paths,
+            atomic_writes = config.atomic_writes,
+            max_file_size = config.max_file_size,
+            "Creating FileOperationsTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "file-operations-tool".to_string(),
@@ -144,7 +151,11 @@ impl FileOperationsTool {
     /// Perform read operation
     #[allow(clippy::unused_async)]
     async fn read_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<String> {
-        info!("Reading file: {:?}", path);
+        let start = Instant::now();
+        info!(
+            path = ?path,
+            "Reading file"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -183,7 +194,7 @@ impl FileOperationsTool {
         })?;
 
         // Convert bytes to string
-        String::from_utf8(content).map_err(|e| LLMSpellError::Storage {
+        let result = String::from_utf8(content).map_err(|e| LLMSpellError::Storage {
             message: format!(
                 "File contains invalid UTF-8: {} - {}",
                 safe_path.to_string_lossy(),
@@ -191,13 +202,36 @@ impl FileOperationsTool {
             ),
             operation: Some("read".to_string()),
             source: None,
-        })
+        });
+
+        let elapsed_ms = start.elapsed().as_millis();
+        match &result {
+            Ok(content) => debug!(
+                path = ?path,
+                duration_ms = elapsed_ms,
+                size = content.len(),
+                "File read successfully"
+            ),
+            Err(e) => error!(
+                path = ?path,
+                duration_ms = elapsed_ms,
+                error = %e,
+                "File read failed"
+            ),
+        }
+        result
     }
 
     /// Perform write operation with optional atomic write
     #[allow(clippy::unused_async)]
     async fn write_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
-        info!("Writing file: {:?}", path);
+        let start = Instant::now();
+        info!(
+            path = ?path,
+            content_size = content.len(),
+            atomic = self.config.atomic_writes,
+            "Writing file"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -221,7 +255,7 @@ impl FileOperationsTool {
             file_utils::write_file
         };
 
-        write_fn(&safe_path, content.as_bytes()).map_err(|e| LLMSpellError::Storage {
+        let result = write_fn(&safe_path, content.as_bytes()).map_err(|e| LLMSpellError::Storage {
             message: format!(
                 "Failed to access path: {} - {}",
                 safe_path.to_string_lossy(),
@@ -229,13 +263,34 @@ impl FileOperationsTool {
             ),
             operation: Some("write".to_string()),
             source: None,
-        })
+        });
+
+        let elapsed_ms = start.elapsed().as_millis();
+        match &result {
+            Ok(()) => debug!(
+                path = ?path,
+                duration_ms = elapsed_ms,
+                size = content.len(),
+                "File written successfully"
+            ),
+            Err(e) => error!(
+                path = ?path,
+                duration_ms = elapsed_ms,
+                error = %e,
+                "File write failed"
+            ),
+        }
+        result
     }
 
     /// Perform append operation
     #[allow(clippy::unused_async)]
     async fn append_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
-        info!("Appending to file: {:?}", path);
+        info!(
+            path = ?path,
+            content_size = content.len(),
+            "Appending to file"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -277,7 +332,10 @@ impl FileOperationsTool {
     /// Delete file
     #[allow(clippy::unused_async)]
     async fn delete_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<()> {
-        info!("Deleting file: {:?}", path);
+        info!(
+            path = ?path,
+            "Deleting file"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -316,7 +374,11 @@ impl FileOperationsTool {
     /// Create directory
     #[allow(clippy::unused_async)]
     async fn create_dir(&self, path: &Path, recursive: bool, sandbox: &FileSandbox) -> Result<()> {
-        info!("Creating directory: {:?} (recursive: {})", path, recursive);
+        info!(
+            path = ?path,
+            recursive,
+            "Creating directory"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -359,10 +421,40 @@ impl FileOperationsTool {
         }
     }
 
+    /// Get file type as string
+    const fn get_file_type(entry: &file_utils::DirEntry) -> &'static str {
+        if entry.is_dir {
+            "directory"
+        } else if entry.is_symlink {
+            "symlink"
+        } else if entry.is_file {
+            "file"
+        } else {
+            "unknown"
+        }
+    }
+
+    /// Convert directory entry to JSON
+    fn entry_to_json(entry: &file_utils::DirEntry) -> Value {
+        json!({
+            "name": entry.name,
+            "path": entry.path.to_string_lossy(),
+            "type": Self::get_file_type(entry),
+            "size": entry.size,
+            "modified": entry.modified.map(|t| {
+                chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()
+            }),
+        })
+    }
+
     /// List directory contents
     #[allow(clippy::unused_async)]
     async fn list_dir(&self, path: &Path, sandbox: &FileSandbox) -> Result<Vec<Value>> {
-        info!("Listing directory: {:?}", path);
+        let start = Instant::now();
+        info!(
+            path = ?path,
+            "Listing directory"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -385,35 +477,27 @@ impl FileOperationsTool {
                 warn!("Directory listing truncated at {} entries", i);
                 break;
             }
-
-            let file_type = if entry.is_dir {
-                "directory"
-            } else if entry.is_symlink {
-                "symlink"
-            } else if entry.is_file {
-                "file"
-            } else {
-                "unknown"
-            };
-
-            entries.push(json!({
-                "name": entry.name,
-                "path": entry.path.to_string_lossy(),
-                "type": file_type,
-                "size": entry.size,
-                "modified": entry.modified.map(|t| {
-                    chrono::DateTime::<chrono::Utc>::from(t).to_rfc3339()
-                }),
-            }));
+            entries.push(Self::entry_to_json(entry));
         }
 
+        debug!(
+            path = ?path,
+            duration_ms = start.elapsed().as_millis(),
+            entry_count = entries.len(),
+            "Directory listed successfully"
+        );
         Ok(entries)
     }
 
     /// Copy file
     #[allow(clippy::unused_async)]
     async fn copy_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
-        info!("Copying file from {:?} to {:?}", from, to);
+        let start = Instant::now();
+        info!(
+            source = ?from,
+            target = ?to,
+            "Copying file"
+        );
 
         // Validate both paths
         let safe_from = sandbox.validate_path(from)?;
@@ -451,13 +535,25 @@ impl FileOperationsTool {
             source: None,
         })?;
 
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            source = ?from,
+            target = ?to,
+            duration_ms = elapsed_ms,
+            file_size = metadata.size,
+            "File copied successfully"
+        );
         Ok(())
     }
 
     /// Move/rename file
     #[allow(clippy::unused_async)]
     async fn move_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
-        info!("Moving file from {:?} to {:?}", from, to);
+        info!(
+            source = ?from,
+            target = ?to,
+            "Moving file"
+        );
 
         // Validate both paths
         let safe_from = sandbox.validate_path(from)?;
@@ -476,7 +572,10 @@ impl FileOperationsTool {
 
     /// Get file metadata
     fn get_metadata(path: &Path, sandbox: &FileSandbox) -> Result<Value> {
-        info!("Getting metadata for: {:?}", path);
+        debug!(
+            path = ?path,
+            "Getting file metadata"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -521,7 +620,10 @@ impl FileOperationsTool {
 
     /// Check if file exists
     fn file_exists(path: &Path, sandbox: &FileSandbox) -> Result<bool> {
-        debug!("Checking if file exists: {:?}", path);
+        trace!(
+            path = ?path,
+            "Checking if file exists"
+        );
 
         // Validate path
         let safe_path = sandbox.validate_path(path)?;
@@ -532,6 +634,7 @@ impl FileOperationsTool {
     /// Parse parameters from input
     #[allow(clippy::unused_self)]
     fn parse_parameters(&self, params: &Value) -> Result<FileParameters> {
+        trace!("Parsing file operation parameters");
         let operation_str = extract_required_string(params, "operation")?;
         let operation: FileOperation = operation_str.parse()?;
 
@@ -603,7 +706,11 @@ impl BaseAgent for FileOperationsTool {
         // Use provided sandbox from bridge
         let sandbox = &self.sandbox;
 
-        info!("Executing file operation: {}", parameters.operation);
+        let start = Instant::now();
+        info!(
+            operation = %parameters.operation,
+            "Executing file operation"
+        );
 
         let (output_text, response_json) = match parameters.operation {
             FileOperation::Read => {
@@ -812,10 +919,18 @@ impl BaseAgent for FileOperationsTool {
         );
         metadata.extra.insert("response".to_string(), response_json);
 
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            operation = %parameters.operation,
+            duration_ms = elapsed_ms,
+            "File operation completed"
+        );
+
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+        trace!("Validating file operation input");
         if input.parameters.is_empty() {
             return Err(LLMSpellError::Validation {
                 message: "No parameters provided".to_string(),

@@ -1,17 +1,17 @@
 //! Tests for tracing instrumentation in llmspell-core
 //! Verifies that tracing statements are properly emitting logs
 
+use async_trait::async_trait;
 use llmspell_core::{
     execution_context::{ContextScope, ExecutionContext, InheritancePolicy},
     traits::base_agent::BaseAgent,
-    traits::tool::{Tool, ToolCategory, ToolSchema, SecurityLevel},
-    traits::workflow::{Workflow, WorkflowStep, Config as WorkflowConfig, Status},
+    traits::tool::{SecurityLevel, Tool, ToolCategory, ToolSchema},
+    traits::workflow::{Config as WorkflowConfig, Status, Workflow, WorkflowStep},
     types::{AgentInput, AgentOutput},
-    ComponentMetadata, ComponentId, LLMSpellError, Result,
+    ComponentId, ComponentMetadata, LLMSpellError, Result,
 };
-use async_trait::async_trait;
-use std::sync::{Arc, Mutex};
 use std::io::Write;
+use std::sync::{Arc, Mutex};
 use tracing::Level;
 use tracing_subscriber::fmt;
 
@@ -23,10 +23,7 @@ struct TestAgent {
 impl TestAgent {
     fn new(name: &str) -> Self {
         Self {
-            metadata: ComponentMetadata::new(
-                name.to_string(),
-                format!("Test agent: {}", name),
-            ),
+            metadata: ComponentMetadata::new(name.to_string(), format!("Test agent: {}", name)),
         }
     }
 }
@@ -69,10 +66,7 @@ struct TestTool {
 impl TestTool {
     fn new(name: &str) -> Self {
         Self {
-            metadata: ComponentMetadata::new(
-                name.to_string(),
-                format!("Test tool: {}", name),
-            ),
+            metadata: ComponentMetadata::new(name.to_string(), format!("Test tool: {}", name)),
         }
     }
 }
@@ -110,7 +104,10 @@ impl Tool for TestTool {
     }
 
     fn schema(&self) -> ToolSchema {
-        ToolSchema::new("test-tool".to_string(), "A test tool for tracing verification".to_string())
+        ToolSchema::new(
+            "test-tool".to_string(),
+            "A test tool for tracing verification".to_string(),
+        )
     }
 }
 
@@ -124,10 +121,7 @@ struct TestWorkflow {
 impl TestWorkflow {
     fn new(name: &str) -> Self {
         Self {
-            metadata: ComponentMetadata::new(
-                name.to_string(),
-                format!("Test workflow: {}", name),
-            ),
+            metadata: ComponentMetadata::new(name.to_string(), format!("Test workflow: {}", name)),
             steps: Vec::new(),
             config: WorkflowConfig::default(),
         }
@@ -145,7 +139,10 @@ impl BaseAgent for TestWorkflow {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Workflow result: {}", input.text)))
+        Ok(AgentOutput::text(format!(
+            "Workflow result: {}",
+            input.text
+        )))
     }
 
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
@@ -203,7 +200,11 @@ impl LogCapture {
 
     #[allow(dead_code)]
     fn contains(&self, text: &str) -> bool {
-        self.logs.lock().unwrap().iter().any(|log| log.contains(text))
+        self.logs
+            .lock()
+            .unwrap()
+            .iter()
+            .any(|log| log.contains(text))
     }
 }
 
@@ -246,11 +247,26 @@ async fn test_base_agent_execute_tracing() {
     let log_text = logs.join("");
 
     // Check for expected log messages from our instrumentation
-    assert!(log_text.contains("Executing component"), "Missing 'Executing component' log");
-    assert!(log_text.contains("test-agent"), "Missing agent name in logs");
-    assert!(log_text.contains("input_size"), "Missing input_size in logs");
-    assert!(log_text.contains("Calling execute_impl"), "Missing 'Calling execute_impl' log");
-    assert!(log_text.contains("Component execution completed"), "Missing completion log");
+    assert!(
+        log_text.contains("Executing component"),
+        "Missing 'Executing component' log"
+    );
+    assert!(
+        log_text.contains("test-agent"),
+        "Missing agent name in logs"
+    );
+    assert!(
+        log_text.contains("input_size"),
+        "Missing input_size in logs"
+    );
+    assert!(
+        log_text.contains("Calling execute_impl"),
+        "Missing 'Calling execute_impl' log"
+    );
+    assert!(
+        log_text.contains("Component execution completed"),
+        "Missing completion log"
+    );
 }
 
 #[tokio::test]
@@ -286,7 +302,10 @@ async fn test_base_agent_error_tracing() {
     let log_text = logs.join("");
 
     // We should see the agent name in logs
-    assert!(log_text.contains("error-test-agent"), "Missing agent name in logs");
+    assert!(
+        log_text.contains("error-test-agent"),
+        "Missing agent name in logs"
+    );
 }
 
 #[tokio::test]
@@ -322,9 +341,18 @@ async fn test_tool_tracing() {
     let logs = capture.get_logs();
     let log_text = logs.join("");
 
-    assert!(log_text.contains("Getting security requirements"), "Missing security requirements log");
-    assert!(log_text.contains("Getting resource limits"), "Missing resource limits log");
-    assert!(log_text.contains("Validating tool parameters"), "Missing parameter validation log");
+    assert!(
+        log_text.contains("Getting security requirements"),
+        "Missing security requirements log"
+    );
+    assert!(
+        log_text.contains("Getting resource limits"),
+        "Missing resource limits log"
+    );
+    assert!(
+        log_text.contains("Validating tool parameters"),
+        "Missing parameter validation log"
+    );
 }
 
 #[tokio::test]
@@ -355,9 +383,18 @@ async fn test_workflow_tracing() {
     let logs = capture.get_logs();
     let log_text = logs.join("");
 
-    assert!(log_text.contains("Planning workflow execution"), "Missing workflow planning log");
-    assert!(log_text.contains("test-workflow"), "Missing workflow name in logs");
-    assert!(log_text.contains("Getting step result"), "Missing step result log");
+    assert!(
+        log_text.contains("Planning workflow execution"),
+        "Missing workflow planning log"
+    );
+    assert!(
+        log_text.contains("test-workflow"),
+        "Missing workflow name in logs"
+    );
+    assert!(
+        log_text.contains("Getting step result"),
+        "Missing step result log"
+    );
 }
 
 #[tokio::test]
@@ -401,12 +438,30 @@ async fn test_execution_context_tracing() {
     let logs = capture.get_logs();
     let log_text = logs.join("");
 
-    assert!(log_text.contains("Setting value in context"), "Missing context set log");
-    assert!(log_text.contains("Getting value from context"), "Missing context get log");
-    assert!(log_text.contains("Creating child context"), "Missing child context log");
-    assert!(log_text.contains("Merging context data"), "Missing merge log");
-    assert!(log_text.contains("Setting value in shared memory"), "Missing shared memory set log");
-    assert!(log_text.contains("Getting value from shared memory"), "Missing shared memory get log");
+    assert!(
+        log_text.contains("Setting value in context"),
+        "Missing context set log"
+    );
+    assert!(
+        log_text.contains("Getting value from context"),
+        "Missing context get log"
+    );
+    assert!(
+        log_text.contains("Creating child context"),
+        "Missing child context log"
+    );
+    assert!(
+        log_text.contains("Merging context data"),
+        "Missing merge log"
+    );
+    assert!(
+        log_text.contains("Setting value in shared memory"),
+        "Missing shared memory set log"
+    );
+    assert!(
+        log_text.contains("Getting value from shared memory"),
+        "Missing shared memory get log"
+    );
 }
 
 #[tokio::test]
@@ -440,9 +495,18 @@ async fn test_error_conversion_tracing() {
     let logs = capture.get_logs();
     let log_text = logs.join("");
 
-    assert!(log_text.contains("IO error converted to LLMSpellError"), "Missing IO error conversion log");
-    assert!(log_text.contains("JSON error converted to LLMSpellError"), "Missing JSON error conversion log");
-    assert!(log_text.contains("Formatting error converted to LLMSpellError"), "Missing fmt error conversion log");
+    assert!(
+        log_text.contains("IO error converted to LLMSpellError"),
+        "Missing IO error conversion log"
+    );
+    assert!(
+        log_text.contains("JSON error converted to LLMSpellError"),
+        "Missing JSON error conversion log"
+    );
+    assert!(
+        log_text.contains("Formatting error converted to LLMSpellError"),
+        "Missing fmt error conversion log"
+    );
 }
 
 #[tokio::test]
@@ -452,7 +516,7 @@ async fn test_tracing_levels() {
     let capture_clone = capture.clone();
 
     let subscriber = fmt::Subscriber::builder()
-        .with_max_level(Level::INFO)  // Set to INFO level
+        .with_max_level(Level::INFO) // Set to INFO level
         .with_writer(move || capture_clone.clone())
         .with_ansi(false)
         .finish();
@@ -475,8 +539,14 @@ async fn test_tracing_levels() {
     let log_text = logs.join("");
 
     // INFO level should be present
-    assert!(log_text.contains("Creating child context"), "INFO level log missing");
+    assert!(
+        log_text.contains("Creating child context"),
+        "INFO level log missing"
+    );
 
     // TRACE level should NOT be present (we're at INFO level)
-    assert!(!log_text.contains("Getting value from context"), "TRACE level log should not appear at INFO level");
+    assert!(
+        !log_text.contains("Getting value from context"),
+        "TRACE level log should not appear at INFO level"
+    );
 }

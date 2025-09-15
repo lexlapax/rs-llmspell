@@ -19,15 +19,15 @@ use llmspell_utils::{
     // NEW: Using shared utilities
     rate_limiter::{RateLimiter, RateLimiterBuilder},
     response::ResponseBuilder,
-    retry::{retry, AlwaysRetry, RetryConfig as SharedRetryConfig},
+    retry::{retry, AlwaysRetry, RetryConfig as SharedRetryConfig, RetryError},
     timeout::TimeoutBuilder,
 };
 use reqwest::{Client, Method, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::time::Duration;
-use tracing::info;
+use std::time::{Duration, Instant};
+use tracing::{debug, error, info, trace};
 
 /// HTTP method types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -200,6 +200,11 @@ impl HttpRequestTool {
     /// - Rate limiter configuration is invalid
     /// - HTTP client creation fails
     pub fn new(config: HttpRequestConfig) -> Result<Self> {
+        debug!(
+            timeout_seconds = config.timeout_seconds,
+            rate_limit = ?config.rate_limit_per_minute,
+            "Creating HttpRequestTool"
+        );
         // Create rate limiter using shared utility
         let rate_limiter = if let Some(rpm) = config.rate_limit_per_minute {
             Some(
@@ -271,6 +276,94 @@ impl HttpRequestTool {
         }
     }
 
+    /// Build the HTTP request with headers, body, and authentication
+    fn build_request(
+        &self,
+        method: Method,
+        url: &str,
+        headers: Option<&HashMap<String, String>>,
+        body: Option<&Value>,
+        auth: &AuthType,
+    ) -> reqwest::RequestBuilder {
+        let mut request = self.client.request(method, url);
+
+        // Add headers
+        if let Some(headers) = headers {
+            for (name, value) in headers {
+                request = request.header(name, value);
+            }
+        }
+
+        // Add body
+        if let Some(body) = body {
+            request = request.json(body);
+        }
+
+        // Apply authentication
+        self.apply_auth(request, auth)
+    }
+
+    /// Apply rate limiting if configured
+    async fn apply_rate_limiting(&self) -> Result<()> {
+        if let Some(limiter) = &self.rate_limiter {
+            trace!("Applying rate limiting");
+            limiter
+                .acquire()
+                .await
+                .map_err(|e| LLMSpellError::RateLimit {
+                    message: format!("Rate limit exceeded: {e}"),
+                    retry_after: None,
+                })?;
+        }
+        Ok(())
+    }
+
+    /// Execute the actual HTTP request
+    async fn do_request(
+        &self,
+        method: Method,
+        url: &str,
+        headers: Option<&HashMap<String, String>>,
+        body: Option<&Value>,
+        auth: &AuthType,
+    ) -> Result<Response> {
+        let request = self.build_request(method, url, headers, body, auth);
+        request.send().await.map_err(|e| LLMSpellError::Tool {
+            message: format!("HTTP request failed: {e}"),
+            tool_name: Some("http_request".to_string()),
+            source: None,
+        })
+    }
+
+    /// Log the result of an HTTP request
+    fn log_result(
+        method: &Method,
+        url: &str,
+        elapsed_ms: u128,
+        result: &std::result::Result<&Response, &RetryError<LLMSpellError>>,
+    ) {
+        match result {
+            Ok(response) => {
+                debug!(
+                    method = %method,
+                    url,
+                    duration_ms = elapsed_ms,
+                    status = response.status().as_u16(),
+                    "HTTP request completed successfully"
+                );
+            }
+            Err(e) => {
+                error!(
+                    method = %method,
+                    url,
+                    duration_ms = elapsed_ms,
+                    error = %e,
+                    "HTTP request failed"
+                );
+            }
+        }
+    }
+
     /// Execute request with retry logic (using shared utility)
     ///
     /// # Errors
@@ -287,57 +380,35 @@ impl HttpRequestTool {
         auth: AuthType,
         retry_config: Option<RetryConfig>,
     ) -> Result<Response> {
+        let start = Instant::now();
+        debug!(
+            method = %method,
+            url,
+            has_auth = !matches!(auth, AuthType::None),
+            "Executing HTTP request with retry"
+        );
+
         let retry_cfg = retry_config.unwrap_or_else(|| self.config.retry_config.clone());
-        let shared_retry_config: SharedRetryConfig = retry_cfg.clone().into();
+        let shared_retry_config: SharedRetryConfig = retry_cfg.into();
 
         // Apply rate limiting
-        if let Some(limiter) = &self.rate_limiter {
-            limiter
-                .acquire()
-                .await
-                .map_err(|e| LLMSpellError::RateLimit {
-                    message: format!("Rate limit exceeded: {e}"),
-                    retry_after: None,
-                })?;
-        }
+        self.apply_rate_limiting().await?;
 
         // Execute with retry logic using shared utility
         let result = retry(shared_retry_config, AlwaysRetry, || async {
-            // Build request
-            let mut request = self.client.request(method.clone(), url);
-
-            // Add headers
-            if let Some(headers) = &headers {
-                for (name, value) in headers {
-                    request = request.header(name, value);
-                }
-            }
-
-            // Add body
-            if let Some(body) = &body {
-                request = request.json(body);
-            }
-
-            // Apply authentication
-            request = self.apply_auth(request, &auth);
-
-            // Execute request
-            request.send().await.map_err(|e| LLMSpellError::Tool {
-                message: format!("HTTP request failed: {e}"),
-                tool_name: Some("http_request".to_string()),
-                source: None,
-            })
+            self.do_request(method.clone(), url, headers.as_ref(), body.as_ref(), &auth)
+                .await
         })
         .await;
 
-        match result {
-            Ok(response) => Ok(response),
-            Err(retry_error) => Err(LLMSpellError::Tool {
-                message: format!("HTTP request failed: {retry_error}"),
-                tool_name: Some("http_request".to_string()),
-                source: None,
-            }),
-        }
+        let elapsed_ms = start.elapsed().as_millis();
+        Self::log_result(&method, url, elapsed_ms, &result.as_ref());
+
+        result.map_err(|retry_error| LLMSpellError::Tool {
+            message: format!("HTTP request failed: {retry_error}"),
+            tool_name: Some("http_request".to_string()),
+            source: None,
+        })
     }
 
     /// Parse response based on content type
@@ -346,6 +417,7 @@ impl HttpRequestTool {
     ///
     /// Returns an error if response parsing fails
     async fn parse_response(&self, response: Response) -> Result<HttpResponse> {
+        trace!(status = response.status().as_u16(), "Parsing HTTP response");
         let status = response.status();
         let headers = response
             .headers()
@@ -395,6 +467,7 @@ impl HttpRequestTool {
     /// - Parameter parsing fails
     #[allow(clippy::unused_self)]
     fn parse_parameters(&self, params: &Value) -> Result<HttpRequestParams> {
+        trace!("Parsing HTTP request parameters");
         let method_str = extract_optional_string(params, "method").unwrap_or("GET");
         let method: HttpMethod = method_str.parse()?;
 
@@ -591,12 +664,14 @@ impl BaseAgent for HttpRequestTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
         let params = extract_parameters(&input)?;
         let request_params = self.parse_parameters(params)?;
 
         info!(
-            "Executing HTTP {} request to {}",
-            request_params.method, request_params.url
+            method = %request_params.method,
+            url = request_params.url,
+            "Executing HTTP request"
         );
 
         // Execute request with timeout using shared utility
@@ -626,6 +701,15 @@ impl BaseAgent for HttpRequestTool {
 
         let http_response = self.parse_response(response?).await?;
 
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            method = %request_params.method,
+            url = request_params.url,
+            status = http_response.status_code,
+            duration_ms = elapsed_ms,
+            "HTTP request operation completed"
+        );
+
         let message = format!(
             "HTTP {} request to {} completed with status {}",
             request_params.method, request_params.url, http_response.status_code
@@ -641,13 +725,14 @@ impl BaseAgent for HttpRequestTool {
             }))
             .with_metadata("method", json!(request_params.method.to_string()))
             .with_metadata("url", json!(request_params.url))
-            .with_metadata("duration_ms", json!(0)) // TODO: Track actual duration
+            .with_metadata("duration_ms", json!(elapsed_ms))
             .build();
 
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+        trace!("Validating HTTP request input");
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
                 message: "Input prompt cannot be empty".to_string(),
@@ -658,6 +743,10 @@ impl BaseAgent for HttpRequestTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+        error!(
+            error = %error,
+            "HTTP request error occurred"
+        );
         Ok(AgentOutput::text(format!("HTTP request error: {error}")))
     }
 }

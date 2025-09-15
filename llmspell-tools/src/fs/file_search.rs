@@ -22,7 +22,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tracing::{debug, info, warn};
+use std::time::Instant;
+use tracing::{debug, error, info, trace, warn};
 
 /// File search tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -107,6 +108,11 @@ impl FileSearchTool {
     /// Create a new file search tool
     #[must_use]
     pub fn new(config: FileSearchConfig, sandbox: Arc<FileSandbox>) -> Self {
+        debug!(
+            max_results = config.max_results,
+            max_file_size = config.max_file_size,
+            "Creating FileSearchTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "file_search".to_string(),
@@ -125,6 +131,7 @@ impl FileSearchTool {
         pattern: &str,
         options: &SearchOptions,
     ) -> Result<SearchResult> {
+        let start = Instant::now();
         // Validate path with sandbox
         self.sandbox
             .validate_path(file_path)
@@ -153,10 +160,13 @@ impl FileSearchTool {
             }
         }
 
+        let elapsed_ms = start.elapsed().as_millis();
         info!(
-            "Found {} matches in file: {}",
-            result.total_matches,
-            file_path.display()
+            file = ?file_path,
+            pattern,
+            matches = result.total_matches,
+            duration_ms = elapsed_ms,
+            "File search completed"
         );
 
         Ok(result)
@@ -170,6 +180,7 @@ impl FileSearchTool {
         pattern: &str,
         options: &SearchOptions,
     ) -> Result<SearchResult> {
+        let start = Instant::now();
         // Validate path with sandbox
         self.sandbox
             .validate_path(directory)
@@ -194,11 +205,14 @@ impl FileSearchTool {
             result.total_matches = self.config.max_results;
         }
 
+        let elapsed_ms = start.elapsed().as_millis();
         info!(
-            "Searched {} files in directory: {}, found {} matches",
-            result.files_searched,
-            directory.display(),
-            result.total_matches
+            directory = ?directory,
+            pattern,
+            files_searched = result.files_searched,
+            matches = result.total_matches,
+            duration_ms = elapsed_ms,
+            "Directory search completed"
         );
 
         Ok(result)
@@ -206,6 +220,7 @@ impl FileSearchTool {
 
     /// Build search options from parameters
     fn build_search_options(&self, params: &serde_json::Value) -> SearchOptions {
+        trace!("Building search options from parameters");
         let mut options = SearchOptions::new();
 
         // Basic search options
@@ -341,6 +356,7 @@ impl FileSearchTool {
     /// Validate search parameters
     #[allow(clippy::unused_async)]
     async fn validate_search_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
+        trace!("Validating search parameters");
         // Required parameters are already validated by extract_required_string
         // Just validate pattern is not empty
         if let Some(pattern) = extract_optional_string(params, "pattern") {
@@ -386,6 +402,7 @@ impl BaseAgent for FileSearchTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        let start = Instant::now();
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -394,6 +411,8 @@ impl BaseAgent for FileSearchTool {
         // Extract required parameters
         let pattern = extract_required_string(params, "pattern")?;
         let path_str = extract_required_string(params, "path")?;
+
+        info!(pattern, path = path_str, "Executing file search");
 
         let search_path = PathBuf::from(path_str);
 
@@ -410,6 +429,10 @@ impl BaseAgent for FileSearchTool {
 
         // Perform search based on path type
         let result = if search_path.is_file() {
+            debug!(
+                path = ?search_path,
+                "Searching in single file"
+            );
             self.search_file(&search_path, pattern, &options)
                 .await
                 .map_err(|e| LLMSpellError::Tool {
@@ -418,6 +441,11 @@ impl BaseAgent for FileSearchTool {
                     source: None,
                 })?
         } else if search_path.is_dir() {
+            debug!(
+                path = ?search_path,
+                recursive = options.recursive,
+                "Searching in directory"
+            );
             self.search_directory(&search_path, pattern, &options)
                 .await
                 .map_err(|e| LLMSpellError::Tool {
@@ -462,10 +490,19 @@ impl BaseAgent for FileSearchTool {
             .insert("operation".to_string(), "search".into());
         metadata.extra.insert("response".to_string(), response);
 
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            pattern,
+            duration_ms = elapsed_ms,
+            has_matches = result.has_matches(),
+            "File search operation completed"
+        );
+
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
+        trace!("Validating file search input");
         if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
                 message: "Input prompt cannot be empty".to_string(),
@@ -476,6 +513,10 @@ impl BaseAgent for FileSearchTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
+        error!(
+            error = %error,
+            "File search error occurred"
+        );
         Ok(AgentOutput::text(format!("File search error: {error}")))
     }
 }
