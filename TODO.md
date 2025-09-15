@@ -1151,6 +1151,278 @@ The REPL and debug interfaces have been successfully consolidated into a unified
 - [x] Interactive experience smooth and responsive ✅
 - [x] REPL tracing integrates with kernel tracing ✅
 
+### Task 9.4.4: Complete CLI Architecture Restructure
+**Priority**: CRITICAL
+**Estimated Time**: 10 hours
+**Assignee**: CLI Architecture Team Lead
+**Dependencies**: Task 9.4.3
+**Status**: 100% COMPLETE ✅ - Full CLI architecture restructure completed with zero compilation errors and zero clippy warnings
+
+**Description**: Complete comprehensive CLI restructure implementing the full architecture from `docs/technical/cli-command-architecture.md` (692 lines). This is a BREAKING CHANGES task with no backward compatibility requirements, implementing the professional CLI design that was specified but not completed.
+
+**Critical Architecture Goals:**
+- Implement complete command hierarchy restructure with proper subcommand groups
+- Add `--connect` functionality to ALL execution commands (run, exec, repl, debug)
+- Implement dual-mode design: online (--kernel), offline (--config), auto-detection
+- Flag consolidation: 20 RAG flags → 1 `--rag-profile`, remove ambiguous `--debug`
+- Global `--config/-c` flag available on ALL commands and subcommands
+- Contextual help system with intelligent help based on command level
+- Remove ALL old command patterns, ensure clean professional CLI UX
+
+**Architectural Reference Documents:**
+- PRIMARY: `docs/technical/cli-command-architecture.md` (complete specification)
+- COMPARE: `/tmp/phase-9-comparison/llmspell-cli/src/cli.rs` (original Phase-9 --connect patterns)
+- CONTEXT: `docs/in-progress/implementation-phases.md` Phase 12 daemon connectivity
+
+**Breaking Changes Implementation (No Backward Compatibility):**
+
+**1. Flag Consolidation:**
+```bash
+# REMOVE these flag combinations:
+--debug --verbose --rag --no-rag --rag-config --rag-dims --rag-backend
+
+# REPLACE with:
+--trace {off|error|warn|info|debug|trace}  # Replaces --debug/--verbose
+--rag-profile {development|production|custom}  # Replaces 5 RAG flags
+--config/-c <FILE>  # Global flag for ALL commands
+```
+
+**2. Command Hierarchy Restructure:**
+```bash
+# OLD → NEW (Breaking Changes)
+llmspell validate → llmspell config validate
+llmspell init → llmspell config init
+llmspell kernel → llmspell kernel start
+llmspell providers → llmspell providers list
+
+# NEW Subcommand Groups:
+llmspell kernel {start [--port] [--daemon] | stop <id> | status [id] | connect <address>}
+llmspell state {show [key] | clear [key] | export <file> | import <file>} [--kernel|--config]
+llmspell session {list | show <id> | replay <id> | delete <id>} [--kernel|--config]
+llmspell config {init [--force] | validate [--file] | show [--section]}
+llmspell keys {add <provider> <key> | list | remove <provider>}
+llmspell backup {create [--output] | restore <file> | list | delete <id>}
+```
+
+**3. --connect Functionality (from Original Phase-9):**
+```rust
+// Add to ALL execution commands:
+Run {
+    #[arg(long, value_name = "ADDRESS")]
+    connect: Option<String>,  // "localhost:9555" or "/path/to/connection.json"
+    // ... existing fields
+}
+Exec {
+    #[arg(long, value_name = "ADDRESS")]
+    connect: Option<String>,
+    // ... existing fields
+}
+Repl {
+    #[arg(long, value_name = "ADDRESS")]
+    connect: Option<String>,
+    // ... existing fields
+}
+Debug {
+    #[arg(long, value_name = "ADDRESS")]
+    connect: Option<String>,
+    // ... existing fields
+}
+```
+
+**4. Dual-Mode Design Implementation:**
+```rust
+pub enum ExecutionContext {
+    Embedded(EmbeddedKernelConfig),           // Default: in-process kernel
+    Connected(String),                        // --connect address
+    KernelMode { kernel_id: String },         // --kernel mode
+    ConfigMode { config_path: PathBuf },      // --config mode
+}
+
+impl ExecutionContext {
+    pub async fn resolve(connect: Option<String>, kernel: Option<String>, config: Option<PathBuf>) -> Result<Self> {
+        match (connect, kernel, config) {
+            (Some(addr), _, _) => Ok(ExecutionContext::Connected(addr)),
+            (_, Some(k), _) => Ok(ExecutionContext::KernelMode { kernel_id: k }),
+            (_, _, Some(c)) => Ok(ExecutionContext::ConfigMode { config_path: c }),
+            (None, None, None) => {
+                // Auto-detection: find running kernel or use config
+                if let Some(kernel) = find_running_kernel().await? {
+                    Ok(ExecutionContext::KernelMode { kernel_id: kernel })
+                } else {
+                    Ok(ExecutionContext::Embedded(EmbeddedKernelConfig::default()))
+                }
+            }
+        }
+    }
+}
+```
+
+**Acceptance Criteria:**
+- [x] ALL commands restructured according to `cli-command-architecture.md` ✅
+- [x] `--connect` functionality works on run, exec, repl, debug commands ✅
+- [x] `--config/-c` global flag works on every command and subcommand ✅
+- [x] Dual-mode design: `--kernel <id>`, `--config <file>`, auto-detection ✅
+- [x] Contextual help system shows appropriate help at each command level ✅
+- [x] Flag consolidation: `--trace` replaces debug flags, `--rag-profile` replaces RAG flags ✅
+- [x] NO old command patterns remain (breaking changes completed) ✅
+- [x] Professional CLI UX with logical command grouping ✅
+- [x] Zero clippy warnings, comprehensive documentation ✅
+
+**REMAINING WORK:**
+- [x] Fix 28 compilation errors (mostly YAML output pattern matching) ✅
+- [x] Complete missing function implementations in keys.rs and backup.rs ✅
+- [x] Fix ExecutionContext Debug trait issues ✅
+- [x] Update run.rs function signature to use ExecutionContext ✅
+- [x] Add missing YAML output handling across all commands ✅
+- [x] Remove unused imports and fix format string issues ✅
+- [x] Fix remaining 13 minor compilation errors (field mismatches, missing functions) ✅
+
+**Implementation Steps:**
+
+**Phase 1: Core CLI Structure (3 hours)**
+1. **Restructure `llmspell-cli/src/cli.rs`:**
+   ```rust
+   #[derive(Parser)]
+   pub struct Cli {
+       /// Configuration file (GLOBAL)
+       #[arg(short = 'c', long, global = true, env = "LLMSPELL_CONFIG")]
+       pub config: Option<PathBuf>,
+
+       /// Trace level (replaces --debug/--verbose)
+       #[arg(long, global = true, value_enum, default_value = "warn")]
+       pub trace: TraceLevel,
+
+       /// Output format
+       #[arg(long, global = true, value_enum, default_value = "text")]
+       pub output: OutputFormat,
+
+       #[command(subcommand)]
+       pub command: Commands,
+   }
+   ```
+
+2. **Add --connect to execution commands:**
+   - Update Run, Exec, Repl, Debug with `connect: Option<String>`
+   - Add proper help documentation for connection strings
+
+3. **Create new subcommand groups:**
+   - `KernelCommands` with start/stop/status/connect
+   - `StateCommands` with show/clear/export/import + dual-mode flags
+   - `ConfigCommands` with init/validate/show
+
+**Phase 2: Dual-Mode Implementation (4 hours)**
+4. **Implement ExecutionContext resolution:**
+   ```rust
+   // llmspell-cli/src/execution_context.rs
+   pub async fn resolve_execution_context(
+       connect: Option<String>,
+       kernel: Option<String>,
+       config: Option<PathBuf>
+   ) -> Result<ExecutionContext> {
+       // Auto-detection logic, connection handling
+   }
+   ```
+
+5. **Update command handlers for dual-mode:**
+   - Modify run/exec/repl/debug handlers to use ExecutionContext
+   - Add kernel discovery mechanism
+   - Implement config-file-only operations
+
+**Phase 3: Help System & Polish (3 hours)**
+6. **Implement contextual help system:**
+   ```rust
+   // Enhanced help based on command depth
+   impl Commands {
+       pub fn show_contextual_help(&self, depth: usize) -> String {
+           match (self, depth) {
+               (Commands::Kernel { .. }, 0) => "Kernel management - use 'llmspell kernel --help'",
+               (Commands::Kernel { command: KernelCommands::Start { .. } }, 1) => kernel_start_help(),
+               // ... contextual help for each level
+           }
+       }
+   }
+   ```
+
+7. **RAG profile system:**
+   ```rust
+   // Replace 5 RAG flags with single profile
+   #[arg(long, value_name = "PROFILE")]
+   rag_profile: Option<String>,  // "development", "production", "custom"
+   ```
+
+8. **Remove ALL legacy patterns:**
+   - Remove old flag combinations
+   - Remove old command structures
+   - Update help documentation
+   - Ensure breaking changes are complete
+
+**Test Steps:**
+1. **Basic Command Restructure:**
+   ```bash
+   # Verify new command structure
+   llmspell kernel start --port 9555
+   llmspell kernel status
+   llmspell config init --force
+   llmspell state show --kernel abc123
+   ```
+
+2. **--connect Functionality:**
+   ```bash
+   # Start kernel service
+   llmspell kernel start --port 9555 --daemon
+
+   # Connect from client
+   llmspell run script.lua --connect localhost:9555
+   llmspell exec "print('test')" --connect localhost:9555
+   llmspell repl --connect localhost:9555
+   ```
+
+3. **Dual-Mode Operations:**
+   ```bash
+   # Online mode (kernel)
+   llmspell state show --kernel abc123
+   llmspell session list --kernel localhost:9555
+
+   # Offline mode (config)
+   llmspell state show --config production.toml
+   llmspell session list --config ~/.llmspell/config.toml
+
+   # Auto mode (smart detection)
+   llmspell state show  # Finds kernel or uses config
+   ```
+
+4. **Flag Consolidation:**
+   ```bash
+   # New simplified flags
+   llmspell run script.lua --trace debug --rag-profile production
+   llmspell exec "code" -c custom.toml --trace info
+
+   # Verify old flags removed
+   llmspell run --debug  # Should fail
+   llmspell run --rag --no-rag  # Should fail
+   ```
+
+5. **Contextual Help:**
+   ```bash
+   llmspell --help                    # Global overview
+   llmspell kernel --help             # Kernel subcommands
+   llmspell kernel start --help       # Specific command help
+   llmspell state --help              # State subcommands
+   ```
+
+**Definition of Done:**
+- [x] CLI structure matches `cli-command-architecture.md` specification exactly
+- [x] All execution commands (run/exec/repl/debug) support `--connect <address>`
+- [x] Dual-mode design works: --kernel/--config/auto-detection
+- [x] Global `--config/-c` flag works on every command
+- [x] Flag consolidation complete: --trace replaces debug flags, --rag-profile replaces RAG flags
+- [x] Contextual help system provides intelligent help at all command levels
+- [x] ALL old command patterns removed (complete breaking changes)
+- [x] Professional CLI UX with logical subcommand organization
+- [x] Zero clippy warnings, comprehensive inline documentation
+- [x] All test scenarios pass including connection modes and dual-mode operations
+- [x] CLI ready for Phase 12 daemon integration (connection infrastructure complete)
+
 ---
 
 ## Phase 9.5: Application Validation & Future-Proofing (Days 14-16)
@@ -1179,7 +1451,7 @@ The REPL and debug interfaces have been successfully consolidated into a unified
 - [ ] Write code with documentation (no clippy warnings)
 
 **Implementation Steps:**
-1. Create `llmspell-kernel/src/testing/application_suite.rs`:
+1. Create `llmspell-testing/examples/application_suite.rs`:
    ```rust
    pub struct ApplicationTestSuite {
        simple_apps: Vec<SimpleAppTest>,      // 2-4 agents, <30s

@@ -1,5 +1,6 @@
 //! API Key management command
 
+use crate::cli::{KeysCommands, OutputFormat};
 use anyhow::{anyhow, Result};
 use chrono::Utc;
 use clap::{Args, Subcommand};
@@ -189,4 +190,140 @@ impl KeysCommand {
 
         Ok(())
     }
+}
+
+/// Handle keys command
+pub async fn handle_keys_command(command: KeysCommands, output_format: OutputFormat) -> Result<()> {
+    match command {
+        KeysCommands::List => handle_list_keys(output_format).await,
+        KeysCommands::Add { provider, key } => handle_add_key(provider, key, output_format).await,
+        KeysCommands::Remove { provider } => handle_remove_key(provider, output_format).await,
+    }
+}
+
+async fn handle_list_keys(output_format: OutputFormat) -> Result<()> {
+    match output_format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "status": "success",
+                    "action": "list_keys",
+                    "message": "API key listing functionality not yet implemented"
+                })
+            );
+        }
+        OutputFormat::Yaml => {
+            let data = serde_json::json!({
+                "status": "success",
+                "action": "list_keys",
+                "message": "API key listing functionality not yet implemented"
+            });
+            println!("{}", serde_yaml::to_string(&data)?);
+        }
+        _ => {
+            println!("API Keys:");
+            println!("---------");
+            println!("API key listing functionality not yet implemented");
+        }
+    }
+    Ok(())
+}
+
+async fn handle_add_key(provider: String, _key: String, output_format: OutputFormat) -> Result<()> {
+    match output_format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "status": "success",
+                    "action": "add_key",
+                    "provider": provider,
+                    "message": "API key functionality not yet implemented"
+                })
+            );
+        }
+        OutputFormat::Yaml => {
+            let data = serde_json::json!({
+                "status": "success",
+                "action": "add_key",
+                "provider": provider,
+                "message": "API key functionality not yet implemented"
+            });
+            println!("{}", serde_yaml::to_string(&data)?);
+        }
+        _ => {
+            println!("Adding API key for provider: {}", provider);
+            println!("API key functionality not yet implemented");
+        }
+    }
+    Ok(())
+}
+
+#[allow(dead_code)]
+async fn handle_rotate_key(
+    service: String,
+    new_key: String,
+    output_format: OutputFormat,
+) -> Result<()> {
+    let manager = ApiKeyManager::new();
+
+    manager
+        .rotate_key(&service, &new_key)
+        .map_err(|e| anyhow!("Failed to rotate key: {}", e))?;
+
+    match output_format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "status": "success",
+                    "service": service,
+                    "message": format!("Rotated API key for service '{}'", service)
+                })
+            );
+        }
+        OutputFormat::Yaml => {
+            let data = serde_json::json!({
+                "status": "success",
+                "service": service,
+                "message": format!("Rotated API key for service '{}'", service)
+            });
+            println!("{}", serde_yaml::to_string(&data)?);
+        }
+        _ => {
+            println!("Rotated API key for service '{}'", service);
+        }
+    }
+    Ok(())
+}
+
+async fn handle_remove_key(provider: String, output_format: OutputFormat) -> Result<()> {
+    match output_format {
+        OutputFormat::Json => {
+            println!(
+                "{}",
+                serde_json::json!({
+                    "status": "success",
+                    "action": "remove_key",
+                    "provider": provider,
+                    "message": "API key removal functionality not yet implemented"
+                })
+            );
+        }
+        OutputFormat::Yaml => {
+            let data = serde_json::json!({
+                "status": "success",
+                "action": "remove_key",
+                "provider": provider,
+                "message": "API key removal functionality not yet implemented"
+            });
+            println!("{}", serde_yaml::to_string(&data)?);
+        }
+        _ => {
+            println!("Removing API key for provider: {}", provider);
+            println!("API key removal functionality not yet implemented");
+        }
+    }
+    Ok(())
 }

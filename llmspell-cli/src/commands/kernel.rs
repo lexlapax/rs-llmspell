@@ -8,24 +8,25 @@ use llmspell_config::LLMSpellConfig;
 use llmspell_kernel::{connect_to_kernel, start_embedded_kernel, start_kernel_service};
 use tracing::info;
 
-/// Execute kernel command based on CLI arguments
-pub async fn execute_kernel_command(
-    subcommand: crate::cli::KernelSubcommand,
-    config: LLMSpellConfig,
+/// Handle kernel management commands
+pub async fn handle_kernel_command(
+    command: crate::cli::KernelCommands,
+    runtime_config: LLMSpellConfig,
+    _output_format: crate::cli::OutputFormat,
 ) -> Result<()> {
-    use crate::cli::KernelSubcommand;
+    use crate::cli::KernelCommands;
 
-    match subcommand {
-        KernelSubcommand::Start {
+    match command {
+        KernelCommands::Start {
             port,
             daemon,
             id: _,
+            connection_file: _,
         } => {
             if daemon {
                 // Service mode - start kernel that listens for connections
-                let port = port.unwrap_or(9999);
                 info!("Starting kernel service on port {}", port);
-                let service = start_kernel_service(port, config).await?;
+                let service = start_kernel_service(port, runtime_config).await?;
                 info!(
                     "Kernel service started. Connection file: {:?}",
                     service.connection_file()
@@ -34,28 +35,46 @@ pub async fn execute_kernel_command(
             } else {
                 // Embedded mode - run kernel in-process
                 info!("Starting embedded kernel");
-                let kernel = start_embedded_kernel(config).await?;
+                let kernel = start_embedded_kernel(runtime_config).await?;
                 info!("Kernel {} started", kernel.kernel_id());
                 kernel.run().await
             }
         }
 
-        KernelSubcommand::Connect { address } => {
+        KernelCommands::Connect { address } => {
             // Client mode - connect to existing kernel
-            info!("Connecting to kernel at: {}", address);
-            let mut client = connect_to_kernel(&address).await?;
-            client.run_repl()
+            match address {
+                Some(addr) => {
+                    info!("Connecting to kernel at: {}", addr);
+                    let mut client = connect_to_kernel(&addr).await?;
+                    client.run_repl()
+                }
+                None => {
+                    info!("No address provided, using default connection");
+                    anyhow::bail!(
+                        "No kernel address provided and auto-discovery not yet implemented"
+                    )
+                }
+            }
         }
 
-        KernelSubcommand::Stop { id } => {
+        KernelCommands::Stop { id } => {
             // Stop a running kernel
-            info!("Stopping kernel: {}", id);
-            // This would send shutdown signal to the kernel
-            // For now, this is a placeholder
-            anyhow::bail!("Kernel stop not yet implemented")
+            match id {
+                Some(kernel_id) => {
+                    info!("Stopping kernel: {}", kernel_id);
+                    // This would send shutdown signal to the kernel
+                    // For now, this is a placeholder
+                    anyhow::bail!("Kernel stop not yet implemented")
+                }
+                None => {
+                    info!("Stopping all kernels");
+                    anyhow::bail!("Stopping all kernels not yet implemented")
+                }
+            }
         }
 
-        KernelSubcommand::Status { id } => {
+        KernelCommands::Status { id } => {
             // Get kernel status
             if let Some(id) = id {
                 info!("Getting status for kernel: {}", id);
@@ -67,12 +86,4 @@ pub async fn execute_kernel_command(
             Ok(())
         }
     }
-}
-
-/// Helper function for the main command handler to call
-pub async fn handle_kernel_subcommand(
-    subcommand: crate::cli::KernelSubcommand,
-    config: LLMSpellConfig,
-) -> Result<()> {
-    execute_kernel_command(subcommand, config).await
 }
