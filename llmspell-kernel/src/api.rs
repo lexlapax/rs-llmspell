@@ -82,6 +82,11 @@ impl KernelHandle {
     pub fn transport(&self) -> Arc<InProcessTransport> {
         self.transport.clone()
     }
+
+    /// Convert handle into the underlying kernel
+    pub fn into_kernel(self) -> IntegratedKernel<JupyterProtocol> {
+        self.kernel
+    }
 }
 
 /// Handle for a client connection to a kernel

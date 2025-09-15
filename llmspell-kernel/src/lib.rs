@@ -28,6 +28,7 @@ pub mod execution;
 pub mod hooks;
 pub mod io;
 pub mod protocols;
+pub mod repl;
 pub mod runtime;
 pub mod sessions;
 pub mod state;
@@ -132,6 +133,9 @@ pub use api::{
     connect_to_kernel, start_embedded_kernel, start_kernel_service, ClientHandle, KernelHandle,
     ServiceHandle,
 };
+
+// Re-export REPL types
+pub use repl::{DebugCommand, InteractiveSession, MetaCommand, ReplCommand, ReplSessionConfig};
 
 #[cfg(test)]
 mod tests {

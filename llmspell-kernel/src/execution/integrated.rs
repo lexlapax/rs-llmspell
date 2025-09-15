@@ -160,7 +160,7 @@ pub struct IntegratedKernel<P: Protocol> {
     /// Session ID
     session_id: String,
     /// Execution counter
-    execution_count: Arc<RwLock<u64>>,
+    pub execution_count: Arc<RwLock<u64>>,
     /// Unified kernel state
     state: Arc<KernelState>,
     /// Session manager
