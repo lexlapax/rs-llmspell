@@ -601,15 +601,17 @@
 - consult `docs/in-progress/phase-09-design-doc.com` and `docs/technical/cli-command-architecture.md` and `docs/in-progress/implementation-phases.md` for the proper design of the implementation of code.
 - Remove SHARED_IO_RUNTIME from Phase-9 `/tmp/phase-9-comparison/llmspell-providers/src/rig.rs` lines 17-40 ✅
 - Update 15 files in llmspell-tools that create HTTP clients ✅
-- Ensure consistent runtime context across all provider operations
+- Ensure consistent runtime context across all provider operations ✅
+- **Fix runtime context awareness** - Modified `create_io_bound_resource()` to detect existing runtime ✅
 
 **Acceptance Criteria:**
-- [ ] SHARED_IO_RUNTIME workaround completely removed
-- [ ] All HTTP clients use global_io_runtime()
-- [ ] Provider operations survive 60+ second executions
-- [ ] Provider-level cost tracking and tracing
-- [ ] No runtime context mismatches in provider calls
-- [ ] Write code with documentation (no clippy warnings)
+- [x] SHARED_IO_RUNTIME workaround completely removed
+- [x] All HTTP clients use global_io_runtime()
+- [x] Provider operations survive 60+ second executions
+- [x] Provider-level cost tracking and tracing
+- [x] No runtime context mismatches in provider calls
+- [x] Write code with documentation (no clippy warnings)
+- [x] **Parallel test execution works** - Fixed runtime context detection
 
 **Implementation Steps:**
 1. Update llmspell-providers/src/rig.rs:
@@ -636,11 +638,24 @@
 4. Validate cost tracking accuracy
 
 **Definition of Done:**
-- [ ] No SHARED_IO_RUNTIME references remain
-- [ ] All provider HTTP clients use global runtime
-- [ ] Long-running provider operations complete successfully
-- [ ] Cost tracking accurate within 5%
-- [ ] Provider tracing shows consistent runtime context
+- [x] No SHARED_IO_RUNTIME references remain
+- [x] All provider HTTP clients use global runtime
+- [x] Long-running provider operations complete successfully
+- [x] Cost tracking accurate within 5%
+- [x] Provider tracing shows consistent runtime context
+- [x] **Tests run in parallel without failures** - Runtime context properly isolated
+
+**Architectural Insights (Post-Implementation):**
+The "dispatch task is gone" error was caused by runtime context mismatches when HTTP clients were created in spawned tasks. Initial fix using global runtime with `enter()` guard caused parallel test failures due to thread-local state conflicts.
+
+**Solution Applied (Option A):**
+Modified `create_io_bound_resource()` in `llmspell-kernel/src/runtime/io_runtime.rs` to detect existing runtime context:
+- If already in a runtime (via `Handle::try_current()`), use it directly
+- Only enter global runtime if no current runtime exists
+- Respects test isolation - each test uses its own runtime
+- Production code unaffected - uses single runtime as before
+
+This fix ensures runtime polymorphism - resources bind to their creation context naturally without forcing a specific runtime. Tests can run in parallel without interference, while production maintains single runtime consistency.
 
 ### Task 9.4.2: Simplify CLI and Remove Pre-warming
 **Priority**: HIGH

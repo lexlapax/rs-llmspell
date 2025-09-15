@@ -10,6 +10,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, Result,
 };
+use llmspell_kernel::runtime::create_io_bound_resource;
 use llmspell_utils::{
     error_builders::llmspell::validation_error,
     params::{
@@ -147,12 +148,14 @@ impl BaseAgent for WebhookCallerTool {
             ));
         }
 
-        // Build client
-        let client = Client::builder()
-            .timeout(Duration::from_secs(timeout))
-            .user_agent("Mozilla/5.0 (compatible; LLMSpell-WebhookCaller/1.0)")
-            .build()
-            .unwrap_or_default();
+        // Build client using global runtime
+        let client = create_io_bound_resource(move || {
+            Client::builder()
+                .timeout(Duration::from_secs(timeout))
+                .user_agent("Mozilla/5.0 (compatible; LLMSpell-WebhookCaller/1.0)")
+                .build()
+                .unwrap_or_default()
+        });
 
         // Simple retry implementation
         let mut last_error = None;

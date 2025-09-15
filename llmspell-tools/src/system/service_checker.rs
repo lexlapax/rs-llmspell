@@ -10,6 +10,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
+use llmspell_kernel::runtime::create_io_bound_resource;
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
     extract_optional_u64, extract_parameters, extract_required_string, response::ResponseBuilder,
@@ -390,16 +391,24 @@ impl ServiceCheckerTool {
             };
         }
 
-        // Create HTTP client with timeout
-        let client = reqwest::Client::builder()
-            .timeout(timeout_duration)
-            .build()
-            .map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to create HTTP client: {e}"),
-                tool_name: Some("service_checker".to_string()),
-                source: None,
-            })
-            .unwrap();
+        // Create HTTP client with timeout using global runtime
+        let client = match create_io_bound_resource(move || {
+            reqwest::Client::builder().timeout(timeout_duration).build()
+        }) {
+            Ok(client) => client,
+            Err(e) => {
+                warn!("Failed to create HTTP client: {}", e);
+                return ServiceCheckResult {
+                    target: url.to_string(),
+                    available: false,
+                    #[allow(clippy::cast_possible_truncation)]
+                    response_time_ms: start_time.elapsed().as_millis() as u64,
+                    status: "Failed to create HTTP client".to_string(),
+                    error: Some(format!("Failed to create HTTP client: {e}")),
+                    metadata: HashMap::new(),
+                };
+            }
+        };
 
         // Make HEAD request to check service availability
         match client.head(url).send().await {

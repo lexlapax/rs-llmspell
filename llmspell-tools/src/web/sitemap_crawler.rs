@@ -10,6 +10,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, Result,
 };
+use llmspell_kernel::runtime::create_io_bound_resource;
 use llmspell_utils::{
     error_builders::llmspell::{component_error, validation_error},
     params::{
@@ -222,11 +223,14 @@ impl SitemapCrawlerTool {
                 return Ok(());
             }
 
-            let client = Client::builder()
-                .timeout(Duration::from_secs(options.timeout_secs))
-                .user_agent("Mozilla/5.0 (compatible; LLMSpell-SitemapCrawler/1.0)")
-                .build()
-                .unwrap_or_default();
+            let timeout_secs = options.timeout_secs;
+            let client = create_io_bound_resource(move || {
+                Client::builder()
+                    .timeout(Duration::from_secs(timeout_secs))
+                    .user_agent("Mozilla/5.0 (compatible; LLMSpell-SitemapCrawler/1.0)")
+                    .build()
+                    .unwrap_or_default()
+            });
 
             let response = client
                 .get(url)

@@ -14,6 +14,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
+use llmspell_kernel::runtime::create_io_bound_resource;
 use llmspell_utils::{
     extract_optional_object, extract_optional_string, extract_parameters, extract_required_string,
     response::ResponseBuilder,
@@ -176,14 +177,18 @@ impl GraphQLQueryTool {
     /// # Errors
     /// Returns an error if the HTTP client cannot be created or rate limiter setup fails.
     pub fn new(config: GraphQLConfig) -> Result<Self> {
-        let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(config.timeout_seconds))
-            .user_agent(&config.user_agent)
-            .build()
-            .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create HTTP client: {e}"),
-                source: None,
-            })?;
+        let timeout_seconds = config.timeout_seconds;
+        let user_agent = config.user_agent.clone();
+        let client = create_io_bound_resource(move || {
+            Client::builder()
+                .timeout(std::time::Duration::from_secs(timeout_seconds))
+                .user_agent(&user_agent)
+                .build()
+        })
+        .map_err(|e| LLMSpellError::Internal {
+            message: format!("Failed to create HTTP client: {e}"),
+            source: None,
+        })?;
 
         Ok(Self {
             metadata: ComponentMetadata::new(

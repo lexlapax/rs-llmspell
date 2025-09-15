@@ -115,23 +115,48 @@ where
     T: Send + 'static,
 {
     let start = Instant::now();
-    debug!("Creating IO-bound resource in global runtime context");
 
-    // Enter the global runtime context
-    let _guard = global_io_runtime().enter();
+    // Check if we're already in a runtime context
+    let in_runtime = tokio::runtime::Handle::try_current().is_ok();
 
-    // Create the resource within the runtime context
-    let resource = creator();
+    if in_runtime {
+        debug!("Creating IO-bound resource in current runtime context");
+        // We're already in a runtime (test or production), use it directly
+        let resource = creator();
 
-    let elapsed = start.elapsed();
-    debug!("IO-bound resource created in {:?}", elapsed);
+        let elapsed = start.elapsed();
+        debug!(
+            "IO-bound resource created in current runtime in {:?}",
+            elapsed
+        );
 
-    // Track metrics
-    if let Some(metrics) = RUNTIME_METRICS.get() {
-        metrics.record_resource_creation(elapsed);
+        // Track metrics
+        if let Some(metrics) = RUNTIME_METRICS.get() {
+            metrics.record_resource_creation(elapsed);
+        }
+
+        resource
+    } else {
+        debug!("Creating IO-bound resource in global runtime context");
+        // No runtime context, enter the global runtime
+        let _guard = global_io_runtime().enter();
+
+        // Create the resource within the global runtime context
+        let resource = creator();
+
+        let elapsed = start.elapsed();
+        debug!(
+            "IO-bound resource created in global runtime in {:?}",
+            elapsed
+        );
+
+        // Track metrics
+        if let Some(metrics) = RUNTIME_METRICS.get() {
+            metrics.record_resource_creation(elapsed);
+        }
+
+        resource
     }
-
-    resource
 }
 
 /// Block on a future using the global runtime

@@ -4,6 +4,7 @@
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_kernel::runtime::create_io_bound_resource;
 use reqwest::{header, Client};
 use serde::Deserialize;
 use tracing::{debug, info};
@@ -23,10 +24,12 @@ impl BraveSearchProvider {
             header::HeaderValue::from_static("application/json"),
         );
 
-        let client = Client::builder()
-            .default_headers(headers)
-            .build()
-            .unwrap_or_else(|_| Client::new());
+        let client = create_io_bound_resource(|| {
+            Client::builder()
+                .default_headers(headers)
+                .build()
+                .unwrap_or_else(|_| Client::new())
+        });
 
         Self {
             client,

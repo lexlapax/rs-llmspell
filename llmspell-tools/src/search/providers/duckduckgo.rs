@@ -4,6 +4,7 @@
 use super::{SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_kernel::runtime::create_io_bound_resource;
 use reqwest::Client;
 use serde_json::Value;
 use tracing::{debug, info, warn};
@@ -14,10 +15,11 @@ pub struct DuckDuckGoProvider {
 }
 
 impl DuckDuckGoProvider {
+    /// Create a new `DuckDuckGo` search provider with global runtime
     #[must_use]
     pub fn new() -> Self {
         Self {
-            client: Client::new(),
+            client: create_io_bound_resource(Client::new),
         }
     }
 }

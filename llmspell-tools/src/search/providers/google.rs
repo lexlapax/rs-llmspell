@@ -4,6 +4,7 @@
 use super::{ProviderConfig, SearchOptions, SearchProvider, SearchResult, SearchType};
 use async_trait::async_trait;
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_kernel::runtime::create_io_bound_resource;
 use reqwest::Client;
 use serde::Deserialize;
 use serde_json::Value;
@@ -26,7 +27,7 @@ impl GoogleSearchProvider {
             .map(std::string::ToString::to_string);
 
         Self {
-            client: Client::new(),
+            client: create_io_bound_resource(Client::new),
             api_key: config.api_key,
             search_engine_id,
         }

@@ -10,6 +10,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, Result,
 };
+use llmspell_kernel::runtime::create_io_bound_resource;
 use llmspell_utils::{
     error_builders::llmspell::{component_error, validation_error},
     // error_handling::{ErrorContext, SafeErrorHandler}, // Available for production use
@@ -95,12 +96,15 @@ impl WebScraperTool {
         selectors: Option<HashMap<String, String>>,
         single_selector: Option<String>,
     ) -> Result<Value> {
-        // Create client with custom timeout
-        let client = Client::builder()
-            .timeout(Duration::from_secs(options.timeout_secs))
-            .user_agent("Mozilla/5.0 (compatible; LLMSpell/1.0)")
-            .build()
-            .unwrap_or_default();
+        // Create client with custom timeout using global runtime
+        let timeout_secs = options.timeout_secs;
+        let client = create_io_bound_resource(move || {
+            Client::builder()
+                .timeout(Duration::from_secs(timeout_secs))
+                .user_agent("Mozilla/5.0 (compatible; LLMSpell/1.0)")
+                .build()
+                .unwrap_or_default()
+        });
 
         // Fetch the page
         let response = client
