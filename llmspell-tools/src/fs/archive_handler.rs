@@ -31,7 +31,7 @@ use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
 use tar::{Archive, Builder};
-use tracing::warn;
+use tracing::{debug, warn};
 use zip::write::{FileOptions, ZipWriter};
 use zip::{CompressionMethod, ZipArchive};
 
@@ -569,7 +569,7 @@ impl ArchiveHandlerTool {
     /// Create archive
     #[allow(clippy::unused_async)]
     async fn create_archive(&self, params: &Value) -> Result<Value> {
-        eprintln!("DEBUG create_archive: params = {params:?}");
+        debug!("create_archive: params = {params:?}");
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             LLMSpellError::Validation {
                 message: "Missing 'path' parameter".to_string(),

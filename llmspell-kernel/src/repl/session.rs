@@ -13,7 +13,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// REPL session configuration
 #[derive(Debug, Clone)]
@@ -123,11 +123,11 @@ impl InteractiveSession {
                 }
                 Ok(command) => {
                     if let Err(e) = self.handle_command(command).await {
-                        eprintln!("Error: {e}");
+                        error!("Command execution error: {e}");
                     }
                 }
                 Err(e) => {
-                    eprintln!("Parse error: {e}");
+                    error!("Command parse error: {e}");
                 }
             }
         }

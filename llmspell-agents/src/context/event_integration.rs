@@ -11,6 +11,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
+use tracing::error;
 
 /// Context-aware event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -358,7 +359,7 @@ impl ContextEventBus {
         // Wait for all handlers to complete
         for task in tasks {
             if let Err(e) = task.await {
-                eprintln!("Handler task failed: {e:?}");
+                error!("Handler task failed: {e:?}");
             }
         }
 

@@ -371,7 +371,7 @@ impl BaseAgent for JsonProcessorTool {
         let (operation, input_json, query) = Self::parse_parameters(params)?;
 
         info!("Executing JSON {} operation", operation);
-        eprintln!("DEBUG: input_json = {:?}", input_json);
+        debug!("input_json = {:?}", input_json);
 
         let result = match operation {
             JsonOperation::Query => {

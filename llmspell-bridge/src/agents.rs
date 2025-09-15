@@ -234,6 +234,7 @@ impl BridgeDiscovery<AgentInfo> for AgentDiscovery {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use tracing::error;
 
     fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
         Arc::new(llmspell_providers::ProviderManager::new())
@@ -275,7 +276,7 @@ mod tests {
             .get_or_create_agent("test", "basic", config.clone())
             .await;
         if let Err(e) = &agent1 {
-            eprintln!("Agent creation failed: {e:?}");
+            error!("Agent creation failed: {e:?}");
         }
         assert!(agent1.is_ok());
 

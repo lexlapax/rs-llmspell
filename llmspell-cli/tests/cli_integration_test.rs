@@ -109,7 +109,7 @@ fn test_output_format_json() {
         .arg("print('test')")
         .assert()
         .success()
-        .stdout(predicate::str::contains("output"));
+        .stdout(predicate::str::contains("\"status\":\"executed\""));
 }
 #[test]
 fn test_validate_missing_config() {
