@@ -1425,6 +1425,382 @@ impl ExecutionContext {
 
 ---
 
+### Task 9.4.5: Complete Tracing Instrumentation Across All Crates
+**Priority**: CRITICAL BLOCKER
+**Estimated Time**: 153 hours (19 days)
+**Assignee**: Infrastructure Team Lead
+**Dependencies**: Task 9.4.4
+**Status**: IN PROGRESS - Phase 1 Subtask 1.1 ✅ COMPLETE, Subtask 1.2 ready to start
+**Analysis Document**: `/TRACING-ANALYSIS.md` (comprehensive gaps analysis)
+
+**Description**: Implement comprehensive tracing instrumentation across all 14 workspace crates to enable proper observability. Currently only 0.02% of async functions are instrumented (1 out of 4,708). This is a CRITICAL blocker for Phase 9.5 as we cannot validate applications without proper observability.
+
+**Critical Findings:**
+- **99.98% of async functions lack #[instrument] attributes**
+- **3 different tracing patterns used inconsistently** (needs standardization)
+- **172 tool implementations have zero initialization tracing**
+- **439 files have error handling without context logging**
+- **43 files use incorrect `tracing::` prefix pattern**
+- **10 files mix multiple patterns causing confusion**
+- **Output destinations not standardized** (mixing stdout/stderr incorrectly)
+
+**Standardization Decisions:**
+
+**1. Output Destinations (Unix Best Practice):**
+- **Tracing/Debug** → stderr (via tracing with `.with_writer(io::stderr)`)
+- **Program Output** → stdout (via `println!` ONLY for actual results)
+- **Errors** → stderr (via `eprintln!` or `error!` macro)
+
+**2. Tracing Pattern:**
+```rust
+// ✅ STANDARD PATTERN - Enforce everywhere
+use tracing::{debug, error, info, instrument, trace, warn};
+
+#[instrument(level = "debug", skip(self), fields(operation = %op_name))]
+async fn example(&self) -> Result<()> {
+    info!("Starting operation"); // Goes to stderr
+    // Never use tracing::info! or log::info!
+}
+```
+
+**Implementation Phases:**
+
+#### 9.4.5.1 Phase 1: Infrastructure Validation & Standardization (Day 1 - 11 hours)**
+
+**Subtask 1.1: Validate Tracing Infrastructure (2 hours) - ✅ 100% COMPLETE**
+
+**✅ COMPLETED:**
+- [x] Verified `--trace` flag works on `run` and `exec` commands
+  - Confirmed output levels: off(7 lines), error(7), warn(9), info(17), debug(26), trace(31)
+  - Trace output format: `[timestamp] [LEVEL] [span_info:] message`
+- [x] Tested all trace levels successfully: off, error, warn, info, debug, trace
+  - Each level progressively shows more output as expected
+  - Default level is "warn" when no --trace specified
+- [x] Created comprehensive test suite: `/llmspell-cli/tests/trace_levels_test.rs`
+  - **ALL 11 tests passing** (was 7 of 8, now fully fixed)
+- [x] Fully validated span propagation
+  - Confirmed span names appear in trace output: "bind", "new", "create_session"
+  - Spans shown in bold formatting in terminal output
+- [x] Fixed `debug` command timeout handling - properly tested with 2-second timeout
+- [x] Fixed `repl` command timeout handling - properly tested with 2-second timeout
+- [x] Fixed `test_trace_on_all_commands` - removed #[ignore], test now passes
+- [x] Added stderr/stdout separation test - verifies Unix best practice
+
+**📝 KEY LEARNINGS:**
+1. Tracing output MUST go to stderr (Unix best practice for CLI tools)
+2. Program output MUST go to stdout (enables piping and redirection)
+3. Fixed `setup_tracing()` to respect RUST_LOG via EnvFilter
+4. Span hierarchy visible with indented output in trace mode
+5. Infrastructure is solid after fixes - ready for instrumentation
+6. Priority: RUST_LOG > --trace flag > default (warn) - this is correct behavior
+7. Interactive commands (debug/repl) correctly wait for input - tests handle with timeout
+
+**✅ FIXES APPLIED:**
+- [x] Fixed RUST_LOG environment variable - now works with EnvFilter
+- [x] Standardized tracing output to stderr using `.with_writer(io::stderr)`
+- [x] Added proper timeout tests for debug and repl commands
+- [x] Removed #[ignore] attribute from test_trace_on_all_commands
+- [x] Added test_stderr_stdout_separation to verify output streams
+- [x] Fixed unused import warnings in test file
+
+**✅ TEST RESULTS:**
+```
+running 11 tests
+test test_trace_level_warn ... ok
+test test_trace_level_debug ... ok
+test test_trace_level_trace ... ok
+test test_stderr_stdout_separation ... ok
+test test_trace_level_error ... ok
+test test_trace_level_off ... ok
+test test_trace_level_info ... ok
+test test_span_propagation ... ok
+test test_trace_on_all_commands ... ok
+test test_repl_command_timeout ... ok
+test test_debug_command_timeout ... ok
+```
+
+**✅ VERIFICATION COMPLETE:**
+- RUST_LOG environment variable works correctly with debug/info/trace levels
+- --trace flag works when RUST_LOG is not set
+- stderr contains tracing output, stdout contains program output
+- Separation verified: `llmspell exec "code" > out.txt 2> err.txt` works correctly
+
+**Subtask 1.2: Standardize Output Destinations (3 hours) - NEW**
+**Priority**: CRITICAL - Must be done before adding more instrumentation
+
+**Problem**: Currently mixing stdout/stderr incorrectly across crates
+- Some crates use `println!` for debug output (wrong - goes to stdout)
+- Some use `eprintln!` for errors (correct - goes to stderr)
+- Tracing output must go to stderr (Unix best practice)
+- Program output must go to stdout
+
+**Implementation:**
+- [ ] Audit all uses of `println!` across workspace - convert debug output to tracing macros
+  - [ ] llmspell-cli: Review setup.rs (has many println! for user interaction - OK)
+  - [ ] llmspell-tools: Check for println! in tool implementations
+  - [ ] llmspell-agents: Check for println! in agent execution
+  - [ ] llmspell-bridge: Check for println! in script execution
+  - [ ] llmspell-kernel: Check for println! in kernel operations
+- [ ] Ensure all error output uses `eprintln!` or tracing error! macro
+- [ ] Verify tracing configuration in all crates uses stderr
+- [ ] Add lint rule to prevent println! in non-UI contexts
+- [ ] Test: `llmspell exec "print('test')" > out.txt 2> err.txt` - verify separation
+
+**Best Practice Standard:**
+```rust
+// ✅ CORRECT - Program output
+println!("{}", result); // Only for actual program output
+
+// ✅ CORRECT - Debug/trace output
+debug!("Processing: {}", item); // Goes to stderr via tracing
+error!("Failed: {}", err); // Goes to stderr via tracing
+
+// ❌ WRONG - Debug output to stdout
+println!("Debug: {}", value); // NEVER do this
+```
+
+**Subtask 1.3: Standardize Tracing Patterns (4 hours)**
+- [ ] Fix 10 files with mixed patterns (HIGHEST PRIORITY):
+  - [ ] `/llmspell-security/src/audit.rs`
+  - [ ] `/llmspell-workflows/src/executor.rs`
+  - [ ] `/llmspell-storage/src/backends/vector/hnsw.rs`
+  - [ ] `/llmspell-bridge/src/lua/global_context.rs`
+  - [ ] `/llmspell-tools/src/registry.rs`
+  - [ ] `/llmspell-agents/src/monitoring/performance.rs`
+  - [ ] `/llmspell-hooks/src/builtin/logging.rs` (convert from log::)
+  - [ ] `/llmspell-events/src/bus.rs`
+  - [ ] `/llmspell-kernel/src/hooks/performance.rs`
+  - [ ] `/llmspell-utils/src/circuit_breaker/mod.rs`
+- [ ] Test: Verify no compilation errors after changes
+
+**Subtask 1.4: Convert tracing:: Prefix Usage (2 hours)**
+- [ ] Convert 43 files from `tracing::info!()` to imported `info!()`
+- [ ] Add proper imports: `use tracing::{debug, error, info, warn};`
+- [ ] Run conversion script: `find . -name "*.rs" -exec sed -i '' 's/tracing:://' {} \;`
+- [ ] Test: `cargo check --workspace`
+
+#### 9.4.5.2 Phase 2: Core Foundation Instrumentation (Day 2 - 8 hours)**
+
+**Subtask 2.1: Instrument llmspell-core Traits (4 hours)**
+- [ ] Add #[instrument] to BaseAgent trait (8 methods):
+  - [ ] `execute()` - level="info", track agent_id
+  - [ ] `execute_impl()` - level="debug", track input size
+  - [ ] `get_capabilities()` - level="trace"
+  - [ ] `validate_input()` - level="debug"
+  - [ ] `format_output()` - level="trace"
+  - [ ] `handle_error()` - level="error", include context
+  - [ ] `shutdown()` - level="info"
+  - [ ] `health_check()` - level="debug"
+- [ ] Add #[instrument] to Tool trait (5 methods)
+- [ ] Add #[instrument] to Workflow trait (6 methods)
+- [ ] Test: `cargo test -p llmspell-core --test tracing_test`
+
+**Subtask 2.2: Instrument ExecutionContext (2 hours)**
+- [ ] Add tracing to context operations (12 methods):
+  - [ ] `get()` - trace level with key
+  - [ ] `set()` - debug level with key and value size
+  - [ ] `merge()` - debug level with context size
+  - [ ] `child_context()` - info level
+- [ ] Add performance metrics to context operations
+- [ ] Test: `cargo test -p llmspell-core test_context_tracing`
+
+**Subtask 2.3: Instrument Error Paths (2 hours)**
+- [ ] Add error context to all LLMSpellError conversions
+- [ ] Instrument error propagation with `error!()` calls
+- [ ] Add `.map_err()` context logging (25 locations)
+- [ ] Test: `cargo test -p llmspell-core test_error_context`
+
+#### 9.4.5.3 Phase 3: Tool Instrumentation (Days 3-4 - 24 hours)**
+
+**Subtask 3.1: Instrument Tool Registry (4 hours)**
+- [ ] Add #[instrument] to registry operations (19 methods):
+  - [ ] `register()` - info level, tool name
+  - [ ] `get()` - debug level, tool lookup
+  - [ ] `list()` - trace level
+  - [ ] `execute_tool()` - info level, tool name and timing
+- [ ] Add initialization tracing to ToolRegistry::new()
+- [ ] Test: `cargo test -p llmspell-tools test_registry_tracing`
+
+**Subtask 3.2: Instrument File System Tools (6 hours)**
+- [ ] FileOperationsTool (3 methods): read, write, delete
+- [ ] FileSearchTool (3 methods): search, glob, find
+- [ ] DirectoryTool (3 methods): create, list, remove
+- [ ] FileSandbox (4 methods): validate, restrict, check
+- [ ] PathResolver (2 methods): resolve, canonicalize
+- [ ] FileWatcher (3 methods): watch, notify, stop
+- [ ] ArchiveTool (2 methods): compress, extract
+- [ ] PermissionsTool (2 methods): get, set
+- [ ] Test each tool individually: `cargo test -p llmspell-tools test_fs_tools_tracing`
+
+**Subtask 3.3: Instrument Web/API Tools (8 hours)**
+- [ ] HttpRequestTool: Add request/response tracing with headers
+- [ ] WebScraperTool: Add URL and content size tracing
+- [ ] GraphQLQueryTool: Add query and variables tracing
+- [ ] RestApiTool: Add endpoint and method tracing
+- [ ] WebhookTool: Add webhook URL and payload tracing
+- [ ] WebSocketTool: Add connection and message tracing
+- [ ] OAuth2Tool: Add auth flow tracing (careful with secrets!)
+- [ ] Test: `cargo test -p llmspell-tools test_web_tools_tracing`
+
+**Subtask 3.4: Instrument System Tools (6 hours)**
+- [ ] ProcessExecutorTool: Add command and args tracing
+- [ ] SystemMonitorTool: Add metrics collection tracing
+- [ ] EnvironmentTool: Add env var access tracing
+- [ ] ShellCommandTool: Add shell command tracing
+- [ ] CronSchedulerTool: Add schedule tracing
+- [ ] ServiceManagerTool: Add service operation tracing
+- [ ] Test: `cargo test -p llmspell-tools test_system_tools_tracing`
+
+#### 9.4.5.4 Phase 4: Agent Infrastructure (Days 5-6 - 16 hours)**
+
+**Subtask 4.1: Instrument Agent Creation (6 hours)**
+- [ ] BasicAgent::new() - Add debug! for config
+- [ ] LLMAgent::new() - Add info! for provider/model
+- [ ] WorkflowAgent::new() - Add debug! for workflow steps
+- [ ] CompoundAgent::new() - Add debug! for sub-agents
+- [ ] Add #[instrument] to all agent factory methods (8 methods)
+- [ ] Test: `cargo test -p llmspell-agents test_agent_creation_tracing`
+
+**Subtask 4.2: Instrument Agent Execution (6 hours)**
+- [ ] Add #[instrument] to execute_impl() for all agents
+- [ ] Track execution time, input size, output size
+- [ ] Add conversation history tracing
+- [ ] Instrument tool invocations from agents
+- [ ] Test: `cargo test -p llmspell-agents test_agent_execution_tracing`
+
+**Subtask 4.3: Instrument Agent State (4 hours)**
+- [ ] State transitions (8 methods): init, ready, executing, complete
+- [ ] State persistence operations
+- [ ] State recovery and rollback
+- [ ] Test: `cargo test -p llmspell-agents test_agent_state_tracing`
+
+#### 9.4.5.5 Phase 5: Provider & Bridge (Days 7-8 - 20 hours)**
+
+**Subtask 5.1: Instrument LLM Providers (8 hours)**
+- [ ] Rig provider (8 methods):
+  - [ ] completion() - info level with model, tokens
+  - [ ] streaming_completion() - debug level with chunks
+  - [ ] embeddings() - debug level with dimensions
+- [ ] Add token counting instrumentation
+- [ ] Add rate limiting and retry tracing
+- [ ] Add cost estimation tracing
+- [ ] Test: `cargo test -p llmspell-providers test_provider_tracing`
+
+**Subtask 5.2: Instrument Script Bridges (12 hours)**
+- [ ] Lua bridge (10 methods):
+  - [ ] execute_script() - info level with script size
+  - [ ] compile() - debug level with bytecode size
+  - [ ] global_context operations - trace level
+- [ ] JavaScript bridge (when implemented)
+- [ ] Python bridge (when implemented)
+- [ ] Add cross-language call tracing
+- [ ] Test: `cargo test -p llmspell-bridge test_bridge_tracing`
+
+#### 9.4.5.6 Phase 6: Supporting Systems (Days 9-10 - 30 hours)**
+
+**Subtask 6.1: Instrument Kernel Operations (8 hours)**
+- [ ] Complete transport layer instrumentation (15 methods)
+- [ ] Message routing tracing with correlation IDs
+- [ ] Session management tracing
+- [ ] I/O routing instrumentation
+- [ ] Test: `cargo test -p llmspell-kernel test_kernel_tracing`
+
+**Subtask 6.2: Instrument Workflows (10 hours)**
+- [ ] Workflow execution (12 methods)
+- [ ] Step transitions with timing
+- [ ] Conditional logic tracing
+- [ ] Parallel execution tracing
+- [ ] Test: `cargo test -p llmspell-workflows test_workflow_tracing`
+
+**Subtask 6.3: Instrument State & Persistence (12 hours)**
+- [ ] State operations (20 methods)
+- [ ] Persistence backend operations
+- [ ] Backup and recovery tracing
+- [ ] Transaction boundaries
+- [ ] Test: `cargo test -p llmspell-state-persistence test_state_tracing`
+
+#### 9.4.5.7 Phase 7: Testing & Verification (Days 11-12 - 16 hours)**
+
+**Subtask 7.1: Create Tracing Test Suite (8 hours)**
+- [ ] Add `tracing-test = "0.2"` to workspace dependencies
+- [ ] Create test module for each crate
+- [ ] Write tests verifying span creation
+- [ ] Write tests verifying field extraction
+- [ ] Write tests verifying error context
+- [ ] Test: `cargo test --workspace --test '*tracing*'`
+
+**Subtask 7.2: Performance Impact Testing (4 hours)**
+- [ ] Baseline performance without tracing
+- [ ] Measure with INFO level (target: <2% overhead)
+- [ ] Measure with DEBUG level (target: <5% overhead)
+- [ ] Measure with TRACE level (document overhead)
+- [ ] Create performance regression tests
+- [ ] Test: `cargo bench --workspace`
+
+**Subtask 7.3: Integration Testing (4 hours)**
+- [ ] Test span propagation across crate boundaries
+- [ ] Test correlation IDs through full request lifecycle
+- [ ] Test error context propagation
+- [ ] Test with distributed tracing collectors
+- [ ] Test: `cargo test --workspace --all-features`
+
+#### 9.4.5.8 Phase 8: Documentation & Enforcement (Day 13 - 8 hours)**
+
+**Subtask 8.1: Update Documentation (4 hours)**
+- [ ] Add tracing examples to each crate's README
+- [ ] Document standard patterns in CONTRIBUTING.md
+- [ ] Create tracing best practices guide
+- [ ] Update API documentation with tracing info
+- [ ] Generate rustdoc: `cargo doc --workspace --all-features`
+
+**Subtask 8.2: Setup Enforcement (4 hours)**
+- [ ] Add clippy lints for tracing patterns
+- [ ] Create pre-commit hooks for pattern checking
+- [ ] Add CI pipeline checks for consistency
+- [ ] Create automated migration scripts
+- [ ] Test: `./scripts/quality-check.sh`
+
+**Acceptance Criteria:**
+- [ ] Zero files using `tracing::` prefix pattern
+- [ ] Zero files using `log::` crate
+- [ ] All 172 tool implementations have initialization tracing
+- [ ] All 15 agent implementations have execution tracing
+- [ ] All 8 provider implementations have API call tracing
+- [ ] 100% of user-facing async functions have #[instrument]
+- [ ] 100% of error paths have context logging
+- [ ] Performance overhead <2% at INFO level
+- [ ] Performance overhead <5% at DEBUG level
+- [ ] All tests pass with tracing enabled
+- [ ] Documentation complete with examples
+
+**Verification Commands:**
+```bash
+# Check for pattern violations
+! grep -r "tracing::" --include="*.rs" .
+! grep -r "log::" --include="*.rs" .
+
+# Run all tracing tests
+cargo test --workspace --test '*tracing*'
+
+# Check performance impact
+cargo bench --workspace -- --baseline
+
+# Verify instrumentation coverage
+cargo llvm-cov --workspace --html
+```
+
+**Definition of Done:**
+- [ ] All 14 workspace crates properly instrumented
+- [ ] Single consistent tracing pattern enforced
+- [ ] Zero clippy warnings related to tracing
+- [ ] Performance targets met (<2% overhead)
+- [ ] All tracing tests passing
+- [ ] Documentation and examples complete
+- [ ] CI/CD enforcement configured
+- [ ] Code review completed by team lead
+
+---
+
 ## Phase 9.5: Application Validation & Future-Proofing (Days 14-16)
 
 ### Task 9.5.1: Implement Application Validation Suite

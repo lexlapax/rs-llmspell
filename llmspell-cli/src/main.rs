@@ -22,12 +22,30 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-/// Set up tracing based on trace level
+/// Set up tracing based on RUST_LOG environment variable or --trace flag
+/// Priority: RUST_LOG > --trace flag > default (warn)
+///
+/// Best Practice: Tracing output goes to stderr to keep stdout clean for program output
+/// This allows: `llmspell exec "code" > output.txt 2> debug.log`
 fn setup_tracing(trace_level: llmspell_cli::cli::TraceLevel) {
-    let level: tracing::Level = trace_level.into();
+    use std::io;
+    use tracing_subscriber::EnvFilter;
 
-    tracing_subscriber::fmt()
-        .with_max_level(level)
-        .with_target(false)
-        .init();
+    // Check if RUST_LOG is set
+    if std::env::var("RUST_LOG").is_ok() {
+        // Use RUST_LOG environment variable with EnvFilter
+        tracing_subscriber::fmt()
+            .with_env_filter(EnvFilter::from_default_env())
+            .with_writer(io::stderr) // Explicitly use stderr for tracing
+            .with_target(false)
+            .init();
+    } else {
+        // Use --trace flag
+        let level: tracing::Level = trace_level.into();
+        tracing_subscriber::fmt()
+            .with_max_level(level)
+            .with_writer(io::stderr) // Explicitly use stderr for tracing
+            .with_target(false)
+            .init();
+    }
 }
