@@ -9,6 +9,7 @@ use llmspell_hooks::{Hook, HookContext, HookMetadata, HookResult, Language, Prio
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
+use tracing::debug;
 
 /// Dynamic condition evaluation for conditional hooks
 #[async_trait]
@@ -355,7 +356,7 @@ impl ConditionalHook {
 #[async_trait]
 impl Hook for ConditionalHook {
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
-        tracing::debug!(
+        debug!(
             "ConditionalHook '{}': Evaluating condition: {}",
             self.metadata.name,
             self.condition.description()
@@ -363,29 +364,28 @@ impl Hook for ConditionalHook {
 
         let condition_result = self.condition.evaluate(context).await?;
 
-        tracing::debug!(
+        debug!(
             "ConditionalHook '{}': Condition result: {}",
-            self.metadata.name,
-            condition_result
+            self.metadata.name, condition_result
         );
 
         if condition_result {
             // Condition is true, execute main hook
-            tracing::debug!(
+            debug!(
                 "ConditionalHook '{}': Executing main hook",
                 self.metadata.name
             );
             self.hook.execute(context).await
         } else if let Some(else_hook) = &self.else_hook {
             // Condition is false, execute else hook if present
-            tracing::debug!(
+            debug!(
                 "ConditionalHook '{}': Executing else hook",
                 self.metadata.name
             );
             else_hook.execute(context).await
         } else {
             // No else hook, continue
-            tracing::debug!(
+            debug!(
                 "ConditionalHook '{}': Condition false, no else hook - continuing",
                 self.metadata.name
             );

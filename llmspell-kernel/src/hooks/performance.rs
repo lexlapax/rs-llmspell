@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tracing::warn;
 
 /// Performance metrics for hook execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -156,11 +157,9 @@ impl KernelPerformanceMonitor {
         // Check threshold violation
         if duration > self.threshold {
             metrics.threshold_violations += 1;
-            tracing::warn!(
+            warn!(
                 "Hook execution threshold violation: {:?} took {:?} (threshold: {:?})",
-                hook_point,
-                duration,
-                self.threshold
+                hook_point, duration, self.threshold
             );
         }
 
@@ -196,7 +195,7 @@ impl KernelPerformanceMonitor {
 
         // Log performance warnings
         if metrics.overhead_percentage > 5.0 {
-            tracing::warn!(
+            warn!(
                 "Hook system overhead ({:.2}%) exceeds 5% threshold",
                 metrics.overhead_percentage
             );

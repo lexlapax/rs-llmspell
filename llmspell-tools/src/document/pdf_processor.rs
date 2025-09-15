@@ -36,6 +36,7 @@ use pdf_extract::{extract_text_from_mem, OutputError as PdfError};
 use serde_json::{json, Value as JsonValue};
 use std::fs;
 use std::path::Path;
+use tracing::{error, info};
 
 /// PDF Processor tool for document analysis and text extraction
 #[derive(Debug, Clone)]
@@ -102,13 +103,13 @@ impl PdfProcessorTool {
 
         // Extract text using spawn_blocking to avoid blocking the async executor
         // pdf-extract is a synchronous library, so we must run it in a blocking thread
-        tracing::info!("Starting PDF text extraction for file: {}", file_path);
-        tracing::info!("File size: {} bytes", file_content.len());
+        info!("Starting PDF text extraction for file: {}", file_path);
+        info!("File size: {} bytes", file_content.len());
 
         let text = with_timeout(std::time::Duration::from_secs(30), async move {
-            tracing::info!("Spawning blocking task for PDF extraction");
+            info!("Spawning blocking task for PDF extraction");
             let result = tokio::task::spawn_blocking(move || {
-                tracing::info!("Inside blocking task, starting extraction");
+                info!("Inside blocking task, starting extraction");
                 let extraction_result =
                     extract_text_from_mem(&file_content).map_err(|e: PdfError| {
                         tool_error(
@@ -116,7 +117,7 @@ impl PdfProcessorTool {
                             Some("pdf_extraction".to_string()),
                         )
                     });
-                tracing::info!(
+                info!(
                     "Extraction complete, success: {}",
                     extraction_result.is_ok()
                 );
@@ -124,26 +125,26 @@ impl PdfProcessorTool {
             })
             .await
             .map_err(|e| {
-                tracing::error!("PDF extraction task failed: {}", e);
+                error!("PDF extraction task failed: {}", e);
                 tool_error(
                     format!("PDF extraction task failed: {e}"),
                     Some("task_spawn".to_string()),
                 )
             })?;
 
-            tracing::info!("Blocking task completed");
+            info!("Blocking task completed");
             result
         })
         .await
         .map_err(|_| {
-            tracing::error!("PDF extraction timed out after 30 seconds");
+            error!("PDF extraction timed out after 30 seconds");
             tool_error(
                 "PDF extraction timed out after 30 seconds".to_string(),
                 Some("timeout".to_string()),
             )
         })??;
 
-        tracing::info!(
+        info!(
             "PDF text extraction successful, text length: {}",
             text.len()
         );

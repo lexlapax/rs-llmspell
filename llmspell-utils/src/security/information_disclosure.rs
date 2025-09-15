@@ -4,6 +4,7 @@
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tracing::error;
 
 /// Information disclosure prevention configuration
 #[derive(Debug, Clone)]
@@ -342,7 +343,7 @@ impl ProductionErrorHandler {
 
         // Log full error internally if enabled
         if self.log_full_errors {
-            tracing::error!(
+            error!(
                 error_code = %self.preventer.generate_error_code(&error_info.message),
                 "Internal error: {}",
                 error

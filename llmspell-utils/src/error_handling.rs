@@ -7,6 +7,7 @@ use crate::security::information_disclosure::{
 use llmspell_core::LLMSpellError;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::error;
 
 /// Production-safe error response
 #[derive(Debug, Clone, serde::Serialize)]
@@ -197,7 +198,7 @@ impl SafeErrorHandler {
             fields.push(("user_id", user.as_str()));
         }
 
-        tracing::error!(
+        error!(
             error_code = %self.preventer.generate_error_code(&error_info.message),
             error_type = ?error_info.kind,
             ?fields,

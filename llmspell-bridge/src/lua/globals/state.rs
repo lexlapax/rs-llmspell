@@ -10,6 +10,7 @@ use mlua::{Error as LuaError, Lua, Value};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::info;
 
 /// Create save operation handler
 fn create_save_handler(
@@ -56,12 +57,9 @@ fn create_load_handler(
         } else {
             key.clone()
         };
-        tracing::info!(
+        info!(
             "Lua State.load: scope='{}', key='{}', actual_key='{}', full_key='{}'",
-            scope_str,
-            key,
-            actual_key,
-            full_key
+            scope_str, key, actual_key, full_key
         );
 
         state_access.as_ref().map_or_else(
@@ -621,7 +619,7 @@ pub fn inject_state_global(
     _context: &GlobalContext,
     state_global: &StateGlobal,
 ) -> mlua::Result<()> {
-    tracing::info!("inject_state_global called");
+    info!("inject_state_global called");
     let state_table = lua.create_table()?;
 
     // Clone references for the closures
@@ -629,7 +627,7 @@ pub fn inject_state_global(
     let _state_manager = state_global.state_manager.clone(); // Keep for migration/backup features
     let fallback_state = state_global.fallback_state.clone();
 
-    tracing::info!(
+    info!(
         "inject_state_global: state_access is_some: {}",
         state_access.is_some()
     );

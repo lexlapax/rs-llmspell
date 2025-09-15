@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::{error, info, warn};
 
 /// Health status levels
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -321,21 +322,17 @@ impl HealthMonitor {
 
                 match monitor.check_all().await {
                     Ok(result) => {
-                        tracing::info!("Health check completed: {}", result.summary());
+                        info!("Health check completed: {}", result.summary());
 
                         // Log any unhealthy components
                         for (id, health) in &result.components {
                             if health.status == HealthStatus::Unhealthy {
-                                tracing::warn!(
-                                    "Component {} is unhealthy: {:?}",
-                                    id,
-                                    health.indicators
-                                );
+                                warn!("Component {} is unhealthy: {:?}", id, health.indicators);
                             }
                         }
                     }
                     Err(e) => {
-                        tracing::error!("Health check failed: {}", e);
+                        error!("Health check failed: {}", e);
                     }
                 }
             }

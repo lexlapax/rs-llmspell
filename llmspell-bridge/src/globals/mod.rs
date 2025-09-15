@@ -32,6 +32,7 @@ pub use types::{GlobalContext, GlobalMetadata, GlobalObject};
 
 use llmspell_core::Result;
 use std::sync::Arc;
+use tracing::warn;
 
 /// Register core globals (json, logger, config, debug)
 fn register_core_globals(builder: &mut GlobalRegistryBuilder) {
@@ -97,7 +98,7 @@ async fn register_rag_global(
                 builder.register(Arc::new(rag_global));
             }
             Err(e) => {
-                tracing::warn!("Failed to initialize RAG global: {}", e);
+                warn!("Failed to initialize RAG global: {}", e);
             }
         }
     }
@@ -179,7 +180,7 @@ async fn create_state_global(context: &Arc<GlobalContext>) -> Arc<state_global::
                     ));
                 }
                 Err(e) => {
-                    tracing::warn!(
+                    warn!(
                         "Failed to initialize state infrastructure: {}, falling back to in-memory",
                         e
                     );

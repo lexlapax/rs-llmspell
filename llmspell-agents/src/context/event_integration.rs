@@ -11,7 +11,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{broadcast, RwLock};
-use tracing::error;
+use tracing::{error, info};
 
 /// Context-aware event
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -415,7 +415,7 @@ impl EventHandler for LoggingEventHandler {
     ///
     /// Returns an error if logging fails
     async fn handle(&self, event: ContextEvent, _context: ExecutionContext) -> Result<()> {
-        tracing::info!(
+        info!(
             event_type = %event.event_type,
             event_id = %event.id,
             source = %event.source_context,

@@ -8,8 +8,8 @@ use crate::types::{HookMetadata, Language, Priority};
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::Utc;
-use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
+use tracing::{debug, error, info, trace, warn};
 
 // OPTIMIZATION: Pre-allocate common strings to reduce allocations
 const BUILTIN_TAG: &str = "builtin";

@@ -11,6 +11,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tracing::{error, warn};
 
 /// Alert severity levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -502,19 +503,16 @@ impl AlertManager {
                         Ok(()) => break,
                         Err(e) => {
                             if attempt == self.config.notification_retries - 1 {
-                                tracing::error!(
+                                error!(
                                     "Failed to send alert {} via {} after {} attempts: {}",
-                                    alert.id,
-                                    channel_name,
-                                    self.config.notification_retries,
-                                    e
+                                    alert.id, channel_name, self.config.notification_retries, e
                                 );
                             }
                         }
                     }
                 }
             } else {
-                tracing::warn!("Channel {} not found", channel_name);
+                warn!("Channel {} not found", channel_name);
             }
         }
 

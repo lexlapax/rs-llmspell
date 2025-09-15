@@ -8,6 +8,7 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::fmt;
 use std::time::Duration;
+use tracing::{info, warn};
 
 /// Comprehensive error type for tool integration operations
 #[derive(Debug, Clone)]
@@ -610,16 +611,16 @@ impl ToolErrorHandler {
                     .await
             }
             ErrorRecoveryStrategy::BestEffort => {
-                tracing::warn!("Error occurred but continuing with best effort: {}", error);
+                warn!("Error occurred but continuing with best effort: {}", error);
                 Ok(Some(JsonValue::Null))
             }
             ErrorRecoveryStrategy::CollectErrors => {
-                tracing::warn!("Error collected for later reporting: {}", error);
+                warn!("Error collected for later reporting: {}", error);
                 Ok(None)
             }
             ErrorRecoveryStrategy::Custom(_strategy_name) => {
                 // Custom strategies would be implemented here
-                tracing::warn!("Custom recovery strategy not implemented, failing fast");
+                warn!("Custom recovery strategy not implemented, failing fast");
                 Err(error.into_llmspell_error())
             }
         }
@@ -651,17 +652,17 @@ impl ToolErrorHandler {
                 continue;
             }
 
-            tracing::info!("Attempting recovery action: {:?}", action);
+            info!("Attempting recovery action: {:?}", action);
 
             match self.execute_recovery_action(action, context, timeout).await {
                 Ok(result) => {
                     context.record_error(error.clone(), Some(action.clone()), true);
-                    tracing::info!("Recovery successful");
+                    info!("Recovery successful");
                     return Ok(Some(result));
                 }
                 Err(recovery_error) => {
                     context.record_error(error.clone(), Some(action.clone()), false);
-                    tracing::warn!("Recovery action failed: {}", recovery_error);
+                    warn!("Recovery action failed: {}", recovery_error);
                 }
             }
         }
@@ -697,7 +698,7 @@ impl ToolErrorHandler {
                     .collect(),
             )),
             RecoveryAction::RequestUserIntervention { message, .. } => {
-                tracing::warn!("User intervention requested: {}", message);
+                warn!("User intervention requested: {}", message);
                 Err(LLMSpellError::Component {
                     message: format!("User intervention required: {message}"),
                     source: None,

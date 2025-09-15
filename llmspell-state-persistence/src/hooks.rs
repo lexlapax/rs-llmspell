@@ -7,6 +7,7 @@ use llmspell_hooks::{
     Hook, HookContext, HookMetadata, HookResult, Language, Priority, ReplayableHook,
 };
 use serde_json::Value;
+use tracing::{debug, info};
 
 /// State change event for hooks
 #[derive(Debug, Clone)]
@@ -75,12 +76,9 @@ impl Hook for StateAuditHook {
         let key = context.get_metadata("key").unwrap_or("unknown");
         let operation = context.get_metadata("operation").unwrap_or("unknown");
 
-        tracing::info!(
+        info!(
             "State operation: {} on {}/{} by component {:?}",
-            operation,
-            scope,
-            key,
-            context.component_id
+            operation, scope, key, context.component_id
         );
 
         Ok(HookResult::Continue)
@@ -110,7 +108,7 @@ impl Hook for StateCacheHook {
     async fn execute(&self, context: &mut HookContext) -> anyhow::Result<HookResult> {
         // In a real implementation, this would invalidate caches
         let key = context.get_metadata("key").unwrap_or("unknown");
-        tracing::debug!("Cache invalidated for key: {}", key);
+        debug!("Cache invalidated for key: {}", key);
         Ok(HookResult::Continue)
     }
 

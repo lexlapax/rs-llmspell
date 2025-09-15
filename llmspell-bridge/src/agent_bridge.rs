@@ -22,6 +22,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tracing::{debug, info, warn};
 
 /// Bridge between scripts and agents
 pub struct AgentBridge {
@@ -167,13 +168,13 @@ impl AgentBridge {
         }
 
         // Also register in component registry for script access
-        tracing::debug!(
+        debug!(
             "DEBUG: Registering agent '{}' in ComponentRegistry",
             instance_name
         );
         self.registry
             .register_agent(instance_name.to_string(), agent)?;
-        tracing::info!(
+        info!(
             "DEBUG: Successfully registered agent '{}' in ComponentRegistry",
             instance_name
         );
@@ -1702,7 +1703,7 @@ impl AgentBridge {
         if metadata.is_some() {
             // State exists but we cannot load it into the agent due to Arc<dyn Agent> limitation
             // This would require refactoring to store agents differently or using interior mutability
-            tracing::warn!(
+            warn!(
                 "Agent state exists for '{}' but cannot be loaded due to immutable agent reference. \
                  Consider using agent-specific state loading methods.",
                 agent_name

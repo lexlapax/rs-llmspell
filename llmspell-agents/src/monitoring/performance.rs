@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tracing::warn;
 
 /// Resource usage snapshot
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -482,7 +483,7 @@ impl PerformanceMonitor {
                 // Check thresholds
                 let violations = monitor.check_thresholds(&snapshot);
                 for violation in &violations {
-                    tracing::warn!(
+                    warn!(
                         "Performance threshold violation for {}: {} (current: {:.2}, threshold: {:.2})",
                         monitor.agent_id,
                         violation.metric,

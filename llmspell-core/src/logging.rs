@@ -175,7 +175,7 @@ pub fn init_from_env() -> Result<(), Box<dyn std::error::Error>> {
 /// Update the global log filter at runtime
 pub fn update_log_filter(filter: &str) -> Result<(), Box<dyn std::error::Error>> {
     // This is a simplified version - in production you'd use reload handles
-    tracing::info!("Log filter update requested: {}", filter);
+    info!("Log filter update requested: {}", filter);
     Ok(())
 }
 

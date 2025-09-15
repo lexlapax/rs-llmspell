@@ -12,6 +12,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
+use tracing::{error, info};
 
 /// Node information in distributed system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -361,7 +362,7 @@ impl DistributedContext {
                 requester,
             } => {
                 // Handle sync request
-                tracing::info!(
+                info!(
                     context_id = %context_id,
                     requester = %requester,
                     "Handling sync request"
@@ -369,7 +370,7 @@ impl DistributedContext {
             }
             SyncMessage::SyncData { context, version } => {
                 // Handle incoming context data
-                tracing::info!(
+                info!(
                     context_id = %context.id,
                     version = %version,
                     "Received context data"
@@ -453,7 +454,7 @@ impl DistributedContext {
             },
             |node| {
                 // In real implementation, would send over network
-                tracing::info!(
+                info!(
                     target_node = %node_id,
                     address = %node.address,
                     "Sending sync message"
@@ -474,7 +475,7 @@ impl DistributedContext {
             loop {
                 interval.tick().await;
                 if let Err(e) = discovery.heartbeat(&node_id).await {
-                    tracing::error!(error = ?e, "Heartbeat failed");
+                    error!(error = ?e, "Heartbeat failed");
                 }
             }
         });
@@ -533,7 +534,7 @@ impl ContextSync {
     pub async fn run(&mut self) {
         while let Some(message) = self.sync_rx.recv().await {
             if let Err(e) = self.distributed.handle_sync_message(message).await {
-                tracing::error!(error = ?e, "Failed to handle sync message");
+                error!(error = ?e, "Failed to handle sync message");
             }
         }
     }

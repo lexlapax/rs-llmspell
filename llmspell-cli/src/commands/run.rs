@@ -8,7 +8,7 @@ use llmspell_kernel::api::{ClientHandle, KernelHandle};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::fs;
-use tracing::info;
+use tracing::{debug, info};
 
 /// Parse script arguments into a HashMap
 /// Supports three formats:
@@ -82,7 +82,7 @@ pub async fn execute_script_file(
     // Parse script arguments
     let parsed_args = parse_script_args(args, &script_path);
     if !parsed_args.is_empty() {
-        tracing::debug!("Parsed script arguments: {:?}", parsed_args);
+        debug!("Parsed script arguments: {:?}", parsed_args);
     }
 
     // Execute based on context type

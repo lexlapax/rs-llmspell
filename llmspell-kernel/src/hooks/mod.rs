@@ -41,6 +41,7 @@ pub use performance::{HookPerformanceMetrics, KernelPerformanceMonitor};
 use crate::events::KernelEvent;
 use anyhow::Result;
 use std::time::Duration;
+use tracing::warn;
 
 /// Kernel hook point definitions extending base `HookPoint`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -197,10 +198,9 @@ impl KernelHookSystem {
 
         // Check performance threshold
         if duration > Duration::from_millis(50) {
-            tracing::warn!(
+            warn!(
                 "Hook execution for {:?} took {:?} (>50ms threshold)",
-                point,
-                duration
+                point, duration
             );
         }
 

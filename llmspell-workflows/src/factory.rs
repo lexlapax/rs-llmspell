@@ -13,6 +13,7 @@ use async_trait::async_trait;
 use llmspell_core::{traits::base_agent::BaseAgent, LLMSpellError, Result};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::{debug, info, warn};
 
 /// Workflow creation parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,15 +129,15 @@ impl WorkflowFactory for DefaultWorkflowFactory {
                     .unwrap_or_else(|| serde_json::json!([]));
 
                 // Debug logging
-                tracing::debug!("Sequential workflow steps JSON: {:?}", steps_json);
+                debug!("Sequential workflow steps JSON: {:?}", steps_json);
 
                 let steps = if let Ok(steps_config) =
                     serde_json::from_value::<Vec<WorkflowStep>>(steps_json.clone())
                 {
-                    tracing::info!("Successfully parsed {} steps", steps_config.len());
+                    info!("Successfully parsed {} steps", steps_config.len());
                     steps_config
                 } else if let Err(e) = serde_json::from_value::<Vec<WorkflowStep>>(steps_json) {
-                    tracing::warn!("Failed to parse workflow steps: {}", e);
+                    warn!("Failed to parse workflow steps: {}", e);
                     Vec::new()
                 } else {
                     Vec::new()

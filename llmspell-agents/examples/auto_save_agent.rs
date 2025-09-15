@@ -24,6 +24,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::time::sleep;
+use tracing::error;
 use tracing::{info, Level};
 
 #[tokio::main]
@@ -92,7 +93,7 @@ async fn main() -> Result<()> {
                     let event = event.clone();
                     tokio::spawn(async move {
                         if let Err(e) = hook.handle_event(&event).await {
-                            tracing::error!("Persistence hook error: {}", e);
+                            error!("Persistence hook error: {}", e);
                         }
                     });
                 }
@@ -149,7 +150,7 @@ async fn main() -> Result<()> {
             loop {
                 sleep(Duration::from_secs(5)).await;
                 if let Err(e) = hook.check_auto_save().await {
-                    tracing::error!("Auto-save check failed: {}", e);
+                    error!("Auto-save check failed: {}", e);
                 }
             }
         })

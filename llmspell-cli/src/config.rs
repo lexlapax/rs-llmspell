@@ -5,6 +5,7 @@ use anyhow::{Context, Result};
 use llmspell_config::LLMSpellConfig;
 use std::path::Path;
 use tokio::fs;
+use tracing::info;
 
 /// Load runtime configuration from file or use defaults
 /// Delegates to llmspell-config which handles:
@@ -44,7 +45,7 @@ pub async fn create_default_config(path: &Path) -> Result<()> {
         .await
         .with_context(|| format!("Failed to write config file: {}", path.display()))?;
 
-    tracing::info!("Created default configuration at: {}", path.display());
+    info!("Created default configuration at: {}", path.display());
     Ok(())
 }
 

@@ -570,11 +570,9 @@ impl ToolExecutor {
 
         // Check if hook execution is taking too long
         if hook_duration > self.config.max_hook_execution_time {
-            tracing::warn!(
+            warn!(
                 "Hook phase {:?} took {:?}, exceeding max time of {:?}",
-                tool_context.execution_phase,
-                hook_duration,
-                self.config.max_hook_execution_time
+                tool_context.execution_phase, hook_duration, self.config.max_hook_execution_time
             );
         }
 

@@ -12,6 +12,7 @@ use llmspell_core::{
 };
 use serde_json::{Map, Value as JsonValue};
 use std::sync::Arc;
+use tracing::warn;
 
 /// Wrapper that allows any `BaseAgent` to be used as a `Tool`.
 ///
@@ -419,7 +420,7 @@ impl AgentWrappedTool {
             }
             TransformType::Custom(function_name) => {
                 // For now, just log that custom transforms are not implemented
-                tracing::warn!(
+                warn!(
                     "Custom transform '{}' not implemented, using identity",
                     function_name
                 );

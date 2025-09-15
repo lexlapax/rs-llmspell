@@ -29,6 +29,7 @@ async fn main() -> Result<()> {
 /// This allows: `llmspell exec "code" > output.txt 2> debug.log`
 fn setup_tracing(trace_level: llmspell_cli::cli::TraceLevel) {
     use std::io;
+    use tracing::Level;
     use tracing_subscriber::EnvFilter;
 
     // Check if RUST_LOG is set
@@ -41,7 +42,7 @@ fn setup_tracing(trace_level: llmspell_cli::cli::TraceLevel) {
             .init();
     } else {
         // Use --trace flag
-        let level: tracing::Level = trace_level.into();
+        let level: Level = trace_level.into();
         tracing_subscriber::fmt()
             .with_max_level(level)
             .with_writer(io::stderr) // Explicitly use stderr for tracing

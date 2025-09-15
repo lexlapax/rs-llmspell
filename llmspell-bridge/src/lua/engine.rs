@@ -16,6 +16,7 @@ use llmspell_core::error::LLMSpellError;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
+use tracing::{debug, warn};
 
 #[cfg(feature = "lua")]
 use {
@@ -284,7 +285,7 @@ impl ScriptEngineBridge for LuaEngine {
                                 as Arc<dyn llmspell_core::traits::state::StateAccess>);
                         }
                         Err(e) => {
-                            tracing::warn!("Failed to create state adapter: {}, state will not be available in context", e);
+                            warn!("Failed to create state adapter: {}, state will not be available in context", e);
                         }
                     }
                 }
@@ -314,10 +315,10 @@ impl ScriptEngineBridge for LuaEngine {
                         &runtime_config.runtime.sessions,
                     )) {
                         Ok(_) => {
-                            tracing::debug!("Session infrastructure initialized successfully");
+                            debug!("Session infrastructure initialized successfully");
                         }
                         Err(e) => {
-                            tracing::warn!(
+                            warn!(
                                 "Failed to initialize session infrastructure: {}, Session/Artifact globals will not be available",
                                 e
                             );
@@ -336,10 +337,10 @@ impl ScriptEngineBridge for LuaEngine {
                             // Store the infrastructure for RAGGlobal to use
                             global_context
                                 .set_bridge("rag_infrastructure", Arc::new(infrastructure));
-                            tracing::debug!("RAG infrastructure initialized successfully");
+                            debug!("RAG infrastructure initialized successfully");
                         }
                         Err(e) => {
-                            tracing::warn!(
+                            warn!(
                                 "Failed to initialize RAG infrastructure: {}, RAG global will not be available",
                                 e
                             );

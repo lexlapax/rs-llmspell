@@ -5,6 +5,7 @@ use super::CircuitState;
 use std::collections::VecDeque;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
+use tracing::info;
 
 /// Maximum number of response times to keep
 const MAX_RESPONSE_TIMES: usize = 100;
@@ -187,11 +188,9 @@ impl MetricsCollector {
 
         *self.state_entry_time.write().await = Instant::now();
 
-        tracing::info!(
+        info!(
             "Circuit state changed from {} to {} after {:?}",
-            from,
-            to,
-            metrics.time_in_state
+            from, to, metrics.time_in_state
         );
     }
 

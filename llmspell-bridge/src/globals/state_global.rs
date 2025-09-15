@@ -11,6 +11,7 @@ use llmspell_state_persistence::{
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::info;
 
 /// State global object providing persistent state management
 ///
@@ -108,7 +109,7 @@ impl StateGlobal {
     ) -> Self {
         // Use StateManagerAdapter with Custom scope for StateGlobal
         // This allows reading keys that were written by NoScopeStateAdapter
-        tracing::info!(
+        info!(
             "StateGlobal: Creating StateManagerAdapter with StateManager at {:p}",
             Arc::as_ptr(&state_manager)
         );

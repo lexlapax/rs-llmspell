@@ -5,6 +5,7 @@ use llmspell_core::{ExecutionContext, LLMSpellError, Result};
 use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
+use tracing::warn;
 
 /// A composition of tools that can be executed as a workflow
 ///
@@ -583,7 +584,7 @@ impl ToolComposition {
             },
             DataTransform::Custom(function_name) => {
                 // Custom transformations would be implemented here
-                tracing::warn!("Custom transform '{}' not implemented", function_name);
+                warn!("Custom transform '{}' not implemented", function_name);
                 Ok(value.clone())
             }
         }

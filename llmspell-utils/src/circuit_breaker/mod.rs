@@ -7,6 +7,7 @@ use std::sync::Arc;
 use std::time::Instant;
 use thiserror::Error;
 use tokio::sync::RwLock;
+use tracing::warn;
 
 mod config;
 mod metrics;
@@ -151,7 +152,7 @@ impl CircuitBreaker {
             }
             CircuitState::Open => {
                 // Shouldn't happen, but handle gracefully
-                tracing::warn!("Success recorded while circuit is open");
+                warn!("Success recorded while circuit is open");
             }
         }
     }

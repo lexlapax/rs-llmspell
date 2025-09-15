@@ -8,6 +8,7 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::BroadcastStream;
+use tracing::error;
 
 /// High-throughput event stream processor
 pub struct EventStream {
@@ -210,7 +211,7 @@ impl HighThroughputProcessor {
                     };
 
                     if let Err(e) = worker_processor(event).await {
-                        tracing::error!("Worker {} processing error: {}", worker_id, e);
+                        error!("Worker {} processing error: {}", worker_id, e);
                     }
                 }
             });
@@ -227,7 +228,7 @@ impl HighThroughputProcessor {
                     }
                 }
                 Err(e) => {
-                    tracing::error!("Stream error: {}", e);
+                    error!("Stream error: {}", e);
                     return Err(e);
                 }
             }

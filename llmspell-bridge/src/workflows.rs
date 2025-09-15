@@ -1451,12 +1451,12 @@ impl WorkflowBridge {
 
             // Write to workflow-specific namespace
             if let Err(e) = state_adapter.write(&workflow_key, value.clone()).await {
-                tracing::warn!("Failed to write workflow-specific shared data: {}", e);
+                warn!("Failed to write workflow-specific shared data: {}", e);
             }
 
             // Also write to global shared namespace for broader access
             if let Err(e) = state_adapter.write(&global_key, value).await {
-                tracing::warn!("Failed to write global shared data: {}", e);
+                warn!("Failed to write global shared data: {}", e);
             }
         }
 

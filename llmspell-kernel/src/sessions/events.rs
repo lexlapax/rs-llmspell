@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::SystemTime;
-use tracing::{debug, info};
+use tracing::{debug, error, info, trace, warn, Level};
 
 /// Session event types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -237,11 +237,11 @@ impl LoggingEventHandler {
 impl EventHandler for LoggingEventHandler {
     fn handle(&self, event: &SessionEvent) {
         match self.log_level {
-            tracing::Level::ERROR => tracing::error!("Session event: {:?}", event),
-            tracing::Level::WARN => tracing::warn!("Session event: {:?}", event),
-            tracing::Level::INFO => info!("Session event: {:?}", event),
-            tracing::Level::DEBUG => debug!("Session event: {:?}", event),
-            tracing::Level::TRACE => tracing::trace!("Session event: {:?}", event),
+            Level::ERROR => error!("Session event: {:?}", event),
+            Level::WARN => warn!("Session event: {:?}", event),
+            Level::INFO => info!("Session event: {:?}", event),
+            Level::DEBUG => debug!("Session event: {:?}", event),
+            Level::TRACE => trace!("Session event: {:?}", event),
         }
     }
 

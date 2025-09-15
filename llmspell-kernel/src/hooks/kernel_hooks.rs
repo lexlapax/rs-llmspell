@@ -11,6 +11,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tracing::debug;
 
 /// Execution context for kernel hooks
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -339,7 +340,7 @@ impl PreExecuteHook {
 #[async_trait]
 impl Hook for PreExecuteHook {
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
-        tracing::debug!("PreExecuteHook '{}': Executing", self.metadata.name);
+        debug!("PreExecuteHook '{}': Executing", self.metadata.name);
 
         // Extract execution context from hook context
         let execution_context = if let Some(exec_data) = context.data.get("execution_context") {
@@ -407,7 +408,7 @@ impl PostExecuteHook {
 #[async_trait]
 impl Hook for PostExecuteHook {
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
-        tracing::debug!("PostExecuteHook '{}': Executing", self.metadata.name);
+        debug!("PostExecuteHook '{}': Executing", self.metadata.name);
 
         // Extract execution context and result
         let execution_context = if let Some(exec_data) = context.data.get("execution_context") {
@@ -481,7 +482,7 @@ impl PreDebugHook {
 #[async_trait]
 impl Hook for PreDebugHook {
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
-        tracing::debug!("PreDebugHook '{}': Executing", self.metadata.name);
+        debug!("PreDebugHook '{}': Executing", self.metadata.name);
 
         // Extract debug context
         let debug_context = if let Some(debug_data) = context.data.get("debug_context") {
@@ -551,7 +552,7 @@ impl StateChangeHook {
 #[async_trait]
 impl Hook for StateChangeHook {
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
-        tracing::debug!("StateChangeHook '{}': Executing", self.metadata.name);
+        debug!("StateChangeHook '{}': Executing", self.metadata.name);
 
         // Extract state context
         let state_context = if let Some(state_data) = context.data.get("state_context") {

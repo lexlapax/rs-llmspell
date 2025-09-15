@@ -237,7 +237,8 @@ async fn print_stream_text(
             llmspell_core::types::ChunkContent::Control(msg) => {
                 // Handle control messages
                 use llmspell_core::types::ControlMessage;
-                tracing::debug!("Control message: {:?}", msg);
+                use tracing::debug;
+                debug!("Control message: {:?}", msg);
                 if let Some(ref pb) = progress {
                     match msg {
                         ControlMessage::StreamStart { .. } => {

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use tracing::info;
 use uuid::Uuid;
 
 /// Trace span representing a unit of work
@@ -424,13 +425,9 @@ pub struct ConsoleTraceExporter;
 impl TraceExporter for ConsoleTraceExporter {
     fn export(&self, span: &TraceSpan) -> Result<()> {
         let duration_ms = span.duration_ms().unwrap_or(0.0);
-        tracing::info!(
+        info!(
             "[TRACE] {} {} - {} ({:.2}ms) - {:?}",
-            span.service,
-            span.operation,
-            span.span_id,
-            duration_ms,
-            span.status
+            span.service, span.operation, span.span_id, duration_ms, span.status
         );
         Ok(())
     }

@@ -13,6 +13,7 @@ use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
+use tracing::debug;
 
 /// Tool invocation wrapper that provides validation, error handling,
 /// and execution tracking for tool calls.
@@ -315,7 +316,7 @@ impl ToolInvoker {
 
         // Log execution if debug logging is enabled
         if self.config.feature_flags.debug_logging {
-            tracing::debug!(
+            debug!(
                 "Tool {} executed in {:?}",
                 tool.metadata().name,
                 metrics.execution_time
