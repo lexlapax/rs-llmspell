@@ -2,6 +2,7 @@
 //! ABOUTME: Provides `LLMSpellError` enum and `Result` type alias
 
 use thiserror::Error;
+use tracing::error;
 
 /// Error severity levels.
 ///
@@ -341,6 +342,11 @@ pub type Result<T> = std::result::Result<T, LLMSpellError>;
 // Common error conversions
 impl From<std::io::Error> for LLMSpellError {
     fn from(err: std::io::Error) -> Self {
+        error!(
+            error = %err,
+            error_kind = ?err.kind(),
+            "IO error converted to LLMSpellError"
+        );
         LLMSpellError::Storage {
             message: format!("IO error: {err}"),
             operation: None,
@@ -351,6 +357,11 @@ impl From<std::io::Error> for LLMSpellError {
 
 impl From<serde_json::Error> for LLMSpellError {
     fn from(err: serde_json::Error) -> Self {
+        error!(
+            error = %err,
+            error_type = "json_serialization",
+            "JSON error converted to LLMSpellError"
+        );
         LLMSpellError::Configuration {
             message: format!("JSON serialization error: {err}"),
             source: Some(Box::new(err)),
@@ -360,6 +371,11 @@ impl From<serde_json::Error> for LLMSpellError {
 
 impl From<std::fmt::Error> for LLMSpellError {
     fn from(err: std::fmt::Error) -> Self {
+        error!(
+            error = %err,
+            error_type = "formatting",
+            "Formatting error converted to LLMSpellError"
+        );
         LLMSpellError::Internal {
             message: format!("Formatting error: {err}"),
             source: Some(Box::new(err)),

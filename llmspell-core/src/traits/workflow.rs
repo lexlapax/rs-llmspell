@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use core::time::Duration;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use tracing::{debug, trace};
 
 /// Workflow step definition.
 ///
@@ -392,8 +393,20 @@ pub trait Workflow: BaseAgent {
     /// Get execution plan (topologically sorted)
     #[inline]
     async fn plan_execution(&self) -> Result<Vec<WorkflowStep>> {
+        debug!(
+            workflow_name = %self.metadata().name,
+            "Planning workflow execution"
+        );
+
         let steps = match self.get_steps().await {
-            Ok(steps) => steps,
+            Ok(steps) => {
+                trace!(
+                    workflow_name = %self.metadata().name,
+                    step_count = steps.len(),
+                    "Retrieved workflow steps"
+                );
+                steps
+            }
             Err(err) => return Err(err),
         };
 
@@ -451,6 +464,12 @@ pub trait Workflow: BaseAgent {
             });
         }
 
+        debug!(
+            workflow_name = %self.metadata().name,
+            sorted_step_count = sorted.len(),
+            "Workflow execution plan completed"
+        );
+
         return Ok(sorted);
     }
 
@@ -463,6 +482,11 @@ pub trait Workflow: BaseAgent {
     /// Get result for specific step
     #[inline]
     async fn get_step_result(&self, step_id: ComponentId) -> Result<Option<StepResult>> {
+        trace!(
+            workflow_name = %self.metadata().name,
+            step_id = %step_id,
+            "Getting step result"
+        );
         let results = match self.get_results().await {
             Ok(results) => results,
             Err(e) => return Err(e),
