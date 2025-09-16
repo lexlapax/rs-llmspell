@@ -78,9 +78,11 @@ pub use state::{
 
 // Re-export session types
 pub use sessions::{
-    AccessControl, ArtifactStorage, ArtifactType, RateLimitConfig, RateLimitPolicy, Session,
-    SessionArtifact, SessionConfig, SessionEvent, SessionEventType, SessionId, SessionManager,
-    SessionMetadata, SessionMetrics, SessionPolicy, SessionSecurity, SessionStatus, TimeoutPolicy,
+    ArtifactId, ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps,
+    ArtifactType, CreateSessionOptions, CreateSessionOptionsBuilder, SessionArtifact, SessionConfig,
+    SessionId, SessionManager, SessionManagerConfig, SessionManagerConfigBuilder, SessionMetadata,
+    SessionStatus, Session, Result as SessionResult, SessionError,
+    events::{SessionEvent, SessionEventType},
 };
 
 // Re-export debug types

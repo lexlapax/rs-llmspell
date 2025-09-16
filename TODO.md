@@ -640,79 +640,370 @@
 
 ### Task 9.4a.2: Complete Sessions Consolidation
 **Priority**: HIGH
-**Estimated Time**: 6 hours
+**Estimated Time**: 14 hours (Revised from 6h after comprehensive analysis)
 **Assignee**: Architecture Team Lead
 **Dependencies**: Task 9.4a.1
+**Status**: READY TO EXECUTE
 
-**Description**: Consolidate llmspell-sessions crate into kernel as designed in Phase 9, eliminating dual session management systems.
-**Discover first via code walkthroughs, program flow etc, what needs to be done to accomplish this and update the steps below to be thorough**
+**Description**: Migrate entire llmspell-sessions crate (40 source files, 4,169+ lines) into llmspell-kernel as designed in Phase 9, creating single source of truth for session management. This migration maintains external state dependencies temporarily until 9.4a.3 consolidates state infrastructure.
+
+**🚨 CRITICAL DEPENDENCY INTERACTION**: Sessions heavily depends on state infrastructure (StateManager, StateScope, StateError) which will be consolidated in 9.4a.3. This task maintains external state dependencies temporarily, then 9.4a.3 will internalize state and update sessions accordingly.
 
 **Acceptance Criteria:**
-- [ ] llmspell-sessions functionality moved to kernel/src/sessions/
-- [ ] Event correlation preserved in kernel
-- [ ] Session TTL and expiration working
-- [ ] Artifact storage integrated
-- [ ] No duplicate session types or managers
+- [ ] Complete llmspell-sessions source moved to kernel/src/sessions/
+- [ ] All 221 session unit tests migrated and passing
+- [ ] All 8 integration tests migrated and passing
+- [ ] Bridge integration preserved (9 critical files)
+- [ ] RAG integration preserved
+- [ ] State dependencies temporarily external (resolved in 9.4a.3)
 - [ ] llmspell-sessions crate removed from workspace
+- [ ] Single session management system in kernel
 
-**Implementation Steps:**
-1. Move SessionManager from llmspell-sessions to kernel/src/sessions/manager.rs
-2. Integrate EventCorrelator into kernel/src/sessions/correlation.rs
-3. Move artifact storage to kernel/src/sessions/artifacts.rs
-4. Update all references from llmspell-sessions to kernel
-5. Remove llmspell-sessions from workspace
-6. Update bridge to use kernel session types
+#### **Task 9.4a.2.1: Pre-migration Analysis and State Dependency Planning** ✅
+**Estimated Time**: 2 hours (Actual: 1.5 hours)
+**Status**: COMPLETE
 
-**Test Steps:**
-1. Test session creation and retrieval
-2. Test event correlation across sessions
-3. Test artifact storage and retrieval
-4. Test session TTL expiration
-5. Verify no session functionality lost
+**Critical Analysis Completed**:
+- [x] Map all state dependencies in sessions (StateManager, StateScope, StateError)
+- [x] Identify files using llmspell_state_persistence and llmspell_state_traits
+- [x] Plan temporary external dependencies for kernel Cargo.toml
+- [x] Analyze conflict resolution between current kernel/src/sessions/ and llmspell-sessions
+- [x] Document state dependency transition plan for 9.4a.3
+
+**🔍 KEY FINDINGS:**
+
+**State Dependencies Identified**:
+```rust
+// 5 Core State Dependencies to Temporarily Keep External:
+use llmspell_state_persistence::StateManager;                    // manager.rs (core dependency)
+use llmspell_state_traits::{StateScope, StateError};             // manager.rs, error.rs
+use llmspell_state_persistence::manager::HookReplayManager;      // replay/ (4 files)
+use llmspell_state_persistence::manager::SerializedHookExecution; // replay/ (3 files)
+```
+
+**File Conflict Resolution**:
+```
+COMPLETE REPLACEMENT STRATEGY:
+Current kernel/src/sessions/ (6 files, 2,768 lines) → DELETE ALL
+llmspell-sessions/src/ (40 files, 9 directories, 4,169+ lines) → MIGRATE ALL
+
+Structure:
+├── artifact/ (9 files) - Sophisticated artifact management
+├── analytics/ (2 files) - Session metrics
+├── bridge/ (3 files) - Language bridges
+├── events/ (2 files) - Event correlation
+├── hooks/ (4 files) - Hook integration
+├── middleware/ (2 files) - Session middleware
+├── policies/ (4 files) - Rate limiting, timeouts
+├── replay/ (6 files) - Debug replay functionality
+└── Core files: manager.rs, session.rs, types.rs, error.rs, config.rs, security.rs
+```
+
+**Dependencies to Add to Kernel Cargo.toml**:
+```toml
+# Temporary state dependencies (removed in 9.4a.3)
+llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-state-traits = { path = "../llmspell-state-traits" }
+llmspell-storage = { path = "../llmspell-storage" }
+
+# New dependencies for artifact storage
+bincode = { workspace = true }
+blake3 = { workspace = true }
+lz4_flex = { workspace = true }
+lru = "0.12"
+
+# Enhanced async support
+futures = { workspace = true }
+tokio-stream = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+```
+
+**9.4a.3 Transition Strategy**:
+- Sessions will use external state during 9.4a.2 (functional but temporary)
+- 9.4a.3 will move state into kernel and update sessions to use internal state
+- This staged approach preserves all 229 session tests during migration
+
+#### **Task 9.4a.2.2: Prepare Kernel Infrastructure and Dependencies** ✅
+**Estimated Time**: 2 hours (Actual: 45 minutes)
+**Status**: COMPLETE
+
+**Infrastructure Updates**:
+- [x] Update kernel/Cargo.toml with sessions dependencies:
+  - llmspell-state-persistence (temporary until 9.4a.3)
+  - llmspell-state-traits (temporary until 9.4a.3)
+  - llmspell-storage (temporary until 9.4a.3)
+  - All other sessions dependencies (chrono, lz4_flex, blake3, lru, etc.)
+- [x] Remove current kernel/src/sessions/* files (backup for rollback)
+- [x] Create kernel/tests/sessions/ directory structure
+- [x] Verify kernel builds with new dependencies
+
+**🔍 KEY ACCOMPLISHMENTS:**
+
+**Dependencies Successfully Added**:
+```toml
+# Temporary state dependencies (removed in 9.4a.3)
+llmspell-state-persistence = { path = "../llmspell-state-persistence", version = "0.8.0" }
+llmspell-state-traits = { path = "../llmspell-state-traits", version = "0.8.0" }
+llmspell-storage = { path = "../llmspell-storage", version = "0.8.0" }
+
+# Enhanced async support
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+
+# Artifact storage support
+bincode = { workspace = true }
+lru = "0.12"
+blake3 = { workspace = true }
+lz4_flex = { workspace = true }
+```
+
+**File Operations Completed**:
+- ✅ **Backup Created**: All 6 kernel sessions files backed up to `sessions_backup_9.4a.2/`
+- ✅ **Clean Slate**: Current sessions directory emptied for migration
+- ✅ **Test Structure**: `kernel/tests/sessions/` directory created for test migration
+
+**Build Status**:
+- ❌ **Expected Failure**: Kernel fails to build (missing sessions module) - will be resolved in 9.4a.2.3
+- ✅ **Dependencies Valid**: All new dependencies resolve correctly
+
+#### **Task 9.4a.2.3: Migrate Session Source Files and Resolve Integration**
+**Estimated Time**: 4 hours
+**Status**: ✅ **COMPLETED**
+
+**File Migration** (40 files):
+- [x] Copy llmspell-sessions/src/* → kernel/src/sessions/
+- [x] Merge lib.rs content into kernel/src/sessions/mod.rs
+- [x] Update all internal imports to use kernel:: paths where appropriate
+- [x] **TEMPORARY FIX**: Added compatibility layer for API incompatibility
+- [x] Kernel builds successfully with comprehensive sessions
+- [x] Fixed major clippy warnings (enum variant boxing, format strings)
+- [x] Handle any naming conflicts with existing kernel modules
+
+**ARCHITECTURAL INCOMPATIBILITY BRIDGED (TEMPORARY)**:
+- ✅ Added compatibility layer in `/kernel/src/sessions/compatibility.rs`
+- ✅ `SessionManager::new_legacy()` wraps comprehensive constructor
+- ✅ `KernelSessionIntegration` trait implemented with temporary no-ops
+- ✅ Blocking adapter for `create_session_legacy()`
+- ✅ **KERNEL BUILDS SUCCESSFULLY** - migration infrastructure complete!
+- ⚠️ **TODO**: Remove compatibility layer in Task 9.4a.2.4
+
+**Migration Results**:
+- **40 files** successfully migrated (4,169+ lines comprehensive sessions)
+- **72 → 0 build errors** through systematic import fixes
+- **6 minimal files** backed up to `sessions_backup_9.4a.2/`
+- **Temporary compatibility** enables gradual API adaptation
+
+**Current Re-exports** (kernel/src/sessions/mod.rs):
+```rust
+// Must re-export all types that external crates import
+pub use self::{
+    manager::SessionManager,
+    session::Session,
+    types::{SessionId, SessionMetadata, CreateSessionOptions, SessionQuery},
+    artifact::{ArtifactId, ArtifactType, ArtifactMetadata, SessionArtifact},
+    error::{SessionError, Result},
+    config::SessionManagerConfig,
+    // ... all other public types
+};
+```
+
+#### **Task 9.4a.2.4: Architecture Cleanup and Direct Integration**
+**Estimated Time**: 3 hours
+**Status**: PENDING
+
+**Remove Compatibility Layer and Implement Direct Integration**:
+- [ ] Remove `/kernel/src/sessions/compatibility.rs` file
+- [ ] Update `kernel/src/execution/integrated.rs` to use comprehensive SessionManager constructor
+- [ ] Replace `SessionManager::new_legacy()` with proper `SessionManager::new()` call
+- [ ] Update session creation to use async `create_session()` method
+- [ ] Remove `KernelSessionIntegration` trait re-export from sessions/mod.rs
+- [ ] Update calling files to use direct imports (`crate::sessions::SessionManager`)
+- [ ] Remove temporary re-exports from `sessions/mod.rs`
+- [ ] Test kernel functionality works with direct comprehensive sessions API
+
+**Files to Update**:
+```rust
+// kernel/src/execution/integrated.rs - Use proper constructor:
+let session_manager = SessionManager::new(
+    state_manager,
+    storage_backend,
+    hook_registry,
+    hook_executor,
+    &event_bus,
+    config
+)?;
+let session_id = session_manager.create_session(options).await?;
+```
+
+**Validation**:
+- [ ] Kernel builds without compatibility.rs
+- [ ] All existing tests continue to pass
+- [ ] Session functionality works with proper async integration
+
+#### **Task 9.4a.2.5: Update External Crate Dependencies**
+**Estimated Time**: 2 hours
+**Status**: PENDING
+
+**7 Crates Requiring Updates**:
+- [ ] **Root Cargo.toml**: Remove llmspell-sessions from workspace members
+- [ ] **llmspell-bridge**: Replace sessions dependency with kernel dependency
+- [ ] **llmspell-agents**: Update Cargo.toml and imports
+- [ ] **llmspell-rag**: Update Cargo.toml and imports
+- [ ] **llmspell-testing**: Update Cargo.toml and imports
+- [ ] **llmspell-kernel**: Remove sessions dependency (now internal)
+
+**Cargo.toml Changes**:
+```toml
+# FROM:
+llmspell-sessions = { path = "../llmspell-sessions" }
+
+# TO:
+llmspell-kernel = { path = "../llmspell-kernel" }
+```
+
+#### **Task 9.4a.2.6: Update Import Paths Throughout Codebase**
+**Estimated Time**: 2 hours
+**Status**: PENDING
+
+**Import Path Updates** (33+ files):
+```rust
+// FROM:
+use llmspell_sessions::{SessionManager, SessionId, ArtifactId};
+
+// TO:
+use llmspell_kernel::sessions::{SessionManager, SessionId, ArtifactId};
+```
+
+**Critical Files Requiring Updates**:
+- [ ] **Bridge (9 files)**: session_bridge.rs, artifact_bridge.rs, lua/globals/session.rs, etc.
+- [ ] **RAG (3 files)**: Integration with session persistence
+- [ ] **Agents (2+ files)**: Session-aware agent functionality
+- [ ] **Testing (5+ files)**: Session test utilities
+
+#### **Task 9.4a.2.7: Migrate and Validate All Tests**
+**Estimated Time**: 3 hours
+**Status**: PENDING
+
+**Test Migration**:
+- [ ] Move 8 integration tests: llmspell-sessions/tests/* → kernel/tests/sessions/
+- [ ] Update all test imports to use llmspell_kernel::sessions
+- [ ] Verify 221 unit tests work in new location
+- [ ] Update test setup to create SessionManager through kernel
+
+**Test Categories**:
+- [ ] **Unit tests**: 221 tests embedded in source files
+- [ ] **Integration tests**: 8 test files for complex scenarios
+- [ ] **Bridge tests**: 5+ files testing session/artifact globals
+- [ ] **RAG tests**: Session persistence integration
+
+#### **Task 9.4a.2.8: Verify Bridge and RAG Integration**
+**Estimated Time**: 2 hours
+**Status**: PENDING
+
+**Critical Integration Validation**:
+- [ ] Bridge session globals work with kernel sessions
+- [ ] Bridge artifact operations preserved
+- [ ] RAG session persistence functional
+- [ ] CLI can create/manage sessions through kernel
+- [ ] No functionality regression in session lifecycle
+
+**Validation Commands**:
+```bash
+# Test CLI session operations
+./target/debug/llmspell exec "Session.create().name('test')"
+
+# Test bridge session creation
+cargo test -p llmspell-bridge session_global_test
+
+# Test RAG session integration
+cargo test -p llmspell-rag session_integration
+```
+
+#### **Task 9.4a.2.9: Remove llmspell-sessions Crate and Cleanup**
+**Estimated Time**: 1 hour
+**Status**: PENDING
+
+**Final Cleanup**:
+- [ ] Remove llmspell-sessions/ directory completely
+- [ ] Remove from workspace Cargo.toml members
+- [ ] Verify no remaining references to llmspell-sessions
+- [ ] Run full workspace build and test suite
+- [ ] Update documentation referencing sessions
+
+**Final Validation**:
+```bash
+# Ensure no sessions references remain
+grep -r "llmspell_sessions" . --include="*.rs" --include="*.toml"
+
+# Full workspace validation
+cargo build --workspace
+cargo test --workspace --lib
+```
+
+**Implementation Notes for 9.4a.3 Transition**:
+- Sessions will have external state dependencies during 9.4a.2
+- 9.4a.3 will move state into kernel and update sessions to use internal state
+- This preserves functionality while enabling staged migration
 
 **Definition of Done:**
-- [ ] Single session management system in kernel
-- [ ] All session tests migrated and passing
-- [ ] Event correlation working in kernel
-- [ ] No references to llmspell-sessions remain
-- [ ] Session features work in REPL
+- [ ] llmspell-sessions crate completely removed
+- [ ] All session functionality preserved in kernel
+- [ ] All 229 tests (221 unit + 8 integration) passing
+- [ ] Bridge and RAG integration verified
+- [ ] No references to external llmspell-sessions remain
+- [ ] Crate count reduced by 1 (workspace consolidation)
+- [ ] Ready for 9.4a.3 state consolidation
 
 ### Task 9.4a.3: Consolidate State Crates
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 6 hours (Revised from 4h to account for sessions integration)
 **Assignee**: State Team Lead
 **Dependencies**: Task 9.4a.2
 
-**Description**: Consolidate state-persistence, state-traits, and storage crates as per Phase 9 design to reduce crate count from 26 to 21.
+**Description**: Consolidate state-persistence, state-traits, and storage crates as per Phase 9 design to reduce crate count. **CRITICAL**: Must also update sessions module (migrated in 9.4a.2) to use internal state instead of external dependencies.
+
+**🚨 SESSIONS INTEGRATION REQUIRED**: Task 9.4a.2 moved sessions into kernel with external state dependencies. This task must update sessions to use internal state, completing the consolidation.
 
 **Acceptance Criteria:**
 - [ ] state-traits merged into llmspell-core
 - [ ] state-persistence merged with storage into kernel/src/state/
+- [ ] **Sessions updated to use internal state (kernel/src/state/) instead of external**
 - [ ] All state operations go through kernel
 - [ ] No duplicate state management code
-- [ ] Crate count reduced by 3
+- [ ] Crate count reduced by 3 (state-persistence, state-traits, storage)
 
 **Implementation Steps:**
 1. Move state traits to llmspell-core/src/state/traits.rs
 2. Move persistence layer to kernel/src/state/persistence/
 3. Integrate storage backends into kernel/src/state/storage/
-4. Update all state references to use kernel
-5. Remove consolidated crates from workspace
-6. Update documentation
+4. **🚨 CRITICAL**: Update kernel/src/sessions/ to use internal state:
+   - Replace `use llmspell_state_persistence::StateManager` with `use crate::state::StateManager`
+   - Replace `use llmspell_state_traits::StateScope` with `use llmspell_core::state::StateScope`
+   - Update all sessions imports to use internal state
+5. Remove external state dependencies from kernel/Cargo.toml (added in 9.4a.2)
+6. Update all other state references to use kernel or core
+7. Remove consolidated crates from workspace
+8. Update documentation
 
 **Test Steps:**
 1. Test state read/write operations
 2. Test persistence across restarts
 3. Test state isolation between sessions
-4. Test state performance (<5ms write, <1ms read)
-5. Verify state consistency
+4. **Test sessions with internal state integration**
+5. Test state performance (<5ms write, <1ms read)
+6. Verify state consistency
+7. **Verify all 229 session tests still pass with internal state**
 
 **Definition of Done:**
 - [ ] State consolidated into kernel and core
+- [ ] **Sessions successfully using internal state (no external state dependencies)**
 - [ ] All state tests passing
+- [ ] **All session tests passing with internal state integration**
 - [ ] Performance targets met
 - [ ] No duplicate state code
-- [ ] Clean crate structure (21 crates total)
+- [ ] Clean crate structure (reduced by 3 crates)
+- [ ] **No external state dependencies in kernel Cargo.toml**
 
 ### Task 9.4a.4: Validate Runtime Fix with Extended Tests
 **Priority**: HIGH
@@ -857,135 +1148,6 @@
 
 **Architectural Insights (Post-Implementation):**
 The "dispatch task is gone" error was caused by runtime context mismatches when HTTP clients were created in spawned tasks. Initial fix using global runtime with `enter()` guard caused parallel test failures due to thread-local state conflicts.
-
-## 🎯 **TASK 9.4.5.3: Phase 3 - Tool Instrumentation** ✅
-
-**STATUS: SUBSTANTIALLY COMPLETE** - *Comprehensive tracing instrumentation added across 6+ tool implementations*
-
-**PROGRESS SUMMARY:**
-- **Subtask 3.4**: System Tools (4 tools) - ✅ **COMPLETED**
-- **Subtask 3.5**: Web Tools (6 tools) - ✅ **COMPLETED**
-- **Subtask 3.6**: Utility Tools (7 tools) - ✅ **COMPLETED**
-- **Subtask 3.7**: Remaining Uninstrumented Tools (3 tools) - ✅ **COMPLETED**
-- **Subtask 3.8**: Enhanced Minimal Tracing (23 files identified) - 🟡 **IN PROGRESS** (6/12 files with 1 info! call completed)
-
-**KEY ACHIEVEMENTS:**
-
-### **Comprehensive Tracing Patterns Established**
-✅ **Constructor Logging** - Every tool logs creation with configuration metadata
-✅ **Entry/Exit Timing** - Full execution lifecycle with duration tracking
-✅ **Parameter Validation** - Detailed extraction and validation timing
-✅ **Operation-Specific Metrics** - Tailored instrumentation per tool type
-✅ **Error Path Instrumentation** - Complete error handling with context
-✅ **Resource Usage Tracking** - File sizes, memory, CPU time monitoring
-
-### **Enhanced Tools Completed (Subtask 3.8 - 6/12)**
-1. **`util/base64_encoder.rs`** - Base64 encoding/decoding with variants
-   - Constructor: Tool metadata with operation/variant counts
-   - Execute: Entry/exit timing, parameter extraction with error handling
-   - Operations: Encoding/decoding timing, file I/O tracking, data size analysis
-
-2. **`util/template_engine.rs`** - Template rendering with Tera/Handlebars
-   - Constructor: Engine configuration and limits
-   - Execute: Template parsing, context processing, rendering timing
-   - Operations: Engine detection, size validation, format-specific metrics
-
-3. **`util/data_validation.rs`** - Data validation with 12 rule types
-   - Constructor: Rule type counts and validation settings
-   - Execute: Rule parsing, data analysis, validation timing
-   - Operations: Error collection, success rates, rule complexity metrics
-
-4. **`data/json_processor.rs`** - JSON processing with full jq support
-   - Constructor: JQ engine metadata and security settings
-   - Execute: Parameter parsing, JQ execution timing, result processing
-   - Operations: Security validation, query complexity, result transformation
-
-5. **`search/web_search_old.rs`** - Web search with multiple providers
-   - Constructor: Provider configuration and rate limiting setup
-   - Execute: Query parsing, search timing, result aggregation
-   - Operations: Provider-specific metrics, rate limit tracking, result counts
-
-6. **`media/audio_processor.rs`** - Audio processing with format detection
-   - Constructor: Format support and processing configuration
-   - Execute: File validation, format detection, metadata extraction
-   - Operations: WAV analysis, conversion tracking, sandbox security
-
-### **Instrumentation Impact Analysis**
-
-**Performance Monitoring Capabilities:**
-- **Duration Tracking**: Constructor, parameter parsing, operation execution, response building
-- **Resource Monitoring**: File sizes, memory estimates, CPU time tracking
-- **Data Analysis**: Input/output size estimation, compression ratios, complexity metrics
-- **Error Context**: Complete error path instrumentation with timing information
-
-**Observability Improvements:**
-- **Log Level Strategy**: info! for lifecycle, debug! for operations, trace! for details, error! for failures
-- **Structured Fields**: Consistent field naming across all tools for log aggregation
-- **Contextual Information**: Tool metadata, configuration settings, operation parameters
-- **Security Awareness**: API key counts, sandbox usage, validation results
-
-**Development & Operations Benefits:**
-- **Debugging**: Clear execution flow with timing and data size information
-- **Performance Analysis**: Bottleneck identification in parameter parsing, operations, response building
-- **Security Monitoring**: File access patterns, size limits, validation failures
-- **Quality Metrics**: Success rates, error patterns, resource utilization
-
-### **Comprehensive Quality Standards**
-
-**Tracing Consistency:**
-- All enhanced tools follow identical instrumentation patterns
-- Structured field naming conventions established
-- Consistent timing measurement approaches
-- Standardized error handling with context
-
-**Code Quality:**
-- Zero warnings target with comprehensive clippy compliance
-- Full test coverage maintenance during enhancements
-- Documentation updates with tracing behavior
-- Security-conscious logging (no sensitive data exposure)
-
-### **Phase 3 Architecture Insights**
-
-**Tool Lifecycle Instrumentation:**
-The comprehensive tracing reveals tool execution patterns that inform optimization:
-- Parameter extraction typically 1-5ms overhead
-- Large file operations dominate execution time
-- Error path frequency indicates validation effectiveness
-- Resource tracking enables proactive limit enforcement
-
-**Cross-Tool Patterns:**
-- File-based tools require size validation and sandbox integration
-- Network tools need rate limiting and provider fallback instrumentation
-- Data processing tools benefit from complexity analysis and progress tracking
-- Utility tools show consistent performance characteristics
-
-**Future Enhancement Opportunities:**
-- **Metrics Export**: Integration with monitoring systems via structured logs
-- **Performance Benchmarking**: Baseline measurements for regression detection
-- **Security Auditing**: Comprehensive access pattern analysis
-- **Resource Optimization**: Data-driven limit tuning based on usage patterns
-
-**Definition of Done:**
-- [x] 6+ tools enhanced with comprehensive tracing (6/12 target files completed)
-- [x] Consistent instrumentation patterns established across all tool types
-- [x] Performance, security, and operational monitoring capabilities added
-- [x] Zero warnings maintained through systematic clippy compliance
-- [x] Documentation updated with tracing behavior and log field specifications
-
-**NEXT ACTIONS:**
-1. Complete remaining 6 files with 1 info! call for full 12/12 completion
-2. Address 5 files with 0 info! calls for complete uninstrumented coverage
-3. Enhance 6 files with 2 info! calls for consistent baseline
-4. Final quality validation with full test suite execution
-
-**Solution Applied (Option A):**
-Modified `create_io_bound_resource()` in `llmspell-kernel/src/runtime/io_runtime.rs` to detect existing runtime context:
-- If already in a runtime (via `Handle::try_current()`), use it directly
-- Only enter global runtime if no current runtime exists
-- Respects test isolation - each test uses its own runtime
-- Production code unaffected - uses single runtime as before
-
-This fix ensures runtime polymorphism - resources bind to their creation context naturally without forcing a specific runtime. Tests can run in parallel without interference, while production maintains single runtime consistency.
 
 ### Task 9.4.2: Simplify CLI and Remove Pre-warming ✅ COMPLETE
 **Priority**: CRITICAL (Elevated due to architectural violation)
@@ -2260,6 +2422,135 @@ error!("Failed: {}", err); // Goes to stderr via tracing
 - Cross-tool patterns inform optimization strategies
 - **COMPILATION:** Fixed all warnings and errors (unused imports, type mismatches)
 - **ACTUAL TIME:** Completed in 6 hours vs estimated 24 hours (75% time savings)
+
+##### 🎯 **TASK 9.4.5.3: Phase 3 - Tool Instrumentation** ✅
+
+**STATUS: SUBSTANTIALLY COMPLETE** - *Comprehensive tracing instrumentation added across 6+ tool implementations*
+
+**PROGRESS SUMMARY:**
+- **Subtask 3.4**: System Tools (4 tools) - ✅ **COMPLETED**
+- **Subtask 3.5**: Web Tools (6 tools) - ✅ **COMPLETED**
+- **Subtask 3.6**: Utility Tools (7 tools) - ✅ **COMPLETED**
+- **Subtask 3.7**: Remaining Uninstrumented Tools (3 tools) - ✅ **COMPLETED**
+- **Subtask 3.8**: Enhanced Minimal Tracing (23 files identified) - 🟡 **IN PROGRESS** (6/12 files with 1 info! call completed)
+
+**KEY ACHIEVEMENTS:**
+
+**Comprehensive Tracing Patterns Established**
+✅ **Constructor Logging** - Every tool logs creation with configuration metadata
+✅ **Entry/Exit Timing** - Full execution lifecycle with duration tracking
+✅ **Parameter Validation** - Detailed extraction and validation timing
+✅ **Operation-Specific Metrics** - Tailored instrumentation per tool type
+✅ **Error Path Instrumentation** - Complete error handling with context
+✅ **Resource Usage Tracking** - File sizes, memory, CPU time monitoring
+
+**Enhanced Tools Completed (Subtask 3.8 - 6/12)**
+1. **`util/base64_encoder.rs`** - Base64 encoding/decoding with variants
+   - Constructor: Tool metadata with operation/variant counts
+   - Execute: Entry/exit timing, parameter extraction with error handling
+   - Operations: Encoding/decoding timing, file I/O tracking, data size analysis
+
+2. **`util/template_engine.rs`** - Template rendering with Tera/Handlebars
+   - Constructor: Engine configuration and limits
+   - Execute: Template parsing, context processing, rendering timing
+   - Operations: Engine detection, size validation, format-specific metrics
+
+3. **`util/data_validation.rs`** - Data validation with 12 rule types
+   - Constructor: Rule type counts and validation settings
+   - Execute: Rule parsing, data analysis, validation timing
+   - Operations: Error collection, success rates, rule complexity metrics
+
+4. **`data/json_processor.rs`** - JSON processing with full jq support
+   - Constructor: JQ engine metadata and security settings
+   - Execute: Parameter parsing, JQ execution timing, result processing
+   - Operations: Security validation, query complexity, result transformation
+
+5. **`search/web_search_old.rs`** - Web search with multiple providers
+   - Constructor: Provider configuration and rate limiting setup
+   - Execute: Query parsing, search timing, result aggregation
+   - Operations: Provider-specific metrics, rate limit tracking, result counts
+
+6. **`media/audio_processor.rs`** - Audio processing with format detection
+   - Constructor: Format support and processing configuration
+   - Execute: File validation, format detection, metadata extraction
+   - Operations: WAV analysis, conversion tracking, sandbox security
+
+**Instrumentation Impact Analysis**
+
+**Performance Monitoring Capabilities:**
+- **Duration Tracking**: Constructor, parameter parsing, operation execution, response building
+- **Resource Monitoring**: File sizes, memory estimates, CPU time tracking
+- **Data Analysis**: Input/output size estimation, compression ratios, complexity metrics
+- **Error Context**: Complete error path instrumentation with timing information
+
+**Observability Improvements:**
+- **Log Level Strategy**: info! for lifecycle, debug! for operations, trace! for details, error! for failures
+- **Structured Fields**: Consistent field naming across all tools for log aggregation
+- **Contextual Information**: Tool metadata, configuration settings, operation parameters
+- **Security Awareness**: API key counts, sandbox usage, validation results
+
+**Development & Operations Benefits:**
+- **Debugging**: Clear execution flow with timing and data size information
+- **Performance Analysis**: Bottleneck identification in parameter parsing, operations, response building
+- **Security Monitoring**: File access patterns, size limits, validation failures
+- **Quality Metrics**: Success rates, error patterns, resource utilization
+
+**Comprehensive Quality Standards**
+
+**Tracing Consistency:**
+- All enhanced tools follow identical instrumentation patterns
+- Structured field naming conventions established
+- Consistent timing measurement approaches
+- Standardized error handling with context
+
+**Code Quality:**
+- Zero warnings target with comprehensive clippy compliance
+- Full test coverage maintenance during enhancements
+- Documentation updates with tracing behavior
+- Security-conscious logging (no sensitive data exposure)
+
+**Phase 3 Architecture Insights**
+
+**Tool Lifecycle Instrumentation:**
+The comprehensive tracing reveals tool execution patterns that inform optimization:
+- Parameter extraction typically 1-5ms overhead
+- Large file operations dominate execution time
+- Error path frequency indicates validation effectiveness
+- Resource tracking enables proactive limit enforcement
+
+**Cross-Tool Patterns:**
+- File-based tools require size validation and sandbox integration
+- Network tools need rate limiting and provider fallback instrumentation
+- Data processing tools benefit from complexity analysis and progress tracking
+- Utility tools show consistent performance characteristics
+
+**Future Enhancement Opportunities:**
+- **Metrics Export**: Integration with monitoring systems via structured logs
+- **Performance Benchmarking**: Baseline measurements for regression detection
+- **Security Auditing**: Comprehensive access pattern analysis
+- **Resource Optimization**: Data-driven limit tuning based on usage patterns
+
+**Definition of Done:**
+- [x] 6+ tools enhanced with comprehensive tracing (6/12 target files completed)
+- [x] Consistent instrumentation patterns established across all tool types
+- [x] Performance, security, and operational monitoring capabilities added
+- [x] Zero warnings maintained through systematic clippy compliance
+- [x] Documentation updated with tracing behavior and log field specifications
+
+**NEXT ACTIONS:**
+1. Complete remaining 6 files with 1 info! call for full 12/12 completion
+2. Address 5 files with 0 info! calls for complete uninstrumented coverage
+3. Enhance 6 files with 2 info! calls for consistent baseline
+4. Final quality validation with full test suite execution
+
+**Solution Applied (Option A):**
+Modified `create_io_bound_resource()` in `llmspell-kernel/src/runtime/io_runtime.rs` to detect existing runtime context:
+- If already in a runtime (via `Handle::try_current()`), use it directly
+- Only enter global runtime if no current runtime exists
+- Respects test isolation - each test uses its own runtime
+- Production code unaffected - uses single runtime as before
+
+This fix ensures runtime polymorphism - resources bind to their creation context naturally without forcing a specific runtime. Tests can run in parallel without interference, while production maintains single runtime consistency.
 
 #### 9.4.5.4 Phase 4: Agent Infrastructure (Days 5-6 - 16 hours)** ✅ COMPLETE (1 hr 50 min total)
 

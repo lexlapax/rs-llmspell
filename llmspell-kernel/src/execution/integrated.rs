@@ -210,12 +210,12 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
             MemoryBackend::new(),
         )))?);
 
-        // Create session manager with default config
-        let mut session_manager = SessionManager::new(SessionConfig::default());
+        // Create session manager with default config (using temporary compatibility)
+        let mut session_manager = SessionManager::new_legacy(SessionConfig::default())?;
         session_manager.set_kernel_state(state.clone());
 
-        // Create a session for this kernel instance
-        let _session_id_obj = session_manager.create_session(None)?;
+        // Create a session for this kernel instance (using temporary compatibility)
+        let _session_id_obj = session_manager.create_session_legacy(None)?;
 
         // Initialize session state
         state.update_session(|session| {

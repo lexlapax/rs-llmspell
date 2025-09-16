@@ -6,14 +6,14 @@
 use crate::debug::coordinator::DebugEvent;
 use crate::io::manager::IOPubMessage;
 use crate::io::router::{MessageDestination, MessageRouter};
-use crate::sessions::SessionEvent as KernelSessionEvent;
+use crate::sessions::events::SessionEvent as KernelSessionEvent;
 use anyhow::Result;
 use llmspell_events::{
     correlation::{CorrelationContext, EventCorrelationTracker, EventLink, EventRelationship},
     universal_event::{Language, UniversalEvent},
     EventBus,
 };
-use llmspell_sessions::events::session_events::SessionEvent as SessionsSessionEvent;
+use crate::sessions::events::SessionEvent as SessionsSessionEvent;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -67,7 +67,7 @@ pub enum KernelEvent {
     /// Session event from sessions crate
     SessionEvent(Box<SessionsSessionEvent>),
     /// Kernel session event (local to kernel)
-    KernelSessionEvent(KernelSessionEvent),
+    KernelSessionEvent(Box<KernelSessionEvent>),
     /// Kernel startup event
     KernelStartup {
         /// Kernel ID
@@ -171,7 +171,7 @@ impl KernelEvent {
             }
             Self::DebugEvent(_debug_event) => None,
             Self::SessionEvent(session_event) => Some(session_event.event.id.to_string()),
-            Self::KernelSessionEvent(kernel_event) => Some(kernel_event.id.clone()),
+            Self::KernelSessionEvent(kernel_event) => Some(kernel_event.event.id.to_string()),
             _ => None,
         }
     }
@@ -229,7 +229,7 @@ impl KernelEvent {
             Self::KernelSessionEvent(kernel_event) => json!({
                 "event_type": kernel_event.event_type,
                 "session_id": kernel_event.session_id.to_string(),
-                "metadata": kernel_event.metadata
+                "metadata": kernel_event.event.metadata
             }),
             Self::KernelStartup {
                 kernel_id,
