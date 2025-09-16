@@ -821,6 +821,10 @@ impl ArtifactStorage {
     }
 
     /// Search for artifacts by content hash
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the content hash search cannot be performed.
     pub async fn find_by_content_hash(
         &self,
         content_hash: &ContentHash,
@@ -842,6 +846,10 @@ impl ArtifactStorage {
     }
 
     /// Count artifacts by type across all sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the artifact type counting cannot be performed.
     pub async fn count_artifacts_by_type(&self) -> Result<HashMap<ArtifactType, usize>> {
         let mut counts = HashMap::new();
 
@@ -859,6 +867,10 @@ impl ArtifactStorage {
     }
 
     /// Get total artifact count across all sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the total artifact count cannot be calculated.
     pub async fn get_total_artifact_count(&self) -> Result<usize> {
         let stats_map = self.session_stats.read().await;
         let total = stats_map.values().map(|stats| stats.artifact_count).sum();
@@ -866,6 +878,10 @@ impl ArtifactStorage {
     }
 
     /// Get total storage size across all sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the total storage size cannot be calculated.
     pub async fn get_total_storage_size(&self) -> Result<usize> {
         let stats_map = self.session_stats.read().await;
         let total = stats_map.values().map(|stats| stats.total_size).sum();
@@ -1506,12 +1522,12 @@ mod tests {
         // Store multiple artifacts
         let mut artifact_ids = Vec::new();
         for i in 1..=3 {
-            let content = format!("Content {}", i).into_bytes();
+            let content = format!("Content {i}").into_bytes();
             let artifact = SessionArtifact::new(
                 session_id,
                 i,
                 ArtifactType::SystemGenerated,
-                format!("file_{}.txt", i),
+                format!("file_{i}.txt"),
                 content,
             )
             .unwrap();
@@ -1522,7 +1538,7 @@ mod tests {
         // Test batch retrieval
         let results = storage.get_artifacts_batch(&artifact_ids).await.unwrap();
         assert_eq!(results.len(), 3);
-        assert!(results.iter().all(|r| r.is_some()));
+        assert!(results.iter().all(Option::is_some));
 
         // Test batch retrieval with non-existent ID
         let mut mixed_ids = artifact_ids.clone();
@@ -1545,12 +1561,12 @@ mod tests {
 
         // Store 5 artifacts
         for i in 1..=5 {
-            let content = format!("Content {}", i).into_bytes();
+            let content = format!("Content {i}").into_bytes();
             let artifact = SessionArtifact::new(
                 session_id,
                 i,
                 ArtifactType::ToolResult,
-                format!("result_{}.json", i),
+                format!("result_{i}.json"),
                 content,
             )
             .unwrap();
@@ -1720,7 +1736,7 @@ mod tests {
                 i as u64 + 1,
                 artifact_type.clone(),
                 (*name).to_string(),
-                format!("content {}", i).into_bytes(),
+                format!("content {i}").into_bytes(),
             )
             .unwrap();
             storage.store_artifact(&artifact).await.unwrap();
@@ -1760,7 +1776,7 @@ mod tests {
                 i as u64 + 1,
                 ArtifactType::UserInput,
                 (*name).to_string(),
-                format!("content {}", i).into_bytes(),
+                format!("content {i}").into_bytes(),
             )
             .unwrap();
             storage.store_artifact(&artifact).await.unwrap();
@@ -1925,8 +1941,8 @@ mod tests {
                 session_id1,
                 i + 1,
                 ArtifactType::UserInput,
-                format!("file{}.txt", i),
-                format!("content {}", i).into_bytes(),
+                format!("file{i}.txt"),
+                format!("content {i}").into_bytes(),
             )
             .unwrap();
             storage.store_artifact(&artifact).await.unwrap();
@@ -1937,8 +1953,8 @@ mod tests {
                 session_id2,
                 i + 1,
                 ArtifactType::ToolResult,
-                format!("result{}.json", i),
-                format!("result {}", i).into_bytes(),
+                format!("result{i}.json"),
+                format!("result {i}").into_bytes(),
             )
             .unwrap();
             storage.store_artifact(&artifact).await.unwrap();

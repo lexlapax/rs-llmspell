@@ -239,8 +239,10 @@ impl Hook for SessionMetricsCollector {
 
                 // Record state size if available
                 if self.config.enable_resource_tracking {
-                    if let Some(state_size) =
-                        context.data.get("state_size").and_then(|v| v.as_u64())
+                    if let Some(state_size) = context
+                        .data
+                        .get("state_size")
+                        .and_then(serde_json::Value::as_u64)
                     {
                         let mut labels = HashMap::new();
                         labels.insert(
@@ -341,7 +343,12 @@ impl SessionAnalytics {
         // Calculate operation counts
         if let Some(ops) = custom_metrics.get("session_operation") {
             for metric in ops {
-                if metric.labels.get("session_id").map(|s| s.as_str()) == Some(&anonymized_id) {
+                if metric
+                    .labels
+                    .get("session_id")
+                    .map(std::string::String::as_str)
+                    == Some(&anonymized_id)
+                {
                     summary.total_operations += 1;
                     if let Some(op) = metric.labels.get("operation") {
                         *summary.operation_breakdown.entry(op.clone()).or_insert(0) += 1;
@@ -353,7 +360,12 @@ impl SessionAnalytics {
         // Get session duration
         if let Some(durations) = custom_metrics.get("session_duration") {
             for metric in durations {
-                if metric.labels.get("session_id").map(|s| s.as_str()) == Some(&anonymized_id) {
+                if metric
+                    .labels
+                    .get("session_id")
+                    .map(std::string::String::as_str)
+                    == Some(&anonymized_id)
+                {
                     summary.session_duration = Some(Duration::from_secs_f64(metric.value));
                     summary.last_activity = Some(metric.timestamp);
                 }
@@ -403,7 +415,12 @@ impl SessionAnalytics {
         // Get resource usage
         if let Some(resources) = custom_metrics.get("session_resource") {
             for metric in resources {
-                if metric.labels.get("session_id").map(|s| s.as_str()) == Some(&anonymized_id) {
+                if metric
+                    .labels
+                    .get("session_id")
+                    .map(std::string::String::as_str)
+                    == Some(&anonymized_id)
+                {
                     if let Some(metric_type) = metric.labels.get("metric_type") {
                         summary
                             .resource_usage
@@ -461,6 +478,9 @@ impl SessionAnalytics {
     }
 
     /// Clean up old metrics based on retention period
+    ///
+    /// # Errors
+    /// Returns error if duration conversion fails
     pub fn cleanup_old_metrics(&self) -> Result<()> {
         let cutoff = Utc::now() - chrono::Duration::from_std(self.config.retention_period)?;
 

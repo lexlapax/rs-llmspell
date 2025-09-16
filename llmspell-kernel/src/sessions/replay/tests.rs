@@ -199,7 +199,7 @@ mod replay_tests {
 
         // Create a mock session entry without correlation_id
         let session_id = SessionId::new();
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
         let session_data = serde_json::json!({
             "id": session_id.to_string(),
             "name": "test_session",
@@ -234,7 +234,7 @@ mod replay_tests {
         let correlation_id = uuid::Uuid::new_v4();
 
         // Store session metadata with correlation_id (as per our implementation)
-        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata_key = format!("session_metadata:{session_id}");
         let metadata = serde_json::json!({
             "id": session_id.to_string(),
             "name": "test_session",
@@ -251,7 +251,7 @@ mod replay_tests {
             .unwrap();
 
         // Also create a dummy session entry to indicate the session exists
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
         storage_backend
             .set(&session_key, vec![1, 2, 3]) // Dummy data to indicate session exists
             .await
@@ -498,7 +498,7 @@ mod replay_tests {
         // Create session with metadata including correlation_id
         let session_id = SessionId::new();
         let correlation_id = uuid::Uuid::new_v4();
-        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata_key = format!("session_metadata:{session_id}");
         let metadata = serde_json::json!({
             "id": session_id.to_string(),
             "name": "test_session",
@@ -537,7 +537,7 @@ mod replay_tests {
         // Create session with metadata
         let session_id = SessionId::new();
         let correlation_id = uuid::Uuid::new_v4();
-        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata_key = format!("session_metadata:{session_id}");
         let metadata = serde_json::json!({
             "id": session_id.to_string(),
             "name": "test_session",
@@ -581,7 +581,7 @@ mod replay_tests {
 
         for (session_id, name) in [(session1, "session1"), (session2, "session2")] {
             let correlation_id = uuid::Uuid::new_v4();
-            let metadata_key = format!("session_metadata:{}", session_id);
+            let metadata_key = format!("session_metadata:{session_id}");
             let metadata = serde_json::json!({
                 "id": session_id.to_string(),
                 "name": name,
@@ -629,7 +629,7 @@ mod replay_tests {
 
         // Check that the expected keys are created
         // Session correlation key should exist immediately after creation
-        let correlation_key = format!("session_correlation:{}", session_id);
+        let correlation_key = format!("session_correlation:{session_id}");
         assert!(storage_backend
             .get(&correlation_key)
             .await
@@ -641,11 +641,11 @@ mod replay_tests {
         manager.save_session(&session).await.unwrap();
 
         // After save, session key should exist (bincode format)
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
         assert!(storage_backend.get(&session_key).await.unwrap().is_some());
 
         // After save, metadata key should exist
-        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata_key = format!("session_metadata:{session_id}");
         assert!(storage_backend.get(&metadata_key).await.unwrap().is_some());
     }
     #[tokio::test]
@@ -695,7 +695,7 @@ mod replay_tests {
         let correlation_id = uuid::Uuid::new_v4();
 
         // Store session metadata
-        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata_key = format!("session_metadata:{session_id}");
         let metadata = serde_json::json!({
             "id": session_id.to_string(),
             "correlation_id": correlation_id.to_string(),
@@ -770,7 +770,7 @@ mod replay_tests {
         let correlation_id = uuid::Uuid::new_v4();
 
         // Store session metadata
-        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata_key = format!("session_metadata:{session_id}");
         let metadata = serde_json::json!({
             "id": session_id.to_string(),
             "correlation_id": correlation_id.to_string(),

@@ -17,6 +17,9 @@ impl SessionOperations {
     }
 
     /// Update session metadata
+    ///
+    /// # Errors
+    /// Returns error if session is not found or metadata update fails
     pub async fn update_metadata(
         &self,
         session_id: &SessionId,
@@ -60,6 +63,9 @@ impl SessionOperations {
     }
 
     /// Get session tags
+    ///
+    /// # Errors
+    /// Returns error if session is not found
     pub async fn get_tags(&self, session_id: &SessionId) -> Result<Vec<String>> {
         let session = self.session_manager.get_session(session_id).await?;
         let metadata = session.metadata.read().await.clone();
@@ -67,6 +73,9 @@ impl SessionOperations {
     }
 
     /// Set session tags (replaces all tags)
+    ///
+    /// # Errors
+    /// Returns error if session is not found or session save fails
     pub async fn set_tags(&self, session_id: &SessionId, tags: Vec<String>) -> Result<()> {
         let session = self.session_manager.get_session(session_id).await?;
         let mut metadata = session.metadata.read().await.clone();
@@ -76,6 +85,9 @@ impl SessionOperations {
     }
 
     /// Add tags to session (appends to existing)
+    ///
+    /// # Errors
+    /// Returns error if session is not found or session save fails
     pub async fn add_tags(&self, session_id: &SessionId, new_tags: Vec<String>) -> Result<()> {
         let session = self.session_manager.get_session(session_id).await?;
         let mut metadata = session.metadata.read().await.clone();
@@ -92,6 +104,9 @@ impl SessionOperations {
     }
 
     /// Remove tags from session
+    ///
+    /// # Errors
+    /// Returns error if session is not found or session save fails
     pub async fn remove_tags(
         &self,
         session_id: &SessionId,
@@ -108,6 +123,9 @@ impl SessionOperations {
     }
 
     /// Check if session has a specific tag
+    ///
+    /// # Errors
+    /// Returns error if session is not found
     pub async fn has_tag(&self, session_id: &SessionId, tag: &str) -> Result<bool> {
         let session = self.session_manager.get_session(session_id).await?;
         let metadata = session.metadata.read().await.clone();
@@ -115,6 +133,9 @@ impl SessionOperations {
     }
 
     /// Get session statistics
+    ///
+    /// # Errors
+    /// Returns error if session is not found or artifacts cannot be retrieved
     pub async fn get_session_stats(&self, session_id: &SessionId) -> Result<SessionStats> {
         let session = self.session_manager.get_session(session_id).await?;
         let metadata = session.metadata.read().await.clone();
@@ -133,6 +154,9 @@ impl SessionOperations {
     }
 
     /// Export session data
+    ///
+    /// # Errors
+    /// Returns error if session is not found, artifacts cannot be retrieved, or serialization fails
     pub async fn export_session(
         &self,
         session_id: &SessionId,
@@ -352,8 +376,8 @@ mod tests {
                 .store_artifact(
                     &session_id,
                     crate::sessions::artifact::ArtifactType::UserInput,
-                    format!("test_artifact_{}.txt", i),
-                    format!("Test content {}", i).as_bytes().to_vec(),
+                    format!("test_artifact_{i}.txt"),
+                    format!("Test content {i}").as_bytes().to_vec(),
                     None,
                 )
                 .await
@@ -463,7 +487,7 @@ mod tests {
         // Should have initial tags plus all concurrent ones
         assert!(tags.len() >= 7); // 2 initial + 5 concurrent
         for i in 0..5 {
-            assert!(tags.contains(&format!("concurrent-{}", i)));
+            assert!(tags.contains(&format!("concurrent-{i}")));
         }
     }
     #[tokio::test]

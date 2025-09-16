@@ -2,7 +2,9 @@
 //! ABOUTME: Integrates with Phase 5 state persistence for automatic session context saving
 
 use crate::sessions::types::CreateSessionOptions;
-use crate::sessions::{Result, SessionConfig, SessionError, SessionId, SessionMetadata, SessionStatus};
+use crate::sessions::{
+    Result, SessionConfig, SessionError, SessionId, SessionMetadata, SessionStatus,
+};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -197,6 +199,10 @@ impl Session {
     }
 
     /// Increment operation count and return the new sequence number
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation count cannot be incremented.
     pub async fn increment_operation_count(&self) -> Result<u64> {
         let mut metadata = self.metadata.write().await;
         metadata.operation_count += 1;
@@ -205,6 +211,10 @@ impl Session {
     }
 
     /// Increment artifact count
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the artifact count cannot be incremented.
     pub async fn increment_artifact_count(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
         metadata.artifact_count += 1;
@@ -213,6 +223,10 @@ impl Session {
     }
 
     /// Decrement artifact count
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the artifact count cannot be decremented.
     pub async fn decrement_artifact_count(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
         if metadata.artifact_count > 0 {

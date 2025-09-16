@@ -286,6 +286,9 @@ impl SessionReplayControls {
 
     /// Schedule a session replay
     ///
+    /// # Errors
+    /// Returns error if replay scheduling fails or hook replay manager operations fail
+    ///
     /// # Panics
     ///
     /// Panics if the speed controls or active replays mutex is poisoned
@@ -326,8 +329,7 @@ impl SessionReplayControls {
             execution_id: replay_request
                 .executions
                 .first()
-                .map(|e| e.execution_id)
-                .unwrap_or_else(Uuid::new_v4),
+                .map_or_else(Uuid::new_v4, |e| e.execution_id),
             config: replay_request.config,
             correlation_id: replay_request.executions.first().map(|e| e.correlation_id),
         };
@@ -337,7 +339,7 @@ impl SessionReplayControls {
             .scheduler
             .schedule(hooks_request.clone(), schedule.clone())
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to schedule replay: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to schedule replay: {e}")))?;
 
         // Create a ScheduledReplay response
         Ok(ScheduledReplay {
@@ -354,32 +356,41 @@ impl SessionReplayControls {
     }
 
     /// Pause session replay
+    ///
+    /// # Errors
+    /// Returns error if the pause command cannot be sent or replay state update fails
     pub async fn pause_replay(&self, session_id: &SessionId) -> Result<()> {
         self.command_tx
             .send(ControlCommand::Pause {
                 session_id: *session_id,
             })
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to send pause command: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to send pause command: {e}")))?;
 
         self.update_replay_state(session_id, SessionReplayState::Paused)?;
         Ok(())
     }
 
     /// Resume session replay
+    ///
+    /// # Errors
+    /// Returns error if the resume command cannot be sent or replay state update fails
     pub async fn resume_replay(&self, session_id: &SessionId) -> Result<()> {
         self.command_tx
             .send(ControlCommand::Resume {
                 session_id: *session_id,
             })
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to send resume command: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to send resume command: {e}")))?;
 
         self.update_replay_state(session_id, SessionReplayState::Running)?;
         Ok(())
     }
 
     /// Stop session replay
+    ///
+    /// # Errors
+    /// Returns error if the stop command cannot be sent or replay state update fails
     ///
     /// # Panics
     ///
@@ -390,7 +401,7 @@ impl SessionReplayControls {
                 session_id: *session_id,
             })
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to send stop command: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to send stop command: {e}")))?;
 
         self.update_replay_state(session_id, SessionReplayState::Cancelled)?;
 
@@ -404,6 +415,9 @@ impl SessionReplayControls {
     }
 
     /// Set replay speed
+    ///
+    /// # Errors
+    /// Returns error if the speed command cannot be sent or progress update fails
     ///
     /// # Panics
     ///
@@ -424,7 +438,7 @@ impl SessionReplayControls {
                 multiplier,
             })
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to send speed command: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to send speed command: {e}")))?;
 
         // Update progress
         self.update_progress_speed(session_id, multiplier)?;
@@ -433,6 +447,9 @@ impl SessionReplayControls {
     }
 
     /// Add a breakpoint
+    ///
+    /// # Errors
+    /// Returns error if the breakpoint command cannot be sent
     ///
     /// # Panics
     ///
@@ -449,12 +466,15 @@ impl SessionReplayControls {
         self.command_tx
             .send(ControlCommand::AddBreakpoint { breakpoint })
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to add breakpoint: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to add breakpoint: {e}")))?;
 
         Ok(())
     }
 
     /// Remove a breakpoint
+    ///
+    /// # Errors
+    /// Returns error if the remove breakpoint command cannot be sent
     ///
     /// # Panics
     ///
@@ -477,19 +497,22 @@ impl SessionReplayControls {
                 breakpoint_id,
             })
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to remove breakpoint: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to remove breakpoint: {e}")))?;
 
         Ok(())
     }
 
     /// Step to next hook (when paused)
+    ///
+    /// # Errors
+    /// Returns error if the step command cannot be sent
     pub async fn step_next(&self, session_id: &SessionId) -> Result<()> {
         self.command_tx
             .send(ControlCommand::StepNext {
                 session_id: *session_id,
             })
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to send step command: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to send step command: {e}")))?;
 
         Ok(())
     }
@@ -567,6 +590,9 @@ impl SessionReplayControls {
 
     /// Update replay progress
     ///
+    /// # Errors
+    /// Returns error if no active replay is found for the specified session
+    ///
     /// # Panics
     ///
     /// Panics if the active replays or speed controls mutex is poisoned
@@ -597,8 +623,7 @@ impl SessionReplayControls {
                 let speed_controls = self.speed_controls.read().unwrap();
                 let speed = speed_controls
                     .get(session_id)
-                    .map(|s| s.multiplier())
-                    .unwrap_or(1.0);
+                    .map_or(1.0, SessionReplaySpeed::multiplier);
                 #[allow(clippy::cast_precision_loss)]
                 let remaining = per_hook.mul_f64(remaining_hooks as f64);
                 progress.estimated_time_remaining =

@@ -137,7 +137,7 @@ impl SessionTimeoutPolicy {
     }
 
     /// Update last activity time
-    fn update_activity_time(&self, context: &mut HookContext) {
+    fn update_activity_time(context: &mut HookContext) {
         context.data.insert(
             "last_activity_time".to_string(),
             serde_json::json!(Utc::now().to_rfc3339()),
@@ -181,7 +181,7 @@ impl Hook for SessionTimeoutPolicy {
         }
 
         // Update activity time for any session operation
-        self.update_activity_time(context);
+        Self::update_activity_time(context);
 
         // Check max duration
         match self.check_max_duration(context)? {

@@ -68,11 +68,17 @@ impl ReplayEngine {
     }
 
     /// Check if a session can be replayed
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to check replay capability
     pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
         self.session_adapter.can_replay_session(session_id).await
     }
 
     /// Replay a session
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to replay the session
     pub async fn replay_session(
         &self,
         session_id: &SessionId,
@@ -84,6 +90,9 @@ impl ReplayEngine {
     }
 
     /// Get session timeline
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to retrieve the session timeline
     pub async fn get_session_timeline(
         &self,
         session_id: &SessionId,
@@ -100,6 +109,9 @@ impl ReplayEngine {
     }
 
     /// Stop session replay
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to stop the replay
     pub fn stop_replay(&self, session_id: &SessionId) -> Result<()> {
         self.session_adapter.stop_replay(session_id)
     }
@@ -110,6 +122,9 @@ impl ReplayEngine {
     }
 
     /// Query hook executions for a specific session
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to query hook executions
     pub async fn query_session_hooks(
         &self,
         session_id: &SessionId,
@@ -121,6 +136,9 @@ impl ReplayEngine {
     }
 
     /// Get session replay metadata
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to retrieve replay metadata
     pub async fn get_session_replay_metadata(
         &self,
         session_id: &SessionId,
@@ -131,11 +149,17 @@ impl ReplayEngine {
     }
 
     /// List all sessions that can be replayed
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to list replayable sessions
     pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
         self.session_adapter.list_replayable_sessions().await
     }
 
     /// Schedule a session replay
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to schedule the replay
     pub async fn schedule_replay(
         &self,
         session_id: &SessionId,
@@ -148,16 +172,25 @@ impl ReplayEngine {
     }
 
     /// Pause session replay
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to pause the replay
     pub async fn pause_replay(&self, session_id: &SessionId) -> Result<()> {
         self.session_adapter.pause_replay(session_id).await
     }
 
     /// Resume session replay
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to resume the replay
     pub async fn resume_replay(&self, session_id: &SessionId) -> Result<()> {
         self.session_adapter.resume_replay(session_id).await
     }
 
     /// Set replay speed
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to set the replay speed
     pub async fn set_replay_speed(&self, session_id: &SessionId, multiplier: f64) -> Result<()> {
         self.session_adapter
             .set_replay_speed(session_id, multiplier)
@@ -165,6 +198,9 @@ impl ReplayEngine {
     }
 
     /// Add a breakpoint
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to add the breakpoint
     pub async fn add_breakpoint(
         &self,
         breakpoint: session_controls::SessionBreakpoint,
@@ -173,6 +209,9 @@ impl ReplayEngine {
     }
 
     /// Remove a breakpoint
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to remove the breakpoint
     pub async fn remove_breakpoint(
         &self,
         session_id: &SessionId,
@@ -184,6 +223,9 @@ impl ReplayEngine {
     }
 
     /// Step to next hook (when paused)
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to step to the next hook
     pub async fn step_next(&self, session_id: &SessionId) -> Result<()> {
         self.session_adapter.step_next(session_id).await
     }
@@ -207,6 +249,9 @@ impl ReplayEngine {
     }
 
     /// Inspect session state at a point in time
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to inspect state at the specified time
     pub fn inspect_state_at(
         &self,
         session_id: &SessionId,
@@ -216,6 +261,9 @@ impl ReplayEngine {
     }
 
     /// Compare states at two different points in time
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to compare states at the specified times
     pub fn compare_states(
         &self,
         session_id: &SessionId,
@@ -232,11 +280,17 @@ impl ReplayEngine {
     }
 
     /// Import debug data for a session
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to import debug data
     pub async fn import_debug_data(&self, session_id: &SessionId) -> Result<()> {
         self.session_adapter.import_debug_data(session_id).await
     }
 
     /// Export debug data for a session
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to export debug data
     pub async fn export_debug_data(
         &self,
         session_id: &SessionId,
@@ -245,6 +299,9 @@ impl ReplayEngine {
     }
 
     /// Navigate to a specific point in the timeline
+    ///
+    /// # Errors
+    /// Returns error if session adapter fails to navigate to the specified timeline point
     pub fn navigate_to_timeline_point(
         &self,
         session_id: &SessionId,

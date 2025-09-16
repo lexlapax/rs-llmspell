@@ -16,6 +16,9 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Register artifact collectors with the hook registry
+///
+/// # Errors
+/// Returns error if hook registration fails
 pub fn register_artifact_collectors(
     registry: &Arc<HookRegistry>,
     config: &CollectorConfig,
@@ -73,6 +76,9 @@ impl Default for CollectorConfig {
 }
 
 /// Process collected artifacts from hook context
+///
+/// # Errors
+/// Returns error if artifact processing or storage fails
 pub async fn process_collected_artifact(
     context: &HookContext,
     session_id: &SessionId,
@@ -170,6 +176,9 @@ impl ArtifactCollectionProcessor {
     /// Process hook context for artifact collection
     ///
     /// This is called after hooks execute to check if any artifacts were collected
+    ///
+    /// # Errors
+    /// Returns error if artifact processing fails
     pub async fn process_hook_context(
         &self,
         context: &HookContext,

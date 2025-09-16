@@ -108,31 +108,34 @@ impl SessionMiddleware {
     }
 
     /// Initialize middleware chains
+    ///
+    /// # Errors
+    /// Returns error if middleware chain creation fails
     pub fn initialize(&mut self) -> Result<()> {
         // Create middleware for different operation types
         self.middleware_chains.insert(
             MiddlewareType::SessionCreate,
-            self.create_middleware_chain(MiddlewareType::SessionCreate)?,
+            self.create_middleware_chain(MiddlewareType::SessionCreate),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionRead,
-            self.create_middleware_chain(MiddlewareType::SessionRead)?,
+            self.create_middleware_chain(MiddlewareType::SessionRead),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionUpdate,
-            self.create_middleware_chain(MiddlewareType::SessionUpdate)?,
+            self.create_middleware_chain(MiddlewareType::SessionUpdate),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionDelete,
-            self.create_middleware_chain(MiddlewareType::SessionDelete)?,
+            self.create_middleware_chain(MiddlewareType::SessionDelete),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionOperation,
-            self.create_middleware_chain(MiddlewareType::SessionOperation)?,
+            self.create_middleware_chain(MiddlewareType::SessionOperation),
         );
 
         // Register all middleware chains with the hook registry
@@ -142,7 +145,7 @@ impl SessionMiddleware {
     }
 
     /// Create middleware chain for specific operation type
-    fn create_middleware_chain(&self, middleware_type: MiddlewareType) -> Result<Arc<dyn Hook>> {
+    fn create_middleware_chain(&self, middleware_type: MiddlewareType) -> Arc<dyn Hook> {
         let mut hooks: Vec<Arc<dyn Hook>> = Vec::new();
 
         // Add enabled middleware components
@@ -172,7 +175,7 @@ impl SessionMiddleware {
         }
 
         // Create composite hook based on pattern
-        let name = format!("{:?}Middleware", middleware_type);
+        let name = format!("{middleware_type:?}Middleware");
         let middleware: Arc<dyn Hook> = match self.config.pattern {
             MiddlewarePattern::Sequential => Arc::new(
                 SequentialMiddleware::new(&name)
@@ -181,8 +184,7 @@ impl SessionMiddleware {
                         name: name.clone(),
                         version: "1.0.0".to_string(),
                         description: Some(format!(
-                            "Middleware chain for {:?} operations",
-                            middleware_type
+                            "Middleware chain for {middleware_type:?} operations"
                         )),
                         priority: llmspell_hooks::Priority(50),
                         tags: vec!["middleware".to_string(), "session".to_string()],
@@ -196,8 +198,7 @@ impl SessionMiddleware {
                         name: name.clone(),
                         version: "1.0.0".to_string(),
                         description: Some(format!(
-                            "Middleware chain for {:?} operations",
-                            middleware_type
+                            "Middleware chain for {middleware_type:?} operations"
                         )),
                         priority: llmspell_hooks::Priority(50),
                         tags: vec!["middleware".to_string(), "session".to_string()],
@@ -211,8 +212,7 @@ impl SessionMiddleware {
                         name: name.clone(),
                         version: "1.0.0".to_string(),
                         description: Some(format!(
-                            "Middleware chain for {:?} operations",
-                            middleware_type
+                            "Middleware chain for {middleware_type:?} operations"
                         )),
                         priority: llmspell_hooks::Priority(50),
                         tags: vec!["middleware".to_string(), "session".to_string()],
@@ -221,7 +221,7 @@ impl SessionMiddleware {
             ),
         };
 
-        Ok(middleware)
+        middleware
     }
 
     /// Register middleware with hook registry
@@ -247,6 +247,9 @@ impl SessionMiddleware {
     }
 
     /// Execute middleware for a specific operation
+    ///
+    /// # Errors
+    /// Returns error if middleware execution fails or middleware chain is not found
     pub async fn execute_middleware(
         &self,
         middleware_type: MiddlewareType,
@@ -290,6 +293,9 @@ impl SessionMiddleware {
     }
 
     /// Update middleware configuration
+    ///
+    /// # Errors
+    /// Returns error if middleware chain recreation fails
     pub fn update_config(&mut self, config: MiddlewareConfig) -> Result<()> {
         self.config = config;
         self.middleware_chains.clear();
@@ -297,27 +303,27 @@ impl SessionMiddleware {
         // Instead, just recreate the middleware chains
         self.middleware_chains.insert(
             MiddlewareType::SessionCreate,
-            self.create_middleware_chain(MiddlewareType::SessionCreate)?,
+            self.create_middleware_chain(MiddlewareType::SessionCreate),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionRead,
-            self.create_middleware_chain(MiddlewareType::SessionRead)?,
+            self.create_middleware_chain(MiddlewareType::SessionRead),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionUpdate,
-            self.create_middleware_chain(MiddlewareType::SessionUpdate)?,
+            self.create_middleware_chain(MiddlewareType::SessionUpdate),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionDelete,
-            self.create_middleware_chain(MiddlewareType::SessionDelete)?,
+            self.create_middleware_chain(MiddlewareType::SessionDelete),
         );
 
         self.middleware_chains.insert(
             MiddlewareType::SessionOperation,
-            self.create_middleware_chain(MiddlewareType::SessionOperation)?,
+            self.create_middleware_chain(MiddlewareType::SessionOperation),
         );
 
         Ok(())
@@ -325,6 +331,9 @@ impl SessionMiddleware {
 }
 
 /// Create session creation middleware
+///
+/// # Errors
+/// Returns error if middleware initialization fails
 pub fn create_session_middleware(
     config: MiddlewareConfig,
     registry: Arc<HookRegistry>,
@@ -336,6 +345,9 @@ pub fn create_session_middleware(
 }
 
 /// Create operation-specific middleware
+///
+/// # Errors
+/// Returns error if middleware creation or initialization fails
 pub fn create_operation_middleware(
     operation_type: MiddlewareType,
     registry: Arc<HookRegistry>,
@@ -358,7 +370,7 @@ pub fn create_operation_middleware(
     };
 
     let middleware = SessionMiddleware::new(config, registry, executor);
-    middleware.create_middleware_chain(operation_type)
+    Ok(middleware.create_middleware_chain(operation_type))
 }
 
 /// Sequential middleware implementation

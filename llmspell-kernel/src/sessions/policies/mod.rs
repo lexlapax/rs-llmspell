@@ -110,6 +110,9 @@ impl SessionPolicyManager {
     }
 
     /// Register session policies with the hook system
+    ///
+    /// # Errors
+    /// Returns error if policy registration fails
     pub fn register_policies(&self) -> Result<()> {
         // Register each policy with the appropriate hook points
         for policy in &self.policies {
@@ -145,6 +148,9 @@ impl SessionPolicyManager {
     }
 
     /// Evaluate policies for a session operation
+    ///
+    /// # Errors
+    /// Returns error if policy evaluation fails or hooks cannot be retrieved
     pub async fn evaluate_policies(&self, context: &mut HookContext) -> Result<HookResult> {
         // Get hooks from registry for this hook point
         let hooks = self.hook_registry.get_hooks(&context.point);

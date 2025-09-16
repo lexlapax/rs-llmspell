@@ -34,6 +34,9 @@ impl SessionSecurityManager {
     }
 
     /// Check if a session can access another session's resources
+    ///
+    /// # Errors
+    /// Currently never returns an error but uses Result for future extensibility
     pub fn can_access_session(
         &self,
         requesting_session: &SessionId,
@@ -66,6 +69,9 @@ impl SessionSecurityManager {
     }
 
     /// Validate cross-session operation
+    ///
+    /// # Errors
+    /// Returns access denied error if the requesting session cannot access the target session
     pub fn validate_cross_session_access(
         &self,
         requesting_session: &SessionId,
@@ -75,8 +81,7 @@ impl SessionSecurityManager {
         if !self.can_access_session(requesting_session, target_session)? {
             return Err(SessionError::AccessDenied {
                 message: format!(
-                    "Session {} cannot perform '{}' on session {} resources due to isolation policy",
-                    requesting_session, operation, target_session
+                    "Session {requesting_session} cannot perform '{operation}' on session {target_session} resources due to isolation policy"
                 ),
             });
         }
@@ -84,6 +89,9 @@ impl SessionSecurityManager {
     }
 
     /// Validate state scope access
+    ///
+    /// # Errors
+    /// Returns access denied error if state scope access is not allowed or validation fails
     pub fn validate_state_scope_access(
         &self,
         requesting_session: Option<&SessionId>,
@@ -103,8 +111,7 @@ impl SessionSecurityManager {
                     if self.strict_isolation {
                         return Err(SessionError::AccessDenied {
                             message: format!(
-                                "Cannot access session state '{}' without session context",
-                                state_scope
+                                "Cannot access session state '{state_scope}' without session context"
                             ),
                         });
                     }
@@ -188,7 +195,7 @@ mod tests {
         manager.register_session(&session1);
         manager.register_session(&session2);
 
-        let scope = format!("session:{}", session2);
+        let scope = format!("session:{session2}");
 
         // Should fail in strict isolation
         assert!(manager
@@ -196,7 +203,7 @@ mod tests {
             .is_err());
 
         // Should succeed for same session
-        let own_scope = format!("session:{}", session1);
+        let own_scope = format!("session:{session1}");
         assert!(manager
             .validate_state_scope_access(Some(&session1), &own_scope)
             .is_ok());

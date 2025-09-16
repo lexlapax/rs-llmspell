@@ -35,7 +35,7 @@ fn create_test_replay_session(_session_id: SessionId) -> ReplaySession {
     let mut captured_states = VecDeque::new();
     for i in 0..5 {
         captured_states.push_back(create_test_captured_state(
-            &format!("hook_{}", i),
+            &format!("hook_{i}"),
             Uuid::new_v4(),
         ));
     }
@@ -102,7 +102,7 @@ fn test_inspect_state_at_timestamp() {
     let mut states = VecDeque::new();
 
     for i in 0..5 {
-        let mut state = create_test_captured_state(&format!("hook_{}", i), Uuid::new_v4());
+        let mut state = create_test_captured_state(&format!("hook_{i}"), Uuid::new_v4());
         state.timestamp = base_time + Duration::from_secs(i * 10);
         states.push_back(state);
     }
@@ -228,7 +228,7 @@ fn test_timeline_navigation() {
     let mut executions = Vec::new();
     for i in 0..5 {
         executions.push(SerializedHookExecution {
-            hook_id: format!("hook_{}", i),
+            hook_id: format!("hook_{i}"),
             execution_id: Uuid::new_v4(),
             correlation_id: Uuid::new_v4(),
             hook_context: vec![],

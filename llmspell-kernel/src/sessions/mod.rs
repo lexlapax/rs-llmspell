@@ -66,9 +66,6 @@ pub mod analytics;
 /// Session security and isolation
 pub mod security;
 
-/// Temporary compatibility layer for kernel integration
-pub mod compatibility;
-
 // Re-export commonly used types
 pub use artifact::{
     ArtifactId, ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps,
@@ -82,9 +79,6 @@ pub use types::{
     CreateSessionOptions, CreateSessionOptionsBuilder, SessionConfig, SessionId, SessionMetadata,
     SessionStatus,
 };
-
-// Re-export compatibility types (temporary)
-pub use compatibility::KernelSessionIntegration;
 
 /// Prelude module for convenient imports
 pub mod prelude {

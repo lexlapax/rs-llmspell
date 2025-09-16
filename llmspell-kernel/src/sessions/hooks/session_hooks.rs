@@ -522,6 +522,9 @@ pub struct SessionHookRegistry;
 
 impl SessionHookRegistry {
     /// Register all session hooks with a `ReplayManager`
+    ///
+    /// # Errors
+    /// Returns error if hook registration fails
     pub fn register_with_replay_manager(replay_manager: &ReplayManager) -> Result<()> {
         // Register session start hook
         let start_hook = SessionStartHook::new();

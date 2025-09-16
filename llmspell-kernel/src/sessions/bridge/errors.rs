@@ -46,21 +46,21 @@ impl From<SessionError> for ScriptError {
     fn from(err: SessionError) -> Self {
         match err {
             SessionError::SessionNotFound { id } => {
-                ScriptError::new("SESSION_NOT_FOUND", format!("Session not found: {}", id))
+                ScriptError::new("SESSION_NOT_FOUND", format!("Session not found: {id}"))
             }
 
             SessionError::SessionAlreadyExists { id } => ScriptError::new(
                 "SESSION_ALREADY_EXISTS",
-                format!("Session already exists: {}", id),
+                format!("Session already exists: {id}"),
             ),
 
             SessionError::InvalidStateTransition { from, to } => ScriptError::new(
                 "INVALID_STATE_TRANSITION",
-                format!("Invalid state transition from {:?} to {:?}", from, to),
+                format!("Invalid state transition from {from:?} to {to:?}"),
             )
             .with_details(serde_json::json!({
-                "from_state": format!("{:?}", from),
-                "to_state": format!("{:?}", to),
+                "from_state": format!("{from:?}"),
+                "to_state": format!("{to:?}"),
             })),
 
             SessionError::InvalidOperation { reason } => {
@@ -73,24 +73,21 @@ impl From<SessionError> for ScriptError {
                 operation,
             } => ScriptError::new(
                 "INVALID_SESSION_STATE",
-                format!(
-                    "Session {} is in invalid state {:?} for operation {}",
-                    id, state, operation
-                ),
+                format!("Session {id} is in invalid state {state:?} for operation {operation}"),
             )
             .with_details(serde_json::json!({
                 "session_id": id,
-                "state": format!("{:?}", state),
+                "state": format!("{state:?}"),
                 "operation": operation,
             })),
 
             SessionError::ArtifactNotFound { id } => {
-                ScriptError::new("ARTIFACT_NOT_FOUND", format!("Artifact not found: {}", id))
+                ScriptError::new("ARTIFACT_NOT_FOUND", format!("Artifact not found: {id}"))
             }
 
             SessionError::ArtifactAlreadyExists { id, session_id } => ScriptError::new(
                 "ARTIFACT_ALREADY_EXISTS",
-                format!("Artifact {} already exists in session {}", id, session_id),
+                format!("Artifact {id} already exists in session {session_id}"),
             ),
 
             SessionError::Storage(msg) => ScriptError::new("STORAGE_ERROR", msg),
@@ -121,7 +118,7 @@ impl From<SessionError> for ScriptError {
 
             SessionError::ResourceLimitExceeded { resource, message } => ScriptError::new(
                 "RESOURCE_LIMIT_EXCEEDED",
-                format!("Resource limit exceeded for {}: {}", resource, message),
+                format!("Resource limit exceeded for {resource}: {message}"),
             )
             .with_details(serde_json::json!({
                 "resource": resource,
@@ -129,7 +126,7 @@ impl From<SessionError> for ScriptError {
             })),
 
             SessionError::Timeout { operation } => {
-                ScriptError::new("TIMEOUT", format!("Operation timed out: {}", operation))
+                ScriptError::new("TIMEOUT", format!("Operation timed out: {operation}"))
             }
 
             SessionError::IntegrityError { message } => {
@@ -187,7 +184,7 @@ impl ErrorBuilder {
     pub fn not_found(resource: &str, id: &str) -> ScriptError {
         ScriptError::new(
             error_codes::SESSION_NOT_FOUND,
-            format!("{} not found: {}", resource, id),
+            format!("{resource} not found: {id}"),
         )
     }
 
@@ -195,7 +192,7 @@ impl ErrorBuilder {
     pub fn invalid_input(field: &str, reason: &str) -> ScriptError {
         ScriptError::new(
             error_codes::INVALID_INPUT,
-            format!("Invalid {}: {}", field, reason),
+            format!("Invalid {field}: {reason}"),
         )
         .with_details(serde_json::json!({
             "field": field,
@@ -207,7 +204,7 @@ impl ErrorBuilder {
     pub fn permission_denied(action: &str, resource: &str) -> ScriptError {
         ScriptError::new(
             error_codes::PERMISSION_DENIED,
-            format!("Permission denied: {} on {}", action, resource),
+            format!("Permission denied: {action} on {resource}"),
         )
         .with_details(serde_json::json!({
             "action": action,
@@ -219,7 +216,7 @@ impl ErrorBuilder {
     pub fn conversion_error(from_type: &str, to_type: &str, reason: &str) -> ScriptError {
         ScriptError::new(
             error_codes::SCRIPT_CONVERSION_ERROR,
-            format!("Failed to convert {} to {}: {}", from_type, to_type, reason),
+            format!("Failed to convert {from_type} to {to_type}: {reason}"),
         )
         .with_details(serde_json::json!({
             "from_type": from_type,

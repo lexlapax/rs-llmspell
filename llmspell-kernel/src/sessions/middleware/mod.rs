@@ -17,6 +17,9 @@ pub use session_middleware::{
 };
 
 /// Create default middleware chain for session operations
+///
+/// # Errors
+/// Returns error if middleware creation fails
 pub fn create_default_middleware() -> Result<Arc<dyn Hook>> {
     // Create a custom hook that executes logging, metrics, and security in sequence
     let middleware = SequentialMiddleware::new("default_session_middleware")
@@ -36,6 +39,9 @@ pub fn create_default_middleware() -> Result<Arc<dyn Hook>> {
 }
 
 /// Create caching middleware for read operations
+///
+/// # Errors
+/// Returns error if middleware creation fails
 pub fn create_caching_middleware() -> Result<Arc<dyn Hook>> {
     // Parallel execution of caching and metrics
     let middleware = ParallelMiddleware::new("caching_middleware")
@@ -54,6 +60,9 @@ pub fn create_caching_middleware() -> Result<Arc<dyn Hook>> {
 }
 
 /// Create security middleware with voting pattern
+///
+/// # Errors
+/// Returns error if middleware creation fails
 pub fn create_security_middleware() -> Result<Arc<dyn Hook>> {
     // Multiple security checks with voting (at least 2 must pass)
     let middleware = VotingMiddleware::new("security_middleware", 0.66)

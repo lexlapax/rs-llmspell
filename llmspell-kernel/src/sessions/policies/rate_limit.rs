@@ -131,12 +131,12 @@ impl SessionRateLimitPolicy {
     }
 
     /// Get the operation type from context
-    fn get_operation_type(&self, context: &HookContext) -> Option<String> {
+    fn get_operation_type(context: &HookContext) -> Option<String> {
         context
             .data
             .get("operation_type")
             .and_then(|v| v.as_str())
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
     }
 
     /// Check rate limits for the operation
@@ -146,7 +146,7 @@ impl SessionRateLimitPolicy {
         if !global_result.should_continue() {
             return Ok(RateLimitStatus::Exceeded {
                 limit_type: "global".to_string(),
-                retry_after: self.extract_retry_after(context),
+                retry_after: Self::extract_retry_after(context),
             });
         }
 
@@ -155,26 +155,26 @@ impl SessionRateLimitPolicy {
         if !session_result.should_continue() {
             return Ok(RateLimitStatus::Exceeded {
                 limit_type: "session".to_string(),
-                retry_after: self.extract_retry_after(context),
+                retry_after: Self::extract_retry_after(context),
             });
         }
 
         // Check operation-specific rate limit
-        if let Some(op_type) = self.get_operation_type(context) {
+        if let Some(op_type) = Self::get_operation_type(context) {
             if let Some(op_limiter) = self.operation_limiters.get(&op_type) {
                 let op_result = op_limiter.execute(context).await?;
                 if !op_result.should_continue() {
                     return Ok(RateLimitStatus::Exceeded {
-                        limit_type: format!("operation:{}", op_type),
-                        retry_after: self.extract_retry_after(context),
+                        limit_type: format!("operation:{op_type}"),
+                        retry_after: Self::extract_retry_after(context),
                     });
                 }
             }
         }
 
         // Check if we're approaching limits
-        if let Some(remaining) = self.extract_remaining_tokens(context) {
-            if let Some(limit) = self.extract_limit(context) {
+        if let Some(remaining) = Self::extract_remaining_tokens(context) {
+            if let Some(limit) = Self::extract_limit(context) {
                 let usage_percent = ((limit - remaining) as f64 / limit as f64) * 100.0;
                 if usage_percent > 80.0 {
                     return Ok(RateLimitStatus::Warning { usage_percent });
@@ -186,29 +186,29 @@ impl SessionRateLimitPolicy {
     }
 
     /// Extract retry-after duration from context
-    fn extract_retry_after(&self, context: &HookContext) -> Option<Duration> {
+    fn extract_retry_after(context: &HookContext) -> Option<Duration> {
         context
             .data
             .get("retry_after_seconds")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map(Duration::from_secs)
     }
 
     /// Extract remaining tokens from context
-    fn extract_remaining_tokens(&self, context: &HookContext) -> Option<u32> {
+    fn extract_remaining_tokens(context: &HookContext) -> Option<u32> {
         context
             .data
             .get("rate_limit_remaining")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map(|v| v as u32)
     }
 
     /// Extract rate limit from context
-    fn extract_limit(&self, context: &HookContext) -> Option<u32> {
+    fn extract_limit(context: &HookContext) -> Option<u32> {
         context
             .data
             .get("rate_limit_limit")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map(|v| v as u32)
     }
 }
@@ -222,7 +222,7 @@ impl Hook for SessionRateLimitPolicy {
                 limit_type,
                 retry_after,
             } => {
-                let retry_seconds = retry_after.map(|d| d.as_secs()).unwrap_or(60);
+                let retry_seconds = retry_after.map_or(60, |d| d.as_secs());
 
                 context.data.insert(
                     "rate_limit_exceeded".to_string(),
@@ -233,8 +233,7 @@ impl Hook for SessionRateLimitPolicy {
                 );
 
                 return Ok(HookResult::Cancel(format!(
-                    "Rate limit exceeded ({}). Retry after {} seconds",
-                    limit_type, retry_seconds
+                    "Rate limit exceeded ({limit_type}). Retry after {retry_seconds} seconds"
                 )));
             }
             RateLimitStatus::Warning { usage_percent } => {
@@ -304,7 +303,7 @@ mod tests {
     #[tokio::test]
     async fn test_operation_type_extraction() {
         let config = RateLimitConfig::default();
-        let policy = SessionRateLimitPolicy::new(config);
+        let _policy = SessionRateLimitPolicy::new(config);
 
         let mut context = HookContext::new(
             HookPoint::SessionCheckpoint,
@@ -315,7 +314,7 @@ mod tests {
             .data
             .insert("operation_type".to_string(), serde_json::json!("llm_call"));
 
-        let op_type = policy.get_operation_type(&context);
+        let op_type = SessionRateLimitPolicy::get_operation_type(&context);
         assert_eq!(op_type, Some("llm_call".to_string()));
     }
     #[tokio::test]

@@ -240,14 +240,14 @@ mod tests {
 
         // Add multiple versions
         for i in 1..=3 {
-            let artifact_id = ArtifactId::new(format!("hash{}", i), session_id, i);
+            let artifact_id = ArtifactId::new(format!("hash{i}"), session_id, i);
             manager
                 .record_version(
                     &session_id,
                     name,
                     u32::try_from(i).expect("version number should fit in u32"),
                     &artifact_id,
-                    &format!("hash{}", i),
+                    &format!("hash{i}"),
                 )
                 .await
                 .unwrap();

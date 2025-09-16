@@ -396,15 +396,15 @@ mod tests {
     #[test]
     fn test_result_type_alias() {
         // Test that Result<T> works as expected
-        fn test_function() -> Result<String> {
-            Ok("success".to_string())
+        fn test_function() -> String {
+            "success".to_string()
         }
 
         fn test_error_function() -> Result<String> {
             Err(SessionError::general("test error"))
         }
 
-        assert!(test_function().is_ok());
+        assert_eq!(test_function(), "success");
         assert!(test_error_function().is_err());
     }
     #[test]

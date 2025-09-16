@@ -88,50 +88,50 @@ impl SessionResourcePolicy {
     }
 
     /// Check memory usage
-    fn check_memory_usage(&self, context: &HookContext) -> Result<ResourceStatus> {
+    fn check_memory_usage(&self, context: &HookContext) -> ResourceStatus {
         if let Some(max_memory) = self.config.max_memory_bytes {
             let current_memory = context
                 .data
                 .get("memory_usage_bytes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
 
             if current_memory > max_memory {
-                return Ok(ResourceStatus::Exceeded {
+                return ResourceStatus::Exceeded {
                     resource: ResourceType::Memory,
                     current: current_memory as f64,
                     limit: max_memory as f64,
-                });
+                };
             }
 
             // Check if approaching limit (>90%)
             if current_memory as f64 > max_memory as f64 * 0.9 {
-                return Ok(ResourceStatus::Warning {
+                return ResourceStatus::Warning {
                     resource: ResourceType::Memory,
                     usage_percent: (current_memory as f64 / max_memory as f64) * 100.0,
-                });
+                };
             }
         }
 
-        Ok(ResourceStatus::Ok)
+        ResourceStatus::Ok
     }
 
     /// Check token usage
-    fn check_token_usage(&self, context: &HookContext) -> Result<ResourceStatus> {
+    fn check_token_usage(&self, context: &HookContext) -> ResourceStatus {
         // Check total tokens
         if let Some(max_tokens) = self.config.max_total_tokens {
             let total_tokens = context
                 .data
                 .get("total_tokens_used")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
 
             if total_tokens > max_tokens {
-                return Ok(ResourceStatus::Exceeded {
+                return ResourceStatus::Exceeded {
                     resource: ResourceType::TotalTokens,
                     current: total_tokens as f64,
                     limit: max_tokens as f64,
-                });
+                };
             }
         }
 
@@ -140,38 +140,38 @@ impl SessionResourcePolicy {
             if let Some(token_usage) = context.data.get("token_usage") {
                 if let Ok(usage) = serde_json::from_value::<TokenUsage>(token_usage.clone()) {
                     if usage.total_tokens > max_per_op {
-                        return Ok(ResourceStatus::Exceeded {
+                        return ResourceStatus::Exceeded {
                             resource: ResourceType::TokensPerOperation,
                             current: usage.total_tokens as f64,
                             limit: max_per_op as f64,
-                        });
+                        };
                     }
                 }
             }
         }
 
-        Ok(ResourceStatus::Ok)
+        ResourceStatus::Ok
     }
 
     /// Check operation count
-    fn check_operation_count(&self, context: &HookContext) -> Result<ResourceStatus> {
+    fn check_operation_count(&self, context: &HookContext) -> ResourceStatus {
         if let Some(max_ops) = self.config.max_operations {
             let operation_count = context
                 .data
                 .get("operation_count")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0);
 
             if operation_count > max_ops {
-                return Ok(ResourceStatus::Exceeded {
+                return ResourceStatus::Exceeded {
                     resource: ResourceType::Operations,
                     current: operation_count as f64,
                     limit: max_ops as f64,
-                });
+                };
             }
         }
 
-        Ok(ResourceStatus::Ok)
+        ResourceStatus::Ok
     }
 
     /// Check cost limits
@@ -185,7 +185,7 @@ impl SessionResourcePolicy {
             let total_cost = context
                 .data
                 .get("total_cost_usd")
-                .and_then(|v| v.as_f64())
+                .and_then(serde_json::Value::as_f64)
                 .unwrap_or(0.0);
 
             if total_cost > max_cost {
@@ -212,12 +212,12 @@ impl SessionResourcePolicy {
     }
 
     /// Update resource usage metrics
-    fn update_usage(&self, context: &mut HookContext) {
+    fn update_usage(context: &mut HookContext) {
         // Increment operation count
         let op_count = context
             .data
             .get("operation_count")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(0);
         context.data.insert(
             "operation_count".to_string(),
@@ -230,7 +230,7 @@ impl SessionResourcePolicy {
                 let total_tokens = context
                     .data
                     .get("total_tokens_used")
-                    .and_then(|v| v.as_u64())
+                    .and_then(serde_json::Value::as_u64)
                     .unwrap_or(0);
                 context.data.insert(
                     "total_tokens_used".to_string(),
@@ -246,14 +246,14 @@ impl Hook for SessionResourcePolicy {
     #[allow(clippy::too_many_lines)]
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
         // Update usage metrics
-        self.update_usage(context);
+        Self::update_usage(context);
 
         // Check memory usage
         if let ResourceStatus::Exceeded {
             resource,
             current,
             limit,
-        } = self.check_memory_usage(context)?
+        } = self.check_memory_usage(context)
         {
             context.data.insert(
                 "resource_limit_exceeded".to_string(),
@@ -271,7 +271,7 @@ impl Hook for SessionResourcePolicy {
         }
 
         // Check token usage
-        match self.check_token_usage(context)? {
+        match self.check_token_usage(context) {
             ResourceStatus::Exceeded {
                 resource,
                 current,
@@ -286,8 +286,7 @@ impl Hook for SessionResourcePolicy {
                     }),
                 );
                 return Ok(HookResult::Cancel(format!(
-                    "{} limit exceeded: {} / {}",
-                    resource, current, limit
+                    "{resource} limit exceeded: {current} / {limit}"
                 )));
             }
             ResourceStatus::Warning {
@@ -310,7 +309,7 @@ impl Hook for SessionResourcePolicy {
             resource,
             current,
             limit,
-        } = self.check_operation_count(context)?
+        } = self.check_operation_count(context)
         {
             context.data.insert(
                 "resource_limit_exceeded".to_string(),
@@ -321,8 +320,7 @@ impl Hook for SessionResourcePolicy {
                 }),
             );
             return Ok(HookResult::Cancel(format!(
-                "Operation limit exceeded: {} / {}",
-                current, limit
+                "Operation limit exceeded: {current} / {limit}"
             )));
         }
 
@@ -342,8 +340,7 @@ impl Hook for SessionResourcePolicy {
                     }),
                 );
                 return Ok(HookResult::Cancel(format!(
-                    "Cost limit exceeded: ${:.2} / ${:.2}",
-                    current, limit
+                    "Cost limit exceeded: ${current:.2} / ${limit:.2}"
                 )));
             }
             ResourceStatus::Warning {
@@ -499,7 +496,7 @@ mod tests {
         let op_count = context
             .data
             .get("operation_count")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(0);
         assert_eq!(op_count, 3);
     }

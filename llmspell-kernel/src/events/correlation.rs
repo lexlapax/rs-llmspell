@@ -7,13 +7,13 @@ use crate::debug::coordinator::DebugEvent;
 use crate::io::manager::IOPubMessage;
 use crate::io::router::{MessageDestination, MessageRouter};
 use crate::sessions::events::SessionEvent as KernelSessionEvent;
+use crate::sessions::events::SessionEvent as SessionsSessionEvent;
 use anyhow::Result;
 use llmspell_events::{
     correlation::{CorrelationContext, EventCorrelationTracker, EventLink, EventRelationship},
     universal_event::{Language, UniversalEvent},
     EventBus,
 };
-use crate::sessions::events::SessionEvent as SessionsSessionEvent;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;

@@ -9,6 +9,9 @@ use crate::sessions::{
 use std::str::FromStr;
 
 /// Convert a script value (JSON) to `CreateSessionOptions`
+///
+/// # Errors
+/// Returns error if the JSON value is not an object or contains invalid field values
 pub fn json_to_create_options(value: &serde_json::Value) -> Result<CreateSessionOptions, String> {
     let obj = value
         .as_object()
@@ -40,7 +43,7 @@ pub fn json_to_create_options(value: &serde_json::Value) -> Result<CreateSession
 
     if let Some(parent) = obj.get("parent_session_id").and_then(|v| v.as_str()) {
         options.parent_session_id = Some(
-            SessionId::from_str(parent).map_err(|e| format!("Invalid parent session ID: {}", e))?,
+            SessionId::from_str(parent).map_err(|e| format!("Invalid parent session ID: {e}"))?,
         );
     }
 
@@ -48,6 +51,9 @@ pub fn json_to_create_options(value: &serde_json::Value) -> Result<CreateSession
 }
 
 /// Convert a script value (JSON) to `SessionQuery`
+///
+/// # Errors
+/// Returns error if the JSON value is not an object or contains invalid field values
 pub fn json_to_session_query(value: &serde_json::Value) -> Result<SessionQuery, String> {
     let obj = value
         .as_object()
@@ -68,13 +74,13 @@ pub fn json_to_session_query(value: &serde_json::Value) -> Result<SessionQuery, 
 
     if let Some(parent) = obj.get("parent_session_id").and_then(|v| v.as_str()) {
         query.parent_session_id =
-            Some(SessionId::from_str(parent).map_err(|e| format!("Invalid parent ID: {}", e))?);
+            Some(SessionId::from_str(parent).map_err(|e| format!("Invalid parent ID: {e}"))?);
     }
 
     if let Some(created_after) = obj.get("created_after").and_then(|v| v.as_str()) {
         query.created_after = Some(
             chrono::DateTime::parse_from_rfc3339(created_after)
-                .map_err(|e| format!("Invalid created_after date: {}", e))?
+                .map_err(|e| format!("Invalid created_after date: {e}"))?
                 .with_timezone(&chrono::Utc),
         );
     }
@@ -82,12 +88,12 @@ pub fn json_to_session_query(value: &serde_json::Value) -> Result<SessionQuery, 
     if let Some(created_before) = obj.get("created_before").and_then(|v| v.as_str()) {
         query.created_before = Some(
             chrono::DateTime::parse_from_rfc3339(created_before)
-                .map_err(|e| format!("Invalid created_before date: {}", e))?
+                .map_err(|e| format!("Invalid created_before date: {e}"))?
                 .with_timezone(&chrono::Utc),
         );
     }
 
-    if let Some(limit) = obj.get("limit").and_then(|v| v.as_u64()) {
+    if let Some(limit) = obj.get("limit").and_then(serde_json::Value::as_u64) {
         query.limit = Some(
             limit
                 .try_into()
@@ -95,7 +101,7 @@ pub fn json_to_session_query(value: &serde_json::Value) -> Result<SessionQuery, 
         );
     }
 
-    if let Some(offset) = obj.get("offset").and_then(|v| v.as_u64()) {
+    if let Some(offset) = obj.get("offset").and_then(serde_json::Value::as_u64) {
         query.offset = Some(
             offset
                 .try_into()
@@ -122,7 +128,7 @@ pub fn session_metadata_to_json(metadata: &SessionMetadata) -> serde_json::Value
         "status": metadata.status.to_string(),
         "created_at": metadata.created_at.to_rfc3339(),
         "updated_at": metadata.updated_at.to_rfc3339(),
-        "parent_session_id": metadata.parent_session_id.as_ref().map(|id| id.to_string()),
+        "parent_session_id": metadata.parent_session_id.as_ref().map(std::string::ToString::to_string),
         "custom_metadata": metadata.custom_metadata,
     })
 }
@@ -140,7 +146,7 @@ pub fn artifact_metadata_to_json(metadata: &ArtifactMetadata) -> serde_json::Val
         "version": metadata.version.version,
         "created_at": metadata.created_at.to_rfc3339(),
         "created_by": metadata.created_by,
-        "parent_artifact": metadata.parent_artifact.as_ref().map(|id| id.to_string()),
+        "parent_artifact": metadata.parent_artifact.as_ref().map(std::string::ToString::to_string),
         "is_compressed": metadata.is_compressed,
         "original_size": metadata.original_size,
     })
@@ -153,7 +159,7 @@ fn parse_session_status(status: &str) -> Result<SessionStatus, String> {
         "suspended" => Ok(SessionStatus::Suspended),
         "completed" => Ok(SessionStatus::Completed),
         "failed" => Ok(SessionStatus::Failed),
-        _ => Err(format!("Unknown session status: {}", status)),
+        _ => Err(format!("Unknown session status: {status}")),
     }
 }
 
@@ -163,11 +169,14 @@ fn parse_sort_by(sort_by: &str) -> Result<SessionSortBy, String> {
         "created_at" => Ok(SessionSortBy::CreatedAt),
         "updated_at" => Ok(SessionSortBy::UpdatedAt),
         "name" => Ok(SessionSortBy::Name),
-        _ => Err(format!("Unknown sort by option: {}", sort_by)),
+        _ => Err(format!("Unknown sort by option: {sort_by}")),
     }
 }
 
 /// Parse artifact type from string
+///
+/// # Errors
+/// Returns error if the artifact type string is not recognized
 pub fn parse_artifact_type(type_str: &str) -> Result<ArtifactType, String> {
     match type_str.to_lowercase().as_str() {
         "agent_output" => Ok(ArtifactType::AgentOutput),

@@ -221,7 +221,7 @@ pub async fn start_embedded_kernel(config: LLMSpellConfig) -> Result<KernelHandl
     let exec_config = build_execution_config(&config);
 
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(protocol.clone(), exec_config, session_id)?;
+    let kernel = IntegratedKernel::new(protocol.clone(), exec_config, session_id).await?;
 
     Ok(KernelHandle {
         kernel,
@@ -362,7 +362,7 @@ pub async fn start_kernel_service(port: u16, config: LLMSpellConfig) -> Result<S
     let exec_config = build_execution_config(&config);
 
     // Create integrated kernel
-    let kernel = IntegratedKernel::new(protocol, exec_config, session_id)?;
+    let kernel = IntegratedKernel::new(protocol, exec_config, session_id).await?;
 
     // Write connection file for clients
     let connection_file = write_connection_file(port, &kernel_id)?;

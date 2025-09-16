@@ -1542,11 +1542,19 @@ impl SessionManager {
     }
 
     /// Check if a session can be replayed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session replay status cannot be determined.
     pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
         self.replay_engine.can_replay_session(session_id).await
     }
 
     /// Replay a session using the existing replay infrastructure
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session replay fails to start or execute.
     pub async fn replay_session(
         &self,
         session_id: &SessionId,
@@ -1556,6 +1564,10 @@ impl SessionManager {
     }
 
     /// Get the timeline of events for a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session timeline cannot be retrieved.
     pub async fn get_session_timeline(
         &self,
         session_id: &SessionId,
@@ -1572,6 +1584,10 @@ impl SessionManager {
     }
 
     /// Stop session replay
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session replay cannot be stopped.
     pub fn stop_replay(&self, session_id: &SessionId) -> Result<()> {
         self.replay_engine.stop_replay(session_id)
     }
@@ -1584,6 +1600,10 @@ impl SessionManager {
     }
 
     /// Query hook executions for a specific session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the hook executions cannot be queried.
     pub async fn query_session_hooks(
         &self,
         session_id: &SessionId,
@@ -1595,6 +1615,10 @@ impl SessionManager {
     }
 
     /// Get session replay metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session replay metadata cannot be retrieved.
     pub async fn get_session_replay_metadata(
         &self,
         session_id: &SessionId,
@@ -1605,6 +1629,10 @@ impl SessionManager {
     }
 
     /// List all sessions that can be replayed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the replayable sessions cannot be listed.
     pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
         self.replay_engine.list_replayable_sessions().await
     }
@@ -1696,7 +1724,7 @@ mod tests {
         // Create multiple sessions
         for i in 0..3 {
             let options = CreateSessionOptions {
-                name: Some(format!("Session {}", i)),
+                name: Some(format!("Session {i}")),
                 tags: vec!["test".to_string()],
                 ..Default::default()
             };
@@ -1896,8 +1924,8 @@ mod tests {
                 .store_artifact(
                     &session_id,
                     ArtifactType::UserInput,
-                    format!("file_{}.txt", i),
-                    format!("content {}", i).into_bytes(),
+                    format!("file_{i}.txt"),
+                    format!("content {i}").into_bytes(),
                     None,
                 )
                 .await

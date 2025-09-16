@@ -65,6 +65,9 @@ impl SessionDebugger {
 
     /// Inspect state at a specific point in time
     ///
+    /// # Errors
+    /// Returns error if no debug data is found for the specified session
+    ///
     /// # Panics
     ///
     /// Panics if the captured states mutex is poisoned
@@ -89,6 +92,9 @@ impl SessionDebugger {
 
     /// Get all captured states for a session
     ///
+    /// # Errors
+    /// Returns error if no debug data is found for the specified session
+    ///
     /// # Panics
     ///
     /// Panics if the captured states mutex is poisoned
@@ -105,6 +111,9 @@ impl SessionDebugger {
     }
 
     /// Compare states at two different points in time
+    ///
+    /// # Errors
+    /// Returns error if state inspection fails for either timestamp
     pub fn compare_states(
         &self,
         session_id: &SessionId,
@@ -155,6 +164,9 @@ impl SessionDebugger {
     }
 
     /// Navigate to a specific point in the timeline
+    ///
+    /// # Errors
+    /// Returns error if no timeline exists for the session, invalid timeline index, or no state at timeline point
     pub fn navigate_to_timeline_point(
         &self,
         session_id: &SessionId,
@@ -204,6 +216,9 @@ impl SessionDebugger {
     }
 
     /// Export debug data for a session
+    ///
+    /// # Errors
+    /// Returns error if retrieving session states fails
     pub fn export_debug_data(&self, session_id: &SessionId) -> Result<SessionDebugData> {
         let states = self.get_all_states(session_id)?;
         let timeline = self.get_timeline(session_id);
@@ -354,7 +369,7 @@ impl StateComparison {
                     let new_path = if path.is_empty() {
                         key.to_string()
                     } else {
-                        format!("{}.{}", path, key)
+                        format!("{path}.{key}")
                     };
                     match (map1.get(key), map2.get(key)) {
                         (Some(v1), Some(v2)) => {

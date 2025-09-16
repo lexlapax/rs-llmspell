@@ -125,6 +125,10 @@ impl AccessControlList {
     }
 
     /// Grant permission to a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the granting session lacks admin permissions or if the operation fails.
     pub fn grant_permission(
         &mut self,
         session_id: SessionId,
@@ -153,6 +157,10 @@ impl AccessControlList {
     }
 
     /// Revoke permission from a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the revoking session lacks admin permissions, if attempting to revoke owner permissions, or if the session has no permissions to revoke.
     pub fn revoke_permission(
         &mut self,
         session_id: &SessionId,
@@ -316,6 +324,10 @@ impl AccessControlManager {
     }
 
     /// Initialize ACL for a new artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an ACL already exists with a different owner.
     pub async fn initialize_acl(&self, artifact_id: ArtifactId, owner: SessionId) -> Result<()> {
         let mut acls = self.acls.write().await;
 
@@ -338,6 +350,10 @@ impl AccessControlManager {
     }
 
     /// Check if a session has permission to access an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the permission check cannot be performed.
     pub async fn check_permission(
         &self,
         artifact_id: &ArtifactId,
@@ -380,6 +396,10 @@ impl AccessControlManager {
     }
 
     /// Grant permission to a session for an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cross-session sharing is disabled, the granting session lacks admin permissions, or the artifact ACL is not found.
     pub async fn grant_permission(
         &self,
         artifact_id: &ArtifactId,
@@ -420,6 +440,10 @@ impl AccessControlManager {
     }
 
     /// Revoke permission from a session for an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the revoking session lacks admin permissions, attempting to revoke owner permissions, or the artifact ACL is not found.
     pub async fn revoke_permission(
         &self,
         artifact_id: &ArtifactId,
@@ -451,6 +475,10 @@ impl AccessControlManager {
     }
 
     /// Get access control list for an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the ACL for the artifact is not found.
     pub async fn get_acl(&self, artifact_id: &ArtifactId) -> Result<AccessControlList> {
         let acls = self.acls.read().await;
         acls.get(artifact_id)

@@ -92,13 +92,13 @@ impl ArtifactSearch {
             .index
             .metadata_cache
             .iter()
-            .filter(|(id, metadata)| self.matches_query(id, metadata, query))
+            .filter(|(id, metadata)| Self::matches_query(id, metadata, query))
             .collect();
 
         let total_count = matches.len();
 
         // Apply sorting
-        self.sort_results(&mut matches, query.sort_order);
+        Self::sort_results(&mut matches, query.sort_order);
 
         // Apply pagination
         let offset = query.offset.unwrap_or(0);
@@ -183,7 +183,6 @@ impl ArtifactSearch {
 
     /// Check if a metadata entry matches the query
     fn matches_query(
-        &self,
         artifact_id: &ArtifactId,
         metadata: &ArtifactMetadata,
         query: &ArtifactSearchQuery,
@@ -251,7 +250,7 @@ impl ArtifactSearch {
     }
 
     /// Sort results according to the specified order
-    fn sort_results(&self, results: &mut [(&ArtifactId, &ArtifactMetadata)], order: SortOrder) {
+    fn sort_results(results: &mut [(&ArtifactId, &ArtifactMetadata)], order: SortOrder) {
         match order {
             SortOrder::DateDesc => {
                 results.sort_by(|a, b| b.1.created_at.cmp(&a.1.created_at));
@@ -301,7 +300,7 @@ mod tests {
         tags: Vec<String>,
     ) -> (ArtifactId, ArtifactMetadata) {
         let session_id = SessionId::new();
-        let artifact_id = ArtifactId::new(format!("hash_{}", name), session_id, 1);
+        let artifact_id = ArtifactId::new(format!("hash_{name}"), session_id, 1);
         let mut metadata = ArtifactMetadata::new(name.to_string(), artifact_type, size);
         metadata.tags = tags;
         (artifact_id, metadata)
@@ -472,7 +471,7 @@ mod tests {
         // Add test data
         for i in 0..10 {
             let (id, meta) = create_test_metadata(
-                &format!("file_{}.txt", i),
+                &format!("file_{i}.txt"),
                 ArtifactType::UserInput,
                 1024 * (i + 1),
                 vec![],

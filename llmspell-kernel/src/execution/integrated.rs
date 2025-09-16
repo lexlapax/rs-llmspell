@@ -22,9 +22,15 @@ use crate::events::{KernelEvent, KernelEventCorrelator};
 use crate::io::manager::EnhancedIOManager;
 use crate::io::router::MessageRouter;
 use crate::runtime::tracing::{OperationCategory, TracingInstrumentation};
-use crate::sessions::{KernelSessionIntegration, SessionConfig, SessionManager};
-use crate::state::{KernelState, MemoryBackend, StorageBackend};
+use crate::sessions::{CreateSessionOptions, SessionManager, SessionManagerConfig};
+use crate::state::{KernelState, StorageBackend};
 use crate::traits::Protocol;
+
+// Session dependencies
+use llmspell_events::bus::EventBus;
+use llmspell_hooks::{HookExecutor, HookRegistry};
+use llmspell_state_persistence::StateManager;
+use llmspell_storage::MemoryBackend as SessionMemoryBackend;
 
 /// Simplified `ScriptRuntime` stub for Phase 9.2
 /// Will be replaced with `llmspell-bridge::ScriptRuntime` in later phases
@@ -164,6 +170,7 @@ pub struct IntegratedKernel<P: Protocol> {
     /// Unified kernel state
     state: Arc<KernelState>,
     /// Session manager
+    #[allow(dead_code)] // Will be used when session integration is fully implemented
     session_manager: SessionManager,
     /// Shutdown signal receiver
     shutdown_rx: Option<mpsc::Receiver<()>>,
@@ -177,7 +184,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
     ///
     /// Returns an error if the script runtime cannot be created
     #[instrument(level = "info", skip_all)]
-    pub fn new(protocol: P, config: ExecutionConfig, session_id: String) -> Result<Self> {
+    pub async fn new(protocol: P, config: ExecutionConfig, session_id: String) -> Result<Self> {
         info!("Creating IntegratedKernel for session {}", session_id);
 
         // Create script runtime with configuration
@@ -207,15 +214,34 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Create unified kernel state with memory backend by default
         let state = Arc::new(KernelState::new(StorageBackend::Memory(Box::new(
-            MemoryBackend::new(),
+            crate::state::MemoryBackend::new(),
         )))?);
 
-        // Create session manager with default config (using temporary compatibility)
-        let mut session_manager = SessionManager::new_legacy(SessionConfig::default())?;
-        session_manager.set_kernel_state(state.clone());
+        // Create session manager dependencies
+        let state_manager = Arc::new(StateManager::new().await?);
 
-        // Create a session for this kernel instance (using temporary compatibility)
-        let _session_id_obj = session_manager.create_session_legacy(None)?;
+        let session_storage_backend = Arc::new(SessionMemoryBackend::new());
+        let hook_registry = Arc::new(HookRegistry::new());
+        let hook_executor = Arc::new(HookExecutor::new());
+        let event_bus = Arc::new(EventBus::new());
+        let session_config = SessionManagerConfig::default();
+
+        // Create session manager with proper dependencies
+        let session_manager = SessionManager::new(
+            state_manager,
+            session_storage_backend,
+            hook_registry,
+            hook_executor,
+            &event_bus,
+            session_config,
+        )?;
+
+        // Create a session for this kernel instance
+        let session_options = CreateSessionOptions::builder()
+            .name(format!("kernel-session-{session_id}"))
+            .build();
+
+        let _session_id_obj = session_manager.create_session(session_options).await?;
 
         // Initialize session state
         state.update_session(|session| {
@@ -358,11 +384,8 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         debug!("Handling message type: {}", msg_type);
 
-        // Convert message to JSON for session handling
-        let json_message = serde_json::to_value(&message)?;
-
-        // Handle message through session manager
-        self.session_manager.handle_kernel_message(json_message)?;
+        // Message handling will be done at the session level as needed
+        // The comprehensive session manager handles session lifecycle, not individual messages
 
         match msg_type {
             "execute_request" => self.handle_execute_request(message).await?,
@@ -765,7 +788,7 @@ mod tests {
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
 
-        let kernel = IntegratedKernel::new(protocol, config, "test-session".to_string());
+        let kernel = IntegratedKernel::new(protocol, config, "test-session".to_string()).await;
 
         assert!(kernel.is_ok());
     }
@@ -778,8 +801,9 @@ mod tests {
         let protocol = MockProtocol;
         let config = ExecutionConfig::default();
 
-        let mut kernel =
-            IntegratedKernel::new(protocol, config, "test-session".to_string()).unwrap();
+        let mut kernel = IntegratedKernel::new(protocol, config, "test-session".to_string())
+            .await
+            .unwrap();
 
         // Set up shutdown signal
         let (shutdown_tx, shutdown_rx) = mpsc::channel(1);

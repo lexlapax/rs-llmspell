@@ -13,6 +13,9 @@ pub use session_metrics::{
 };
 
 /// Create default session analytics
+///
+/// # Errors
+/// Returns error if hook registration fails
 pub fn create_session_analytics(
     hook_registry: &Arc<HookRegistry>,
 ) -> Result<Arc<SessionAnalytics>> {

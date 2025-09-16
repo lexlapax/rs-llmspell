@@ -168,21 +168,21 @@ impl SessionReplayAdapter {
     /// Load session correlation ID from storage
     async fn load_session_correlation_id(&self, session_id: &SessionId) -> Result<Uuid> {
         // Try to load from session_metadata first (new format)
-        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata_key = format!("session_metadata:{session_id}");
         if let Ok(Some(metadata_bytes)) = self.storage_backend.get(&metadata_key).await {
             if let Ok(metadata) = serde_json::from_slice::<serde_json::Value>(&metadata_bytes) {
                 if let Some(correlation_id_str) =
                     metadata.get("correlation_id").and_then(|v| v.as_str())
                 {
                     return Uuid::parse_str(correlation_id_str).map_err(|e| {
-                        SessionError::general(format!("Invalid correlation_id: {}", e))
+                        SessionError::general(format!("Invalid correlation_id: {e}"))
                     });
                 }
             }
         }
 
         // Fallback to try loading from the main session key (for backward compatibility)
-        let session_key = format!("session:{}", session_id);
+        let session_key = format!("session:{session_id}");
         let session_bytes = self
             .storage_backend
             .get(&session_key)
@@ -198,8 +198,7 @@ impl SessionReplayAdapter {
             ))
         } else {
             Err(SessionError::general(format!(
-                "Session {} not found",
-                session_id
+                "Session {session_id} not found"
             )))
         }
     }
@@ -224,6 +223,10 @@ impl SessionReplayAdapter {
     }
 
     /// Check if a session can be replayed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session correlation ID cannot be loaded or hook executions cannot be retrieved.
     pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
         match self.load_session_correlation_id(session_id).await {
             Ok(correlation_uuid) => {
@@ -247,7 +250,13 @@ impl SessionReplayAdapter {
     ///
     /// # Panics
     ///
-    /// Panics if the active replays mutex is poisoned
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be replayed, hook executions cannot be retrieved, or the replay fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active replays mutex is poisoned.
     pub async fn replay_session(
         &self,
         session_id: &SessionId,
@@ -264,7 +273,7 @@ impl SessionReplayAdapter {
             .hook_replay_manager
             .get_hook_executions_by_correlation(correlation_uuid)
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {e}")))?;
 
         if state_executions.is_empty() {
             return Err(SessionError::replay("No hook executions found for session"));
@@ -329,7 +338,7 @@ impl SessionReplayAdapter {
             .replay_manager
             .batch_replay(batch_request)
             .await
-            .map_err(|e| SessionError::replay(format!("Batch replay failed: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Batch replay failed: {e}")))?;
 
         // Create session-specific result
         let result = SessionReplayResult {
@@ -366,6 +375,10 @@ impl SessionReplayAdapter {
     }
 
     /// Get replay timeline for a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session correlation ID cannot be loaded or hook executions cannot be retrieved.
     pub async fn get_session_timeline(
         &self,
         session_id: &SessionId,
@@ -409,9 +422,13 @@ impl SessionReplayAdapter {
 
     /// Stop/cancel session replay
     ///
+    /// # Errors
+    ///
+    /// Returns an error if the session replay cannot be stopped.
+    ///
     /// # Panics
     ///
-    /// Panics if the active replays mutex is poisoned
+    /// Panics if the active replays mutex is poisoned.
     pub fn stop_replay(&self, session_id: &SessionId) -> Result<()> {
         let mut active = self.active_replays.write().unwrap();
         if let Some(status) = active.get_mut(session_id) {
@@ -457,6 +474,10 @@ impl SessionReplayAdapter {
     }
 
     /// Query hook executions for a specific session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session correlation ID cannot be loaded or hook executions cannot be queried.
     pub async fn query_session_hooks(
         &self,
         session_id: &SessionId,
@@ -496,6 +517,9 @@ impl SessionReplayAdapter {
     }
 
     /// Get session replay metadata
+    ///
+    /// # Errors
+    /// Returns error if session correlation ID cannot be loaded or hook executions cannot be retrieved
     pub async fn get_session_replay_metadata(
         &self,
         session_id: &SessionId,
@@ -530,6 +554,9 @@ impl SessionReplayAdapter {
     }
 
     /// List all sessions that can be replayed
+    ///
+    /// # Errors
+    /// Returns error if storage backend fails to list session metadata keys or parse session IDs
     pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
         // List all session_metadata keys
         let prefix = "session_metadata:";
@@ -562,6 +589,9 @@ impl SessionReplayAdapter {
     }
 
     /// Schedule a session replay
+    ///
+    /// # Errors
+    /// Returns error if session correlation ID cannot be loaded, hook executions cannot be retrieved, or replay scheduling fails
     pub async fn schedule_replay(
         &self,
         session_id: &SessionId,
@@ -576,7 +606,7 @@ impl SessionReplayAdapter {
             .hook_replay_manager
             .get_hook_executions_by_correlation(correlation_uuid)
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {e}")))?;
 
         if executions.is_empty() {
             return Err(SessionError::replay("No hook executions found for session"));
@@ -598,26 +628,41 @@ impl SessionReplayAdapter {
     }
 
     /// Pause session replay
+    ///
+    /// # Errors
+    /// Returns error if replay controls fail to pause the specified session
     pub async fn pause_replay(&self, session_id: &SessionId) -> Result<()> {
         self.controls.pause_replay(session_id).await
     }
 
     /// Resume session replay
+    ///
+    /// # Errors
+    /// Returns error if replay controls fail to resume the specified session
     pub async fn resume_replay(&self, session_id: &SessionId) -> Result<()> {
         self.controls.resume_replay(session_id).await
     }
 
     /// Set replay speed
+    ///
+    /// # Errors
+    /// Returns error if replay controls fail to set the speed for the specified session
     pub async fn set_replay_speed(&self, session_id: &SessionId, multiplier: f64) -> Result<()> {
         self.controls.set_replay_speed(session_id, multiplier).await
     }
 
     /// Add a breakpoint
+    ///
+    /// # Errors
+    /// Returns error if replay controls fail to add the breakpoint
     pub async fn add_breakpoint(&self, breakpoint: SessionBreakpoint) -> Result<()> {
         self.controls.add_breakpoint(breakpoint).await
     }
 
     /// Remove a breakpoint
+    ///
+    /// # Errors
+    /// Returns error if replay controls fail to remove the specified breakpoint
     pub async fn remove_breakpoint(
         &self,
         session_id: &SessionId,
@@ -629,6 +674,9 @@ impl SessionReplayAdapter {
     }
 
     /// Step to next hook (when paused)
+    ///
+    /// # Errors
+    /// Returns error if replay controls fail to step to the next hook for the specified session
     pub async fn step_next(&self, session_id: &SessionId) -> Result<()> {
         self.controls.step_next(session_id).await
     }
@@ -654,6 +702,9 @@ impl SessionReplayAdapter {
     }
 
     /// Inspect session state at a point in time
+    ///
+    /// # Errors
+    /// Returns error if the debugger fails to inspect the session state at the specified timestamp
     pub fn inspect_state_at(
         &self,
         session_id: &SessionId,
@@ -663,6 +714,9 @@ impl SessionReplayAdapter {
     }
 
     /// Compare states at two different points in time
+    ///
+    /// # Errors
+    /// Returns error if the debugger fails to compare session states at the specified timestamps
     pub fn compare_states(
         &self,
         session_id: &SessionId,
@@ -679,6 +733,9 @@ impl SessionReplayAdapter {
     }
 
     /// Import debug data from replay session
+    ///
+    /// # Errors
+    /// Returns error if session correlation ID cannot be loaded or hook executions cannot be retrieved
     pub async fn import_debug_data(&self, session_id: &SessionId) -> Result<()> {
         // Get the replay session from the replay manager if available
         // For now, we'll update the timeline with hook executions
@@ -688,7 +745,7 @@ impl SessionReplayAdapter {
             .hook_replay_manager
             .get_hook_executions_by_correlation(correlation_uuid)
             .await
-            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {}", e)))?;
+            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {e}")))?;
 
         // Update the debugger's timeline
         self.debugger.update_timeline(*session_id, executions);
@@ -698,6 +755,9 @@ impl SessionReplayAdapter {
     }
 
     /// Export debug data for a session
+    ///
+    /// # Errors
+    /// Returns error if debug data import fails or debugger fails to export session data
     pub async fn export_debug_data(
         &self,
         session_id: &SessionId,
@@ -709,6 +769,9 @@ impl SessionReplayAdapter {
     }
 
     /// Get timeline navigation
+    ///
+    /// # Errors
+    /// Returns error if the debugger fails to navigate to the specified timeline point
     pub fn navigate_to_timeline_point(
         &self,
         session_id: &SessionId,
