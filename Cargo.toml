@@ -3,7 +3,7 @@ resolver = "2"
 
 members = [
     "llmspell-cli",
-    "llmspell-core", 
+    "llmspell-core",
     "llmspell-agents",
     "llmspell-tools",
     "llmspell-workflows",
@@ -20,13 +20,15 @@ members = [
     "llmspell-state-traits",
     "llmspell-sessions",
     "llmspell-rag",
+    "llmspell-tenancy",
+    "llmspell-kernel",
     "examples/rust-developers/extension-pattern-example",
-    "examples/rust-developers/builder-pattern-example", 
+    "examples/rust-developers/builder-pattern-example",
     "examples/rust-developers/custom-tool-example",
     "examples/rust-developers/custom-agent-example",
     "examples/rust-developers/async-patterns-example",
     "examples/rust-developers/integration-test-example"
-, "llmspell-tenancy"]
+]
 
 [workspace.package]
 version = "0.8.0"

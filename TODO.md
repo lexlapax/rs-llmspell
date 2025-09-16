@@ -587,7 +587,217 @@
 
 ---
 
-## Phase 9.4: External Interfaces & CLI Integration (Days 11-13)
+## Phase 9.4a: Foundation Fixes & Consolidation (Days 11-12)
+
+**🚨 CRITICAL**: This phase addresses architectural debt and consolidates crates as outlined in Phase 9 design document before proceeding to external interfaces.
+
+### Task 9.4a.1: Complete Workspace Integration ✅
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours (Actual: 1 hour)
+**Assignee**: Core Team Lead
+**Dependencies**: Task 9.3.4
+**Status**: COMPLETE ✅
+
+**Description**: Complete workspace integration by ensuring llmspell-kernel is fully integrated and all dependent crates properly reference it.
+
+**Acceptance Criteria:**
+- [x] llmspell-kernel added to workspace members in root Cargo.toml ✅
+- [x] All kernel dependencies properly resolved ✅
+- [x] Kernel builds as part of workspace ✅
+- [x] All workspace tests pass with kernel included ✅
+- [x] CLI properly references kernel for execution ✅
+
+**Implementation Steps:**
+1. ✅ Add llmspell-kernel to workspace members
+2. ✅ llmspell-cli already uses kernel API (verified in execution_context.rs)
+3. ✅ No circular dependency issues found
+4. ✅ Bridge crate compatible with kernel types
+5. ✅ All examples build with kernel
+
+**Test Steps:**
+1. ✅ Run `cargo build --workspace` - builds successfully
+2. ✅ Run `cargo test --workspace` - tests pass
+3. ✅ Run `./target/debug/llmspell exec "print('kernel integration test')"` - executes via kernel
+4. ✅ Verify kernel tests pass (116+ tests confirmed)
+
+**Accomplishments & Insights:**
+- **Key Finding**: llmspell-kernel was already well-integrated but missing from workspace members list
+- **Already Done**: CLI was using kernel API through `llmspell_kernel::api::{connect_to_kernel, start_embedded_kernel}`
+- **Kernel Structure**: Has proper module organization:
+  - `/sessions/` - session management (ready for 9.4a.2 consolidation)
+  - `/events/` - event correlation
+  - `/state/` - state management
+  - `/runtime/` - IO runtime (fixes "dispatch task is gone")
+  - `/transport/` - multi-protocol support
+- **Execution Path**: CLI → Kernel API → Embedded/Connected Kernel → Script Bridge → Engine
+- **Next Step**: 33 files still reference llmspell-sessions (to be addressed in 9.4a.2)
+
+**Definition of Done:**
+- [x] Kernel in workspace and builds ✅
+- [x] All crates that need kernel reference it properly ✅
+- [x] Session/state consolidation deferred to 9.4a.2 ✅
+- [x] Workspace tests pass consistently ✅
+
+### Task 9.4a.2: Complete Sessions Consolidation
+**Priority**: HIGH
+**Estimated Time**: 6 hours
+**Assignee**: Architecture Team Lead
+**Dependencies**: Task 9.4a.1
+
+**Description**: Consolidate llmspell-sessions crate into kernel as designed in Phase 9, eliminating dual session management systems.
+**Discover first via code walkthroughs, program flow etc, what needs to be done to accomplish this and update the steps below to be thorough**
+
+**Acceptance Criteria:**
+- [ ] llmspell-sessions functionality moved to kernel/src/sessions/
+- [ ] Event correlation preserved in kernel
+- [ ] Session TTL and expiration working
+- [ ] Artifact storage integrated
+- [ ] No duplicate session types or managers
+- [ ] llmspell-sessions crate removed from workspace
+
+**Implementation Steps:**
+1. Move SessionManager from llmspell-sessions to kernel/src/sessions/manager.rs
+2. Integrate EventCorrelator into kernel/src/sessions/correlation.rs
+3. Move artifact storage to kernel/src/sessions/artifacts.rs
+4. Update all references from llmspell-sessions to kernel
+5. Remove llmspell-sessions from workspace
+6. Update bridge to use kernel session types
+
+**Test Steps:**
+1. Test session creation and retrieval
+2. Test event correlation across sessions
+3. Test artifact storage and retrieval
+4. Test session TTL expiration
+5. Verify no session functionality lost
+
+**Definition of Done:**
+- [ ] Single session management system in kernel
+- [ ] All session tests migrated and passing
+- [ ] Event correlation working in kernel
+- [ ] No references to llmspell-sessions remain
+- [ ] Session features work in REPL
+
+### Task 9.4a.3: Consolidate State Crates
+**Priority**: HIGH
+**Estimated Time**: 4 hours
+**Assignee**: State Team Lead
+**Dependencies**: Task 9.4a.2
+
+**Description**: Consolidate state-persistence, state-traits, and storage crates as per Phase 9 design to reduce crate count from 26 to 21.
+
+**Acceptance Criteria:**
+- [ ] state-traits merged into llmspell-core
+- [ ] state-persistence merged with storage into kernel/src/state/
+- [ ] All state operations go through kernel
+- [ ] No duplicate state management code
+- [ ] Crate count reduced by 3
+
+**Implementation Steps:**
+1. Move state traits to llmspell-core/src/state/traits.rs
+2. Move persistence layer to kernel/src/state/persistence/
+3. Integrate storage backends into kernel/src/state/storage/
+4. Update all state references to use kernel
+5. Remove consolidated crates from workspace
+6. Update documentation
+
+**Test Steps:**
+1. Test state read/write operations
+2. Test persistence across restarts
+3. Test state isolation between sessions
+4. Test state performance (<5ms write, <1ms read)
+5. Verify state consistency
+
+**Definition of Done:**
+- [ ] State consolidated into kernel and core
+- [ ] All state tests passing
+- [ ] Performance targets met
+- [ ] No duplicate state code
+- [ ] Clean crate structure (21 crates total)
+
+### Task 9.4a.4: Validate Runtime Fix with Extended Tests
+**Priority**: HIGH
+**Estimated Time**: 3 hours
+**Assignee**: QA Lead
+**Dependencies**: Task 9.4a.3
+
+**Description**: Validate the global IO runtime fix with comprehensive 60+ second tests to ensure "dispatch task is gone" error is completely resolved.
+
+**Acceptance Criteria:**
+- [ ] Create test suite for long-running operations
+- [ ] All tests run for 60+ seconds without errors
+- [ ] Provider operations stable over time
+- [ ] No runtime context mismatches
+- [ ] Performance regression tests pass
+
+**Implementation Steps:**
+1. Create `tests/runtime_stability_test.rs` with 60+ second tests
+2. Test HTTP clients with delays between requests
+3. Test provider operations with long-running LLM calls
+4. Test concurrent operations across different runtime contexts
+5. Add performance benchmarks for runtime overhead
+
+**Test Steps:**
+1. Run test with 60-second HTTP client keep-alive
+2. Run test with 90-second provider operation
+3. Run test with 100 concurrent runtime operations
+4. Monitor memory and CPU usage during tests
+5. Verify no "dispatch task is gone" errors
+
+**Definition of Done:**
+- [ ] Extended test suite created
+- [ ] All tests pass consistently
+- [ ] No runtime errors in logs
+- [ ] Performance within targets
+- [ ] Runtime stable for hours-long operations
+
+### Task 9.4a.5: Run Full Application Test Suite
+**Priority**: CRITICAL
+**Estimated Time**: 2 hours
+**Assignee**: Integration Team Lead
+**Dependencies**: Task 9.4a.4
+
+**Description**: Run and fix all 9 example applications to ensure Phase 9 changes don't break existing functionality.
+
+**Acceptance Criteria:**
+- [ ] All 9 applications in examples/script-users/applications/ run
+- [ ] No runtime errors or panics
+- [ ] Applications complete their tasks
+- [ ] Performance acceptable (no hangs)
+- [ ] Debug features work in applications
+
+**Implementation Steps:**
+1. Run each application with timeout:
+   - code-review-assistant
+   - communication-manager
+   - content-creator
+   - file-organizer
+   - knowledge-base
+   - personal-assistant
+   - process-orchestrator
+   - research-collector
+   - webapp-creator
+2. Fix any issues found
+3. Document any API changes needed
+4. Update application configs if needed
+5. Create automated test script
+
+**Test Steps:**
+1. Run `./scripts/test-all-applications.sh`
+2. Check each application completes
+3. Verify no errors in logs
+4. Test with debug mode enabled
+5. Test with different providers
+
+**Definition of Done:**
+- [ ] All 9 applications run successfully
+- [ ] Automated test script created
+- [ ] No regressions from Phase 8
+- [ ] Applications work with new kernel
+- [ ] Performance acceptable
+
+---
+
+## Phase 9.4: External Interfaces & CLI Integration (Days 13)
 
 ### Task 9.4.1: Fix Provider System Runtime Context
 **Priority**: CRITICAL
