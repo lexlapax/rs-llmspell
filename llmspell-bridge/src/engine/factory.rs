@@ -6,6 +6,7 @@ use llmspell_core::error::LLMSpellError;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, LazyLock, RwLock};
+use tracing::{debug, info, instrument};
 
 /// Factory for creating script engines
 pub struct EngineFactory;
@@ -16,9 +17,15 @@ impl EngineFactory {
     /// # Errors
     ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
+    #[instrument(level = "debug", skip(config), fields(
+        engine_type = "lua",
+        stdlib_level = ?config.stdlib,
+        debug_enabled = config.debug
+    ))]
     pub fn create_lua_engine(
         config: &LuaConfig,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+        debug!("Creating Lua engine");
         Self::create_lua_engine_with_runtime(config, None)
     }
 
@@ -27,10 +34,17 @@ impl EngineFactory {
     /// # Errors
     ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
+    #[instrument(level = "debug", skip(config, runtime_config), fields(
+        engine_type = "lua",
+        stdlib_level = ?config.stdlib,
+        debug_enabled = config.debug,
+        has_runtime_config = runtime_config.is_some()
+    ))]
     pub fn create_lua_engine_with_runtime(
         config: &LuaConfig,
         runtime_config: Option<Arc<llmspell_config::LLMSpellConfig>>,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+        debug!("Creating Lua engine with runtime configuration");
         #[cfg(feature = "lua")]
         {
             use crate::lua::LuaEngine;
@@ -55,9 +69,14 @@ impl EngineFactory {
     ///
     /// Returns an error if JavaScript feature is not enabled or engine creation fails
     #[allow(unused_variables)]
+    #[instrument(level = "debug", skip(config), fields(
+        engine_type = "javascript",
+        module_resolution = ?config.module_resolution
+    ))]
     pub fn create_javascript_engine(
         config: &JSConfig,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+        debug!("Creating JavaScript engine");
         #[cfg(feature = "javascript")]
         {
             use crate::javascript::JSEngine;
@@ -85,10 +104,15 @@ impl EngineFactory {
     /// # Panics
     ///
     /// Panics if the plugin registry lock is poisoned
+    #[instrument(level = "info", skip(config), fields(
+        engine_name = %name,
+        config_type = if config.is_object() { "object" } else { "other" }
+    ))]
     pub fn create_from_name(
         name: &str,
         config: &Value,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+        info!("Creating engine by name: {}", name);
         match name {
             "lua" => {
                 let lua_config =
@@ -133,8 +157,10 @@ impl EngineFactory {
     /// # Panics
     ///
     /// Panics if the plugin registry lock is poisoned
+    #[instrument(level = "debug")]
     #[must_use]
     pub fn list_available_engines() -> Vec<EngineInfo> {
+        debug!("Listing all available engines");
         let mut engines = vec![];
 
         #[cfg(feature = "lua")]
