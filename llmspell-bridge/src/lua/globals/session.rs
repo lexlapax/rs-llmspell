@@ -12,6 +12,7 @@ use llmspell_sessions::{
 use mlua::{Error as LuaError, Lua, Table, UserData, UserDataMethods};
 use std::str::FromStr;
 use std::sync::Arc;
+use tracing::{info, instrument};
 
 /// `SessionBuilder` for creating sessions with method chaining
 #[derive(Clone)]
@@ -95,11 +96,17 @@ impl UserData for SessionBuilder {
 /// - Lua table creation fails
 /// - Function binding fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "info",
+    skip(lua, _context, session_bridge),
+    fields(global_name = "Session", has_session_manager = true)
+)]
 pub fn inject_session_global(
     lua: &Lua,
     _context: &GlobalContext,
     session_bridge: Arc<SessionBridge>,
 ) -> mlua::Result<()> {
+    info!("Injecting Session global API");
     // Create Session table
     let session_table = lua.create_table()?;
 

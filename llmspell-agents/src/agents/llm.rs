@@ -435,8 +435,7 @@ impl BaseAgent for LLMAgent {
 
         debug!(
             output_size = response.text.len(),
-            "LLMAgent '{}' completed execution",
-            self.metadata.name
+            "LLMAgent '{}' completed execution", self.metadata.name
         );
         Ok(response)
     }

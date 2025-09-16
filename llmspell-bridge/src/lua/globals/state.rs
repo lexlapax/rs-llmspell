@@ -10,7 +10,7 @@ use mlua::{Error as LuaError, Lua, Value};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::info;
+use tracing::{info, instrument};
 
 /// Create save operation handler
 fn create_save_handler(
@@ -614,12 +614,16 @@ fn setup_backup_methods(
 /// Returns an error if:
 /// - Lua table creation fails
 /// - Function binding fails
+#[instrument(level = "info", skip(lua, _context, state_global), fields(
+    global_name = "State",
+    has_state_backend = state_global.state_access.is_some()
+))]
 pub fn inject_state_global(
     lua: &Lua,
     _context: &GlobalContext,
     state_global: &StateGlobal,
 ) -> mlua::Result<()> {
-    info!("inject_state_global called");
+    info!("Injecting State global API");
     let state_table = lua.create_table()?;
 
     // Clone references for the closures

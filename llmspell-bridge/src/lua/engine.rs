@@ -16,7 +16,7 @@ use llmspell_core::error::LLMSpellError;
 use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
-use tracing::{debug, warn};
+use tracing::{debug, info, instrument, warn};
 
 #[cfg(feature = "lua")]
 use {
@@ -257,11 +257,21 @@ impl ScriptEngineBridge for LuaEngine {
     }
 
     #[allow(clippy::cognitive_complexity)]
+    #[instrument(
+        level = "info",
+        skip(self, registry, providers),
+        fields(
+            engine_type = "lua",
+            globals_injected = 0,
+            infrastructure_initialized = 0
+        )
+    )]
     fn inject_apis(
         &mut self,
         registry: &Arc<ComponentRegistry>,
         providers: &Arc<ProviderManager>,
     ) -> Result<(), LLMSpellError> {
+        info!("Injecting Lua global APIs");
         #[cfg(feature = "lua")]
         {
             let lua = self.lua.lock();
@@ -356,7 +366,12 @@ impl ScriptEngineBridge for LuaEngine {
                         source: None,
                     })?;
             let injector = GlobalInjector::new(Arc::new(global_registry));
-            injector.inject_lua(&lua, &global_context)?;
+            let metrics = injector.inject_lua(&lua, &global_context)?;
+            info!(
+                globals_injected = metrics.globals_injected,
+                total_injection_time_us = metrics.total_injection_time_us,
+                "Successfully injected all Lua globals"
+            );
         }
         Ok(())
     }

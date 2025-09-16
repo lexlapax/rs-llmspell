@@ -23,7 +23,7 @@ async fn test_runtime_with_engine_name() {
     let config = LLMSpellConfig::default();
 
     // Test creating with Lua by name
-    let runtime = ScriptRuntime::new_with_engine_name("lua", config.clone()).await;
+    let runtime = Box::pin(ScriptRuntime::new_with_engine_name("lua", config.clone())).await;
     assert!(
         runtime.is_ok(),
         "Failed to create runtime with engine name 'lua'"
@@ -141,7 +141,7 @@ async fn test_runtime_with_custom_engine_name() {
     let config = LLMSpellConfig::default();
 
     // Test unknown engine
-    let result = ScriptRuntime::new_with_engine_name("unknown", config).await;
+    let result = Box::pin(ScriptRuntime::new_with_engine_name("unknown", config)).await;
     assert!(result.is_err());
 
     if let Err(e) = result {

@@ -7,6 +7,7 @@ use mlua::{Function, Lua, Result as LuaResult, Table, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt::Write;
+use tracing::{debug, instrument};
 
 /// Stack frame information
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -94,7 +95,13 @@ impl StackTraceOptions {
 
 /// Capture a stack trace from the current Lua execution point
 #[must_use]
+#[instrument(level = "debug", skip(lua, options), fields(
+    max_depth = options.max_depth,
+    capture_locals = options.capture_locals,
+    capture_upvalues = options.capture_upvalues
+))]
 pub fn capture_stack_trace(lua: &Lua, options: &StackTraceOptions) -> StackTrace {
+    debug!("Capturing Lua stack trace");
     match capture_stack_trace_impl(lua, options) {
         Ok(trace) => trace,
         Err(e) => StackTrace {

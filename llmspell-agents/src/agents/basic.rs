@@ -323,8 +323,7 @@ impl BaseAgent for BasicAgent {
         let output = AgentOutput::text(response);
         debug!(
             output_size = output.text.len(),
-            "BasicAgent '{}' completed execution",
-            self.metadata.name
+            "BasicAgent '{}' completed execution", self.metadata.name
         );
         Ok(output)
     }

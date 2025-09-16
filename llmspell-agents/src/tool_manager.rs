@@ -211,10 +211,7 @@ impl ToolManager {
         parameters: JsonValue,
         context: ExecutionContext,
     ) -> Result<AgentOutput> {
-        info!(
-            "Invoking tool '{}'",
-            tool_name
-        );
+        info!("Invoking tool '{}'", tool_name);
         // Check if tool is available
         if !self.tool_available(tool_name).await {
             return Err(LLMSpellError::Component {
@@ -263,8 +260,7 @@ impl ToolManager {
 
         debug!(
             output_size = result.text.len(),
-            "Tool '{}' execution completed successfully",
-            tool_name
+            "Tool '{}' execution completed successfully", tool_name
         );
         Ok(result)
     }

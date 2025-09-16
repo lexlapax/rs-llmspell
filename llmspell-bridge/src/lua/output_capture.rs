@@ -6,6 +6,7 @@ use crate::debug_bridge::DebugBridge;
 use mlua::{Lua, MultiValue, Result as LuaResult, Value};
 use parking_lot::Mutex;
 use std::sync::Arc;
+use tracing::{debug, instrument, trace};
 
 /// Console output collector
 #[derive(Debug, Clone)]
@@ -69,7 +70,9 @@ impl Default for ConsoleCapture {
 /// # Errors
 ///
 /// Returns an error if function creation or global setting fails
+#[instrument(level = "trace", skip(lua, capture))]
 pub fn override_print(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResult<()> {
+    trace!("Overriding Lua print function");
     // Create a custom print function
     let print_fn = lua.create_function(move |_lua, args: MultiValue| {
         let mut output = Vec::new();
@@ -162,10 +165,14 @@ pub fn override_io_functions(lua: &Lua, capture: Arc<ConsoleCapture>) -> LuaResu
 /// # Errors
 ///
 /// Returns an error if output capture installation fails
+#[instrument(level = "debug", skip(lua, debug_bridge), fields(
+    has_debug_bridge = debug_bridge.is_some()
+))]
 pub fn install_output_capture(
     lua: &Lua,
     debug_bridge: Option<Arc<DebugBridge>>,
 ) -> LuaResult<Arc<ConsoleCapture>> {
+    debug!("Installing Lua output capture");
     let capture = debug_bridge.map_or_else(
         || Arc::new(ConsoleCapture::new()),
         |bridge| Arc::new(ConsoleCapture::with_debug_bridge(bridge)),

@@ -10,6 +10,7 @@ use mlua::{
 };
 use serde_json;
 use std::time::Duration;
+use tracing::{instrument, trace};
 
 /// Lua wrapper for `ReplayMode`
 #[derive(Debug, Clone)]
@@ -177,7 +178,9 @@ fn lua_value_to_json(lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
 /// Returns an error if:
 /// - Replay API creation fails
 /// - Global injection fails
+#[instrument(level = "trace", skip(lua), fields(global_name = "Replay"))]
 pub fn inject_replay_global(lua: &Lua) -> Result<(), LLMSpellError> {
+    trace!("Injecting Replay global API");
     let replay = create_replay_api(lua).map_err(|e| LLMSpellError::Internal {
         message: e.to_string(),
         source: None,

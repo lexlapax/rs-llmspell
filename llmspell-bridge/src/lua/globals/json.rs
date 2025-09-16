@@ -5,13 +5,16 @@ use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use llmspell_core::error::LLMSpellError;
 use mlua::Lua;
 use serde_json;
+use tracing::{instrument, trace};
 
 /// Inject JSON global into Lua environment
 ///
 /// # Errors
 ///
 /// Returns an error if JSON global injection or table creation fails
+#[instrument(level = "trace", skip(lua), fields(global_name = "JSON"))]
 pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
+    trace!("Injecting JSON global API");
     let json_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create JSON table: {e}"),
         source: None,

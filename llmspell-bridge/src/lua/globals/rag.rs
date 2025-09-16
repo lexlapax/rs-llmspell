@@ -9,7 +9,7 @@ use crate::lua::sync_utils::block_on_async;
 use crate::rag_bridge::{ChunkingConfig, RAGBridge, RAGDocument};
 use mlua::{Lua, Table};
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, info, instrument};
 
 /// Register `RAG.search()` method
 /// Parse search parameters from Lua table
@@ -491,11 +491,17 @@ fn register_session_methods(lua: &Lua, rag_table: &Table) -> mlua::Result<()> {
 /// - Function creation fails
 /// - Global setting fails
 #[allow(clippy::needless_pass_by_value)] // We need to pass by value to clone for multiple closures
+#[instrument(
+    level = "info",
+    skip(lua, _context, bridge),
+    fields(global_name = "RAG", rag_backend = "configured")
+)]
 pub fn inject_rag_global(
     lua: &Lua,
     _context: &GlobalContext,
     bridge: Arc<RAGBridge>,
 ) -> mlua::Result<()> {
+    info!("Injecting RAG global API");
     let rag_table = lua.create_table()?;
 
     // Register all RAG methods

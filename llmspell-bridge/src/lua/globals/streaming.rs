@@ -9,6 +9,7 @@ use mlua::{
 };
 use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
+use tracing::{debug, instrument};
 
 /// Inject Streaming global into Lua environment
 ///
@@ -18,7 +19,13 @@ use tokio::sync::{mpsc, Mutex};
 /// - Lua table creation fails
 /// - Function injection fails
 /// - Global setting fails
+#[instrument(
+    level = "debug",
+    skip(lua, _context),
+    fields(global_name = "Streaming")
+)]
 pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<(), LLMSpellError> {
+    debug!("Injecting Streaming global API");
     // Create the streaming utilities table
     let streaming_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create streaming table: {e}"),

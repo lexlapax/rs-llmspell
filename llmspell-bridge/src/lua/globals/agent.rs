@@ -14,6 +14,7 @@ use llmspell_core::types::ComponentId;
 use mlua::{Lua, Table, UserData, UserDataMethods, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tracing::{info, instrument};
 
 /// Lua userdata representing an agent instance
 struct LuaAgentInstance {
@@ -51,7 +52,7 @@ impl UserData for LuaAgentInstance {
                 None,
             )?;
 
-            agent_output_to_lua_table(lua, result)
+            agent_output_to_lua_table(lua, &result)
         });
 
         // execute method (alias for invoke) - synchronous wrapper
@@ -80,7 +81,7 @@ impl UserData for LuaAgentInstance {
                 None,
             )?;
 
-            agent_output_to_lua_table(lua, result)
+            agent_output_to_lua_table(lua, &result)
         });
 
         // invokeStream method - synchronous wrapper
@@ -112,7 +113,7 @@ impl UserData for LuaAgentInstance {
                         // Process stream
                         let mut chunk_count = 0;
                         while let Some(output) = rx.recv().await {
-                            let output_table = agent_output_to_lua_table(lua, output)?;
+                            let output_table = agent_output_to_lua_table(lua, &output)?;
                             callback.call::<_, ()>(output_table)?;
                             chunk_count += 1;
                         }
@@ -275,7 +276,7 @@ impl UserData for LuaAgentInstance {
                 )?;
 
                 // Convert AgentOutput to Lua table
-                agent_output_to_lua_table(lua, result)
+                agent_output_to_lua_table(lua, &result)
             },
         );
 
@@ -858,7 +859,7 @@ impl UserData for LuaAgentInstance {
                     None,
                 )?;
 
-                agent_output_to_lua_table(lua, result)
+                agent_output_to_lua_table(lua, &result)
             },
         );
 
@@ -1182,11 +1183,17 @@ impl UserData for AgentBuilder {
 /// - Lua table creation fails
 /// - Function binding fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "info",
+    skip(lua, context, bridge),
+    fields(global_name = "Agent", agent_count = 0)
+)]
 pub fn inject_agent_global(
     lua: &Lua,
     context: &GlobalContext,
     bridge: Arc<AgentBridge>,
 ) -> mlua::Result<()> {
+    info!("Injecting Agent global API");
     let agent_table = lua.create_table()?;
 
     // Store bridge reference in context for cross-global access

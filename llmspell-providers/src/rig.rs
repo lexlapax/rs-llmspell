@@ -225,7 +225,10 @@ impl RigProvider {
         model = %self.config.model
     ))]
     async fn execute_completion(&self, prompt: String) -> Result<String, LLMSpellError> {
-        debug!("Executing completion with {} character prompt", prompt.len());
+        debug!(
+            "Executing completion with {} character prompt",
+            prompt.len()
+        );
         match &self.model {
             RigModel::OpenAI(model) => model
                 .completion_request(&prompt)

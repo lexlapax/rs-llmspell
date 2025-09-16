@@ -5,6 +5,7 @@ use llmspell_core::error::LLMSpellError;
 use mlua::Lua;
 use std::collections::HashMap;
 use std::hash::BuildHasher;
+use tracing::{instrument, trace};
 
 /// Inject ARGS global into Lua environment
 ///
@@ -17,10 +18,15 @@ use std::hash::BuildHasher;
 /// # Errors
 ///
 /// Returns an error if ARGS global injection or table creation fails
+#[instrument(level = "trace", skip(lua, args), fields(
+    global_name = "ARGS",
+    arg_count = args.len()
+))]
 pub fn inject_args_global<S: BuildHasher>(
     lua: &Lua,
     args: &HashMap<String, String, S>,
 ) -> Result<(), LLMSpellError> {
+    trace!(arg_count = args.len(), "Injecting ARGS global");
     let args_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create ARGS table: {e}"),
         source: None,

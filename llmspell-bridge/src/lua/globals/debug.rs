@@ -10,6 +10,7 @@ use crate::lua::stacktrace::{capture_stack_trace, StackTraceOptions};
 use llmspell_utils::debug::FilterPattern;
 use mlua::{Lua, UserData, UserDataFields, UserDataMethods, Value};
 use std::sync::Arc;
+use tracing::{debug, instrument};
 
 /// Timer handle for Lua
 struct LuaTimer {
@@ -47,11 +48,17 @@ impl UserData for LuaTimer {
 /// - Lua table creation fails
 /// - Function binding fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "debug",
+    skip(lua, _context, bridge),
+    fields(global_name = "Debug", debug_features = "logging,profiling,stacktrace")
+)]
 pub fn inject_debug_global(
     lua: &Lua,
     _context: &GlobalContext,
     bridge: &Arc<DebugBridge>,
 ) -> mlua::Result<()> {
+    debug!("Injecting Debug global API");
     let debug_table = lua.create_table()?;
 
     // Debug.log(level, message, [module])

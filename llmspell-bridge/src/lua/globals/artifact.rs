@@ -10,6 +10,7 @@ use llmspell_sessions::{artifact::ArtifactId, SessionId};
 use mlua::{Error as LuaError, Lua, Table, Value};
 use std::str::FromStr;
 use std::sync::Arc;
+use tracing::{debug, instrument};
 
 /// Inject Artifact global into Lua environment
 ///
@@ -19,11 +20,17 @@ use std::sync::Arc;
 /// - Lua table creation fails
 /// - Function binding fails
 #[allow(clippy::too_many_lines)]
+#[instrument(
+    level = "debug",
+    skip(lua, _context, artifact_bridge),
+    fields(global_name = "Artifact")
+)]
 pub fn inject_artifact_global(
     lua: &Lua,
     _context: &GlobalContext,
     artifact_bridge: Arc<ArtifactBridge>,
 ) -> mlua::Result<()> {
+    debug!("Injecting Artifact global API");
     // Create Artifact table
     let artifact_table = lua.create_table()?;
 
