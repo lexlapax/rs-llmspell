@@ -37,6 +37,8 @@ use llmspell_utils::{
     },
 };
 use serde_json::{json, Value};
+use std::time::Instant;
+use tracing::{debug, error, info, trace};
 
 /// Date/time handler tool
 #[derive(Debug, Clone)]
@@ -47,6 +49,12 @@ pub struct DateTimeHandlerTool {
 
 impl Default for DateTimeHandlerTool {
     fn default() -> Self {
+        info!(
+            supported_operations = 8,
+            timezone_support = true,
+            arithmetic_support = true,
+            "Creating DateTimeHandlerTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "datetime-handler".to_string(),
@@ -65,267 +73,547 @@ impl DateTimeHandlerTool {
     }
 
     /// Process date/time operation
+    fn handle_parse_operation(&self, params: &Value) -> Result<Value> {
+        let parse_start = Instant::now();
+        let input = extract_required_string(params, "input")?;
+
+        debug!(
+            operation = "parse",
+            input = %input,
+            input_length = input.len(),
+            "Starting date parsing operation"
+        );
+
+        let dt = parse_datetime(input).map_err(|e| {
+            error!(
+                operation = "parse",
+                input = %input,
+                error = %e,
+                parse_duration_ms = parse_start.elapsed().as_millis(),
+                "Date parsing failed"
+            );
+            tool_error(
+                format!("Failed to parse date: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        let output_format = extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
+
+        debug!(
+            operation = "parse",
+            input = %input,
+            parsed_year = dt.year(),
+            parsed_month = dt.month(),
+            parsed_day = dt.day(),
+            weekday = %weekday_name(&dt),
+            output_format = %output_format,
+            parse_duration_ms = parse_start.elapsed().as_millis(),
+            "Date parsing completed successfully"
+        );
+
+        let response = ResponseBuilder::success("parse")
+            .with_message("Date parsed successfully")
+            .with_result(json!({
+                "input": input,
+                "parsed": {
+                    "utc": format_datetime(&dt, output_format),
+                    "timestamp": dt.timestamp(),
+                    "year": dt.year(),
+                    "month": dt.month(),
+                    "day": dt.day(),
+                    "hour": dt.hour(),
+                    "minute": dt.minute(),
+                    "second": dt.second(),
+                    "weekday": weekday_name(&dt),
+                },
+                "format_used": output_format
+            }))
+            .build();
+        Ok(response)
+    }
+
+    fn handle_now_operation(&self, params: &Value) -> Result<Value> {
+        let now_start = Instant::now();
+        let timezone = extract_optional_string(params, "timezone");
+        let format = extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
+
+        debug!(
+            operation = "now",
+            timezone = ?timezone,
+            format = %format,
+            "Retrieving current time"
+        );
+
+        let (dt_str, tz_name) = self.get_current_time_formatted(timezone, format)?;
+
+        debug!(
+            operation = "now",
+            timezone = %tz_name,
+            format = %format,
+            now_duration_ms = now_start.elapsed().as_millis(),
+            "Current time retrieval completed"
+        );
+
+        let response = ResponseBuilder::success("now")
+            .with_message("Current time retrieved")
+            .with_result(json!({
+                "timezone": tz_name,
+                "datetime": dt_str,
+                "format": format
+            }))
+            .build();
+        Ok(response)
+    }
+
+    fn get_current_time_formatted(
+        &self,
+        timezone: Option<&str>,
+        format: &str,
+    ) -> Result<(String, String)> {
+        timezone.map_or_else(
+            || Ok(Self::get_local_time_formatted(format)),
+            |tz| self.get_timezone_specific_time(tz, format),
+        )
+    }
+
+    fn get_timezone_specific_time(&self, timezone: &str, format: &str) -> Result<(String, String)> {
+        trace!(
+            operation = "now",
+            target_timezone = %timezone,
+            "Converting UTC time to specific timezone"
+        );
+        let utc_now = now_utc();
+        let tz_time = convert_timezone(&utc_now, timezone).map_err(|e| {
+            error!(
+                operation = "now",
+                timezone = %timezone,
+                error = %e,
+                "Timezone conversion failed"
+            );
+            LLMSpellError::Tool {
+                message: format!("Invalid timezone: {e}"),
+                tool_name: Some(self.metadata.name.clone()),
+                source: None,
+            }
+        })?;
+        Ok((tz_time.format(format).to_string(), timezone.to_string()))
+    }
+
+    fn get_local_time_formatted(format: &str) -> (String, String) {
+        trace!(operation = "now", "Using local timezone");
+        let local = now_local();
+        (local.format(format).to_string(), "local".to_string())
+    }
+
+    fn handle_timezone_conversion(&self, params: &Value) -> Result<Value> {
+        let convert_start = Instant::now();
+        let input = extract_required_string(params, "input")?;
+
+        let target_tz = params
+            .get("target_timezone")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| LLMSpellError::Validation {
+                message: "Missing 'target_timezone' parameter".to_string(),
+                field: Some("target_timezone".to_string()),
+            })?;
+
+        debug!(
+            operation = "convert_timezone",
+            input = %input,
+            target_timezone = %target_tz,
+            "Starting timezone conversion"
+        );
+
+        let parse_start = Instant::now();
+        let dt = parse_datetime(input).map_err(|e| {
+            error!(
+                operation = "convert_timezone",
+                input = %input,
+                error = %e,
+                parse_duration_ms = parse_start.elapsed().as_millis(),
+                "Failed to parse input date for timezone conversion"
+            );
+            tool_error(
+                format!("Failed to parse date: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        trace!(
+            operation = "convert_timezone",
+            input = %input,
+            parsed_datetime = %format_datetime(&dt, "%Y-%m-%dT%H:%M:%S%.fZ"),
+            parse_duration_ms = parse_start.elapsed().as_millis(),
+            "Date parsing completed for timezone conversion"
+        );
+
+        let conversion_start = Instant::now();
+        let converted = convert_timezone(&dt, target_tz).map_err(|e| {
+            error!(
+                operation = "convert_timezone",
+                input = %input,
+                target_timezone = %target_tz,
+                error = %e,
+                conversion_duration_ms = conversion_start.elapsed().as_millis(),
+                "Timezone conversion failed"
+            );
+            LLMSpellError::Tool {
+                message: format!("Failed to convert timezone: {e}"),
+                tool_name: Some(self.metadata.name.clone()),
+                source: None,
+            }
+        })?;
+
+        debug!(
+            operation = "convert_timezone",
+            input = %input,
+            target_timezone = %target_tz,
+            conversion_duration_ms = conversion_start.elapsed().as_millis(),
+            total_duration_ms = convert_start.elapsed().as_millis(),
+            "Timezone conversion completed successfully"
+        );
+
+        let format = params
+            .get("format")
+            .and_then(|v| v.as_str())
+            .unwrap_or("%Y-%m-%d %H:%M:%S %Z");
+
+        let response = ResponseBuilder::success("convert_timezone")
+            .with_message("Timezone converted successfully")
+            .with_result(json!({
+                "input": input,
+                "target_timezone": target_tz,
+                "original": format_datetime(&dt, format),
+                "converted": converted.format(format).to_string(),
+            }))
+            .build();
+        Ok(response)
+    }
+
+    fn handle_arithmetic_operation(&self, params: &Value, operation: &str) -> Result<Value> {
+        let arithmetic_start = Instant::now();
+        let input = extract_required_string(params, "input")?;
+
+        let amount = extract_optional_i64(params, "amount").ok_or_else(|| {
+            validation_error(
+                "Missing or invalid 'amount' parameter",
+                Some("amount".to_string()),
+            )
+        })?;
+
+        let unit = extract_required_string(params, "unit")?;
+
+        debug!(
+            operation = %operation,
+            input = %input,
+            amount = amount,
+            unit = %unit,
+            "Starting date arithmetic operation"
+        );
+
+        let parse_start = Instant::now();
+        let dt = parse_datetime(input).map_err(|e| {
+            error!(
+                operation = %operation,
+                input = %input,
+                error = %e,
+                parse_duration_ms = parse_start.elapsed().as_millis(),
+                "Failed to parse input date for arithmetic operation"
+            );
+            tool_error(
+                format!("Failed to parse date: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        trace!(
+            operation = %operation,
+            input = %input,
+            parsed_datetime = %format_datetime(&dt, "%Y-%m-%dT%H:%M:%S%.fZ"),
+            parse_duration_ms = parse_start.elapsed().as_millis(),
+            "Date parsing completed for arithmetic operation"
+        );
+
+        let calculation_start = Instant::now();
+        let result = if operation == "add" {
+            add_duration(&dt, amount, unit)
+        } else {
+            subtract_duration(&dt, amount, unit)
+        }
+        .map_err(|e| {
+            error!(
+                operation = %operation,
+                input = %input,
+                amount = amount,
+                unit = %unit,
+                error = %e,
+                calculation_duration_ms = calculation_start.elapsed().as_millis(),
+                "Date arithmetic calculation failed"
+            );
+            tool_error(
+                format!("Failed to {operation} duration: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        debug!(
+            operation = %operation,
+            input = %input,
+            amount = amount,
+            unit = %unit,
+            result_datetime = %format_datetime(&result, "%Y-%m-%dT%H:%M:%S%.fZ"),
+            calculation_duration_ms = calculation_start.elapsed().as_millis(),
+            total_duration_ms = arithmetic_start.elapsed().as_millis(),
+            "Date arithmetic operation completed successfully"
+        );
+
+        let format = extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
+
+        let response = ResponseBuilder::success(operation)
+            .with_message(format!("{operation} operation completed"))
+            .with_result(json!({
+                "input": input,
+                "amount": amount,
+                "unit": unit,
+                "original": format_datetime(&dt, format),
+                "result": format_datetime(&result, format),
+            }))
+            .build();
+        Ok(response)
+    }
+
+    fn handle_difference_operation(&self, params: &Value) -> Result<Value> {
+        let diff_start = Instant::now();
+        let start = params
+            .get("start")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| LLMSpellError::Validation {
+                message: "Missing 'start' parameter".to_string(),
+                field: Some("start".to_string()),
+            })?;
+
+        let end = params.get("end").and_then(|v| v.as_str()).ok_or_else(|| {
+            LLMSpellError::Validation {
+                message: "Missing 'end' parameter".to_string(),
+                field: Some("end".to_string()),
+            }
+        })?;
+
+        debug!(
+            operation = "difference",
+            start = %start,
+            end = %end,
+            "Starting date difference calculation"
+        );
+
+        let start_parse_start = Instant::now();
+        let start_dt = parse_datetime(start).map_err(|e| {
+            error!(
+                operation = "difference",
+                start = %start,
+                error = %e,
+                start_parse_duration_ms = start_parse_start.elapsed().as_millis(),
+                "Failed to parse start date"
+            );
+            LLMSpellError::Tool {
+                message: format!("Failed to parse start date: {e}"),
+                tool_name: Some(self.metadata.name.clone()),
+                source: None,
+            }
+        })?;
+
+        let end_parse_start = Instant::now();
+        let end_dt = parse_datetime(end).map_err(|e| {
+            error!(
+                operation = "difference",
+                end = %end,
+                error = %e,
+                end_parse_duration_ms = end_parse_start.elapsed().as_millis(),
+                "Failed to parse end date"
+            );
+            LLMSpellError::Tool {
+                message: format!("Failed to parse end date: {e}"),
+                tool_name: Some(self.metadata.name.clone()),
+                source: None,
+            }
+        })?;
+
+        trace!(
+            operation = "difference",
+            start = %start,
+            end = %end,
+            start_parsed = %format_datetime(&start_dt, "%Y-%m-%dT%H:%M:%S%.fZ"),
+            end_parsed = %format_datetime(&end_dt, "%Y-%m-%dT%H:%M:%S%.fZ"),
+            parsing_duration_ms = (start_parse_start.elapsed() + end_parse_start.elapsed()).as_millis(),
+            "Both dates parsed successfully"
+        );
+
+        let calc_start = Instant::now();
+        let duration = duration_between(&start_dt, &end_dt);
+
+        debug!(
+            operation = "difference",
+            start = %start,
+            end = %end,
+            total_seconds = duration.num_seconds(),
+            days = duration.num_days(),
+            hours = duration.num_hours(),
+            calculation_duration_ms = calc_start.elapsed().as_millis(),
+            total_duration_ms = diff_start.elapsed().as_millis(),
+            "Date difference calculation completed"
+        );
+
+        let response = ResponseBuilder::success("difference")
+            .with_message("Date difference calculated")
+            .with_result(json!({
+                "start": start,
+                "end": end,
+                "difference": {
+                    "total_seconds": duration.num_seconds(),
+                    "days": duration.num_days(),
+                    "hours": duration.num_hours(),
+                    "minutes": duration.num_minutes(),
+                    "human_readable": format_duration(&duration),
+                }
+            }))
+            .build();
+        Ok(response)
+    }
+
+    fn handle_info_operation(&self, params: &Value) -> Result<Value> {
+        let info_start = Instant::now();
+        let input = extract_required_string(params, "input")?;
+
+        debug!(
+            operation = "info",
+            input = %input,
+            "Starting date information extraction"
+        );
+
+        let parse_start = Instant::now();
+        let dt = parse_datetime(input).map_err(|e| {
+            error!(
+                operation = "info",
+                input = %input,
+                error = %e,
+                parse_duration_ms = parse_start.elapsed().as_millis(),
+                "Failed to parse date for info extraction"
+            );
+            tool_error(
+                format!("Failed to parse date: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        let info_calc_start = Instant::now();
+        let year = dt.year();
+        let month = dt.month();
+        let day_of_year = dt.ordinal();
+        let week_of_year = dt.iso_week().week();
+
+        debug!(
+            operation = "info",
+            input = %input,
+            year = year,
+            month = month,
+            day = dt.day(),
+            weekday = %weekday_name(&dt),
+            day_of_year = day_of_year,
+            week_of_year = week_of_year,
+            is_leap_year = is_leap_year(year),
+            info_calculation_duration_ms = info_calc_start.elapsed().as_millis(),
+            total_duration_ms = info_start.elapsed().as_millis(),
+            "Date information extraction completed"
+        );
+
+        let response = ResponseBuilder::success("info")
+            .with_message("Date information retrieved")
+            .with_result(json!({
+                "input": input,
+                "info": {
+                    "year": year,
+                    "month": month,
+                    "day": dt.day(),
+                    "hour": dt.hour(),
+                    "minute": dt.minute(),
+                    "second": dt.second(),
+                    "weekday": weekday_name(&dt),
+                    "day_of_year": day_of_year,
+                    "week_of_year": week_of_year,
+                    "is_leap_year": is_leap_year(year),
+                    "days_in_month": days_in_month(year, month),
+                    "start_of_day": format_datetime(&start_of_day(&dt), "%Y-%m-%dT%H:%M:%S%.fZ"),
+                    "end_of_day": format_datetime(&end_of_day(&dt), "%Y-%m-%dT%H:%M:%S%.fZ"),
+                }
+            }))
+            .build();
+        Ok(response)
+    }
+
+    fn handle_formats_operation() -> Value {
+        debug!(
+            operation = "formats",
+            available_format_count = DATE_FORMATS.len(),
+            "Listing available date formats"
+        );
+        // Show available date formats
+        let response = ResponseBuilder::success("formats")
+            .with_message("Available date formats")
+            .with_result(json!({
+                "available_formats": DATE_FORMATS,
+                "example_formats": {
+                    "ISO8601": "%Y-%m-%dT%H:%M:%S%.fZ",
+                    "RFC3339": "%Y-%m-%d %H:%M:%S%:z",
+                    "RFC2822": "%a, %d %b %Y %H:%M:%S %z",
+                    "Unix timestamp": "timestamp",
+                    "Human readable": "%B %d, %Y at %I:%M %p",
+                    "Date only": "%Y-%m-%d",
+                    "Time only": "%H:%M:%S",
+                }
+            }))
+            .build();
+        trace!(operation = "formats", "Format listing completed");
+        response
+    }
+
     #[allow(clippy::unused_async)]
-    #[allow(clippy::too_many_lines)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
+        let operation_start = Instant::now();
         let operation = extract_string_with_default(params, "operation", "parse");
 
-        match operation {
-            "parse" => {
-                let input = extract_required_string(params, "input")?;
+        debug!(
+            operation = %operation,
+            "Processing date/time operation"
+        );
 
-                let dt = parse_datetime(input).map_err(|e| {
-                    tool_error(
-                        format!("Failed to parse date: {e}"),
-                        Some(self.metadata.name.clone()),
-                    )
-                })?;
-
-                let output_format =
-                    extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
-
-                let response = ResponseBuilder::success("parse")
-                    .with_message("Date parsed successfully")
-                    .with_result(json!({
-                        "input": input,
-                        "parsed": {
-                            "utc": format_datetime(&dt, output_format),
-                            "timestamp": dt.timestamp(),
-                            "year": dt.year(),
-                            "month": dt.month(),
-                            "day": dt.day(),
-                            "hour": dt.hour(),
-                            "minute": dt.minute(),
-                            "second": dt.second(),
-                            "weekday": weekday_name(&dt),
-                        },
-                        "format_used": output_format
-                    }))
-                    .build();
-                Ok(response)
+        let result = match operation {
+            "parse" => self.handle_parse_operation(params),
+            "now" => self.handle_now_operation(params),
+            "convert_timezone" => self.handle_timezone_conversion(params),
+            "add" | "subtract" => self.handle_arithmetic_operation(params, operation),
+            "difference" => self.handle_difference_operation(params),
+            "info" => self.handle_info_operation(params),
+            "formats" => Ok(Self::handle_formats_operation()),
+            _ => {
+                error!(
+                    operation = %operation,
+                    "Unknown date/time operation requested"
+                );
+                Err(validation_error(
+                    format!("Unknown operation: {operation}"),
+                    Some("operation".to_string()),
+                ))
             }
-            "now" => {
-                let timezone = extract_optional_string(params, "timezone");
-                let format = extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
+        };
 
-                let (dt_str, tz_name) = if let Some(tz) = timezone {
-                    let utc_now = now_utc();
-                    let tz_time =
-                        convert_timezone(&utc_now, tz).map_err(|e| LLMSpellError::Tool {
-                            message: format!("Invalid timezone: {e}"),
-                            tool_name: Some(self.metadata.name.clone()),
-                            source: None,
-                        })?;
-                    (tz_time.format(format).to_string(), tz.to_string())
-                } else {
-                    let local = now_local();
-                    (local.format(format).to_string(), "local".to_string())
-                };
+        debug!(
+            operation = %operation,
+            total_operation_duration_ms = operation_start.elapsed().as_millis(),
+            "Date/time operation processing completed"
+        );
 
-                let response = ResponseBuilder::success("now")
-                    .with_message("Current time retrieved")
-                    .with_result(json!({
-                        "timezone": tz_name,
-                        "datetime": dt_str,
-                        "format": format
-                    }))
-                    .build();
-                Ok(response)
-            }
-            "convert_timezone" => {
-                let input = extract_required_string(params, "input")?;
-
-                let target_tz = params
-                    .get("target_timezone")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Missing 'target_timezone' parameter".to_string(),
-                        field: Some("target_timezone".to_string()),
-                    })?;
-
-                let dt = parse_datetime(input).map_err(|e| {
-                    tool_error(
-                        format!("Failed to parse date: {e}"),
-                        Some(self.metadata.name.clone()),
-                    )
-                })?;
-
-                let converted =
-                    convert_timezone(&dt, target_tz).map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to convert timezone: {e}"),
-                        tool_name: Some(self.metadata.name.clone()),
-                        source: None,
-                    })?;
-
-                let format = params
-                    .get("format")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("%Y-%m-%d %H:%M:%S %Z");
-
-                let response = ResponseBuilder::success("convert_timezone")
-                    .with_message("Timezone converted successfully")
-                    .with_result(json!({
-                        "input": input,
-                        "target_timezone": target_tz,
-                        "original": format_datetime(&dt, format),
-                        "converted": converted.format(format).to_string(),
-                    }))
-                    .build();
-                Ok(response)
-            }
-            "add" | "subtract" => {
-                let input = extract_required_string(params, "input")?;
-
-                let amount = extract_optional_i64(params, "amount").ok_or_else(|| {
-                    validation_error(
-                        "Missing or invalid 'amount' parameter",
-                        Some("amount".to_string()),
-                    )
-                })?;
-
-                let unit = extract_required_string(params, "unit")?;
-
-                let dt = parse_datetime(input).map_err(|e| {
-                    tool_error(
-                        format!("Failed to parse date: {e}"),
-                        Some(self.metadata.name.clone()),
-                    )
-                })?;
-
-                let result = if operation == "add" {
-                    add_duration(&dt, amount, unit)
-                } else {
-                    subtract_duration(&dt, amount, unit)
-                }
-                .map_err(|e| {
-                    tool_error(
-                        format!("Failed to {operation} duration: {e}"),
-                        Some(self.metadata.name.clone()),
-                    )
-                })?;
-
-                let format = extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
-
-                let response = ResponseBuilder::success(operation)
-                    .with_message(format!("{operation} operation completed"))
-                    .with_result(json!({
-                        "input": input,
-                        "amount": amount,
-                        "unit": unit,
-                        "original": format_datetime(&dt, format),
-                        "result": format_datetime(&result, format),
-                    }))
-                    .build();
-                Ok(response)
-            }
-            "difference" => {
-                let start = params
-                    .get("start")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Missing 'start' parameter".to_string(),
-                        field: Some("start".to_string()),
-                    })?;
-
-                let end = params.get("end").and_then(|v| v.as_str()).ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        message: "Missing 'end' parameter".to_string(),
-                        field: Some("end".to_string()),
-                    }
-                })?;
-
-                let start_dt = parse_datetime(start).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to parse start date: {e}"),
-                    tool_name: Some(self.metadata.name.clone()),
-                    source: None,
-                })?;
-
-                let end_dt = parse_datetime(end).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to parse end date: {e}"),
-                    tool_name: Some(self.metadata.name.clone()),
-                    source: None,
-                })?;
-
-                let duration = duration_between(&start_dt, &end_dt);
-
-                let response = ResponseBuilder::success("difference")
-                    .with_message("Date difference calculated")
-                    .with_result(json!({
-                        "start": start,
-                        "end": end,
-                        "difference": {
-                            "total_seconds": duration.num_seconds(),
-                            "days": duration.num_days(),
-                            "hours": duration.num_hours(),
-                            "minutes": duration.num_minutes(),
-                            "human_readable": format_duration(&duration),
-                        }
-                    }))
-                    .build();
-                Ok(response)
-            }
-            "info" => {
-                let input = extract_required_string(params, "input")?;
-
-                let dt = parse_datetime(input).map_err(|e| {
-                    tool_error(
-                        format!("Failed to parse date: {e}"),
-                        Some(self.metadata.name.clone()),
-                    )
-                })?;
-
-                let year = dt.year();
-                let month = dt.month();
-                let day_of_year = dt.ordinal();
-                let week_of_year = dt.iso_week().week();
-
-                let response = ResponseBuilder::success("info")
-                    .with_message("Date information retrieved")
-                    .with_result(json!({
-                        "input": input,
-                        "info": {
-                            "year": year,
-                            "month": month,
-                            "day": dt.day(),
-                            "hour": dt.hour(),
-                            "minute": dt.minute(),
-                            "second": dt.second(),
-                            "weekday": weekday_name(&dt),
-                            "day_of_year": day_of_year,
-                            "week_of_year": week_of_year,
-                            "is_leap_year": is_leap_year(year),
-                            "days_in_month": days_in_month(year, month),
-                            "start_of_day": format_datetime(&start_of_day(&dt), "%Y-%m-%dT%H:%M:%S%.fZ"),
-                            "end_of_day": format_datetime(&end_of_day(&dt), "%Y-%m-%dT%H:%M:%S%.fZ"),
-                        }
-                    }))
-                    .build();
-                Ok(response)
-            }
-            "formats" => {
-                // Show available date formats
-                let response = ResponseBuilder::success("formats")
-                    .with_message("Available date formats")
-                    .with_result(json!({
-                        "available_formats": DATE_FORMATS,
-                        "example_formats": {
-                            "ISO8601": "%Y-%m-%dT%H:%M:%S%.fZ",
-                            "RFC3339": "%Y-%m-%d %H:%M:%S%:z",
-                            "RFC2822": "%a, %d %b %Y %H:%M:%S %z",
-                            "Unix timestamp": "timestamp",
-                            "Human readable": "%B %d, %Y at %I:%M %p",
-                            "Date only": "%Y-%m-%d",
-                            "Time only": "%H:%M:%S",
-                        }
-                    }))
-                    .build();
-                Ok(response)
-            }
-            _ => Err(validation_error(
-                format!("Unknown operation: {operation}"),
-                Some("operation".to_string()),
-            )),
-        }
+        result
     }
 }
 
@@ -340,11 +628,25 @@ impl BaseAgent for DateTimeHandlerTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing date/time handler tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
         // Process the operation
         let result = self.process_operation(params).await?;
+
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            success = true,
+            total_duration_ms = elapsed_ms,
+            "Date/time handler execution completed successfully"
+        );
 
         // Return the result as JSON formatted text
         Ok(AgentOutput::text(

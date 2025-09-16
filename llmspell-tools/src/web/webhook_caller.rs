@@ -24,6 +24,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::time::{Duration, Instant};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookCallerTool {
@@ -39,6 +40,7 @@ impl Default for WebhookCallerTool {
 impl WebhookCallerTool {
     #[must_use]
     pub fn new() -> Self {
+        info!("Creating WebhookCallerTool");
         Self {
             metadata: ComponentMetadata::new(
                 "webhook-caller".to_string(),
@@ -128,6 +130,13 @@ impl BaseAgent for WebhookCallerTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing webhook caller tool"
+        );
+
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let payload = extract_optional_object(params, "payload");
@@ -139,14 +148,37 @@ impl BaseAgent for WebhookCallerTool {
         let max_retries = extract_optional_u64(params, "max_retries").unwrap_or(3) as u32;
         let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
 
+        debug!(
+            url = %url,
+            method = %method,
+            max_retries,
+            timeout_secs = timeout,
+            has_payload = payload.is_some(),
+            has_headers = headers.is_some(),
+            "Starting webhook call with configuration"
+        );
+
         // Validate URL with SSRF protection
+        trace!(
+            url = %url,
+            "Validating URL with SSRF protection"
+        );
         let ssrf_protector = SsrfProtector::new();
         if let Err(e) = ssrf_protector.validate_url(url) {
+            error!(
+                url = %url,
+                error = %e,
+                "URL failed SSRF validation"
+            );
             return Err(validation_error(
                 format!("URL validation failed: {e}"),
                 Some("input".to_string()),
             ));
         }
+        trace!(
+            url = %url,
+            "URL passed SSRF validation"
+        );
 
         // Build client using global runtime
         let client = create_io_bound_resource(move || {
@@ -161,13 +193,34 @@ impl BaseAgent for WebhookCallerTool {
         let mut last_error = None;
         let mut retry_count = 0;
 
+        info!(
+            url = %url,
+            method = %method,
+            max_retries,
+            "Starting webhook retry loop"
+        );
+
         for attempt in 0..=max_retries {
             if attempt > 0 {
                 // Wait before retry (exponential backoff)
                 let delay = Duration::from_millis(500 * 2u64.pow(attempt - 1));
+                debug!(
+                    url = %url,
+                    attempt,
+                    delay_ms = delay.as_millis(),
+                    "Waiting before retry attempt"
+                );
                 tokio::time::sleep(delay).await;
                 retry_count += 1;
             }
+
+            debug!(
+                url = %url,
+                method = %method,
+                attempt,
+                retry_count,
+                "Making webhook request attempt"
+            );
 
             let mut request = match method.as_str() {
                 "GET" => client.get(url),
@@ -181,8 +234,18 @@ impl BaseAgent for WebhookCallerTool {
             // Add payload for methods that support it
             if method != "GET" && method != "HEAD" {
                 if let Some(payload_data) = &payload {
+                    trace!(
+                        url = %url,
+                        method = %method,
+                        "Adding JSON payload to request"
+                    );
                     request = request.json(payload_data);
                 } else if method == "POST" || method == "PUT" || method == "PATCH" {
+                    trace!(
+                        url = %url,
+                        method = %method,
+                        "Adding default empty JSON payload"
+                    );
                     // Default empty JSON payload for write methods
                     request = request.json(&json!({}));
                 }
@@ -190,6 +253,12 @@ impl BaseAgent for WebhookCallerTool {
 
             // Add headers
             if let Some(headers_map) = headers {
+                let header_count = headers_map.len();
+                trace!(
+                    url = %url,
+                    header_count,
+                    "Adding custom headers to request"
+                );
                 for (key, value) in headers_map {
                     if let Some(val_str) = value.as_str() {
                         request = request.header(key, val_str);
@@ -198,6 +267,12 @@ impl BaseAgent for WebhookCallerTool {
             }
 
             let start_time = Instant::now();
+            trace!(
+                url = %url,
+                method = %method,
+                attempt,
+                "Sending webhook request"
+            );
             match request.send().await {
                 Ok(response) => {
                     let elapsed = start_time.elapsed();
@@ -207,13 +282,32 @@ impl BaseAgent for WebhookCallerTool {
                     let response_headers = response.headers().clone();
                     let body_text = response.text().await.unwrap_or_default();
 
+                    debug!(
+                        url = %url,
+                        method = %method,
+                        attempt,
+                        status_code = status.as_u16(),
+                        response_time_ms,
+                        success = status.is_success(),
+                        server_error = status.is_server_error(),
+                        "Webhook request completed"
+                    );
+
                     // Only retry on 5xx errors
                     if status.is_server_error() && attempt < max_retries {
-                        last_error = Some(format!(
+                        let error_msg = format!(
                             "Server error: {} {}",
                             status.as_u16(),
                             status.canonical_reason().unwrap_or("Unknown")
-                        ));
+                        );
+                        warn!(
+                            url = %url,
+                            method = %method,
+                            attempt,
+                            status_code = status.as_u16(),
+                            "Server error, will retry"
+                        );
+                        last_error = Some(error_msg);
                         continue;
                     }
 
@@ -225,6 +319,16 @@ impl BaseAgent for WebhookCallerTool {
                             headers_map.insert(name.to_string(), json!(val));
                         }
                     }
+
+                    trace!(
+                        url = %url,
+                        method = %method,
+                        attempt,
+                        body_length = body_text.len(),
+                        is_json = body_json.is_some(),
+                        header_count = headers_map.len(),
+                        "Processed response data"
+                    );
 
                     let body_value = body_json.clone().unwrap_or_else(|| json!(body_text));
                     let result = json!({
@@ -243,6 +347,18 @@ impl BaseAgent for WebhookCallerTool {
                         "retries_attempted": retry_count,
                     });
 
+                    let total_elapsed = start.elapsed();
+                    info!(
+                        url = %url,
+                        method = %method,
+                        status_code = status.as_u16(),
+                        success = status.is_success(),
+                        retry_count,
+                        response_time_ms,
+                        total_duration_ms = total_elapsed.as_millis(),
+                        "Webhook call completed successfully"
+                    );
+
                     let response = ResponseBuilder::success("call").with_result(result).build();
 
                     return Ok(AgentOutput::text(
@@ -251,6 +367,17 @@ impl BaseAgent for WebhookCallerTool {
                 }
                 Err(e) => {
                     let error_str = e.to_string();
+                    let elapsed = start_time.elapsed();
+
+                    error!(
+                        url = %url,
+                        method = %method,
+                        attempt,
+                        error = %error_str,
+                        duration_ms = elapsed.as_millis(),
+                        "Webhook request failed"
+                    );
+
                     last_error = Some(error_str.clone());
 
                     // Don't retry on timeout, connection refused, or connection errors
@@ -259,10 +386,23 @@ impl BaseAgent for WebhookCallerTool {
                         || error_str.contains("dns")
                         || error_str.contains("refused")
                     {
+                        warn!(
+                            url = %url,
+                            method = %method,
+                            attempt,
+                            error_type = "non_retryable",
+                            "Error type not suitable for retry, stopping"
+                        );
                         break;
                     }
 
                     if attempt >= max_retries {
+                        warn!(
+                            url = %url,
+                            method = %method,
+                            attempt,
+                            "Maximum retries reached"
+                        );
                         break;
                     }
                 }
@@ -271,6 +411,18 @@ impl BaseAgent for WebhookCallerTool {
 
         // All retries exhausted
         let error_msg = last_error.unwrap_or_else(|| "Unknown error".to_string());
+        let total_elapsed = start.elapsed();
+
+        error!(
+            url = %url,
+            method = %method,
+            max_retries,
+            retry_count,
+            total_duration_ms = total_elapsed.as_millis(),
+            final_error = %error_msg,
+            "Webhook call failed after all retries"
+        );
+
         let error_result = json!({
             "success": false,
             "webhook_url": url,

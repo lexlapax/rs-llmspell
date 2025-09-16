@@ -29,6 +29,8 @@ use llmspell_utils::{
 use serde_json::{json, Value};
 use similar::{ChangeTag, DiffTag, TextDiff};
 use std::fs;
+use std::time::Instant;
+use tracing::{debug, error, info, trace};
 
 /// Diff output format
 #[derive(Debug, Clone)]
@@ -67,6 +69,14 @@ pub struct DiffCalculatorTool {
 
 impl Default for DiffCalculatorTool {
     fn default() -> Self {
+        info!(
+            supported_diff_types = 2,   // text, json
+            supported_text_formats = 4, // unified, context, inline, simple
+            file_support = true,
+            max_memory_mb = 100,
+            max_cpu_seconds = 10,
+            "Creating DiffCalculatorTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "diff-calculator".to_string(),
@@ -86,18 +96,41 @@ impl DiffCalculatorTool {
     /// Calculate text diff
     #[allow(clippy::unused_self)]
     #[allow(clippy::too_many_lines)]
+    #[allow(clippy::cognitive_complexity)]
     fn calculate_text_diff(&self, old: &str, new: &str, format: &DiffFormat) -> String {
         use std::fmt::Write;
 
-        let diff = TextDiff::from_lines(old, new);
+        let text_diff_start = Instant::now();
+        let old_lines = old.lines().count();
+        let new_lines = new.lines().count();
 
-        match format {
-            DiffFormat::Unified => diff
-                .unified_diff()
-                .context_radius(3)
-                .header("old", "new")
-                .to_string(),
+        debug!(
+            old_lines,
+            new_lines,
+            format = ?format,
+            old_length = old.len(),
+            new_length = new.len(),
+            "Starting text diff calculation"
+        );
+
+        let diff_creation_start = Instant::now();
+        let diff = TextDiff::from_lines(old, new);
+        trace!(
+            diff_creation_duration_ms = diff_creation_start.elapsed().as_millis(),
+            "TextDiff object created"
+        );
+
+        let format_start = Instant::now();
+        let result = match format {
+            DiffFormat::Unified => {
+                trace!("Generating unified diff format");
+                diff.unified_diff()
+                    .context_radius(3)
+                    .header("old", "new")
+                    .to_string()
+            }
             DiffFormat::Context => {
+                trace!("Generating context diff format");
                 // Context format - show more surrounding lines
                 let mut output = String::new();
                 output.push_str("*** old\n--- new\n");
@@ -158,6 +191,7 @@ impl DiffCalculatorTool {
                 output
             }
             DiffFormat::Inline => {
+                trace!("Generating inline diff format");
                 // For inline diff, we'll use iter_all_changes to show inline changes
                 let mut output = String::new();
                 for change in diff.iter_all_changes() {
@@ -171,6 +205,7 @@ impl DiffCalculatorTool {
                 output
             }
             DiffFormat::Simple => {
+                trace!("Generating simple diff format");
                 let mut output = String::new();
                 let mut changes = 0;
 
@@ -212,12 +247,36 @@ impl DiffCalculatorTool {
                 output.insert_str(0, &format!("Total changes: {changes}\n\n"));
                 output
             }
-        }
+        };
+
+        debug!(
+            old_lines,
+            new_lines,
+            format = ?format,
+            output_length = result.len(),
+            format_duration_ms = format_start.elapsed().as_millis(),
+            total_duration_ms = text_diff_start.elapsed().as_millis(),
+            "Text diff calculation completed"
+        );
+
+        result
     }
 
     /// Calculate JSON diff
     #[allow(clippy::unused_self)]
     fn calculate_json_diff(&self, old_json: &Value, new_json: &Value) -> Result<Value> {
+        let json_diff_start = Instant::now();
+
+        debug!(
+            old_is_object = old_json.is_object(),
+            old_is_array = old_json.is_array(),
+            new_is_object = new_json.is_object(),
+            new_is_array = new_json.is_array(),
+            old_size = estimate_json_size(old_json),
+            new_size = estimate_json_size(new_json),
+            "Starting JSON diff calculation"
+        );
+
         let mut diff = json!({
             "added": {},
             "removed": {},
@@ -225,7 +284,23 @@ impl DiffCalculatorTool {
             "unchanged": []
         });
 
+        let comparison_start = Instant::now();
         compare_json_values(old_json, new_json, "", &mut diff)?;
+
+        let added_count = diff["added"].as_object().map_or(0, serde_json::Map::len);
+        let removed_count = diff["removed"].as_object().map_or(0, serde_json::Map::len);
+        let modified_count = diff["modified"].as_object().map_or(0, serde_json::Map::len);
+        let unchanged_count = diff["unchanged"].as_array().map_or(0, std::vec::Vec::len);
+
+        debug!(
+            added_count,
+            removed_count,
+            modified_count,
+            unchanged_count,
+            comparison_duration_ms = comparison_start.elapsed().as_millis(),
+            total_duration_ms = json_diff_start.elapsed().as_millis(),
+            "JSON diff calculation completed"
+        );
 
         Ok(diff)
     }
@@ -323,134 +398,300 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
     Ok(())
 }
 
+/// Estimate JSON value size for logging
+fn estimate_json_size(value: &Value) -> usize {
+    match value {
+        Value::Object(obj) => obj.len(),
+        Value::Array(arr) => arr.len(),
+        Value::String(s) => s.len(),
+        _ => 1,
+    }
+}
+
 impl DiffCalculatorTool {
     /// Process diff operation
+    fn read_text_from_files(&self, old_file: &str, new_file: &str) -> Result<(String, String)> {
+        debug!(
+            old_file = %old_file,
+            new_file = %new_file,
+            "Reading text diff from files"
+        );
+
+        let file_read_start = Instant::now();
+        let old = fs::read_to_string(old_file).map_err(|e| {
+            error!(
+                old_file = %old_file,
+                error = %e,
+                "Failed to read old file"
+            );
+            tool_error(
+                format!("Failed to read old file: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        let new = fs::read_to_string(new_file).map_err(|e| {
+            error!(
+                new_file = %new_file,
+                error = %e,
+                "Failed to read new file"
+            );
+            tool_error(
+                format!("Failed to read new file: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        trace!(
+            old_file = %old_file,
+            new_file = %new_file,
+            old_length = old.len(),
+            new_length = new.len(),
+            file_read_duration_ms = file_read_start.elapsed().as_millis(),
+            "File reading completed"
+        );
+
+        Ok((old, new))
+    }
+
+    fn get_text_inputs(&self, params: &Value) -> Result<(String, String)> {
+        if let (Some(old_file), Some(new_file)) = (
+            extract_optional_string(params, "old_file"),
+            extract_optional_string(params, "new_file"),
+        ) {
+            self.read_text_from_files(old_file, new_file)
+        } else if let (Some(old), Some(new)) = (
+            extract_optional_string(params, "old_text"),
+            extract_optional_string(params, "new_text"),
+        ) {
+            debug!(
+                old_length = old.len(),
+                new_length = new.len(),
+                "Using provided text content for diff"
+            );
+            Ok((old.to_string(), new.to_string()))
+        } else {
+            error!(diff_type = "text", "Missing required text input parameters");
+            Err(validation_error(
+                "Either (old_text, new_text) or (old_file, new_file) must be provided",
+                Some("input".to_string()),
+            ))
+        }
+    }
+
+    fn read_json_from_files(&self, old_file: &str, new_file: &str) -> Result<(Value, Value)> {
+        debug!(
+            old_file = %old_file,
+            new_file = %new_file,
+            "Reading JSON diff from files"
+        );
+
+        let file_read_start = Instant::now();
+        let old_content = fs::read_to_string(old_file).map_err(|e| {
+            error!(
+                old_file = %old_file,
+                error = %e,
+                "Failed to read old JSON file"
+            );
+            tool_error(
+                format!("Failed to read old file: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        let new_content = fs::read_to_string(new_file).map_err(|e| {
+            error!(
+                new_file = %new_file,
+                error = %e,
+                "Failed to read new JSON file"
+            );
+            tool_error(
+                format!("Failed to read new file: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        trace!(
+            old_file = %old_file,
+            new_file = %new_file,
+            old_content_length = old_content.len(),
+            new_content_length = new_content.len(),
+            file_read_duration_ms = file_read_start.elapsed().as_millis(),
+            "JSON file reading completed"
+        );
+
+        let parse_start = Instant::now();
+        let old_json: Value = serde_json::from_str(&old_content).map_err(|e| {
+            error!(
+                old_file = %old_file,
+                error = %e,
+                "Failed to parse old JSON content"
+            );
+            tool_error(
+                format!("Failed to parse old JSON: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        let new_json: Value = serde_json::from_str(&new_content).map_err(|e| {
+            error!(
+                new_file = %new_file,
+                error = %e,
+                "Failed to parse new JSON content"
+            );
+            tool_error(
+                format!("Failed to parse new JSON: {e}"),
+                Some(self.metadata.name.clone()),
+            )
+        })?;
+
+        trace!(
+            old_file = %old_file,
+            new_file = %new_file,
+            old_size = estimate_json_size(&old_json),
+            new_size = estimate_json_size(&new_json),
+            parse_duration_ms = parse_start.elapsed().as_millis(),
+            "JSON parsing completed"
+        );
+
+        Ok((old_json, new_json))
+    }
+
+    fn get_json_inputs(&self, params: &Value) -> Result<(Value, Value)> {
+        if let (Some(old_file), Some(new_file)) = (
+            extract_optional_string(params, "old_file"),
+            extract_optional_string(params, "new_file"),
+        ) {
+            self.read_json_from_files(old_file, new_file)
+        } else if let (Some(old), Some(new)) = (params.get("old_json"), params.get("new_json")) {
+            debug!(
+                old_size = estimate_json_size(old),
+                new_size = estimate_json_size(new),
+                "Using provided JSON objects for diff"
+            );
+            Ok((old.clone(), new.clone()))
+        } else {
+            error!(diff_type = "json", "Missing required JSON input parameters");
+            Err(validation_error(
+                "Either (old_json, new_json) or (old_file, new_file) must be provided",
+                Some("input".to_string()),
+            ))
+        }
+    }
+
+    fn handle_text_diff(&self, params: &Value) -> Result<Value> {
+        let text_start = Instant::now();
+        debug!(diff_type = "text", "Starting text diff operation");
+
+        // Get text inputs
+        let (old_text, new_text) = self.get_text_inputs(params)?;
+
+        // Get format
+        let format_str = extract_string_with_default(params, "format", "unified");
+        let format = DiffFormat::from_str(format_str)?;
+
+        debug!(
+            diff_type = "text",
+            format = %format_str,
+            old_lines = old_text.lines().count(),
+            new_lines = new_text.lines().count(),
+            "Starting text diff calculation"
+        );
+
+        // Calculate diff
+        let diff_output = self.calculate_text_diff(&old_text, &new_text, &format);
+
+        debug!(
+            diff_type = "text",
+            format = %format_str,
+            output_length = diff_output.len(),
+            total_duration_ms = text_start.elapsed().as_millis(),
+            "Text diff operation completed"
+        );
+
+        let response = ResponseBuilder::success("text_diff")
+            .with_message("Text diff calculated successfully")
+            .with_result(json!({
+                "type": "text",
+                "format": format_str,
+                "diff": diff_output,
+                "stats": {
+                    "old_lines": old_text.lines().count(),
+                    "new_lines": new_text.lines().count()
+                }
+            }))
+            .build();
+        Ok(response)
+    }
+
+    fn handle_json_diff(&self, params: &Value) -> Result<Value> {
+        let json_start = Instant::now();
+        debug!(diff_type = "json", "Starting JSON diff operation");
+
+        // Get JSON inputs
+        let (old_json, new_json) = self.get_json_inputs(params)?;
+
+        // Calculate JSON diff
+        let diff = self.calculate_json_diff(&old_json, &new_json)?;
+
+        debug!(
+            diff_type = "json",
+            added_count = diff["added"].as_object().map_or(0, serde_json::Map::len),
+            removed_count = diff["removed"].as_object().map_or(0, serde_json::Map::len),
+            modified_count = diff["modified"].as_object().map_or(0, serde_json::Map::len),
+            unchanged_count = diff["unchanged"].as_array().map_or(0, std::vec::Vec::len),
+            total_duration_ms = json_start.elapsed().as_millis(),
+            "JSON diff operation completed"
+        );
+
+        let response = ResponseBuilder::success("json_diff")
+            .with_message("JSON diff calculated successfully")
+            .with_result(json!({
+                "type": "json",
+                "diff": diff,
+                "summary": {
+                    "added": diff["added"].as_object().map_or(0, serde_json::Map::len),
+                    "removed": diff["removed"].as_object().map_or(0, serde_json::Map::len),
+                    "modified": diff["modified"].as_object().map_or(0, serde_json::Map::len),
+                    "unchanged": diff["unchanged"].as_array().map_or(0, std::vec::Vec::len)
+                }
+            }))
+            .build();
+        Ok(response)
+    }
+
     #[allow(clippy::unused_async)]
-    #[allow(clippy::too_many_lines)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
+        let operation_start = Instant::now();
         let diff_type = extract_string_with_default(params, "type", "text");
 
-        match diff_type {
-            "text" => {
-                // Get text inputs
-                let (old_text, new_text) = if let (Some(old_file), Some(new_file)) = (
-                    extract_optional_string(params, "old_file"),
-                    extract_optional_string(params, "new_file"),
-                ) {
-                    // Read from files
-                    let old = fs::read_to_string(old_file).map_err(|e| {
-                        tool_error(
-                            format!("Failed to read old file: {e}"),
-                            Some(self.metadata.name.clone()),
-                        )
-                    })?;
-                    let new = fs::read_to_string(new_file).map_err(|e| {
-                        tool_error(
-                            format!("Failed to read new file: {e}"),
-                            Some(self.metadata.name.clone()),
-                        )
-                    })?;
-                    (old, new)
-                } else if let (Some(old), Some(new)) = (
-                    extract_optional_string(params, "old_text"),
-                    extract_optional_string(params, "new_text"),
-                ) {
-                    (old.to_string(), new.to_string())
-                } else {
-                    return Err(validation_error(
-                        "Either (old_text, new_text) or (old_file, new_file) must be provided",
-                        Some("input".to_string()),
-                    ));
-                };
+        debug!(
+            diff_type = %diff_type,
+            "Processing diff operation"
+        );
 
-                // Get format
-                let format_str = extract_string_with_default(params, "format", "unified");
-                let format = DiffFormat::from_str(format_str)?;
-
-                // Calculate diff
-                let diff_output = self.calculate_text_diff(&old_text, &new_text, &format);
-
-                let response = ResponseBuilder::success("text_diff")
-                    .with_message("Text diff calculated successfully")
-                    .with_result(json!({
-                        "type": "text",
-                        "format": format_str,
-                        "diff": diff_output,
-                        "stats": {
-                            "old_lines": old_text.lines().count(),
-                            "new_lines": new_text.lines().count()
-                        }
-                    }))
-                    .build();
-                Ok(response)
+        let result = match diff_type {
+            "text" => self.handle_text_diff(params),
+            "json" => self.handle_json_diff(params),
+            _ => {
+                error!(
+                    diff_type = %diff_type,
+                    "Invalid diff type requested"
+                );
+                Err(validation_error(
+                    format!("Invalid diff type: {diff_type}"),
+                    Some("type".to_string()),
+                ))
             }
-            "json" => {
-                // Get JSON inputs
-                let (old_json, new_json) = if let (Some(old_file), Some(new_file)) = (
-                    extract_optional_string(params, "old_file"),
-                    extract_optional_string(params, "new_file"),
-                ) {
-                    // Read from files
-                    let old_content = fs::read_to_string(old_file).map_err(|e| {
-                        tool_error(
-                            format!("Failed to read old file: {e}"),
-                            Some(self.metadata.name.clone()),
-                        )
-                    })?;
-                    let new_content = fs::read_to_string(new_file).map_err(|e| {
-                        tool_error(
-                            format!("Failed to read new file: {e}"),
-                            Some(self.metadata.name.clone()),
-                        )
-                    })?;
+        };
 
-                    let old_json: Value = serde_json::from_str(&old_content).map_err(|e| {
-                        tool_error(
-                            format!("Failed to parse old JSON: {e}"),
-                            Some(self.metadata.name.clone()),
-                        )
-                    })?;
-                    let new_json: Value = serde_json::from_str(&new_content).map_err(|e| {
-                        tool_error(
-                            format!("Failed to parse new JSON: {e}"),
-                            Some(self.metadata.name.clone()),
-                        )
-                    })?;
-                    (old_json, new_json)
-                } else if let (Some(old), Some(new)) =
-                    (params.get("old_json"), params.get("new_json"))
-                {
-                    (old.clone(), new.clone())
-                } else {
-                    return Err(validation_error(
-                        "Either (old_json, new_json) or (old_file, new_file) must be provided",
-                        Some("input".to_string()),
-                    ));
-                };
+        debug!(
+            diff_type = %diff_type,
+            total_operation_duration_ms = operation_start.elapsed().as_millis(),
+            "Diff operation processing completed"
+        );
 
-                // Calculate JSON diff
-                let diff = self.calculate_json_diff(&old_json, &new_json)?;
-
-                let response = ResponseBuilder::success("json_diff")
-                    .with_message("JSON diff calculated successfully")
-                    .with_result(json!({
-                        "type": "json",
-                        "diff": diff,
-                        "summary": {
-                            "added": diff["added"].as_object().map_or(0, serde_json::Map::len),
-                            "removed": diff["removed"].as_object().map_or(0, serde_json::Map::len),
-                            "modified": diff["modified"].as_object().map_or(0, serde_json::Map::len),
-                            "unchanged": diff["unchanged"].as_array().map_or(0, std::vec::Vec::len)
-                        }
-                    }))
-                    .build();
-                Ok(response)
-            }
-            _ => Err(validation_error(
-                format!("Invalid diff type: {diff_type}"),
-                Some("type".to_string()),
-            )),
-        }
+        result
     }
 }
 
@@ -465,11 +706,25 @@ impl BaseAgent for DiffCalculatorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing diff calculator tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
         // Process the operation
         let result = self.process_operation(params).await?;
+
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            success = true,
+            total_duration_ms = elapsed_ms,
+            "Diff calculator execution completed successfully"
+        );
 
         // Return the result as JSON formatted text
         Ok(AgentOutput::text(

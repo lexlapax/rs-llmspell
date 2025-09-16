@@ -114,6 +114,12 @@ impl ServiceCheckerTool {
     /// Create a new service checker tool
     #[must_use]
     pub fn new(config: ServiceCheckerConfig) -> Self {
+        info!(
+            default_timeout_seconds = config.default_timeout_seconds,
+            max_timeout_seconds = config.max_timeout_seconds,
+            allowed_ports_count = config.allowed_ports.len(),
+            "Creating ServiceCheckerTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "service_checker".to_string(),
@@ -216,6 +222,12 @@ impl ServiceCheckerTool {
         timeout_duration: Duration,
     ) -> ServiceCheckResult {
         let target = format!("{host}:{port}");
+        debug!(
+            host = %host,
+            port = port,
+            timeout_seconds = timeout_duration.as_secs(),
+            "Checking TCP port"
+        );
         let start_time = Instant::now();
 
         debug!("Checking TCP port: {}", target);
@@ -491,12 +503,24 @@ impl BaseAgent for ServiceCheckerTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        let _start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing service checker tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
         // Extract required parameters
         let target = extract_required_string(params, "target")?;
         let check_type = extract_required_string(params, "check_type")?;
+        debug!(
+            target = %target,
+            check_type = %check_type,
+            "Starting service check"
+        );
 
         // Validate check_type
         match check_type {

@@ -23,7 +23,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashSet;
 use std::pin::Pin;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SitemapCrawlerTool {
@@ -39,6 +40,7 @@ impl Default for SitemapCrawlerTool {
 impl SitemapCrawlerTool {
     #[must_use]
     pub fn new() -> Self {
+        info!("Creating SitemapCrawlerTool");
         Self {
             metadata: ComponentMetadata::new(
                 "sitemap-crawler".to_string(),
@@ -113,6 +115,13 @@ impl BaseAgent for SitemapCrawlerTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing sitemap crawler tool"
+        );
+
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let follow_sitemaps = extract_optional_bool(params, "follow_sitemaps").unwrap_or(true);
@@ -120,13 +129,26 @@ impl BaseAgent for SitemapCrawlerTool {
         let max_urls = extract_optional_u64(params, "max_urls").unwrap_or(1000) as usize;
         let timeout_secs = extract_optional_u64(params, "timeout").unwrap_or(30);
 
+        debug!(
+            url = %url,
+            follow_sitemaps,
+            max_urls,
+            timeout_secs,
+            "Starting sitemap crawl"
+        );
+
         // Validate URL
         if !url.starts_with("http://") && !url.starts_with("https://") {
+            error!(
+                url = %url,
+                "Invalid URL format - must start with http:// or https://"
+            );
             return Err(validation_error(
                 "URL must start with http:// or https://",
                 Some("input".to_string()),
             ));
         }
+        trace!(url = %url, "URL validation passed");
 
         let mut all_urls = Vec::new();
         let mut visited_sitemaps = HashSet::new();
@@ -138,6 +160,11 @@ impl BaseAgent for SitemapCrawlerTool {
             timeout_secs,
         };
 
+        info!(
+            url = %url,
+            "Beginning sitemap crawl"
+        );
+
         self.crawl_sitemap(
             url,
             &options,
@@ -146,6 +173,13 @@ impl BaseAgent for SitemapCrawlerTool {
             &mut stats,
         )
         .await?;
+
+        info!(
+            urls_found = all_urls.len(),
+            sitemaps_processed = stats.sitemaps_processed,
+            index_files = stats.index_files_found,
+            "Sitemap crawl completed"
+        );
 
         let result = json!({
             "sitemap_url": url,
@@ -162,6 +196,10 @@ impl BaseAgent for SitemapCrawlerTool {
         });
 
         let response = if all_urls.is_empty() && stats.sitemaps_processed == 0 {
+            warn!(
+                url = %url,
+                "No sitemaps could be processed or no URLs found"
+            );
             ResponseBuilder::error("crawl", "No sitemaps could be processed or no URLs found")
                 .build()
         } else {
@@ -169,6 +207,14 @@ impl BaseAgent for SitemapCrawlerTool {
                 .with_result(result)
                 .build()
         };
+
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            url = %url,
+            urls_found = all_urls.len(),
+            duration_ms = elapsed_ms,
+            "Sitemap crawler execution completed"
+        );
 
         Ok(AgentOutput::text(
             serde_json::to_string_pretty(&response).unwrap(),
@@ -203,6 +249,7 @@ struct CrawlOptions {
 
 impl SitemapCrawlerTool {
     #[allow(clippy::too_many_arguments)]
+    #[allow(clippy::too_many_lines)]
     fn crawl_sitemap<'a>(
         &'a self,
         url: &'a str,
@@ -214,14 +261,26 @@ impl SitemapCrawlerTool {
         Box::pin(async move {
             // Prevent infinite loops
             if visited_sitemaps.contains(url) {
+                trace!(url = %url, "Skipping already visited sitemap");
                 return Ok(());
             }
             visited_sitemaps.insert(url.to_string());
 
             // Stop if we've reached max URLs
             if all_urls.len() >= options.max_urls {
+                debug!(
+                    current_urls = all_urls.len(),
+                    max_urls = options.max_urls,
+                    "Reached maximum URL limit"
+                );
                 return Ok(());
             }
+
+            debug!(
+                url = %url,
+                visited_count = visited_sitemaps.len(),
+                "Processing sitemap"
+            );
 
             let timeout_secs = options.timeout_secs;
             let client = create_io_bound_resource(move || {
@@ -232,24 +291,46 @@ impl SitemapCrawlerTool {
                     .unwrap_or_default()
             });
 
-            let response = client
-                .get(url)
-                .send()
-                .await
-                .map_err(|e| component_error(format!("Failed to fetch sitemap: {e}")))?;
+            let request_start = Instant::now();
+            let response = client.get(url).send().await.map_err(|e| {
+                error!(
+                    url = %url,
+                    error = %e,
+                    duration_ms = request_start.elapsed().as_millis(),
+                    "Failed to fetch sitemap"
+                );
+                component_error(format!("Failed to fetch sitemap: {e}"))
+            })?;
 
-            if !response.status().is_success() {
+            let http_status = response.status();
+            if !http_status.is_success() {
+                error!(
+                    url = %url,
+                    status_code = http_status.as_u16(),
+                    "HTTP error fetching sitemap"
+                );
                 return Err(component_error(format!(
                     "HTTP error: {} - {}",
-                    response.status(),
-                    response.status().canonical_reason().unwrap_or("Unknown")
+                    http_status,
+                    http_status.canonical_reason().unwrap_or("Unknown")
                 )));
             }
 
-            let xml_content = response
-                .text()
-                .await
-                .map_err(|e| component_error(format!("Failed to read sitemap content: {e}")))?;
+            let xml_content = response.text().await.map_err(|e| {
+                error!(
+                    url = %url,
+                    error = %e,
+                    "Failed to read sitemap content"
+                );
+                component_error(format!("Failed to read sitemap content: {e}"))
+            })?;
+
+            trace!(
+                url = %url,
+                content_length = xml_content.len(),
+                duration_ms = request_start.elapsed().as_millis(),
+                "Fetched sitemap content"
+            );
 
             stats.sitemaps_processed += 1;
 

@@ -31,8 +31,10 @@ use llmspell_utils::{
     validators::validate_enum,
 };
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::fs;
-use tracing::info;
+use std::time::Instant;
+use tracing::{debug, error, info};
 
 /// Base64 encoding/decoding tool
 #[derive(Debug, Clone)]
@@ -43,6 +45,18 @@ pub struct Base64EncoderTool {
 
 impl Default for Base64EncoderTool {
     fn default() -> Self {
+        info!(
+            tool_name = "base64-encoder",
+            supported_operations = 2,  // encode, decode
+            supported_variants = 2,    // standard, url-safe
+            supported_input_types = 3, // text, binary (hex), file
+            max_file_size_mb = 50,
+            cpu_limit_seconds = 5,
+            security_level = "Safe",
+            category = "Utility",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating Base64EncoderTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "base64-encoder".to_string(),
@@ -59,131 +73,177 @@ impl Base64EncoderTool {
         Self::default()
     }
 
-    /// Process Base64 operation
-    #[allow(clippy::unused_async)]
-    #[allow(clippy::too_many_lines)]
-    async fn process_operation(&self, params: &Value) -> Result<Value> {
-        // Extract parameters using utilities
+    fn validate_operation(params: &Value) -> Result<String> {
         let operation = extract_required_string(params, "operation")?;
         validate_enum(&operation, &["encode", "decode"], "operation")?;
+        Ok(operation.to_string())
+    }
 
+    fn validate_variant(params: &Value) -> Result<String> {
         let variant = extract_optional_string(params, "variant").unwrap_or("standard");
         validate_enum(&variant, &["standard", "url-safe"], "variant")?;
+        Ok(variant.to_string())
+    }
 
-        // Get input data
+    fn load_input_from_file(file_path: &str) -> Result<Vec<u8>> {
+        fs::read(file_path).map_err(|e| {
+            storage_error(
+                format!("Failed to read input file: {e}"),
+                Some("read_file".to_string()),
+            )
+        })
+    }
+
+    fn load_input_from_string(input: &str, binary_input: bool) -> Result<Vec<u8>> {
+        if binary_input {
+            hex::decode(input).map_err(|e| {
+                validation_error(
+                    format!("Failed to parse hex input: {e}"),
+                    Some("input".to_string()),
+                )
+            })
+        } else {
+            Ok(input.as_bytes().to_vec())
+        }
+    }
+
+    fn load_input_data(params: &Value) -> Result<Vec<u8>> {
         let input_file = extract_optional_string(params, "input_file");
         let input_str = extract_optional_string(params, "input");
         let binary_input = extract_optional_bool(params, "binary_input").unwrap_or(false);
 
-        let input_data = if let Some(file_path) = input_file {
-            // Read from file
-            fs::read(file_path).map_err(|e| {
-                storage_error(
-                    format!("Failed to read input file: {e}"),
-                    Some("read_file".to_string()),
+        input_file.map_or_else(
+            || {
+                input_str.map_or_else(
+                    || {
+                        Err(validation_error(
+                            "Either 'input' or 'input_file' must be provided",
+                            Some("input".to_string()),
+                        ))
+                    },
+                    |input| Self::load_input_from_string(input, binary_input),
                 )
-            })?
-        } else if let Some(input) = input_str {
-            if binary_input {
-                // Parse hex string as binary
-                hex::decode(input).map_err(|e| {
-                    validation_error(
-                        format!("Failed to parse hex input: {e}"),
-                        Some("input".to_string()),
-                    )
-                })?
-            } else {
-                // Use text input
-                input.as_bytes().to_vec()
-            }
+            },
+            Self::load_input_from_file,
+        )
+    }
+
+    fn encode_data(input_data: &[u8], variant: &str) -> Vec<u8> {
+        let encoded = if variant == "url-safe" {
+            base64_encode_url_safe(input_data)
         } else {
-            return Err(validation_error(
-                "Either 'input' or 'input_file' must be provided",
-                Some("input".to_string()),
-            ));
+            base64_encode(input_data)
         };
+        encoded.into_bytes()
+    }
 
-        // Perform operation
-        let result_data = match operation {
-            "encode" => {
-                let encoded = match variant {
-                    "url-safe" => base64_encode_url_safe(&input_data),
-                    _ => base64_encode(&input_data),
-                };
-                encoded.into_bytes()
-            }
-            "decode" => {
-                let input_str = if let Some(input) = input_str {
-                    input.to_string()
-                } else {
-                    // Convert file data to string for decoding
-                    String::from_utf8(input_data).map_err(|e| {
-                        validation_error(
-                            format!("Input file contains invalid UTF-8 for Base64 decoding: {e}"),
-                            Some("input_file".to_string()),
-                        )
-                    })?
-                };
-
-                let decoded = match variant {
-                    "url-safe" => base64_decode_url_safe(&input_str),
-                    _ => base64_decode(&input_str),
-                };
-
-                decoded.map_err(|e| {
+    fn prepare_decode_string(params: &Value, input_data: &[u8]) -> Result<String> {
+        extract_optional_string(params, "input").map_or_else(
+            || {
+                String::from_utf8(input_data.to_vec()).map_err(|e| {
                     validation_error(
-                        format!("Base64 decode error: {e}"),
-                        Some("input".to_string()),
+                        format!("Input file contains invalid UTF-8 for Base64 decoding: {e}"),
+                        Some("input_file".to_string()),
                     )
-                })?
-            }
-            _ => unreachable!(), // Already validated
+                })
+            },
+            |input_str| Ok(input_str.to_string()),
+        )
+    }
+
+    fn decode_data(input_str: &str, variant: &str) -> Result<Vec<u8>> {
+        let result = if variant == "url-safe" {
+            base64_decode_url_safe(input_str)
+        } else {
+            base64_decode(input_str)
         };
+
+        result.map_err(|e| {
+            validation_error(
+                format!("Base64 decode error: {e}"),
+                Some("input".to_string()),
+            )
+        })
+    }
+
+    fn perform_operation(
+        operation: &str,
+        params: &Value,
+        input_data: &[u8],
+        variant: &str,
+    ) -> Result<Vec<u8>> {
+        match operation {
+            "encode" => Ok(Self::encode_data(input_data, variant)),
+            "decode" => {
+                let input_str = Self::prepare_decode_string(params, input_data)?;
+                Self::decode_data(&input_str, variant)
+            }
+            _ => unreachable!("Operation already validated"),
+        }
+    }
+
+    fn write_output_file(path: &str, data: &[u8]) -> Result<()> {
+        fs::write(path, data).map_err(|e| {
+            storage_error(
+                format!("Failed to write output file: {e}"),
+                Some("write_file".to_string()),
+            )
+        })
+    }
+
+    fn format_output_string(operation: &str, result_data: &[u8]) -> String {
+        match operation {
+            "encode" => String::from_utf8_lossy(result_data).to_string(),
+            "decode" => {
+                String::from_utf8(result_data.to_vec()).unwrap_or_else(|_| hex::encode(result_data))
+            }
+            _ => unreachable!(),
+        }
+    }
+
+    fn build_file_response(operation: &str, variant: &str, path: &str, size: usize) -> Value {
+        ResponseBuilder::success(operation)
+            .with_message(format!("Base64 {operation} completed successfully"))
+            .with_metadata("variant", json!(variant))
+            .with_file_info(path, Some(size as u64))
+            .build()
+    }
+
+    fn build_string_response(operation: &str, variant: &str, output: &str) -> Value {
+        let is_binary = operation == "decode" && !output.is_ascii();
+        ResponseBuilder::success(operation)
+            .with_message(format!("Base64 {operation} completed"))
+            .with_result(json!({
+                "output": output,
+                "variant": variant,
+                "binary": is_binary
+            }))
+            .build()
+    }
+
+    /// Process Base64 operation
+    #[allow(clippy::unused_async)]
+    async fn process_operation(&self, params: &Value) -> Result<Value> {
+        let operation = Self::validate_operation(params)?;
+        let variant = Self::validate_variant(params)?;
+        let input_data = Self::load_input_data(params)?;
+
+        let result_data = Self::perform_operation(&operation, params, &input_data, &variant)?;
 
         // Handle output
         let output_path = extract_optional_string(params, "output_file");
 
         if let Some(path) = output_path {
-            // Write to file
-            fs::write(path, &result_data).map_err(|e| {
-                storage_error(
-                    format!("Failed to write output file: {e}"),
-                    Some("write_file".to_string()),
-                )
-            })?;
-
-            info!(
-                "Base64 {} completed: {} -> {}",
-                operation,
-                input_file.unwrap_or("input"),
-                path
-            );
-
-            Ok(ResponseBuilder::success(operation)
-                .with_message(format!("Base64 {operation} completed successfully"))
-                .with_metadata("variant", json!(variant))
-                .with_file_info(path, Some(result_data.len() as u64))
-                .build())
+            Self::write_output_file(path, &result_data)?;
+            Ok(Self::build_file_response(
+                &operation,
+                &variant,
+                path,
+                result_data.len(),
+            ))
         } else {
-            // Return as string
-            let output = match operation {
-                "encode" => String::from_utf8_lossy(&result_data).to_string(),
-                "decode" => {
-                    // Try to convert to string, otherwise return hex
-                    String::from_utf8(result_data.clone())
-                        .unwrap_or_else(|_| hex::encode(&result_data))
-                }
-                _ => unreachable!(),
-            };
-
-            Ok(ResponseBuilder::success(operation)
-                .with_message(format!("Base64 {operation} completed"))
-                .with_result(json!({
-                    "output": output,
-                    "variant": variant,
-                    "binary": operation == "decode" && !output.is_ascii()
-                }))
-                .build())
+            let output = Self::format_output_string(&operation, &result_data);
+            Ok(Self::build_string_response(&operation, &variant, &output))
         }
     }
 }
@@ -199,45 +259,64 @@ impl BaseAgent for Base64EncoderTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        let execute_start = Instant::now();
+        info!(
+            tool_name = %self.metadata().name,
+            input_text_length = input.text.len(),
+            has_parameters = !input.parameters.is_empty(),
+            "Starting Base64EncoderTool execution"
+        );
+
         // Extract parameters using shared utility
         let params = extract_parameters(&input)?;
+        debug!(
+            param_count = params.as_object().map_or(0, serde_json::Map::len),
+            "Successfully extracted parameters"
+        );
 
-        // Process the operation
-        let result = self.process_operation(params).await?;
+        let operation_start = Instant::now();
+        let response = self.process_operation(params).await?;
 
-        // Return the result as JSON formatted text
-        Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
+        let total_duration_ms = execute_start.elapsed().as_millis();
+        let operation_duration_ms = operation_start.elapsed().as_millis();
+
+        debug!(
+            tool_name = %self.metadata().name,
+            total_duration_ms,
+            operation_duration_ms,
+            parameter_extraction_ms = 0, // Simplified timing
+            "Base64EncoderTool execution completed successfully"
+        );
+
+        Ok(AgentOutput::text(
+            serde_json::to_string_pretty(&response).unwrap(),
+        ))
     }
 
-    async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-        if input.text.is_empty() {
-            return Err(validation_error(
-                "Input prompt cannot be empty",
-                Some("prompt".to_string()),
-            ));
-        }
+    async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
+        // Validation is performed in process_operation
         Ok(())
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Base64 encoding error: {error}")))
+        error!(
+            tool_name = %self.metadata().name,
+            error = %error,
+            "Handling error in Base64EncoderTool"
+        );
+        let error_response = ResponseBuilder::error("base64", error.to_string()).build();
+        Ok(AgentOutput::text(
+            serde_json::to_string_pretty(&error_response).unwrap(),
+        ))
     }
 }
 
 #[async_trait]
 impl Tool for Base64EncoderTool {
-    fn category(&self) -> ToolCategory {
-        ToolCategory::Utility
-    }
-
-    fn security_level(&self) -> SecurityLevel {
-        SecurityLevel::Safe
-    }
-
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
-            "base64_encoder".to_string(),
-            "Base64 encoding and decoding tool with standard and URL-safe variants".to_string(),
+            self.metadata.name.clone(),
+            self.metadata.description.clone(),
         )
         .with_parameter(ParameterDef {
             name: "operation".to_string(),
@@ -247,204 +326,68 @@ impl Tool for Base64EncoderTool {
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "variant".to_string(),
-            param_type: ParameterType::String,
-            description: "Base64 variant: 'standard' or 'url-safe' (default: 'standard')"
-                .to_string(),
-            required: false,
-            default: Some(json!("standard")),
-        })
-        .with_parameter(ParameterDef {
             name: "input".to_string(),
             param_type: ParameterType::String,
-            description: "Input data (text for encode, base64 for decode)".to_string(),
+            description: "Input text or Base64 string (optional if input_file provided)"
+                .to_string(),
             required: false,
             default: None,
         })
         .with_parameter(ParameterDef {
             name: "input_file".to_string(),
             param_type: ParameterType::String,
-            description: "Input file path (alternative to input)".to_string(),
+            description: "Path to input file (optional if input provided)".to_string(),
             required: false,
             default: None,
         })
         .with_parameter(ParameterDef {
             name: "output_file".to_string(),
             param_type: ParameterType::String,
-            description: "Output file path (optional)".to_string(),
+            description: "Path to output file (optional)".to_string(),
             required: false,
             default: None,
         })
         .with_parameter(ParameterDef {
+            name: "variant".to_string(),
+            param_type: ParameterType::String,
+            description: "Encoding variant: 'standard' (default) or 'url-safe'".to_string(),
+            required: false,
+            default: Some(json!("standard")),
+        })
+        .with_parameter(ParameterDef {
             name: "binary_input".to_string(),
             param_type: ParameterType::Boolean,
-            description: "Treat input as hex string for binary data".to_string(),
+            description: "Treat input string as hex-encoded binary (default: false)".to_string(),
             required: false,
             default: Some(json!(false)),
         })
-        .with_returns(ParameterType::Object)
     }
 
-    fn security_requirements(&self) -> SecurityRequirements {
-        SecurityRequirements::safe()
+    fn category(&self) -> ToolCategory {
+        ToolCategory::Utility
     }
 
     fn resource_limits(&self) -> ResourceLimits {
-        ResourceLimits::strict()
-            .with_memory_limit(50 * 1024 * 1024) // 50MB
-            .with_cpu_limit(5000) // 5 seconds
+        ResourceLimits {
+            max_memory_bytes: Some(100 * 1024 * 1024), // 100MB
+            max_cpu_time_ms: Some(5000),               // 5 seconds
+            max_network_bps: None,
+            max_file_ops_per_sec: Some(10),
+            custom_limits: HashMap::default(),
+        }
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use serde_json::json;
-    #[tokio::test]
-    async fn test_encode_decode_text() {
-        let tool = Base64EncoderTool::new();
-        let test_text = "Hello, Base64!";
-
-        // Test standard encoding
-        let input = AgentInput::text("encode text").with_parameter(
-            "parameters",
-            json!({
-                "operation": "encode",
-                "input": test_text
-            }),
-        );
-
-        let result = tool
-            .execute(input, ExecutionContext::default())
-            .await
-            .unwrap();
-        let output: Value = serde_json::from_str(&result.text).unwrap();
-        assert!(output["success"].as_bool().unwrap_or(false));
-        let encoded = output["result"]["output"].as_str().unwrap();
-        assert_eq!(encoded, "SGVsbG8sIEJhc2U2NCE=");
-
-        // Test standard decoding
-        let input = AgentInput::text("decode text").with_parameter(
-            "parameters",
-            json!({
-                "operation": "decode",
-                "input": encoded
-            }),
-        );
-
-        let result = tool
-            .execute(input, ExecutionContext::default())
-            .await
-            .unwrap();
-        let output: Value = serde_json::from_str(&result.text).unwrap();
-        assert!(output["success"].as_bool().unwrap_or(false));
-        let decoded = output["result"]["output"].as_str().unwrap();
-        assert_eq!(decoded, test_text);
+    fn security_level(&self) -> SecurityLevel {
+        SecurityLevel::Safe
     }
-    #[tokio::test]
-    async fn test_url_safe_variant() {
-        let tool = Base64EncoderTool::new();
-        let test_data = "data with +/ characters";
 
-        // Test URL-safe encoding
-        let input = AgentInput::text("encode url-safe").with_parameter(
-            "parameters",
-            json!({
-                "operation": "encode",
-                "variant": "url-safe",
-                "input": test_data
-            }),
-        );
-
-        let result = tool
-            .execute(input, ExecutionContext::default())
-            .await
-            .unwrap();
-        let output: Value = serde_json::from_str(&result.text).unwrap();
-        assert!(output["success"].as_bool().unwrap_or(false));
-        let encoded = output["result"]["output"].as_str().unwrap();
-        assert!(!encoded.contains('+'));
-        assert!(!encoded.contains('/'));
-
-        // Test URL-safe decoding
-        let input = AgentInput::text("decode url-safe").with_parameter(
-            "parameters",
-            json!({
-                "operation": "decode",
-                "variant": "url-safe",
-                "input": encoded
-            }),
-        );
-
-        let result = tool
-            .execute(input, ExecutionContext::default())
-            .await
-            .unwrap();
-        let output: Value = serde_json::from_str(&result.text).unwrap();
-        assert!(output["success"].as_bool().unwrap_or(false));
-        let decoded = output["result"]["output"].as_str().unwrap();
-        assert_eq!(decoded, test_data);
-    }
-    #[tokio::test]
-    async fn test_binary_input() {
-        let tool = Base64EncoderTool::new();
-        let hex_data = "deadbeef";
-
-        // Test encoding binary data
-        let input = AgentInput::text("encode binary").with_parameter(
-            "parameters",
-            json!({
-                "operation": "encode",
-                "input": hex_data,
-                "binary_input": true
-            }),
-        );
-
-        let result = tool
-            .execute(input, ExecutionContext::default())
-            .await
-            .unwrap();
-        let output: Value = serde_json::from_str(&result.text).unwrap();
-        assert!(output["success"].as_bool().unwrap_or(false));
-        let encoded = output["result"]["output"].as_str().unwrap();
-        assert_eq!(encoded, "3q2+7w==");
-    }
-    #[tokio::test]
-    async fn test_invalid_operation() {
-        let tool = Base64EncoderTool::new();
-
-        let input = AgentInput::text("invalid operation").with_parameter(
-            "parameters",
-            json!({
-                "operation": "invalid",
-                "input": "test"
-            }),
-        );
-
-        let result = tool.execute(input, ExecutionContext::default()).await;
-        assert!(result.is_err());
-    }
-    #[tokio::test]
-    async fn test_missing_input() {
-        let tool = Base64EncoderTool::new();
-
-        let input = AgentInput::text("missing input").with_parameter(
-            "parameters",
-            json!({
-                "operation": "encode"
-            }),
-        );
-
-        let result = tool.execute(input, ExecutionContext::default()).await;
-        assert!(result.is_err());
-    }
-    #[tokio::test]
-    async fn test_tool_metadata() {
-        let tool = Base64EncoderTool::new();
-
-        assert_eq!(tool.metadata().name, "base64-encoder");
-        assert!(tool.metadata().description.contains("Base64"));
-        assert_eq!(tool.category(), ToolCategory::Utility);
-        assert_eq!(tool.security_level(), SecurityLevel::Safe);
+    fn security_requirements(&self) -> SecurityRequirements {
+        SecurityRequirements {
+            level: SecurityLevel::Safe,
+            file_permissions: Vec::default(),
+            network_permissions: Vec::default(),
+            env_permissions: Vec::default(),
+            custom_requirements: HashMap::default(),
+        }
     }
 }

@@ -21,7 +21,8 @@ use llmspell_utils::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use std::time::Instant;
+use tracing::{debug, error, info, trace, warn};
 
 /// Search provider types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -107,15 +108,47 @@ pub struct WebSearchTool {
 impl WebSearchTool {
     /// Create a new web search tool
     pub fn new(config: WebSearchConfig) -> Result<Self> {
+        info!(
+            tool_name = "web-search-tool",
+            default_provider = %config.default_provider,
+            supported_providers = 3, // Google, Bing, DuckDuckGo
+            max_results = config.max_results,
+            rate_limit_per_minute = config.rate_limit,
+            safe_search = config.safe_search,
+            language = ?config.language,
+            api_keys_count = config.api_keys.len(),
+            security_level = "Safe",
+            category = "Web",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating WebSearchTool with configuration"
+        );
+
         // Create rate limiter using shared utility
+        let rate_limiter_creation_start = Instant::now();
         let rate_limiter = RateLimiterBuilder::default()
             .per_minute(config.rate_limit)
             .sliding_window()
             .build()
-            .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create rate limiter: {}", e),
-                source: None,
+            .map_err(|e| {
+                let rate_limiter_creation_duration_ms = rate_limiter_creation_start.elapsed().as_millis();
+                error!(
+                    rate_limit_per_minute = config.rate_limit,
+                    rate_limiter_creation_duration_ms,
+                    error = %e,
+                    "Failed to create rate limiter"
+                );
+                LLMSpellError::Internal {
+                    message: format!("Failed to create rate limiter: {}", e),
+                    source: None,
+                }
             })?;
+
+        let rate_limiter_creation_duration_ms = rate_limiter_creation_start.elapsed().as_millis();
+        debug!(
+            rate_limit_per_minute = config.rate_limit,
+            rate_limiter_creation_duration_ms,
+            "Rate limiter created successfully"
+        );
 
         Ok(Self {
             metadata: ComponentMetadata::new(
@@ -289,21 +322,102 @@ impl BaseAgent for WebSearchTool {
     }
 
     async fn execute_impl(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        let execute_start = Instant::now();
+        info!(
+            tool_name = %self.metadata().name,
+            input_text_length = input.text.len(),
+            has_parameters = !input.parameters.is_empty(),
+            "Starting WebSearchTool execution"
+        );
+
         // Get parameters using shared utility
-        let params = extract_parameters(&input)?;
+        let params = match extract_parameters(&input) {
+            Ok(params) => {
+                debug!(
+                    param_count = params.as_object().map(|o| o.len()).unwrap_or(0),
+                    "Successfully extracted parameters"
+                );
+                params
+            }
+            Err(e) => {
+                error!(
+                    error = %e,
+                    input_text_length = input.text.len(),
+                    "Failed to extract parameters"
+                );
+                return Err(e);
+            }
+        };
 
         // Parse parameters
-        let (query, provider, num_results) = self.parse_parameters(params)?;
+        let parameter_parsing_start = Instant::now();
+        let (query, provider, num_results) = match self.parse_parameters(params) {
+            Ok(parsed) => {
+                let parameter_parsing_duration_ms = parameter_parsing_start.elapsed().as_millis();
+                debug!(
+                    query = %parsed.0,
+                    provider = %parsed.1,
+                    num_results = parsed.2,
+                    parameter_parsing_duration_ms,
+                    "Successfully parsed search parameters"
+                );
+                parsed
+            }
+            Err(e) => {
+                let parameter_parsing_duration_ms = parameter_parsing_start.elapsed().as_millis();
+                error!(
+                    error = %e,
+                    parameter_parsing_duration_ms,
+                    "Failed to parse search parameters"
+                );
+                return Err(e);
+            }
+        };
 
-        debug!(
-            "Executing web search: query='{}', provider={}, results={}",
-            query, provider, num_results
+        info!(
+            query = %query,
+            provider = %provider,
+            requested_results = num_results,
+            max_allowed_results = self.config.max_results,
+            safe_search = self.config.safe_search,
+            rate_limit = self.config.rate_limit,
+            "Executing web search with validated parameters"
+        );
+
+        trace!(
+            query_length = query.len(),
+            query_preview = %query.chars().take(100).collect::<String>(),
+            "Search query details"
         );
 
         // Perform search
-        let results = self
-            .search_with_provider(&query, provider, num_results)
-            .await?;
+        let search_start = Instant::now();
+        let results = match self.search_with_provider(&query, provider, num_results).await {
+            Ok(results) => {
+                let search_duration_ms = search_start.elapsed().as_millis();
+                debug!(
+                    provider = %provider,
+                    query = %query,
+                    returned_results = results.len(),
+                    requested_results = num_results,
+                    search_duration_ms,
+                    "Search completed successfully"
+                );
+                results
+            }
+            Err(e) => {
+                let search_duration_ms = search_start.elapsed().as_millis();
+                error!(
+                    provider = %provider,
+                    query = %query,
+                    requested_results = num_results,
+                    search_duration_ms,
+                    error = %e,
+                    "Search failed"
+                );
+                return Err(e);
+            }
+        };
 
         // Create success message
         let message = format!(
@@ -314,6 +428,7 @@ impl BaseAgent for WebSearchTool {
         );
 
         // Build response
+        let response_building_start = Instant::now();
         let response = ResponseBuilder::success("search")
             .with_message(message)
             .with_result(serde_json::json!({
@@ -323,6 +438,21 @@ impl BaseAgent for WebSearchTool {
                 "results": results,
             }))
             .build();
+
+        let response_building_duration_ms = response_building_start.elapsed().as_millis();
+        let total_execution_duration_ms = execute_start.elapsed().as_millis();
+
+        info!(
+            query = %query,
+            provider = %provider,
+            results_count = results.len(),
+            requested_results = num_results,
+            total_duration_ms = total_execution_duration_ms,
+            search_duration_ms = search_start.elapsed().as_millis(),
+            response_building_duration_ms,
+            success = true,
+            "WebSearchTool execution completed successfully"
+        );
 
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }

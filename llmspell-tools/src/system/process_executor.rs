@@ -34,7 +34,7 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, trace, warn};
 
 /// Process execution result
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -178,6 +178,14 @@ impl ProcessExecutorTool {
     /// Create a new process executor tool
     #[must_use]
     pub fn new(config: ProcessExecutorConfig, sandbox: Arc<FileSandbox>) -> Self {
+        info!(
+            max_execution_time = config.max_execution_time_seconds,
+            max_output_size = config.max_output_size,
+            allowed_executables_count = config.allowed_executables.len(),
+            blocked_executables_count = config.blocked_executables.len(),
+            "Creating ProcessExecutorTool"
+        );
+
         // Determine if in production mode based on config
         let is_production = !cfg!(debug_assertions);
 
@@ -223,12 +231,18 @@ impl ProcessExecutorTool {
     /// Resolve executable path
     #[allow(clippy::unused_async)]
     async fn resolve_executable(&self, executable: &str) -> LLMResult<PathBuf> {
+        trace!(
+            executable = %executable,
+            "Resolving executable path"
+        );
         // If it's already a full path, validate it exists
         let exe_path = Path::new(executable);
         if exe_path.is_absolute() {
             if exe_path.exists() {
+                trace!(path = ?exe_path, "Using absolute path");
                 return Ok(exe_path.to_path_buf());
             }
+            error!(executable = %executable, "Absolute path executable not found");
             return Err(LLMSpellError::Validation {
                 message: format!("Executable not found: {executable}"),
                 field: Some("executable".to_string()),
@@ -238,12 +252,16 @@ impl ProcessExecutorTool {
         // Try to find in PATH
         find_executable(executable).map_or_else(
             || {
+                error!(executable = %executable, "Executable not found in PATH");
                 Err(LLMSpellError::Validation {
                     message: format!("Executable not found in PATH: {executable}"),
                     field: Some("executable".to_string()),
                 })
             },
-            Ok,
+            |path| {
+                trace!(executable = %executable, path = ?path, "Found executable in PATH");
+                Ok(path)
+            },
         )
     }
 
@@ -264,6 +282,10 @@ impl ProcessExecutorTool {
 
         // Check if executable is allowed
         if !self.is_executable_allowed(exe_path.to_str().unwrap_or(executable)) {
+            error!(
+                executable = %executable,
+                "Blocked execution of non-permitted executable"
+            );
             return Err(LLMSpellError::Security {
                 message: format!("Execution of '{executable}' is not permitted"),
                 violation_type: Some("executable_blocked".to_string()),
@@ -271,9 +293,11 @@ impl ProcessExecutorTool {
         }
 
         info!(
-            "Executing process: {} with args: {:?}",
-            exe_path.display(),
-            args
+            executable = %exe_path.display(),
+            args = ?args,
+            working_dir = ?working_dir,
+            env_vars_count = env_vars.as_ref().map_or(0, |e| e.len()),
+            "Executing process"
         );
 
         // Build command
@@ -284,6 +308,11 @@ impl ProcessExecutorTool {
         if let Some(dir) = working_dir.or(self.config.default_working_directory.as_deref()) {
             // Validate working directory using sandbox
             if let Err(e) = self.sandbox.validate_path(dir) {
+                error!(
+                    directory = ?dir,
+                    error = %e,
+                    "Working directory validation failed"
+                );
                 return Err(LLMSpellError::Security {
                     message: format!("Working directory access denied: {e}"),
                     violation_type: Some("path_validation".to_string()),
@@ -486,6 +515,13 @@ impl BaseAgent for ProcessExecutorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        let start = std::time::Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing process executor tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -534,6 +570,14 @@ impl BaseAgent for ProcessExecutorTool {
                     .collect()
             });
 
+        debug!(
+            executable = %sanitized_executable,
+            args_count = args.len(),
+            has_working_dir = working_dir_path.is_some(),
+            has_env_vars = env_vars.is_some(),
+            "Starting process execution"
+        );
+
         // Execute the process
         let result = self
             .execute_process(
@@ -575,6 +619,14 @@ impl BaseAgent for ProcessExecutorTool {
                 "timed_out": result.timed_out
             }))
             .build();
+
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            executable = %executable,
+            success = result.success,
+            duration_ms = elapsed_ms,
+            "Process execution completed"
+        );
 
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }

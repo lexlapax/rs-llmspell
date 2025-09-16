@@ -392,6 +392,6 @@ async fn test_tool_metadata() {
 
     // Verify schema
     let schema = tool.schema();
-    assert_eq!(schema.name, "base64_encoder");
+    assert_eq!(schema.name, "base64-encoder");
     assert!(schema.description.contains("Base64"));
 }

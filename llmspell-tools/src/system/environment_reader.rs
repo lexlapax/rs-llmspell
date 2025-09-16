@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Instant;
 use tracing::{debug, info, warn};
 
 /// Environment reader tool configuration
@@ -96,9 +97,76 @@ pub struct EnvironmentReaderTool {
 }
 
 impl EnvironmentReaderTool {
+    async fn handle_get_operation(&self, params: &serde_json::Value) -> LLMResult<AgentOutput> {
+        let var_name = extract_required_string(params, "variable_name")?;
+
+        if let Some(value) = self.get_single_var(var_name).await? {
+            let response = ResponseBuilder::success("get")
+                .with_message(format!("Environment variable '{var_name}' = '{value}'"))
+                .with_result(json!({
+                    "variable_name": var_name,
+                    "value": value,
+                    "found": true
+                }))
+                .build();
+            Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
+        } else {
+            let response = ResponseBuilder::success("get")
+                .with_message(format!("Environment variable '{var_name}' not found"))
+                .with_result(json!({
+                    "variable_name": var_name,
+                    "value": null,
+                    "found": false
+                }))
+                .build();
+            Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
+        }
+    }
+
+    async fn handle_list_operation(&self) -> LLMResult<AgentOutput> {
+        let vars = self.get_all_vars().await?;
+        let response = ResponseBuilder::success("list")
+            .with_message(format!(
+                "Found {} allowed environment variables",
+                vars.len()
+            ))
+            .with_result(json!({
+                "variables": vars,
+                "count": vars.len()
+            }))
+            .build();
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
+    }
+
+    async fn handle_pattern_operation(&self, params: &serde_json::Value) -> LLMResult<AgentOutput> {
+        let pattern = extract_required_string(params, "pattern")?;
+        let vars = self.get_vars_by_pattern(pattern).await?;
+        let response = ResponseBuilder::success("pattern")
+            .with_message(format!(
+                "Found {} environment variables matching pattern '{}'",
+                vars.len(),
+                pattern
+            ))
+            .with_result(json!({
+                "pattern": pattern,
+                "variables": vars,
+                "count": vars.len()
+            }))
+            .build();
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
+    }
+
     /// Create a new environment reader tool
     #[must_use]
     pub fn new(config: EnvironmentReaderConfig) -> Self {
+        info!(
+            max_variables = config.max_variables_returned,
+            allowed_patterns_count = config.allowed_patterns.len(),
+            blocked_patterns_count = config.blocked_patterns.len(),
+            allow_read_all = config.allow_read_all,
+            allow_set = config.allow_set_variables,
+            "Creating EnvironmentReaderTool"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "environment_reader".to_string(),
@@ -337,68 +405,25 @@ impl BaseAgent for EnvironmentReaderTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        let start = Instant::now();
+        info!(
+            input_size = input.text.len(),
+            has_params = !input.parameters.is_empty(),
+            "Executing environment reader tool"
+        );
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
         let operation = extract_required_string(params, "operation")?;
+        debug!(
+            operation = %operation,
+            "Starting environment operation"
+        );
 
         let result = match operation {
-            "get" => {
-                let var_name = extract_required_string(params, "variable_name")?;
-
-                if let Some(value) = self.get_single_var(var_name).await? {
-                    let response = ResponseBuilder::success("get")
-                        .with_message(format!("Environment variable '{var_name}' = '{value}'"))
-                        .with_result(json!({
-                            "variable_name": var_name,
-                            "value": value,
-                            "found": true
-                        }))
-                        .build();
-                    AgentOutput::text(serde_json::to_string_pretty(&response)?)
-                } else {
-                    let response = ResponseBuilder::success("get")
-                        .with_message(format!("Environment variable '{var_name}' not found"))
-                        .with_result(json!({
-                            "variable_name": var_name,
-                            "value": null,
-                            "found": false
-                        }))
-                        .build();
-                    AgentOutput::text(serde_json::to_string_pretty(&response)?)
-                }
-            }
-            "list" => {
-                let vars = self.get_all_vars().await?;
-                let response = ResponseBuilder::success("list")
-                    .with_message(format!(
-                        "Found {} allowed environment variables",
-                        vars.len()
-                    ))
-                    .with_result(json!({
-                        "variables": vars,
-                        "count": vars.len()
-                    }))
-                    .build();
-                AgentOutput::text(serde_json::to_string_pretty(&response)?)
-            }
-            "pattern" => {
-                let pattern = extract_required_string(params, "pattern")?;
-
-                let vars = self.get_vars_by_pattern(pattern).await?;
-                let response = ResponseBuilder::success("pattern")
-                    .with_message(format!(
-                        "Found {} environment variables matching pattern '{}'",
-                        vars.len(),
-                        pattern
-                    ))
-                    .with_result(json!({
-                        "pattern": pattern,
-                        "variables": vars,
-                        "count": vars.len()
-                    }))
-                    .build();
-                AgentOutput::text(serde_json::to_string_pretty(&response)?)
-            }
+            "get" => self.handle_get_operation(params).await?,
+            "list" => self.handle_list_operation().await?,
+            "pattern" => self.handle_pattern_operation(params).await?,
             "set" => {
                 let var_name = extract_required_string(params, "variable_name")?;
                 let value = extract_required_string(params, "value")?;
@@ -423,6 +448,13 @@ impl BaseAgent for EnvironmentReaderTool {
                 });
             }
         };
+
+        let elapsed_ms = start.elapsed().as_millis();
+        debug!(
+            operation = %operation,
+            duration_ms = elapsed_ms,
+            "Environment operation completed"
+        );
 
         Ok(result)
     }

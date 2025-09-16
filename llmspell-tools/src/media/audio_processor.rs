@@ -26,7 +26,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::Path;
 use std::sync::Arc;
-use tracing::{debug, info};
+use std::time::Instant;
+use tracing::{debug, error, info};
 
 /// Audio format types
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -124,6 +125,19 @@ impl AudioProcessorTool {
     /// Create a new audio processor tool
     #[must_use]
     pub fn new(config: AudioProcessorConfig, sandbox: Arc<FileSandbox>) -> Self {
+        info!(
+            tool_name = "audio_processor",
+            supported_operations = 3, // detect, metadata, convert
+            supported_formats = config.supported_formats.len(),
+            max_file_size_mb = config.max_file_size / (1024 * 1024),
+            extract_tags = config.extract_tags,
+            analyze_properties = config.analyze_properties,
+            conversion_quality = config.conversion_quality,
+            security_level = "Safe",
+            category = "Media",
+            phase = "Phase 3 (comprehensive instrumentation)",
+            "Creating AudioProcessorTool with configuration"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "audio_processor".to_string(),
@@ -480,17 +494,66 @@ impl BaseAgent for AudioProcessorTool {
         &self.metadata
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn execute_impl(
         &self,
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        // Get parameters using shared utility
-        let params = extract_parameters(&input)?;
+        let _execute_start = Instant::now();
+        info!(
+            tool_name = %self.metadata().name,
+            input_text_length = input.text.len(),
+            has_parameters = !input.parameters.is_empty(),
+            "Starting AudioProcessorTool execution"
+        );
 
-        self.validate_parameters(params).await?;
+        // Get parameters using shared utility
+        let params = match extract_parameters(&input) {
+            Ok(params) => {
+                debug!(
+                    param_count = params.as_object().map_or(0, serde_json::Map::len),
+                    "Successfully extracted parameters"
+                );
+                params
+            }
+            Err(e) => {
+                error!(
+                    error = %e,
+                    input_text_length = input.text.len(),
+                    "Failed to extract parameters"
+                );
+                return Err(e);
+            }
+        };
+
+        let validation_start = Instant::now();
+        match self.validate_parameters(params).await {
+            Ok(()) => {
+                let validation_duration_ms = validation_start.elapsed().as_millis();
+                debug!(validation_duration_ms, "Parameter validation passed");
+            }
+            Err(e) => {
+                let validation_duration_ms = validation_start.elapsed().as_millis();
+                error!(
+                    validation_duration_ms,
+                    error = %e,
+                    "Parameter validation failed"
+                );
+                return Err(e);
+            }
+        }
 
         let operation = extract_optional_string(params, "operation").unwrap_or("metadata");
+
+        info!(
+            operation = %operation,
+            default_operation = operation == "metadata",
+            max_file_size_mb = self.config.max_file_size / (1024 * 1024),
+            extract_tags = self.config.extract_tags,
+            analyze_properties = self.config.analyze_properties,
+            "Executing audio processor operation"
+        );
 
         match operation {
             "detect" => {

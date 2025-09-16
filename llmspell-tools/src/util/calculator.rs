@@ -39,6 +39,7 @@ use llmspell_utils::{
 };
 use serde_json::{json, Value as JsonValue};
 use std::collections::BTreeMap;
+use tracing::info;
 
 /// Calculator tool for mathematical expressions
 #[derive(Debug, Clone)]
@@ -53,6 +54,11 @@ pub struct CalculatorTool {
 
 impl Default for CalculatorTool {
     fn default() -> Self {
+        info!(
+            basic_analyzer_enabled = true,
+            enhanced_analyzer_enabled = true,
+            "Creating CalculatorTool with DoS protection"
+        );
         Self {
             metadata: ComponentMetadata::new(
                 "calculator".to_string(),
@@ -74,71 +80,114 @@ impl CalculatorTool {
         Self::default()
     }
 
+    fn create_resource_tracker() -> ResourceTracker {
+        let limits = ResourceLimits {
+            max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
+            max_cpu_time_ms: Some(5_000),             // 5 seconds
+            max_operations: Some(10_000),             // 10K operations
+            operation_timeout_ms: Some(5_000),        // 5 seconds
+            ..Default::default()
+        };
+        ResourceTracker::new(limits)
+    }
+
+    fn add_metrics_to_response(mut response: JsonValue, tracker: &ResourceTracker) -> JsonValue {
+        if let Some(obj) = response.as_object_mut() {
+            let metrics = tracker.get_metrics();
+            obj.insert(
+                "resource_usage".to_string(),
+                json!({
+                    "memory_bytes": metrics.memory_bytes,
+                    "cpu_time_ms": metrics.cpu_time_ms,
+                    "operations_count": metrics.operations_count,
+                }),
+            );
+        }
+        response
+    }
+
+    fn format_success_output(response: JsonValue, tracker: &ResourceTracker) -> AgentOutput {
+        let response_with_metrics = Self::add_metrics_to_response(response, tracker);
+        AgentOutput::text(serde_json::to_string_pretty(&response_with_metrics).unwrap())
+    }
+
+    fn format_error_output(error: &str) -> AgentOutput {
+        let error_response = ResponseBuilder::error("evaluate", error).build();
+        AgentOutput::text(serde_json::to_string_pretty(&error_response).unwrap())
+    }
+
     /// Convert fasteval error to `LLMSpellError`
     fn convert_error(&self, error: &FastevalError) -> LLMSpellError {
         tool_error(error.to_string(), Some(self.metadata.name.clone()))
     }
 
-    /// Evaluate expression with custom functions and variables
-    async fn evaluate_expression(
-        &self,
-        expression: &str,
-        variables: &serde_json::Map<String, JsonValue>,
-    ) -> Result<f64> {
-        // First, analyze expression complexity for DoS protection
+    fn validate_expression_complexity(&self, expression: &str) -> Result<()> {
         let complexity = self.analyzer.analyze(expression);
         if !complexity.is_safe {
             return Err(validation_error(
                 format!(
                     "Expression too complex: {}",
-                    complexity.unsafe_reason.unwrap_or_default()
+                    complexity.unsafe_reason.as_ref().unwrap_or(&String::new())
                 ),
                 Some("input".to_string()),
             ));
         }
+        Ok(())
+    }
 
-        // Then run enhanced analysis for advanced DoS protection
+    fn validate_expression_security(&self, expression: &str) -> Result<()> {
         let enhanced_complexity = self.enhanced_analyzer.analyze(expression);
         if !enhanced_complexity.is_safe {
             return Err(validation_error(
                 format!(
                     "Expression failed security check: {}",
-                    enhanced_complexity.unsafe_reason.unwrap_or_default()
+                    enhanced_complexity
+                        .unsafe_reason
+                        .as_ref()
+                        .unwrap_or(&String::new())
                 ),
                 Some("input".to_string()),
             ));
         }
+        Ok(())
+    }
 
-        // Preprocess custom functions
-        let processed_expr = self.preprocess_custom_functions(expression);
-
-        // Convert JSON variables to BTreeMap<String, f64>
+    fn convert_variables(variables: &serde_json::Map<String, JsonValue>) -> BTreeMap<String, f64> {
         let mut ns = BTreeMap::new();
         for (name, value) in variables {
             if let Some(n) = value.as_f64() {
                 ns.insert(name.clone(), n);
             }
         }
+        ns
+    }
 
-        // Create memory tracker for this evaluation
-        let memory_tracker = MemoryTracker::new(1_000_000); // 1MB limit per evaluation
+    fn validate_memory_requirements(
+        expression: &str,
+        variables: &serde_json::Map<String, JsonValue>,
+    ) -> Result<()> {
+        let memory_tracker = MemoryTracker::new(1_000_000); // 1MB limit
+        let expr_memory = expression.len() * 8 + variables.len() * 64;
 
-        // Track initial memory for expression and variables
-        let expr_memory = processed_expr.len() * 8 + variables.len() * 64;
-        if let Err(e) = memory_tracker.allocate(expr_memory) {
-            return Err(validation_error(
+        memory_tracker.allocate(expr_memory).map_err(|e| {
+            validation_error(
                 format!("Expression requires too much memory: {e}"),
                 Some("input".to_string()),
-            ));
-        }
+            )
+        })
+    }
 
-        // Evaluate with timeout to prevent DoS
+    async fn evaluate_with_timeout(
+        &self,
+        expression: &str,
+        variables: BTreeMap<String, f64>,
+    ) -> Result<f64> {
         let max_eval_time = self.analyzer.max_evaluation_time();
-        let ns_clone = ns.clone();
-        let expr_clone = processed_expr.clone();
+        let expr_clone = expression.to_string();
+        let vars_clone = variables.clone();
 
-        let result = match with_timeout(max_eval_time, async move {
-            fasteval::ez_eval(&expr_clone, &mut ns_clone.clone())
+        match with_timeout(max_eval_time, async move {
+            fasteval::ez_eval(&expr_clone, &mut vars_clone.clone())
         })
         .await
         {
@@ -148,12 +197,26 @@ impl CalculatorTool {
                 format!("Expression evaluation timed out after {max_eval_time:?}"),
                 Some("input".to_string()),
             )),
-        };
+        }
+    }
 
-        // Clean up memory tracking
-        memory_tracker.reset();
+    /// Evaluate expression with custom functions and variables
+    async fn evaluate_expression(
+        &self,
+        expression: &str,
+        variables: &serde_json::Map<String, JsonValue>,
+    ) -> Result<f64> {
+        // Validate complexity and security
+        self.validate_expression_complexity(expression)?;
+        self.validate_expression_security(expression)?;
 
-        result
+        // Preprocess and validate
+        let processed_expr = self.preprocess_custom_functions(expression);
+        Self::validate_memory_requirements(&processed_expr, variables)?;
+
+        // Convert variables and evaluate
+        let ns = Self::convert_variables(variables);
+        self.evaluate_with_timeout(&processed_expr, ns).await
     }
 
     /// Preprocess expression to replace custom functions with their implementations
@@ -184,101 +247,96 @@ impl CalculatorTool {
         result
     }
 
+    fn format_result_value(result: f64) -> JsonValue {
+        if result.is_infinite() {
+            if result.is_sign_positive() {
+                json!("Infinity")
+            } else {
+                json!("-Infinity")
+            }
+        } else if result.is_nan() {
+            json!("NaN")
+        } else {
+            json!(result)
+        }
+    }
+
+    async fn process_evaluate(&self, params: &JsonValue) -> Result<JsonValue> {
+        let expression = extract_required_string(params, "input")?;
+        let variables = extract_optional_object(params, "variables")
+            .cloned()
+            .unwrap_or_default();
+
+        let result = self.evaluate_expression(expression, &variables).await?;
+        let result_value = Self::format_result_value(result);
+
+        Ok(ResponseBuilder::success("evaluate")
+            .with_message("Expression evaluated successfully")
+            .with_result(json!({
+                "input": expression,
+                "result": result_value,
+                "result_type": if result.is_finite() { "float" } else { "special" },
+                "variables": variables,
+            }))
+            .build())
+    }
+
+    async fn process_validate(&self, params: &JsonValue) -> Result<JsonValue> {
+        let expression = extract_required_string(params, "input")?;
+        let empty_vars = serde_json::Map::new();
+
+        match self.evaluate_expression(expression, &empty_vars).await {
+            Ok(_) => Ok(ResponseBuilder::success("validate")
+                .with_message("Expression is valid")
+                .with_result(json!({
+                    "input": expression,
+                    "valid": true,
+                }))
+                .build()),
+            Err(e) => Ok(ResponseBuilder::success("validate")
+                .with_message("Expression validation failed")
+                .with_result(json!({
+                    "input": expression,
+                    "valid": false,
+                    "error": e.to_string()
+                }))
+                .build()),
+        }
+    }
+
+    fn process_functions() -> JsonValue {
+        ResponseBuilder::success("functions")
+            .with_message("Available functions and operators")
+            .with_result(json!({
+                "arithmetic": ["+", "-", "*", "/", "%", "^"],
+                "comparison": ["==", "!=", "<", ">", "<=", ">="],
+                "logical": ["&&", "||", "!"],
+                "trigonometric": ["sin", "cos", "tan", "asin", "acos", "atan"],
+                "hyperbolic": ["sinh", "cosh", "tanh", "asinh", "acosh", "atanh"],
+                "mathematical": ["sqrt", "exp", "ln", "log", "abs", "sign"],
+                "rounding": ["int", "ceil", "floor", "round"],
+                "constants": ["pi()", "e()"],
+                "utility": ["min", "max"],
+                "examples": {
+                    "basic": "2 + 3 * 4",
+                    "variables": "x^2 + y^2 where x=3, y=4",
+                    "trigonometry": "sin(pi()/2) + cos(0)",
+                    "complex": "sqrt(x^2 + y^2) * exp(-t)",
+                    "logarithms": "log(10, 100) or ln(e())"
+                },
+                "note": "All trigonometric functions work in radians. Use deg/360*2*pi() to convert degrees."
+            }))
+            .build()
+    }
+
     /// Process calculator operation
     async fn process_operation(&self, params: &JsonValue) -> Result<JsonValue> {
         let operation = extract_string_with_default(params, "operation", "evaluate");
 
         match operation {
-            "evaluate" => {
-                let expression = extract_required_string(params, "input")?;
-
-                // Get variables if provided
-                let variables = extract_optional_object(params, "variables")
-                    .cloned()
-                    .unwrap_or_default();
-
-                // Use our custom evaluation method
-                let result = self.evaluate_expression(expression, &variables).await?;
-
-                // Handle special float values (infinity, NaN) that don't serialize well to JSON
-                let result_value = if result.is_infinite() {
-                    if result.is_sign_positive() {
-                        json!("Infinity")
-                    } else {
-                        json!("-Infinity")
-                    }
-                } else if result.is_nan() {
-                    json!("NaN")
-                } else {
-                    json!(result)
-                };
-
-                let response = ResponseBuilder::success("evaluate")
-                    .with_message("Expression evaluated successfully")
-                    .with_result(json!({
-                        "input": expression,
-                        "result": result_value,
-                        "result_type": if result.is_finite() { "float" } else { "special" },
-                        "variables": variables,
-                    }))
-                    .build();
-                Ok(response)
-            }
-            "validate" => {
-                let expression = extract_required_string(params, "input")?;
-
-                // Try to evaluate the expression with empty variables to validate syntax
-                let empty_vars = serde_json::Map::new();
-                match self.evaluate_expression(expression, &empty_vars).await {
-                    Ok(_) => {
-                        let response = ResponseBuilder::success("validate")
-                            .with_message("Expression is valid")
-                            .with_result(json!({
-                                "input": expression,
-                                "valid": true,
-                            }))
-                            .build();
-                        Ok(response)
-                    }
-                    Err(e) => {
-                        let response = ResponseBuilder::success("validate")
-                            .with_message("Expression validation failed")
-                            .with_result(json!({
-                                "input": expression,
-                                "valid": false,
-                                "error": e.to_string()
-                            }))
-                            .build();
-                        Ok(response)
-                    }
-                }
-            }
-            "functions" => {
-                // List available functions
-                let response = ResponseBuilder::success("functions")
-                    .with_message("Available functions and operators")
-                    .with_result(json!({
-                        "arithmetic": ["+", "-", "*", "/", "%", "^"],
-                        "comparison": ["==", "!=", "<", ">", "<=", ">="],
-                        "logical": ["&&", "||", "!"],
-                        "trigonometric": ["sin", "cos", "tan", "asin", "acos", "atan"],
-                        "hyperbolic": ["sinh", "cosh", "tanh", "asinh", "acosh", "atanh"],
-                        "mathematical": ["sqrt", "exp", "ln", "log", "abs", "sign"],
-                        "rounding": ["int", "ceil", "floor", "round"],
-                        "constants": ["pi()", "e()"],
-                        "utility": ["min", "max"],
-                        "examples": {
-                            "basic": "2 + 3 * 4",
-                            "variables": "x^2 + y^2 where x=3, y=4",
-                            "trigonometry": "sin(pi()/2) + cos(0)",
-                            "complex": "sqrt(x^2 + y^2) * exp(-t)",
-                            "logarithms": "log(10, 100) or ln(e())"
-                        },
-                        "note": "All trigonometric functions work in radians. Use deg/360*2*pi() to convert degrees."
-                    }))
-                    .build();
-                Ok(response)
-            }
+            "evaluate" => self.process_evaluate(params).await,
+            "validate" => self.process_validate(params).await,
+            "functions" => Ok(Self::process_functions()),
             _ => Err(validation_error(
                 format!("Unknown operation: {operation}"),
                 Some("operation".to_string()),
@@ -298,63 +356,22 @@ impl BaseAgent for CalculatorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput> {
-        // Create resource tracker for this execution
-        let limits = ResourceLimits {
-            max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
-            max_cpu_time_ms: Some(5_000),             // 5 seconds
-            max_operations: Some(10_000),             // 10K operations
-            operation_timeout_ms: Some(5_000),        // 5 seconds
-            ..Default::default()
-        };
-        let tracker = ResourceTracker::new(limits);
-
-        // Track the operation
+        // Create resource tracker
+        let tracker = Self::create_resource_tracker();
         tracker.track_operation()?;
 
-        // Get parameters using shared utility
+        // Get parameters
         let params = extract_parameters(&input)?;
 
-        // Process the operation with resource tracking
+        // Process with timeout
         let result = tracker
             .with_timeout(async { self.process_operation(params).await })
             .await;
 
-        // Format the result
+        // Handle result
         match result {
-            Ok(Ok(response)) => {
-                // Add resource metrics to the response
-                let mut response_with_metrics = response;
-                if let Some(obj) = response_with_metrics.as_object_mut() {
-                    let metrics = tracker.get_metrics();
-                    obj.insert(
-                        "resource_usage".to_string(),
-                        json!({
-                            "memory_bytes": metrics.memory_bytes,
-                            "cpu_time_ms": metrics.cpu_time_ms,
-                            "operations_count": metrics.operations_count,
-                        }),
-                    );
-                }
-
-                // Return the result as JSON formatted text
-                Ok(AgentOutput::text(
-                    serde_json::to_string_pretty(&response_with_metrics).unwrap(),
-                ))
-            }
-            Ok(Err(e)) => {
-                // Return error as a response with success=false
-                let error_response = ResponseBuilder::error("evaluate", e.to_string()).build();
-                Ok(AgentOutput::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                ))
-            }
-            Err(e) => {
-                // Timeout error
-                let error_response = ResponseBuilder::error("evaluate", e.to_string()).build();
-                Ok(AgentOutput::text(
-                    serde_json::to_string_pretty(&error_response).unwrap(),
-                ))
-            }
+            Ok(Ok(response)) => Ok(Self::format_success_output(response, &tracker)),
+            Ok(Err(e)) | Err(e) => Ok(Self::format_error_output(&e.to_string())),
         }
     }
 
