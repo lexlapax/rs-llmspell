@@ -4,9 +4,8 @@
 use anyhow::Result;
 use llmspell_events::bus::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_sessions::{
+use llmspell_kernel::sessions::{
     CreateSessionOptions, SessionId, SessionManager, SessionManagerConfig,
-    SessionManagerConfigBuilder,
 };
 use llmspell_state_persistence::StateManager;
 use llmspell_storage::{MemoryBackend, StorageBackend};
@@ -16,12 +15,12 @@ use tempfile::TempDir;
 /// Test fixture containing all session management dependencies
 pub struct TestFixture {
     pub session_manager: Arc<SessionManager>,
-    pub state_manager: Arc<StateManager>,
-    pub storage_backend: Arc<dyn StorageBackend>,
-    pub event_bus: Arc<EventBus>,
-    pub hook_registry: Arc<HookRegistry>,
-    pub hook_executor: Arc<HookExecutor>,
-    pub _temp_dir: Option<TempDir>,
+    _state_manager: Arc<StateManager>,
+    _storage_backend: Arc<dyn StorageBackend>,
+    _event_bus: Arc<EventBus>,
+    _hook_registry: Arc<HookRegistry>,
+    _hook_executor: Arc<HookExecutor>,
+    _temp_dir: Option<TempDir>,
 }
 
 impl TestFixture {
@@ -49,32 +48,15 @@ impl TestFixture {
 
         Ok(Self {
             session_manager,
-            state_manager,
-            storage_backend,
-            event_bus,
-            hook_registry,
-            hook_executor,
+            _state_manager: state_manager,
+            _storage_backend: storage_backend,
+            _event_bus: event_bus,
+            _hook_registry: hook_registry,
+            _hook_executor: hook_executor,
             _temp_dir: None,
         })
     }
 
-    /// Create a new test fixture with file storage backend
-    pub async fn with_file_storage() -> Result<Self> {
-        let temp_dir = TempDir::new()?;
-        let config = SessionManagerConfigBuilder::new()
-            .storage_path(temp_dir.path())
-            .build();
-
-        let mut fixture = Self::with_config(config).await?;
-        fixture._temp_dir = Some(temp_dir);
-        Ok(fixture)
-    }
-
-    /// Create a test session with default options
-    pub async fn create_test_session(&self) -> Result<SessionId> {
-        self.create_test_session_with_options(CreateSessionOptions::default())
-            .await
-    }
 
     /// Create a test session with custom options
     pub async fn create_test_session_with_options(
@@ -97,63 +79,6 @@ impl TestFixture {
         }
         Ok(sessions)
     }
-}
-
-/// Create a minimal test configuration
-pub fn minimal_test_config() -> SessionManagerConfig {
-    SessionManagerConfigBuilder::new()
-        .auto_persist(false)
-        .max_active_sessions(10)
-        .storage_path("/tmp/llmspell-test")
-        .build()
-}
-
-/// Create a performance test configuration
-pub fn performance_test_config() -> SessionManagerConfig {
-    SessionManagerConfigBuilder::new()
-        .auto_persist(false)
-        .max_active_sessions(1000)
-        .enable_compression(false) // Disable for performance tests
-        .build()
-}
-
-/// Helper to create test artifacts
-pub async fn create_test_artifact(
-    fixture: &TestFixture,
-    session_id: &SessionId,
-    name: &str,
-    content: &str,
-) -> Result<llmspell_sessions::ArtifactId> {
-    Ok(fixture
-        .session_manager
-        .store_artifact(
-            session_id,
-            llmspell_sessions::ArtifactType::UserInput,
-            name.to_string(),
-            content.as_bytes().to_vec(),
-            Default::default(),
-        )
-        .await?)
-}
-
-/// Helper to verify session state
-pub async fn assert_session_status(
-    fixture: &TestFixture,
-    session_id: &SessionId,
-    expected_status: llmspell_sessions::SessionStatus,
-) {
-    let session = fixture
-        .session_manager
-        .get_session(session_id)
-        .await
-        .expect("Failed to get session");
-    
-    let status = session.status().await;
-    assert_eq!(
-        status, expected_status,
-        "Expected session status {:?}, got {:?}",
-        expected_status, status
-    );
 }
 
 /// Helper for timing operations
@@ -189,7 +114,7 @@ mod tests {
     #[tokio::test]
     async fn test_fixture_creation() {
         let fixture = TestFixture::new().await.expect("Failed to create fixture");
-        assert!(fixture.session_manager.list_sessions().await.unwrap().is_empty());
+        assert!(fixture.session_manager.list_sessions(Default::default()).await.unwrap().is_empty());
     }
     #[tokio::test]
     async fn test_create_test_sessions() {
@@ -200,7 +125,7 @@ mod tests {
             .expect("Failed to create sessions");
         
         assert_eq!(sessions.len(), 3);
-        let listed = fixture.session_manager.list_sessions().await.unwrap();
+        let listed = fixture.session_manager.list_sessions(Default::default()).await.unwrap();
         assert_eq!(listed.len(), 3);
     }
     #[tokio::test]

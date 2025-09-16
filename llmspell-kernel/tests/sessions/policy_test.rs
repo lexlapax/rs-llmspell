@@ -7,7 +7,7 @@ use llmspell_hooks::{
     types::{ComponentId, ComponentType},
     HookContext, HookExecutor, HookPoint, HookRegistry,
 };
-use llmspell_sessions::{
+use llmspell_kernel::sessions::{
     policies::{
         rate_limit::RateLimitConfig, resource_limit::ResourceConfig, timeout::TimeoutConfig,
         PolicyComposition, PolicyType, SessionPolicyConfig, SessionPolicyManager,
@@ -114,7 +114,7 @@ async fn test_rate_limit_policy_enforcement() -> Result<()> {
         enable_timeout: false,
         enable_resource_limits: false,
         enable_rate_limiting: true,
-        rate_limit_config: llmspell_sessions::policies::rate_limit::RateLimitConfig {
+        rate_limit_config: llmspell_kernel::sessions::policies::rate_limit::RateLimitConfig {
             global_rpm: 1, // Very low for testing
             ..Default::default()
         },
@@ -266,7 +266,7 @@ async fn test_policy_integration_with_session_manager() -> Result<()> {
     let session = session_manager.get_session(&session_id).await?;
     assert_eq!(
         session.status().await,
-        llmspell_sessions::SessionStatus::Active
+        llmspell_kernel::sessions::SessionStatus::Active
     );
 
     Ok(())

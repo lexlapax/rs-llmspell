@@ -6,7 +6,7 @@ use llmspell_hooks::{
     types::{ComponentId, ComponentType},
     HookContext, HookExecutor, HookPoint, HookRegistry,
 };
-use llmspell_sessions::middleware::{
+use llmspell_kernel::sessions::middleware::{
     create_caching_middleware, create_default_middleware, create_operation_middleware,
     create_security_middleware, create_session_middleware, session_middleware::MiddlewarePattern,
     MiddlewareConfig, MiddlewareType, SessionMiddleware,

@@ -4,7 +4,7 @@
 use anyhow::Result;
 use llmspell_events::bus::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_sessions::{types::CreateSessionOptions, SessionManager, SessionManagerConfig};
+use llmspell_kernel::sessions::{types::CreateSessionOptions, SessionManager, SessionManagerConfig};
 use llmspell_state_persistence::StateManager;
 use llmspell_storage::MemoryBackend;
 use std::sync::Arc;
@@ -20,7 +20,7 @@ async fn test_session_lifecycle_correlation() -> Result<()> {
     let event_bus = Arc::new(EventBus::new());
 
     let config = SessionManagerConfig {
-        event_config: llmspell_sessions::config::EventConfig {
+        event_config: llmspell_kernel::sessions::config::EventConfig {
             enable_session_events: true,
             ..Default::default()
         },
@@ -59,7 +59,7 @@ async fn test_session_lifecycle_correlation() -> Result<()> {
     let session = session_manager.get_session(&session_id).await?;
     assert_eq!(
         session.status().await,
-        llmspell_sessions::SessionStatus::Suspended
+        llmspell_kernel::sessions::SessionStatus::Suspended
     );
 
     // Resume the session
@@ -83,7 +83,7 @@ async fn test_artifact_event_correlation() -> Result<()> {
     let event_bus = Arc::new(EventBus::new());
 
     let config = SessionManagerConfig {
-        event_config: llmspell_sessions::config::EventConfig {
+        event_config: llmspell_kernel::sessions::config::EventConfig {
             enable_session_events: true,
             ..Default::default()
         },
@@ -110,7 +110,7 @@ async fn test_artifact_event_correlation() -> Result<()> {
     let artifact_id = session_manager
         .store_artifact(
             &session_id,
-            llmspell_sessions::artifact::ArtifactType::UserInput,
+            llmspell_kernel::sessions::artifact::ArtifactType::UserInput,
             "test.txt".to_string(),
             artifact_content,
             None,
@@ -144,7 +144,7 @@ async fn test_session_lifecycle_with_multiple_operations() -> Result<()> {
     let event_bus = Arc::new(EventBus::new());
 
     let config = SessionManagerConfig {
-        event_config: llmspell_sessions::config::EventConfig {
+        event_config: llmspell_kernel::sessions::config::EventConfig {
             enable_session_events: true,
             ..Default::default()
         },
@@ -179,7 +179,7 @@ async fn test_session_lifecycle_with_multiple_operations() -> Result<()> {
         session_manager
             .store_artifact(
                 &session_id,
-                llmspell_sessions::artifact::ArtifactType::UserInput,
+                llmspell_kernel::sessions::artifact::ArtifactType::UserInput,
                 format!("file{}.txt", i),
                 format!("Content {}", i).into_bytes(),
                 None,
@@ -212,7 +212,7 @@ async fn test_multiple_sessions_correlation_isolation() -> Result<()> {
     let event_bus = Arc::new(EventBus::new());
 
     let config = SessionManagerConfig {
-        event_config: llmspell_sessions::config::EventConfig {
+        event_config: llmspell_kernel::sessions::config::EventConfig {
             enable_session_events: true,
             ..Default::default()
         },
@@ -251,7 +251,7 @@ async fn test_multiple_sessions_correlation_isolation() -> Result<()> {
     session_manager
         .store_artifact(
             &session1_id,
-            llmspell_sessions::artifact::ArtifactType::UserInput,
+            llmspell_kernel::sessions::artifact::ArtifactType::UserInput,
             "session1_file.txt".to_string(),
             b"Session 1 content".to_vec(),
             None,
@@ -261,7 +261,7 @@ async fn test_multiple_sessions_correlation_isolation() -> Result<()> {
     session_manager
         .store_artifact(
             &session2_id,
-            llmspell_sessions::artifact::ArtifactType::UserInput,
+            llmspell_kernel::sessions::artifact::ArtifactType::UserInput,
             "session2_file.txt".to_string(),
             b"Session 2 content".to_vec(),
             None,
@@ -285,7 +285,7 @@ async fn test_multiple_sessions_correlation_isolation() -> Result<()> {
 
     // Verify both sessions completed (removed from active list)
     let sessions = session_manager
-        .list_sessions(llmspell_sessions::types::SessionQuery::default())
+        .list_sessions(llmspell_kernel::sessions::types::SessionQuery::default())
         .await?;
     assert_eq!(sessions.len(), 0); // All sessions completed and removed
 

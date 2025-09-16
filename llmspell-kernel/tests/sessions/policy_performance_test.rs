@@ -6,7 +6,7 @@ use llmspell_hooks::{
     types::{ComponentId, ComponentType},
     HookContext, HookExecutor, HookPoint, HookRegistry,
 };
-use llmspell_sessions::policies::{
+use llmspell_kernel::sessions::policies::{
     rate_limit::RateLimitConfig, timeout::TimeoutConfig, PolicyComposition, SessionPolicyConfig,
     SessionPolicyManager,
 };

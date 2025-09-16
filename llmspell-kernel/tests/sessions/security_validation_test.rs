@@ -5,7 +5,7 @@
 mod tests {
     use llmspell_events::bus::EventBus;
     use llmspell_hooks::{HookExecutor, HookRegistry};
-    use llmspell_sessions::{
+    use llmspell_kernel::sessions::{
         artifact::ArtifactType, config::SessionManagerConfig, types::CreateSessionOptions,
         SessionManager,
     };

@@ -948,21 +948,39 @@ This task was essentially a verification step that confirmed the thoroughness of
 
 #### **Task 9.4a.2.7: Migrate and Validate All Tests**
 **Estimated Time**: 3 hours
-**Status**: PENDING
+**Status**: COMPLETED ✅
 
 **🔍 PARTIAL COMPLETION DISCOVERED**: Test files were already copied to kernel/tests/sessions/ in Task 9.4a.2.3, but their imports still need updating!
 
 **Test Migration**:
 - [x] Move 8 integration tests: llmspell-sessions/tests/* → kernel/tests/sessions/ ✅ (done in 9.4a.2.3)
-- [ ] Update all test imports to use llmspell_kernel::sessions (REQUIRED - files still use old imports)
-- [x] Verify 221 unit tests work in new location ✅ (314 kernel tests passing)
-- [ ] Update test setup to create SessionManager through kernel
+- [x] Update all test imports to use llmspell_kernel::sessions ✅ (all 8 test files + common module updated)
+- [x] Verify 221 unit tests work in new location ✅ (315 kernel tests passing)
+- [x] Update test setup to create SessionManager through kernel ✅ (created sessions_tests.rs harness)
 
 **Test Categories**:
 - [x] **Unit tests**: 221 tests embedded in source files ✅ (already passing)
-- [ ] **Integration tests**: 8 test files need import updates
+- [x] **Integration tests**: 8 test files updated and passing ✅ (57 integration tests pass)
 - [x] **Bridge tests**: 5+ files testing session/artifact globals ✅ (updated in 9.4a.2.5)
 - [x] **RAG tests**: Session persistence integration ✅ (updated in 9.4a.2.5)
+
+**🔑 Insights from Task 9.4a.2.7**:
+1. **Test Harness Required**: Tests in subdirectories need a top-level test harness file (`sessions_tests.rs`) to be compiled and run
+2. **API Changes**: `list_sessions()` now requires a `SessionQuery` parameter (used `Default::default()` for compatibility)
+3. **Import Updates Complete**: All 8 test files + common module successfully migrated from `llmspell_sessions` to `llmspell_kernel::sessions`
+4. **All Tests Pass**: 57 integration tests + 315 unit tests = 372 total tests passing ✅
+5. **Zero Warning Policy Maintained**: Removed 6 unused helper functions rather than suppressing with `#[allow(dead_code)]`
+
+**Files Updated**:
+- Created: `llmspell-kernel/tests/sessions_tests.rs` (test harness)
+- Updated: `access_control_test.rs`, `event_correlation_test.rs`, `middleware_test.rs`, `performance_test.rs`, `policy_performance_test.rs`, `policy_test.rs`, `security_validation_test.rs`
+- Cleaned: `common/mod.rs` - removed unused functions: `with_file_storage()`, `create_test_session()`, `minimal_test_config()`, `performance_test_config()`, `create_test_artifact()`, `assert_session_status()`
+- Fixed: Prefixed unused struct fields with underscore in `TestFixture`
+
+**Zero Warning Compliance**:
+- ✅ No clippy warnings with `--all-targets --all-features`
+- ✅ Removed unused code instead of suppressing warnings
+- ✅ All tests pass without warnings
 
 #### **Task 9.4a.2.8: Verify Bridge and RAG Integration**
 **Estimated Time**: 2 hours
