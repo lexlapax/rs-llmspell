@@ -219,7 +219,13 @@ impl RigProvider {
         self.total_requests.load(Ordering::SeqCst)
     }
 
+    #[instrument(level = "debug", skip(self, prompt), fields(
+        prompt_length = prompt.len(),
+        provider = %self.config.provider_type,
+        model = %self.config.model
+    ))]
     async fn execute_completion(&self, prompt: String) -> Result<String, LLMSpellError> {
+        debug!("Executing completion with {} character prompt", prompt.len());
         match &self.model {
             RigModel::OpenAI(model) => model
                 .completion_request(&prompt)
@@ -414,7 +420,13 @@ impl ProviderInstance for RigProvider {
         Ok(output)
     }
 
+    #[instrument(level = "debug", skip(self, _input), fields(
+        provider_type = %self.config.provider_type,
+        model = %self.config.model,
+        streaming_support = false
+    ))]
     async fn complete_streaming(&self, _input: &AgentInput) -> Result<AgentStream, LLMSpellError> {
+        debug!("Streaming completion requested but not supported");
         // Rig doesn't expose streaming yet, use default implementation
         Err(LLMSpellError::Provider {
             message: "Streaming not yet supported in Rig provider".to_string(),
@@ -423,7 +435,12 @@ impl ProviderInstance for RigProvider {
         })
     }
 
+    #[instrument(level = "debug", skip(self), fields(
+        provider_type = %self.config.provider_type,
+        model = %self.config.model
+    ))]
     async fn validate(&self) -> Result<(), LLMSpellError> {
+        info!("Validating provider configuration");
         // Try a simple completion to validate the configuration
         let test_input = AgentInput::text("Say 'test'");
 
