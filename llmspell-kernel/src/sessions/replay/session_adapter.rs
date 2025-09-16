@@ -8,7 +8,7 @@ use llmspell_hooks::replay::{
     BatchReplayRequest, BatchReplayResponse, ReplayConfig, ReplayManager, ReplayMode,
     ReplaySchedule, ReplayState,
 };
-use llmspell_state_persistence::manager::{HookReplayManager, SerializedHookExecution};
+use crate::state::manager::{HookReplayManager, SerializedHookExecution};
 use llmspell_storage::StorageBackend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

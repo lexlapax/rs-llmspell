@@ -14,7 +14,7 @@ pub use hook_replay_bridge::HookReplayBridge;
 use crate::sessions::{Result, SessionId};
 use llmspell_events::EventBus;
 use llmspell_hooks::replay::ReplayManager;
-use llmspell_state_persistence::manager::HookReplayManager;
+use crate::state::manager::HookReplayManager;
 use llmspell_storage::StorageBackend;
 use session_adapter::SessionReplayAdapter;
 use std::sync::Arc;
@@ -96,7 +96,7 @@ impl ReplayEngine {
     pub async fn get_session_timeline(
         &self,
         session_id: &SessionId,
-    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+    ) -> Result<Vec<crate::state::manager::SerializedHookExecution>> {
         self.session_adapter.get_session_timeline(session_id).await
     }
 
@@ -129,7 +129,7 @@ impl ReplayEngine {
         &self,
         session_id: &SessionId,
         filter: session_adapter::SessionHookFilter,
-    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+    ) -> Result<Vec<crate::state::manager::SerializedHookExecution>> {
         self.session_adapter
             .query_session_hooks(session_id, filter)
             .await
@@ -330,13 +330,13 @@ impl Default for ReplayEngine {
         let stub_storage = Arc::new(llmspell_storage::MemoryBackend::new());
         let stub_event_bus = Arc::new(EventBus::new());
         let stub_state_adapter = Arc::new(
-            llmspell_state_persistence::backend_adapter::StateStorageAdapter::new(
+            crate::state::backend_adapter::StateStorageAdapter::new(
                 stub_storage.clone(),
                 "stub".to_string(),
             ),
         );
         let stub_hook_replay_manager = Arc::new(
-            llmspell_state_persistence::manager::HookReplayManager::new(stub_state_adapter),
+            crate::state::manager::HookReplayManager::new(stub_state_adapter),
         );
 
         // Create stub components using the bridge adapter

@@ -18,10 +18,7 @@ llmspell-utils = { path = "../llmspell-utils", version = "0.8.0" }
 llmspell-events = { path = "../llmspell-events", version = "0.8.0" }
 llmspell-hooks = { path = "../llmspell-hooks", version = "0.8.0" }
 
-# Temporary state dependencies (will be removed in 9.4a.3)
-llmspell-state-persistence = { path = "../llmspell-state-persistence", version = "0.8.0" }
-llmspell-state-traits = { path = "../llmspell-state-traits", version = "0.8.0" }
-llmspell-storage = { path = "../llmspell-storage", version = "0.8.0" }
+# State dependencies now consolidated internally
 
 # Async runtime
 tokio = { version = "1.41", features = ["full", "tracing"] }

@@ -21,9 +21,7 @@ use crate::sessions::{
 use chrono::{DateTime, Utc};
 use llmspell_events::{bus::EventBus, correlation::EventCorrelationTracker};
 use llmspell_hooks::{HookExecutor, HookPoint, HookRegistry, LoggingHook, MetricsHook};
-use llmspell_state_persistence::StateManager;
-use llmspell_state_traits::StateScope;
-use llmspell_storage::StorageBackend;
+use crate::state::{StateManager, StateScope, StorageBackend};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -124,13 +122,13 @@ impl SessionManager {
 
         // Create replay infrastructure components
         let state_storage_adapter = Arc::new(
-            llmspell_state_persistence::backend_adapter::StateStorageAdapter::new(
+            crate::state::backend_adapter::StateStorageAdapter::new(
                 storage_backend.clone(),
                 "sessions".to_string(),
             ),
         );
         let hook_replay_manager =
-            Arc::new(llmspell_state_persistence::manager::HookReplayManager::new(
+            Arc::new(crate::state::manager::HookReplayManager::new(
                 state_storage_adapter.clone(),
             ));
 
@@ -1571,7 +1569,7 @@ impl SessionManager {
     pub async fn get_session_timeline(
         &self,
         session_id: &SessionId,
-    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+    ) -> Result<Vec<crate::state::manager::SerializedHookExecution>> {
         self.replay_engine.get_session_timeline(session_id).await
     }
 
@@ -1608,7 +1606,7 @@ impl SessionManager {
         &self,
         session_id: &SessionId,
         filter: crate::sessions::replay::session_adapter::SessionHookFilter,
-    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+    ) -> Result<Vec<crate::state::manager::SerializedHookExecution>> {
         self.replay_engine
             .query_session_hooks(session_id, filter)
             .await

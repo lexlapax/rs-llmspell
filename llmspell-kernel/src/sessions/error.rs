@@ -1,7 +1,7 @@
 //! ABOUTME: Error types for session management operations including session lifecycle, artifact storage, and replay
 //! ABOUTME: Provides comprehensive error handling with context and recovery information
 
-use llmspell_state_traits::StateError;
+use crate::state::StateError;
 use thiserror::Error;
 
 /// Result type alias for session operations
@@ -409,7 +409,7 @@ mod tests {
     }
     #[test]
     fn test_from_state_error() {
-        use llmspell_state_traits::StateError;
+        use crate::state::StateError;
 
         let state_error = StateError::NotFound {
             scope: "test_scope".to_string(),

@@ -5,7 +5,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_hooks::persistence::HookReplayManager as HooksHookReplayManager;
 use llmspell_hooks::{HookContext, HookResult, ReplayableHook};
-use llmspell_state_persistence::manager::HookReplayManager as StateHookReplayManager;
+use crate::state::manager::HookReplayManager as StateHookReplayManager;
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;

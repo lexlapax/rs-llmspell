@@ -8,7 +8,7 @@ use llmspell_hooks::persistence::{
     CapturedState, ReplayError, ReplayErrorType, ReplaySession, TimelineEntry,
 };
 use llmspell_hooks::result::HookResult;
-use llmspell_state_persistence::manager::SerializedHookExecution;
+use crate::state::manager::SerializedHookExecution;
 use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, SystemTime};

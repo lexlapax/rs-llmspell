@@ -2,6 +2,9 @@
 //!
 //! This module provides a unified state system that consolidates execution,
 //! session, and debug state with pluggable storage backends.
+//!
+//! Also includes comprehensive state-persistence and storage functionality
+//! consolidated from llmspell-state-persistence and llmspell-storage.
 
 use anyhow::Result;
 use parking_lot::RwLock;
@@ -10,15 +13,67 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, info, instrument, warn};
 
-pub mod backends;
+// Import state traits from core
+pub use llmspell_core::state::{StateError, StateResult, StateScope};
+
+// Original kernel state modules
 pub mod circuit_breaker;
+pub mod kernel_backends; // Original kernel storage backends enum
 pub mod persistence;
 pub mod types;
 
-pub use backends::{MemoryBackend, SledBackend, StorageBackend, VectorBackend};
+// Consolidated state-persistence modules
+pub mod agent_state;
+pub mod backend_adapter;
+pub mod backends; // Comprehensive storage backends from consolidated crates
+pub mod backup;
+pub mod config;
+pub mod hooks;
+pub mod key_manager;
+pub mod manager;
+pub mod migration;
+pub mod performance;
+pub mod schema;
+pub mod sensitive_data;
+pub mod session_test;
+pub mod vector_storage;
+
+// Re-export original kernel state types
 pub use circuit_breaker::CircuitBreaker;
 pub use persistence::StatePersistence;
 pub use types::{DebugState, ExecutionState, SessionState};
+
+// Re-export consolidated state-persistence types (needed by sessions)
+pub use agent_state::{AgentState, AgentStateManager};
+pub use backend_adapter::StateStorageAdapter;
+pub use config::{PersistenceConfig, StorageBackendType};
+pub use manager::{HookReplayManager, SerializedHookExecution, StateManager, StateManagerTrait};
+pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
+
+// Re-export original kernel storage types
+pub use kernel_backends::{MemoryBackend as KernelMemoryBackend, SledBackend as KernelSledBackend, StorageBackend, VectorBackend};
+
+// Re-export comprehensive storage backends
+pub use backends::{MemoryBackend, SledBackend};
+
+// Re-export vector storage types
+pub use vector_storage::{
+    DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
+    VectorEntry, VectorQuery, VectorResult, VectorStorage,
+};
+
+// Migration and schema types
+pub use migration::{
+    DataTransformer, MigrationConfig, MigrationEngine, MigrationResult, MigrationStatus,
+    ValidationLevel, ValidationResult,
+};
+pub use schema::{
+    CompatibilityChecker, CompatibilityResult, EnhancedStateSchema, MigrationPlan,
+    MigrationPlanner, SchemaRegistry, SchemaVersion, SemanticVersion,
+};
+
+// Performance optimization types
+pub use performance::{FastPathConfig, FastPathManager, StateClass};
 
 /// Unified kernel state that combines execution, session, and debug state
 #[derive(Clone)]

@@ -6,7 +6,7 @@ use llmspell_hooks::persistence::{
     CapturedState, ReplayError, ReplayErrorType, ReplaySession, TimelineEntry,
 };
 use llmspell_hooks::replay::{ComparisonResult, HookResultComparator};
-use llmspell_state_persistence::manager::SerializedHookExecution;
+use crate::state::manager::SerializedHookExecution;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};
