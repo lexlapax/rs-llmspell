@@ -17,7 +17,7 @@ use llmspell_core::{
 use llmspell_providers::{ModelSpecifier, ProviderInstance, ProviderManager};
 use llmspell_state_persistence::StateManager;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// LLM-powered agent implementation
 pub struct LLMAgent {
@@ -41,6 +41,7 @@ impl LLMAgent {
     /// - Model configuration is missing
     /// - Provider creation fails
     /// - Agent initialization fails
+    #[instrument(level = "debug", skip(config, provider_manager), fields(agent_name = %config.name, agent_type = %config.agent_type))]
     pub async fn new(config: AgentConfig, provider_manager: Arc<ProviderManager>) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
         let agent_id_string = metadata.id.to_string();
@@ -66,6 +67,12 @@ impl LLMAgent {
                 base_url: None,
             }
         };
+
+        info!(
+            provider = ?model_spec.provider,
+            model = %model_spec.model,
+            "Creating LLMAgent with provider and model"
+        );
 
         // Get or create provider instance
         let provider = provider_manager

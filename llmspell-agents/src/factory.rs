@@ -8,7 +8,7 @@ use llmspell_core::traits::agent::Agent;
 use llmspell_hooks::HookRegistry;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::info;
+use tracing::{debug, info, instrument};
 
 /// Configuration for creating agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -268,7 +268,9 @@ pub trait CreationHook: Send + Sync {
 impl DefaultAgentFactory {
     /// Create a new agent factory with provider manager
     #[must_use]
+    #[instrument(level = "debug", skip(provider_manager))]
     pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
+        debug!("Creating DefaultAgentFactory with provider manager");
         let mut templates = std::collections::HashMap::new();
 
         // LLM agent is now the default template
@@ -404,7 +406,13 @@ impl DefaultAgentFactory {
 
 #[async_trait]
 impl AgentFactory for DefaultAgentFactory {
+    #[instrument(level = "debug", skip(self, config), fields(agent_name = %config.name, agent_type = %config.agent_type))]
     async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>> {
+        debug!(
+            config = ?config,
+            "Creating agent from configuration"
+        );
+
         // Validate configuration
         self.validate_config(&config)?;
 
@@ -443,7 +451,10 @@ impl AgentFactory for DefaultAgentFactory {
         Ok(agent)
     }
 
+    #[instrument(level = "debug", skip(self))]
     async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>> {
+        debug!("Creating agent from template: {}", template_name);
+
         let config = self
             .templates
             .get(template_name)

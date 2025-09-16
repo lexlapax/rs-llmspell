@@ -32,6 +32,7 @@ use std::{
     time::Duration,
 };
 use tokio::sync::broadcast;
+use tracing::{debug, instrument};
 
 /// Configuration for mock agent behavior
 #[derive(Debug, Clone)]
@@ -108,7 +109,12 @@ pub struct MockAgent {
 impl MockAgent {
     /// Create new mock agent
     #[must_use]
+    #[instrument(level = "debug", skip(config), fields(agent_name = %config.agent_config.name, agent_type = %config.agent_config.agent_type))]
     pub fn new(config: MockAgentConfig) -> Self {
+        debug!(
+            config = ?config,
+            "Creating MockAgent with configuration"
+        );
         let metadata = ComponentMetadata {
             id: ComponentId::from_name(&config.agent_config.name),
             name: config.agent_config.name.clone(),

@@ -16,7 +16,7 @@ use llmspell_core::{
 };
 use llmspell_state_persistence::StateManager;
 use std::sync::{Arc, Mutex};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Basic agent implementation
 pub struct BasicAgent {
@@ -35,7 +35,12 @@ impl BasicAgent {
     /// # Errors
     ///
     /// Returns an error if agent configuration is invalid
+    #[instrument(level = "debug", skip(config), fields(agent_name = %config.name, agent_type = %config.agent_type))]
     pub fn new(config: AgentConfig) -> Result<Self> {
+        debug!(
+            config = ?config,
+            "Creating BasicAgent with configuration"
+        );
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
         let agent_id_string = metadata.id.to_string();
 

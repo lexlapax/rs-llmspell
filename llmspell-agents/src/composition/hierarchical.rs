@@ -18,6 +18,7 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock, Weak};
 use tokio::sync::RwLock as TokioRwLock;
+use tracing::{debug, instrument};
 
 /// A hierarchical composite agent that manages parent-child relationships
 pub struct HierarchicalCompositeAgent {
@@ -96,8 +97,14 @@ struct HierarchicalMetrics {
 
 impl HierarchicalCompositeAgent {
     /// Create a new hierarchical composite agent
+    #[instrument(level = "debug", skip_all)]
     pub fn new(name: impl Into<String>, config: HierarchicalConfig) -> Self {
         let name = name.into();
+        debug!(
+            name = %name,
+            config = ?config,
+            "Creating HierarchicalCompositeAgent with configuration"
+        );
         let description = format!("Hierarchical composite agent: {name}");
         Self {
             metadata: ComponentMetadata::new(name, description),
