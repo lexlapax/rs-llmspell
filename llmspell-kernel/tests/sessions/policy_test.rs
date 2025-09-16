@@ -15,7 +15,7 @@ use llmspell_kernel::sessions::{
     types::CreateSessionOptions,
     SessionManager, SessionManagerConfig,
 };
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use llmspell_storage::MemoryBackend;
 use std::sync::Arc;
 use std::time::Duration;

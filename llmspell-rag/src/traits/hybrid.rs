@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use llmspell_storage::{VectorResult, VectorStorage};
 
 /// Hybrid storage supporting multiple retrieval methods

@@ -8,7 +8,7 @@ use llmspell_rag::{
     state_integration::StateAwareVectorStorage,
 };
 use llmspell_kernel::sessions::{SessionId, SessionManager};
-use llmspell_state_persistence::{StateManager, StateScope};
+use llmspell_kernel::state::{StateManager, StateScope};
 use llmspell_storage::{VectorEntry, VectorResult, VectorStorage};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

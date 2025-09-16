@@ -204,7 +204,7 @@ impl BackupManager {
         let duration = start_time.elapsed();
 
         // Extract entry count from snapshot metadata
-        let snapshot: crate::backup::atomic::StateSnapshot = rmp_serde::from_slice(&backup_data)
+        let snapshot: crate::state::backup::atomic::StateSnapshot = rmp_serde::from_slice(&backup_data)
             .map_err(|e| {
                 StateError::serialization(format!(
                     "Failed to deserialize snapshot for metadata: {}",

@@ -267,7 +267,7 @@ impl CleanupScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::backup::retention::{RetentionDecision, RetentionPriority};
+    use crate::state::backup::retention::{RetentionDecision, RetentionPriority};
     #[tokio::test]
     async fn test_cleanup_dry_run() {
         let temp_dir = tempfile::tempdir().unwrap();

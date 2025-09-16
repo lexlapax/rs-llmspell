@@ -22,7 +22,7 @@ use crate::vector_storage::{
     DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
     VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 
 /// HNSW vector storage implementation using hnsw_rs
 #[derive(Debug)]

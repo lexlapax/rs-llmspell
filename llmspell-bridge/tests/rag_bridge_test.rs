@@ -6,7 +6,7 @@ use llmspell_bridge::ProviderManager;
 use llmspell_config::providers::ProviderManagerConfig;
 use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
 use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
 use llmspell_storage::vector_storage::HNSWConfig;
 use llmspell_storage::MemoryBackend;

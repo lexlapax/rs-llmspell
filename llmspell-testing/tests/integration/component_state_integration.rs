@@ -2,7 +2,7 @@
 // ABOUTME: Validates state persistence integration and cross-component data consistency
 
 use llmspell_core::ComponentMetadata;
-use llmspell_state_persistence::StateScope;
+use llmspell_kernel::state::StateScope;
 use llmspell_testing::state_helpers::create_test_state_manager;
 use llmspell_tools::state::{ToolState, ToolStateRegistry};
 use llmspell_workflows::state::{PersistentWorkflowState, PersistentWorkflowStateManager};

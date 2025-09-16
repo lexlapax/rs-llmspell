@@ -1,7 +1,7 @@
 //! Multi-tenant RAG integration with cost tracking and tenant isolation
 
 use anyhow::Result;
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use llmspell_tenancy::MultiTenantVectorManager;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

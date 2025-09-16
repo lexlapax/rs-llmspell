@@ -7,7 +7,7 @@ use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::workflows::WorkflowBridge;
 use crate::ComponentRegistry;
 use llmspell_core::Result;
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use std::sync::Arc;
 use tracing::info;
 

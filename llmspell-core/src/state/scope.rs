@@ -13,7 +13,7 @@ use std::fmt;
 /// # Examples
 ///
 /// ```
-/// use llmspell_state_traits::StateScope;
+/// use llmspell_core::state::StateScope;
 ///
 /// // Global application state
 /// let global_scope = StateScope::Global;

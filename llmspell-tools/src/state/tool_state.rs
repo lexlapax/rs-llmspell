@@ -5,7 +5,7 @@ use anyhow::{Context, Result};
 use async_trait::async_trait;
 use llmspell_core::traits::tool::Tool;
 use llmspell_core::ComponentMetadata;
-use llmspell_state_traits::{StateManager, StateScope};
+use llmspell_core::state::{StateManager, StateScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -474,13 +474,13 @@ macro_rules! impl_tool_state_persistence {
         impl $crate::state::tool_state::ToolStatePersistence for $tool_type {
             fn state_manager(
                 &self,
-            ) -> Option<&std::sync::Arc<llmspell_state_persistence::StateManager>> {
+            ) -> Option<&std::sync::Arc<llmspell_kernel::state::StateManager>> {
                 self.state_manager()
             }
 
             fn set_state_manager(
                 &mut self,
-                state_manager: std::sync::Arc<llmspell_state_persistence::StateManager>,
+                state_manager: std::sync::Arc<llmspell_kernel::state::StateManager>,
             ) {
                 self.set_state_manager(state_manager)
             }
@@ -493,8 +493,8 @@ mod tests {
     use super::*;
     use llmspell_core::types::{AgentInput, AgentOutput};
     use llmspell_core::{BaseAgent, ExecutionContext, LLMSpellError};
-    use llmspell_state_persistence::config::PersistenceConfig;
-    use llmspell_state_persistence::config::StorageBackendType;
+    use llmspell_kernel::state::config::PersistenceConfig;
+    use llmspell_kernel::state::config::StorageBackendType;
     use std::sync::Mutex;
 
     // Mock tool for testing
@@ -609,7 +609,7 @@ mod tests {
         };
 
         Arc::new(
-            llmspell_state_persistence::StateManager::with_backend(
+            llmspell_kernel::state::StateManager::with_backend(
                 StorageBackendType::Memory,
                 config,
             )

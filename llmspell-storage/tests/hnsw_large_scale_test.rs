@@ -1,7 +1,7 @@
 //! Large-scale tests for HNSW vector storage
 //! These tests verify memory usage and load time with 100K vectors
 
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use llmspell_storage::{
     backends::vector::hnsw::HNSWVectorStorage,
     vector_storage::{HNSWConfig, VectorEntry, VectorQuery, VectorStorage},

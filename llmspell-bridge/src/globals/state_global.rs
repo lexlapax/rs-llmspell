@@ -5,7 +5,7 @@
 
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use llmspell_core::{error::LLMSpellError, traits::state::StateAccess};
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     migration::MigrationEngine, schema::SchemaRegistry, StateManager, StateScope,
 };
 use parking_lot::RwLock;
@@ -29,7 +29,7 @@ pub struct StateGlobal {
     /// Schema registry for migration planning (optional)
     pub schema_registry: Option<Arc<SchemaRegistry>>,
     /// Backup manager for state backup/restore operations (optional)
-    pub backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
+    pub backup_manager: Option<Arc<llmspell_kernel::state::backup::BackupManager>>,
 }
 
 impl StateGlobal {
@@ -105,7 +105,7 @@ impl StateGlobal {
         state_manager: Arc<StateManager>,
         migration_engine: Option<Arc<MigrationEngine>>,
         schema_registry: Option<Arc<SchemaRegistry>>,
-        backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
+        backup_manager: Option<Arc<llmspell_kernel::state::backup::BackupManager>>,
     ) -> Self {
         // Use StateManagerAdapter with Custom scope for StateGlobal
         // This allows reading keys that were written by NoScopeStateAdapter

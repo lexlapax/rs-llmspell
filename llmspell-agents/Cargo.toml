@@ -12,11 +12,11 @@ workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-hooks = { path = "../llmspell-hooks" }
-llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 tokio.workspace = true
 tokio-util.workspace = true
 async-trait.workspace = true

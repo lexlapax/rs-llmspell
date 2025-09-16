@@ -300,7 +300,7 @@ impl Default for FastAgentStateOps {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::agent_state::{AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats};
+    use crate::state::agent_state::{AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats};
     use std::collections::HashMap;
     #[test]
     fn test_lock_free_basic_operations() {

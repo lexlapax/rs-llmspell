@@ -127,7 +127,7 @@ pub struct SessionReplayStatus {
 pub struct SessionReplayAdapter {
     /// Core replay manager from llmspell-hooks
     replay_manager: Arc<ReplayManager>,
-    /// Hook replay manager from llmspell-state-persistence
+    /// Hook replay manager from internal state management
     hook_replay_manager: Arc<HookReplayManager>,
     /// Session storage backend
     storage_backend: Arc<dyn StorageBackend>,

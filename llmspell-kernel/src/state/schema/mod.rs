@@ -126,7 +126,7 @@ impl EnhancedStateSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_config::FieldSchema;
+    use crate::state::config::FieldSchema;
     #[test]
     fn test_enhanced_schema_creation() {
         let version = SemanticVersion::new(1, 2, 3);

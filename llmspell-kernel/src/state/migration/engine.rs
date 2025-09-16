@@ -634,7 +634,7 @@ mod tests {
     use super::*;
     #[tokio::test]
     async fn test_migration_engine_creation() {
-        let storage_adapter = Arc::new(crate::backend_adapter::StateStorageAdapter::new(
+        let storage_adapter = Arc::new(crate::state::backend_adapter::StateStorageAdapter::new(
             Arc::new(llmspell_storage::MemoryBackend::new()),
             "test".to_string(),
         ));

@@ -7,7 +7,7 @@ use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_kernel::sessions::{
     ArtifactType, CreateSessionOptions, SessionManager, SessionManagerConfig, SessionStatus,
 };
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use llmspell_storage::backends::memory::MemoryBackend;
 use std::sync::Arc;
 use std::time::Duration;

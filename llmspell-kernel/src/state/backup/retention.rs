@@ -307,7 +307,7 @@ impl RetentionReport {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use super::backup::BackupStats;
+    use crate::state::backup::BackupStats;
     #[test]
     fn test_retention_priority_ordering() {
         assert!(RetentionPriority::Critical > RetentionPriority::Important);

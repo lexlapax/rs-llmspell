@@ -214,7 +214,7 @@ impl<P: Protocol + 'static> IntegratedKernel<P> {
 
         // Create unified kernel state with memory backend by default
         let state = Arc::new(KernelState::new(StorageBackend::Memory(Box::new(
-            crate::state::MemoryBackend::new(),
+            crate::state::KernelMemoryBackend::new(),
         )))?);
 
         // Create session manager dependencies

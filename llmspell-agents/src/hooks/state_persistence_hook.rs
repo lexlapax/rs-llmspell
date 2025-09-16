@@ -6,7 +6,7 @@
 use crate::lifecycle::events::{LifecycleEvent, LifecycleEventType};
 use anyhow::Result;
 use llmspell_core::traits::agent::Agent;
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;

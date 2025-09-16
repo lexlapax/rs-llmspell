@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use llmspell_kernel::sessions::{SessionId, SessionManager};
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -407,7 +407,7 @@ impl Clone for SessionAwareRAGPipeline {
 
 /// Helper functions for `StateScope` tenant patterns
 pub mod scope_helpers {
-    use llmspell_state_traits::StateScope;
+    use llmspell_core::state::StateScope;
 
     /// Create a tenant scope
     #[must_use]

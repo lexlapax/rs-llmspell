@@ -43,7 +43,7 @@ pub struct MigrationStep {
     pub migration_type: String,
     pub description: String,
     pub estimated_duration: Duration,
-    pub risk_level: crate::schema::compatibility::RiskLevel,
+    pub risk_level: crate::state::schema::compatibility::RiskLevel,
     pub requires_backup: bool,
     pub validation_rules: Vec<String>,
 }
@@ -57,7 +57,7 @@ impl MigrationStep {
             migration_type: legacy.migration_type.clone(),
             description: legacy.description.clone(),
             estimated_duration: Duration::from_secs(60), // Default estimate
-            risk_level: crate::schema::compatibility::RiskLevel::Medium,
+            risk_level: crate::state::schema::compatibility::RiskLevel::Medium,
             requires_backup: legacy.migration_type.contains("breaking"),
             validation_rules: vec!["basic_validation".to_string()],
         }
@@ -81,7 +81,7 @@ pub struct MigrationPlan {
     pub to_version: SemanticVersion,
     pub steps: Vec<MigrationStep>,
     pub estimated_duration: Duration,
-    pub total_risk_level: crate::schema::compatibility::RiskLevel,
+    pub total_risk_level: crate::state::schema::compatibility::RiskLevel,
     pub requires_backup: bool,
     pub compatibility_analysis: CompatibilityResult,
     pub warnings: Vec<String>,
@@ -126,7 +126,7 @@ impl MigrationPlan {
     }
 
     pub fn is_safe(&self) -> bool {
-        self.total_risk_level <= crate::schema::compatibility::RiskLevel::Medium
+        self.total_risk_level <= crate::state::schema::compatibility::RiskLevel::Medium
             && self.compatibility_analysis.compatible
     }
 
@@ -310,7 +310,7 @@ impl MigrationPlanner {
                 breaking_changes: compatibility.breaking_changes.len(),
                 estimated_duration: Duration::from_secs(field_changes_count * 10 + 60),
                 requires_backup: compatibility.risk_level
-                    >= crate::schema::compatibility::RiskLevel::High,
+                    >= crate::state::schema::compatibility::RiskLevel::High,
                 complexity_score: self.calculate_complexity_score(&compatibility),
             };
 
@@ -337,10 +337,10 @@ impl MigrationPlanner {
 
         // Risk level multiplier
         let risk_multiplier = match compatibility.risk_level {
-            crate::schema::compatibility::RiskLevel::Low => 1,
-            crate::schema::compatibility::RiskLevel::Medium => 2,
-            crate::schema::compatibility::RiskLevel::High => 4,
-            crate::schema::compatibility::RiskLevel::Critical => 8,
+            crate::state::schema::compatibility::RiskLevel::Low => 1,
+            crate::state::schema::compatibility::RiskLevel::Medium => 2,
+            crate::state::schema::compatibility::RiskLevel::High => 4,
+            crate::state::schema::compatibility::RiskLevel::Critical => 8,
         };
 
         score * risk_multiplier
@@ -361,7 +361,7 @@ impl Default for MigrationPlanner {
 /// Migration complexity assessment
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationComplexity {
-    pub risk_level: crate::schema::compatibility::RiskLevel,
+    pub risk_level: crate::state::schema::compatibility::RiskLevel,
     pub field_changes: usize,
     pub breaking_changes: usize,
     pub estimated_duration: Duration,
@@ -372,12 +372,12 @@ pub struct MigrationComplexity {
 impl MigrationComplexity {
     pub fn is_simple(&self) -> bool {
         self.complexity_score < 100
-            && self.risk_level <= crate::schema::compatibility::RiskLevel::Low
+            && self.risk_level <= crate::state::schema::compatibility::RiskLevel::Low
     }
 
     pub fn is_complex(&self) -> bool {
         self.complexity_score > 500
-            || self.risk_level >= crate::schema::compatibility::RiskLevel::High
+            || self.risk_level >= crate::state::schema::compatibility::RiskLevel::High
     }
 }
 
@@ -456,7 +456,7 @@ mod tests {
     #[test]
     fn test_migration_complexity() {
         let complexity = MigrationComplexity {
-            risk_level: crate::schema::compatibility::RiskLevel::Low,
+            risk_level: crate::state::schema::compatibility::RiskLevel::Low,
             field_changes: 2,
             breaking_changes: 0,
             estimated_duration: Duration::from_secs(80),
@@ -478,7 +478,7 @@ mod tests {
             to_version: SemanticVersion::new(2, 0, 0),
             steps: vec![],
             estimated_duration: Duration::from_secs(60),
-            total_risk_level: crate::schema::compatibility::RiskLevel::Low,
+            total_risk_level: crate::state::schema::compatibility::RiskLevel::Low,
             requires_backup: false,
             compatibility_analysis: CompatibilityResult {
                 compatible: true,
@@ -487,7 +487,7 @@ mod tests {
                 warnings: vec![],
                 field_changes: HashMap::new(),
                 migration_required: false,
-                risk_level: crate::schema::compatibility::RiskLevel::Low,
+                risk_level: crate::state::schema::compatibility::RiskLevel::Low,
             },
             warnings: vec![],
             metadata: HashMap::new(),

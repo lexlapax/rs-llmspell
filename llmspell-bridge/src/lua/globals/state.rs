@@ -369,15 +369,15 @@ fn create_tool_set_handler(
 fn setup_migration_methods(
     lua: &Lua,
     state_table: &mlua::Table,
-    migration_engine: &Arc<llmspell_state_persistence::migration::MigrationEngine>,
-    schema_registry: &Arc<llmspell_state_persistence::schema::SchemaRegistry>,
+    migration_engine: &Arc<llmspell_kernel::state::migration::MigrationEngine>,
+    schema_registry: &Arc<llmspell_kernel::state::schema::SchemaRegistry>,
 ) -> mlua::Result<()> {
     // migrate(target_version) - Trigger migration to target schema version
     let migrate_engine = migration_engine.clone();
     let migrate_registry = schema_registry.clone();
     let migrate_fn = lua.create_function(move |lua, target_version: String| {
         // Parse semantic version
-        let target_ver: llmspell_state_persistence::schema::SemanticVersion =
+        let target_ver: llmspell_kernel::state::schema::SemanticVersion =
             target_version.parse().map_err(|e| {
                 mlua::Error::RuntimeError(format!("Invalid version '{target_version}': {e}"))
             })?;
@@ -398,13 +398,13 @@ fn setup_migration_methods(
         }
 
         // Execute migration
-        let migration_config = llmspell_state_persistence::migration::MigrationConfig {
+        let migration_config = llmspell_kernel::state::migration::MigrationConfig {
             dry_run: false,
             create_backup: true,
             batch_size: 100,
             timeout: std::time::Duration::from_secs(300),
             max_concurrent_migrations: 1,
-            validation_level: llmspell_state_persistence::migration::ValidationLevel::Strict,
+            validation_level: llmspell_kernel::state::migration::ValidationLevel::Strict,
             rollback_on_error: true,
         };
 
@@ -522,7 +522,7 @@ fn setup_migration_methods(
 fn setup_backup_methods(
     lua: &Lua,
     state_table: &mlua::Table,
-    _backup_mgr: &Arc<llmspell_state_persistence::backup::BackupManager>,
+    _backup_mgr: &Arc<llmspell_kernel::state::backup::BackupManager>,
 ) -> mlua::Result<()> {
     // create_backup(incremental) - Create a backup (full or incremental)
     let create_backup_fn = lua.create_function(move |lua, incremental: Option<bool>| {

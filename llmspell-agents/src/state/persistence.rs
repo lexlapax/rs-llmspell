@@ -4,8 +4,9 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::traits::agent::{Agent, ConversationMessage, MessageRole as CoreMessageRole};
-use llmspell_state_persistence::{
-    AgentMetadata as PersistentMetadata, MessageRole, PersistentAgentState, StateManager,
+use llmspell_kernel::state::{
+    agent_state::{AgentMetadata as PersistentMetadata, MessageRole, PersistentAgentState},
+    StateManager,
 };
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -141,32 +142,32 @@ pub trait StateManagerHolder {
 macro_rules! impl_persistent_agent {
     ($agent_type:ty) => {
         #[async_trait::async_trait]
-        impl llmspell_state_persistence::PersistentAgent for $agent_type {
+        impl llmspell_kernel::state::agent_state::PersistentAgent for $agent_type {
             fn agent_id(&self) -> &str {
                 &self.agent_id_string
             }
 
             fn get_persistent_state(
                 &self,
-            ) -> llmspell_state_persistence::StateResult<
-                llmspell_state_persistence::PersistentAgentState,
+            ) -> llmspell_kernel::state::StateResult<
+                llmspell_kernel::state::PersistentAgentState,
             > {
                 // Since we need async, we use block_on here
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(self.create_persistent_state()).map_err(|e| {
-                    llmspell_state_persistence::StateError::SerializationError(e.to_string())
+                    llmspell_kernel::state::StateError::SerializationError(e.to_string())
                 })
             }
 
             fn apply_persistent_state(
                 &self,
-                state: llmspell_state_persistence::PersistentAgentState,
-            ) -> llmspell_state_persistence::StateResult<()> {
+                state: llmspell_kernel::state::PersistentAgentState,
+            ) -> llmspell_kernel::state::StateResult<()> {
                 // Since we need async, we use block_on here
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(self.restore_from_persistent_state(state))
                     .map_err(|e| {
-                        llmspell_state_persistence::StateError::SerializationError(e.to_string())
+                        llmspell_kernel::state::StateError::SerializationError(e.to_string())
                     })
             }
         }

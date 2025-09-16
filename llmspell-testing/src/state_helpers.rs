@@ -14,7 +14,7 @@
 //!     create_test_state_manager_with_backup,
 //!     populate_test_state_data,
 //! };
-//! use llmspell_state_persistence::StateScope;
+//! use llmspell_kernel::state::StateScope;
 //!
 //! # async fn test_example() {
 //! // Create a test state manager
@@ -29,7 +29,7 @@
 //! # }
 //! ```
 
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     backup::{BackupConfig, BackupManager, CompressionType},
     config::{PersistenceConfig, StorageBackendType},
     manager::StateManager,

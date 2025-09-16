@@ -1,5 +1,5 @@
 //! ABOUTME: Session replay engine for reconstructing session history from events and hooks
-//! ABOUTME: Leverages existing replay infrastructure from llmspell-hooks and llmspell-state-persistence
+//! ABOUTME: Leverages existing replay infrastructure from llmspell-hooks and internal state management
 
 mod hook_replay_bridge;
 pub mod session_adapter;
@@ -25,7 +25,7 @@ pub struct ReplayEngine {
     /// Core replay manager from llmspell-hooks
     #[allow(dead_code)]
     replay_manager: Arc<ReplayManager>,
-    /// Hook replay manager from llmspell-state-persistence
+    /// Hook replay manager from internal state management
     #[allow(dead_code)]
     hook_replay_manager: Arc<HookReplayManager>,
     /// Session storage backend

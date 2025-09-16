@@ -4,8 +4,8 @@
 use anyhow::{Context, Result};
 use clap::{Args, Subcommand};
 use llmspell_config::LLMSpellConfig;
-use llmspell_state_persistence::backup::{BackupManager, RestoreOptions};
-use llmspell_state_persistence::manager::StateManager;
+use llmspell_kernel::state::backup::{BackupManager, RestoreOptions};
+use llmspell_kernel::state::manager::StateManager;
 use serde_json::json;
 use std::sync::Arc;
 
@@ -135,7 +135,7 @@ pub async fn execute_backup(
 async fn initialize_backup_infrastructure(
     _config: &LLMSpellConfig,
 ) -> Result<(Arc<StateManager>, Arc<BackupManager>)> {
-    use llmspell_state_persistence::config::{BackupConfig, StorageBackendType};
+    use llmspell_kernel::state::config::{BackupConfig, StorageBackendType};
 
     // For now, we'll use default state config
 
@@ -150,7 +150,7 @@ async fn initialize_backup_infrastructure(
     let backup_config = BackupConfig {
         backup_dir: std::path::PathBuf::from("./backups"),
         compression_enabled: true,
-        compression_type: llmspell_state_persistence::config::CompressionType::Zstd,
+        compression_type: llmspell_kernel::state::config::CompressionType::Zstd,
         compression_level: 3,
         encryption_enabled: false,
         max_backups: Some(10),

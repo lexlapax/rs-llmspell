@@ -10,7 +10,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use uuid::Uuid;
 
-use llmspell_state_traits::{StateManager, StateScope};
+use llmspell_core::state::{StateManager, StateScope};
 
 /// Hook-specific metadata for enhanced storage
 #[derive(Debug, Clone, Serialize, Deserialize)]

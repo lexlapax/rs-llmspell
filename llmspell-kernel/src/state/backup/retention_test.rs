@@ -3,8 +3,8 @@
 
 #[cfg(test)]
 mod test {
-    use super::backup::retention::*;
-    use super::backup::*;
+    use crate::state::backup::retention::*;
+    use crate::state::backup::*;
     use std::collections::HashMap;
     use std::time::{Duration, SystemTime};
     #[tokio::test]

@@ -1,7 +1,7 @@
 //! Security context for access control decisions
 
 use anyhow::Result;
-use llmspell_state_traits::StateScope;
+use llmspell_core::state::StateScope;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;

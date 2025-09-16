@@ -1,7 +1,7 @@
 // ABOUTME: Disaster recovery scenario tests for operational readiness validation
 // ABOUTME: Tests complete system failure and recovery procedures including data consistency
 
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     backup::{BackupConfig, BackupManager, CompressionType, RestoreOptions},
     config::{PersistenceConfig, StorageBackendType},
     manager::StateManager,

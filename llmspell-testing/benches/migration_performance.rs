@@ -4,7 +4,7 @@
 // Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     manager::SerializableState,
     migration::{DataTransformer, FieldTransform, StateTransformation},
 };

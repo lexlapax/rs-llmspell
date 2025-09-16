@@ -16,8 +16,6 @@ members = [
     "llmspell-events",
     "llmspell-testing",
     "llmspell-utils",
-    "llmspell-state-persistence",
-    "llmspell-state-traits",
     "llmspell-rag",
     "llmspell-tenancy",
     "llmspell-kernel",

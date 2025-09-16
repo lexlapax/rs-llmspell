@@ -7,7 +7,7 @@ use llmspell_hooks::{HookExecutor, HookRegistry};
 use llmspell_kernel::sessions::{
     CreateSessionOptions, SessionId, SessionManager, SessionManagerConfig,
 };
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use llmspell_storage::{MemoryBackend, StorageBackend};
 use std::sync::Arc;
 use tempfile::TempDir;

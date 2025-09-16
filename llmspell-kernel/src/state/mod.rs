@@ -4,7 +4,7 @@
 //! session, and debug state with pluggable storage backends.
 //!
 //! Also includes comprehensive state-persistence and storage functionality
-//! consolidated from llmspell-state-persistence and llmspell-storage.
+//! consolidated from internal state management and llmspell-storage.
 
 use anyhow::Result;
 use parking_lot::RwLock;
@@ -340,7 +340,7 @@ mod tests {
 
     #[test]
     fn test_kernel_state_creation() {
-        let backend = StorageBackend::Memory(Box::new(MemoryBackend::new()));
+        let backend = StorageBackend::Memory(Box::new(kernel_backends::MemoryBackend::new()));
         let state = KernelState::new(backend).unwrap();
 
         assert!(!state.is_circuit_open());
@@ -350,7 +350,7 @@ mod tests {
 
     #[test]
     fn test_state_updates() {
-        let backend = StorageBackend::Memory(Box::new(MemoryBackend::new()));
+        let backend = StorageBackend::Memory(Box::new(kernel_backends::MemoryBackend::new()));
         let state = KernelState::new(backend).unwrap();
 
         // Update execution state
@@ -366,7 +366,7 @@ mod tests {
 
     #[test]
     fn test_state_persistence() {
-        let backend = StorageBackend::Memory(Box::new(MemoryBackend::new()));
+        let backend = StorageBackend::Memory(Box::new(kernel_backends::MemoryBackend::new()));
         let state = KernelState::new(backend).unwrap();
 
         // Update and persist

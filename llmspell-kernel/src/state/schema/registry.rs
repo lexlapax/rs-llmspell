@@ -325,7 +325,7 @@ pub struct RegistryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_config::FieldSchema;
+    use crate::state::config::FieldSchema;
 
     fn create_test_schema(version: SemanticVersion) -> EnhancedStateSchema {
         let mut schema = EnhancedStateSchema::new(version);

@@ -6,7 +6,7 @@ use llmspell_config::StatePersistenceConfig;
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::{EventBus, EventCorrelationTracker};
 use llmspell_hooks::HookExecutor;
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     backend_adapter::StateStorageAdapter,
     config::{PersistenceConfig, SledConfig, StorageBackendType},
     migration::MigrationEngine,
@@ -38,7 +38,7 @@ pub async fn get_or_create_state_infrastructure(
         let schema_registry = context.get_bridge::<SchemaRegistry>("schema_registry");
 
         let backup_manager = context
-            .get_bridge::<llmspell_state_persistence::backup::BackupManager>("backup_manager");
+            .get_bridge::<llmspell_kernel::state::backup::BackupManager>("backup_manager");
 
         return Ok(StateInfrastructure {
             state_manager,
@@ -85,7 +85,7 @@ pub async fn get_or_create_state_infrastructure(
         // For now, create a new one with the same backend type
         let migration_backend_type = create_backend_type(config);
         let migration_backend =
-            llmspell_state_persistence::backend_adapter::create_storage_backend(
+            llmspell_kernel::state::backend_adapter::create_storage_backend(
                 &migration_backend_type,
             )
             .await
@@ -132,16 +132,16 @@ pub async fn get_or_create_state_infrastructure(
         #[allow(clippy::option_if_let_else)] // Complex pattern
         let backup_config = if let Some(ref backup_cfg) = config.backup {
             // Convert from runtime BackupConfig to state-persistence BackupConfig
-            llmspell_state_persistence::config::BackupConfig {
+            llmspell_kernel::state::config::BackupConfig {
                 backup_dir: std::path::PathBuf::from(
                     backup_cfg.backup_dir.as_deref().unwrap_or("./backups"),
                 ),
                 compression_enabled: backup_cfg.compression_enabled,
                 compression_type: match backup_cfg.compression_type.as_str() {
-                    "gzip" => llmspell_state_persistence::config::CompressionType::Gzip,
-                    "lz4" => llmspell_state_persistence::config::CompressionType::Lz4,
-                    "brotli" => llmspell_state_persistence::config::CompressionType::Brotli,
-                    _ => llmspell_state_persistence::config::CompressionType::Zstd,
+                    "gzip" => llmspell_kernel::state::config::CompressionType::Gzip,
+                    "lz4" => llmspell_kernel::state::config::CompressionType::Lz4,
+                    "brotli" => llmspell_kernel::state::config::CompressionType::Brotli,
+                    _ => llmspell_kernel::state::config::CompressionType::Zstd,
                 },
                 compression_level: backup_cfg.compression_level,
                 encryption_enabled: false, // Not exposed in runtime config yet
@@ -153,11 +153,11 @@ pub async fn get_or_create_state_infrastructure(
                 full_backup_interval: std::time::Duration::from_secs(86400), // 24 hours default
             }
         } else {
-            llmspell_state_persistence::config::BackupConfig::default()
+            llmspell_kernel::state::config::BackupConfig::default()
         };
 
         // Create backup manager using the same StateManager instance
-        match llmspell_state_persistence::backup::BackupManager::new(
+        match llmspell_kernel::state::backup::BackupManager::new(
             backup_config,
             state_manager.clone(),
         ) {
@@ -261,7 +261,7 @@ pub struct StateInfrastructure {
     pub state_manager: Arc<StateManager>,
     pub migration_engine: Option<Arc<MigrationEngine>>,
     pub schema_registry: Option<Arc<SchemaRegistry>>,
-    pub backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
+    pub backup_manager: Option<Arc<llmspell_kernel::state::backup::BackupManager>>,
 }
 
 #[cfg(test)]

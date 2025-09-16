@@ -1,7 +1,7 @@
 // ABOUTME: Core StateManager implementation with persistent backend support
 // ABOUTME: Integrates Phase 4 hooks and Phase 3.3 storage for state persistence
 
-use super::agent_state::ToolUsageStats;
+use crate::state::agent_state::ToolUsageStats;
 use super::backend_adapter::{create_storage_backend, StateStorageAdapter};
 use super::config::{PersistenceConfig, StateSchema};
 use super::key_manager::KeyManager;
@@ -345,7 +345,7 @@ impl StateManager {
         };
 
         // Handle hook results
-        let final_value = match crate::hooks::aggregate_hook_results(&pre_results) {
+        let final_value = match crate::state::hooks::aggregate_hook_results(&pre_results) {
             HookResult::Continue => value,
             HookResult::Modified(new_data) => new_data
                 .as_object()
@@ -471,7 +471,7 @@ impl StateManager {
         };
 
         // Handle hook results
-        let final_value = match crate::hooks::aggregate_hook_results(&pre_results) {
+        let final_value = match crate::state::hooks::aggregate_hook_results(&pre_results) {
             HookResult::Continue => value,
             HookResult::Modified(new_data) => new_data
                 .as_object()
@@ -845,7 +845,7 @@ impl StateManager {
     /// Save agent state to persistent storage with concurrent access protection
     pub async fn save_agent_state(
         &self,
-        agent_state: &crate::agent_state::PersistentAgentState,
+        agent_state: &crate::state::agent_state::PersistentAgentState,
     ) -> StateResult<()> {
         // Use async hooks if enabled
         if self.async_hook_processor.is_some() {
@@ -859,7 +859,7 @@ impl StateManager {
     /// Save agent state with async hook processing
     async fn save_agent_state_async(
         &self,
-        agent_state: &crate::agent_state::PersistentAgentState,
+        agent_state: &crate::state::agent_state::PersistentAgentState,
     ) -> StateResult<()> {
         // Use fast path for benchmark data
         if agent_state.agent_id.starts_with("benchmark:")
@@ -876,7 +876,7 @@ impl StateManager {
             let agent_lock = self.get_agent_lock(&agent_state.agent_id);
             let _guard = agent_lock.write();
             let safe_bytes = agent_state.safe_to_storage_bytes()?;
-            crate::agent_state::PersistentAgentState::safe_from_storage_bytes(&safe_bytes)?
+            crate::state::agent_state::PersistentAgentState::safe_from_storage_bytes(&safe_bytes)?
         };
 
         // Create hook context
@@ -964,7 +964,7 @@ impl StateManager {
     /// Save agent state with synchronous hook processing (original implementation)
     async fn save_agent_state_sync(
         &self,
-        agent_state: &crate::agent_state::PersistentAgentState,
+        agent_state: &crate::state::agent_state::PersistentAgentState,
     ) -> StateResult<()> {
         // Use fast path for benchmark data
         if agent_state.agent_id.starts_with("benchmark:")
@@ -983,7 +983,7 @@ impl StateManager {
 
             // Perform serialization with circular reference check and sensitive data protection
             let safe_bytes = agent_state.safe_to_storage_bytes()?;
-            crate::agent_state::PersistentAgentState::safe_from_storage_bytes(&safe_bytes)?
+            crate::state::agent_state::PersistentAgentState::safe_from_storage_bytes(&safe_bytes)?
         }; // Lock is dropped here before any async operations
         let correlation_id = Uuid::new_v4();
 
@@ -1080,7 +1080,7 @@ impl StateManager {
     pub async fn load_agent_state(
         &self,
         agent_id: &str,
-    ) -> StateResult<Option<crate::agent_state::PersistentAgentState>> {
+    ) -> StateResult<Option<crate::state::agent_state::PersistentAgentState>> {
         // Use fast path for benchmark data
         if agent_id.starts_with("benchmark:") || agent_id.starts_with("test:") {
             return self.load_agent_state_fast(agent_id).await;
@@ -1206,7 +1206,7 @@ impl StateManager {
     pub async fn get_agent_metadata(
         &self,
         agent_id: &str,
-    ) -> StateResult<Option<crate::agent_state::AgentMetadata>> {
+    ) -> StateResult<Option<crate::state::agent_state::AgentMetadata>> {
         if let Some(state) = self.load_agent_state(agent_id).await? {
             Ok(Some(state.metadata))
         } else {
@@ -1219,7 +1219,7 @@ impl StateManager {
     /// Save agent state using lock-free fast path
     async fn save_agent_state_fast(
         &self,
-        agent_state: &crate::agent_state::PersistentAgentState,
+        agent_state: &crate::state::agent_state::PersistentAgentState,
     ) -> StateResult<()> {
         // Ultra-fast path for benchmarks - just store in lock-free memory
         if agent_state.agent_id.starts_with("benchmark:") {
@@ -1243,7 +1243,7 @@ impl StateManager {
     pub async fn load_agent_state_fast(
         &self,
         agent_id: &str,
-    ) -> StateResult<Option<crate::agent_state::PersistentAgentState>> {
+    ) -> StateResult<Option<crate::state::agent_state::PersistentAgentState>> {
         // Check lock-free store first
         if let Some(state) = self.fast_agent_ops.load_fast(agent_id)? {
             return Ok(Some(state));
@@ -1392,7 +1392,7 @@ impl StateManager {
     /// Synchronous benchmark API for measuring true overhead
     pub fn save_agent_state_benchmark_sync(
         &self,
-        agent_state: &crate::agent_state::PersistentAgentState,
+        agent_state: &crate::state::agent_state::PersistentAgentState,
     ) -> StateResult<()> {
         if agent_state.agent_id.starts_with("benchmark:") {
             self.fast_agent_ops.save_benchmark(agent_state)
@@ -1450,7 +1450,7 @@ impl StateManager {
     /// Get hook processor statistics
     pub fn hook_processor_stats(
         &self,
-    ) -> Option<crate::performance::async_hooks::HookProcessorStatsSnapshot> {
+    ) -> Option<crate::state::performance::async_hooks::HookProcessorStatsSnapshot> {
         self.async_hook_processor.as_ref().map(|processor| {
             let proc = processor.lock();
             proc.stats()
@@ -1517,22 +1517,22 @@ impl StateManager {
         hooks: Vec<Arc<dyn Hook>>,
     ) -> StateResult<()> {
         // Convert to PersistentAgentState
-        let state_data = crate::agent_state::AgentStateData {
+        let state_data = crate::state::agent_state::AgentStateData {
             conversation_history: vec![],
             context_variables: HashMap::new(),
             tool_usage_stats: ToolUsageStats::default(),
-            execution_state: crate::agent_state::ExecutionState::Idle,
+            execution_state: crate::state::agent_state::ExecutionState::Idle,
             custom_data: agent_state
                 .as_object()
                 .map(|obj| obj.clone().into_iter().collect())
                 .unwrap_or_default(),
         };
 
-        let persistent_state = crate::agent_state::PersistentAgentState {
+        let persistent_state = crate::state::agent_state::PersistentAgentState {
             agent_id: agent_id.to_string(),
             agent_type: "custom".to_string(),
             state: state_data,
-            metadata: crate::agent_state::AgentMetadata {
+            metadata: crate::state::agent_state::AgentMetadata {
                 name: agent_id.to_string(),
                 description: None,
                 version: "1.0.0".to_string(),
@@ -1670,15 +1670,14 @@ impl StateManager {
 }
 
 // ==============================================================================
-// TRAIT IMPLEMENTATIONS FOR llmspell-state-traits
+// TRAIT IMPLEMENTATIONS FOR llmspell-core state traits
 // ==============================================================================
 
 use async_trait::async_trait;
-use super::{StatePersistence};
-use llmspell_core::state::{StatePersistence as StatePersistenceTrait, TypedStatePersistence};
+use llmspell_core::state::{StateManager as StateManagerTrait, StatePersistence as StatePersistenceTrait, TypedStatePersistence};
 
 #[async_trait]
-impl StatePersistenceTrait for StateManager {
+impl StateManagerTrait for StateManager {
     async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
         self.set(scope, key, value).await
     }
@@ -1716,7 +1715,8 @@ impl StatePersistenceTrait for StateManager {
     }
 }
 
-// TypedStatePersistence provides default implementations on top of StatePersistence
+// StatePersistence and TypedStatePersistence provide default implementations on top of StateManager
+impl StatePersistenceTrait for StateManager {}
 impl TypedStatePersistence for StateManager {}
 
 #[cfg(test)]
@@ -1810,7 +1810,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_agent_state_persistence() {
-        use super::agent_state::{MessageRole, PersistentAgentState};
+        use crate::state::agent_state::{MessageRole, PersistentAgentState};
 
         let manager = StateManager::new().await.unwrap();
 
@@ -1849,7 +1849,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_agent_metadata_retrieval() {
-        use super::agent_state::PersistentAgentState;
+        use crate::state::agent_state::PersistentAgentState;
 
         let manager = StateManager::new().await.unwrap();
 

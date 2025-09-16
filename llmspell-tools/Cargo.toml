@@ -15,8 +15,6 @@ llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-kernel = { path = "../llmspell-kernel" }
-llmspell-state-persistence = { path = "../llmspell-state-persistence" }
-llmspell-state-traits = { path = "../llmspell-state-traits" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true

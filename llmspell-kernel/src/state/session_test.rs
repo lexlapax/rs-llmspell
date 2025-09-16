@@ -3,21 +3,13 @@
 
 #[cfg(test)]
 mod session_tests {
-    use super::{StateManager, PersistenceConfig};
+    use crate::state::{StateManager, StorageBackendType};
     use crate::state::StateScope;
     use serde_json::json;
     use tempfile::TempDir;
     #[tokio::test]
     async fn test_session_scope_basic_operations() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = PersistenceConfig {
-            enabled: true,
-            backend_type: crate::StorageBackendType::Disk,
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-
-        let state_manager = StateManager::new(config).await.unwrap();
+        let state_manager = StateManager::new().await.unwrap();
 
         // Test saving to session scope
         let session_id = "test-session-123";
@@ -84,15 +76,7 @@ mod session_tests {
     }
     #[tokio::test]
     async fn test_session_scope_isolation_from_global() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = PersistenceConfig {
-            enabled: true,
-            backend_type: crate::StorageBackendType::Disk,
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-
-        let state_manager = StateManager::new(config).await.unwrap();
+        let state_manager = StateManager::new().await.unwrap();
 
         // Save same key in different scopes
         state_manager
@@ -124,15 +108,7 @@ mod session_tests {
     }
     #[tokio::test]
     async fn test_clear_session_scope() {
-        let temp_dir = TempDir::new().unwrap();
-        let config = PersistenceConfig {
-            enabled: true,
-            backend_type: crate::StorageBackendType::Disk,
-            path: temp_dir.path().to_path_buf(),
-            ..Default::default()
-        };
-
-        let state_manager = StateManager::new(config).await.unwrap();
+        let state_manager = StateManager::new().await.unwrap();
         let session_scope = StateScope::Session("cleanup-test".to_string());
 
         // Add multiple keys to session

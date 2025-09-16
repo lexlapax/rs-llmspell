@@ -8,7 +8,7 @@ use llmspell_core::traits::agent::Agent;
 use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::AgentInput;
 use llmspell_core::ExecutionContext;
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
 };
 use std::sync::Arc;

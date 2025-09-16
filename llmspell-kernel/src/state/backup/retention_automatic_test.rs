@@ -3,9 +3,10 @@
 
 #[cfg(test)]
 mod test {
-    use super::backup::*;
-    use super::{StateManager, StateScope};
-    use llmspell_config::{BackupConfig, PersistenceConfig, StorageBackendType};
+    use crate::state::backup::*;
+    use crate::state::{StateManager, StateScope};
+    use crate::state::config::BackupConfig;
+    use crate::state::{PersistenceConfig, StorageBackendType};
     use serde_json::json;
     use std::sync::Arc;
     use std::time::Duration;

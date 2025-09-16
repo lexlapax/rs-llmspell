@@ -9,7 +9,7 @@ mod tests {
         artifact::ArtifactType, config::SessionManagerConfig, types::CreateSessionOptions,
         SessionManager,
     };
-    use llmspell_state_persistence::StateManager;
+    use llmspell_kernel::state::StateManager;
     use llmspell_storage::MemoryBackend;
     use std::collections::HashSet;
     use std::sync::Arc;

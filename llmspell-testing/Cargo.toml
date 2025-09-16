@@ -106,7 +106,6 @@ llmspell-security = { path = "../llmspell-security" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-events = { path = "../llmspell-events" }
 llmspell-utils = { path = "../llmspell-utils" }
-llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-kernel = { path = "../llmspell-kernel" }
 
 # Testing frameworks

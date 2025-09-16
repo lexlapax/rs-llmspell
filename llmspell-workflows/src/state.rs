@@ -686,7 +686,7 @@ mod tests {
 // ==============================================================================
 
 use async_trait::async_trait;
-use llmspell_state_traits::{StateManager as PersistentStateManager, StateScope};
+use llmspell_core::state::{StateManager as PersistentStateManager, StateScope};
 use serde::{Deserialize, Serialize};
 
 /// Persistent workflow state for storage

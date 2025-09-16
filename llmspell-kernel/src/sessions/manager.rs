@@ -21,7 +21,7 @@ use crate::sessions::{
 use chrono::{DateTime, Utc};
 use llmspell_events::{bus::EventBus, correlation::EventCorrelationTracker};
 use llmspell_hooks::{HookExecutor, HookPoint, HookRegistry, LoggingHook, MetricsHook};
-use crate::state::{StateManager, StateScope, StorageBackend};
+use crate::state::{StateManager, StateScope};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;

@@ -15,7 +15,7 @@ use llmspell_core::{
     ComponentMetadata, ExecutionContext, LLMSpellError,
 };
 use llmspell_providers::{ModelSpecifier, ProviderInstance, ProviderManager};
-use llmspell_state_persistence::StateManager;
+use llmspell_kernel::state::StateManager;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, error, info, instrument, warn};
 

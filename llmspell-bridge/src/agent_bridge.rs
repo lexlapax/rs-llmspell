@@ -17,7 +17,7 @@ use llmspell_core::execution_context::{
 };
 use llmspell_core::types::{AgentInput, AgentOutput, ComponentId};
 use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result, Tool};
-use llmspell_state_persistence::{StateManager, StateScope};
+use llmspell_kernel::state::{StateManager, StateScope};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;

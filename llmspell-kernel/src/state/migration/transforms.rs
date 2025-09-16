@@ -271,7 +271,7 @@ impl DataTransformer {
         }
     }
 
-    pub fn with_sensitive_data_config(config: crate::sensitive_data::SensitiveDataConfig) -> Self {
+    pub fn with_sensitive_data_config(config: crate::state::sensitive_data::SensitiveDataConfig) -> Self {
         Self {
             sensitive_data_protector: SensitiveDataProtector::new(config),
         }

@@ -4,7 +4,7 @@
 use anyhow::Result;
 use llmspell_agents::{agents::basic::BasicAgent, builder::AgentBuilder, state::StatePersistence};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
-use llmspell_state_persistence::{
+use llmspell_kernel::state::{
     PersistenceConfig, SledConfig, StateManager, StateScope, StorageBackendType,
 };
 use std::sync::Arc;

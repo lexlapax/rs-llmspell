@@ -78,7 +78,7 @@ async fn register_rag_global(
         .and_then(|infra| infra.vector_storage.clone());
 
     if let (Some(state_manager), Some(session_manager), Some(multi_tenant_rag)) = (
-        context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager"),
+        context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager"),
         session_manager_opt,
         context.get_bridge::<llmspell_rag::multi_tenant_integration::MultiTenantRAG>(
             "multi_tenant_rag",
@@ -128,7 +128,7 @@ async fn register_agent_workflow(
 ) -> Result<()> {
     // Create agent global with state manager if available
     let agent_global = if let Some(state_manager) =
-        context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
+        context.get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
     {
         agent_global::AgentGlobal::with_state_manager(
             context.registry.clone(),
@@ -143,7 +143,7 @@ async fn register_agent_workflow(
 
     // Create workflow global with state manager if available
     let workflow_global = context
-        .get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
+        .get_bridge::<llmspell_kernel::state::StateManager>("state_manager")
         .map_or_else(
             || workflow_global::WorkflowGlobal::new(context.registry.clone()),
             |state_manager| {
