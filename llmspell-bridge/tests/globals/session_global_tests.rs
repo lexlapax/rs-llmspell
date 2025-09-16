@@ -6,7 +6,7 @@ use llmspell_bridge::runtime::Global;
 use llmspell_config::LLMSpellConfig;
 use llmspell_bridge::ComponentRegistry;
 use llmspell_core::test_utils::TestLogger;
-use llmspell_sessions::config::SessionManagerConfig;
+use llmspell_kernel::sessions::config::SessionManagerConfig;
 use std::sync::Arc;
 use tempfile::TempDir;
 use tokio;

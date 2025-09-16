@@ -5,7 +5,7 @@ use crate::globals::GlobalContext;
 use crate::lua::conversion::json_to_lua_value;
 use crate::lua::sync_utils::block_on_async;
 use crate::session_bridge::SessionBridge;
-use llmspell_sessions::{
+use llmspell_kernel::sessions::{
     types::{CreateSessionOptions, SessionQuery},
     SessionId,
 };
@@ -201,7 +201,7 @@ pub fn inject_session_global(
         let lua_table = lua.create_table()?;
         for (i, metadata) in result.iter().enumerate() {
             let json_value =
-                llmspell_sessions::bridge::conversions::session_metadata_to_json(metadata);
+                llmspell_kernel::sessions::bridge::conversions::session_metadata_to_json(metadata);
             let lua_value = json_to_lua_value(lua, &json_value)?;
             lua_table.set(i + 1, lua_value)?;
         }

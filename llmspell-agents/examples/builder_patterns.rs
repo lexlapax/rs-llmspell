@@ -1,7 +1,7 @@
 //! Example demonstrating the use of builder patterns for configuration objects
 
 use llmspell_agents::factory::{AgentConfig, ModelConfig};
-use llmspell_sessions::config::SessionManagerConfig;
+use llmspell_kernel::sessions::config::SessionManagerConfig;
 use llmspell_workflows::types::WorkflowConfig;
 use std::time::Duration;
 

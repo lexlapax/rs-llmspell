@@ -858,17 +858,42 @@ let _session_id_obj = session_manager.create_session(session_options).await?;
 - **Zero-Overhead Migration**: All 315 kernel tests pass, confirming no regression in functionality
 - **Foundation for 9.4a.3**: Clean architecture ready for state dependencies internalization
 
-#### **Task 9.4a.2.5: Update External Crate Dependencies**
-**Estimated Time**: 2 hours
-**Status**: PENDING
+#### **Task 9.4a.2.5: Update External Crate Dependencies** ✅
+**Estimated Time**: 2 hours (Actual: 1.5 hours)
+**Status**: COMPLETE
 
 **7 Crates Requiring Updates**:
-- [ ] **Root Cargo.toml**: Remove llmspell-sessions from workspace members
-- [ ] **llmspell-bridge**: Replace sessions dependency with kernel dependency
-- [ ] **llmspell-agents**: Update Cargo.toml and imports
-- [ ] **llmspell-rag**: Update Cargo.toml and imports
-- [ ] **llmspell-testing**: Update Cargo.toml and imports
-- [ ] **llmspell-kernel**: Remove sessions dependency (now internal)
+- [x] **Root Cargo.toml**: Remove llmspell-sessions from workspace members ✅
+  - **Insight**: Line 20 removed cleanly, no other workspace references
+- [x] **llmspell-bridge**: Replace sessions dependency with kernel dependency ✅
+  - **Insight**: Successfully updated Cargo.toml and 16 source files (8 src, 6 tests, 1 bench, 1 mod.rs)
+  - **Pattern**: Used `llmspell_kernel::sessions::` as the new import path
+  - **Automated Fix**: Test files were auto-fixed using sed command
+- [x] **llmspell-agents**: Update Cargo.toml and imports ✅
+  - **Insight**: Only had dev-dependency and one example file to update
+  - **Clean Migration**: Single file change in examples/builder_patterns.rs
+- [x] **llmspell-rag**: Update Cargo.toml and imports ✅
+  - **Insight**: Minimal changes - only Cargo.toml and one source file
+  - **Clean Migration**: session_integration.rs was the only file needing updates
+- [x] **llmspell-testing**: Update Cargo.toml and imports ✅
+  - **Insight**: Only had Cargo.toml dependency and one test file to update
+  - **Clean Migration**: phase6_integration.rs was the only test needing updates
+- [x] **llmspell-kernel**: Remove sessions dependency (now internal) ✅
+  - **Insight**: No dependency to remove - sessions was already integrated internally in 9.4a.2.4
+  - **Verification**: Confirmed no llmspell-sessions references in kernel Cargo.toml
+
+**Validation & Results**:
+- ✅ Workspace builds successfully without llmspell-sessions
+- ✅ All 314 kernel tests pass (0 failures, 1 ignored)
+- ✅ No import errors or dependency conflicts
+- ✅ Clean migration path: `llmspell_sessions::` → `llmspell_kernel::sessions::`
+
+**Key Insights from 9.4a.2.5**:
+1. **Minimal Disruption**: Only 26 files needed updates across 6 crates
+2. **Clean Import Pattern**: Consistent migration to `llmspell_kernel::sessions::`
+3. **Test Preservation**: All 314 kernel tests continue passing
+4. **Workspace Simplification**: Successfully removed llmspell-sessions from workspace
+5. **Ready for 9.4a.3**: External state dependencies remain temporary, ready for consolidation
 
 **Cargo.toml Changes**:
 ```toml

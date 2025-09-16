@@ -23,7 +23,7 @@ llmspell-events = { path = "../llmspell-events" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-storage = { path = "../llmspell-storage" }
-llmspell-sessions = { path = "../llmspell-sessions" }
+llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-rag = { path = "../llmspell-rag" }
 llmspell-tenancy = { path = "../llmspell-tenancy" }
 tokio.workspace = true

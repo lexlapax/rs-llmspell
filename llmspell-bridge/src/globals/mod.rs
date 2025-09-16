@@ -46,9 +46,9 @@ fn register_core_globals(builder: &mut GlobalRegistryBuilder) {
 fn register_session_artifacts(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
-) -> Option<Arc<llmspell_sessions::manager::SessionManager>> {
+) -> Option<Arc<llmspell_kernel::sessions::manager::SessionManager>> {
     let session_manager_opt =
-        context.get_bridge::<llmspell_sessions::manager::SessionManager>("session_manager");
+        context.get_bridge::<llmspell_kernel::sessions::manager::SessionManager>("session_manager");
 
     if let Some(session_manager) = session_manager_opt.clone() {
         let session_bridge = Arc::new(crate::session_bridge::SessionBridge::new(
@@ -70,7 +70,7 @@ fn register_session_artifacts(
 async fn register_rag_global(
     builder: &mut GlobalRegistryBuilder,
     context: &Arc<GlobalContext>,
-    session_manager_opt: Option<Arc<llmspell_sessions::manager::SessionManager>>,
+    session_manager_opt: Option<Arc<llmspell_kernel::sessions::manager::SessionManager>>,
 ) {
     // Try to get vector storage from infrastructure
     let vector_storage = context

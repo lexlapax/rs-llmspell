@@ -4,7 +4,7 @@
 //! artifact tracking, and tenant isolation.
 
 use anyhow::Result;
-use llmspell_sessions::{SessionId, SessionManager};
+use llmspell_kernel::sessions::{SessionId, SessionManager};
 use llmspell_state_traits::StateScope;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

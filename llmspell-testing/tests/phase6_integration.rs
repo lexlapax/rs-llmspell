@@ -4,7 +4,7 @@
 use anyhow::Result;
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_sessions::{
+use llmspell_kernel::sessions::{
     ArtifactType, CreateSessionOptions, SessionManager, SessionManagerConfig, SessionStatus,
 };
 use llmspell_state_persistence::StateManager;

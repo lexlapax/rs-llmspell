@@ -18,7 +18,6 @@ members = [
     "llmspell-utils",
     "llmspell-state-persistence",
     "llmspell-state-traits",
-    "llmspell-sessions",
     "llmspell-rag",
     "llmspell-tenancy",
     "llmspell-kernel",

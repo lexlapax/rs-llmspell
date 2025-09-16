@@ -36,7 +36,7 @@ rand = "0.8"
 [dev-dependencies]
 tracing-subscriber.workspace = true
 tempfile = "3.8"
-llmspell-sessions = { path = "../llmspell-sessions" }
+llmspell-kernel = { path = "../llmspell-kernel" }
 llmspell-workflows = { path = "../llmspell-workflows" }
 llmspell-testing = { path = "../llmspell-testing" }
 

@@ -6,7 +6,7 @@ use llmspell_config::SessionConfig;
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_events::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_sessions::{SessionManager, SessionManagerConfig};
+use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
 use llmspell_state_persistence::StateManager;
 use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend};
 use std::sync::Arc;

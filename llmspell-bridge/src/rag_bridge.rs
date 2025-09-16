@@ -7,7 +7,7 @@ use llmspell_rag::{
     multi_tenant_integration::MultiTenantRAG, session_integration::SessionAwareRAGPipeline,
     state_integration::StateAwareVectorStorage,
 };
-use llmspell_sessions::{SessionId, SessionManager};
+use llmspell_kernel::sessions::{SessionId, SessionManager};
 use llmspell_state_persistence::{StateManager, StateScope};
 use llmspell_storage::{VectorEntry, VectorResult, VectorStorage};
 use serde::{Deserialize, Serialize};

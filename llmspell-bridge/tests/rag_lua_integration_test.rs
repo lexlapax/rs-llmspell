@@ -10,7 +10,7 @@ mod rag_lua_tests {
     use llmspell_events::bus::EventBus;
     use llmspell_hooks::{HookExecutor, HookRegistry};
     use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
-    use llmspell_sessions::{SessionManager, SessionManagerConfig};
+    use llmspell_kernel::sessions::{SessionManager, SessionManagerConfig};
     use llmspell_state_persistence::StateManager;
     use llmspell_storage::backends::vector::hnsw::HNSWVectorStorage;
     use llmspell_storage::vector_storage::HNSWConfig;
