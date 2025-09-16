@@ -3,7 +3,7 @@
 
 use crossbeam::queue::SegQueue;
 use llmspell_hooks::{Hook, HookContext, HookExecutor};
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::{StateError, StateResult};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;

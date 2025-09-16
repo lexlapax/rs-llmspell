@@ -3,8 +3,8 @@
 
 use super::compatibility::RiskLevel;
 use super::{CompatibilityChecker, CompatibilityResult, EnhancedStateSchema, SemanticVersion};
-use crate::config::MigrationStep;
-use llmspell_state_traits::StateError;
+use super::super::config::MigrationStep;
+use crate::state::StateError;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use thiserror::Error;
@@ -570,7 +570,7 @@ pub struct MigrationStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::FieldSchema;
+    use llmspell_config::FieldSchema;
 
     fn create_test_schema(version: SemanticVersion) -> EnhancedStateSchema {
         let mut schema = EnhancedStateSchema::new(version);

@@ -11,9 +11,9 @@ use super::{
     AtomicBackup, BackupCompression, BackupConfig, BackupId, BackupResult, BackupValidation,
     CompressionLevel, RestoreOptions,
 };
-use crate::manager::StateManager;
+use crate::state::StateManager;
 use anyhow::{Context, Result};
-use llmspell_state_traits::StateError;
+use crate::state::StateError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;

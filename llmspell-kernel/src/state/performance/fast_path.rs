@@ -1,8 +1,8 @@
 // ABOUTME: Fast-path state operations that bypass expensive validation and processing
 // ABOUTME: Provides direct serialization paths for trusted and ephemeral data
 
-use crate::StateScope;
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::StateScope;
+use crate::state::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

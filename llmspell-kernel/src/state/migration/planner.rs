@@ -1,13 +1,13 @@
 // ABOUTME: Migration planner integration with existing schema system
 // ABOUTME: Provides high-level migration planning interface for StateManager integration
 
-use crate::config::MigrationStep as LegacyMigrationStep;
-use crate::schema::{
+use super::super::config::MigrationStep as LegacyMigrationStep;
+use crate::state::schema::{
     CompatibilityChecker, CompatibilityResult, EnhancedStateSchema,
     MigrationPlan as SchemaMigrationPlan, MigrationPlanner as SchemaMigrationPlanner,
     SchemaRegistry, SemanticVersion,
 };
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;
@@ -384,7 +384,7 @@ impl MigrationComplexity {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::FieldSchema;
+    use super::super::super::config::FieldSchema;
 
     fn create_test_schema(version: SemanticVersion) -> EnhancedStateSchema {
         let mut schema = EnhancedStateSchema::new(version);
@@ -482,7 +482,7 @@ mod tests {
             requires_backup: false,
             compatibility_analysis: CompatibilityResult {
                 compatible: true,
-                compatibility_level: crate::config::CompatibilityLevel::BackwardCompatible,
+                compatibility_level: crate::state::config::CompatibilityLevel::BackwardCompatible,
                 breaking_changes: vec![],
                 warnings: vec![],
                 field_changes: HashMap::new(),

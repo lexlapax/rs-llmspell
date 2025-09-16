@@ -1,7 +1,7 @@
 // ABOUTME: Key validation and namespace management for state isolation
 // ABOUTME: Ensures key security and prevents traversal attacks
 
-use llmspell_state_traits::{StateError, StateResult, StateScope};
+use super::{StateError, StateResult, StateScope};
 use unicode_normalization::UnicodeNormalization;
 
 pub struct KeyManager;

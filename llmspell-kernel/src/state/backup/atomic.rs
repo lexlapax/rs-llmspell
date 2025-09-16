@@ -1,9 +1,9 @@
 // ABOUTME: Atomic backup operations ensuring consistent point-in-time snapshots
 // ABOUTME: Implements lock-free backup strategies with minimal performance impact
 
-use crate::manager::StateManager;
+use crate::state::StateManager;
 use anyhow::Result;
-use llmspell_state_traits::{StateError, StateScope};
+use crate::state::{StateError, StateScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};

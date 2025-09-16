@@ -3,11 +3,11 @@
 
 #[cfg(test)]
 mod backup_tests {
-    use crate::backup::atomic::{AtomicBackup, BackupOperation, OperationStatus};
-    use crate::backup::compression::{BackupCompression, CompressionLevel};
-    use crate::backup::manager::{BackupMetadata, BackupStats, BackupType};
-    use crate::backup::*;
-    use crate::StateScope;
+    use super::backup::atomic::{AtomicBackup, BackupOperation, OperationStatus};
+    use super::backup::compression::{BackupCompression, CompressionLevel};
+    use super::backup::manager::{BackupMetadata, BackupStats, BackupType};
+    use super::backup::*;
+    use crate::state::StateScope;
     #[tokio::test]
     async fn test_backup_config_defaults() {
         let config = BackupConfig::default();
@@ -159,10 +159,10 @@ mod backup_tests {
 
 #[cfg(test)]
 mod integration_tests {
-    use crate::backup::atomic::AtomicBackup;
-    use crate::backup::*;
-    use crate::config::{BackupConfig, CompressionType, PersistenceConfig, StorageBackendType};
-    use crate::{StateManager, StateScope};
+    use super::backup::atomic::AtomicBackup;
+    use super::backup::*;
+    use llmspell_config::{BackupConfig, CompressionType, PersistenceConfig, StorageBackendType};
+    use super::{StateManager, StateScope};
     use serde_json::json;
     use std::sync::Arc;
     use std::time::Duration;

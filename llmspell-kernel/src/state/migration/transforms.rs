@@ -1,9 +1,9 @@
 // ABOUTME: Data transformation engine for state migrations
 // ABOUTME: Handles field mappings, type conversions, and data validation during migrations
 
-use crate::manager::SerializableState;
-use crate::sensitive_data::{SensitiveDataConfig, SensitiveDataProtector};
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::manager::SerializableState;
+use crate::state::sensitive_data::{SensitiveDataConfig, SensitiveDataProtector};
+use crate::state::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

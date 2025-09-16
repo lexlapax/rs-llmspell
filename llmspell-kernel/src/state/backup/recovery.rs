@@ -3,7 +3,7 @@
 
 use super::{BackupId, BackupManager, BackupValidation, RestoreOptions};
 use anyhow::Result;
-use llmspell_state_traits::StateError;
+use crate::state::StateError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};

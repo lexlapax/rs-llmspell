@@ -29,7 +29,7 @@ use crate::traits::Protocol;
 // Session dependencies
 use llmspell_events::bus::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_state_persistence::StateManager;
+use crate::state::StateManager;
 use llmspell_storage::MemoryBackend as SessionMemoryBackend;
 
 /// Simplified `ScriptRuntime` stub for Phase 9.2

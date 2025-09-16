@@ -2,7 +2,7 @@
 // ABOUTME: Provides compatibility analysis, breaking change detection, and upgrade path validation
 
 use super::{EnhancedStateSchema, SemanticVersion};
-use crate::config::{CompatibilityLevel, FieldSchema};
+use super::super::config::{CompatibilityLevel, FieldSchema};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;

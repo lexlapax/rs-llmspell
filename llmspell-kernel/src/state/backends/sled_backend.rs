@@ -1,7 +1,7 @@
 //! ABOUTME: Sled storage backend implementation
 //! ABOUTME: Provides persistent embedded database storage
 
-use crate::traits::{StorageBackend, StorageBackendType, StorageCharacteristics};
+use llmspell_storage::{StorageBackend, StorageBackendType, StorageCharacteristics};
 use anyhow::Result;
 use async_trait::async_trait;
 use sled::Db;

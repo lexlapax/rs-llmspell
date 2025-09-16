@@ -1,9 +1,9 @@
 // ABOUTME: Lock-free agent state management for high-performance concurrent access
 // ABOUTME: Eliminates per-agent locks that cause massive overhead in state operations
 
-use crate::agent_state::PersistentAgentState;
+use crate::state::agent_state::PersistentAgentState;
 use crossbeam_skiplist::SkipMap;
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::{StateError, StateResult};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -300,7 +300,7 @@ impl Default for FastAgentStateOps {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::agent_state::{AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats};
+    use super::agent_state::{AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats};
     use std::collections::HashMap;
     #[test]
     fn test_lock_free_basic_operations() {

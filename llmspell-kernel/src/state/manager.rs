@@ -1,11 +1,11 @@
 // ABOUTME: Core StateManager implementation with persistent backend support
 // ABOUTME: Integrates Phase 4 hooks and Phase 3.3 storage for state persistence
 
-use crate::agent_state::ToolUsageStats;
-use crate::backend_adapter::{create_storage_backend, StateStorageAdapter};
-use crate::config::{PersistenceConfig, StateSchema};
-use crate::key_manager::KeyManager;
-use crate::performance::{
+use super::agent_state::ToolUsageStats;
+use super::backend_adapter::{create_storage_backend, StateStorageAdapter};
+use super::config::{PersistenceConfig, StateSchema};
+use super::key_manager::KeyManager;
+use super::performance::{
     AsyncHookProcessor, FastAgentStateOps, FastPathConfig, FastPathManager, HookEvent,
     HookEventType, StateClass,
 };
@@ -15,7 +15,7 @@ use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, Uni
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
-use llmspell_state_traits::{StateError, StateResult, StateScope};
+use super::{StateError, StateResult, StateScope};
 use llmspell_storage::StorageBackend;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -150,7 +150,7 @@ impl StateManager {
     /// Create a new state manager with default in-memory backend
     pub async fn new() -> StateResult<Self> {
         Self::with_backend(
-            crate::config::StorageBackendType::Memory,
+            crate::state::config::StorageBackendType::Memory,
             PersistenceConfig::default(),
         )
         .await
@@ -164,7 +164,7 @@ impl StateManager {
         };
 
         let storage_backend =
-            create_storage_backend(&crate::config::StorageBackendType::Memory).await?;
+            create_storage_backend(&crate::state::config::StorageBackendType::Memory).await?;
         let storage_adapter = Arc::new(StateStorageAdapter::new(
             storage_backend.clone(),
             "state".to_string(),
@@ -198,7 +198,7 @@ impl StateManager {
 
     /// Create a new state manager with specified backend
     pub async fn with_backend(
-        backend_type: crate::config::StorageBackendType,
+        backend_type: crate::state::config::StorageBackendType,
         config: PersistenceConfig,
     ) -> StateResult<Self> {
         let storage_backend = create_storage_backend(&backend_type).await?;
@@ -1674,12 +1674,11 @@ impl StateManager {
 // ==============================================================================
 
 use async_trait::async_trait;
-use llmspell_state_traits::{
-    StateManager as StateManagerTrait, StatePersistence, TypedStatePersistence,
-};
+use super::{StatePersistence};
+use llmspell_core::state::{StatePersistence as StatePersistenceTrait, TypedStatePersistence};
 
 #[async_trait]
-impl StateManagerTrait for StateManager {
+impl StatePersistenceTrait for StateManager {
     async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
         self.set(scope, key, value).await
     }
@@ -1717,9 +1716,7 @@ impl StateManagerTrait for StateManager {
     }
 }
 
-#[async_trait]
-impl StatePersistence for StateManager {}
-
+// TypedStatePersistence provides default implementations on top of StatePersistence
 impl TypedStatePersistence for StateManager {}
 
 #[cfg(test)]
@@ -1813,7 +1810,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_agent_state_persistence() {
-        use crate::agent_state::{MessageRole, PersistentAgentState};
+        use super::agent_state::{MessageRole, PersistentAgentState};
 
         let manager = StateManager::new().await.unwrap();
 
@@ -1852,7 +1849,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_agent_metadata_retrieval() {
-        use crate::agent_state::PersistentAgentState;
+        use super::agent_state::PersistentAgentState;
 
         let manager = StateManager::new().await.unwrap();
 

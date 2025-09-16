@@ -1,9 +1,9 @@
 // ABOUTME: Storage backend adapter for state persistence
 // ABOUTME: Integrates with Phase 3.3 llmspell-storage infrastructure
 
-use crate::config::StorageBackendType;
-use crate::performance::UnifiedSerializer;
-use llmspell_state_traits::{StateError, StateResult};
+use super::config::StorageBackendType;
+use super::performance::UnifiedSerializer;
+use crate::state::{StateError, StateResult};
 use llmspell_storage::{StorageBackend, StorageSerialize};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

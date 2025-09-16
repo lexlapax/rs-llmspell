@@ -18,11 +18,11 @@ use hnsw_rs::{
     prelude::{DistCosine, DistDot, DistL1, DistL2},
 };
 
-use crate::vector_storage::{
+use crate::state::vector_storage::{
     DistanceMetric, HNSWConfig, HNSWStorage, NamespaceStats, ScopedStats, StorageStats,
     VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };
-use llmspell_state_traits::StateScope;
+use crate::state::StateScope;
 
 /// HNSW vector storage implementation using hnsw_rs
 #[derive(Debug)]

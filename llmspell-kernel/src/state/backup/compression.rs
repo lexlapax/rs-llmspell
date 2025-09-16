@@ -1,9 +1,9 @@
 // ABOUTME: Backup compression implementation with multiple algorithm support
 // ABOUTME: Targets >70% compression ratio for typical state data
 
-use crate::config::CompressionType;
+use super::super::config::CompressionType;
 use anyhow::Result;
-use llmspell_state_traits::StateError;
+use crate::state::StateError;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use tracing::debug;

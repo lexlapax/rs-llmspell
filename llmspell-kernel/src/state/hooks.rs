@@ -12,7 +12,7 @@ use tracing::{debug, info};
 /// State change event for hooks
 #[derive(Debug, Clone)]
 pub struct StateChangeEvent {
-    pub scope: llmspell_state_traits::StateScope,
+    pub scope: crate::state::StateScope,
     pub key: String,
     pub old_value: Option<Value>,
     pub new_value: Option<Value>,

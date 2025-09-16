@@ -44,10 +44,10 @@ pub use persistence::StatePersistence;
 pub use types::{DebugState, ExecutionState, SessionState};
 
 // Re-export consolidated state-persistence types (needed by sessions)
-pub use agent_state::{AgentState, AgentStateManager};
+pub use agent_state::{PersistentAgentState, AgentStateData, AgentMetadata, ToolUsageStats};
 pub use backend_adapter::StateStorageAdapter;
 pub use config::{PersistenceConfig, StorageBackendType};
-pub use manager::{HookReplayManager, SerializedHookExecution, StateManager, StateManagerTrait};
+pub use manager::{HookReplayManager, SerializedHookExecution, StateManager};
 pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
 
 // Re-export original kernel storage types

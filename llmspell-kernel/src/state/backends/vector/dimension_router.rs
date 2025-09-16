@@ -9,10 +9,10 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 use super::hnsw::HNSWVectorStorage;
-use crate::vector_storage::{
+use crate::state::vector_storage::{
     HNSWConfig, ScopedStats, StorageStats, VectorEntry, VectorQuery, VectorResult, VectorStorage,
 };
-use llmspell_state_traits::StateScope;
+use crate::state::StateScope;
 
 /// Routes vectors to appropriate storage based on dimensions
 ///

@@ -35,7 +35,7 @@ pub struct SessionManager {
     /// State persistence manager
     state_manager: Arc<StateManager>,
     /// Storage backend for session data
-    storage_backend: Arc<dyn StorageBackend>,
+    storage_backend: Arc<dyn llmspell_storage::StorageBackend>,
     /// Hook registry for lifecycle events
     hook_registry: Arc<HookRegistry>,
     /// Hook executor for lifecycle events (future use)
@@ -73,7 +73,7 @@ impl SessionManager {
     /// Returns an error if configuration is invalid or storage directory cannot be created
     pub fn new(
         state_manager: Arc<StateManager>,
-        storage_backend: Arc<dyn StorageBackend>,
+        storage_backend: Arc<dyn llmspell_storage::StorageBackend>,
         hook_registry: Arc<HookRegistry>,
         hook_executor: Arc<HookExecutor>,
         event_bus: &Arc<EventBus>,

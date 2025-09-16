@@ -5,12 +5,12 @@ use super::{
     events::{MigrationEvent, MigrationEventBuilder},
     MigrationConfig, MigrationContext, MigrationResult, ValidationLevel,
 };
-use crate::backend_adapter::StateStorageAdapter;
-use crate::manager::SerializableState;
-use crate::schema::{MigrationPlan, MigrationPlanner, SchemaRegistry, SemanticVersion};
+use crate::state::backend_adapter::StateStorageAdapter;
+use crate::state::manager::SerializableState;
+use crate::state::schema::{MigrationPlan, MigrationPlanner, SchemaRegistry, SemanticVersion};
 use llmspell_events::{EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{ComponentId, ComponentType, HookContext, HookExecutor, HookPoint};
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::{StateError, StateResult};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;

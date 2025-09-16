@@ -26,9 +26,9 @@ pub use retention::{
 };
 
 // Re-export backup config from config module
-pub use crate::config::{BackupConfig, CompressionType};
+pub use super::config::{BackupConfig, CompressionType};
 
-use llmspell_state_traits::StateError;
+use crate::state::StateError;
 use serde::{Deserialize, Serialize};
 use std::time::SystemTime;
 

@@ -1,8 +1,8 @@
 // ABOUTME: Agent state persistence structures and serialization
 // ABOUTME: Implements StorageSerialize for agent state with Phase 4 hook integration
 
-use crate::sensitive_data::SensitiveDataConfig;
-use llmspell_state_traits::StateResult;
+use super::sensitive_data::SensitiveDataConfig;
+use super::StateResult;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -191,7 +191,7 @@ impl PersistentAgentState {
     /// Serialize with circular reference check and sensitive data protection
     pub fn safe_to_storage_bytes(&self) -> StateResult<Vec<u8>> {
         // Use unified serializer for single-pass serialization
-        use crate::performance::UnifiedSerializer;
+        use super::performance::UnifiedSerializer;
 
         let serializer = UnifiedSerializer::new(SensitiveDataConfig::default());
         serializer.serialize(self)
@@ -200,7 +200,7 @@ impl PersistentAgentState {
     /// Deserialize from storage bytes (no special handling needed on read)
     pub fn safe_from_storage_bytes(bytes: &[u8]) -> StateResult<Self> {
         // Use unified serializer for deserialization
-        use crate::performance::UnifiedSerializer;
+        use super::performance::UnifiedSerializer;
 
         let serializer = UnifiedSerializer::new(SensitiveDataConfig::default());
         serializer.deserialize(bytes)
@@ -208,7 +208,7 @@ impl PersistentAgentState {
 
     /// Fast serialization for benchmarks (no protection)
     pub fn fast_to_bytes(&self) -> StateResult<Vec<u8>> {
-        use crate::performance::UnifiedSerializer;
+        use super::performance::UnifiedSerializer;
 
         let serializer = UnifiedSerializer::fast();
         serializer.serialize(self)
@@ -216,7 +216,7 @@ impl PersistentAgentState {
 
     /// Fast deserialization for benchmarks
     pub fn fast_from_bytes(bytes: &[u8]) -> StateResult<Self> {
-        use crate::performance::UnifiedSerializer;
+        use super::performance::UnifiedSerializer;
 
         let serializer = UnifiedSerializer::fast();
         serializer.deserialize(bytes)
@@ -236,7 +236,7 @@ pub trait PersistentAgent {
     fn apply_persistent_state(&self, state: PersistentAgentState) -> StateResult<()>;
 
     /// Save the agent's state
-    async fn save_state(&self, state_manager: &crate::manager::StateManager) -> StateResult<()> {
+    async fn save_state(&self, state_manager: &crate::state::manager::StateManager) -> StateResult<()> {
         let state = self.get_persistent_state()?;
         state_manager.save_agent_state(&state).await
     }
@@ -244,7 +244,7 @@ pub trait PersistentAgent {
     /// Load the agent's state
     async fn load_state(
         &mut self,
-        state_manager: &crate::manager::StateManager,
+        state_manager: &crate::state::manager::StateManager,
     ) -> StateResult<()> {
         if let Some(state) = state_manager.load_agent_state(self.agent_id()).await? {
             self.apply_persistent_state(state)?;
@@ -253,7 +253,7 @@ pub trait PersistentAgent {
     }
 
     /// Delete the agent's state
-    async fn delete_state(&self, state_manager: &crate::manager::StateManager) -> StateResult<()> {
+    async fn delete_state(&self, state_manager: &crate::state::manager::StateManager) -> StateResult<()> {
         state_manager.delete_agent_state(self.agent_id()).await?;
         Ok(())
     }

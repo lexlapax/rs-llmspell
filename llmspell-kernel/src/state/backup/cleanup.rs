@@ -2,7 +2,7 @@
 // ABOUTME: Implements atomic cleanup operations with rollback capability and audit logging
 
 use super::{retention::RetentionDecision, BackupId, BackupMetadata};
-use llmspell_state_traits::StateError;
+use crate::state::StateError;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -267,7 +267,7 @@ impl CleanupScheduler {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::backup::retention::{RetentionDecision, RetentionPriority};
+    use super::backup::retention::{RetentionDecision, RetentionPriority};
     #[tokio::test]
     async fn test_cleanup_dry_run() {
         let temp_dir = tempfile::tempdir().unwrap();

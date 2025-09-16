@@ -2,7 +2,7 @@
 // ABOUTME: Provides centralized schema storage, version resolution, and schema discovery
 
 use super::{EnhancedStateSchema, SchemaVersion, SemanticVersion};
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::{StateError, StateResult};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};
@@ -325,7 +325,7 @@ pub struct RegistryStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::FieldSchema;
+    use llmspell_config::FieldSchema;
 
     fn create_test_schema(version: SemanticVersion) -> EnhancedStateSchema {
         let mut schema = EnhancedStateSchema::new(version);

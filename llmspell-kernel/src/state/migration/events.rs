@@ -1,7 +1,7 @@
 // ABOUTME: Migration-specific events that integrate with existing event correlation system
 // ABOUTME: Defines migration events for timeline reconstruction and correlation tracking
 
-use crate::schema::SemanticVersion;
+use crate::state::schema::SemanticVersion;
 use chrono::Utc;
 use llmspell_events::{EventMetadata, Language, UniversalEvent};
 use serde::{Deserialize, Serialize};

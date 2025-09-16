@@ -17,6 +17,7 @@ llmspell-config = { path = "../llmspell-config", version = "0.8.0" }
 llmspell-utils = { path = "../llmspell-utils", version = "0.8.0" }
 llmspell-events = { path = "../llmspell-events", version = "0.8.0" }
 llmspell-hooks = { path = "../llmspell-hooks", version = "0.8.0" }
+llmspell-storage = { path = "../llmspell-storage", version = "0.8.0" }
 
 # State dependencies now consolidated internally
 
@@ -45,6 +46,7 @@ tracing-appender = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 bincode = { workspace = true }
+rmp-serde = "1.3"
 
 # Error handling
 anyhow = "1.0"
@@ -58,6 +60,16 @@ once_cell = "1.20"
 arc-swap = "1.7"
 num_cpus = "1.16"
 dirs = "5.0"
+unicode-normalization = "0.1"
+rand = "0.8"
+
+# Performance optimizations (for consolidated state persistence)
+crossbeam = "0.8"
+crossbeam-skiplist = "0.1"
+dashmap = "6.1"
+
+# Vector storage (for consolidated state persistence)
+hnsw_rs = "0.3"
 
 # Session artifact storage dependencies
 lru = "0.12"
@@ -66,6 +78,12 @@ lz4_flex = { workspace = true }
 
 # Storage
 sled = "0.34"
+
+# Compression libraries (for consolidated state persistence)
+flate2 = "1.0"
+zstd = "0.13"
+lz4 = "1.24"
+brotli = "3.5"
 
 # Cryptography
 sha2 = "0.10"

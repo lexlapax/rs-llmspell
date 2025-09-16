@@ -3,8 +3,8 @@
 
 #[cfg(test)]
 mod session_tests {
-    use crate::{StateManager, PersistenceConfig, SerializableState};
-    use llmspell_state_traits::StateScope;
+    use super::{StateManager, PersistenceConfig};
+    use crate::state::StateScope;
     use serde_json::json;
     use tempfile::TempDir;
     #[tokio::test]

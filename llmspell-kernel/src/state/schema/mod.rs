@@ -11,7 +11,7 @@ pub use migration::{MigrationPlan, MigrationPlanner, MigrationPlannerError};
 pub use registry::{SchemaRegistry, SchemaRegistryError};
 pub use version::{SchemaVersion, SemanticVersion};
 
-use crate::config::{CompatibilityLevel, MigrationStep, StateSchema};
+use super::config::{CompatibilityLevel, MigrationStep, StateSchema};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
@@ -21,7 +21,7 @@ pub struct EnhancedStateSchema {
     pub version: SemanticVersion,
     pub hash: String,
     pub created_at: std::time::SystemTime,
-    pub fields: HashMap<String, crate::config::FieldSchema>,
+    pub fields: HashMap<String, crate::state::config::FieldSchema>,
     pub compatibility: CompatibilityLevel,
     pub migration_path: Vec<MigrationStep>,
     pub dependencies: Vec<SemanticVersion>,
@@ -67,12 +67,12 @@ impl EnhancedStateSchema {
         }
     }
 
-    pub fn add_field(&mut self, name: String, field: crate::config::FieldSchema) {
+    pub fn add_field(&mut self, name: String, field: crate::state::config::FieldSchema) {
         self.fields.insert(name, field);
         self.hash = self.calculate_content_hash();
     }
 
-    pub fn remove_field(&mut self, name: &str) -> Option<crate::config::FieldSchema> {
+    pub fn remove_field(&mut self, name: &str) -> Option<crate::state::config::FieldSchema> {
         let result = self.fields.remove(name);
         if result.is_some() {
             self.hash = self.calculate_content_hash();
@@ -126,7 +126,7 @@ impl EnhancedStateSchema {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::FieldSchema;
+    use llmspell_config::FieldSchema;
     #[test]
     fn test_enhanced_schema_creation() {
         let version = SemanticVersion::new(1, 2, 3);

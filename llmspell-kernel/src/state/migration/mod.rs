@@ -16,7 +16,7 @@ pub use planner::{MigrationPlan, MigrationPlanner, MigrationStep as NewMigration
 pub use transforms::{DataTransformer, FieldTransform, StateTransformation, TransformationError};
 pub use validator::{MigrationValidator, ValidationResult, ValidationRules};
 
-use crate::schema::{SchemaRegistry, SemanticVersion};
+use crate::state::schema::{SchemaRegistry, SemanticVersion};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 

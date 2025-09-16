@@ -5,7 +5,7 @@
 
 use anyhow::Result;
 use async_trait::async_trait;
-use llmspell_state_traits::StateScope;
+use crate::state::StateScope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -38,7 +38,7 @@ pub trait VectorStorage: Send + Sync {
     ///
     /// ```rust
     /// use llmspell_storage::{VectorEntry, VectorStorage};
-    /// use llmspell_state_traits::StateScope;
+    /// use crate::state::StateScope;
     /// use std::collections::HashMap;
     /// use serde_json::Value;
     ///
@@ -116,7 +116,7 @@ pub trait VectorStorage: Send + Sync {
     ///
     /// ```rust
     /// use llmspell_storage::{VectorQuery, VectorStorage};
-    /// use llmspell_state_traits::StateScope;
+    /// use crate::state::StateScope;
     ///
     /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
     /// let query = VectorQuery::new(vec![0.1, 0.2, 0.3], 10);
@@ -214,7 +214,7 @@ pub trait VectorStorage: Send + Sync {
     ///
     /// ```rust
     /// use llmspell_storage::VectorStorage;
-    /// use llmspell_state_traits::StateScope;
+    /// use crate::state::StateScope;
     ///
     /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
     /// let user_scope = StateScope::User("user-to-delete".to_string());
@@ -277,7 +277,7 @@ pub trait VectorStorage: Send + Sync {
     ///
     /// ```rust
     /// use llmspell_storage::VectorStorage;
-    /// use llmspell_state_traits::StateScope;
+    /// use crate::state::StateScope;
     ///
     /// # async fn example(storage: &dyn VectorStorage) -> anyhow::Result<()> {
     /// let tenant_scope = StateScope::Custom("tenant:acme-corp".to_string());

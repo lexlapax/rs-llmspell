@@ -1,8 +1,8 @@
 // ABOUTME: Unified serialization pipeline that performs all operations in a single pass
 // ABOUTME: Eliminates multiple serialization cycles for optimal performance
 
-use crate::sensitive_data::SensitiveDataConfig;
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::sensitive_data::SensitiveDataConfig;
+use crate::state::{StateError, StateResult};
 use rmp_serde as msgpack;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

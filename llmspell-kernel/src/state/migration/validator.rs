@@ -1,9 +1,9 @@
 // ABOUTME: Migration validation system for ensuring data integrity
 // ABOUTME: Provides pre and post-migration validation with existing StateManager integration
 
-use crate::manager::SerializableState;
-use crate::schema::{EnhancedStateSchema, SchemaRegistry};
-use llmspell_state_traits::{StateError, StateResult};
+use crate::state::manager::SerializableState;
+use crate::state::schema::{EnhancedStateSchema, SchemaRegistry};
+use crate::state::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -651,7 +651,7 @@ impl MigrationValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::schema::EnhancedStateSchema;
+    use crate::state::schema::EnhancedStateSchema;
     #[test]
     fn test_validation_result() {
         let mut result = ValidationResult::new();
@@ -693,7 +693,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_migration_validator() {
-        use crate::schema::SemanticVersion;
+        use crate::state::schema::SemanticVersion;
 
         let rules = ValidationRules::permissive();
         let validator = MigrationValidator::new(rules);
