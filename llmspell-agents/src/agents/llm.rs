@@ -302,6 +302,15 @@ impl BaseAgent for LLMAgent {
         &self.metadata
     }
 
+    #[instrument(
+        level = "debug",
+        skip(self, _context),
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -374,6 +383,10 @@ impl BaseAgent for LLMAgent {
 
         // Build messages for the provider
         let messages = self.build_messages(&input.text);
+        debug!(
+            message_count = messages.len(),
+            "Built message history for provider"
+        );
 
         // Create provider input with conversation messages as JSON
         let messages_json =
@@ -398,15 +411,33 @@ impl BaseAgent for LLMAgent {
         }
 
         // Call the provider
+        info!(
+            provider_call = "complete",
+            max_tokens = ?self.core_config.max_tokens,
+            temperature = ?self.core_config.temperature,
+            "Calling LLM provider"
+        );
         let response = self.provider.complete(&provider_input).await?;
+        debug!(
+            response_size = response.text.len(),
+            "Received response from provider"
+        );
 
         // Update conversation history
         if let Ok(mut conv) = self.conversation.lock() {
+            debug!(
+                conversation_length = conv.len(),
+                "Updating conversation history"
+            );
             conv.push(ConversationMessage::user(input.text.clone()));
             conv.push(ConversationMessage::assistant(response.text.clone()));
         }
 
-        debug!("LLMAgent '{}' completed execution", self.metadata.name);
+        debug!(
+            output_size = response.text.len(),
+            "LLMAgent '{}' completed execution",
+            self.metadata.name
+        );
         Ok(response)
     }
 

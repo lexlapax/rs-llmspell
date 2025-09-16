@@ -16,6 +16,7 @@ use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, info, instrument, warn};
 
 /// Tool manager that provides concrete implementation of tool integration capabilities.
 ///
@@ -196,12 +197,24 @@ impl ToolManager {
     /// - Tool is not found or not available
     /// - Tool execution times out
     /// - Tool execution fails
+    #[instrument(
+        level = "debug",
+        skip(self, parameters, context),
+        fields(
+            tool_name = %tool_name,
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     pub async fn invoke_tool(
         &self,
         tool_name: &str,
         parameters: JsonValue,
         context: ExecutionContext,
     ) -> Result<AgentOutput> {
+        info!(
+            "Invoking tool '{}'",
+            tool_name
+        );
         // Check if tool is available
         if !self.tool_available(tool_name).await {
             return Err(LLMSpellError::Component {
@@ -231,16 +244,28 @@ impl ToolManager {
             .with_parameter("parameters".to_string(), parameters);
 
         // Execute tool with timeout
+        debug!(
+            timeout_ms = self.config.max_execution_time_ms,
+            "Executing tool with timeout"
+        );
         let result = tokio::time::timeout(
             std::time::Duration::from_millis(self.config.max_execution_time_ms),
             tool.execute(input, context),
         )
         .await
-        .map_err(|_| LLMSpellError::Component {
-            message: format!("Tool '{tool_name}' execution timed out"),
-            source: None,
+        .map_err(|_| {
+            warn!("Tool '{}' execution timed out", tool_name);
+            LLMSpellError::Component {
+                message: format!("Tool '{tool_name}' execution timed out"),
+                source: None,
+            }
         })??;
 
+        debug!(
+            output_size = result.text.len(),
+            "Tool '{}' execution completed successfully",
+            tool_name
+        );
         Ok(result)
     }
 

@@ -282,6 +282,15 @@ impl BaseAgent for MockAgent {
     /// # Panics
     ///
     /// Panics if any Mutex is poisoned
+    #[instrument(
+        level = "debug",
+        skip(self, context),
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -669,6 +678,15 @@ impl BaseAgent for MockTool {
     /// # Panics
     ///
     /// Panics if any Mutex is poisoned
+    #[instrument(
+        level = "debug",
+        skip(self, _context),
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,

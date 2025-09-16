@@ -11,7 +11,7 @@ use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 use tokio::sync::{Mutex, RwLock};
 use tokio_util::sync::CancellationToken;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 // Hook system imports (optional - only used if hooks are enabled)
 use llmspell_hooks::circuit_breaker::{BreakerConfig, BreakerState};
@@ -849,6 +849,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Uninitialized state
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "initialize"))]
     pub async fn initialize(&self) -> Result<()> {
         if !self.is_state(AgentState::Uninitialized).await {
             return Err(anyhow!(
@@ -883,6 +884,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Ready or Paused state
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "start"))]
     pub async fn start(&self) -> Result<()> {
         let current = self.current_state().await;
         if !matches!(current, AgentState::Ready | AgentState::Paused) {
@@ -903,6 +905,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Running state
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "pause"))]
     pub async fn pause(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be paused from Running state"));
@@ -919,6 +922,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Paused state
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "resume"))]
     pub async fn resume(&self) -> Result<()> {
         if !self.is_state(AgentState::Paused).await {
             return Err(anyhow!("Agent can only be resumed from Paused state"));
@@ -935,6 +939,7 @@ impl AgentStateMachine {
     /// Returns an error if:
     /// - Agent is not in Running state
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "stop"))]
     pub async fn stop(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be stopped from Running state"));
@@ -949,6 +954,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if agent cannot be terminated from current state
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "terminate"))]
     pub async fn terminate(&self) -> Result<()> {
         let current = self.current_state().await;
         if !current.can_terminate() {
@@ -983,6 +989,7 @@ impl AgentStateMachine {
     /// # Errors
     ///
     /// Returns an error if agent is already terminated
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "error", error_message = %error_message))]
     pub async fn error(&self, error_message: String) -> Result<()> {
         let current = self.current_state().await;
         if current == AgentState::Terminated {
@@ -1010,6 +1017,7 @@ impl AgentStateMachine {
     /// - Agent is not in error state
     /// - Maximum recovery attempts exceeded
     /// - State transition fails
+    #[instrument(level = "debug", skip(self), fields(agent_name = %self.agent_id, state_transition = "recover"))]
     pub async fn recover(&self) -> Result<()> {
         if !self.is_state(AgentState::Error).await {
             return Err(anyhow!("Agent can only recover from Error state"));

@@ -205,6 +205,15 @@ impl BaseAgent for HierarchicalCompositeAgent {
         &self.metadata
     }
 
+    #[instrument(
+        level = "debug",
+        skip(self, context),
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,

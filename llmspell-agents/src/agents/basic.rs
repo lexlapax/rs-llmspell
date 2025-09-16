@@ -225,6 +225,15 @@ impl BaseAgent for BasicAgent {
         &self.metadata
     }
 
+    #[instrument(
+        level = "debug",
+        skip(self, _context),
+        fields(
+            agent_name = %self.metadata.name,
+            input_size = input.text.len(),
+            execution_id = %uuid::Uuid::new_v4()
+        )
+    )]
     async fn execute_impl(
         &self,
         input: AgentInput,
@@ -303,12 +312,21 @@ impl BaseAgent for BasicAgent {
 
         // Add to conversation history
         if let Ok(mut conv) = self.conversation.lock() {
+            debug!(
+                conversation_length = conv.len(),
+                "Adding messages to conversation history"
+            );
             conv.push(ConversationMessage::user(input.text.clone()));
             conv.push(ConversationMessage::assistant(response.clone()));
         }
 
-        debug!("BasicAgent '{}' completed execution", self.metadata.name);
-        Ok(AgentOutput::text(response))
+        let output = AgentOutput::text(response);
+        debug!(
+            output_size = output.text.len(),
+            "BasicAgent '{}' completed execution",
+            self.metadata.name
+        );
+        Ok(output)
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<(), LLMSpellError> {
