@@ -11,84 +11,130 @@ use uuid::Uuid;
 /// Persistent agent state structure with full serialization support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistentAgentState {
+    /// Unique identifier for the agent instance
     pub agent_id: String,
+    /// Type classification of the agent (e.g., "assistant", "reviewer", "analyzer")
     pub agent_type: String,
+    /// Core operational state data for the agent
     pub state: AgentStateData,
+    /// Descriptive metadata about agent capabilities and configuration
     pub metadata: AgentMetadata,
+    /// Timestamp of when this agent state was initially created
     pub creation_time: SystemTime,
+    /// Timestamp of the most recent state modification
     pub last_modified: SystemTime,
+    /// Version number of the state schema for migration compatibility
     pub schema_version: u32,
 
     // Hook integration fields (Phase 4)
+    /// List of registered hook identifiers for state change notifications
     pub hook_registrations: Vec<String>,
+    /// Timestamp of the last successful hook execution
     pub last_hook_execution: Option<SystemTime>,
+    /// Correlation UUID for tracking related operations across the system
     pub correlation_context: Option<Uuid>,
 }
 
 /// Core agent state data
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentStateData {
+    /// Historical record of conversation messages and interactions
     pub conversation_history: Vec<ConversationMessage>,
+    /// Dynamic context variables for agent decision-making
     pub context_variables: HashMap<String, serde_json::Value>,
+    /// Aggregated statistics on tool usage patterns and performance
     pub tool_usage_stats: ToolUsageStats,
+    /// Current execution state and workflow position
     pub execution_state: ExecutionState,
+    /// Application-specific custom data storage
     pub custom_data: HashMap<String, serde_json::Value>,
 }
 
 /// Agent metadata for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentMetadata {
+    /// Human-readable name for the agent
     pub name: String,
+    /// Optional detailed description of agent purpose and behavior
     pub description: Option<String>,
+    /// Semantic version string for agent implementation
     pub version: String,
+    /// List of capabilities this agent can perform
     pub capabilities: Vec<String>,
+    /// Provider-specific configuration (e.g., model settings, API keys)
     pub provider_config: Option<serde_json::Value>,
+    /// Categorization tags for agent organization and discovery
     pub tags: Vec<String>,
 }
 
 /// Conversation message structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversationMessage {
+    /// Role of the message sender in the conversation
     pub role: MessageRole,
+    /// Actual message content text
     pub content: String,
+    /// When this message was created
     pub timestamp: SystemTime,
+    /// Optional metadata for tool calls, attachments, or other context
     pub metadata: Option<HashMap<String, serde_json::Value>>,
 }
 
+/// Role of a participant in the conversation
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum MessageRole {
+    /// System-level instructions or prompts
     System,
+    /// Human user input
     User,
+    /// AI assistant response
     Assistant,
+    /// Tool execution result or output
     Tool,
 }
 
 /// Tool usage statistics
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolUsageStats {
+    /// Total number of tool invocations attempted
     pub total_invocations: u64,
+    /// Number of successful tool executions
     pub successful_invocations: u64,
+    /// Number of failed tool executions
     pub failed_invocations: u64,
+    /// Per-tool performance metrics indexed by tool name
     pub tool_performance: HashMap<String, ToolPerformance>,
 }
 
+/// Performance metrics for individual tool usage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolPerformance {
+    /// Number of times this tool has been invoked
     pub invocation_count: u64,
+    /// Cumulative execution time in milliseconds
     pub total_duration_ms: u64,
+    /// Average execution time per invocation in milliseconds
     pub average_duration_ms: f64,
+    /// Most recent usage timestamp
     pub last_used: SystemTime,
 }
 
 /// Agent execution state
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ExecutionState {
+    /// Agent is ready but not actively processing
     Idle,
+    /// Agent is actively processing a request
     Processing,
+    /// Agent is waiting for user input to continue
     WaitingForInput,
+    /// Agent is waiting for a tool to complete execution
     WaitingForTool,
+    /// Agent execution is temporarily suspended
     Suspended,
+    /// Agent has completed its task successfully
     Completed,
+    /// Agent execution failed with an error message
     Failed(String),
 }
 

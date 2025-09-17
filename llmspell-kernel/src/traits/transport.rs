@@ -8,6 +8,7 @@ use anyhow::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use tracing::{debug, info, instrument};
 
 /// Generic transport configuration
 ///
@@ -73,6 +74,7 @@ pub trait Transport: Send + Sync {
 
     /// Shutdown the transport gracefully
     async fn shutdown(&mut self) -> Result<()> {
+        debug!("Transport shutdown initiated");
         Ok(())
     }
 
@@ -89,7 +91,9 @@ pub type BoxedTransport = Box<dyn Transport>;
 /// # Errors
 ///
 /// Returns an error if the transport type is unknown or not compiled in
+#[instrument(level = "debug")]
 pub fn create_transport(transport_type: &str) -> Result<BoxedTransport> {
+    info!("Creating transport of type: {}", transport_type);
     match transport_type {
         "inprocess" | "embedded" => {
             use crate::transport::inprocess::InProcessTransport;

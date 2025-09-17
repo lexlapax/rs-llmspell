@@ -76,7 +76,12 @@ impl HnswContainer {
         let nb_layers = self
             .config
             .nb_layers
-            .unwrap_or_else(|| 16.min((max_elements as f32).ln() as usize).max(1));
+            .unwrap_or_else(|| {
+                // Safe conversion with proper bounds checking
+                let ln_value = (max_elements as f64).ln();
+                let layer_count = ln_value.round().clamp(1.0, 16.0) as usize;
+                layer_count
+            });
 
         // Prepare vectors for parallel insertion
         let vector_refs: Vec<(&Vec<f32>, usize)> = self

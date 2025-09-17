@@ -9,7 +9,8 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc::{self, Sender};
-use tracing::{debug, instrument, warn};
+use tracing::{debug, info, instrument, trace, warn, Span};
+use tracing::field::Empty;
 use uuid::Uuid;
 
 use super::manager::IOPubMessage;
@@ -49,19 +50,25 @@ pub struct MessageRouter {
     max_history: usize,
     /// Tracing instrumentation
     tracing: Option<TracingInstrumentation>,
+    /// Current correlation ID for message tracking
+    correlation_id: Arc<RwLock<Option<Uuid>>>,
 }
 
 impl MessageRouter {
     /// Create a new message router
-    #[instrument(level = "debug")]
+    #[instrument(level = "debug", fields(router_id = Empty))]
     pub fn new(max_history: usize) -> Self {
-        debug!("Creating MessageRouter with max_history={}", max_history);
+        let router_id = Uuid::new_v4();
+        Span::current().record("router_id", &router_id.to_string());
+
+        info!("Creating MessageRouter with max_history={}", max_history);
 
         Self {
             clients: Arc::new(RwLock::new(HashMap::new())),
             message_history: Arc::new(RwLock::new(Vec::with_capacity(max_history))),
             max_history,
             tracing: None,
+            correlation_id: Arc::new(RwLock::new(None)),
         }
     }
 
@@ -110,10 +117,13 @@ impl MessageRouter {
     }
 
     /// Mark a client as inactive
+    #[instrument(level = "debug", skip(self))]
     pub fn deactivate_client(&self, client_id: &str) {
         if let Some(client) = self.clients.write().get_mut(client_id) {
             client.active = false;
-            debug!("Deactivated client {}", client_id);
+            info!("Deactivated client {}", client_id);
+        } else {
+            warn!("Attempted to deactivate non-existent client {}", client_id);
         }
     }
 
@@ -122,29 +132,66 @@ impl MessageRouter {
     /// # Errors
     ///
     /// Returns an error if message routing fails
-    #[instrument(level = "trace", skip(self, message))]
+    #[instrument(level = "trace", skip(self, message), fields(
+        correlation_id = Empty,
+        destination = ?destination,
+        message_type = Empty
+    ))]
     pub async fn route_message(
         &self,
         message: IOPubMessage,
         destination: MessageDestination,
     ) -> Result<()> {
+        // Generate or use existing correlation ID
+        let correlation_id = self.get_or_create_correlation_id();
+        Span::current().record("correlation_id", &correlation_id.to_string());
+
+        trace!("Routing message with correlation_id={}", correlation_id);
+
         // Store in history
         self.store_message(&message);
 
         // Route based on destination
         match destination {
             MessageDestination::Broadcast => {
+                debug!("Broadcasting message to all clients");
                 self.broadcast_message(message).await?;
             }
-            MessageDestination::Client(client_id) => {
-                self.send_to_client(&client_id, message).await?;
+            MessageDestination::Client(ref client_id) => {
+                debug!("Sending message to client {}", client_id);
+                self.send_to_client(client_id, message).await?;
             }
             MessageDestination::Requester => {
+                debug!("Sending message to original requester");
                 self.send_to_requester(message).await?;
             }
         }
 
         Ok(())
+    }
+
+    /// Get or create a correlation ID for message tracking
+    fn get_or_create_correlation_id(&self) -> Uuid {
+        let mut correlation_id = self.correlation_id.write();
+        match *correlation_id {
+            Some(id) => id,
+            None => {
+                let id = Uuid::new_v4();
+                *correlation_id = Some(id);
+                id
+            }
+        }
+    }
+
+    /// Set a new correlation ID for a new message flow
+    #[instrument(level = "debug", skip(self))]
+    pub fn set_correlation_id(&self, id: Option<Uuid>) {
+        *self.correlation_id.write() = id;
+        if let Some(id) = id {
+            debug!("Set correlation_id={}", id);
+        } else {
+            debug!("Cleared correlation_id");
+        }
     }
 
     /// Broadcast message to all active clients

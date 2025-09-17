@@ -23,18 +23,44 @@ pub mod persistence;
 pub mod types;
 
 // Consolidated state-persistence modules
+
+/// Agent-specific state management with conversation history and metadata
 pub mod agent_state;
+
+/// Adapter layer for abstracting different storage backend implementations
 pub mod backend_adapter;
-pub mod backends; // Comprehensive storage backends from consolidated crates
+
+/// Comprehensive storage backends from consolidated crates
+pub mod backends;
+
+/// Backup and restore functionality for state persistence
 pub mod backup;
+
+/// Configuration management for state storage and persistence
 pub mod config;
+
+/// Hook system for state change notifications and event handling
 pub mod hooks;
+
+/// Cryptographic key management for secure state storage
 pub mod key_manager;
+
+/// High-level state management coordination and lifecycle control
 pub mod manager;
+
+/// Schema migration system for evolving state structures
 pub mod migration;
+
+/// Performance monitoring and optimization for state operations
 pub mod performance;
+
+/// Schema definition and versioning for state structures
 pub mod schema;
+
+/// Sensitive data handling and redaction for privacy compliance
 pub mod sensitive_data;
+
+/// Testing utilities and helpers for session state validation
 pub mod session_test;
 pub mod vector_storage;
 

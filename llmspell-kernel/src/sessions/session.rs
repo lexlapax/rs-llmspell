@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+use tracing::{debug, info, instrument, warn, Span};
+use tracing::field::Empty;
 
 /// Core session structure managing lifecycle and state
 #[derive(Debug, Clone)]
@@ -26,8 +28,16 @@ pub struct Session {
 
 impl Session {
     /// Create a new session with the given options
+    #[instrument(level = "info", skip(options), fields(
+        session_id = Empty,
+        session_name = ?options.name,
+        created_by = ?options.created_by
+    ))]
     pub fn new(options: CreateSessionOptions) -> Self {
         let id = SessionId::new();
+        Span::current().record("session_id", &id.to_string());
+        info!("Creating new session with id={}", id);
+
         let metadata = SessionMetadata::new(id, options.name.clone(), options.created_by.clone());
 
         // Apply initial metadata from options
@@ -51,11 +61,13 @@ impl Session {
     }
 
     /// Get the session ID
+    #[instrument(level = "trace", skip(self))]
     pub async fn id(&self) -> SessionId {
         self.metadata.read().await.id
     }
 
     /// Get the current session status
+    #[instrument(level = "trace", skip(self))]
     pub async fn status(&self) -> SessionStatus {
         self.metadata.read().await.status
     }
@@ -65,17 +77,24 @@ impl Session {
     /// # Errors
     ///
     /// Returns `SessionError::InvalidStateTransition` if the session is not in Active state
+    #[instrument(level = "info", skip(self), fields(session_id = Empty))]
     pub async fn suspend(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
+        Span::current().record("session_id", &metadata.id.to_string());
+
         match metadata.status {
             SessionStatus::Active => {
+                info!("Suspending session {}", metadata.id);
                 metadata.update_status(SessionStatus::Suspended);
                 Ok(())
             }
-            status => Err(SessionError::InvalidStateTransition {
-                from: status,
-                to: SessionStatus::Suspended,
-            }),
+            status => {
+                warn!("Cannot suspend session in state {:?}", status);
+                Err(SessionError::InvalidStateTransition {
+                    from: status,
+                    to: SessionStatus::Suspended,
+                })
+            }
         }
     }
 
@@ -84,10 +103,14 @@ impl Session {
     /// # Errors
     ///
     /// Returns `SessionError::InvalidStateTransition` if the session is not in Suspended state
+    #[instrument(level = "info", skip(self), fields(session_id = Empty))]
     pub async fn resume(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
+        Span::current().record("session_id", &metadata.id.to_string());
+
         match metadata.status {
             SessionStatus::Suspended => {
+                info!("Resuming session {}", metadata.id);
                 metadata.update_status(SessionStatus::Active);
                 Ok(())
             }
@@ -103,6 +126,7 @@ impl Session {
     /// # Errors
     ///
     /// Returns `SessionError::InvalidStateTransition` if the session is not in Active or Suspended state
+    #[instrument(level = "info", skip(self), fields(session_id = Empty))]
     pub async fn complete(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
         match metadata.status {
@@ -122,6 +146,7 @@ impl Session {
     /// # Errors
     ///
     /// Returns `SessionError::InvalidStateTransition` if the session is already in a terminal state
+    #[instrument(level = "warn", skip(self), fields(session_id = Empty))]
     pub async fn fail(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
         if metadata.status.is_terminal() {
@@ -140,11 +165,15 @@ impl Session {
     /// # Errors
     ///
     /// Currently always succeeds, but returns Result for future error cases
+    #[instrument(level = "debug", skip(self), fields(session_id = Empty, artifact_id = %artifact_id))]
     pub async fn add_artifact(&self, artifact_id: String) -> Result<()> {
         let mut artifacts = self.artifact_ids.write().await;
         let mut metadata = self.metadata.write().await;
 
+        Span::current().record("session_id", &metadata.id.to_string());
+
         if !artifacts.contains(&artifact_id) {
+            debug!("Adding artifact {} to session {}", artifact_id, metadata.id);
             artifacts.push(artifact_id);
             metadata.artifact_count = artifacts.len();
             metadata.operation_count += 1;

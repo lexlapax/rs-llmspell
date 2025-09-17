@@ -2873,13 +2873,13 @@ This fix ensures runtime polymorphism - resources bind to their creation context
 
 #### 9.4.5.6 Phase 6: Supporting Systems (Days 9-10 - 30 hours) without adding clippy warnings**
 
-**Subtask 6.1: Instrument Kernel Operations (8 hours) without adding clippy warnings**
-- [ ] Discover first and expand / other opportunities for instrumentation in the task list below
-- [ ] Complete transport layer instrumentation (15 methods)
-- [ ] Message routing tracing with correlation IDs
-- [ ] Session management tracing
-- [ ] I/O routing instrumentation
-- [ ] Test: `cargo test -p llmspell-kernel test_kernel_tracing`
+**Subtask 6.1: Instrument Kernel Operations (8 hours) without adding clippy warnings** ✅ COMPLETED
+- [x] Discover first and expand / other opportunities for instrumentation in the task list below
+- [x] Complete transport layer instrumentation (15 methods)
+- [x] Message routing tracing with correlation IDs
+- [x] Session management tracing
+- [x] I/O routing instrumentation
+- [x] Test: `cargo test -p llmspell-kernel test_kernel_tracing`
 
 **Subtask 6.2: Instrument Workflows (10 hours) without adding clippy warnings**
 - [ ] Discover first and expand / other opportunities for instrumentation in the task list below
