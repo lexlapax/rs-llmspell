@@ -28,7 +28,7 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::sync::{Mutex, RwLock, Semaphore};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// A branch in a parallel workflow
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -521,6 +521,12 @@ impl ParallelWorkflow {
 
     /// Execute a single branch
     #[allow(clippy::too_many_arguments)]
+    #[instrument(level = "info", skip_all, fields(
+        branch_name = %branch.name,
+        step_count = branch.steps.len(),
+        steps = branch.steps.len(),
+        execution_id = ?execution_component_id
+    ))]
     async fn execute_branch(
         branch: ParallelBranch,
         step_executor: Arc<StepExecutor>,
@@ -672,6 +678,12 @@ impl BaseAgent for ParallelWorkflow {
         &self.metadata
     }
 
+    #[instrument(level = "info", skip(self, input, context), fields(
+        workflow_name = %self.metadata.name,
+        branch_count = self.branches.len(),
+        max_concurrency = self.config.max_concurrency,
+        input_size = input.text.len()
+    ))]
     async fn execute_impl(
         &self,
         input: AgentInput,

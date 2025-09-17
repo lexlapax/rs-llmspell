@@ -183,8 +183,16 @@ impl Session {
     }
 
     /// Get all artifact IDs for this session
+    #[instrument(level = "trace", skip(self), fields(
+        session_id = Empty,
+        artifact_count = Empty
+    ))]
     pub async fn artifact_ids(&self) -> Vec<String> {
-        self.artifact_ids.read().await.clone()
+        let artifacts = self.artifact_ids.read().await.clone();
+        let metadata = self.metadata.read().await;
+        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("artifact_count", artifacts.len());
+        artifacts
     }
 
     /// Set a session state value
@@ -192,10 +200,15 @@ impl Session {
     /// # Errors
     ///
     /// Currently always succeeds, but returns Result for future error cases
+    #[instrument(level = "debug", skip(self, value), fields(
+        session_id = Empty,
+        state_key = %key
+    ))]
     pub async fn set_state(&self, key: String, value: serde_json::Value) -> Result<()> {
         let mut state = self.state.write().await;
         let mut metadata = self.metadata.write().await;
 
+        Span::current().record("session_id", &metadata.id.to_string());
         state.insert(key, value);
         metadata.operation_count += 1;
 
@@ -203,13 +216,27 @@ impl Session {
     }
 
     /// Get a session state value
+    #[instrument(level = "trace", skip(self), fields(
+        session_id = Empty,
+        state_key = %key
+    ))]
     pub async fn get_state(&self, key: &str) -> Option<serde_json::Value> {
+        let metadata = self.metadata.read().await;
+        Span::current().record("session_id", &metadata.id.to_string());
         self.state.read().await.get(key).cloned()
     }
 
     /// Get all session state
+    #[instrument(level = "trace", skip(self), fields(
+        session_id = Empty,
+        state_size = Empty
+    ))]
     pub async fn get_all_state(&self) -> HashMap<String, serde_json::Value> {
-        self.state.read().await.clone()
+        let state = self.state.read().await.clone();
+        let metadata = self.metadata.read().await;
+        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("state_size", state.len());
+        state
     }
 
     /// Clear session state
@@ -217,10 +244,13 @@ impl Session {
     /// # Errors
     ///
     /// Currently always succeeds, but returns Result for future error cases
+    #[instrument(level = "info", skip(self), fields(session_id = Empty))]
     pub async fn clear_state(&self) -> Result<()> {
         let mut state = self.state.write().await;
         let mut metadata = self.metadata.write().await;
 
+        Span::current().record("session_id", &metadata.id.to_string());
+        info!("Clearing state for session {}", metadata.id);
         state.clear();
         metadata.operation_count += 1;
 
@@ -232,10 +262,16 @@ impl Session {
     /// # Errors
     ///
     /// Returns an error if the operation count cannot be incremented.
+    #[instrument(level = "trace", skip(self), fields(
+        session_id = Empty,
+        new_count = Empty
+    ))]
     pub async fn increment_operation_count(&self) -> Result<u64> {
         let mut metadata = self.metadata.write().await;
         metadata.operation_count += 1;
         metadata.updated_at = Utc::now();
+        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("new_count", metadata.operation_count);
         Ok(metadata.operation_count)
     }
 
@@ -244,8 +280,10 @@ impl Session {
     /// # Errors
     ///
     /// Returns an error if the artifact count cannot be incremented.
+    #[instrument(level = "trace", skip(self), fields(session_id = Empty))]
     pub async fn increment_artifact_count(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
+        Span::current().record("session_id", &metadata.id.to_string());
         metadata.artifact_count += 1;
         metadata.updated_at = Utc::now();
         Ok(())
@@ -256,8 +294,10 @@ impl Session {
     /// # Errors
     ///
     /// Returns an error if the artifact count cannot be decremented.
+    #[instrument(level = "trace", skip(self), fields(session_id = Empty))]
     pub async fn decrement_artifact_count(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
+        Span::current().record("session_id", &metadata.id.to_string());
         if metadata.artifact_count > 0 {
             metadata.artifact_count -= 1;
             metadata.updated_at = Utc::now();
@@ -293,9 +333,13 @@ fn default_version() -> u32 {
 
 impl Session {
     /// Create a snapshot of the session for persistence
+    #[instrument(level = "debug", skip(self), fields(session_id = Empty))]
     pub async fn snapshot(&self) -> SessionSnapshot {
+        let metadata = self.metadata.read().await.clone();
+        Span::current().record("session_id", &metadata.id.to_string());
+        debug!("Creating snapshot for session {}", metadata.id);
         SessionSnapshot {
-            metadata: self.metadata.read().await.clone(),
+            metadata,
             config: self.config.clone(),
             state: self.state.read().await.clone(),
             artifact_ids: self.artifact_ids.read().await.clone(),

@@ -23,7 +23,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tracing::debug;
+use tracing::{debug, instrument};
+use tracing::field::Empty;
 use uuid::Uuid;
 
 /// Serialized hook execution for persistence
@@ -58,6 +59,11 @@ impl HookReplayManager {
         Self { storage_adapter }
     }
 
+    #[instrument(level = "trace", skip_all, fields(
+        hook_id = %hook.replay_id(),
+        correlation_id = %context.correlation_id,
+        duration_ms = duration.as_millis() as u64
+    ))]
     pub async fn persist_hook_execution(
         &self,
         hook: &dyn ReplayableHook,
@@ -87,6 +93,10 @@ impl HookReplayManager {
         self.storage_adapter.store(&key, &execution).await
     }
 
+    #[instrument(level = "debug", skip(self), fields(
+        correlation_id = %correlation_id,
+        execution_count = Empty
+    ))]
     pub async fn get_hook_executions_by_correlation(
         &self,
         correlation_id: Uuid,
@@ -101,6 +111,7 @@ impl HookReplayManager {
             }
         }
 
+        tracing::Span::current().record("execution_count", executions.len());
         Ok(executions)
     }
 }
@@ -148,6 +159,7 @@ pub struct StateManager {
 
 impl StateManager {
     /// Create a new state manager with default in-memory backend
+    #[instrument(level = "debug")]
     pub async fn new() -> StateResult<Self> {
         Self::with_backend(
             crate::state::config::StorageBackendType::Memory,
@@ -197,6 +209,10 @@ impl StateManager {
     }
 
     /// Create a new state manager with specified backend
+    #[instrument(level = "info", fields(
+        backend_type = ?backend_type,
+        persistence_enabled = config.enabled
+    ))]
     pub async fn with_backend(
         backend_type: crate::state::config::StorageBackendType,
         config: PersistenceConfig,
@@ -272,6 +288,11 @@ impl StateManager {
     }
 
     /// Set state with hooks and persistence (uses async hooks if enabled)
+    #[instrument(level = "debug", skip(self, value), fields(
+        scope = ?scope,
+        key = %key,
+        async_hooks = self.async_hook_processor.is_some()
+    ))]
     pub async fn set_with_hooks(
         &self,
         scope: StateScope,
@@ -550,11 +571,17 @@ impl StateManager {
     }
 
     /// Set state value (backward compatible method)
+    #[instrument(level = "trace", skip(self, value), fields(scope = ?scope, key = %key))]
     pub async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
         self.set_with_class(scope, key, value, None).await
     }
 
     /// Set state with explicit state class for performance optimization
+    #[instrument(level = "trace", skip(self, value), fields(
+        scope = ?scope,
+        key = %key,
+        state_class = ?class
+    ))]
     pub async fn set_with_class(
         &self,
         scope: StateScope,
@@ -598,6 +625,11 @@ impl StateManager {
     }
 
     /// Fast path for trusted data with minimal overhead
+    #[instrument(level = "trace", skip(self, value), fields(
+        scope = ?scope,
+        key = %key,
+        fast_path = true
+    ))]
     async fn set_fast_path(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
         let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
 
@@ -658,11 +690,17 @@ impl StateManager {
     }
 
     /// Get state value
+    #[instrument(level = "trace", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn get(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
         self.get_with_class(scope, key, None).await
     }
 
     /// Get state with explicit state class for performance optimization
+    #[instrument(level = "trace", skip(self), fields(
+        scope = ?scope,
+        key = %key,
+        state_class = ?class
+    ))]
     pub async fn get_with_class(
         &self,
         scope: StateScope,
@@ -753,6 +791,7 @@ impl StateManager {
     }
 
     /// Delete state value
+    #[instrument(level = "debug", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn delete(&self, scope: StateScope, key: &str) -> StateResult<bool> {
         let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
 
@@ -771,6 +810,7 @@ impl StateManager {
     }
 
     /// List all keys in a scope
+    #[instrument(level = "debug", skip(self), fields(scope = ?scope, key_count = Empty))]
     pub async fn list_keys(&self, scope: StateScope) -> StateResult<Vec<String>> {
         let prefix = scope.prefix();
 
@@ -789,11 +829,13 @@ impl StateManager {
                 .filter(|k| KeyManager::belongs_to_scope(k, &scope))
                 .filter_map(|k| KeyManager::extract_key(k, &scope))
                 .collect();
+            tracing::Span::current().record("key_count", keys.len());
             Ok(keys)
         }
     }
 
     /// Clear all state in a scope
+    #[instrument(level = "info", skip(self), fields(scope = ?scope))]
     pub async fn clear_scope(&self, scope: StateScope) -> StateResult<()> {
         let keys = self.list_keys(scope.clone()).await?;
 
@@ -843,6 +885,10 @@ impl StateManager {
     }
 
     /// Save agent state to persistent storage with concurrent access protection
+    #[instrument(level = "info", skip_all, fields(
+        agent_id = %agent_state.agent_id,
+        agent_type = %agent_state.agent_type
+    ))]
     pub async fn save_agent_state(
         &self,
         agent_state: &crate::state::agent_state::PersistentAgentState,
@@ -1077,6 +1123,7 @@ impl StateManager {
     }
 
     /// Load agent state from persistent storage with concurrent access protection
+    #[instrument(level = "info", skip(self), fields(agent_id = %agent_id))]
     pub async fn load_agent_state(
         &self,
         agent_id: &str,
@@ -1103,6 +1150,7 @@ impl StateManager {
     }
 
     /// Delete agent state from persistent storage with concurrent access protection
+    #[instrument(level = "info", skip(self), fields(agent_id = %agent_id))]
     pub async fn delete_agent_state(&self, agent_id: &str) -> StateResult<bool> {
         let key = format!("agent_state:{agent_id}");
         let correlation_id = Uuid::new_v4();
@@ -1191,18 +1239,22 @@ impl StateManager {
     }
 
     /// List all saved agent states
+    #[instrument(level = "debug", skip(self), fields(agent_count = Empty))]
     pub async fn list_agent_states(&self) -> StateResult<Vec<String>> {
         let prefix = "agent_state:";
         let keys = self.storage_adapter.list_keys(prefix).await?;
 
         // Extract agent IDs from keys
-        Ok(keys
+        let agent_ids: Vec<String> = keys
             .into_iter()
             .filter_map(|k| k.strip_prefix(prefix).map(str::to_string))
-            .collect())
+            .collect();
+        tracing::Span::current().record("agent_count", agent_ids.len());
+        Ok(agent_ids)
     }
 
     /// Get agent state metadata without loading full state
+    #[instrument(level = "debug", skip(self), fields(agent_id = %agent_id))]
     pub async fn get_agent_metadata(
         &self,
         agent_id: &str,
@@ -1240,6 +1292,10 @@ impl StateManager {
     }
 
     /// Load agent state using lock-free fast path
+    #[instrument(level = "trace", skip(self), fields(
+        agent_id = %agent_id,
+        fast_path = true
+    ))]
     pub async fn load_agent_state_fast(
         &self,
         agent_id: &str,
@@ -1261,16 +1317,19 @@ impl StateManager {
     // ===== Isolation Enforcement Methods =====
 
     /// Get scoped state value with isolation check
+    #[instrument(level = "trace", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn get_scoped(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
         self.get(scope, key).await
     }
 
     /// Set scoped state value with isolation check
+    #[instrument(level = "trace", skip(self, value), fields(scope = ?scope, key = %key))]
     pub async fn set_scoped(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
         self.set(scope, key, value).await
     }
 
     /// Delete scoped state value with isolation check
+    #[instrument(level = "trace", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn delete_scoped(&self, scope: StateScope, key: &str) -> StateResult<bool> {
         self.delete(scope, key).await
     }

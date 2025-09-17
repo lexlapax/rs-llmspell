@@ -8,7 +8,8 @@ use llmspell_core::{ComponentId, ComponentLookup, ComponentMetadata, LLMSpellErr
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
+use tracing::field::Empty;
 
 /// Basic step executor for workflow steps
 #[derive(Clone)]
@@ -66,6 +67,12 @@ impl StepExecutor {
     }
 
     /// Execute a single step with retry logic
+    #[instrument(level = "info", skip(self, step, context), fields(
+        step_name = %step.name,
+        step_type = ?step.step_type,
+        execution_count = Empty,
+        retry_attempt = Empty
+    ))]
     pub async fn execute_step(
         &self,
         step: &WorkflowStep,
@@ -76,6 +83,14 @@ impl StepExecutor {
     }
 
     /// Execute a single step with workflow metadata for hooks
+    #[instrument(level = "info", skip_all, fields(
+        step_name = %step.name,
+        step_type = ?step.step_type,
+        workflow_id = "",
+        workflow_name = workflow_metadata.as_ref().map_or("", |m| m.name.as_str()),
+        step_name = %step.name,
+        step_type = ?step.step_type
+    ))]
     pub async fn execute_step_with_metadata(
         &self,
         step: &WorkflowStep,
@@ -195,6 +210,9 @@ impl StepExecutor {
     }
 
     /// Execute a step with retry logic
+    #[instrument(level = "info", skip(self, step, context, error_strategy), fields(
+        step_name = %step.name
+    ))]
     pub async fn execute_step_with_retry(
         &self,
         step: &WorkflowStep,
@@ -269,6 +287,10 @@ impl StepExecutor {
     }
 
     /// Internal step execution logic with hook integration
+    #[instrument(level = "debug", skip_all, fields(
+        step_name = %step.name,
+        step_type = ?step.step_type
+    ))]
     async fn execute_step_internal(
         &self,
         step: &WorkflowStep,

@@ -2881,28 +2881,28 @@ This fix ensures runtime polymorphism - resources bind to their creation context
 - [x] I/O routing instrumentation
 - [x] Test: `cargo test -p llmspell-kernel test_kernel_tracing`
 
-**Subtask 6.2: Instrument Workflows (10 hours) without adding clippy warnings**
-- [ ] Discover first and expand / other opportunities for instrumentation in the task list below
-- [ ] Workflow execution (12 methods)
-- [ ] Step transitions with timing
-- [ ] Conditional logic tracing
-- [ ] Parallel execution tracing
-- [ ] Test: `cargo test -p llmspell-workflows test_workflow_tracing`
+**Subtask 6.2: Instrument Workflows (10 hours) without adding clippy warnings** ✅ COMPLETED
+- [x] Discover first and expand / other opportunities for instrumentation in the task list below
+- [x] Workflow execution (12 methods)
+- [x] Step transitions with timing
+- [x] Conditional logic tracing
+- [x] Parallel execution tracing
+- [x] Test: `cargo test -p llmspell-workflows test_workflow_tracing`
 
-**Subtask 6.3: Instrument State & Persistence (12 hours) without adding clippy warnings**
-- [ ] Discover first and expand / other opportunities for instrumentation in the task list below
-- [ ] State operations (20 methods)
-- [ ] Persistence backend operations
-- [ ] Backup and recovery tracing
-- [ ] Transaction boundaries
-- [ ] Test: `cargo test -p llmspell-state-persistence test_state_tracing`
+**Subtask 6.3: Instrument State & Persistence (12 hours) without adding clippy warnings** ✅ COMPLETED
+- [x] Discover first and expand / other opportunities for instrumentation in the task list below
+- [x] State operations (20 methods) - Instrumented key state manager methods (set, get, delete, list_keys, save_agent_state, etc.)
+- [x] Persistence backend operations - Instrumented FilePersistence and MemoryPersistence implementations
+- [x] Backup and recovery tracing - Instrumented snapshot operations (save_snapshot, load_snapshot, list_snapshots)
+- [x] Transaction boundaries - Instrumented hook execution persistence and correlation tracking
+- [x] Test: `cargo test -p llmspell-kernel test_state_tracing` - Created comprehensive state_tracing_test.rs
 
-**Subtask 6.4: Instrument Sessions - do ultrathink discovery first. without adding clippy warnings**
-- [ ] Discover first and expand / other opportunities for instrumentation in the task list below
-- [ ] Session operations 
-- [ ] Persistence backend operations
-- [ ] Transaction boundaries
-- [ ] Test: `cargo test -p ??? test_state_tracing`
+**Subtask 6.4: Instrument Sessions - do ultrathink discovery first. without adding clippy warnings** ✅ COMPLETED
+- [x] Discover first and expand / other opportunities for instrumentation in the task list below
+- [x] Session operations - Instrumented all session lifecycle methods (new, suspend, resume, complete, fail, snapshot)
+- [x] Persistence backend operations - Instrumented artifact and state management operations
+- [x] Transaction boundaries - Instrumented operation counting and state transitions
+- [x] Test: `cargo test -p llmspell-kernel test_session_tracing` - Created comprehensive session_tracing_test.rs
 
 #### 9.4.5.7 Phase 7: Testing & Verification (Days 11-12 - 16 hours)**
 

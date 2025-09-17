@@ -6,7 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use tracing::{info, instrument};
+use tracing::{debug, info, instrument};
+use tracing::field::Empty;
 
 use super::types::{DebugState, ExecutionState, SessionState};
 
@@ -148,10 +149,12 @@ impl StatePersistence for FilePersistence {
         Ok(Some(state))
     }
 
+    #[instrument(level = "trace", skip_all)]
     async fn state_exists(&self) -> Result<bool> {
         Ok(self.state_path().exists())
     }
 
+    #[instrument(level = "debug", skip_all)]
     async fn delete_state(&self) -> Result<()> {
         let path = self.state_path();
 
@@ -163,6 +166,7 @@ impl StatePersistence for FilePersistence {
         Ok(())
     }
 
+    #[instrument(level = "debug", skip_all, fields(snapshot_count = Empty))]
     async fn list_snapshots(&self) -> Result<Vec<SnapshotInfo>> {
         let snapshots_dir = self.base_path.join("snapshots");
 
@@ -190,9 +194,12 @@ impl StatePersistence for FilePersistence {
             }
         }
 
+        tracing::Span::current().record("snapshot_count", snapshots.len());
+        debug!("Found {} snapshots", snapshots.len());
         Ok(snapshots)
     }
 
+    #[instrument(level = "info", skip(self, state), fields(snapshot_name = %name))]
     async fn save_snapshot(&self, name: &str, state: &KernelStateSnapshot) -> Result<()> {
         let path = self.snapshot_path(name);
 
@@ -208,6 +215,7 @@ impl StatePersistence for FilePersistence {
         Ok(())
     }
 
+    #[instrument(level = "info", skip_all, fields(snapshot_name = %name))]
     async fn load_snapshot(&self, name: &str) -> Result<Option<KernelStateSnapshot>> {
         let path = self.snapshot_path(name);
 
@@ -246,22 +254,26 @@ impl Default for MemoryPersistence {
 
 #[async_trait]
 impl StatePersistence for MemoryPersistence {
+    #[instrument(level = "trace", skip_all)]
     async fn save_state(&self, state: &KernelStateSnapshot) -> Result<()> {
         let mut storage = self.storage.write().await;
         storage.insert("main".to_string(), state.clone());
         Ok(())
     }
 
+    #[instrument(level = "trace", skip_all)]
     async fn load_state(&self) -> Result<Option<KernelStateSnapshot>> {
         let storage = self.storage.read().await;
         Ok(storage.get("main").cloned())
     }
 
+    #[instrument(level = "trace", skip_all)]
     async fn state_exists(&self) -> Result<bool> {
         let storage = self.storage.read().await;
         Ok(storage.contains_key("main"))
     }
 
+    #[instrument(level = "trace", skip_all)]
     async fn delete_state(&self) -> Result<()> {
         let mut storage = self.storage.write().await;
         storage.remove("main");
@@ -279,17 +291,20 @@ impl StatePersistence for MemoryPersistence {
                 size: 0, // Not applicable for memory storage
                 metadata: snapshot.metadata.clone(),
             })
-            .collect();
+            .collect::<Vec<_>>();
 
+        tracing::Span::current().record("snapshot_count", snapshots.len());
         Ok(snapshots)
     }
 
+    #[instrument(level = "trace", skip(self, state), fields(snapshot_name = %name))]
     async fn save_snapshot(&self, name: &str, state: &KernelStateSnapshot) -> Result<()> {
         let mut storage = self.storage.write().await;
         storage.insert(name.to_string(), state.clone());
         Ok(())
     }
 
+    #[instrument(level = "trace", skip_all, fields(snapshot_name = %name))]
     async fn load_snapshot(&self, name: &str) -> Result<Option<KernelStateSnapshot>> {
         let storage = self.storage.read().await;
         Ok(storage.get(name).cloned())

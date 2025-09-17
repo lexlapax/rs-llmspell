@@ -28,7 +28,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, warn};
 
 /// Conditional workflow branch containing steps to execute when condition is met
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -451,6 +451,10 @@ impl ConditionalWorkflow {
     ///
     /// This method evaluates conditions and executes the matching branch,
     /// writing outputs to state and returning only metadata.
+    #[instrument(level = "info", skip(self, context), fields(
+        workflow_name = %self.metadata.name,
+        branch_count = self.branches.len()
+    ))]
     pub async fn execute_with_state(&self, context: &ExecutionContext) -> Result<WorkflowResult> {
         let start_time = Instant::now();
         // Generate ComponentId once and use it consistently
@@ -791,6 +795,10 @@ impl ConditionalWorkflow {
     }
 
     /// Execute the workflow (legacy method for backward compatibility)
+    #[instrument(level = "info", skip(self), fields(
+        workflow_name = %self.metadata.name,
+        branch_count = self.branches.len()
+    ))]
     pub async fn execute_workflow(&self) -> Result<ConditionalWorkflowResult> {
         let start_time = Instant::now();
         // Generate ComponentId once and use it consistently
@@ -1020,6 +1028,12 @@ impl ConditionalWorkflow {
     }
 
     /// Execute a single branch
+    #[instrument(level = "debug", skip(self, branch, _context), fields(
+        branch_name = %branch.name,
+        branch_id = ?branch.id,
+        step_count = branch.steps.len(),
+        is_default = branch.is_default
+    ))]
     async fn execute_branch(
         &self,
         branch: &ConditionalBranch,
@@ -1156,6 +1170,10 @@ impl BaseAgent for ConditionalWorkflow {
         &self.metadata
     }
 
+    #[instrument(level = "info", skip(self, input, context), fields(
+        workflow_name = %self.metadata.name,
+        input_size = input.text.len()
+    ))]
     async fn execute_impl(
         &self,
         input: AgentInput,
