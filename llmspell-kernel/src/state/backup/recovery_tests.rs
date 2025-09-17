@@ -4,10 +4,10 @@
 #[cfg(test)]
 mod tests {
     use crate::state::backup::{BackupManager, RestoreOptions};
-    use crate::state::{StateManager, StateScope};
     use crate::state::config::{BackupConfig, CompressionType};
     use crate::state::PersistenceConfig;
     use crate::state::StorageBackendType;
+    use crate::state::{StateManager, StateScope};
     use serde_json::json;
     use std::sync::Arc;
     use std::time::Duration;

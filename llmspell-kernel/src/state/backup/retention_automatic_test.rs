@@ -4,9 +4,9 @@
 #[cfg(test)]
 mod test {
     use crate::state::backup::*;
-    use crate::state::{StateManager, StateScope};
     use crate::state::config::BackupConfig;
     use crate::state::{PersistenceConfig, StorageBackendType};
+    use crate::state::{StateManager, StateScope};
     use serde_json::json;
     use std::sync::Arc;
     use std::time::Duration;

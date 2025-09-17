@@ -8,9 +8,9 @@ use super::{
 use crate::state::backend_adapter::StateStorageAdapter;
 use crate::state::manager::SerializableState;
 use crate::state::schema::{MigrationPlan, MigrationPlanner, SchemaRegistry, SemanticVersion};
+use crate::state::{StateError, StateResult};
 use llmspell_events::{EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{ComponentId, ComponentType, HookContext, HookExecutor, HookPoint};
-use crate::state::{StateError, StateResult};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -46,7 +46,7 @@ impl From<MigrationEngineError> for StateError {
     }
 }
 
-/// Migration engine that integrates with existing StateManager infrastructure
+/// Migration engine that integrates with existing `StateManager` infrastructure
 pub struct MigrationEngine {
     /// Existing storage adapter for all storage operations
     storage_adapter: Arc<StateStorageAdapter>,
@@ -209,7 +209,7 @@ impl MigrationEngine {
                 if config.rollback_on_error {
                     warn!("Attempting rollback for migration {}", migration_id);
                     match self.rollback_migration(&plan, &context).await {
-                        Ok(_) => {
+                        Ok(()) => {
                             result.mark_rolled_back();
                             info!("Migration {} rolled back successfully", migration_id);
                         }
@@ -218,7 +218,7 @@ impl MigrationEngine {
                                 "Rollback failed for migration {}: {}",
                                 migration_id, rollback_err
                             );
-                            result.add_error(format!("Rollback failed: {}", rollback_err));
+                            result.add_error(format!("Rollback failed: {rollback_err}"));
                         }
                     }
                 }
@@ -275,7 +275,7 @@ impl MigrationEngine {
 
             // Create transformation for this step
             let transformation = super::transforms::StateTransformation::new(
-                format!("migration_step_{}", step_index),
+                format!("migration_step_{step_index}"),
                 step.description.clone(),
                 step.from_version,
                 step.to_version,
@@ -315,7 +315,7 @@ impl MigrationEngine {
         // Get all state keys to migrate
         let all_keys = self.storage_adapter.list_keys("").await.map_err(|e| {
             MigrationEngineError::MigrationFailed {
-                reason: format!("Failed to list keys: {}", e),
+                reason: format!("Failed to list keys: {e}"),
             }
         })?;
 
@@ -337,7 +337,7 @@ impl MigrationEngine {
                         warn!("Failed to transform state item '{}': {}", key, e);
                         if config.validation_level == ValidationLevel::Strict {
                             return Err(MigrationEngineError::MigrationFailed {
-                                reason: format!("Transformation failed for key '{}': {}", key, e),
+                                reason: format!("Transformation failed for key '{key}': {e}"),
                             });
                         }
                     }
@@ -521,7 +521,7 @@ impl MigrationEngine {
         Ok(())
     }
 
-    /// Emit typed migration event using new MigrationEvent system
+    /// Emit typed migration event using new `MigrationEvent` system
     async fn emit_typed_migration_event(
         &self,
         migration_event: &MigrationEvent,
@@ -601,8 +601,7 @@ impl MigrationEngine {
             Ok(())
         } else {
             Err(StateError::MigrationError(format!(
-                "Migration {} not found or already completed",
-                migration_id
+                "Migration {migration_id} not found or already completed"
             )))
         }
     }

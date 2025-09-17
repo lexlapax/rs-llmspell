@@ -22,7 +22,7 @@ impl KeyManager {
         }
 
         // Prevent path traversal
-        if key.contains("..") || key.contains("\\") || key.contains("//") {
+        if key.contains("..") || key.contains('\\') || key.contains("//") {
             return Err(StateError::invalid_format(
                 "Key contains invalid path traversal characters",
             ));
@@ -90,7 +90,7 @@ impl KeyManager {
             .unwrap()
             .as_nanos();
 
-        format!("__{}:{}:{}", prefix, id, timestamp)
+        format!("__{prefix}:{id}:{timestamp}")
     }
 
     /// Sanitize a key for safe storage

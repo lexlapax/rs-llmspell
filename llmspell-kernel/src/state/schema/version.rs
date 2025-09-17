@@ -86,11 +86,11 @@ impl fmt::Display for SemanticVersion {
         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)?;
 
         if let Some(ref pre) = self.pre_release {
-            write!(f, "-{}", pre)?;
+            write!(f, "-{pre}")?;
         }
 
         if let Some(ref build) = self.build {
-            write!(f, "+{}", build)?;
+            write!(f, "+{build}")?;
         }
 
         Ok(())
@@ -124,8 +124,7 @@ impl FromStr for SemanticVersion {
         let parts: Vec<&str> = core_version.split('.').collect();
         if parts.len() != 3 {
             return Err(VersionError::InvalidFormat(format!(
-                "Expected format 'major.minor.patch', got: {}",
-                s
+                "Expected format 'major.minor.patch', got: {s}"
             )));
         }
 
@@ -233,7 +232,7 @@ impl fmt::Display for SchemaVersion {
         write!(f, "{}", self.version)?;
 
         if let Some(ref desc) = self.description {
-            write!(f, " ({})", desc)?;
+            write!(f, " ({desc})")?;
         }
 
         Ok(())

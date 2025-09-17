@@ -2,8 +2,8 @@
 // ABOUTME: Implements lock-free backup strategies with minimal performance impact
 
 use crate::state::StateManager;
-use anyhow::Result;
 use crate::state::{StateError, StateScope};
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
@@ -221,7 +221,7 @@ impl AtomicBackup {
                         last_modified: SystemTime::now(), // TODO: Track modification time
                     };
 
-                    let entry_key = format!("{}:{}", scope, key);
+                    let entry_key = format!("{scope}:{key}");
                     entries.insert(entry_key, entry);
                 }
                 Ok(None) => {
@@ -289,7 +289,7 @@ impl AtomicBackup {
 
         for scope in &scopes_to_clear {
             match self.state_manager.clear_scope(scope.clone()).await {
-                Ok(_) => {
+                Ok(()) => {
                     debug!("Cleared scope: {}", scope);
                 }
                 Err(e) => {
@@ -308,7 +308,7 @@ impl AtomicBackup {
                 .set(entry.scope, &entry.key, entry.data)
                 .await
             {
-                Ok(_) => {
+                Ok(()) => {
                     restored_count += 1;
                 }
                 Err(e) => {
@@ -357,7 +357,7 @@ impl AtomicBackup {
 
         for scope in &scopes_to_clear {
             match self.state_manager.clear_scope(scope.clone()).await {
-                Ok(_) => {
+                Ok(()) => {
                     debug!("Cleared scope: {}", scope);
                 }
                 Err(e) => {
@@ -379,7 +379,7 @@ impl AtomicBackup {
                 .set(entry.scope, &entry.key, entry.data)
                 .await
             {
-                Ok(_) => {
+                Ok(()) => {
                     restored_count += 1;
                     // Report progress every 10 entries or on last entry
                     if restored_count % 10 == 0 || idx == total_entries - 1 {

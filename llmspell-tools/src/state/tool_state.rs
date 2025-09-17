@@ -3,9 +3,9 @@
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
+use llmspell_core::state::{StateManager, StateScope};
 use llmspell_core::traits::tool::Tool;
 use llmspell_core::ComponentMetadata;
-use llmspell_core::state::{StateManager, StateScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -609,12 +609,9 @@ mod tests {
         };
 
         Arc::new(
-            llmspell_kernel::state::StateManager::with_backend(
-                StorageBackendType::Memory,
-                config,
-            )
-            .await
-            .unwrap(),
+            llmspell_kernel::state::StateManager::with_backend(StorageBackendType::Memory, config)
+                .await
+                .unwrap(),
         )
     }
     #[tokio::test]

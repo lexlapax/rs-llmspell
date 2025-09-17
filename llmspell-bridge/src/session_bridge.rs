@@ -155,7 +155,8 @@ impl SessionBridge {
         _options: serde_json::Value,
     ) -> Result<serde_json::Value> {
         // For now, use default config - full implementation in Task 6.5.6
-        let config = llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig::default();
+        let config =
+            llmspell_kernel::sessions::replay::session_adapter::SessionReplayConfig::default();
         let result = convert_err!(
             self.session_manager
                 .replay_session(session_id, config)

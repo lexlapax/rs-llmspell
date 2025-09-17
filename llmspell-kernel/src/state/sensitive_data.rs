@@ -17,7 +17,7 @@ static API_KEY_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
         // Generic API key patterns
         Regex::new(r#"(?i)(api[_-]?key|apikey|api[_-]?secret|access[_-]?token|auth[_-]?token|bearer)\s*[:=]\s*['\"]?([a-zA-Z0-9_\-\.]{20,})['\"]?"#).unwrap(),
         // JWT tokens
-        Regex::new(r#"eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+"#).unwrap(),
+        Regex::new(r"eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+").unwrap(),
         // AWS credentials
         Regex::new(r"AKIA[0-9A-Z]{16}").unwrap(),
         // GitHub tokens
@@ -329,7 +329,7 @@ impl<T: Serialize + for<'de> Deserialize<'de>> RedactSensitiveData for T {
     fn redact_sensitive_data(&mut self, config: &SensitiveDataConfig) -> Result<(), String> {
         // Serialize to JSON
         let mut value = serde_json::to_value(&*self)
-            .map_err(|e| format!("Failed to serialize for redaction: {}", e))?;
+            .map_err(|e| format!("Failed to serialize for redaction: {e}"))?;
 
         // Redact sensitive data
         let mut protector = SensitiveDataProtector::new(config.clone());
@@ -337,7 +337,7 @@ impl<T: Serialize + for<'de> Deserialize<'de>> RedactSensitiveData for T {
 
         // Deserialize back
         *self = serde_json::from_value(value)
-            .map_err(|e| format!("Failed to deserialize after redaction: {}", e))?;
+            .map_err(|e| format!("Failed to deserialize after redaction: {e}"))?;
 
         Ok(())
     }
@@ -350,14 +350,14 @@ pub fn safe_serialize_with_redaction<T: Serialize + Clone>(
 ) -> Result<Vec<u8>, String> {
     // Serialize to JSON value first
     let mut json_value =
-        serde_json::to_value(value).map_err(|e| format!("Serialization failed: {}", e))?;
+        serde_json::to_value(value).map_err(|e| format!("Serialization failed: {e}"))?;
 
     // Redact sensitive data
     let mut protector = SensitiveDataProtector::new(config.clone());
     protector.redact_value(&mut json_value);
 
     // Serialize to bytes
-    serde_json::to_vec(&json_value).map_err(|e| format!("Final serialization failed: {}", e))
+    serde_json::to_vec(&json_value).map_err(|e| format!("Final serialization failed: {e}"))
 }
 
 #[cfg(test)]

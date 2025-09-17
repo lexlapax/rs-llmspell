@@ -11,9 +11,9 @@ use super::{
     AtomicBackup, BackupCompression, BackupConfig, BackupId, BackupResult, BackupValidation,
     CompressionLevel, RestoreOptions,
 };
+use crate::state::StateError;
 use crate::state::StateManager;
 use anyhow::{Context, Result};
-use crate::state::StateError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -204,11 +204,10 @@ impl BackupManager {
         let duration = start_time.elapsed();
 
         // Extract entry count from snapshot metadata
-        let snapshot: crate::state::backup::atomic::StateSnapshot = rmp_serde::from_slice(&backup_data)
-            .map_err(|e| {
+        let snapshot: crate::state::backup::atomic::StateSnapshot =
+            rmp_serde::from_slice(&backup_data).map_err(|e| {
                 StateError::serialization(format!(
-                    "Failed to deserialize snapshot for metadata: {}",
-                    e
+                    "Failed to deserialize snapshot for metadata: {e}"
                 ))
             })?;
         let entry_count = snapshot.metadata.entry_count;
@@ -218,7 +217,7 @@ impl BackupManager {
             let compressed = self.compress_backup(&backup_data).await?;
             let info = CompressionInfo {
                 algorithm: self.config.compression_type.to_string(),
-                level: self.config.compression_level as u32,
+                level: u32::from(self.config.compression_level),
                 original_size: backup_data.len() as u64,
                 compressed_size: compressed.len() as u64,
             };
@@ -231,7 +230,7 @@ impl BackupManager {
         let backup_path = self.get_backup_path(&backup_id);
         tokio::fs::write(&backup_path, &data)
             .await
-            .map_err(|e| StateError::storage(format!("Failed to write backup file: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Failed to write backup file: {e}")))?;
 
         // Create metadata
         let metadata = BackupMetadata {
@@ -374,7 +373,7 @@ impl BackupManager {
         let metadata = match self.get_backup_metadata(backup_id).await {
             Ok(m) => m,
             Err(e) => {
-                errors.push(format!("Failed to load metadata: {}", e));
+                errors.push(format!("Failed to load metadata: {e}"));
                 return Ok(BackupValidation {
                     is_valid: false,
                     validated_at: SystemTime::now(),
@@ -391,7 +390,7 @@ impl BackupManager {
         let data = match tokio::fs::read(&backup_path).await {
             Ok(d) => d,
             Err(e) => {
-                errors.push(format!("Failed to read backup file: {}", e));
+                errors.push(format!("Failed to read backup file: {e}"));
                 return Ok(BackupValidation {
                     is_valid: false,
                     validated_at: SystemTime::now(),
@@ -437,10 +436,18 @@ impl BackupManager {
             .duration_since(UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let random_suffix: String = (0..8)
-            .map(|_| format!("{:x}", rand::random::<u8>()))
-            .collect();
-        format!("backup_{}_{}", timestamp, random_suffix)
+        let random_suffix = format!(
+            "{:x}{:x}{:x}{:x}{:x}{:x}{:x}{:x}",
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+            rand::random::<u8>(),
+            rand::random::<u8>()
+        );
+        format!("backup_{timestamp}_{random_suffix}")
     }
 
     async fn find_parent_backup(&self) -> BackupResult<Option<BackupId>> {
@@ -454,7 +461,7 @@ impl BackupManager {
     }
 
     fn get_backup_path(&self, backup_id: &str) -> PathBuf {
-        self.config.backup_dir.join(format!("{}.backup", backup_id))
+        self.config.backup_dir.join(format!("{backup_id}.backup"))
     }
 
     async fn get_backup_metadata(&self, backup_id: &str) -> BackupResult<BackupMetadata> {
@@ -462,17 +469,17 @@ impl BackupManager {
         index
             .get(backup_id)
             .cloned()
-            .ok_or_else(|| StateError::storage(format!("Backup not found: {}", backup_id)))
+            .ok_or_else(|| StateError::storage(format!("Backup not found: {backup_id}")))
     }
 
     async fn save_backup_metadata(&self, metadata: &BackupMetadata) -> BackupResult<()> {
         let metadata_path = self.config.backup_dir.join(format!("{}.meta", metadata.id));
         let json = serde_json::to_string_pretty(metadata).map_err(|e| {
-            StateError::serialization(format!("Failed to serialize metadata: {}", e))
+            StateError::serialization(format!("Failed to serialize metadata: {e}"))
         })?;
         tokio::fs::write(metadata_path, json)
             .await
-            .map_err(|e| StateError::storage(format!("Failed to write metadata file: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Failed to write metadata file: {e}")))?;
         Ok(())
     }
 
@@ -481,7 +488,7 @@ impl BackupManager {
         let mut checksums = HashMap::new();
 
         let hash = Sha256::digest(data);
-        checksums.insert("sha256".to_string(), format!("{:x}", hash));
+        checksums.insert("sha256".to_string(), format!("{hash:x}"));
 
         checksums
     }
@@ -563,7 +570,7 @@ impl BackupManager {
         let backup_path = self.get_backup_path(backup_id);
         let compressed_data = tokio::fs::read(&backup_path)
             .await
-            .map_err(|e| StateError::storage(format!("Failed to read backup: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Failed to read backup: {e}")))?;
 
         // Decompress if needed
         let backup_data = if let Some(ref compression_info) = metadata.compression {

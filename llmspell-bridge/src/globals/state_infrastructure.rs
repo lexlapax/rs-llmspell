@@ -37,8 +37,8 @@ pub async fn get_or_create_state_infrastructure(
         let migration_engine = context.get_bridge::<MigrationEngine>("migration_engine");
         let schema_registry = context.get_bridge::<SchemaRegistry>("schema_registry");
 
-        let backup_manager = context
-            .get_bridge::<llmspell_kernel::state::backup::BackupManager>("backup_manager");
+        let backup_manager =
+            context.get_bridge::<llmspell_kernel::state::backup::BackupManager>("backup_manager");
 
         return Ok(StateInfrastructure {
             state_manager,
@@ -84,15 +84,14 @@ pub async fn get_or_create_state_infrastructure(
         // Note: StateManager already has a storage adapter, we need to share it
         // For now, create a new one with the same backend type
         let migration_backend_type = create_backend_type(config);
-        let migration_backend =
-            llmspell_kernel::state::backend_adapter::create_storage_backend(
-                &migration_backend_type,
-            )
-            .await
-            .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create migration backend: {e}"),
-                source: None,
-            })?;
+        let migration_backend = llmspell_kernel::state::backend_adapter::create_storage_backend(
+            &migration_backend_type,
+        )
+        .await
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create migration backend: {e}"),
+            source: None,
+        })?;
 
         let storage_adapter = Arc::new(StateStorageAdapter::new(
             migration_backend,

@@ -2,11 +2,11 @@
 //! ABOUTME: Provides state inspection, timeline navigation, and comparison tools for session replay
 
 use crate::sessions::{Result, SessionError, SessionId};
+use crate::state::manager::SerializedHookExecution;
 use llmspell_hooks::persistence::{
     CapturedState, ReplayError, ReplayErrorType, ReplaySession, TimelineEntry,
 };
 use llmspell_hooks::replay::{ComparisonResult, HookResultComparator};
-use crate::state::manager::SerializedHookExecution;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use std::sync::{Arc, RwLock};

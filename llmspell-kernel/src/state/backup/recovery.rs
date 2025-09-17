@@ -2,8 +2,8 @@
 // ABOUTME: Provides rollback capabilities and recovery coordination
 
 use super::{BackupId, BackupManager, BackupValidation, RestoreOptions};
-use anyhow::Result;
 use crate::state::StateError;
+use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -136,7 +136,7 @@ impl RecoveryOrchestrator {
                     }
                 }
                 Err(e) => {
-                    status.errors.push(format!("Validation failed: {}", e));
+                    status.errors.push(format!("Validation failed: {e}"));
                     status.status = RecoveryState::Failed;
                     return Ok(status);
                 }
@@ -156,7 +156,7 @@ impl RecoveryOrchestrator {
                     // Continue anyway, but note the error
                     status
                         .errors
-                        .push(format!("Rollback point creation failed: {}", e));
+                        .push(format!("Rollback point creation failed: {e}"));
                 }
             }
         }
@@ -194,7 +194,7 @@ impl RecoveryOrchestrator {
                         error!("Rollback also failed: {}", rollback_err);
                         status
                             .errors
-                            .push(format!("Rollback failed: {}", rollback_err));
+                            .push(format!("Rollback failed: {rollback_err}"));
                     } else {
                         status.status = RecoveryState::RolledBack;
                     }

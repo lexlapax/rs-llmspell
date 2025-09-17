@@ -4,7 +4,9 @@
 use anyhow::Result;
 use llmspell_events::bus::EventBus;
 use llmspell_hooks::{HookExecutor, HookRegistry};
-use llmspell_kernel::sessions::{types::CreateSessionOptions, SessionManager, SessionManagerConfig};
+use llmspell_kernel::sessions::{
+    types::CreateSessionOptions, SessionManager, SessionManagerConfig,
+};
 use llmspell_kernel::state::StateManager;
 use llmspell_storage::MemoryBackend;
 use std::sync::Arc;

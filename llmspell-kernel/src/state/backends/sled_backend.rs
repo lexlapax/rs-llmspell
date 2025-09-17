@@ -1,9 +1,9 @@
 //! ABOUTME: Sled storage backend implementation
 //! ABOUTME: Provides persistent embedded database storage
 
-use llmspell_storage::{StorageBackend, StorageBackendType, StorageCharacteristics};
 use anyhow::Result;
 use async_trait::async_trait;
+use llmspell_storage::{StorageBackend, StorageBackendType, StorageCharacteristics};
 use sled::Db;
 use std::collections::HashMap;
 use std::path::Path;

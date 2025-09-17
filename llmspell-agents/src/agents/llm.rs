@@ -14,8 +14,8 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError,
 };
-use llmspell_providers::{ModelSpecifier, ProviderInstance, ProviderManager};
 use llmspell_kernel::state::StateManager;
+use llmspell_providers::{ModelSpecifier, ProviderInstance, ProviderManager};
 use std::sync::{Arc, Mutex};
 use tracing::{debug, error, info, instrument, warn};
 

@@ -1,7 +1,6 @@
 // ABOUTME: Core StateManager implementation with persistent backend support
 // ABOUTME: Integrates Phase 4 hooks and Phase 3.3 storage for state persistence
 
-use crate::state::agent_state::ToolUsageStats;
 use super::backend_adapter::{create_storage_backend, StateStorageAdapter};
 use super::config::{PersistenceConfig, StateSchema};
 use super::key_manager::KeyManager;
@@ -9,13 +8,14 @@ use super::performance::{
     AsyncHookProcessor, FastAgentStateOps, FastPathConfig, FastPathManager, HookEvent,
     HookEventType, StateClass,
 };
+use super::{StateError, StateResult, StateScope};
+use crate::state::agent_state::ToolUsageStats;
 use llmspell_core::state::{ArtifactCorrelationManager, ArtifactId, StateOperation};
 use llmspell_core::types::ComponentId as CoreComponentId;
 use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
-use super::{StateError, StateResult, StateScope};
 use llmspell_storage::StorageBackend;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -91,7 +91,7 @@ impl HookReplayManager {
         &self,
         correlation_id: Uuid,
     ) -> StateResult<Vec<SerializedHookExecution>> {
-        let prefix = format!("hook_history:{}:", correlation_id);
+        let prefix = format!("hook_history:{correlation_id}:");
         let keys = self.storage_adapter.list_keys(&prefix).await?;
 
         let mut executions = Vec::new();
@@ -105,7 +105,7 @@ impl HookReplayManager {
     }
 }
 
-/// Enhanced StateManager with persistent backend
+/// Enhanced `StateManager` with persistent backend
 pub struct StateManager {
     // In-memory cache for fast access
     in_memory: Arc<RwLock<HashMap<String, Value>>>,
@@ -335,13 +335,13 @@ impl StateManager {
         };
 
         // For pre-hooks, we still need to execute synchronously to handle modifications
-        let pre_results = if !before_hooks.is_empty() {
+        let pre_results = if before_hooks.is_empty() {
+            vec![]
+        } else {
             self.hook_executor
                 .execute_hooks(&before_hooks, &mut hook_context)
                 .await
                 .map_err(|e| StateError::hook_error(e.to_string()))?
-        } else {
-            vec![]
         };
 
         // Handle hook results
@@ -461,13 +461,13 @@ impl StateManager {
             }
         };
 
-        let pre_results = if !hooks_to_execute.is_empty() {
+        let pre_results = if hooks_to_execute.is_empty() {
+            vec![]
+        } else {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
                 .map_err(|e| StateError::hook_error(e.to_string()))?
-        } else {
-            vec![]
         };
 
         // Handle hook results
@@ -1086,7 +1086,7 @@ impl StateManager {
             return self.load_agent_state_fast(agent_id).await;
         }
 
-        let key = format!("agent_state:{}", agent_id);
+        let key = format!("agent_state:{agent_id}");
 
         // Briefly acquire lock just to ensure atomicity with save/delete operations
         {
@@ -1104,7 +1104,7 @@ impl StateManager {
 
     /// Delete agent state from persistent storage with concurrent access protection
     pub async fn delete_agent_state(&self, agent_id: &str) -> StateResult<bool> {
-        let key = format!("agent_state:{}", agent_id);
+        let key = format!("agent_state:{agent_id}");
         let correlation_id = Uuid::new_v4();
 
         // Check if state exists
@@ -1251,7 +1251,7 @@ impl StateManager {
 
         // Fall back to storage if not in memory - use fast load
         if self.persistence_config.enabled {
-            let key = format!("agent_state:{}", agent_id);
+            let key = format!("agent_state:{agent_id}");
             self.storage_adapter.load_fast(&key).await
         } else {
             Ok(None)
@@ -1426,12 +1426,12 @@ impl StateManager {
         self.async_hook_processor.is_some()
     }
 
-    /// Start async hook processing (alias for enable_async_hooks for compatibility)
+    /// Start async hook processing (alias for `enable_async_hooks` for compatibility)
     pub async fn start_async_hooks(&mut self) -> StateResult<()> {
         self.enable_async_hooks()
     }
 
-    /// Stop async hook processing (alias for disable_async_hooks for compatibility)
+    /// Stop async hook processing (alias for `disable_async_hooks` for compatibility)
     pub async fn stop_async_hooks(&mut self) -> StateResult<()> {
         self.disable_async_hooks().await
     }
@@ -1603,14 +1603,14 @@ impl StateManager {
     ) -> StateResult<()> {
         // Create a correlation between state and artifact
         let component_id = match &scope {
-            StateScope::Agent(id) => CoreComponentId::from_name(&format!("agent:{}", id)),
-            StateScope::Tool(id) => CoreComponentId::from_name(&format!("tool:{}", id)),
-            StateScope::Workflow(id) => CoreComponentId::from_name(&format!("workflow:{}", id)),
-            StateScope::Custom(id) => CoreComponentId::from_name(&format!("custom:{}", id)),
+            StateScope::Agent(id) => CoreComponentId::from_name(&format!("agent:{id}")),
+            StateScope::Tool(id) => CoreComponentId::from_name(&format!("tool:{id}")),
+            StateScope::Workflow(id) => CoreComponentId::from_name(&format!("workflow:{id}")),
+            StateScope::Custom(id) => CoreComponentId::from_name(&format!("custom:{id}")),
             StateScope::Global => CoreComponentId::from_name("global"),
-            StateScope::Session(id) => CoreComponentId::from_name(&format!("session:{}", id)),
-            StateScope::User(id) => CoreComponentId::from_name(&format!("user:{}", id)),
-            StateScope::Hook(id) => CoreComponentId::from_name(&format!("hook:{}", id)),
+            StateScope::Session(id) => CoreComponentId::from_name(&format!("session:{id}")),
+            StateScope::User(id) => CoreComponentId::from_name(&format!("user:{id}")),
+            StateScope::Hook(id) => CoreComponentId::from_name(&format!("hook:{id}")),
         };
 
         let correlation_id = Uuid::new_v4().to_string();
@@ -1631,7 +1631,7 @@ impl StateManager {
             .await;
 
         // Store artifact reference in state
-        let artifact_key = format!("artifact:{}:{}", key, artifact_id_str);
+        let artifact_key = format!("artifact:{key}:{artifact_id_str}");
         let artifact_metadata = json!({
             "artifact_id": artifact_id_str,
             "correlation_id": correlation_id,
@@ -1674,7 +1674,10 @@ impl StateManager {
 // ==============================================================================
 
 use async_trait::async_trait;
-use llmspell_core::state::{StateManager as StateManagerTrait, StatePersistence as StatePersistenceTrait, TypedStatePersistence};
+use llmspell_core::state::{
+    StateManager as StateManagerTrait, StatePersistence as StatePersistenceTrait,
+    TypedStatePersistence,
+};
 
 #[async_trait]
 impl StateManagerTrait for StateManager {

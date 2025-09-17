@@ -57,7 +57,6 @@ impl TestFixture {
         })
     }
 
-
     /// Create a test session with custom options
     pub async fn create_test_session_with_options(
         &self,
@@ -114,7 +113,12 @@ mod tests {
     #[tokio::test]
     async fn test_fixture_creation() {
         let fixture = TestFixture::new().await.expect("Failed to create fixture");
-        assert!(fixture.session_manager.list_sessions(Default::default()).await.unwrap().is_empty());
+        assert!(fixture
+            .session_manager
+            .list_sessions(Default::default())
+            .await
+            .unwrap()
+            .is_empty());
     }
     #[tokio::test]
     async fn test_create_test_sessions() {
@@ -123,9 +127,13 @@ mod tests {
             .create_test_sessions(3)
             .await
             .expect("Failed to create sessions");
-        
+
         assert_eq!(sessions.len(), 3);
-        let listed = fixture.session_manager.list_sessions(Default::default()).await.unwrap();
+        let listed = fixture
+            .session_manager
+            .list_sessions(Default::default())
+            .await
+            .unwrap();
         assert_eq!(listed.len(), 3);
     }
     #[tokio::test]

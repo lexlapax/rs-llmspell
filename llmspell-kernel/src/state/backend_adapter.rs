@@ -131,7 +131,7 @@ impl StateStorageAdapter {
         format!("{}:{}", self.namespace, key)
     }
 
-    /// Fast store method using UnifiedSerializer for benchmark data
+    /// Fast store method using `UnifiedSerializer` for benchmark data
     pub async fn store_fast<T: Serialize>(&self, key: &str, value: &T) -> StateResult<()> {
         let namespaced_key = self.make_key(key);
         let bytes = self.fast_serializer.serialize(value)?;
@@ -142,7 +142,7 @@ impl StateStorageAdapter {
             .map_err(|e| StateError::storage(e.to_string()))
     }
 
-    /// Fast load method using UnifiedSerializer
+    /// Fast load method using `UnifiedSerializer`
     pub async fn load_fast<T: for<'de> Deserialize<'de>>(
         &self,
         key: &str,

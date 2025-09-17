@@ -6,8 +6,8 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_agents::factory::{AgentFactory, DefaultAgentFactory};
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
-use llmspell_providers::ProviderManager;
 use llmspell_kernel::state::{StateClass, StateManager, StateScope};
+use llmspell_providers::ProviderManager;
 use llmspell_tools::util::calculator::CalculatorTool;
 use llmspell_workflows::{
     parallel::ParallelBranch, ParallelWorkflowBuilder, SequentialWorkflowBuilder, StepType,

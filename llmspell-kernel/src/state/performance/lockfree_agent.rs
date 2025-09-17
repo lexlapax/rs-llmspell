@@ -2,17 +2,17 @@
 // ABOUTME: Eliminates per-agent locks that cause massive overhead in state operations
 
 use crate::state::agent_state::PersistentAgentState;
-use crossbeam_skiplist::SkipMap;
 use crate::state::{StateError, StateResult};
+use crossbeam_skiplist::SkipMap;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::SystemTime;
 
-/// Lock-free agent state store using SkipMap for concurrent access
+/// Lock-free agent state store using `SkipMap` for concurrent access
 pub struct LockFreeAgentStore {
-    /// Agent states indexed by agent_id
+    /// Agent states indexed by `agent_id`
     states: Arc<SkipMap<String, Arc<VersionedAgentState>>>,
 
     /// Global version counter for optimistic concurrency
@@ -57,7 +57,7 @@ impl LockFreeAgentStore {
         loop {
             // Get current state if exists
             let current = self.states.get(agent_id);
-            let current_version = current.as_ref().map(|e| e.value().version).unwrap_or(0);
+            let current_version = current.as_ref().map_or(0, |e| e.value().version);
             let current_state = current.as_ref().map(|e| &e.value().state);
 
             // Apply update function
@@ -89,8 +89,7 @@ impl LockFreeAgentStore {
             retries += 1;
             if retries >= max_retries {
                 return Err(StateError::lock_error(format!(
-                    "Failed to update agent state after {} retries",
-                    max_retries
+                    "Failed to update agent state after {max_retries} retries"
                 )));
             }
 
@@ -300,7 +299,9 @@ impl Default for FastAgentStateOps {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::state::agent_state::{AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats};
+    use crate::state::agent_state::{
+        AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats,
+    };
     use std::collections::HashMap;
     #[test]
     fn test_lock_free_basic_operations() {

@@ -14,7 +14,7 @@ pub struct UnifiedSerializer {
     /// Configuration for sensitive data handling
     sensitive_config: SensitiveDataConfig,
 
-    /// Whether to use MessagePack (true) or JSON (false)
+    /// Whether to use `MessagePack` (true) or JSON (false)
     use_msgpack: bool,
 
     /// Skip validation for trusted data
@@ -103,7 +103,7 @@ impl UnifiedSerializer {
         match value {
             Value::Object(map) => {
                 // Check for circular references using object identity
-                let obj_id = format!("{:p}", map as *const _);
+                let obj_id = format!("{:p}", std::ptr::from_ref(map));
                 if visited.contains(&obj_id) {
                     return Err(StateError::validation_error(format!(
                         "Circular reference detected at path: {}",
@@ -131,7 +131,7 @@ impl UnifiedSerializer {
             }
             Value::Array(arr) => {
                 for (i, val) in arr.iter_mut().enumerate() {
-                    path.push(format!("[{}]", i));
+                    path.push(format!("[{i}]"));
                     self.protect_value(val, visited, path)?;
                     path.pop();
                 }
@@ -171,7 +171,7 @@ impl UnifiedSerializer {
     }
 }
 
-/// Builder for UnifiedSerializer with fluent API
+/// Builder for `UnifiedSerializer` with fluent API
 pub struct UnifiedSerializerBuilder {
     sensitive_config: Option<SensitiveDataConfig>,
     use_msgpack: bool,

@@ -1,4 +1,4 @@
-//! Real HNSW implementation using hnsw_rs crate
+//! Real HNSW implementation using `hnsw_rs` crate
 //!
 //! This module provides a production-ready HNSW vector index with persistence support.
 
@@ -24,7 +24,7 @@ use crate::state::vector_storage::{
 };
 use crate::state::StateScope;
 
-/// HNSW vector storage implementation using hnsw_rs
+/// HNSW vector storage implementation using `hnsw_rs`
 #[derive(Debug)]
 pub struct HNSWVectorStorage {
     /// Map of namespace to HNSW index
@@ -238,7 +238,7 @@ impl HNSWVectorStorage {
     ///
     /// # Arguments
     ///
-    /// * `dimensions` - The dimensionality of vectors that will be stored (e.g., 384 for OpenAI embeddings)
+    /// * `dimensions` - The dimensionality of vectors that will be stored (e.g., 384 for `OpenAI` embeddings)
     /// * `config` - HNSW configuration parameters controlling index behavior
     ///
     /// # Examples
@@ -333,7 +333,7 @@ impl HNSWVectorStorage {
             .clone()
     }
 
-    /// Convert StateScope to namespace string
+    /// Convert `StateScope` to namespace string
     fn scope_to_namespace(scope: &StateScope) -> String {
         match scope {
             StateScope::Global => "__global__".to_string(),

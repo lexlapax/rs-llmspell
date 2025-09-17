@@ -8,10 +8,9 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ExecutionContext,
 };
+use llmspell_kernel::state::config::{PerformanceConfig, SledConfig};
+use llmspell_kernel::state::{PersistenceConfig, StateManager, StorageBackendType};
 use llmspell_providers::ProviderManager;
-use llmspell_kernel::state::{
-    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
-};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -41,7 +40,7 @@ impl ProviderTestContext {
         // Create state manager with persistent storage
         let state_manager = Arc::new(
             StateManager::with_backend(
-                StorageBackendType::Sled(llmspell_kernel::state::SledConfig {
+                StorageBackendType::Sled(SledConfig {
                     path: storage_path.join("test_states"),
                     cache_capacity: 1024 * 1024, // 1MB
                     use_compression: true,

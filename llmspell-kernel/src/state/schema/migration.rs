@@ -1,9 +1,9 @@
 // ABOUTME: Migration planning and execution system for schema version transitions
 // ABOUTME: Provides automated migration path discovery and execution planning
 
+use super::super::config::MigrationStep;
 use super::compatibility::RiskLevel;
 use super::{CompatibilityChecker, CompatibilityResult, EnhancedStateSchema, SemanticVersion};
-use super::super::config::MigrationStep;
 use crate::state::StateError;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
@@ -122,13 +122,13 @@ impl MigrationPlanner {
 
         let _from_schema = self.schema_registry.get(from_version).ok_or_else(|| {
             MigrationPlannerError::PlanningFailed {
-                details: format!("Source schema {} not found", from_version),
+                details: format!("Source schema {from_version} not found"),
             }
         })?;
 
         let _to_schema = self.schema_registry.get(to_version).ok_or_else(|| {
             MigrationPlannerError::PlanningFailed {
-                details: format!("Target schema {} not found", to_version),
+                details: format!("Target schema {to_version} not found"),
             }
         })?;
 
@@ -162,7 +162,7 @@ impl MigrationPlanner {
                 from_version: step_from.major, // Convert to legacy format for compatibility
                 to_version: step_to.major,
                 migration_type: Self::determine_migration_type(&compatibility),
-                description: format!("Migrate from {} to {}", step_from, step_to),
+                description: format!("Migrate from {step_from} to {step_to}"),
             };
             steps.push(migration_step);
 
@@ -277,7 +277,7 @@ impl MigrationPlanner {
 
         let from_schema = self.schema_registry.get(from).ok_or_else(|| {
             MigrationPlannerError::PlanningFailed {
-                details: format!("Schema {} not found", from),
+                details: format!("Schema {from} not found"),
             }
         })?;
 
@@ -285,7 +285,7 @@ impl MigrationPlanner {
             self.schema_registry
                 .get(to)
                 .ok_or_else(|| MigrationPlannerError::PlanningFailed {
-                    details: format!("Schema {} not found", to),
+                    details: format!("Schema {to} not found"),
                 })?;
 
         let compatibility = CompatibilityChecker::check_compatibility(from_schema, to_schema);
@@ -301,8 +301,8 @@ impl MigrationPlanner {
         to_version: &SemanticVersion,
         compatibility: &CompatibilityResult,
     ) -> Result<DataTransformation, MigrationPlannerError> {
-        let transformation_id = format!("transform_{}_{}", from_version, to_version);
-        let description = format!("Transform data from {} to {}", from_version, to_version);
+        let transformation_id = format!("transform_{from_version}_{to_version}");
+        let description = format!("Transform data from {from_version} to {to_version}");
 
         let mut field_mappings = HashMap::new();
         let mut validation_rules = Vec::new();
@@ -334,7 +334,15 @@ impl MigrationPlanner {
                     new_field,
                     ..
                 } => {
-                    if old_field.field_type != new_field.field_type {
+                    if old_field.field_type == new_field.field_type {
+                        field_mappings.insert(
+                            field_name.clone(),
+                            FieldMapping::Direct {
+                                from_field: field_name.clone(),
+                                to_field: field_name.clone(),
+                            },
+                        );
+                    } else {
                         field_mappings.insert(
                             field_name.clone(),
                             FieldMapping::Transform {
@@ -346,14 +354,6 @@ impl MigrationPlanner {
                                 ),
                             },
                         );
-                    } else {
-                        field_mappings.insert(
-                            field_name.clone(),
-                            FieldMapping::Direct {
-                                from_field: field_name.clone(),
-                                to_field: field_name.clone(),
-                            },
-                        );
                     }
                 }
                 super::compatibility::FieldChange::TypeChanged { old_type, new_type } => {
@@ -362,7 +362,7 @@ impl MigrationPlanner {
                         FieldMapping::Transform {
                             from_field: field_name.clone(),
                             to_field: field_name.clone(),
-                            transformation: format!("convert_{}_to_{}", old_type, new_type),
+                            transformation: format!("convert_{old_type}_to_{new_type}"),
                         },
                     );
                 }
@@ -413,7 +413,7 @@ impl MigrationPlanner {
                 from_version: from_version.major,
                 to_version: to_version.major,
                 migration_type: "rollback".to_string(),
-                description: format!("Rollback from {} to {}", from_version, to_version),
+                description: format!("Rollback from {from_version} to {to_version}"),
             }],
             estimated_duration: std::time::Duration::from_secs(300), // 5 minutes default
             risk_level: RiskLevel::High,                             // Rollbacks are always risky
@@ -508,7 +508,7 @@ impl MigrationPlanner {
         for (i, transformation) in plan.data_transformations.iter().enumerate() {
             if transformation.field_mappings.is_empty() && plan.steps.len() > i {
                 return Err(MigrationPlannerError::ValidationFailed {
-                    reason: format!("Transformation {} has no field mappings", i),
+                    reason: format!("Transformation {i} has no field mappings"),
                 });
             }
         }
@@ -529,7 +529,9 @@ impl MigrationPlanner {
             distribution
         };
 
-        let average_migration_complexity = if !self.compatibility_cache.is_empty() {
+        let average_migration_complexity = if self.compatibility_cache.is_empty() {
+            0.0
+        } else {
             #[allow(clippy::cast_precision_loss)]
             let sum_f64 = self
                 .compatibility_cache
@@ -539,8 +541,6 @@ impl MigrationPlanner {
             #[allow(clippy::cast_precision_loss)]
             let len_f64 = self.compatibility_cache.len() as f64;
             sum_f64 / len_f64
-        } else {
-            0.0
         };
 
         MigrationStats {

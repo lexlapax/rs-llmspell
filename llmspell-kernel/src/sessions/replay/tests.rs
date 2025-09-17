@@ -8,9 +8,9 @@ mod replay_tests {
         HookReplayBridge, ReplayEngine,
     };
     use crate::sessions::{types::CreateSessionOptions, SessionId, SessionManager};
+    use crate::state::{manager::HookReplayManager, StateManager};
     use llmspell_events::EventBus;
     use llmspell_hooks::{replay::ReplayManager, HookExecutor, HookRegistry};
-    use crate::state::{manager::HookReplayManager, StateManager};
     use llmspell_storage::{MemoryBackend, StorageBackend};
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
@@ -25,12 +25,11 @@ mod replay_tests {
         let event_bus = Arc::new(EventBus::new());
 
         // Create hook persistence manager and replay manager using bridge
-        let state_storage_adapter = Arc::new(
-            crate::state::backend_adapter::StateStorageAdapter::new(
+        let state_storage_adapter =
+            Arc::new(crate::state::backend_adapter::StateStorageAdapter::new(
                 storage_backend.clone(),
                 "test_sessions".to_string(),
-            ),
-        );
+            ));
         let state_hook_replay_manager = Arc::new(HookReplayManager::new(state_storage_adapter));
         let hook_replay_bridge = Arc::new(HookReplayBridge::new(state_hook_replay_manager.clone()));
         let hook_storage_backend =

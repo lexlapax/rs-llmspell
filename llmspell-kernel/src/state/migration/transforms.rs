@@ -210,7 +210,7 @@ impl DataTransformer {
             if let Some(obj) = current.as_object_mut() {
                 // Create nested object if it doesn't exist
                 if !obj.contains_key(*part) {
-                    obj.insert(part.to_string(), Value::Object(serde_json::Map::new()));
+                    obj.insert((*part).to_string(), Value::Object(serde_json::Map::new()));
                 }
                 // Move to the nested object
                 current = obj
@@ -271,7 +271,9 @@ impl DataTransformer {
         }
     }
 
-    pub fn with_sensitive_data_config(config: crate::state::sensitive_data::SensitiveDataConfig) -> Self {
+    pub fn with_sensitive_data_config(
+        config: crate::state::sensitive_data::SensitiveDataConfig,
+    ) -> Self {
         Self {
             sensitive_data_protector: SensitiveDataProtector::new(config),
         }
@@ -307,7 +309,7 @@ impl DataTransformer {
                     }
                 }
                 Err(e) => {
-                    result.add_error(format!("Transform failed: {}", e));
+                    result.add_error(format!("Transform failed: {e}"));
                     warn!("Field transformation failed: {}", e);
 
                     // Continue with other transforms unless it's a critical error
@@ -333,7 +335,7 @@ impl DataTransformer {
         // Apply validation rules
         for rule in &transformation.validation_rules {
             if let Err(e) = self.apply_validation_rule(&state.value, rule) {
-                result.add_error(format!("Validation failed: {}", e));
+                result.add_error(format!("Validation failed: {e}"));
                 if rule.required {
                     return Err(e.into());
                 }
@@ -546,34 +548,31 @@ impl DataTransformer {
         to_fields: &[String],
         splitter: &str,
     ) -> Result<Vec<(String, Value)>, TransformationError> {
-        match splitter {
-            "comma_split" => {
-                if let Some(s) = value.as_str() {
-                    let parts: Vec<&str> = s.split(',').map(str::trim).collect();
-                    let mut result = Vec::new();
-                    for (i, field) in to_fields.iter().enumerate() {
-                        let value = if i < parts.len() {
-                            Value::String(parts[i].to_string())
-                        } else {
-                            Value::Null
-                        };
-                        result.push((field.clone(), value));
-                    }
-                    Ok(result)
-                } else {
-                    Err(TransformationError::FieldTransformFailed {
-                        field: "unknown".to_string(),
-                        reason: "Value is not a string for comma_split".to_string(),
-                    })
+        if splitter == "comma_split" {
+            if let Some(s) = value.as_str() {
+                let parts: Vec<&str> = s.split(',').map(str::trim).collect();
+                let mut result = Vec::new();
+                for (i, field) in to_fields.iter().enumerate() {
+                    let value = if i < parts.len() {
+                        Value::String(parts[i].to_string())
+                    } else {
+                        Value::Null
+                    };
+                    result.push((field.clone(), value));
                 }
+                Ok(result)
+            } else {
+                Err(TransformationError::FieldTransformFailed {
+                    field: "unknown".to_string(),
+                    reason: "Value is not a string for comma_split".to_string(),
+                })
             }
-            _ => {
-                debug!("Unknown splitter '{}', using identity split", splitter);
-                Ok(to_fields
-                    .iter()
-                    .map(|f| (f.clone(), value.clone()))
-                    .collect())
-            }
+        } else {
+            debug!("Unknown splitter '{}', using identity split", splitter);
+            Ok(to_fields
+                .iter()
+                .map(|f| (f.clone(), value.clone()))
+                .collect())
         }
     }
 
@@ -638,7 +637,7 @@ impl DataTransformer {
 
         match &rule.rule_type {
             ValidationType::NotNull => {
-                if field_value.is_none_or(|v| v.is_null()) {
+                if field_value.is_none_or(serde_json::Value::is_null) {
                     return Err(TransformationError::ValidationFailed {
                         details: rule
                             .error_message

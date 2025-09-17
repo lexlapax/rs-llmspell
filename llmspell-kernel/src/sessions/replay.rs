@@ -12,9 +12,9 @@ mod tests;
 pub use hook_replay_bridge::HookReplayBridge;
 
 use crate::sessions::{Result, SessionId};
+use crate::state::manager::HookReplayManager;
 use llmspell_events::EventBus;
 use llmspell_hooks::replay::ReplayManager;
-use crate::state::manager::HookReplayManager;
 use llmspell_storage::StorageBackend;
 use session_adapter::SessionReplayAdapter;
 use std::sync::Arc;
@@ -329,15 +329,13 @@ impl Default for ReplayEngine {
         // Real functionality will be implemented in subsequent tasks
         let stub_storage = Arc::new(llmspell_storage::MemoryBackend::new());
         let stub_event_bus = Arc::new(EventBus::new());
-        let stub_state_adapter = Arc::new(
-            crate::state::backend_adapter::StateStorageAdapter::new(
-                stub_storage.clone(),
-                "stub".to_string(),
-            ),
-        );
-        let stub_hook_replay_manager = Arc::new(
-            crate::state::manager::HookReplayManager::new(stub_state_adapter),
-        );
+        let stub_state_adapter = Arc::new(crate::state::backend_adapter::StateStorageAdapter::new(
+            stub_storage.clone(),
+            "stub".to_string(),
+        ));
+        let stub_hook_replay_manager = Arc::new(crate::state::manager::HookReplayManager::new(
+            stub_state_adapter,
+        ));
 
         // Create stub components using the bridge adapter
         let hook_replay_bridge = Arc::new(HookReplayBridge::new(stub_hook_replay_manager.clone()));

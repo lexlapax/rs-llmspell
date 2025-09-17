@@ -141,7 +141,7 @@ pub enum BackupEvent {
 }
 
 impl BackupEvent {
-    /// Convert to UniversalEvent for EventBus
+    /// Convert to `UniversalEvent` for `EventBus`
     pub fn to_universal_event(&self) -> UniversalEvent {
         let event_type = match self {
             Self::BackupStarted { .. } => "backup.started",

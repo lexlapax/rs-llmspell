@@ -122,8 +122,8 @@ impl BackupCleanup {
             .get(backup_id)
             .ok_or_else(|| StateError::not_found("backup", backup_id))?;
 
-        let backup_path = self.backup_dir.join(format!("{}.backup", backup_id));
-        let metadata_path = self.backup_dir.join(format!("{}.meta", backup_id));
+        let backup_path = self.backup_dir.join(format!("{backup_id}.backup"));
+        let metadata_path = self.backup_dir.join(format!("{backup_id}.meta"));
 
         if self.dry_run {
             debug!(
@@ -144,12 +144,12 @@ impl BackupCleanup {
         // Delete backup file
         tokio::fs::remove_file(&backup_path)
             .await
-            .map_err(|e| StateError::storage(format!("Failed to delete backup file: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Failed to delete backup file: {e}")))?;
 
         // Delete metadata file
         if metadata_path.exists() {
             tokio::fs::remove_file(&metadata_path).await.map_err(|e| {
-                StateError::storage(format!("Failed to delete metadata file: {}", e))
+                StateError::storage(format!("Failed to delete metadata file: {e}"))
             })?;
         }
 

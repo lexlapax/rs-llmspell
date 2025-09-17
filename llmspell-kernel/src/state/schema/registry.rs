@@ -115,8 +115,7 @@ impl SchemaRegistry {
             let schemas = self.schemas.read();
             if !schemas.contains_key(&version) {
                 return Err(StateError::MigrationError(format!(
-                    "Cannot register named schema '{}': version {} not found",
-                    name, version
+                    "Cannot register named schema '{name}': version {version} not found"
                 )));
             }
         }
@@ -302,7 +301,7 @@ impl SchemaRegistry {
 
             if field_schema.field_type.is_empty() {
                 return Err(SchemaRegistryError::ValidationFailed {
-                    details: format!("Field '{}' must have a type", field_name),
+                    details: format!("Field '{field_name}' must have a type"),
                 });
             }
         }

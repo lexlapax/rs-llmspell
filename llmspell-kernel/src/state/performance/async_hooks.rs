@@ -1,9 +1,9 @@
 // ABOUTME: Async hook processing to remove hooks from critical state operation path
 // ABOUTME: Uses lock-free queues and background processing for zero-overhead hook execution
 
+use crate::state::{StateError, StateResult};
 use crossbeam::queue::SegQueue;
 use llmspell_hooks::{Hook, HookContext, HookExecutor};
-use crate::state::{StateError, StateResult};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;

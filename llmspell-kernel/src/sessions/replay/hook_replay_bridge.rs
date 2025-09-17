@@ -1,11 +1,11 @@
 //! ABOUTME: Bridge adapter to connect state persistence `HookReplayManager` to hooks `HookReplayManager` trait
 //! ABOUTME: Temporary bridge for Task 6.4.1 - will be refactored in subsequent tasks
 
+use crate::state::manager::HookReplayManager as StateHookReplayManager;
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_hooks::persistence::HookReplayManager as HooksHookReplayManager;
 use llmspell_hooks::{HookContext, HookResult, ReplayableHook};
-use crate::state::manager::HookReplayManager as StateHookReplayManager;
 use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;

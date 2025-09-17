@@ -79,7 +79,7 @@ impl RetentionPolicy for TimeBasedPolicy {
         }
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "TimeBasedPolicy"
     }
 }
@@ -121,7 +121,7 @@ impl RetentionPolicy for CountBasedPolicy {
         }
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "CountBasedPolicy"
     }
 }
@@ -201,11 +201,11 @@ impl RetentionPolicy for ImportanceBasedPolicy {
             backup_id: backup.id.clone(),
             should_retain,
             priority,
-            reason: format!("Importance: {:?}", priority),
+            reason: format!("Importance: {priority:?}"),
         }
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "ImportanceBasedPolicy"
     }
 }
@@ -275,7 +275,7 @@ impl RetentionPolicy for CompositePolicy {
         }
     }
 
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "CompositePolicy"
     }
 }

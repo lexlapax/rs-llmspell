@@ -1,8 +1,8 @@
 // ABOUTME: Schema compatibility checking and validation system
 // ABOUTME: Provides compatibility analysis, breaking change detection, and upgrade path validation
 
-use super::{EnhancedStateSchema, SemanticVersion};
 use super::super::config::{CompatibilityLevel, FieldSchema};
+use super::{EnhancedStateSchema, SemanticVersion};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use thiserror::Error;
@@ -137,21 +137,18 @@ impl CompatibilityChecker {
     ) {
         if to_version.is_breaking_change_from(from_version) {
             result.breaking_changes.push(format!(
-                "Major version change: {} -> {}",
-                from_version, to_version
+                "Major version change: {from_version} -> {to_version}"
             ));
             result.compatibility_level = CompatibilityLevel::BreakingChange;
             result.migration_required = true;
         } else if to_version < from_version {
             result.breaking_changes.push(format!(
-                "Downgrade detected: {} -> {}",
-                from_version, to_version
+                "Downgrade detected: {from_version} -> {to_version}"
             ));
             result.compatibility_level = CompatibilityLevel::BreakingChange;
         } else if to_version.minor > from_version.minor {
             result.warnings.push(format!(
-                "Minor version upgrade: {} -> {}",
-                from_version, to_version
+                "Minor version upgrade: {from_version} -> {to_version}"
             ));
         }
     }
@@ -171,11 +168,11 @@ impl CompatibilityChecker {
             if old_field.required {
                 result
                     .breaking_changes
-                    .push(format!("Required field '{}' was removed", removed_field));
+                    .push(format!("Required field '{removed_field}' was removed"));
             } else {
                 result
                     .warnings
-                    .push(format!("Optional field '{}' was removed", removed_field));
+                    .push(format!("Optional field '{removed_field}' was removed"));
             }
 
             result.field_changes.insert(
@@ -193,13 +190,12 @@ impl CompatibilityChecker {
 
             if new_field.required && new_field.default_value.is_none() {
                 result.breaking_changes.push(format!(
-                    "Required field '{}' was added without default value",
-                    added_field
+                    "Required field '{added_field}' was added without default value"
                 ));
             } else {
                 result
                     .warnings
-                    .push(format!("Field '{}' was added", added_field));
+                    .push(format!("Field '{added_field}' was added"));
             }
 
             result.field_changes.insert(
@@ -253,14 +249,12 @@ impl CompatibilityChecker {
             if new_field.required && !old_field.required {
                 // Optional -> Required is breaking
                 result.breaking_changes.push(format!(
-                    "Field '{}' changed from optional to required",
-                    field_name
+                    "Field '{field_name}' changed from optional to required"
                 ));
             } else {
                 // Required -> Optional is safe
                 result.warnings.push(format!(
-                    "Field '{}' changed from required to optional",
-                    field_name
+                    "Field '{field_name}' changed from required to optional"
                 ));
             }
             changes.push(format!(
@@ -281,7 +275,7 @@ impl CompatibilityChecker {
         if old_field.default_value != new_field.default_value {
             result
                 .warnings
-                .push(format!("Field '{}' default value changed", field_name));
+                .push(format!("Field '{field_name}' default value changed"));
             changes.push("Default value changed".to_string());
         }
 
@@ -289,7 +283,7 @@ impl CompatibilityChecker {
         if old_field.validators != new_field.validators {
             result
                 .warnings
-                .push(format!("Field '{}' validators changed", field_name));
+                .push(format!("Field '{field_name}' validators changed"));
             changes.push("Validators changed".to_string());
         }
 
@@ -318,14 +312,14 @@ impl CompatibilityChecker {
         for removed_dep in from_deps_set.difference(&to_deps_set) {
             result
                 .warnings
-                .push(format!("Dependency on schema {} was removed", removed_dep));
+                .push(format!("Dependency on schema {removed_dep} was removed"));
         }
 
         // Check for added dependencies
         for added_dep in to_deps_set.difference(&from_deps_set) {
             result
                 .warnings
-                .push(format!("Dependency on schema {} was added", added_dep));
+                .push(format!("Dependency on schema {added_dep} was added"));
         }
     }
 

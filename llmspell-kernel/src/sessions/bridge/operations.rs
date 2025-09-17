@@ -222,9 +222,9 @@ pub struct SessionExport {
 mod tests {
     use super::*;
     use crate::sessions::{types::CreateSessionOptions, SessionManagerConfigBuilder};
+    use crate::state::StateManager;
     use llmspell_events::bus::EventBus;
     use llmspell_hooks::{HookExecutor, HookRegistry};
-    use crate::state::StateManager;
     use llmspell_storage::MemoryBackend;
     use std::sync::Arc;
 

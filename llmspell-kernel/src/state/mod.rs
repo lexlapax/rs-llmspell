@@ -44,14 +44,22 @@ pub use persistence::StatePersistence;
 pub use types::{DebugState, ExecutionState, SessionState};
 
 // Re-export consolidated state-persistence types (needed by sessions)
-pub use agent_state::{PersistentAgentState, AgentStateData, AgentMetadata, ToolUsageStats};
+pub use agent_state::{
+    AgentMetadata, AgentStateData, MessageRole, PersistentAgentState, ToolUsageStats,
+};
 pub use backend_adapter::StateStorageAdapter;
-pub use config::{PersistenceConfig, StorageBackendType};
+pub use config::{
+    BackupConfig, EncryptionConfig, PerformanceConfig, PersistenceConfig, RocksDBConfig,
+    SledConfig, StorageBackendType,
+};
 pub use manager::{HookReplayManager, SerializedHookExecution, StateManager};
 pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
 
 // Re-export original kernel storage types
-pub use kernel_backends::{MemoryBackend as KernelMemoryBackend, SledBackend as KernelSledBackend, StorageBackend, VectorBackend};
+pub use kernel_backends::{
+    MemoryBackend as KernelMemoryBackend, SledBackend as KernelSledBackend, StorageBackend,
+    VectorBackend,
+};
 
 // Re-export comprehensive storage backends
 pub use backends::{MemoryBackend, SledBackend};

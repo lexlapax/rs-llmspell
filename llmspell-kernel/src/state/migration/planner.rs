@@ -34,7 +34,7 @@ impl From<MigrationPlannerError> for StateError {
     }
 }
 
-/// Enhanced migration step with more detail than legacy MigrationStep
+/// Enhanced migration step with more detail than legacy `MigrationStep`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationStep {
     pub id: String,
@@ -73,7 +73,7 @@ impl MigrationStep {
     }
 }
 
-/// Enhanced migration plan that integrates with StateManager
+/// Enhanced migration plan that integrates with `StateManager`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MigrationPlan {
     pub id: String,
@@ -143,7 +143,7 @@ impl MigrationPlan {
     }
 }
 
-/// Migration planner that integrates with StateManager
+/// Migration planner that integrates with `StateManager`
 pub struct MigrationPlanner {
     schema_planner: SchemaMigrationPlanner,
     schema_registry: SchemaRegistry,
@@ -186,12 +186,12 @@ impl MigrationPlanner {
             .schema_registry
             .get_schema(from_version)
             .ok_or_else(|| MigrationPlannerError::PlanningFailed {
-                reason: format!("Source schema {} not found", from_version),
+                reason: format!("Source schema {from_version} not found"),
             })?;
 
         let to_schema = self.schema_registry.get_schema(to_version).ok_or_else(|| {
             MigrationPlannerError::PlanningFailed {
-                reason: format!("Target schema {} not found", to_version),
+                reason: format!("Target schema {to_version} not found"),
             }
         })?;
 
@@ -383,8 +383,8 @@ impl MigrationComplexity {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::super::config::FieldSchema;
+    use super::*;
 
     fn create_test_schema(version: SemanticVersion) -> EnhancedStateSchema {
         let mut schema = EnhancedStateSchema::new(version);

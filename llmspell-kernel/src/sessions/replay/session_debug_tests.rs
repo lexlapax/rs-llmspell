@@ -4,11 +4,11 @@
 // Tests are included directly in the parent module
 use super::{ErrorAnalysis, SessionDebugData, SessionDebugger, SessionState, StateComparison};
 use crate::sessions::SessionId;
+use crate::state::manager::SerializedHookExecution;
 use llmspell_hooks::persistence::{
     CapturedState, ReplayError, ReplayErrorType, ReplaySession, TimelineEntry,
 };
 use llmspell_hooks::result::HookResult;
-use crate::state::manager::SerializedHookExecution;
 use serde_json::json;
 use std::collections::{HashMap, VecDeque};
 use std::time::{Duration, SystemTime};

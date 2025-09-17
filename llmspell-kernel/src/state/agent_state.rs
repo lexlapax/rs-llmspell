@@ -236,7 +236,10 @@ pub trait PersistentAgent {
     fn apply_persistent_state(&self, state: PersistentAgentState) -> StateResult<()>;
 
     /// Save the agent's state
-    async fn save_state(&self, state_manager: &crate::state::manager::StateManager) -> StateResult<()> {
+    async fn save_state(
+        &self,
+        state_manager: &crate::state::manager::StateManager,
+    ) -> StateResult<()> {
         let state = self.get_persistent_state()?;
         state_manager.save_agent_state(&state).await
     }
@@ -253,7 +256,10 @@ pub trait PersistentAgent {
     }
 
     /// Delete the agent's state
-    async fn delete_state(&self, state_manager: &crate::state::manager::StateManager) -> StateResult<()> {
+    async fn delete_state(
+        &self,
+        state_manager: &crate::state::manager::StateManager,
+    ) -> StateResult<()> {
         state_manager.delete_agent_state(self.agent_id()).await?;
         Ok(())
     }

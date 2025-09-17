@@ -18,10 +18,10 @@ use crate::sessions::{
     types::{CreateSessionOptions, SessionQuery, SessionSortBy},
     Result, SessionError, SessionId, SessionMetadata,
 };
+use crate::state::{StateManager, StateScope};
 use chrono::{DateTime, Utc};
 use llmspell_events::{bus::EventBus, correlation::EventCorrelationTracker};
 use llmspell_hooks::{HookExecutor, HookPoint, HookRegistry, LoggingHook, MetricsHook};
-use crate::state::{StateManager, StateScope};
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -121,16 +121,14 @@ impl SessionManager {
         };
 
         // Create replay infrastructure components
-        let state_storage_adapter = Arc::new(
-            crate::state::backend_adapter::StateStorageAdapter::new(
+        let state_storage_adapter =
+            Arc::new(crate::state::backend_adapter::StateStorageAdapter::new(
                 storage_backend.clone(),
                 "sessions".to_string(),
-            ),
-        );
-        let hook_replay_manager =
-            Arc::new(crate::state::manager::HookReplayManager::new(
-                state_storage_adapter.clone(),
             ));
+        let hook_replay_manager = Arc::new(crate::state::manager::HookReplayManager::new(
+            state_storage_adapter.clone(),
+        ));
 
         // Create bridge adapter for type compatibility
         let hook_replay_bridge = Arc::new(crate::sessions::replay::HookReplayBridge::new(

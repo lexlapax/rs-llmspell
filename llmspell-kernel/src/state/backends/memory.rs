@@ -1,9 +1,9 @@
 //! ABOUTME: In-memory storage backend implementation
 //! ABOUTME: Provides fast non-persistent storage for testing and development
 
-use llmspell_storage::{StorageBackend, StorageBackendType, StorageCharacteristics};
 use anyhow::Result;
 use async_trait::async_trait;
+use llmspell_storage::{StorageBackend, StorageBackendType, StorageCharacteristics};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;

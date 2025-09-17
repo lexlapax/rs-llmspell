@@ -267,7 +267,7 @@ impl Default for ValidationRules {
     }
 }
 
-/// Migration validator that integrates with existing StateManager
+/// Migration validator that integrates with existing `StateManager`
 pub struct MigrationValidator {
     rules: ValidationRules,
     #[allow(dead_code)]
@@ -317,7 +317,7 @@ impl MigrationValidator {
                         rule_id: "max_issues_reached".to_string(),
                         severity: ValidationSeverity::Warning,
                         field: None,
-                        message: format!("Maximum issue limit reached ({})", max_issues),
+                        message: format!("Maximum issue limit reached ({max_issues})"),
                         details: Some("Validation stopped early".to_string()),
                         suggestion: Some("Review and fix existing issues".to_string()),
                     });
@@ -364,7 +364,7 @@ impl MigrationValidator {
                         rule_id: "max_issues_reached".to_string(),
                         severity: ValidationSeverity::Warning,
                         field: None,
-                        message: format!("Maximum issue limit reached ({})", max_issues),
+                        message: format!("Maximum issue limit reached ({max_issues})"),
                         details: Some("Validation stopped early".to_string()),
                         suggestion: Some("Review and fix existing issues".to_string()),
                     });
@@ -404,7 +404,7 @@ impl MigrationValidator {
                             rule_id: rule.id.clone(),
                             severity: ValidationSeverity::Error,
                             field: None,
-                            message: format!("Validation rule execution failed: {}", e),
+                            message: format!("Validation rule execution failed: {e}"),
                             details: Some(e.to_string()),
                             suggestion: Some("Check validation rule configuration".to_string()),
                         });
@@ -504,7 +504,7 @@ impl MigrationValidator {
                         rule_id: rule.id.clone(),
                         severity: rule.severity.clone(),
                         field: Some(field_name.clone()),
-                        message: format!("Required field '{}' is missing", field_name),
+                        message: format!("Required field '{field_name}' is missing"),
                         details: Some(format!(
                             "Field is required by schema version {}",
                             schema.version
@@ -541,12 +541,10 @@ impl MigrationValidator {
                             severity: rule.severity.clone(),
                             field: Some(field_name.clone()),
                             message: format!(
-                                "Type mismatch: expected '{}', got '{}'",
-                                expected_type, actual_type
+                                "Type mismatch: expected '{expected_type}', got '{actual_type}'"
                             ),
                             details: Some(format!(
-                                "Field '{}' value: {:?}",
-                                field_name, field_value
+                                "Field '{field_name}' value: {field_value:?}"
                             )),
                             suggestion: Some("Convert field to the expected type".to_string()),
                         });

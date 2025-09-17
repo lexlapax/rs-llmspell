@@ -10,7 +10,7 @@ use std::collections::HashMap;
 /// Configuration for fast-path operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FastPathConfig {
-    /// Enable MessagePack for better performance than JSON
+    /// Enable `MessagePack` for better performance than JSON
     pub use_messagepack: bool,
 
     /// Enable compression for large values
@@ -56,11 +56,11 @@ impl FastPathManager {
     pub fn serialize_trusted(&self, value: &Value) -> StateResult<Vec<u8>> {
         if self.config.use_messagepack {
             rmp_serde::to_vec(value).map_err(|e| {
-                StateError::serialization(format!("MessagePack serialization failed: {}", e))
+                StateError::serialization(format!("MessagePack serialization failed: {e}"))
             })
         } else {
             serde_json::to_vec(value)
-                .map_err(|e| StateError::serialization(format!("JSON serialization failed: {}", e)))
+                .map_err(|e| StateError::serialization(format!("JSON serialization failed: {e}")))
         }
     }
 
@@ -68,11 +68,11 @@ impl FastPathManager {
     pub fn deserialize_trusted(&self, bytes: &[u8]) -> StateResult<Value> {
         if self.config.use_messagepack {
             rmp_serde::from_slice(bytes).map_err(|e| {
-                StateError::serialization(format!("MessagePack deserialization failed: {}", e))
+                StateError::serialization(format!("MessagePack deserialization failed: {e}"))
             })
         } else {
             serde_json::from_slice(bytes).map_err(|e| {
-                StateError::serialization(format!("JSON deserialization failed: {}", e))
+                StateError::serialization(format!("JSON deserialization failed: {e}"))
             })
         }
     }
@@ -83,7 +83,7 @@ impl FastPathManager {
             return Ok(()); // Ephemeral data discarded if cache disabled
         }
 
-        let cache_key = format!("{}:{}", scope, key);
+        let cache_key = format!("{scope}:{key}");
 
         let mut cache = self.ephemeral_cache.write();
 
@@ -105,7 +105,7 @@ impl FastPathManager {
             return Ok(None);
         }
 
-        let cache_key = format!("{}:{}", scope, key);
+        let cache_key = format!("{scope}:{key}");
         let cache = self.ephemeral_cache.read();
         Ok(cache.get(&cache_key).cloned())
     }
@@ -166,11 +166,11 @@ impl FastPathManager {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
         encoder
             .write_all(&data)
-            .map_err(|e| StateError::compression_error(format!("Compression failed: {}", e)))?;
+            .map_err(|e| StateError::compression_error(format!("Compression failed: {e}")))?;
 
         encoder
             .finish()
-            .map_err(|e| StateError::compression_error(format!("Compression finish failed: {}", e)))
+            .map_err(|e| StateError::compression_error(format!("Compression finish failed: {e}")))
     }
 
     /// Decompress data if needed
@@ -183,7 +183,7 @@ impl FastPathManager {
             let mut decoder = GzDecoder::new(data);
             let mut decompressed = Vec::new();
             decoder.read_to_end(&mut decompressed).map_err(|e| {
-                StateError::compression_error(format!("Decompression failed: {}", e))
+                StateError::compression_error(format!("Decompression failed: {e}"))
             })?;
             Ok(decompressed)
         } else {

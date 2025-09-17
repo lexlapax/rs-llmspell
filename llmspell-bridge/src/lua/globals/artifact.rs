@@ -134,7 +134,9 @@ pub fn inject_artifact_global(
 
         // Convert metadata to JSON then to Lua
         let metadata_json =
-            llmspell_kernel::sessions::bridge::conversions::artifact_metadata_to_json(&result.metadata);
+            llmspell_kernel::sessions::bridge::conversions::artifact_metadata_to_json(
+                &result.metadata,
+            );
         let metadata_lua = json_to_lua_value(lua, &metadata_json)?;
         result_table.set("metadata", metadata_lua)?;
 

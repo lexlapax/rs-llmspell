@@ -149,9 +149,8 @@ macro_rules! impl_persistent_agent {
 
             fn get_persistent_state(
                 &self,
-            ) -> llmspell_kernel::state::StateResult<
-                llmspell_kernel::state::PersistentAgentState,
-            > {
+            ) -> llmspell_kernel::state::StateResult<llmspell_kernel::state::PersistentAgentState>
+            {
                 // Since we need async, we use block_on here
                 let rt = tokio::runtime::Handle::current();
                 rt.block_on(self.create_persistent_state()).map_err(|e| {

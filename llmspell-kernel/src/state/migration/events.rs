@@ -223,7 +223,7 @@ impl MigrationEvent {
     }
 }
 
-/// Convert MigrationEvent to UniversalEvent for existing event system integration
+/// Convert `MigrationEvent` to `UniversalEvent` for existing event system integration
 impl From<MigrationEvent> for UniversalEvent {
     fn from(migration_event: MigrationEvent) -> Self {
         let event_type = migration_event.event_type().to_string();

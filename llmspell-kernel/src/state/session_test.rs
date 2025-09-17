@@ -3,8 +3,8 @@
 
 #[cfg(test)]
 mod session_tests {
-    use crate::state::{StateManager, StorageBackendType};
     use crate::state::StateScope;
+    use crate::state::{StateManager, StorageBackendType};
     use serde_json::json;
     use tempfile::TempDir;
     #[tokio::test]
@@ -14,14 +14,18 @@ mod session_tests {
         // Test saving to session scope
         let session_id = "test-session-123";
         let session_scope = StateScope::Session(session_id.to_string());
-        
+
         state_manager
             .set(session_scope.clone(), "user_id", json!("user-456"))
             .await
             .unwrap();
-        
+
         state_manager
-            .set(session_scope.clone(), "preferences", json!({"theme": "dark"}))
+            .set(
+                session_scope.clone(),
+                "preferences",
+                json!({"theme": "dark"}),
+            )
             .await
             .unwrap();
 
@@ -40,10 +44,7 @@ mod session_tests {
 
         // Test session isolation - different session shouldn't see the data
         let other_session = StateScope::Session("other-session-789".to_string());
-        let other_user = state_manager
-            .get(other_session, "user_id")
-            .await
-            .unwrap();
+        let other_user = state_manager.get(other_session, "user_id").await.unwrap();
         assert_eq!(other_user, None);
 
         // Test listing keys in session scope
@@ -88,7 +89,7 @@ mod session_tests {
             .set(
                 StateScope::Session("session-1".to_string()),
                 "config",
-                json!("session-config")
+                json!("session-config"),
             )
             .await
             .unwrap();
@@ -117,18 +118,24 @@ mod session_tests {
                 .set(
                     session_scope.clone(),
                     &format!("key-{}", i),
-                    json!(format!("value-{}", i))
+                    json!(format!("value-{}", i)),
                 )
                 .await
                 .unwrap();
         }
 
         // Verify all keys exist
-        let keys = state_manager.list_keys(session_scope.clone()).await.unwrap();
+        let keys = state_manager
+            .list_keys(session_scope.clone())
+            .await
+            .unwrap();
         assert_eq!(keys.len(), 5);
 
         // Clear the session scope
-        state_manager.clear_scope(session_scope.clone()).await.unwrap();
+        state_manager
+            .clear_scope(session_scope.clone())
+            .await
+            .unwrap();
 
         // Verify all keys are gone
         let keys_after = state_manager.list_keys(session_scope).await.unwrap();

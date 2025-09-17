@@ -3,9 +3,9 @@
 //! This module defines the core abstractions for vector storage operations,
 //! including storage backends, query interfaces, and configuration types.
 
+use crate::state::StateScope;
 use anyhow::Result;
 use async_trait::async_trait;
-use crate::state::StateScope;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -325,14 +325,14 @@ pub struct VectorEntry {
     pub updated_at: SystemTime,
 
     /// Event time - when the event actually occurred (bi-temporal support)
-    /// Different from created_at which is when it was ingested
+    /// Different from `created_at` which is when it was ingested
     pub event_time: Option<SystemTime>,
 
     /// Optional expiration time for session vectors
     pub expires_at: Option<SystemTime>,
 
-    /// TTL duration in seconds (alternative to expires_at)
-    /// If set, expires_at will be calculated as created_at + ttl
+    /// TTL duration in seconds (alternative to `expires_at`)
+    /// If set, `expires_at` will be calculated as `created_at` + ttl
     pub ttl_seconds: Option<u64>,
 
     /// Explicit tenant ID for billing
@@ -406,7 +406,7 @@ impl VectorEntry {
         }
     }
 
-    /// Update the entry (updates the updated_at timestamp)
+    /// Update the entry (updates the `updated_at` timestamp)
     pub fn update(&mut self) {
         self.updated_at = SystemTime::now();
     }

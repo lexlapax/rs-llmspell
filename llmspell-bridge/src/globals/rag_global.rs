@@ -5,9 +5,9 @@ use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::rag_bridge::RAGBridge;
 use crate::{ComponentRegistry, ProviderManager};
 use llmspell_core::Result;
-use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
 use llmspell_kernel::sessions::SessionManager;
 use llmspell_kernel::state::StateManager;
+use llmspell_rag::multi_tenant_integration::MultiTenantRAG;
 use llmspell_storage::VectorStorage;
 use std::sync::Arc;
 
