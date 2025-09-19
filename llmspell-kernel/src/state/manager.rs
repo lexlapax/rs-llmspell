@@ -23,8 +23,8 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tracing::{debug, instrument};
 use tracing::field::Empty;
+use tracing::{debug, instrument};
 use uuid::Uuid;
 
 /// Serialized hook execution for persistence
@@ -64,6 +64,13 @@ impl HookReplayManager {
         correlation_id = %context.correlation_id,
         duration_ms = duration.as_millis() as u64
     ))]
+    /// Persist hook execution for replay
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to serialize hook context or result
+    /// - Failed to store execution data
     pub async fn persist_hook_execution(
         &self,
         hook: &dyn ReplayableHook,
@@ -97,6 +104,13 @@ impl HookReplayManager {
         correlation_id = %correlation_id,
         execution_count = Empty
     ))]
+    /// Get hook executions by correlation ID
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys with correlation prefix
+    /// - Failed to load execution data from storage
     pub async fn get_hook_executions_by_correlation(
         &self,
         correlation_id: Uuid,
@@ -159,6 +173,12 @@ pub struct StateManager {
 
 impl StateManager {
     /// Create a new state manager with default in-memory backend
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to create storage backend
+    /// - Failed to initialize state manager components
     #[instrument(level = "debug")]
     pub async fn new() -> StateResult<Self> {
         Self::with_backend(
@@ -169,6 +189,12 @@ impl StateManager {
     }
 
     /// Create a benchmark-optimized state manager for performance testing
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to create storage backend
+    /// - Failed to initialize state manager components
     pub async fn new_benchmark() -> StateResult<Self> {
         let config = PersistenceConfig {
             enabled: false, // Disable persistence for benchmarks
@@ -209,6 +235,12 @@ impl StateManager {
     }
 
     /// Create a new state manager with specified backend
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to create specified storage backend
+    /// - Failed to initialize state manager components
     #[instrument(level = "info", fields(
         backend_type = ?backend_type,
         persistence_enabled = config.enabled
@@ -511,7 +543,7 @@ impl StateManager {
             .await?;
 
         // Publish state change event and track correlation
-        let event = self.create_state_change_event(
+        let event = Self::create_state_change_event(
             "state.changed",
             &scope,
             key,
@@ -571,12 +603,26 @@ impl StateManager {
     }
 
     /// Set state value (backward compatible method)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to store value in storage backend
+    /// - Hook execution fails
     #[instrument(level = "trace", skip(self, value), fields(scope = ?scope, key = %key))]
     pub async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
         self.set_with_class(scope, key, value, None).await
     }
 
     /// Set state with explicit state class for performance optimization
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to store value in storage backend
+    /// - Hook execution fails
     #[instrument(level = "trace", skip(self, value), fields(
         scope = ?scope,
         key = %key,
@@ -690,6 +736,12 @@ impl StateManager {
     }
 
     /// Get state value
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to retrieve value from storage backend
     #[instrument(level = "trace", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn get(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
         self.get_with_class(scope, key, None).await
@@ -791,6 +843,13 @@ impl StateManager {
     }
 
     /// Delete state value
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to delete value from storage backend
+    /// - Hook execution fails
     #[instrument(level = "debug", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn delete(&self, scope: StateScope, key: &str) -> StateResult<bool> {
         let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
@@ -810,6 +869,11 @@ impl StateManager {
     }
 
     /// List all keys in a scope
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys from storage backend
     #[instrument(level = "debug", skip(self), fields(scope = ?scope, key_count = Empty))]
     pub async fn list_keys(&self, scope: StateScope) -> StateResult<Vec<String>> {
         let prefix = scope.prefix();
@@ -835,6 +899,12 @@ impl StateManager {
     }
 
     /// Clear all state in a scope
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys in scope
+    /// - Failed to delete keys from storage backend
     #[instrument(level = "info", skip(self), fields(scope = ?scope))]
     pub async fn clear_scope(&self, scope: StateScope) -> StateResult<()> {
         let keys = self.list_keys(scope.clone()).await?;
@@ -1150,6 +1220,14 @@ impl StateManager {
     }
 
     /// Delete agent state from persistent storage with concurrent access protection
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to check if state exists
+    /// - Failed to delete state from storage
+    /// - Hook execution fails
+    /// - Failed to publish delete event
     #[instrument(level = "info", skip(self), fields(agent_id = %agent_id))]
     pub async fn delete_agent_state(&self, agent_id: &str) -> StateResult<bool> {
         let key = format!("agent_state:{agent_id}");
@@ -1239,6 +1317,11 @@ impl StateManager {
     }
 
     /// List all saved agent states
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys from storage backend
     #[instrument(level = "debug", skip(self), fields(agent_count = Empty))]
     pub async fn list_agent_states(&self) -> StateResult<Vec<String>> {
         let prefix = "agent_state:";
@@ -1254,6 +1337,11 @@ impl StateManager {
     }
 
     /// Get agent state metadata without loading full state
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to load agent state
     #[instrument(level = "debug", skip(self), fields(agent_id = %agent_id))]
     pub async fn get_agent_metadata(
         &self,
@@ -1317,29 +1405,60 @@ impl StateManager {
     // ===== Isolation Enforcement Methods =====
 
     /// Get scoped state value with isolation check
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to retrieve value from storage backend
     #[instrument(level = "trace", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn get_scoped(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
         self.get(scope, key).await
     }
 
     /// Set scoped state value with isolation check
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to store value in storage backend
+    /// - Hook execution fails
     #[instrument(level = "trace", skip(self, value), fields(scope = ?scope, key = %key))]
     pub async fn set_scoped(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
         self.set(scope, key, value).await
     }
 
     /// Delete scoped state value with isolation check
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to delete value from storage backend
+    /// - Hook execution fails
     #[instrument(level = "trace", skip(self), fields(scope = ?scope, key = %key))]
     pub async fn delete_scoped(&self, scope: StateScope, key: &str) -> StateResult<bool> {
         self.delete(scope, key).await
     }
 
     /// List keys in a specific scope
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys from storage backend
     pub async fn list_keys_in_scope(&self, scope: StateScope) -> StateResult<Vec<String>> {
         self.list_keys(scope).await
     }
 
     /// Check if a key exists in a scope
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails
+    /// - Failed to check existence in storage backend
     pub async fn exists_in_scope(&self, scope: StateScope, key: &str) -> StateResult<bool> {
         let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
 
@@ -1360,6 +1479,12 @@ impl StateManager {
     }
 
     /// Get all values in a scope (for backup/migration)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys in scope
+    /// - Failed to retrieve any value from storage
     pub async fn get_all_in_scope(&self, scope: StateScope) -> StateResult<HashMap<String, Value>> {
         let keys = self.list_keys_in_scope(scope.clone()).await?;
         let mut result = HashMap::new();
@@ -1374,6 +1499,12 @@ impl StateManager {
     }
 
     /// Clear all values in a scope (returns count of deleted items)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys in scope
+    /// - Failed to delete any key from storage
     pub async fn clear_scope_count(&self, scope: StateScope) -> StateResult<usize> {
         let keys = self.list_keys_in_scope(scope.clone()).await?;
         let count = keys.len();
@@ -1386,6 +1517,12 @@ impl StateManager {
     }
 
     /// Copy state from one scope to another
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to get all values from source scope
+    /// - Failed to set any value in destination scope
     pub async fn copy_scope(
         &self,
         from_scope: StateScope,
@@ -1402,6 +1539,12 @@ impl StateManager {
     }
 
     /// Move state from one scope to another
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to copy scope
+    /// - Failed to clear source scope after copy
     pub async fn move_scope(
         &self,
         from_scope: StateScope,
@@ -1414,7 +1557,6 @@ impl StateManager {
 
     /// Create a state change event for correlation tracking
     fn create_state_change_event(
-        &self,
         event_type: &str,
         scope: &StateScope,
         key: &str,
@@ -1449,6 +1591,11 @@ impl StateManager {
     }
 
     /// Synchronous benchmark API for measuring true overhead
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to save agent state to fast storage
     pub fn save_agent_state_benchmark_sync(
         &self,
         agent_state: &crate::state::agent_state::PersistentAgentState,
@@ -1461,6 +1608,11 @@ impl StateManager {
     }
 
     /// Enable async hook processing for better performance
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to start async hook processor
     pub fn enable_async_hooks(&mut self) -> StateResult<()> {
         if self.async_hook_processor.is_none() && self.persistence_config.enabled {
             let mut processor = AsyncHookProcessor::new(self.hook_executor.clone());
@@ -1471,6 +1623,11 @@ impl StateManager {
     }
 
     /// Disable async hook processing (process hooks synchronously)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to stop async hook processor
     #[allow(clippy::await_holding_lock)]
     pub async fn disable_async_hooks(&mut self) -> StateResult<()> {
         if let Some(processor) = self.async_hook_processor.take() {
@@ -1486,16 +1643,31 @@ impl StateManager {
     }
 
     /// Start async hook processing (alias for `enable_async_hooks` for compatibility)
-    pub async fn start_async_hooks(&mut self) -> StateResult<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to start async hook processor
+    pub fn start_async_hooks(&mut self) -> StateResult<()> {
         self.enable_async_hooks()
     }
 
     /// Stop async hook processing (alias for `disable_async_hooks` for compatibility)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to stop async hook processor
     pub async fn stop_async_hooks(&mut self) -> StateResult<()> {
         self.disable_async_hooks().await
     }
 
     /// Wait for all queued hooks to be processed
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Timeout exceeded while waiting for hooks
     #[allow(clippy::await_holding_lock)]
     pub async fn wait_for_hooks(&self, timeout: Duration) -> StateResult<()> {
         if let Some(processor) = &self.async_hook_processor {

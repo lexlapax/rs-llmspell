@@ -235,6 +235,13 @@ impl Default for AgentMetadata {
 
 impl PersistentAgentState {
     /// Serialize with circular reference check and sensitive data protection
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - The serialization process fails
+    /// - Circular references are detected
+    /// - Data cannot be encoded to `MessagePack` format
     pub fn safe_to_storage_bytes(&self) -> StateResult<Vec<u8>> {
         // Use unified serializer for single-pass serialization
         use super::performance::UnifiedSerializer;
@@ -244,6 +251,13 @@ impl PersistentAgentState {
     }
 
     /// Deserialize from storage bytes (no special handling needed on read)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - The bytes cannot be decoded from `MessagePack` format
+    /// - The data structure doesn't match expected schema
+    /// - The deserialized data is invalid or corrupted
     pub fn safe_from_storage_bytes(bytes: &[u8]) -> StateResult<Self> {
         // Use unified serializer for deserialization
         use super::performance::UnifiedSerializer;
@@ -253,6 +267,12 @@ impl PersistentAgentState {
     }
 
     /// Fast serialization for benchmarks (no protection)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - The serialization process fails
+    /// - Data cannot be encoded to `MessagePack` format
     pub fn fast_to_bytes(&self) -> StateResult<Vec<u8>> {
         use super::performance::UnifiedSerializer;
 
@@ -261,6 +281,12 @@ impl PersistentAgentState {
     }
 
     /// Fast deserialization for benchmarks
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - The bytes cannot be decoded from `MessagePack` format
+    /// - The data structure doesn't match expected schema
     pub fn fast_from_bytes(bytes: &[u8]) -> StateResult<Self> {
         use super::performance::UnifiedSerializer;
 
@@ -276,9 +302,19 @@ pub trait PersistentAgent {
     fn agent_id(&self) -> &str;
 
     /// Get the current persistent state
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if the state cannot be retrieved or constructed
     fn get_persistent_state(&self) -> StateResult<PersistentAgentState>;
 
     /// Apply a persistent state to the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - The state is incompatible with the agent
+    /// - The state cannot be applied due to validation failures
     fn apply_persistent_state(&self, state: PersistentAgentState) -> StateResult<()>;
 
     /// Save the agent's state

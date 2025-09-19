@@ -63,6 +63,12 @@ impl SchemaRegistry {
     }
 
     /// Register a new schema version
+    ///
+    /// # Errors
+    ///
+    /// Returns `SchemaRegistryError` if:
+    /// - Version conflict with existing schema
+    /// - Schema validation fails
     pub fn register_schema(
         &self,
         schema: EnhancedStateSchema,
@@ -79,7 +85,7 @@ impl SchemaRegistry {
         }
 
         // Validate schema
-        self.validate_schema(&schema)?;
+        Self::validate_schema(&schema)?;
 
         // Register the schema
         {
@@ -109,6 +115,11 @@ impl SchemaRegistry {
     }
 
     /// Register a named schema for easier lookup
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::MigrationError` if:
+    /// - Schema version not found in registry
     pub fn register_named_schema(&self, name: String, version: SemanticVersion) -> StateResult<()> {
         // Verify the version exists
         {
@@ -203,6 +214,11 @@ impl SchemaRegistry {
     }
 
     /// Remove a schema version (use with caution)
+    ///
+    /// # Errors
+    ///
+    /// Returns `SchemaRegistryError::SchemaNotFound` if:
+    /// - Schema version not found in registry
     pub fn remove_schema(&self, version: &SemanticVersion) -> Result<(), SchemaRegistryError> {
         {
             let mut schemas = self.schemas.write();
@@ -235,6 +251,11 @@ impl SchemaRegistry {
     }
 
     /// Set the current active schema version
+    ///
+    /// # Errors
+    ///
+    /// Returns `SchemaRegistryError::SchemaNotFound` if:
+    /// - Schema version not found in registry
     pub fn set_current_version(&self, version: SemanticVersion) -> Result<(), SchemaRegistryError> {
         {
             let schemas = self.schemas.read();
@@ -276,7 +297,7 @@ impl SchemaRegistry {
     }
 
     /// Validate a schema before registration
-    fn validate_schema(&self, schema: &EnhancedStateSchema) -> Result<(), SchemaRegistryError> {
+    fn validate_schema(schema: &EnhancedStateSchema) -> Result<(), SchemaRegistryError> {
         // Basic validation checks
         if schema.fields.is_empty() && schema.version.major > 0 {
             return Err(SchemaRegistryError::ValidationFailed {

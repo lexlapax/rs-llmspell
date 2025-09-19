@@ -47,6 +47,12 @@ impl LockFreeAgentStore {
     }
 
     /// Update agent state using lock-free compare-and-swap
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Update function returns an error
+    /// - Maximum retry attempts exceeded due to concurrent modifications
     pub fn update<F>(&self, agent_id: &str, update_fn: F) -> StateResult<Arc<VersionedAgentState>>
     where
         F: Fn(Option<&PersistentAgentState>) -> StateResult<PersistentAgentState>,
@@ -189,8 +195,7 @@ fn estimate_agent_state_size(state: &PersistentAgentState) -> usize {
 /// Estimate size of a JSON value
 fn estimate_json_size(value: &Value) -> usize {
     match value {
-        Value::Null => 4,
-        Value::Bool(_) => 4,
+        Value::Null | Value::Bool(_) => 4,
         Value::Number(_) => 8,
         Value::String(s) => s.len(),
         Value::Array(arr) => arr.iter().map(estimate_json_size).sum::<usize>() + 8,
@@ -219,6 +224,11 @@ impl FastAgentStateOps {
     }
 
     /// Save agent state without heavy serialization
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to update agent state in lock-free store
     pub fn save_fast(&self, state: &PersistentAgentState) -> StateResult<()> {
         let agent_id = state.agent_id.clone();
 
@@ -228,6 +238,11 @@ impl FastAgentStateOps {
     }
 
     /// Ultra-fast save for benchmarks - minimal overhead
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to acquire write lock on benchmark store
     pub fn save_benchmark(&self, state: &PersistentAgentState) -> StateResult<()> {
         // For benchmarks, use simple HashMap to measure true overhead
         let arc_state = Arc::new(state.clone());
@@ -238,6 +253,11 @@ impl FastAgentStateOps {
     }
 
     /// Load agent state without heavy deserialization
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to access agent state in lock-free store
     pub fn load_fast(&self, agent_id: &str) -> StateResult<Option<PersistentAgentState>> {
         Ok(self
             .store
@@ -246,7 +266,13 @@ impl FastAgentStateOps {
     }
 
     /// Update specific field in agent state
-    pub fn update_field(&self, agent_id: &str, field: &str, value: Value) -> StateResult<()> {
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Agent state not found
+    /// - Field update fails due to invalid value
+    pub fn update_field(&self, agent_id: &str, field: &str, value: &Value) -> StateResult<()> {
         self.store.update(agent_id, |current| {
             let mut state = current
                 .ok_or_else(|| StateError::not_found("agent", agent_id))?
@@ -529,7 +555,7 @@ mod tests {
         assert_eq!(loaded.agent_id, "fast-agent");
 
         // Test field update
-        ops.update_field("fast-agent", "status", Value::String("active".to_string()))
+        ops.update_field("fast-agent", "status", &Value::String("active".to_string()))
             .unwrap();
 
         let updated = ops.load_fast("fast-agent").unwrap().unwrap();

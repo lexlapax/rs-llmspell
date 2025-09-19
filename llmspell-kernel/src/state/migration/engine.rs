@@ -208,7 +208,7 @@ impl MigrationEngine {
                 // Rollback if configured to do so
                 if config.rollback_on_error {
                     warn!("Attempting rollback for migration {}", migration_id);
-                    match self.rollback_migration(&plan, &context).await {
+                    match self.rollback_migration(&plan, &context) {
                         Ok(()) => {
                             result.mark_rolled_back();
                             info!("Migration {} rolled back successfully", migration_id);
@@ -576,7 +576,7 @@ impl MigrationEngine {
     }
 
     /// Rollback migration (simplified implementation)
-    async fn rollback_migration(
+    fn rollback_migration(
         &self,
         _plan: &MigrationPlan,
         _context: &MigrationContext,
@@ -594,7 +594,7 @@ impl MigrationEngine {
     }
 
     /// Cancel an active migration
-    pub async fn cancel_migration(&self, migration_id: Uuid) -> StateResult<()> {
+    pub fn cancel_migration(&self, migration_id: Uuid) -> StateResult<()> {
         let mut active = self.active_migrations.write();
         if active.remove(&migration_id).is_some() {
             info!("Migration {} cancelled", migration_id);

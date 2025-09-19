@@ -103,6 +103,14 @@ impl RecoveryOrchestrator {
     }
 
     /// Perform a coordinated recovery operation
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Backup validation fails when `verify_checksums` is enabled
+    /// - Failed to create rollback point when `backup_current` is enabled
+    /// - Restoration process fails
+    /// - Rollback fails after a failed restoration
     pub async fn recover(
         &mut self,
         target_backup: &str,
@@ -274,6 +282,12 @@ impl RecoveryOrchestrator {
     }
 
     /// Rollback to previous state
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - No rollback backup is available
+    /// - Failed to restore from rollback backup
     pub async fn rollback(&mut self) -> Result<(), StateError> {
         if let Some(rollback_id) = &self.rollback_backup {
             info!("Rolling back to backup {}", rollback_id);

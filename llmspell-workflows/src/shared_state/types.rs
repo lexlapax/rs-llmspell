@@ -15,7 +15,9 @@ pub enum StateScope {
 
     /// Step-specific scope within a workflow
     Step {
+        /// ID of the workflow containing the step
         workflow_id: String,
+        /// Name of the specific step
         step_name: String,
     },
 

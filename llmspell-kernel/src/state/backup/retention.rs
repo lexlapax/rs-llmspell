@@ -136,7 +136,6 @@ impl ImportanceBasedPolicy {
 
     /// Calculate importance score for a backup
     fn calculate_importance(
-        &self,
         backup: &BackupMetadata,
         context: &RetentionContext,
     ) -> RetentionPriority {
@@ -153,7 +152,7 @@ impl ImportanceBasedPolicy {
         }
 
         // First backup of the day/week/month is important
-        if self.is_checkpoint_backup(backup, &context.all_backups) {
+        if Self::is_checkpoint_backup(backup, &context.all_backups) {
             return RetentionPriority::Important;
         }
 
@@ -166,11 +165,7 @@ impl ImportanceBasedPolicy {
     }
 
     /// Check if backup is a checkpoint (first of day/week/month)
-    fn is_checkpoint_backup(
-        &self,
-        backup: &BackupMetadata,
-        all_backups: &[BackupMetadata],
-    ) -> bool {
+    fn is_checkpoint_backup(backup: &BackupMetadata, all_backups: &[BackupMetadata]) -> bool {
         // This is a simplified check - in production, you'd want proper date parsing
         let backup_time = backup.created_at;
 
@@ -194,7 +189,7 @@ impl Default for ImportanceBasedPolicy {
 
 impl RetentionPolicy for ImportanceBasedPolicy {
     fn evaluate(&self, backup: &BackupMetadata, context: &RetentionContext) -> RetentionDecision {
-        let priority = self.calculate_importance(backup, context);
+        let priority = Self::calculate_importance(backup, context);
         let should_retain = priority >= RetentionPriority::Important;
 
         RetentionDecision {

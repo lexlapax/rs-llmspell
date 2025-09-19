@@ -311,7 +311,7 @@ impl MigrationPlanner {
                 estimated_duration: Duration::from_secs(field_changes_count * 10 + 60),
                 requires_backup: compatibility.risk_level
                     >= crate::state::schema::compatibility::RiskLevel::High,
-                complexity_score: self.calculate_complexity_score(&compatibility),
+                complexity_score: Self::calculate_complexity_score(&compatibility),
             };
 
             Ok(complexity)
@@ -324,7 +324,7 @@ impl MigrationPlanner {
     }
 
     /// Calculate a numeric complexity score
-    fn calculate_complexity_score(&self, compatibility: &CompatibilityResult) -> u32 {
+    fn calculate_complexity_score(compatibility: &CompatibilityResult) -> u32 {
         let mut score = 0u32;
 
         // Base score for field changes

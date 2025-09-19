@@ -10,8 +10,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, info, instrument, warn, Span};
 use tracing::field::Empty;
+use tracing::{debug, info, instrument, warn, Span};
 
 /// Core session structure managing lifecycle and state
 #[derive(Debug, Clone)]

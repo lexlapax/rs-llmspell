@@ -8,8 +8,8 @@ use llmspell_core::{ComponentId, ComponentLookup, ComponentMetadata, LLMSpellErr
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
-use tracing::{debug, error, info, instrument, warn};
 use tracing::field::Empty;
+use tracing::{debug, error, info, instrument, warn};
 
 /// Basic step executor for workflow steps
 #[derive(Clone)]

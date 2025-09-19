@@ -153,7 +153,7 @@ impl StateClassConfig {
 
         // Check explicit patterns first
         for (pattern, class) in &self.key_patterns {
-            if self.matches_pattern(key, pattern) {
+            if Self::matches_pattern(key, pattern) {
                 return *class;
             }
         }
@@ -167,7 +167,7 @@ impl StateClassConfig {
     }
 
     /// Simple glob-style pattern matching
-    fn matches_pattern(&self, key: &str, pattern: &str) -> bool {
+    fn matches_pattern(key: &str, pattern: &str) -> bool {
         if pattern.ends_with('*') {
             let prefix = pattern.strip_suffix('*').unwrap();
             key.starts_with(prefix)

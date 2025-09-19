@@ -9,6 +9,12 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Creates appropriate storage backend based on configuration
+///
+/// # Errors
+///
+/// Returns `StateError::StorageError` if:
+/// - Sled backend cannot be created at the specified path
+/// - `RocksDB` backend is requested (not yet implemented)
 pub async fn create_storage_backend(
     backend_type: &StorageBackendType,
 ) -> StateResult<Arc<dyn StorageBackend>> {
@@ -48,6 +54,12 @@ impl StateStorageAdapter {
     }
 
     /// Store a value with state-specific key formatting
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - `SerializationError`: The value cannot be serialized to bytes
+    /// - `StorageError`: The backend fails to store the data
     pub async fn store<T: StorageSerialize>(&self, key: &str, value: &T) -> StateResult<()> {
         let namespaced_key = self.make_key(key);
         let bytes = value
@@ -61,6 +73,12 @@ impl StateStorageAdapter {
     }
 
     /// Load a value with state-specific key formatting
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - `SerializationError`: The stored bytes cannot be deserialized
+    /// - `StorageError`: The backend fails to retrieve the data
     pub async fn load<T: StorageSerialize>(&self, key: &str) -> StateResult<Option<T>> {
         let namespaced_key = self.make_key(key);
 
@@ -76,6 +94,10 @@ impl StateStorageAdapter {
     }
 
     /// Delete a value
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::StorageError` if the backend fails to delete the key
     pub async fn delete(&self, key: &str) -> StateResult<()> {
         let namespaced_key = self.make_key(key);
         self.backend
@@ -85,6 +107,10 @@ impl StateStorageAdapter {
     }
 
     /// Check if a key exists
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::StorageError` if the backend fails to check existence
     pub async fn exists(&self, key: &str) -> StateResult<bool> {
         let namespaced_key = self.make_key(key);
         self.backend
@@ -94,6 +120,10 @@ impl StateStorageAdapter {
     }
 
     /// List all keys in the namespace
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::StorageError` if the backend fails to list keys
     pub async fn list_keys(&self, prefix: &str) -> StateResult<Vec<String>> {
         let namespaced_prefix = self.make_key(prefix);
         let keys = self
@@ -117,6 +147,12 @@ impl StateStorageAdapter {
     }
 
     /// Clear all data in the namespace
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::StorageError` if:
+    /// - Failed to list keys in the namespace
+    /// - Backend fails to delete the batch of keys
     pub async fn clear_namespace(&self) -> StateResult<()> {
         let keys = self.list_keys("").await?;
         let namespaced_keys: Vec<_> = keys.iter().map(|k| self.make_key(k)).collect();
@@ -132,6 +168,12 @@ impl StateStorageAdapter {
     }
 
     /// Fast store method using `UnifiedSerializer` for benchmark data
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - `SerializationError`: The value cannot be serialized
+    /// - `StorageError`: The backend fails to store the data
     pub async fn store_fast<T: Serialize>(&self, key: &str, value: &T) -> StateResult<()> {
         let namespaced_key = self.make_key(key);
         let bytes = self.fast_serializer.serialize(value)?;
@@ -143,6 +185,12 @@ impl StateStorageAdapter {
     }
 
     /// Fast load method using `UnifiedSerializer`
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - `SerializationError`: The stored bytes cannot be deserialized
+    /// - `StorageError`: The backend fails to retrieve the data
     pub async fn load_fast<T: for<'de> Deserialize<'de>>(
         &self,
         key: &str,

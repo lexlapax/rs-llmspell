@@ -92,6 +92,10 @@ impl AsyncHookProcessor {
     }
 
     /// Start background processing
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if the processor is already running
     pub fn start(&mut self) -> StateResult<()> {
         if self.processor_handle.is_some() {
             return Err(StateError::already_exists(
@@ -157,6 +161,10 @@ impl AsyncHookProcessor {
     }
 
     /// Stop background processing
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if unable to stop the processor
     pub async fn stop(&mut self) -> StateResult<()> {
         self.shutdown.store(true, Ordering::Relaxed);
 
@@ -170,6 +178,10 @@ impl AsyncHookProcessor {
     }
 
     /// Queue hook event for async processing
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if the event queue is full
     pub fn queue_hook_event(&self, event: HookEvent) -> StateResult<()> {
         self.event_queue.push(event);
         self.stats.events_queued.fetch_add(1, Ordering::Relaxed);
@@ -178,6 +190,10 @@ impl AsyncHookProcessor {
     }
 
     /// Queue multiple hook events
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if the event queue is full
     pub fn queue_hook_events(&self, events: Vec<HookEvent>) -> StateResult<()> {
         let count = events.len() as u64;
         for event in events {
@@ -213,6 +229,10 @@ impl AsyncHookProcessor {
     }
 
     /// Wait for queue to drain (for testing)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if timeout is exceeded before queue drains
     pub async fn wait_for_drain(&self, timeout: Duration) -> StateResult<()> {
         let start = Instant::now();
 

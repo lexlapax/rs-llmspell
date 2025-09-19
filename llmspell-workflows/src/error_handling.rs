@@ -184,39 +184,63 @@ pub enum ErrorAction {
 /// Types of workflow errors
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WorkflowErrorType {
+    /// Operation exceeded time limit
     Timeout,
+    /// Input or data validation failed
     Validation,
+    /// Tool execution failed
     ToolFailure,
+    /// Agent execution failed
     AgentFailure,
+    /// Workflow logic or condition error
     WorkflowLogic,
+    /// System resources exhausted
     ResourceExhaustion,
+    /// Network communication failure
     NetworkFailure,
+    /// Unknown or unclassified error
     Unknown,
 }
 
 /// Suggested recovery actions
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum RecoveryAction {
+    /// Retry from the last successful step
     RetryFromLastSuccessful,
+    /// Retry with exponential backoff
     RetryWithBackoff,
+    /// Increase timeout values
     IncreaseTimeouts,
+    /// Reduce parallel concurrency
     ReduceConcurrency,
+    /// Fix or validate input data
     FixInputData,
+    /// Check configuration settings
     CheckConfiguration,
+    /// Review workflow design
     ReviewWorkflowDesign,
+    /// Requires manual intervention
     ManualIntervention,
 }
 
 /// Analysis of a workflow error
 #[derive(Debug, Clone)]
 pub struct WorkflowErrorAnalysis {
+    /// Type of error that occurred
     pub error_type: WorkflowErrorType,
+    /// Detailed error message
     pub error_message: String,
+    /// Workflow completion percentage
     pub progress_percentage: u32,
+    /// Number of successfully completed steps
     pub successful_steps: usize,
+    /// Number of failed steps
     pub failed_steps: usize,
+    /// Number of remaining steps
     pub remaining_steps: usize,
+    /// Suggested recovery action
     pub recovery_suggestion: RecoveryAction,
+    /// Whether the error is recoverable
     pub is_recoverable: bool,
 }
 

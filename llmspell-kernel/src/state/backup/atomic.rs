@@ -14,77 +14,119 @@ use tracing::{debug, error, info};
 
 /// Atomic backup operation handle
 pub struct AtomicBackup {
+    /// Unique identifier for this backup
     backup_id: String,
+    /// Reference to the state manager
     state_manager: Arc<StateManager>,
+    /// Parent backup ID for incremental backups
     parent_backup: Option<String>,
+    /// Timestamp when snapshot was taken
     snapshot_time: SystemTime,
+    /// Lock to ensure atomic operations
     operation_lock: Arc<Mutex<()>>,
+    /// Number of entries in this backup
     pub entry_count: usize,
 }
 
 /// Builder for atomic backup operations
 pub struct AtomicBackupBuilder {
+    /// Unique identifier for this backup
     backup_id: String,
+    /// Parent backup ID for incremental backups
     parent_backup: Option<String>,
+    /// Scopes to include in backup
     include_scopes: Option<Vec<StateScope>>,
+    /// Scopes to exclude from backup
     exclude_scopes: Option<Vec<StateScope>>,
+    /// Patterns to include in backup
     include_patterns: Option<Vec<String>>,
+    /// Patterns to exclude from backup
     exclude_patterns: Option<Vec<String>>,
 }
 
 /// Backup operation status
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BackupOperation {
+    /// Unique backup identifier
     pub backup_id: String,
+    /// Current operation status
     pub status: OperationStatus,
+    /// When the operation started
     pub started_at: SystemTime,
+    /// When the operation completed
     pub completed_at: Option<SystemTime>,
+    /// Number of entries processed
     pub entries_processed: usize,
+    /// Total bytes processed
     pub bytes_processed: u64,
+    /// Any errors encountered
     pub errors: Vec<String>,
 }
 
 /// Operation status
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum OperationStatus {
+    /// Operation is pending
     Pending,
+    /// Operation is in progress
     InProgress,
+    /// Operation completed successfully
     Completed,
+    /// Operation failed
     Failed,
+    /// Operation was cancelled
     Cancelled,
 }
 
 /// Snapshot data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateSnapshot {
+    /// When the snapshot was taken
     pub timestamp: SystemTime,
+    /// Snapshot entries by key
     pub entries: HashMap<String, SnapshotEntry>,
+    /// Snapshot metadata
     pub metadata: SnapshotMetadata,
 }
 
 /// Individual snapshot entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotEntry {
+    /// State scope for this entry
     pub scope: StateScope,
+    /// Entry key
     pub key: String,
+    /// Entry data
     pub data: Value,
+    /// Entry version number
     pub version: u64,
+    /// When entry was last modified
     pub last_modified: SystemTime,
 }
 
 /// Snapshot metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SnapshotMetadata {
+    /// Backup identifier
     pub backup_id: String,
+    /// Parent backup identifier for incremental
     pub parent_id: Option<String>,
+    /// When snapshot was created
     pub created_at: SystemTime,
+    /// Number of entries
     pub entry_count: usize,
+    /// Total size in bytes
     pub total_size: u64,
+    /// Schema version string
     pub schema_version: String,
 }
 
 impl AtomicBackup {
     /// Create a new atomic backup operation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the backup cannot be initialized
     pub fn new(
         backup_id: String,
         state_manager: Arc<StateManager>,
@@ -113,6 +155,12 @@ impl AtomicBackup {
     }
 
     /// Capture atomic snapshot of current state
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to create snapshot from current state
+    /// - Serialization of snapshot data fails
     pub async fn capture(&self) -> Result<Vec<u8>, StateError> {
         let _lock = self.operation_lock.lock().await;
         info!("Starting atomic backup capture: {}", self.backup_id);
@@ -132,7 +180,7 @@ impl AtomicBackup {
         let snapshot = self.create_snapshot().await?;
 
         // Serialize snapshot
-        let serialized = self.serialize_snapshot(&snapshot)?;
+        let serialized = Self::serialize_snapshot(&snapshot)?;
 
         let duration = start_time.elapsed();
         info!(
@@ -146,6 +194,12 @@ impl AtomicBackup {
     }
 
     /// Create consistent snapshot of state data
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to discover scopes in the state manager
+    /// - Failed to capture data from any critical scope
     async fn create_snapshot(&self) -> Result<StateSnapshot, StateError> {
         let mut entries = HashMap::new();
         let mut total_size = 0u64;
@@ -195,6 +249,12 @@ impl AtomicBackup {
     }
 
     /// Capture data for a specific scope
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to list keys for the scope
+    /// - Failed to retrieve data for keys in the scope
     async fn capture_scope_data(
         &self,
         scope: &StateScope,
@@ -238,6 +298,12 @@ impl AtomicBackup {
     }
 
     /// Discover all scopes that contain data by examining storage keys
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to get storage keys from state manager
+    /// - Failed to parse scope information from keys
     async fn discover_scopes(&self) -> Result<Vec<StateScope>, StateError> {
         use std::collections::HashSet;
 
@@ -262,12 +328,26 @@ impl AtomicBackup {
     }
 
     /// Serialize snapshot to bytes
-    fn serialize_snapshot(&self, snapshot: &StateSnapshot) -> Result<Vec<u8>, StateError> {
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - Failed to serialize snapshot to `MessagePack` format
+    /// - Snapshot contains invalid data structures
+    fn serialize_snapshot(snapshot: &StateSnapshot) -> Result<Vec<u8>, StateError> {
         // Use MessagePack for efficient binary serialization
         rmp_serde::to_vec(snapshot).map_err(|e| StateError::serialization(e.to_string()))
     }
 
     /// Restore state from snapshot data
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to deserialize snapshot data from `MessagePack` format
+    /// - Snapshot validation fails (backup ID mismatch)
+    /// - Failed to clear existing scopes before restore
+    /// - Failed to restore any entry to the state manager
     pub async fn restore(&self, snapshot_data: &[u8]) -> Result<(), StateError> {
         let _lock = self.operation_lock.lock().await;
         info!("Starting atomic restore from backup: {}", self.backup_id);
@@ -326,6 +406,14 @@ impl AtomicBackup {
     }
 
     /// Restore state from snapshot data with progress tracking
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to deserialize snapshot data from `MessagePack` format
+    /// - Snapshot validation fails (backup ID mismatch)
+    /// - Failed to clear existing scopes before restore
+    /// - Failed to restore any entry to the state manager
     pub async fn restore_with_progress<F>(
         &self,
         snapshot_data: &[u8],
@@ -401,6 +489,12 @@ impl AtomicBackup {
     }
 
     /// Validate snapshot before restore
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::ValidationError` if:
+    /// - Backup ID in snapshot doesn't match expected backup ID
+    /// - Snapshot metadata is corrupted or invalid
     fn validate_snapshot(&self, snapshot: &StateSnapshot) -> Result<(), StateError> {
         // Basic validation
         if snapshot.metadata.backup_id != self.backup_id {
@@ -417,36 +511,46 @@ impl AtomicBackup {
 
 impl AtomicBackupBuilder {
     /// Set parent backup for incremental backup
+    #[must_use]
     pub fn with_parent(mut self, parent_id: String) -> Self {
         self.parent_backup = Some(parent_id);
         self
     }
 
     /// Include specific scopes in backup
+    #[must_use]
     pub fn include_scopes(mut self, scopes: Vec<StateScope>) -> Self {
         self.include_scopes = Some(scopes);
         self
     }
 
     /// Exclude specific scopes from backup
+    #[must_use]
     pub fn exclude_scopes(mut self, scopes: Vec<StateScope>) -> Self {
         self.exclude_scopes = Some(scopes);
         self
     }
 
     /// Include keys matching patterns
+    #[must_use]
     pub fn include_patterns(mut self, patterns: Vec<String>) -> Self {
         self.include_patterns = Some(patterns);
         self
     }
 
     /// Exclude keys matching patterns
+    #[must_use]
     pub fn exclude_patterns(mut self, patterns: Vec<String>) -> Self {
         self.exclude_patterns = Some(patterns);
         self
     }
 
     /// Build the atomic backup instance
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to initialize the atomic backup with provided configuration
     pub fn build(self, state_manager: Arc<StateManager>) -> Result<AtomicBackup, StateError> {
         Ok(AtomicBackup {
             backup_id: self.backup_id,

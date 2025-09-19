@@ -41,6 +41,12 @@ impl UnifiedSerializer {
     }
 
     /// Serialize value with all protections in a single pass
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - Serialization to JSON or `MessagePack` fails
+    /// - Circular references are detected during protection
     pub fn serialize<T: Serialize>(&self, value: &T) -> StateResult<Vec<u8>> {
         if self.skip_validation {
             // Fast path - direct serialization
@@ -56,6 +62,12 @@ impl UnifiedSerializer {
     }
 
     /// Deserialize value
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - Data is not valid `MessagePack` or JSON format
+    /// - Deserialization to target type fails
     pub fn deserialize<T: for<'de> Deserialize<'de>>(&self, data: &[u8]) -> StateResult<T> {
         if self.use_msgpack {
             msgpack::from_slice(data).map_err(|e| StateError::serialization(e.to_string()))
@@ -164,8 +176,9 @@ impl UnifiedSerializer {
     /// Redact a sensitive value
     fn redact_value(&self, value: &Value) -> Value {
         match value {
-            Value::String(_) => Value::String(self.sensitive_config.redaction_text.clone()),
-            Value::Number(_) => Value::String(self.sensitive_config.redaction_text.clone()),
+            Value::String(_) | Value::Number(_) => {
+                Value::String(self.sensitive_config.redaction_text.clone())
+            }
             _ => value.clone(),
         }
     }
@@ -187,16 +200,19 @@ impl UnifiedSerializerBuilder {
         }
     }
 
+    #[must_use]
     pub fn with_sensitive_config(mut self, config: SensitiveDataConfig) -> Self {
         self.sensitive_config = Some(config);
         self
     }
 
+    #[must_use]
     pub fn use_json(mut self) -> Self {
         self.use_msgpack = false;
         self
     }
 
+    #[must_use]
     pub fn skip_validation(mut self) -> Self {
         self.skip_validation = true;
         self
@@ -228,6 +244,13 @@ impl<W: Write> StreamingSerializer<W> {
         Self { writer, serializer }
     }
 
+    /// Serialize to writer
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::SerializationError` if:
+    /// - Serialization fails
+    /// - Writing to output stream fails
     pub fn serialize<T: Serialize>(&mut self, value: &T) -> StateResult<()> {
         let data = self.serializer.serialize(value)?;
         self.writer

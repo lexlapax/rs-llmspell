@@ -16,18 +16,30 @@ pub struct SledBackend {
 
 impl SledBackend {
     /// Create new sled backend with default path
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sled database cannot be opened at the default path
     pub fn new() -> Result<Self> {
         let db = sled::open("rs-llmspell.db")?;
         Ok(Self { db: Arc::new(db) })
     }
 
     /// Create new sled backend with custom path
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the sled database cannot be opened at the specified path
     pub fn new_with_path<P: AsRef<Path>>(path: P) -> Result<Self> {
         let db = sled::open(path)?;
         Ok(Self { db: Arc::new(db) })
     }
 
     /// Create temporary sled backend (for testing)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the temporary sled database cannot be created
     pub fn new_temporary() -> Result<Self> {
         let db = sled::Config::new().temporary(true).open()?;
         Ok(Self { db: Arc::new(db) })

@@ -16,6 +16,11 @@ pub struct CompressionLevel(u32);
 
 impl CompressionLevel {
     /// Create new compression level (1-9)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::ValidationError` if:
+    /// - Level is not between 1 and 9 inclusive
     pub fn new(level: u32) -> Result<Self, StateError> {
         if !(1..=9).contains(&level) {
             return Err(StateError::validation_error(
@@ -68,6 +73,12 @@ impl BackupCompression {
     }
 
     /// Compress data
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Compression algorithm fails to compress the data
+    /// - Output buffer allocation fails
     pub fn compress(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         let start_size = data.len();
         debug!(
@@ -103,6 +114,13 @@ impl BackupCompression {
     }
 
     /// Decompress data
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Data is corrupted or invalid
+    /// - Wrong compression algorithm for the data
+    /// - Decompression buffer allocation fails
     pub fn decompress(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         debug!(
             "Decompressing {} bytes with {}",
@@ -112,10 +130,10 @@ impl BackupCompression {
 
         let decompressed = match self.compression_type {
             CompressionType::None => data.to_vec(),
-            CompressionType::Gzip => self.decompress_gzip(data)?,
-            CompressionType::Zstd => self.decompress_zstd(data)?,
-            CompressionType::Lz4 => self.decompress_lz4(data)?,
-            CompressionType::Brotli => self.decompress_brotli(data)?,
+            CompressionType::Gzip => Self::decompress_gzip(data)?,
+            CompressionType::Zstd => Self::decompress_zstd(data)?,
+            CompressionType::Lz4 => Self::decompress_lz4(data)?,
+            CompressionType::Brotli => Self::decompress_brotli(data)?,
         };
 
         debug!("Decompression complete: {} bytes", decompressed.len());
@@ -137,7 +155,7 @@ impl BackupCompression {
     }
 
     /// Decompress gzip
-    fn decompress_gzip(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
+    fn decompress_gzip(data: &[u8]) -> Result<Vec<u8>, StateError> {
         use flate2::read::GzDecoder;
 
         let mut decoder = GzDecoder::new(data);
@@ -157,9 +175,8 @@ impl BackupCompression {
     }
 
     /// Decompress zstd
-    fn decompress_zstd(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
-        zstd::decode_all(data)
-            .map_err(|e| StateError::storage(format!("Decompression error: {e}")))
+    fn decompress_zstd(data: &[u8]) -> Result<Vec<u8>, StateError> {
+        zstd::decode_all(data).map_err(|e| StateError::storage(format!("Decompression error: {e}")))
     }
 
     /// Compress with lz4
@@ -181,7 +198,7 @@ impl BackupCompression {
     }
 
     /// Decompress lz4
-    fn decompress_lz4(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
+    fn decompress_lz4(data: &[u8]) -> Result<Vec<u8>, StateError> {
         lz4::block::decompress(data, None)
             .map_err(|e| StateError::storage(format!("Decompression error: {e}")))
     }
@@ -202,7 +219,7 @@ impl BackupCompression {
     }
 
     /// Decompress brotli
-    fn decompress_brotli(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
+    fn decompress_brotli(data: &[u8]) -> Result<Vec<u8>, StateError> {
         let mut output = Vec::new();
         brotli::BrotliDecompress(&mut std::io::Cursor::new(data), &mut output)
             .map_err(|e| StateError::storage(format!("Decompression error: {e}")))?;
@@ -278,6 +295,12 @@ pub struct CompressionAnalysis {
 }
 
 /// Find optimal compression settings for data
+///
+/// # Errors
+///
+/// Returns `StateError` if:
+/// - All compression algorithms fail to compress the data
+/// - Time measurement fails
 pub fn find_optimal_compression(
     data: &[u8],
     max_time_ms: u64,

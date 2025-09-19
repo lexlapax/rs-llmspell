@@ -38,13 +38,20 @@ impl BackupCleanup {
     }
 
     /// Execute cleanup based on retention decisions
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to delete any critical backup
+    /// - Failed to access backup directory
+    /// - IO operations fail during cleanup
     pub async fn execute_cleanup(
         &self,
         decisions: Vec<RetentionDecision>,
         backup_index: &HashMap<BackupId, BackupMetadata>,
     ) -> Result<CleanupResult, StateError> {
         let start_time = Instant::now();
-        let operation_id = self.generate_operation_id();
+        let operation_id = Self::generate_operation_id();
 
         info!(
             "Starting cleanup operation {} (dry_run: {})",
@@ -112,6 +119,13 @@ impl BackupCleanup {
     }
 
     /// Delete a single backup
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Backup not found in index
+    /// - Backup file doesn't exist on disk
+    /// - Failed to delete backup or metadata files
     async fn delete_backup(
         &self,
         backup_id: &str,
@@ -148,16 +162,16 @@ impl BackupCleanup {
 
         // Delete metadata file
         if metadata_path.exists() {
-            tokio::fs::remove_file(&metadata_path).await.map_err(|e| {
-                StateError::storage(format!("Failed to delete metadata file: {e}"))
-            })?;
+            tokio::fs::remove_file(&metadata_path)
+                .await
+                .map_err(|e| StateError::storage(format!("Failed to delete metadata file: {e}")))?;
         }
 
         Ok(metadata.stats.total_size)
     }
 
     /// Generate unique operation ID
-    fn generate_operation_id(&self) -> String {
+    fn generate_operation_id() -> String {
         let timestamp = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .unwrap()
@@ -171,6 +185,12 @@ impl BackupCleanup {
     }
 
     /// Rollback a cleanup operation (restore from trash if implemented)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Operation ID not found in deletion log
+    /// - Rollback functionality not implemented
     pub async fn rollback_operation(&self, operation_id: &str) -> Result<(), StateError> {
         let operations = self.deletion_log.read().await;
         let operation = operations

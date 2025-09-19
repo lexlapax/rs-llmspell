@@ -15,8 +15,8 @@
 //! ```
 
 use llmspell_kernel::runtime::{
-    block_on_global, create_io_bound_resource, ensure_runtime_initialized,
-    runtime_metrics, spawn_global,
+    block_on_global, create_io_bound_resource, ensure_runtime_initialized, runtime_metrics,
+    spawn_global,
 };
 use reqwest::Client;
 use serde_json::json;
@@ -79,11 +79,7 @@ fn test_http_client_60_second_keepalive() {
             info!("Making request {} at {:?}", i, elapsed);
 
             // Make a request to a reliable endpoint
-            match client_clone
-                .get("https://httpbin.org/delay/1")
-                .send()
-                .await
-            {
+            match client_clone.get("https://httpbin.org/delay/1").send().await {
                 Ok(response) => {
                     let status = response.status();
                     let _ = response.text().await;
@@ -109,9 +105,19 @@ fn test_http_client_60_second_keepalive() {
     info!("Test completed in {:?}", elapsed);
 
     // Assertions
-    assert!(elapsed >= Duration::from_secs(60), "Test should run for at least 60 seconds");
-    assert!(request_count.load(Ordering::Relaxed) >= 6, "Should complete at least 6 requests");
-    assert_eq!(error_count.load(Ordering::Relaxed), 0, "Should have no errors");
+    assert!(
+        elapsed >= Duration::from_secs(60),
+        "Test should run for at least 60 seconds"
+    );
+    assert!(
+        request_count.load(Ordering::Relaxed) >= 6,
+        "Should complete at least 6 requests"
+    );
+    assert_eq!(
+        error_count.load(Ordering::Relaxed),
+        0,
+        "Should have no errors"
+    );
 
     // Verify the client is still valid
     let final_handle = spawn_global(async move {
@@ -128,7 +134,10 @@ fn test_http_client_60_second_keepalive() {
     });
 
     let final_result = block_on_global(final_handle);
-    assert!(final_result.unwrap(), "Client should still be valid after 60+ seconds");
+    assert!(
+        final_result.unwrap(),
+        "Client should still be valid after 60+ seconds"
+    );
 }
 
 /// Provider Operation Test - 90 seconds
@@ -183,8 +192,9 @@ fn test_provider_operations_90_seconds() {
                         "max_tokens": 1000,
                         "temperature": 0.7
                     }))
-                    .send()
-            ).await;
+                    .send(),
+            )
+            .await;
 
             match request_result {
                 Ok(Ok(response)) => {
@@ -220,9 +230,20 @@ fn test_provider_operations_90_seconds() {
     info!("Provider test completed in {:?}", elapsed);
 
     // Assertions
-    assert!(elapsed >= Duration::from_secs(70), "Test should run for at least 70 seconds");
-    assert_eq!(operation_count.load(Ordering::Relaxed), 3, "Should complete all 3 operations");
-    assert_eq!(error_count.load(Ordering::Relaxed), 0, "Should have no errors");
+    assert!(
+        elapsed >= Duration::from_secs(70),
+        "Test should run for at least 70 seconds"
+    );
+    assert_eq!(
+        operation_count.load(Ordering::Relaxed),
+        3,
+        "Should complete all 3 operations"
+    );
+    assert_eq!(
+        error_count.load(Ordering::Relaxed),
+        0,
+        "Should have no errors"
+    );
 }
 
 /// Concurrent Operations Test - 100 concurrent tasks
@@ -271,7 +292,9 @@ fn test_100_concurrent_runtime_operations() {
                 // Read back the value
                 let state = state_clone.read().await;
                 state.get(&i).cloned()
-            }).await {
+            })
+            .await
+            {
                 Ok(Some(value)) => {
                     trace!("Task {} completed with value: {}", i, value);
                     completed_clone.fetch_add(1, Ordering::Relaxed);
@@ -345,9 +368,7 @@ fn test_runtime_overhead_benchmark() {
     // Benchmark 1: Resource creation overhead
     let start = Instant::now();
     for _ in 0..ITERATIONS {
-        let _resource = create_io_bound_resource(|| {
-            format!("resource_{}", rand::random::<u64>())
-        });
+        let _resource = create_io_bound_resource(|| format!("resource_{}", rand::random::<u64>()));
     }
     let resource_creation_time = start.elapsed();
 
@@ -461,8 +482,9 @@ fn test_memory_stability_60_seconds() {
                 // Use the resource
                 let _ = timeout(
                     Duration::from_secs(2),
-                    client.get("https://httpbin.org/get").send()
-                ).await;
+                    client.get("https://httpbin.org/get").send(),
+                )
+                .await;
 
                 cycle_count += 1;
 
@@ -499,8 +521,14 @@ fn test_memory_stability_60_seconds() {
     info!("Resources created: {}", created);
     info!("Total cycles: {}", total_cycles);
 
-    assert!(elapsed >= Duration::from_secs(60), "Test should run for at least 60 seconds");
-    assert!(created > 100, "Should create many resources during the test");
+    assert!(
+        elapsed >= Duration::from_secs(60),
+        "Test should run for at least 60 seconds"
+    );
+    assert!(
+        created > 100,
+        "Should create many resources during the test"
+    );
 }
 
 /// Integration test combining all scenarios
@@ -566,8 +594,9 @@ fn test_comprehensive_runtime_stability() {
                         "operation": i,
                         "test": "provider_simulation"
                     }))
-                    .send()
-            ).await;
+                    .send(),
+            )
+            .await;
 
             match result {
                 Ok(Ok(resp)) => info!("Provider operation {} completed: {}", i, resp.status()),
@@ -624,7 +653,10 @@ fn test_comprehensive_runtime_stability() {
         info!("  Tasks spawned: {}", metrics.tasks_spawned());
         info!("  Runtime uptime: {:?}", metrics.uptime());
 
-        assert!(metrics.resources_created() > 5, "Should create multiple resources");
+        assert!(
+            metrics.resources_created() > 5,
+            "Should create multiple resources"
+        );
         assert!(metrics.tasks_spawned() > 50, "Should spawn many tasks");
     }
 }

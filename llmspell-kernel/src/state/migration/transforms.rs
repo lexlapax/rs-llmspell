@@ -301,7 +301,7 @@ impl DataTransformer {
 
         // Apply field transformations
         for transform in &transformation.field_transforms {
-            match self.apply_field_transform(&state.value, &mut new_value, transform) {
+            match Self::apply_field_transform(&state.value, &mut new_value, transform) {
                 Ok(applied) => {
                     if applied {
                         result.fields_transformed += 1;
@@ -334,7 +334,7 @@ impl DataTransformer {
 
         // Apply validation rules
         for rule in &transformation.validation_rules {
-            if let Err(e) = self.apply_validation_rule(&state.value, rule) {
+            if let Err(e) = Self::apply_validation_rule(&state.value, rule) {
                 result.add_error(format!("Validation failed: {e}"));
                 if rule.required {
                     return Err(e.into());
@@ -348,7 +348,6 @@ impl DataTransformer {
 
     /// Apply a single field transformation
     fn apply_field_transform(
-        &self,
         source: &Value,
         target: &mut Value,
         transform: &FieldTransform,
@@ -378,7 +377,7 @@ impl DataTransformer {
                 converter,
             } => {
                 if let Some(value) = Self::get_nested_field(source, from_field) {
-                    let converted = self.convert_value(value, from_type, to_type, converter)?;
+                    let converted = Self::convert_value(value, from_type, to_type, converter)?;
                     if Self::set_nested_field(target, to_field, converted) {
                         if from_field != to_field {
                             Self::remove_nested_field(target, from_field);
@@ -407,7 +406,7 @@ impl DataTransformer {
                 splitter,
             } => {
                 if let Some(value) = source.get(from_field) {
-                    let split_values = self.split_value(value, to_fields, splitter)?;
+                    let split_values = Self::split_value(value, to_fields, splitter)?;
                     if let Some(target_obj) = target.as_object_mut() {
                         for (field, split_value) in split_values {
                             target_obj.insert(field, split_value);
@@ -430,7 +429,7 @@ impl DataTransformer {
                     .collect();
 
                 if !source_values.is_empty() {
-                    let merged = self.merge_values(&source_values, merger)?;
+                    let merged = Self::merge_values(&source_values, merger)?;
                     if let Some(target_obj) = target.as_object_mut() {
                         target_obj.insert(to_field.clone(), merged);
                         // Remove source fields
@@ -456,7 +455,7 @@ impl DataTransformer {
 
                 if !source_values.is_empty() {
                     let transformed =
-                        self.apply_custom_transform(&source_values, transformer, config)?;
+                        Self::apply_custom_transform(&source_values, transformer, config);
                     if let Some(target_obj) = target.as_object_mut() {
                         for (i, to_field) in to_fields.iter().enumerate() {
                             if let Some(value) = transformed.get(i) {
@@ -477,7 +476,6 @@ impl DataTransformer {
 
     /// Convert a value from one type to another
     fn convert_value(
-        &self,
         value: &Value,
         from_type: &str,
         to_type: &str,
@@ -543,7 +541,6 @@ impl DataTransformer {
 
     /// Split a value into multiple values
     fn split_value(
-        &self,
         value: &Value,
         to_fields: &[String],
         splitter: &str,
@@ -577,7 +574,7 @@ impl DataTransformer {
     }
 
     /// Merge multiple values into one
-    fn merge_values(&self, values: &[&Value], merger: &str) -> Result<Value, TransformationError> {
+    fn merge_values(values: &[&Value], merger: &str) -> Result<Value, TransformationError> {
         match merger {
             "concat_strings" => {
                 let strings: Vec<String> = values
@@ -614,22 +611,20 @@ impl DataTransformer {
 
     /// Apply custom transformation logic
     fn apply_custom_transform(
-        &self,
         _source_values: &HashMap<String, &Value>,
         transformer: &str,
         _config: &HashMap<String, Value>,
-    ) -> Result<Vec<Value>, TransformationError> {
+    ) -> Vec<Value> {
         // Placeholder for custom transformation logic
         debug!(
             "Custom transformer '{}' not implemented, returning empty",
             transformer
         );
-        Ok(vec![])
+        vec![]
     }
 
     /// Apply validation rule to a value
     fn apply_validation_rule(
-        &self,
         data: &Value,
         rule: &ValidationRule,
     ) -> Result<(), TransformationError> {

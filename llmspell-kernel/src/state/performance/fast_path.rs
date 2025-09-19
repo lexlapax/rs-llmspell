@@ -53,6 +53,10 @@ impl FastPathManager {
     }
 
     /// Fast serialization without any validation
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if serialization fails
     pub fn serialize_trusted(&self, value: &Value) -> StateResult<Vec<u8>> {
         if self.config.use_messagepack {
             rmp_serde::to_vec(value).map_err(|e| {
@@ -65,19 +69,26 @@ impl FastPathManager {
     }
 
     /// Fast deserialization without any validation
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if deserialization fails
     pub fn deserialize_trusted(&self, bytes: &[u8]) -> StateResult<Value> {
         if self.config.use_messagepack {
             rmp_serde::from_slice(bytes).map_err(|e| {
                 StateError::serialization(format!("MessagePack deserialization failed: {e}"))
             })
         } else {
-            serde_json::from_slice(bytes).map_err(|e| {
-                StateError::serialization(format!("JSON deserialization failed: {e}"))
-            })
+            serde_json::from_slice(bytes)
+                .map_err(|e| StateError::serialization(format!("JSON deserialization failed: {e}")))
         }
     }
 
     /// Store ephemeral data in memory cache
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if cache operation fails
     pub fn store_ephemeral(&self, scope: &StateScope, key: &str, value: Value) -> StateResult<()> {
         if !self.config.enable_ephemeral_cache {
             return Ok(()); // Ephemeral data discarded if cache disabled
@@ -100,6 +111,10 @@ impl FastPathManager {
     }
 
     /// Retrieve ephemeral data from memory cache
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if cache operation fails
     pub fn get_ephemeral(&self, scope: &StateScope, key: &str) -> StateResult<Option<Value>> {
         if !self.config.enable_ephemeral_cache {
             return Ok(None);
@@ -134,8 +149,7 @@ impl FastPathManager {
     #[allow(clippy::only_used_in_recursion)]
     fn estimate_value_size(&self, value: &Value) -> usize {
         match value {
-            Value::Null => 4,
-            Value::Bool(_) => 4,
+            Value::Null | Value::Bool(_) => 4,
             Value::Number(_) => 8,
             Value::String(s) => s.len(),
             Value::Array(arr) => {
@@ -154,14 +168,18 @@ impl FastPathManager {
     }
 
     /// Compress data if it exceeds threshold
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if compression fails
     pub fn maybe_compress(&self, data: Vec<u8>) -> StateResult<Vec<u8>> {
-        if !self.config.enable_compression || data.len() < self.config.compression_threshold {
-            return Ok(data);
-        }
-
         use flate2::write::GzEncoder;
         use flate2::Compression;
         use std::io::Write;
+
+        if !self.config.enable_compression || data.len() < self.config.compression_threshold {
+            return Ok(data);
+        }
 
         let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
         encoder
@@ -174,6 +192,10 @@ impl FastPathManager {
     }
 
     /// Decompress data if needed
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if decompression fails
     pub fn maybe_decompress(&self, data: &[u8]) -> StateResult<Vec<u8>> {
         // Simple heuristic: if data starts with gzip magic bytes, decompress
         if data.len() >= 2 && data[0] == 0x1f && data[1] == 0x8b {
@@ -182,9 +204,9 @@ impl FastPathManager {
 
             let mut decoder = GzDecoder::new(data);
             let mut decompressed = Vec::new();
-            decoder.read_to_end(&mut decompressed).map_err(|e| {
-                StateError::compression_error(format!("Decompression failed: {e}"))
-            })?;
+            decoder
+                .read_to_end(&mut decompressed)
+                .map_err(|e| StateError::compression_error(format!("Decompression failed: {e}")))?;
             Ok(decompressed)
         } else {
             Ok(data.to_vec())

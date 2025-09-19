@@ -73,15 +73,12 @@ impl HnswContainer {
     fn build_index(&self, metric: DistanceMetric) -> HnswIndex {
         let max_elements = self.vectors.len().max(1000);
         // Use configured nb_layers or calculate based on max_elements
-        let nb_layers = self
-            .config
-            .nb_layers
-            .unwrap_or_else(|| {
-                // Safe conversion with proper bounds checking
-                let ln_value = (max_elements as f64).ln();
-                let layer_count = ln_value.round().clamp(1.0, 16.0) as usize;
-                layer_count
-            });
+        let nb_layers = self.config.nb_layers.unwrap_or_else(|| {
+            // Safe conversion with proper bounds checking
+            let ln_value = (max_elements as f64).ln();
+
+            ln_value.round().clamp(1.0, 16.0) as usize
+        });
 
         // Prepare vectors for parallel insertion
         let vector_refs: Vec<(&Vec<f32>, usize)> = self
@@ -305,6 +302,7 @@ impl HNSWVectorStorage {
     /// └── global/
     ///     └── vectors.bin
     /// ```
+    #[must_use]
     pub fn with_persistence(mut self, dir: PathBuf) -> Self {
         self.persistence_dir = Some(dir);
         self
@@ -384,7 +382,7 @@ impl HNSWVectorStorage {
     }
 
     /// Load a namespace from disk and rebuild index
-    async fn load_namespace(&self, namespace: &str) -> Result<NamespaceData> {
+    fn load_namespace(&self, namespace: &str) -> Result<NamespaceData> {
         let Some(ref base_dir) = self.persistence_dir else {
             anyhow::bail!("No persistence directory configured");
         };
@@ -619,7 +617,7 @@ impl VectorStorage for HNSWVectorStorage {
                 }
 
                 // Convert distance to similarity score based on metric
-                let score = match self.config.metric {
+                let similarity_score = match self.config.metric {
                     DistanceMetric::Cosine => 1.0 - neighbour.distance,
                     DistanceMetric::Euclidean | DistanceMetric::Manhattan => {
                         1.0 / (1.0 + neighbour.distance)
@@ -629,14 +627,14 @@ impl VectorStorage for HNSWVectorStorage {
 
                 // Apply threshold if specified
                 if let Some(threshold) = query.threshold {
-                    if score < threshold {
+                    if similarity_score < threshold {
                         continue;
                     }
                 }
 
                 results.push(VectorResult {
                     id: metadata.entry.id.clone(),
-                    score,
+                    score: similarity_score,
                     vector: if query.include_metadata {
                         Some(metadata.entry.embedding.clone())
                     } else {
@@ -825,7 +823,7 @@ impl HNSWStorage for HNSWVectorStorage {
 
         // Now save without holding any locks
         for (namespace_name, data) in namespaces_to_save {
-            self.save_namespace(&namespace_name, &data).await?;
+            self.save_namespace(&namespace_name, &data)?;
         }
 
         info!("Saved all namespaces to disk");
@@ -875,6 +873,13 @@ impl HNSWVectorStorage {
     /// - Loading time is approximately O(n log n) where n is the number of vectors
     /// - For 100K vectors, expect load times under 5 seconds
     /// - Memory usage during loading may temporarily spike during index reconstruction
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to read namespace files from disk
+    /// - Deserialization of namespace data fails
+    /// - Vector data is corrupted or incompatible
     pub async fn from_path(path: &Path, dimensions: usize, config: HNSWConfig) -> Result<Self> {
         let storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
         // Don't call load() on an immutable storage - load() mutates self
@@ -892,7 +897,7 @@ impl HNSWVectorStorage {
             let entry = entry?;
             if entry.file_type()?.is_dir() {
                 let namespace = entry.file_name().to_string_lossy().to_string();
-                match storage.load_namespace(&namespace).await {
+                match storage.load_namespace(&namespace) {
                     Ok(data) => {
                         storage
                             .namespaces

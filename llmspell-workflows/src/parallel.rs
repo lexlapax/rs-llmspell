@@ -46,6 +46,7 @@ pub struct ParallelBranch {
 }
 
 impl ParallelBranch {
+    /// Create a new parallel branch
     pub fn new(name: String) -> Self {
         Self {
             name,
@@ -56,21 +57,25 @@ impl ParallelBranch {
         }
     }
 
+    /// Set the description for this branch
     pub fn with_description(mut self, description: String) -> Self {
         self.description = description;
         self
     }
 
+    /// Add a step to this branch
     pub fn add_step(mut self, step: TraitWorkflowStep) -> Self {
         self.steps.push(step);
         self
     }
 
+    /// Mark this branch as optional (failures won't fail the workflow)
     pub fn optional(mut self) -> Self {
         self.required = false;
         self
     }
 
+    /// Set a timeout for this branch
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = Some(timeout);
         self
@@ -181,6 +186,7 @@ pub struct BranchResult {
 }
 
 impl BranchResult {
+    /// Create a successful branch result
     pub fn success(
         branch_name: String,
         step_results: Vec<StepResult>,
@@ -197,6 +203,7 @@ impl BranchResult {
         }
     }
 
+    /// Create a failed branch result
     pub fn failure(
         branch_name: String,
         step_results: Vec<StepResult>,
@@ -237,6 +244,7 @@ pub struct ParallelWorkflowResult {
 }
 
 impl ParallelWorkflowResult {
+    /// Create a new parallel workflow result
     pub fn new(
         workflow_name: String,
         branch_results: Vec<BranchResult>,
@@ -1155,6 +1163,7 @@ pub struct ParallelWorkflowBuilder {
 }
 
 impl ParallelWorkflowBuilder {
+    /// Create a new parallel workflow builder
     pub fn new(name: impl Into<String>) -> Self {
         Self {
             name: name.into(),
@@ -1167,36 +1176,43 @@ impl ParallelWorkflowBuilder {
         }
     }
 
+    /// Set the description for this parallel workflow
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
     }
 
+    /// Add a branch to the parallel workflow
     pub fn add_branch(mut self, branch: ParallelBranch) -> Self {
         self.branches.push(branch);
         self
     }
 
+    /// Set the maximum concurrency for parallel execution
     pub fn with_max_concurrency(mut self, max: usize) -> Self {
         self.config.max_concurrency = max;
         self
     }
 
+    /// Enable fail-fast mode (stop on first failure)
     pub fn fail_fast(mut self, enabled: bool) -> Self {
         self.config.fail_fast = enabled;
         self
     }
 
+    /// Set a timeout for the parallel workflow
     pub fn with_timeout(mut self, timeout: Duration) -> Self {
         self.config.timeout = Some(timeout);
         self
     }
 
+    /// Continue execution even if optional branches fail
     pub fn continue_on_optional_failure(mut self, enabled: bool) -> Self {
         self.config.continue_on_optional_failure = enabled;
         self
     }
 
+    /// Set the workflow configuration
     pub fn with_workflow_config(mut self, config: WorkflowConfig) -> Self {
         self.workflow_config = config;
         self
@@ -1214,6 +1230,7 @@ impl ParallelWorkflowBuilder {
         self
     }
 
+    /// Build the parallel workflow
     pub fn build(self) -> Result<ParallelWorkflow> {
         if self.branches.is_empty() {
             return Err(llmspell_core::LLMSpellError::Configuration {

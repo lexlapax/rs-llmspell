@@ -234,7 +234,7 @@ impl SensitiveDataProtector {
             Value::Object(_) | Value::Array(_) => {
                 // For complex types, replace entire value
                 let hash = if self.config.hash_redacted {
-                    format!("{}_{}", self.config.redaction_text, self.hash_value(value))
+                    format!("{}_{}", self.config.redaction_text, Self::hash_value(value))
                 } else {
                     self.config.redaction_text.clone()
                 };
@@ -245,7 +245,7 @@ impl SensitiveDataProtector {
                 // For other types, convert to string and redact
                 let original = value.to_string();
                 if self.config.hash_redacted {
-                    let hash = self.hash_string(&original);
+                    let hash = Self::hash_string(&original);
                     self.redaction_map.insert(hash.clone(), original);
                     *value = Value::String(format!("{}_{}", self.config.redaction_text, hash));
                 } else {
@@ -257,15 +257,15 @@ impl SensitiveDataProtector {
 
     fn redact_string(&mut self, s: &mut String) {
         if self.config.hash_redacted {
-            let hash = self.hash_string(s);
+            let hash = Self::hash_string(s);
             self.redaction_map.insert(hash.clone(), s.clone());
             *s = format!("{}_{}", self.config.redaction_text, hash);
         } else {
-            *s = self.config.redaction_text.clone();
+            s.clone_from(&self.config.redaction_text);
         }
     }
 
-    fn hash_string(&self, s: &str) -> String {
+    fn hash_string(s: &str) -> String {
         use std::collections::hash_map::DefaultHasher;
         use std::hash::{Hash, Hasher};
 
@@ -274,8 +274,8 @@ impl SensitiveDataProtector {
         format!("{:x}", hasher.finish())
     }
 
-    fn hash_value(&self, value: &Value) -> String {
-        self.hash_string(&value.to_string())
+    fn hash_value(value: &Value) -> String {
+        Self::hash_string(&value.to_string())
     }
 
     /// Get the redaction map for recovery purposes
@@ -322,6 +322,13 @@ impl SensitiveDataProtector {
 
 /// Trait for types that can have sensitive data redacted
 pub trait RedactSensitiveData {
+    /// Redact sensitive data from this value
+    ///
+    /// # Errors
+    ///
+    /// Returns an error string if:
+    /// - Serialization to JSON fails
+    /// - Deserialization after redaction fails
     fn redact_sensitive_data(&mut self, config: &SensitiveDataConfig) -> Result<(), String>;
 }
 
@@ -344,6 +351,12 @@ impl<T: Serialize + for<'de> Deserialize<'de>> RedactSensitiveData for T {
 }
 
 /// Safe serialization with sensitive data redaction
+///
+/// # Errors
+///
+/// Returns an error string if:
+/// - Serialization to JSON fails
+/// - `MessagePack` serialization fails
 pub fn safe_serialize_with_redaction<T: Serialize + Clone>(
     value: &T,
     config: &SensitiveDataConfig,

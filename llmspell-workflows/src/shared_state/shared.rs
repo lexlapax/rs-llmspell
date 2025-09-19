@@ -207,14 +207,17 @@ pub struct GlobalStateAccess {
 }
 
 impl GlobalStateAccess {
+    /// Get a value from global state by key
     pub fn get(&self, key: &str) -> Option<serde_json::Value> {
         self.manager.get_state(&StateScope::Global, key)
     }
 
+    /// Set a value in global state
     pub fn set(&self, key: &str, value: serde_json::Value) {
         self.manager.set_state(&StateScope::Global, key, value)
     }
 
+    /// Delete a value from global state
     pub fn delete(&self, key: &str) {
         self.manager.delete_state(&StateScope::Global, key)
     }
@@ -228,14 +231,17 @@ pub struct StepStateAccess {
 }
 
 impl StepStateAccess {
+    /// Get a value from step-specific state by key
     pub fn get(&self, key: &str) -> Option<serde_json::Value> {
         self.manager.get_state(&self.scope, key)
     }
 
+    /// Set a value in step-specific state
     pub fn set(&self, key: &str, value: serde_json::Value) {
         self.manager.set_state(&self.scope, key, value)
     }
 
+    /// Delete a value from step-specific state
     pub fn delete(&self, key: &str) {
         self.manager.delete_state(&self.scope, key)
     }

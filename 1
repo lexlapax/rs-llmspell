@@ -1,0 +1,1828 @@
+    Checking llmspell-kernel v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-kernel)
+    Checking llmspell-kernel v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-kernel)
+warning: binding's name is too similar to existing binding
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:619:21
+    |
+619 |                 let score = match self.config.metric {
+    |                     ^^^^^
+    |warning: binding's name is too similar to existing binding
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:619:21
+    |
+619 |                 let score = match self.config.metric {
+    |                     ^^^^^
+    |
+note: existing binding defined here
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:547:9
+    |
+547 |         scope: &StateScope,
+    |         ^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+note: the lint level is defined here
+   --> llmspell-kernel/src/lib.rs:19:9
+    |
+19  | #![warn(clippy::pedantic)]
+    |         ^^^^^^^^^^^^^^^^
+    = note: `#[warn(clippy::similar_names)]` implied by `#[warn(clippy::pedantic)]`
+
+
+note: existing binding defined here
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:547:9
+    |
+547 |         scope: &StateScope,
+    |         ^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+note: the lint level is defined here
+   --> llmspell-kernel/src/lib.rs:19:9
+    |
+19  | #![warn(clippy::pedantic)]
+    |         ^^^^^^^^^^^^^^^^
+    = note: `#[warn(clippy::similar_names)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+  --> llmspell-kernel/src/state/backends/vector/hnsw.rs:78:28
+   |
+78 |             let ln_value = (max_elements as f64).ln();
+   |                            ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+   = note: `#[warn(clippy::cast_precision_loss)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: casting `f64` to `usize` may truncate the value
+  --> llmspell-kernel/src/state/backends/vector/hnsw.rs:80:13warning: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+  --> llmspell-kernel/src/state/backends/vector/hnsw.rs:78:28
+   |
+78 |             let ln_value = (max_elements as f64).ln();
+   |                            ^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+   = note: `#[warn(clippy::cast_precision_loss)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: casting `f64` to `usize` may truncate the value
+  --> llmspell-kernel/src/state/backends/vector/hnsw.rs:80:13
+   |
+80 |             ln_value.round().clamp(1.0, 16.0) as usize
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+   = note: `#[warn(clippy::cast_possible_truncation)]` implied by `#[warn(clippy::pedantic)]`
+
+
+   |
+80 |             ln_value.round().clamp(1.0, 16.0) as usize
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+   = note: `#[warn(clippy::cast_possible_truncation)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: casting `f64` to `usize` may lose the sign of the value
+  --> llmspell-kernel/src/state/backends/vector/hnsw.rs:80:13
+   |
+80 |             ln_value.round().clamp(1.0, 16.0) as usizewarning: casting `f64` to `usize` may lose the sign of the value
+  --> llmspell-kernel/src/state/backends/vector/hnsw.rs:80:13
+   |
+80 |             ln_value.round().clamp(1.0, 16.0) as usize
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+   = note: `#[warn(clippy::cast_sign_loss)]` implied by `#[warn(clippy::pedantic)]`
+
+
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
+   = note: `#[warn(clippy::cast_sign_loss)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:305:5
+    |
+305 | /     pub fn with_persistence(mut self, dir: PathBuf) -> Self {
+306 |warning: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:305:5
+    |
+305 | /     pub fn with_persistence(mut self, dir: PathBuf) -> Self {
+306 | |         self.persistence_dir = Some(dir);
+307 | |         self.persistence_dir = Some(dir);
+307 | |         self
+308 | |     } |         self
+308 | |     }
+    | |_____^
+    |
+    
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+= help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+    = note: `#[warn(clippy::return_self_not_must_use)]` implied by `#[warn(clippy::pedantic)]`
+
+    = note: `#[warn(clippy::return_self_not_must_use)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/backup/compression.rs:187:13
+    |
+187 |             4..=6 => 3, // Default
+    |             ^^^^^^^^^^warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/backup/compression.rs:187:13
+    |
+187 |             4..=6 => 3, // Default
+    |             ^^^^^^^^^^
+188 |             7..=9 => 9, // Best
+189 |             _ => 3,
+    |             ^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+    = note: `#[warn(clippy::match_same_arms)]` implied by `#[warn(clippy::pedantic)]`
+
+188 |             7..=9 => 9, // Best
+189 |             _ => 3,
+    |             ^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+    = note: `#[warn(clippy::match_same_arms)]` implied by `#[warn(clippy::pedantic)]`
+help: otherwise remove the non-wildcard arm
+    help: otherwise remove the non-wildcard arm
+    |
+187 -             4..=6 => 3, // Default
+187 +             // Default
+    |
+187 -             4..=6 => 3, // Default
+187 +             // Default
+    |
+
+|
+
+warning: this could be rewritten as `let...else`
+   --> llmspell-kernel/src/state/backup/compression.rs:235:9
+    |
+235 | /         let compressed = match self.compress(data) {
+236warning: this could be rewritten as `let...else`
+   --> llmspell-kernel/src/state/backup/compression.rs:235:9
+    |
+235 | /         let compressed = match self.compress(data) {
+236 | |             Ok(c) => c,
+237 |  | |             Ok(c) => c,
+237 | |             Err(_) => {
+238 | | |             Err(_) => {
+238 | |                 return CompressionAnalysis {
+...   |
+                return CompressionAnalysis {
+...   |
+249 | |         };
+    | |__________^
+    |
+249 | |         };
+    | |__________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_let_else
+    = note: `#[warn(clippy::manual_let_else)]` implied by `#[warn(clippy::pedantic)]`
+help: consider writing
+    |
+235 ~             = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_let_else
+    = note: `#[warn(clippy::manual_let_else)]` implied by `#[warn(clippy::pedantic)]`
+help: consider writing
+    |
+235 ~         let Ok(compressed) = self.compress(data) else {
+236 +                 return CompressionAnalysis {
+237 +                     original_size,let Ok(compressed) = self.compress(data) else {
+236 +                 return CompressionAnalysis {
+237 +                     original_size,
+238 +                     compressed_size: original_size,
+239 +                     compression_ratio: 0.0,
+238 +                     compressed_size: original_size,
+239 +                     compression_ratio: 0.0,
+240 +                     compression_time_ms: 0,
+241
+240 +                     compression_time_ms: 0,
+241 +                     estimated_decompression_time_ms: 0,
+242 +                     algorithm: self.compression_type,
+243 +                     estimated_decompression_time_ms: 0,
+242 +                     algorithm: self.compression_type,
+243 +                     level: self.compression_level,
+244 +                     is_compressible: false,
+245 +                     level: self.compression_level,
+244 +                     is_compressible: false,
+245 +                 };
+246 +             };
+    |
+
+ +                 };
+246 +             };
+    |
+
+warning: this function's return value is unnecessary
+   --> llmspell-kernel/src/state/backup/manager.rs:658:5
+    |
+658 |     fn load_backup_index(&mut self) -> Result<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+    = note: `#[warn(clippy::unnecessary_wraps)]` implied by `#[warn(clippy::pedantic)]`warning: this function's return value is unnecessary
+   --> llmspell-kernel/src/state/backup/manager.rs:658:5
+    |
+658 |     fn load_backup_index(&mut self) -> Result<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+    = note: `#[warn(clippy::unnecessary_wraps)]` implied by `#[warn(clippy::pedantic)]`
+help: remove the return type...
+    |
+658 -     fn load_backup_index(&mut self) -> Result<()> {
+658 +     fn load_backup_index(&mut self) -> () {
+help: remove the return type...
+    |
+658 -     fn load_backup_index(&mut self) -> Result<()> {
+658 +     fn load_backup_index(&mut self) -> () {
+    |
+help: ...and then remove returned values
+    |
+
+    |
+help: ...and then remove returned values
+    |
+690 -         Ok(())
+    |
+
+690 -         Ok(())
+    |
+
+warning: docs for function returning `Result` missing `# Errors` section
+   warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/backup/manager.rs:823:5
+    |
+823 | --> llmspell-kernel/src/state/backup/manager.rs:823:5
+    |
+823 |     pub async fn cleanup_backups(&self) -> BackupResult<RetentionReport> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+        pub async fn cleanup_backups(&self) -> BackupResult<RetentionReport> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+    = note: `#[warn(clippy::missing_errors_doc)]` implied by `#[warn(clippy::pedantic)]`= help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+    = note: `#[warn(clippy::missing_errors_doc)]` implied by `#[warn(clippy::pedantic)]`
+
+
+
+warning: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-kernel/src/state/backup/retention.rs:220:5
+    |
+220 | /     pub fn add_policy(mut self, policy: Box<dyn RetentionPolicy>) -> Self {
+221 warning: missing `#[must_use]` attribute on a method returning `Self`
+   --> llmspell-kernel/src/state/backup/retention.rs:220:5
+    |
+220 | /     pub fn add_policy(mut self, policy: Box<dyn RetentionPolicy>) -> Self {
+221 | |         self.policies.push(policy);
+222 | |         self
+223 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+| |         self.policies.push(policy);
+222 | |         self
+223 | |     }
+    | |_____^
+    |
+    = help: consider adding the `#[must_use]` attribute to the method or directly to the `Self` type
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#return_self_not_must_use
+
+warning: docs for function which may panic missing `# Panics` section
+   --> llmspell-kernel/src/state/key_manager.rs:102:5
+    |
+102 |     pub fn generate_internal_key(prefix: &str, id: &str) -> String {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^warning: docs for function which may panic missing `# Panics` section
+   --> llmspell-kernel/src/state/key_manager.rs:102:5
+    |
+102 |     pub fn generate_internal_key(prefix: &str, id: &str) -> String {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+note: first possible panic found here
+   --> llmspell-kernel/src/state/key_manager.rs:103:25
+    |
+103 |           let timestamp = std::time::SystemTime::now()
+    |  _________________________^
+    |
+note: first possible panic found here
+   --> llmspell-kernel/src/state/key_manager.rs:103:25
+    |
+103 |           let timestamp = std::time::SystemTime::now()
+    |  _________________________^
+104 | |             .duration_since(std::time::UNIX_EPOCH)
+105 
+104 | |             .duration_since(std::time::UNIX_EPOCH)
+105 | |             .unwrap()
+    | |             .unwrap()
+    | |_____________________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+    | |_____________________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+    = note: `#[warn(clippy::missing_panics_doc)]` implied by `#[warn(clippy::pedantic)]`
+
+= note: `#[warn(clippy::missing_panics_doc)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: casting `u128` to `u64` may truncate the value
+  --> llmspell-kernel/src/state/manager.rs:65:41
+   |
+65 |           duration_ms = duration.as_millis() as u64
+   |  _________________________________________^
+66 | |     ))]
+67 | |     /// Persist hook execution for replay
+68 | |     ///
+...  |
+78 | |         result: &HookResult,
+79 | |         duration: Duration,
+   | warning: casting `u128` to `u64` may truncate the value
+  --> llmspell-kernel/src/state/manager.rs:65:41
+   |
+65 |           duration_ms = duration.as_millis() as u64
+   |  _________________________________________^
+66 | |     ))]
+67 | |     /// Persist hook execution for replay
+68 | |     ///
+...  |
+78 | |         result: &HookResult,
+79 | |         duration: Duration,
+   | |________________^
+   |
+   = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+   |
+65 ~         duration_ms = duration.as_millisu64::try_from(() as u64
+66 +     ))]
+67 +     /// Persist hook execution for replay
+68 +     ///
+69 +     /// # Errors
+70 |________________^
+   |
+   = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+   |
+65 ~         duration_ms = duration.as_millisu64::try_from(() as u64
+66 +     ))]
+67 +     /// Persist hook execution for replay
+68 +     ///
+69 +     /// # Errors
+70 +     ///
+71 +     /// Returns `StateError` if:
+72 +     /// - Failed to serialize hook context or result
+73 +     /// - Failed to store execution data
+74 +     pub async fn persist_hook_execution(
+75 +         &self,
+76 +         hook: &dyn ReplayableHook,
+77 +         context: &HookContext,
+78 +         result: &HookResult,
+79 ~         duration): Duration,
+   |
+
++     ///
+71 +     /// Returns `StateError` if:
+72 +     /// - Failed to serialize hook context or result
+73 +     /// - Failed to store execution data
+74 +     pub async fn persist_hook_execution(
+75 +         &self,
+76 +         hook: &dyn ReplayableHook,
+77 +         context: &HookContext,
+78 +         result: &HookResult,
+79 ~         duration): Duration,
+   |
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/manager.rs:328:5
+    |
+328 | /     pub async fn set_with_hooks(
+329 | warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/manager.rs:328:5
+    |
+328 | /     pub async fn set_with_hooks(
+329 | |         &self,
+330 | |         scope: StateScope,
+331 | |         key: &str,
+332 | |         value: Value,
+333 | |     ) -> StateResult<()> {
+    | |________________________^
+    |         &self,
+330 | |         scope: StateScope,
+331 | |         key: &str,
+332 | |         value: Value,
+333 | |     ) -> StateResult<()> {
+    | |________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+|
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/manager.rs:402:13
+    |
+402 |             HookResult::Continue => value,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+412 | warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/manager.rs:402:13
+    |
+402 |             HookResult::Continue => value,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+412 |             _ => value,
+    |             ^^^^^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms            _ => value,
+    |             ^^^^^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise remove the non-wildcard arm
+    |
+402 - 
+help: otherwise remove the non-wildcard arm
+    |
+402 -             HookResult::Continue => value,
+    |
+
+            HookResult::Continue => value,
+    |
+
+warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/manager.rs:528:13
+    |
+528 |             HookResult::Continue => value,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+538 |             _ => value,warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/manager.rs:528:13
+    |
+528 |             HookResult::Continue => value,
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+538 |             _ => value,
+    |             ^^^^^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+
+    |             ^^^^^^^^^^ the wildcard arm
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise remove the non-wildcard arm
+    |
+528 -             HookResult::Continue => value,
+    |
+help: otherwise remove the non-wildcard arm
+    |
+528 -             HookResult::Continue => value,
+    |
+
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/manager.rs:756:5
+    |
+756 | /     pub async fn get_with_class(
+757 | |         &self,
+758 | |         scope: StateScope,
+759 | |         key: &str,
+760 | |         class: Option<StateClass>,
+761 | |     ) -> StateResult<Option<Value>> {
+    | |___________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/manager.rs:756:5
+    |
+756 | /     pub async fn get_with_class(
+757 | |         &self,
+758 | |         scope: StateScope,
+759 | |         key: &str,
+760 | |         class: Option<StateClass>,
+761 | |     ) -> StateResult<Option<Value>> {
+    | |___________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/manager.rs:962:5
+    |
+962 | /     pub async fn save_agent_state(
+963 | warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/manager.rs:962:5
+    |
+962 | /     pub async fn save_agent_state(
+963 | |         &self,
+964 | ||         &self,
+964 | |         agent_state: &crate::state::agent_state::PersistentAgentState,
+965 | |          agent_state: &crate::state::agent_state::PersistentAgentState,
+965 | |     ) -> StateResult<()> {
+    | |________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc    ) -> StateResult<()> {
+    | |________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+
+
+warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1197:5
+     |
+1197 |warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1197:5
+     |
+1197 | /     pub async fn load_agent_state(
+1198 | |         &self,
+1199 |  /     pub async fn load_agent_state(
+1198 | |         &self,
+1199 | |         agent_id: &str,
+1200 | |         agent_id: &str,
+1200 | |     ) -> StateResult<Option<crate::state::agent_state::PersistentAgentState>> {
+     | |_____________________________________________________________________________^
+|     ) -> StateResult<Option<crate::state::agent_state::PersistentAgentState>> {
+     | |_____________________________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+
+warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1387:5
+     |
+1387warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1387:5
+     |
+1387 | /     pub async fn load_agent_state_fast(
+1388 | |         &self, | /     pub async fn load_agent_state_fast(
+1388 | |         &self,
+1389 | |         agent_id: &str,
+1390 | | 
+1389 | |         agent_id: &str,
+1390 | |     ) -> StateResult<Option<crate::state::agent_state::PersistentAgentState>> {
+     | |_____________________________________________________________________________^    ) -> StateResult<Option<crate::state::agent_state::PersistentAgentState>> {
+     | |_____________________________________________________________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+
+
+warning: it is more idiomatic to use `Option<&T>` instead of `&Option<T>`
+    --> llmspell-kernel/src/state/manager.rs:1559:5
+warning: it is more idiomatic to use `Option<&T>` instead of `&Option<T>`
+    --> llmspell-kernel/src/state/manager.rs:1559:5
+     |
+1559 | /     fn create_state_change_event(
+1560 | |         event_type: &str,
+1561 | |         scope: &StateScope,
+1562 | |         key: &str,
+1563 | |         old_value: &Option<Value>,
+     |
+1559 | /     fn create_state_change_event(
+1560 | |         event_type: &str,
+1561 | |         scope: &StateScope,
+1562 | |         key: &str,
+1563 | |         old_value: &Option<Value>,
+     | |                    -------------- help: change this to: `Option<&Value>`
+...    |     | |                    -------------- help: change this to: `Option<&Value>`
+...    |
+1578 | |             .with_tag("state_change")
+1579 | |     }
+     | |_____^
+
+1578 | |             .with_tag("state_change")
+1579 | |     }
+     | |_____^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#ref_option
+     = note: `#[warn(clippy::ref_option)]` implied by `#[warn(clippy::pedantic)]`
+
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#ref_option
+     = note: `#[warn(clippy::ref_option)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1692:5
+     |
+1692 | /     pub fn configure_hook_batching(
+1693 | |         &mut self,warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1692:5
+     |
+1692 | /     pub fn configure_hook_batching(
+1693 | |         &mut self,
+1694 | |         _batch_size: usize,
+1695 | |         _batch_timeout: Duration,
+
+1694 | |         _batch_size: usize,
+1695 | |         _batch_timeout: Duration,
+1696 | |     ) -> StateResult<()> {
+     |1696 | |     ) -> StateResult<()> {
+     | |________________________^
+     |
+     = help |________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1703:5
+     |
+1703 | /     pub async fn set_with_async_hooks_public(
+1704 | |         &self,
+1705 | |         key: &str,
+1706 | | warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1703:5
+     |
+1703 | /     pub async fn set_with_async_hooks_public(
+1704 | |         &self,
+1705 | |         key: &str,
+1706 | |         value: Value,
+1707 | |         class: StateClass,
+1708 | |        value: Value,
+1707 | |         class: StateClass,
+1708 | |         hooks: Vec<Arc<dyn Hook>>,
+1709 | |          hooks: Vec<Arc<dyn Hook>>,
+1709 | |     ) -> StateResult<()> {
+     | |________________________^
+     |    ) -> StateResult<()> {
+     | |________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1744:5
+     |
+1744 | /     pub async fn save_agent_state_with_hooks(
+1745 | |         &self,
+1746 | warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1744:5
+     |
+1744 | /     pub async fn save_agent_state_with_hooks(
+1745 | |         &self,
+1746 | |         agent_id: &str,
+1747 | |         agent_state: Value,
+1748 | |         hooks: Vec<Arc<dyn Hook>>,
+1749 | |     ) -> StateResult<()> {
+     | |________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+|         agent_id: &str,
+1747 | |         agent_state: Value,
+1748 | |         hooks: Vec<Arc<dyn Hook>>,
+1749 | |     ) -> StateResult<()> {
+     | |________________________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function which may panic missing `# Panics` section
+    --> warning: docs for function which may panic missing `# Panics` section
+    --> llmspell-kernel/src/state/manager.rs:1828:5
+     |
+1828 llmspell-kernel/src/state/manager.rs:1828:5
+     |
+1828 | /     pub async fn track_artifact_in_state(
+1829 || /     pub async fn track_artifact_in_state(
+1829 | |         &self,
+1830 | |         scope: StateScope, |         &self,
+1830 | |         scope: StateScope,
+1831 | |
+1831 | |         key: &str,
+1832 | |          key: &str,
+1832 | |         artifact_id: ArtifactId,
+1833 | |         artifact_id: ArtifactId,
+1833 | |         operation: StateOperation,
+1834 | |     ) -> StateResult<()> {        operation: StateOperation,
+1834 | |     ) -> StateResult<()> {
+     | |________________________^
+     |
+note: first possible panic found here
+    
+     | |________________________^
+     |
+note: first possible panic found here
+    --> llmspell-kernel/src/state/manager.rs:1869:26
+     |
+1869 |--> llmspell-kernel/src/state/manager.rs:1869:26
+     |
+1869 |               "timestamp": SystemTime::now()
+     |  __________________________^
+               "timestamp": SystemTime::now()
+     |  __________________________^
+1870 | |                 .duration_since(SystemTime::UNIX_EPOCH)
+1870 | |                 .duration_since(SystemTime::UNIX_EPOCH)
+1871 | |                 .unwrap()
+     1871 | |                 .unwrap()
+     | |_________________________^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc| |_________________________^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+
+
+
+warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1828:5warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1828:5
+     |
+1828 | /     pub async fn track_artifact_in_state(
+1829 | | 
+     |
+1828 | /     pub async fn track_artifact_in_state(
+1829 | |         &self,
+1830 | |         scope: StateScope,        &self,
+1830 | |         scope: StateScope,
+1831 | |         key: &str,
+
+1831 | |         key: &str,
+1832 | |         artifact_id: ArtifactId,
+1833 | 1832 | |         artifact_id: ArtifactId,
+1833 | |         operation: StateOperation,
+1834 | ||         operation: StateOperation,
+1834 | |     ) -> StateResult<()> {
+     | |________________________^
+     ) -> StateResult<()> {
+     | |________________________^
+     |
+     =      |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1895:5
+     |
+1895 |warning: docs for function returning `Result` missing `# Errors` section
+    --> llmspell-kernel/src/state/manager.rs:1895:5
+     |
+1895 |     pub async fn get_all_storage_keys(&self) -> StateResult<Vec<String>> {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+     pub async fn get_all_storage_keys(&self) -> StateResult<Vec<String>> {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/engine.rs:97:5
+    |
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/engine.rs:97:5
+    |
+97  | /97  | /     pub async fn migrate(
+98  | |      pub async fn migrate(
+98  | |         &self,
+99  | |        &self,
+99  | |         from_version: &SemanticVersion,
+100 | |          from_version: &SemanticVersion,
+100 | |         to_version: &SemanticVersion,
+101 | |         config: MigrationConfig,        to_version: &SemanticVersion,
+101 | |         config: MigrationConfig,
+102 | |     ) -> StateResult<MigrationResult> {
+    | |_____________________________________^
+
+102 | |     ) -> StateResult<MigrationResult> {
+    | |_____________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: this function has too many lines (114/100)
+   --> llmspell-kernel/src/state/migration/engine.rs:97:5
+    |
+97  | / warning: this function has too many lines (114/100)
+   --> llmspell-kernel/src/state/migration/engine.rs:97:5
+    |
+97  | /     pub async fn migrate(
+98  | |         &self,
+99  |     pub async fn migrate(
+98  | |         &self,
+99  | |         from_version: &SemanticVersion,
+100 | |         to_version: &SemanticVersion,
+...   |
+247 | |         Ok(result)
+248 ||         from_version: &SemanticVersion,
+100 | |         to_version: &SemanticVersion,
+...   |
+247 | |         Ok(result)
+248 | |     }
+    | |_____^
+     |     }
+    | |_____^
+    |
+    = help|
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+    = note: `#[warn(clippy::too_many_lines)]` implied by `#[warn(clippy::pedantic)]`
+
+: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+    = note: `#[warn(clippy::too_many_lines)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/engine.rs:597:5
+    |
+597 |     pub async fn cancel_migration(&self, migration_id: Uuid) -> StateResult<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/engine.rs:597:5
+    |
+597 |     pub async fn cancel_migration(&self, migration_id: Uuid) -> StateResult<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:168:5
+    |
+168 |     pub fn register_schema(&mut self, schema: EnhancedStateSchema) -> StateResult<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:168:5
+    |
+168 |     pub fn register_schema(&mut self, schema: EnhancedStateSchema) -> StateResult<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:179:5
+    |
+179 | /     pub fn create_migration_plan(
+180 | |         &mut self,
+181 | warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:179:5
+    |
+179 | /     pub fn create_migration_plan(
+180 | |         &mut self,
+181 | |         from_version: &SemanticVersion,
+182 | |         to_version: &SemanticVersion,
+183 | |     ) -> StateResult<MigrationPlan> {
+    | |___________________________________^
+    ||         from_version: &SemanticVersion,
+182 | |         to_version: &SemanticVersion,
+183 | |     ) -> StateResult<MigrationPlan> {
+    | |___________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:219:5
+    |
+219 |     pub fn validate_plan(&self, plan: &MigrationPlan) -> StateResult<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:219:5
+    |
+219 |     pub fn validate_plan(&self, plan: &MigrationPlan) -> StateResult<()> {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:269:5
+    |
+269 | /     pub fn find_migration_paths(
+270 | |         &self,
+271 | warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:269:5
+    |
+269 | /     pub fn find_migration_paths(
+270 | |         &self,
+271 | |         from_version: &SemanticVersion,
+272 | |     ) -> StateResult<Vec<SemanticVersion>> {
+    | |__________________________________________^|         from_version: &SemanticVersion,
+272 | |     ) -> StateResult<Vec<SemanticVersion>> {
+    | |__________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:294:5
+    |
+294 | /     pub fn estimate_complexity(
+295 | |         &self,
+296 | |         from_version: &SemanticVersion,
+297 | | warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/planner.rs:294:5
+    |
+294 | /     pub fn estimate_complexity(
+295 | |         &self,
+296 | |         from_version: &SemanticVersion,
+297 | |         to_version: &SemanticVersion,
+298 | |     ) -> StateResult<MigrationComplexity> {
+    | |_________________________________________^
+            to_version: &SemanticVersion,
+298 | |     ) -> StateResult<MigrationComplexity> {
+    | |_________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+|
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> llmspell-kernel/src/state/migration/planner.rs:336:18
+    |
+336 |         score += compatibility.breaking_changes.len() as u32 * 50;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = warning: casting `usize` to `u32` may truncate the value on targets with 64-bit wide pointers
+   --> llmspell-kernel/src/state/migration/planner.rs:336:18
+    |
+336 |         score += compatibility.breaking_changes.len() as u32 * 50;
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+336 -         score += compatibility.breaking_changes.len() as u32 * 50;
+336 +         score += u32::try_from(compatibility.breaking_changes.len()) * 50;
+    help: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_possible_truncation
+help: ... or use `try_from` and handle the error accordingly
+    |
+336 -         score += compatibility.breaking_changes.len() as u32 * 50;
+336 +         score += u32::try_from(compatibility.breaking_changes.len()) * 50;
+    |
+|
+
+
+warning: these match arms have identical bodies
+  --> llmspell-kernel/src/state/migration/transforms.rs:86:13
+   |
+86 |             FieldTransform::Copy { from_field, .. } => vec![from_field],
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+warning: these match arms have identical bodies
+  --> llmspell-kernel/src/state/migration/transforms.rs:86:13
+   |
+86 |             FieldTransform::Copy { from_field, .. } => vec![from_field],
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+87 |             FieldTransform::Convert { from_field, .. } => vec![from_field],
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+90 |             FieldTransform::Split { from_field, .. } => vec![from_field],
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^87 |             FieldTransform::Convert { from_field, .. } => vec![from_field],
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+90 |             FieldTransform::Split { from_field, .. } => vec![from_field],
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: if this is unintentional make the arms return different values
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help
+   |
+   = help: if this is unintentional make the arms return different values
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise merge the patterns into a single arm
+   |
+86 ~             FieldTransform::Default { .. } => vec![],
+87 |             FieldTransform::Remove { field } => vec![field],
+88 ~             FieldTransform::Copy { from_field, .. } | FieldTransform::Convert { from_field, .. } | FieldTransform::Split { from_field, .. } => vec![from_field],: otherwise merge the patterns into a single arm
+   |
+86 ~             FieldTransform::Default { .. } => vec![],
+87 |             FieldTransform::Remove { field } => vec![field],
+88 ~             FieldTransform::Copy { from_field, .. } | FieldTransform::Convert { from_field, .. } | FieldTransform::Split { from_field, .. } => vec![from_field],
+   |
+
+
+   |
+
+warning: these match arms have identical bodies
+  --> llmspell-kernel/src/state/migration/transforms.rs:91:13
+   |
+warning: these match arms have identical bodies
+  --> llmspell-kernel/src/state/migration/transforms.rs:91:13
+   |
+91 | /             FieldTransform::Merge { from_fields, .. } => {
+92 | |                 from_fields.iter().map(String::as_str).collect()
+93 | |             }
+   | |_____________^
+94 | /91 | /             FieldTransform::Merge { from_fields, .. } => {
+92 | |                 from_fields.iter().map(String::as_str).collect()
+93 | |             }
+   | |_____________^
+94 | /             FieldTransform::Custom { from_fields, .. } => {
+95 | |                 from_fields.iter().map(String::as_str).collect()
+96 | |             }
+   | |_____________^
+   |
+   = help: if this is unintentional make the arms return different values
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise merge the patterns into a single arm
+   |
+             FieldTransform::Custom { from_fields, .. } => {
+95 | |                 from_fields.iter().map(String::as_str).collect()
+96 | |             }
+   | |_____________^
+   |
+   = help: if this is unintentional make the arms return different values
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise merge the patterns into a single arm
+   |
+91 ~             FieldTransform::Merge { from_fields, .. } | FieldTransform::Custom { from_fields, .. } => {
+92 |91 ~             FieldTransform::Merge { from_fields, .. } | FieldTransform::Custom { from_fields, .. } => {
+92 |                 from_fields.iter().map(String::as_str).collect()
+93 |             }
+94                  from_fields.iter().map(String::as_str).collect()
+93 |             }
+94 ~             }
+   |
+
+~             }
+   |
+
+warning: these match arms have identical bodies
+   --> warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/migration/transforms.rs:103:13
+    |
+103 |             FieldTransform::Copy { to_field, .. } => vec![to_field],
+llmspell-kernel/src/state/migration/transforms.rs:103:13
+    |
+103 |             FieldTransform::Copy { to_field, .. } => vec![to_field],
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+104 |    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+104 |             FieldTransform::Convert { to_field, .. } => vec![to_field],
+                 FieldTransform::Convert { to_field, .. } => vec![to_field],
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+110 | |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+110 |             FieldTransform::Merge { to_field, .. } => vec![to_field],
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    =             FieldTransform::Merge { to_field, .. } => vec![to_field],
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise merge the patterns into a single arm
+help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise merge the patterns into a single arm
+    |    |
+103 
+103 ~             FieldTransform::Default { field, .. } => vec![field],
+~             FieldTransform::Default { field, .. } => vec![field],
+104 |104 |             FieldTransform::Remove { .. } => vec![],
+...             FieldTransform::Remove { .. } => vec![],
+...
+107
+107 |             }
+108 ~             FieldTransform:: |             }
+108 ~             FieldTransform::Copy { to_field, .. } | FieldTransform::Convert { to_field, .. } | FieldTransform::Merge { to_field, .. } => vec![to_field],
+    |
+
+Copy { to_field, .. } | FieldTransform::Convert { to_field, .. } | FieldTransform::Merge { to_field, .. } => vec![to_field],
+    |
+
+warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/migration/transforms.rs:107:13
+    |
+107 | /             FieldTransform::Split { to_fields, .. } => {
+108 | |                 to_fields.iter().map(String::as_str).collect()
+109 | |             }
+    | |_____________^
+110 |               FieldTransform::Merge { to_field, .. } => vec![to_field],
+111 | /             FieldTransform::Custom { to_fields, .. } => {
+112 | |                 to_fields.iter().map(String::as_str).collect()
+113 | |             }
+    | |_____________^
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise merge the patterns into a single arm
+    |
+107 ~             FieldTransform::Split { to_fields, .. } | FieldTransform::Custom { to_fields, .. } => {
+108 |warning: these match arms have identical bodies
+   --> llmspell-kernel/src/state/migration/transforms.rs:107:13
+    |
+107 | /             FieldTransform::Split { to_fields, .. } => {
+108 | |                 to_fields.iter().map(String::as_str).collect()
+109 | |             }
+    | |_____________^
+110 |               FieldTransform::Merge { to_field, .. } => vec![to_field],
+111 | /             FieldTransform::Custom { to_fields, .. } => {
+112 | |                 to_fields.iter().map(String::as_str).collect()
+113 | |             }
+    | |_____________^
+    |
+    = help: if this is unintentional make the arms return different values
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_same_arms
+help: otherwise merge the patterns into a single arm
+    |
+107 ~             FieldTransform::Split { to_fields, .. } | FieldTransform::Custom { to_fields, .. } => {
+108 |                 to_fields.iter().map(String::as_str).collect()
+109 |             }
+110 |             FieldTransform::Merge { to_field, .. } => vec![to_field],
+111 ~             }
+    |                 to_fields.iter().map(String::as_str).collect()
+109 |             }
+110 |             FieldTransform::Merge { to_field, .. } => vec![to_field],
+111 ~             }
+    |
+
+
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/transforms.rs:283:5
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/transforms.rs:283:5
+    |
+283 | /     pub fn transform_state(
+284 | |         &self,
+285 |     |
+283 | /     pub fn transform_state(
+284 | |         &self,
+285 | | |         state: &mut SerializableState,
+286 | |         transformation: &StateTransformation,
+287        state: &mut SerializableState,
+286 | |         transformation: &StateTransformation,
+287 | |     ) -> StateResult<TransformationResult> {
+    |  | |     ) -> StateResult<TransformationResult> {
+    | |__________________________________________^
+    |
+    = help|__________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: this function has too many lines (108/100)
+   --> llmspell-kernel/src/state/migration/transforms.rs:350:5
+warning: this function has too many lines (108/100)
+   --> llmspell-kernel/src/state/migration/transforms.rs:350:5
+    |
+350 | /     fn apply_field_transform(
+351 |     |
+350 | /     fn apply_field_transform(
+351 | |         source: &Value,
+352 | |         source: &Value,
+352 | |         target: &mut Value,
+353 | | |         target: &mut Value,
+353 | |         transform: &FieldTransform,
+...   |
+475 |        transform: &FieldTransform,
+...   |
+475 | |     }
+    | |_____^ |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+
+
+
+warning: this function has too many lines (109/100)
+   --> llmspell-kernel/src/state/migration/transforms.rs:627:5
+    |
+627 | /     fn apply_validation_rule(
+warning: this function has too many lines (109/100)
+   --> llmspell-kernel/src/state/migration/transforms.rs:627:5
+    |
+627 | /     fn apply_validation_rule(
+628 | |         data: &Value,
+629 | |         rule: &ValidationRule,
+630 | |     ) -> Result<(), TransformationError> {
+...   |
+743 | |         Ok(())
+744 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+
+628 | |         data: &Value,
+629 | |         rule: &ValidationRule,
+630 | |     ) -> Result<(), TransformationError> {
+...   |
+743 | |         Ok(())
+744 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/validator.rs:293:5
+    |
+293 | /     pub fn validate_pre_migration(
+294warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/validator.rs:293:5
+    |
+293 | /     pub fn validate_pre_migration(
+294 | |         &self,
+295 | |         data: &[SerializableState],
+296  | |         &self,
+295 | |         data: &[SerializableState],
+296 | |         source_schema: &EnhancedStateSchema,
+| |         source_schema: &EnhancedStateSchema,
+297 | |     ) -> StateResult<ValidationResult> {
+297 | |     ) -> StateResult<ValidationResult> {
+    | |______________________________________^
+    |
+        | |______________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+= help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/validator.rs:339:5
+    |
+339 | /     pub fn validate_post_migration(
+340 | |         &self,
+341 | |         data: &[SerializableState],
+342 | |         target_schema: &EnhancedStateSchema,
+343 | |     ) -> StateResult<ValidationResult> {
+    | |______________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: docs for function returning `Result` missing `# Errors` section
+   --> llmspell-kernel/src/state/migration/validator.rs:339:5
+    |
+339 | /     pub fn validate_post_migration(
+340 | |         &self,
+341 | |         data: &[SerializableState],
+342 | |         target_schema: &EnhancedStateSchema,
+343 | |     ) -> StateResult<ValidationResult> {
+    | |______________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:386:5
+    |
+386 | /     fn validate_state_item(
+387 | |         &self,
+388 | | warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:386:5
+    |
+386 | /     fn validate_state_item(
+387 | |         &self,
+388 | |         state: &SerializableState,
+389 | |         schema: &EnhancedStateSchema,
+390 | |        state: &SerializableState,
+389 | |         schema: &EnhancedStateSchema,
+390 | |         phase: &str,
+391 | |     ) -> StateResult<ValidationResult> {
+             phase: &str,
+391 | |     ) -> StateResult<ValidationResult> {
+    | |______________________________________^
+    |
+    = help| |______________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+391 -     ) -> StateResult<ValidationResult> {
+391
+391 -     ) -> StateResult<ValidationResult> {
+391 +     ) -> state::migration::validator::ValidationResult {
+    | +     ) -> state::migration::validator::ValidationResult {
+    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+416 -         Ok(result)
+416 +         result
+    |
+
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+416 -         Ok(result)
+416 +         result
+    |
+
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:464:5
+    |
+464 | /     fn validate_schema_conformance(
+465 warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:464:5
+    |
+464 | /     fn validate_schema_conformance(
+465 | |         state: &SerializableState,
+466 | |         schema: &EnhancedStateSchema,
+467 | |         rule: &ValidationRule,
+468 | | | |         state: &SerializableState,
+466 | |         schema: &EnhancedStateSchema,
+467 | |         rule: &ValidationRule,
+468 | |     ) -> StateResult<Vec<ValidationIssue>> {
+    | |__________________________________________^
+    |
+    ) -> StateResult<Vec<ValidationIssue>> {
+    | |__________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+468 -     ) -> StateResult<Vec<ValidationIssue>> {
+468
+468 -     ) -> StateResult<Vec<ValidationIssue>> {
+468 +     ) -> std::vec::Vec<state::migration::validator::ValidationIssue> {
+    |
+help +     ) -> std::vec::Vec<state::migration::validator::ValidationIssue> {
+    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+486 -         Ok(issues)
+486 +         issues
+    |
+
+: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+486 -         Ok(issues)
+486 +         issues
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:490:5
+    |
+490 |warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:490:5
+    |
+490 | /     fn validate_required_fields(
+491 | |         state: &SerializableState,
+492 | |         schema: &EnhancedStateSchema,
+493 | |         rule: &ValidationRule,
+494 | |     ) -> StateResult<Vec<ValidationIssue>> {
+    | |__________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+494 -     ) ->  /     fn validate_required_fields(
+491 | |         state: &SerializableState,
+492 | |         schema: &EnhancedStateSchema,
+493 | |         rule: &ValidationRule,
+494 | |     ) -> StateResult<Vec<ValidationIssue>> {
+    | |__________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+494 -     ) -> StateResult<Vec<ValidationIssue>> {
+494 +     ) -> std::vec::Vec<state::migration::validator::ValidationIssue> {
+    StateResult<Vec<ValidationIssue>> {
+494 +     ) -> std::vec::Vec<state::migration::validator::ValidationIssue> {
+    ||
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+517 - 
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+517 -         Ok(issues)
+517 +         issues
+            Ok(issues)
+517 +         issues
+    |
+
+|
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:521:5
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/migration/validator.rs:521:5
+    |
+521 | /     fn validate_field_types(
+522     |
+521 | /     fn validate_field_types(
+522 | |         state: &SerializableState,
+523 | |         schema: &EnhancedStateSchema,
+524 | |         rule: &ValidationRule,
+525 | |     ) -> StateResult<Vec<ValidationIssue>> {
+    | |__________________________________________^
+    |
+    = help| |         state: &SerializableState,
+523 | |         schema: &EnhancedStateSchema,
+524 | |         rule: &ValidationRule,
+525 | |     ) -> StateResult<Vec<ValidationIssue>> {
+    | |__________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+525: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+525 -     ) -> StateResult<Vec<ValidationIssue>> {
+525 +     ) -> std::vec::Vec<state::migration::validator::ValidationIssue> {
+ -     ) -> StateResult<Vec<ValidationIssue>> {
+525 +     ) -> std::vec::Vec<state::migration::validator::ValidationIssue> {
+    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+550    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+550 -         Ok(issues)
+550 +          -         Ok(issues)
+550 +         issues
+    |
+
+issues
+    |
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/schema/migration.rs:306:5
+    |
+306 | /     fn create_data_transformation(
+307 | warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/schema/migration.rs:306:5
+    |
+306 | /     fn create_data_transformation(
+307 | |         from_version: &SemanticVersion,
+308 | |         to_version: &SemanticVersion,
+309 | |         compatibility: &CompatibilityResult,
+310 | |     ) -> Result<DataTransformation, MigrationPlannerError> {
+    |         from_version: &SemanticVersion,
+308 | |         to_version: &SemanticVersion,
+309 | |         compatibility: &CompatibilityResult,
+310 | |     ) -> Result<DataTransformation, MigrationPlannerError> {
+    | |__________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+310 -     ) -> Result<DataTransformation, MigrationPlannerError> {
+310 +     ) -> state::schema::migration::DataTransformation {
+    || |__________________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+310 -     ) -> Result<DataTransformation, MigrationPlannerError> {
+310 +     ) -> state::schema::migration::DataTransformation {
+    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+400 ~         DataTransformation {
+401 +             transformation_id,
+402 +             description,
+403
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+400 ~         DataTransformation {
+401 +             transformation_id,
+402 +             description,
+403 +             field_mappings,
+404 +             custom_logic: None,
+405 +             validation_rules,
+406 +         }
+    | +             field_mappings,
+404 +             custom_logic: None,
+405 +             validation_rules,
+406 +         }
+    |
+
+
+
+warning: wildcard matches only a single variant and will also match any future added variants
+   --> llmspell-kernel/src/state/schema/migration.rs:397:13
+    |
+397 |             _ => {}
+    |             ^ warning: wildcard matches only a single variant and will also match any future added variants
+   --> llmspell-kernel/src/state/schema/migration.rs:397:13
+    |
+397 |             _ => {}
+    |             ^ help: try: `RiskLevel::Low`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_wildcard_for_single_variants
+    help: try: `RiskLevel::Low`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#match_wildcard_for_single_variants
+    = note: `#[warn(clippy::match_wildcard_for_single_variants)]` implied by `#[warn(clippy::pedantic)]`
+
+= note: `#[warn(clippy::match_wildcard_for_single_variants)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/schema/migration.rs:410:5
+    |
+410 | /     fn create_rollback_plan(
+411 | |         from_version: &SemanticVersion,
+412 |warning: this function's return value is unnecessarily wrapped by `Result`
+   --> llmspell-kernel/src/state/schema/migration.rs:410:5
+    |
+410 | /     fn create_rollback_plan(
+411 | |         from_version: &SemanticVersion,
+412 | |         to_version: &SemanticVersion,
+413 | |     ) -> Result<MigrationPlan, MigrationPlannerError> {
+     |         to_version: &SemanticVersion,
+413 | |     ) -> Result<MigrationPlan, MigrationPlannerError> {
+    | |_____________________________________________________^
+    |
+    = help| |_____________________________________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
+help: remove `Result` from the return type...
+    |
+413 -     ) -> Result<MigrationPlan, MigrationPlannerError> {
+413413 -     ) -> Result<MigrationPlan, MigrationPlannerError> {
+413 +     ) -> state::schema::migration::MigrationPlan {
+    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    | +     ) -> state::schema::migration::MigrationPlan {
+    |
+help: ...and then remove the surrounding `Ok()` from returning expressions
+    |
+415 ~         MigrationPlan {
+416 
+415 ~         MigrationPlan {
+416 +             from_version: from_version.clone(),
+417 +             to_version: to_version.clone(),+             from_version: from_version.clone(),
+417 +             to_version: to_version.clone(),
+418 +             steps: vec![MigrationStep {
+419 +                 from_version: from_version.major,
+418 +             steps: vec![MigrationStep {
+419 +                 from_version: from_version.major,
+420 +                 to_version: to_version.major,
+421 +                 migration_type: "rollback".to_string(),
+422 +                 description: format!("Rollback from {from_version} to {to_version}"),
+423 +             }],
+
+420 +                 to_version: to_version.major,
+421 +                 migration_type: "rollback".to_string(),
+422 +                 description: format!("Rollback from {from_version} to {to_version}"),
+423 +             }],
+424 +             estimated_duration: std::time::Duration::from_secs(300), // 5 minutes default
+425 +             risk_level: RiskLevel::High,                             // Rollbacks are always risky
+426424 +             estimated_duration: std::time::Duration::from_secs(300), // 5 minutes default
+425 +             risk_level: RiskLevel::High,                             // Rollbacks are always risky
+426 +             requires_backup: true,
+427 +             data_transformations: vec![],
+428 +             rollback_plan: None, // No nested rollback plans
+429 +             warnings: vec!["Rollback may cause data loss".to_string()],
+ +             requires_backup: true,
+427 +             data_transformations: vec![],
+428 +             rollback_plan: None, // No nested rollback plans
+429 +             warnings: vec!["Rollback may cause data loss".to_string()],
+430 +         }
+    |
+
+430 +         }
+    |
+
+warning: assigning the result of `Clone::clone()` may be inefficient
+   --> llmspell-kernel/src/state/sensitive_data.rs:264:13warning: assigning the result of `Clone::clone()` may be inefficient
+   --> llmspell-kernel/src/state/sensitive_data.rs:264:13
+    |
+264 |             *s = self.config.redaction_text.clone();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `s.clone_from(&self.config.redaction_text)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assigning_clones
+    = note: `#[warn(clippy::assigning_clones)]` implied by `#[warn(clippy::pedantic)]`
+
+
+    |
+264 |             *s = self.config.redaction_text.clone();
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use `clone_from()`: `s.clone_from(&self.config.redaction_text)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assigning_clones
+    = note: `#[warn(clippy::assigning_clones)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:354:5
+    |
+354 | /     async fn save_namespace(&self, namespace: &str, data: &NamespaceData) -> Result<()> {
+355 | |         let Some(ref base_dir) = self.persistence_dir else {
+356 | |             return Ok(());
+357 | |         };
+...   |
+380 | |         Ok(())
+381 | |     }
+    warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:354:5
+    |
+354 | /     async fn save_namespace(&self, namespace: &str, data: &NamespaceData) -> Result<()> {
+355 | |         let Some(ref base_dir) = self.persistence_dir else {
+356 | |             return Ok(());
+357 | |         };
+...   |
+380 | |         Ok(())
+381 | |     }
+    | |_____^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+    = note: `#[warn(clippy::unused_async)]` implied by `#[warn(clippy::pedantic)]`
+
+| |_____^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+    = note: `#[warn(clippy::unused_async)]` implied by `#[warn(clippy::pedantic)]`
+
+warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:384:5
+    |warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/backends/vector/hnsw.rs:384:5
+    |
+384 | /     async fn load_namespace(&self, namespace: &str) -> Result<NamespaceData> {
+385 | |         let Some(ref base_dir) = self.persistence_dir else {
+384 | /     async fn load_namespace(&self, namespace: &str) -> Result<NamespaceData> {
+385 | |         let Some(ref base_dir) = self.persistence_dir else {
+386 | |             anyhow::bail!("No persistence directory configured");
+386 | |             anyhow::bail!("No persistence directory configured");
+387 | |         };
+...   
+387 | |         };
+...   |
+436 | |         })
+|
+436 | |         })
+437 | |     }
+    | 437 | |     }
+    | |_____^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async|_____^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+   
+
+warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/backup/manager.rs:529:5
+    |
+529 | /     async fn compress_backup(&self, data: &[u8]) -> BackupResult<Vec<u8>> {
+--> llmspell-kernel/src/state/backup/manager.rs:529:5
+    |
+529 | /     async fn compress_backup(&self, data: &[u8]) -> BackupResult<Vec<u8>> {
+530 | | 530 | |         let compressor = BackupCompression::new(
+531 | |             self.config.compression_type,
+        let compressor = BackupCompression::new(
+531 | |             self.config.compression_type,
+532 | |             CompressionLevel::new(self.config.compression_level.into())?,
+532 | |             CompressionLevel::new(self.config.compression_level.into())?,
+533 | |533 | |         );
+534 |         );
+534 | |         compressor.compress(data)
+535 | |         compressor.compress(data)
+535 | |     }
+    | |_____^ |     }
+    | |_____^
+    |
+    = help: consider removing the `async` from this function
+    
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+= help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/backup/manager.rs:537:5
+    |
+537    --> llmspell-kernel/src/state/backup/manager.rs:537:5
+    |
+537 | /     async fn get_current_schema_version(&self) -> BackupResult<String> {
+538 | /     async fn get_current_schema_version(&self) -> BackupResult<String> {
+538 | |         // TODO: Get actual schema version from state manager
+539 | | |         // TODO: Get actual schema version from state manager
+539 | |         Ok("1.0.0".to_string())
+540 | ||         Ok("1.0.0".to_string())
+540 | |      }
+    | |_____^
+        }
+    | |_____^
+    |
+    = help: consider removing the `async` from this function
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+= help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+    --> llmspell-kernel/src/state/manager.rs:1651:5
+     |
+1651 | /     pub async fn start_async_hooks(&mut self) -> StateResult<()> {
+1652 | |         self.enable_async_hooks()
+1653 | |     }
+     | |_____^
+     |
+     = help: consider removing the `async` from this function
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/migration/engine.rs:579:5
+    |
+579 |warning: unused `async` for function with no await statements
+    --> llmspell-kernel/src/state/manager.rs:1651:5
+     |
+1651 | /     pub async fn start_async_hooks(&mut self) -> StateResult<()> {
+1652 | |         self.enable_async_hooks()
+1653 | |     }
+     | |_____^
+     |
+     = help: consider removing the `async` from this function
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/migration/engine.rs:579:5
+    |
+579 | /     async fn rollback_migration(
+580 | |         &self,
+581 | |         _plan: &MigrationPlan, /     async fn rollback_migration(
+580 | |         &self,
+581 | |         _plan: &MigrationPlan,
+582 | |         _context: &MigrationContext,
+...
+582 | |         _context: &MigrationContext,
+...   |
+587 | |         Ok(())   |
+587 | |         Ok(())
+588 | |     }
+
+588 | |     }
+    | |_____^
+    |
+    = help: consider removing the `async` from this function
+    = help    | |_____^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+   --> : for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+warning: unused `async` for function with no await statements
+   --> llmspell-kernel/src/state/migration/engine.rs:597:5
+    |
+597 | llmspell-kernel/src/state/migration/engine.rs:597:5
+    |
+597 | /     pub async fn cancel_migration(&self, migration_id: Uuid) -> StateResult<()> {
+598 | |         let mut active = self.active_migrations.write();
+599 /     pub async fn cancel_migration(&self, migration_id: Uuid) -> StateResult<()> {
+598 | |         let mut active = self.active_migrations.write();
+599 | |         if active.remove(&migration_id).is_some() {
+600 || |         if active.remove(&migration_id).is_some() {
+600 | |             info!("Migration {} cancelled", migration_id);
+...   |
+ |             info!("Migration {} cancelled", migration_id);
+...   |
+607 | |     }
+    607 | |     }
+    | |_____^
+    |
+    | |_____^
+    |
+    = help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async= help: consider removing the `async` from this function
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unused_async
+
+
+
+warning: `llmspell-kernel` (lib) generated 59 warnings
+warning: `llmspell-kernel` (lib) generated 59 warnings
+    Checking llmspell-tools v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-tools)
+    Checking llmspell-tools v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-tools)
+    Checking llmspell-workflows v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-workflows)
+    Checking llmspell-rag v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-rag)
+    Checking llmspell-workflows v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-workflows)
+    Checking llmspell-rag v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-rag)
+    Checking llmspell-agents v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents)
+    Checking llmspell-agents v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-agents)
+    Checking llmspell-bridge v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-bridge)
+    Checking llmspell-bridge v0.8.0 (/Users/spuri/projects/lexlapax/rs-llmspell/llmspell-bridge)

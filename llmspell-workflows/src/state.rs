@@ -475,13 +475,21 @@ impl StateManager {
 /// Execution statistics for workflow monitoring
 #[derive(Debug, Clone)]
 pub struct ExecutionStats {
+    /// Total number of steps in the workflow
     pub total_steps: usize,
+    /// Number of steps that completed successfully
     pub successful_steps: usize,
+    /// Number of steps that failed
     pub failed_steps: usize,
+    /// Total execution duration
     pub total_duration: Duration,
+    /// Average duration per step
     pub average_step_duration: Duration,
+    /// Total number of retry attempts across all steps
     pub total_retries: u32,
+    /// When the execution started
     pub execution_start_time: Option<Instant>,
+    /// Current step being executed (0-indexed)
     pub current_step: usize,
 }
 

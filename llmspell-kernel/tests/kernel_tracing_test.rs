@@ -64,8 +64,10 @@ impl TraceCapture {
                     .without_time()
                     .compact(),
             )
-            .with(tracing_subscriber::EnvFilter::from_default_env()
-                .add_directive("llmspell_kernel=trace".parse().unwrap()));
+            .with(
+                tracing_subscriber::EnvFilter::from_default_env()
+                    .add_directive("llmspell_kernel=trace".parse().unwrap()),
+            );
 
         tracing::subscriber::set_default(subscriber)
     }
@@ -377,7 +379,7 @@ async fn test_session_state_transition_tracing() {
 
     // Try invalid transitions (should be traced as warnings)
     let _ = session.suspend().await; // Can't suspend completed
-    let _ = session.resume().await;  // Can't resume completed
+    let _ = session.resume().await; // Can't resume completed
 
     // Test failure path
     let options2 = CreateSessionOptions {
@@ -435,10 +437,7 @@ async fn test_integrated_kernel_tracing() {
 
     // 4. Register session with router
     let (tx, _rx) = mpsc::channel(100);
-    let client_id = router.register_client(
-        session.id().await.to_string(),
-        tx
-    );
+    let client_id = router.register_client(session.id().await.to_string(), tx);
 
     // 5. Perform operations
     session.suspend().await.unwrap();
@@ -449,7 +448,10 @@ async fn test_integrated_kernel_tracing() {
         metadata: HashMap::new(),
         content: {
             let mut content = HashMap::new();
-            content.insert("code".to_string(), serde_json::json!("print('Hello, World!')"));
+            content.insert(
+                "code".to_string(),
+                serde_json::json!("print('Hello, World!')"),
+            );
             content.insert("execution_count".to_string(), serde_json::json!(1));
             content
         },
@@ -470,18 +472,12 @@ async fn test_integrated_kernel_tracing() {
         capture.contains("transport"),
         "Should have transport traces"
     );
-    assert!(
-        capture.contains("session"),
-        "Should have session traces"
-    );
+    assert!(capture.contains("session"), "Should have session traces");
     assert!(
         capture.contains("correlation_id"),
         "Should have correlation ID traces"
     );
-    assert!(
-        capture.contains("router"),
-        "Should have router traces"
-    );
+    assert!(capture.contains("router"), "Should have router traces");
 
     debug!("Integrated kernel tracing test completed successfully");
 }
@@ -517,7 +513,10 @@ async fn test_tracing_performance_impact() {
         duration_with_tracing.as_millis()
     );
 
-    info!("Performance test: 100 iterations in {:?}", duration_with_tracing);
+    info!(
+        "Performance test: 100 iterations in {:?}",
+        duration_with_tracing
+    );
 }
 
 /// Verify no new clippy warnings in instrumented code

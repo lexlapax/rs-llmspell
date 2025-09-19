@@ -6,8 +6,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::SystemTime;
-use tracing::{debug, info, instrument};
 use tracing::field::Empty;
+use tracing::{debug, info, instrument};
 
 use super::types::{DebugState, ExecutionState, SessionState};
 

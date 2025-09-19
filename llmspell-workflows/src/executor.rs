@@ -12,8 +12,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{oneshot, RwLock};
 use tokio::task::JoinHandle;
-use tracing::{debug, info, instrument, warn, Span};
 use tracing::field::Empty;
+use tracing::{debug, info, instrument, warn, Span};
 
 /// Execution metrics for workflow runs
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,6 +118,7 @@ pub struct DefaultWorkflowExecutor {
 }
 
 impl DefaultWorkflowExecutor {
+    /// Create a new default workflow executor
     pub fn new() -> Self {
         Self {
             active_executions: Arc::new(RwLock::new(std::collections::HashMap::new())),
@@ -215,8 +216,8 @@ impl WorkflowExecutor for DefaultWorkflowExecutor {
         let start_time = Instant::now();
 
         // Record tracing fields
-        Span::current().record("workflow_name", &workflow_name.as_str());
-        Span::current().record("execution_id", &execution_id.as_str());
+        Span::current().record("workflow_name", workflow_name.as_str());
+        Span::current().record("execution_id", execution_id.as_str());
 
         debug!(
             "Starting workflow execution: {} ({})",

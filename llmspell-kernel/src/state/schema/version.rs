@@ -37,11 +37,13 @@ impl SemanticVersion {
         }
     }
 
+    #[must_use]
     pub fn with_pre_release(mut self, pre_release: String) -> Self {
         self.pre_release = Some(pre_release);
         self
     }
 
+    #[must_use]
     pub fn with_build(mut self, build: String) -> Self {
         self.build = Some(build);
         self
@@ -205,6 +207,7 @@ impl SchemaVersion {
         }
     }
 
+    #[must_use]
     pub fn with_description(mut self, description: String) -> Self {
         self.description = Some(description);
         self

@@ -392,8 +392,8 @@ impl MigrationValidator {
         let mut result = ValidationResult::new();
 
         for rule in self.rules.get_enabled_rules() {
-            if self.rule_applies_to_phase(rule, phase) {
-                match self.apply_validation_rule(state, schema, rule) {
+            if Self::rule_applies_to_phase(rule, phase) {
+                match Self::apply_validation_rule(state, schema, rule) {
                     Ok(issues) => {
                         for issue in issues {
                             result.add_issue(issue);
@@ -418,7 +418,6 @@ impl MigrationValidator {
 
     /// Apply a single validation rule
     fn apply_validation_rule(
-        &self,
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
@@ -427,34 +426,34 @@ impl MigrationValidator {
 
         match &rule.rule_type {
             ValidationRuleType::SchemaConformance => {
-                issues.extend(self.validate_schema_conformance(state, schema, rule)?);
+                issues.extend(Self::validate_schema_conformance(state, schema, rule)?);
             }
             ValidationRuleType::RequiredFields => {
-                issues.extend(self.validate_required_fields(state, schema, rule)?);
+                issues.extend(Self::validate_required_fields(state, schema, rule)?);
             }
             ValidationRuleType::TypeValidation => {
-                issues.extend(self.validate_field_types(state, schema, rule)?);
+                issues.extend(Self::validate_field_types(state, schema, rule)?);
             }
             ValidationRuleType::RangeValidation => {
-                issues.extend(self.validate_value_ranges(state, schema, rule)?);
+                issues.extend(Self::validate_value_ranges(state, schema, rule));
             }
             ValidationRuleType::LengthValidation => {
-                issues.extend(self.validate_field_lengths(state, schema, rule)?);
+                issues.extend(Self::validate_field_lengths(state, schema, rule));
             }
             ValidationRuleType::PatternValidation => {
-                issues.extend(self.validate_field_patterns(state, schema, rule)?);
+                issues.extend(Self::validate_field_patterns(state, schema, rule));
             }
             ValidationRuleType::CustomValidation(validator_name) => {
-                issues.extend(self.validate_custom(state, schema, rule, validator_name)?);
+                issues.extend(Self::validate_custom(state, schema, rule, validator_name));
             }
             ValidationRuleType::ReferentialIntegrity => {
-                issues.extend(self.validate_referential_integrity(state, schema, rule)?);
+                issues.extend(Self::validate_referential_integrity(state, schema, rule));
             }
             ValidationRuleType::UniquenessConstraint => {
-                issues.extend(self.validate_uniqueness(state, schema, rule)?);
+                issues.extend(Self::validate_uniqueness(state, schema, rule));
             }
             ValidationRuleType::CrossFieldValidation => {
-                issues.extend(self.validate_cross_field(state, schema, rule)?);
+                issues.extend(Self::validate_cross_field(state, schema, rule));
             }
         }
 
@@ -463,7 +462,6 @@ impl MigrationValidator {
 
     /// Validate schema conformance
     fn validate_schema_conformance(
-        &self,
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
@@ -490,7 +488,6 @@ impl MigrationValidator {
 
     /// Validate required fields
     fn validate_required_fields(
-        &self,
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
@@ -522,7 +519,6 @@ impl MigrationValidator {
 
     /// Validate field types
     fn validate_field_types(
-        &self,
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
@@ -533,9 +529,9 @@ impl MigrationValidator {
             for (field_name, field_value) in obj {
                 if let Some(field_schema) = schema.fields.get(field_name) {
                     let expected_type = &field_schema.field_type;
-                    let actual_type = self.get_value_type(field_value);
+                    let actual_type = Self::get_value_type(field_value);
 
-                    if !self.types_compatible(expected_type, &actual_type) {
+                    if !Self::types_compatible(expected_type, &actual_type) {
                         issues.push(ValidationIssue {
                             rule_id: rule.id.clone(),
                             severity: rule.severity.clone(),
@@ -543,9 +539,7 @@ impl MigrationValidator {
                             message: format!(
                                 "Type mismatch: expected '{expected_type}', got '{actual_type}'"
                             ),
-                            details: Some(format!(
-                                "Field '{field_name}' value: {field_value:?}"
-                            )),
+                            details: Some(format!("Field '{field_name}' value: {field_value:?}")),
                             suggestion: Some("Convert field to the expected type".to_string()),
                         });
                     }
@@ -558,79 +552,72 @@ impl MigrationValidator {
 
     /// Validate value ranges (placeholder implementations for other validation types)
     fn validate_value_ranges(
-        &self,
         _state: &SerializableState,
         _schema: &EnhancedStateSchema,
         _rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
-        Ok(vec![])
+    ) -> Vec<ValidationIssue> {
+        vec![]
     }
 
     fn validate_field_lengths(
-        &self,
         _state: &SerializableState,
         _schema: &EnhancedStateSchema,
         _rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
-        Ok(vec![])
+    ) -> Vec<ValidationIssue> {
+        vec![]
     }
 
     fn validate_field_patterns(
-        &self,
         _state: &SerializableState,
         _schema: &EnhancedStateSchema,
         _rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
-        Ok(vec![])
+    ) -> Vec<ValidationIssue> {
+        vec![]
     }
 
     fn validate_custom(
-        &self,
         _state: &SerializableState,
         _schema: &EnhancedStateSchema,
         rule: &ValidationRule,
         validator_name: &str,
-    ) -> StateResult<Vec<ValidationIssue>> {
+    ) -> Vec<ValidationIssue> {
         debug!(
             "Custom validator '{}' not implemented for rule '{}'",
             validator_name, rule.id
         );
-        Ok(vec![])
+        vec![]
     }
 
     fn validate_referential_integrity(
-        &self,
         _state: &SerializableState,
         _schema: &EnhancedStateSchema,
         _rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
-        Ok(vec![])
+    ) -> Vec<ValidationIssue> {
+        vec![]
     }
 
     fn validate_uniqueness(
-        &self,
         _state: &SerializableState,
         _schema: &EnhancedStateSchema,
         _rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
-        Ok(vec![])
+    ) -> Vec<ValidationIssue> {
+        vec![]
     }
 
     fn validate_cross_field(
-        &self,
         _state: &SerializableState,
         _schema: &EnhancedStateSchema,
         _rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
-        Ok(vec![])
+    ) -> Vec<ValidationIssue> {
+        vec![]
     }
 
     /// Helper methods
-    fn rule_applies_to_phase(&self, _rule: &ValidationRule, _phase: &str) -> bool {
+    fn rule_applies_to_phase(_rule: &ValidationRule, _phase: &str) -> bool {
         true // For now, all rules apply to all phases
     }
 
-    fn get_value_type(&self, value: &Value) -> String {
+    fn get_value_type(value: &Value) -> String {
         match value {
             Value::String(_) => "string".to_string(),
             Value::Number(_) => "number".to_string(),
@@ -641,7 +628,7 @@ impl MigrationValidator {
         }
     }
 
-    fn types_compatible(&self, expected: &str, actual: &str) -> bool {
+    fn types_compatible(expected: &str, actual: &str) -> bool {
         expected == actual || expected == "any" || actual == "null"
     }
 }

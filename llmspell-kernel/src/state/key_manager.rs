@@ -8,6 +8,15 @@ pub struct KeyManager;
 
 impl KeyManager {
     /// Validate a state key
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError::InvalidFormat` if:
+    /// - Key is empty
+    /// - Key exceeds 256 characters
+    /// - Key contains path traversal characters (.., \, //)
+    /// - Key contains control characters (\0, \n, \r)
+    /// - Key starts with reserved prefixes (__ or $$)
     pub fn validate_key(key: &str) -> StateResult<()> {
         // Check empty key
         if key.is_empty() {
@@ -46,6 +55,12 @@ impl KeyManager {
     }
 
     /// Create a scoped key with namespace prefix
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Key validation fails (see `validate_key` for details)
+    /// - Scoped key exceeds 512 characters
     pub fn create_scoped_key(scope: &StateScope, key: &str) -> StateResult<String> {
         Self::validate_key(key)?;
 

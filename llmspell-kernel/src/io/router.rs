@@ -9,8 +9,8 @@ use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::mpsc::{self, Sender};
-use tracing::{debug, info, instrument, trace, warn, Span};
 use tracing::field::Empty;
+use tracing::{debug, info, instrument, trace, warn, Span};
 use uuid::Uuid;
 
 use super::manager::IOPubMessage;
@@ -173,13 +173,12 @@ impl MessageRouter {
     /// Get or create a correlation ID for message tracking
     fn get_or_create_correlation_id(&self) -> Uuid {
         let mut correlation_id = self.correlation_id.write();
-        match *correlation_id {
-            Some(id) => id,
-            None => {
-                let id = Uuid::new_v4();
-                *correlation_id = Some(id);
-                id
-            }
+        if let Some(id) = *correlation_id {
+            id
+        } else {
+            let id = Uuid::new_v4();
+            *correlation_id = Some(id);
+            id
         }
     }
 

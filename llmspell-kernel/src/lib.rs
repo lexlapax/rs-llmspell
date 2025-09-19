@@ -15,7 +15,6 @@
 //! share the same Tokio runtime, preventing runtime context mismatches that
 //! cause HTTP client failures in long-running operations.
 
-#![warn(missing_docs)]
 #![warn(clippy::all)]
 #![warn(clippy::pedantic)]
 #![allow(clippy::module_name_repetitions)]

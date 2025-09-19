@@ -23,25 +23,47 @@ pub enum Condition {
         expected_value: serde_json::Value,
     },
     /// Check if shared data key exists
-    SharedDataExists { key: String },
+    SharedDataExists {
+        /// Key to check for existence
+        key: String,
+    },
     /// Compare step result output to expected value
     StepResultEquals {
+        /// ID of the step to check
         step_id: ComponentId,
+        /// Expected output string
         expected_output: String,
     },
     /// Check if previous step was successful
-    StepSucceeded { step_id: ComponentId },
+    StepSucceeded {
+        /// ID of the step to check
+        step_id: ComponentId,
+    },
     /// Check if previous step failed
-    StepFailed { step_id: ComponentId },
+    StepFailed {
+        /// ID of the step to check
+        step_id: ComponentId,
+    },
     /// Logical AND of multiple conditions
-    And { conditions: Vec<Condition> },
+    And {
+        /// Conditions that must all be true
+        conditions: Vec<Condition>,
+    },
     /// Logical OR of multiple conditions
-    Or { conditions: Vec<Condition> },
+    Or {
+        /// Conditions where at least one must be true
+        conditions: Vec<Condition>,
+    },
     /// Logical NOT of a condition
-    Not { condition: Box<Condition> },
+    Not {
+        /// Condition to negate
+        condition: Box<Condition>,
+    },
     /// Custom condition with JavaScript-like expression
     Custom {
+        /// Expression to evaluate
         expression: String,
+        /// Human-readable description
         description: String,
     },
     /// Check if step output contains a specific string

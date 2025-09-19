@@ -111,6 +111,13 @@ impl MigrationPlanner {
     }
 
     /// Create a migration plan between two schema versions
+    ///
+    /// # Errors
+    ///
+    /// Returns `MigrationPlannerError` if:
+    /// - Source or target schema not found in registry
+    /// - No migration path exists between versions
+    /// - Incompatible schema changes detected
     pub fn create_migration_plan(
         &mut self,
         from_version: &SemanticVersion,
@@ -168,7 +175,7 @@ impl MigrationPlanner {
 
             // Create data transformations
             let transformation =
-                self.create_data_transformation(step_from, step_to, &compatibility)?;
+                Self::create_data_transformation(step_from, step_to, &compatibility);
             data_transformations.push(transformation);
 
             // Collect warnings
@@ -180,9 +187,10 @@ impl MigrationPlanner {
 
         // Create rollback plan if needed
         let rollback_plan = if requires_backup {
-            Some(Box::new(
-                self.create_rollback_plan(to_version, from_version)?,
-            ))
+            Some(Box::new(Self::create_rollback_plan(
+                to_version,
+                from_version,
+            )))
         } else {
             None
         };
@@ -251,14 +259,14 @@ impl MigrationPlanner {
         self.schema_registry
             .keys()
             .filter(|version| {
-                *version > from_version && self.is_migration_possible(from_version, version)
+                *version > from_version && Self::is_migration_possible(from_version, version)
             })
             .cloned()
             .collect()
     }
 
     /// Check if migration is possible between two versions
-    fn is_migration_possible(&self, from: &SemanticVersion, to: &SemanticVersion) -> bool {
+    fn is_migration_possible(from: &SemanticVersion, to: &SemanticVersion) -> bool {
         // Allow migration within same major version or to next major version
         to.major <= from.major + 1
     }
@@ -296,7 +304,6 @@ impl MigrationPlanner {
 
     /// Create data transformation for a migration step
     fn create_data_transformation(
-        &self,
         from_version: &SemanticVersion,
         to_version: &SemanticVersion,
         compatibility: &CompatibilityResult,
@@ -401,12 +408,11 @@ impl MigrationPlanner {
 
     /// Create a rollback plan
     fn create_rollback_plan(
-        &mut self,
         from_version: &SemanticVersion,
         to_version: &SemanticVersion,
-    ) -> Result<MigrationPlan, MigrationPlannerError> {
+    ) -> MigrationPlan {
         // Create a simple rollback plan (reverse migration)
-        Ok(MigrationPlan {
+        MigrationPlan {
             from_version: from_version.clone(),
             to_version: to_version.clone(),
             steps: vec![MigrationStep {
@@ -421,7 +427,7 @@ impl MigrationPlanner {
             data_transformations: vec![],
             rollback_plan: None, // No nested rollback plans
             warnings: vec!["Rollback may cause data loss".to_string()],
-        })
+        }
     }
 
     /// Create a no-op migration plan for same version
@@ -473,6 +479,13 @@ impl MigrationPlanner {
     }
 
     /// Validate a migration plan
+    ///
+    /// # Errors
+    ///
+    /// Returns `MigrationPlannerError` if:
+    /// - Source or target schema not found in registry
+    /// - Plan contains invalid migration steps
+    /// - Risk level exceeds acceptable threshold
     pub fn validate_plan(&self, plan: &MigrationPlan) -> Result<(), MigrationPlannerError> {
         // Check that all schemas in the plan exist
         if !self.schema_registry.contains_key(&plan.from_version) {

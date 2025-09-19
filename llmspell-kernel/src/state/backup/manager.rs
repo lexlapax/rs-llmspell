@@ -155,6 +155,12 @@ pub struct BackupManager {
 
 impl BackupManager {
     /// Create a new backup manager
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to create backup directory
+    /// - Failed to load existing backup index
     pub fn new(config: BackupConfig, state_manager: Arc<StateManager>) -> Result<Self> {
         // Ensure backup directory exists
         std::fs::create_dir_all(&config.backup_dir).context("Failed to create backup directory")?;
@@ -173,8 +179,16 @@ impl BackupManager {
     }
 
     /// Create a new backup
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to find parent backup for incremental backup
+    /// - Failed to capture state snapshot
+    /// - Failed to compress backup data
+    /// - Failed to save backup to disk
     pub async fn create_backup(&self, incremental: bool) -> BackupResult<BackupStatus> {
-        let backup_id = self.generate_backup_id();
+        let backup_id = Self::generate_backup_id();
         info!(
             "Creating {} backup: {}",
             if incremental { "incremental" } else { "full" },
@@ -214,7 +228,7 @@ impl BackupManager {
 
         // Compress if enabled
         let (data, compression_info) = if self.config.compression_enabled {
-            let compressed = self.compress_backup(&backup_data).await?;
+            let compressed = self.compress_backup(&backup_data)?;
             let info = CompressionInfo {
                 algorithm: self.config.compression_type.to_string(),
                 level: u32::from(self.config.compression_level),
@@ -242,8 +256,8 @@ impl BackupManager {
                 BackupType::Full
             },
             parent_id: parent_id.clone(),
-            schema_version: self.get_current_schema_version().await?,
-            checksums: self.calculate_checksums(&data),
+            schema_version: self.get_current_schema_version()?,
+            checksums: Self::calculate_checksums(&data),
             compression: compression_info.clone(),
             encryption: None, // TODO: Implement encryption
             stats: BackupStats {
@@ -286,6 +300,14 @@ impl BackupManager {
     }
 
     /// Restore from a backup
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Backup validation fails when `verify_checksums` is enabled
+    /// - Failed to create current state backup when `backup_current` is enabled
+    /// - Failed to load backup metadata
+    /// - Failed to restore backup data
     pub async fn restore_backup(
         &self,
         backup_id: &str,
@@ -338,6 +360,11 @@ impl BackupManager {
     }
 
     /// List available backups
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to read backup index
     pub async fn list_backups(&self) -> BackupResult<Vec<BackupStatus>> {
         let index = self.backup_index.read().await;
         let mut backups = Vec::new();
@@ -363,6 +390,13 @@ impl BackupManager {
     }
 
     /// Validate a backup
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to load backup metadata
+    /// - Failed to read backup file
+    /// - Checksum verification fails
     pub async fn validate_backup(&self, backup_id: &str) -> BackupResult<BackupValidation> {
         debug!("Validating backup: {}", backup_id);
 
@@ -403,7 +437,7 @@ impl BackupManager {
         };
 
         // Verify checksums
-        let calculated_checksums = self.calculate_checksums(&data);
+        let calculated_checksums = Self::calculate_checksums(&data);
         let checksum_valid = calculated_checksums == metadata.checksums;
         if !checksum_valid {
             errors.push("Checksum verification failed".to_string());
@@ -431,7 +465,7 @@ impl BackupManager {
 
     // Private helper methods
 
-    fn generate_backup_id(&self) -> BackupId {
+    fn generate_backup_id() -> BackupId {
         let timestamp = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .unwrap()
@@ -474,16 +508,15 @@ impl BackupManager {
 
     async fn save_backup_metadata(&self, metadata: &BackupMetadata) -> BackupResult<()> {
         let metadata_path = self.config.backup_dir.join(format!("{}.meta", metadata.id));
-        let json = serde_json::to_string_pretty(metadata).map_err(|e| {
-            StateError::serialization(format!("Failed to serialize metadata: {e}"))
-        })?;
+        let json = serde_json::to_string_pretty(metadata)
+            .map_err(|e| StateError::serialization(format!("Failed to serialize metadata: {e}")))?;
         tokio::fs::write(metadata_path, json)
             .await
             .map_err(|e| StateError::storage(format!("Failed to write metadata file: {e}")))?;
         Ok(())
     }
 
-    fn calculate_checksums(&self, data: &[u8]) -> HashMap<String, String> {
+    fn calculate_checksums(data: &[u8]) -> HashMap<String, String> {
         use sha2::{Digest, Sha256};
         let mut checksums = HashMap::new();
 
@@ -493,7 +526,7 @@ impl BackupManager {
         checksums
     }
 
-    async fn compress_backup(&self, data: &[u8]) -> BackupResult<Vec<u8>> {
+    fn compress_backup(&self, data: &[u8]) -> BackupResult<Vec<u8>> {
         let compressor = BackupCompression::new(
             self.config.compression_type,
             CompressionLevel::new(self.config.compression_level.into())?,
@@ -501,7 +534,7 @@ impl BackupManager {
         compressor.compress(data)
     }
 
-    async fn get_current_schema_version(&self) -> BackupResult<String> {
+    fn get_current_schema_version(&self) -> BackupResult<String> {
         // TODO: Get actual schema version from state manager
         Ok("1.0.0".to_string())
     }
@@ -658,6 +691,13 @@ impl BackupManager {
     }
 
     /// Apply retention policies to manage backup storage
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Failed to read backup index
+    /// - Failed to apply retention policies
+    /// - Failed to execute cleanup operations
     pub async fn apply_retention_policies(&self) -> BackupResult<RetentionReport> {
         let start_time = Instant::now();
         let event_builder = BackupEventBuilder::new();

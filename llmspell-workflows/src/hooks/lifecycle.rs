@@ -32,6 +32,7 @@ pub enum HookPoint {
 }
 
 impl HookPoint {
+    /// Convert hook point to string representation
     pub fn as_str(&self) -> &str {
         match self {
             HookPoint::BeforeStart => "before_start",
