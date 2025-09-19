@@ -290,6 +290,10 @@ impl MigrationValidator {
     }
 
     /// Validate data before migration
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if validation fails
     pub fn validate_pre_migration(
         &self,
         data: &[SerializableState],
@@ -301,7 +305,7 @@ impl MigrationValidator {
         debug!("Starting pre-migration validation for {} items", data.len());
 
         for state in data {
-            let item_result = self.validate_state_item(state, source_schema, "pre_migration")?;
+            let item_result = self.validate_state_item(state, source_schema, "pre_migration");
             result.merge(item_result);
             result.validated_items += 1;
 
@@ -336,6 +340,10 @@ impl MigrationValidator {
     }
 
     /// Validate data after migration
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if validation fails
     pub fn validate_post_migration(
         &self,
         data: &[SerializableState],
@@ -350,7 +358,7 @@ impl MigrationValidator {
         );
 
         for state in data {
-            let item_result = self.validate_state_item(state, target_schema, "post_migration")?;
+            let item_result = self.validate_state_item(state, target_schema, "post_migration");
             result.merge(item_result);
             result.validated_items += 1;
 
@@ -388,32 +396,19 @@ impl MigrationValidator {
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         phase: &str,
-    ) -> StateResult<ValidationResult> {
+    ) -> ValidationResult {
         let mut result = ValidationResult::new();
 
         for rule in self.rules.get_enabled_rules() {
             if Self::rule_applies_to_phase(rule, phase) {
-                match Self::apply_validation_rule(state, schema, rule) {
-                    Ok(issues) => {
-                        for issue in issues {
-                            result.add_issue(issue);
-                        }
-                    }
-                    Err(e) => {
-                        result.add_issue(ValidationIssue {
-                            rule_id: rule.id.clone(),
-                            severity: ValidationSeverity::Error,
-                            field: None,
-                            message: format!("Validation rule execution failed: {e}"),
-                            details: Some(e.to_string()),
-                            suggestion: Some("Check validation rule configuration".to_string()),
-                        });
-                    }
+                let issues = Self::apply_validation_rule(state, schema, rule);
+                for issue in issues {
+                    result.add_issue(issue);
                 }
             }
         }
 
-        Ok(result)
+        result
     }
 
     /// Apply a single validation rule
@@ -421,18 +416,18 @@ impl MigrationValidator {
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
+    ) -> Vec<ValidationIssue> {
         let mut issues = Vec::new();
 
         match &rule.rule_type {
             ValidationRuleType::SchemaConformance => {
-                issues.extend(Self::validate_schema_conformance(state, schema, rule)?);
+                issues.extend(Self::validate_schema_conformance(state, schema, rule));
             }
             ValidationRuleType::RequiredFields => {
-                issues.extend(Self::validate_required_fields(state, schema, rule)?);
+                issues.extend(Self::validate_required_fields(state, schema, rule));
             }
             ValidationRuleType::TypeValidation => {
-                issues.extend(Self::validate_field_types(state, schema, rule)?);
+                issues.extend(Self::validate_field_types(state, schema, rule));
             }
             ValidationRuleType::RangeValidation => {
                 issues.extend(Self::validate_value_ranges(state, schema, rule));
@@ -457,7 +452,7 @@ impl MigrationValidator {
             }
         }
 
-        Ok(issues)
+        issues
     }
 
     /// Validate schema conformance
@@ -465,7 +460,7 @@ impl MigrationValidator {
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
+    ) -> Vec<ValidationIssue> {
         let mut issues = Vec::new();
 
         // Check if state schema version matches
@@ -483,7 +478,7 @@ impl MigrationValidator {
             });
         }
 
-        Ok(issues)
+        issues
     }
 
     /// Validate required fields
@@ -491,7 +486,7 @@ impl MigrationValidator {
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
+    ) -> Vec<ValidationIssue> {
         let mut issues = Vec::new();
 
         if let Some(obj) = state.value.as_object() {
@@ -514,7 +509,7 @@ impl MigrationValidator {
             }
         }
 
-        Ok(issues)
+        issues
     }
 
     /// Validate field types
@@ -522,7 +517,7 @@ impl MigrationValidator {
         state: &SerializableState,
         schema: &EnhancedStateSchema,
         rule: &ValidationRule,
-    ) -> StateResult<Vec<ValidationIssue>> {
+    ) -> Vec<ValidationIssue> {
         let mut issues = Vec::new();
 
         if let Some(obj) = state.value.as_object() {
@@ -547,7 +542,7 @@ impl MigrationValidator {
             }
         }
 
-        Ok(issues)
+        issues
     }
 
     /// Validate value ranges (placeholder implementations for other validation types)

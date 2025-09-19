@@ -217,7 +217,7 @@ mod tests {
         let schema_registry = SchemaRegistry::new();
         let context = MigrationContext::new(config, schema_registry, 5);
 
-        assert_eq!(context.progress(), 0.0);
+        assert!((context.progress() - 0.0).abs() < f64::EPSILON);
         assert_eq!(context.current_step, 0);
         assert_eq!(context.total_steps, 5);
     }

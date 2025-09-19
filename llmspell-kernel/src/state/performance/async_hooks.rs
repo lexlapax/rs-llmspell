@@ -377,7 +377,7 @@ mod tests {
         assert_eq!(stats.events_queued, 1);
         assert_eq!(stats.events_processed, 1);
         assert_eq!(stats.events_failed, 0);
-        assert_eq!(stats.success_rate(), 100.0);
+        assert!((stats.success_rate() - 100.0).abs() < f64::EPSILON);
 
         // Stop processor
         processor.stop().await.unwrap();

@@ -270,7 +270,7 @@ mod tests {
             let _deserialized: Value = serde_json::from_slice(&serialized).unwrap();
         }
         let json_baseline = start.elapsed();
-        println!("JSON baseline (serialize+deserialize): {:?}", json_baseline);
+        println!("JSON baseline (serialize+deserialize): {json_baseline:?}");
 
         // Fast path: MessagePack serialization
         let start = std::time::Instant::now();
@@ -279,10 +279,7 @@ mod tests {
             let _deserialized = manager.deserialize_trusted(&serialized).unwrap();
         }
         let fast_path = start.elapsed();
-        println!(
-            "MessagePack fast path (serialize+deserialize): {:?}",
-            fast_path
-        );
+        println!("MessagePack fast path (serialize+deserialize): {fast_path:?}");
 
         // Calculate improvement over JSON
         #[allow(clippy::cast_precision_loss)]
@@ -290,26 +287,23 @@ mod tests {
         #[allow(clippy::cast_precision_loss)]
         let fast_nanos = fast_path.as_nanos() as f64;
         let improvement = ((json_nanos / fast_nanos) - 1.0) * 100.0;
-        println!("MessagePack is {:.1}% faster than JSON", improvement);
+        println!("MessagePack is {improvement:.1}% faster than JSON");
 
         // MessagePack can be slower than JSON for small payloads due to binary encoding overhead
         // but provides better compression for larger data. Allow up to 50% overhead for small data.
         assert!(
             fast_path.as_micros() <= json_baseline.as_micros() * 150 / 100, // Allow 50% variance
-            "MessagePack overhead should be reasonable, but got {:?} vs {:?}",
-            fast_path,
-            json_baseline
+            "MessagePack overhead should be reasonable, but got {fast_path:?} vs {json_baseline:?}"
         );
 
         // Also test that it's reasonably fast in absolute terms
         let per_op_micros = fast_path.as_micros() as f64 / 1000.0;
-        println!("Per operation time: {:.2}µs", per_op_micros);
+        println!("Per operation time: {per_op_micros:.2}µs");
 
         // Should be under 2µs per operation on modern hardware
         assert!(
             per_op_micros < 5.0,
-            "Serialization should be <5µs per operation, got {:.2}µs",
-            per_op_micros
+            "Serialization should be <5µs per operation, got {per_op_micros:.2}µs"
         );
     }
     #[test]

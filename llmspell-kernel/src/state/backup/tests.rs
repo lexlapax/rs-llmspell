@@ -178,8 +178,8 @@ mod integration_tests {
         )
     }
 
-    /// Helper to create a test backup manager  
-    async fn create_test_backup_manager(
+    /// Helper to create a test backup manager
+    fn create_test_backup_manager(
         state_manager: Arc<StateManager>,
     ) -> (Arc<BackupManager>, TempDir) {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -218,7 +218,7 @@ mod integration_tests {
             .expect("Failed to set state");
 
         // Create backup manager and perform backup
-        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone()).await;
+        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone());
         let backup_status = backup_manager
             .create_backup(false)
             .await
@@ -268,7 +268,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_empty_backup() {
         let state_manager = create_test_state_manager().await;
-        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone()).await;
+        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone());
 
         // Create backup of empty state
         let backup_status = backup_manager
@@ -405,7 +405,7 @@ mod integration_tests {
         // Create 5 backups without automatic cleanup
         for i in 0..5 {
             state_manager
-                .set(StateScope::Global, &format!("test_key_{}", i), json!(i))
+                .set(StateScope::Global, &format!("test_key_{i}"), json!(i))
                 .await
                 .expect("Failed to set state");
 
@@ -464,7 +464,7 @@ mod integration_tests {
     #[tokio::test]
     async fn test_importance_based_retention() {
         let state_manager = create_test_state_manager().await;
-        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone()).await;
+        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone());
 
         // Create a full backup
         state_manager
@@ -480,7 +480,7 @@ mod integration_tests {
         // Create several incremental backups
         for i in 0..3 {
             state_manager
-                .set(StateScope::Global, &format!("data_{}", i), json!(i))
+                .set(StateScope::Global, &format!("data_{i}"), json!(i))
                 .await
                 .expect("Failed to set state");
 
@@ -523,7 +523,7 @@ mod integration_tests {
         // Add test data
         for i in 0..10 {
             state_manager
-                .set(StateScope::Global, &format!("key{}", i), json!(i))
+                .set(StateScope::Global, &format!("key{i}"), json!(i))
                 .await
                 .expect("Failed to set state");
         }

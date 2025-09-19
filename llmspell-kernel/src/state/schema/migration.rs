@@ -307,7 +307,7 @@ impl MigrationPlanner {
         from_version: &SemanticVersion,
         to_version: &SemanticVersion,
         compatibility: &CompatibilityResult,
-    ) -> Result<DataTransformation, MigrationPlannerError> {
+    ) -> DataTransformation {
         let transformation_id = format!("transform_{from_version}_{to_version}");
         let description = format!("Transform data from {from_version} to {to_version}");
 
@@ -394,16 +394,16 @@ impl MigrationPlanner {
             RiskLevel::Medium => {
                 validation_rules.push("validate_required_fields".to_string());
             }
-            _ => {}
+            RiskLevel::Low => {}
         }
 
-        Ok(DataTransformation {
+        DataTransformation {
             transformation_id,
             description,
             field_mappings,
             custom_logic: None,
             validation_rules,
-        })
+        }
     }
 
     /// Create a rollback plan

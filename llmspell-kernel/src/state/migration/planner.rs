@@ -165,6 +165,10 @@ impl MigrationPlanner {
     }
 
     /// Register a schema for migration planning
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if schema registration fails
     pub fn register_schema(&mut self, schema: EnhancedStateSchema) -> StateResult<()> {
         // Register with both the schema registry and planner
         self.schema_registry
@@ -176,6 +180,13 @@ impl MigrationPlanner {
     }
 
     /// Create a migration plan between versions
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Source or target schemas not found
+    /// - Migration path cannot be determined
+    /// - Compatibility check fails
     pub fn create_migration_plan(
         &mut self,
         from_version: &SemanticVersion,
@@ -216,6 +227,10 @@ impl MigrationPlanner {
     }
 
     /// Validate a migration plan
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if validation fails
     pub fn validate_plan(&self, plan: &MigrationPlan) -> StateResult<()> {
         // Check for empty plan
         if plan.steps.is_empty() && plan.from_version != plan.to_version {
@@ -266,6 +281,10 @@ impl MigrationPlanner {
     }
 
     /// Find all possible migration paths from a version
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if schema lookup fails
     pub fn find_migration_paths(
         &self,
         from_version: &SemanticVersion,
@@ -291,6 +310,10 @@ impl MigrationPlanner {
     }
 
     /// Get migration complexity estimate
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if complexity estimation fails
     pub fn estimate_complexity(
         &self,
         from_version: &SemanticVersion,

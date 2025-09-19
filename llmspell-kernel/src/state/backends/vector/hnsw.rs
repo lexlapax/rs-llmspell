@@ -352,7 +352,7 @@ impl HNSWVectorStorage {
     }
 
     /// Save a namespace to disk using data-first persistence
-    async fn save_namespace(&self, namespace: &str, data: &NamespaceData) -> Result<()> {
+    fn save_namespace(&self, namespace: &str, data: &NamespaceData) -> Result<()> {
         let Some(ref base_dir) = self.persistence_dir else {
             return Ok(());
         };
@@ -880,7 +880,7 @@ impl HNSWVectorStorage {
     /// - Failed to read namespace files from disk
     /// - Deserialization of namespace data fails
     /// - Vector data is corrupted or incompatible
-    pub async fn from_path(path: &Path, dimensions: usize, config: HNSWConfig) -> Result<Self> {
+    pub fn from_path(path: &Path, dimensions: usize, config: HNSWConfig) -> Result<Self> {
         let storage = Self::new(dimensions, config).with_persistence(path.to_path_buf());
         // Don't call load() on an immutable storage - load() mutates self
         // Instead, manually load namespaces
@@ -997,7 +997,7 @@ mod tests {
             }
             // Add some noise to make vectors more realistic
             vec[i % 128] = 1.0;
-            vectors.push(VectorEntry::new(format!("vec{}", i), vec).with_scope(StateScope::Global));
+            vectors.push(VectorEntry::new(format!("vec{i}"), vec).with_scope(StateScope::Global));
         }
 
         let ids = storage.insert(vectors.clone()).await.unwrap();
@@ -1041,7 +1041,7 @@ mod tests {
                 vec[i % 64] = 1.0;
                 vec[(i + 1) % 64] = 0.8;
                 vec[(i + 2) % 64] = 0.6;
-                VectorEntry::new(format!("batch1_{}", i), vec).with_scope(StateScope::Global)
+                VectorEntry::new(format!("batch1_{i}"), vec).with_scope(StateScope::Global)
             })
             .collect();
 
@@ -1055,7 +1055,7 @@ mod tests {
                 vec[(i + 32) % 64] = 1.0;
                 vec[(i + 33) % 64] = 0.8;
                 vec[(i + 34) % 64] = 0.6;
-                VectorEntry::new(format!("batch2_{}", i), vec).with_scope(StateScope::Global)
+                VectorEntry::new(format!("batch2_{i}"), vec).with_scope(StateScope::Global)
             })
             .collect();
 
@@ -1104,9 +1104,8 @@ mod tests {
 
         // Load from disk
         {
-            let storage = HNSWVectorStorage::from_path(&persistence_path, 3, HNSWConfig::default())
-                .await
-                .unwrap();
+            let storage =
+                HNSWVectorStorage::from_path(&persistence_path, 3, HNSWConfig::default()).unwrap();
 
             // Search should work
             let query = VectorQuery::new(vec![1.0, 0.0, 0.0], 1);

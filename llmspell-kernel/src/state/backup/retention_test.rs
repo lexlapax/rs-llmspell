@@ -14,7 +14,7 @@ mod test {
 
         // Add 5 backups with different ages
         for i in 0..5 {
-            let id = format!("backup_{}", i);
+            let id = format!("backup_{i}");
             let metadata = BackupMetadata {
                 id: id.clone(),
                 created_at: SystemTime::now() - Duration::from_secs(i * 3600), // Each backup 1 hour older

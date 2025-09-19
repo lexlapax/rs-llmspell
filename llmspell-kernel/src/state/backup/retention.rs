@@ -217,6 +217,7 @@ impl CompositePolicy {
         }
     }
 
+    #[must_use]
     pub fn add_policy(mut self, policy: Box<dyn RetentionPolicy>) -> Self {
         self.policies.push(policy);
         self

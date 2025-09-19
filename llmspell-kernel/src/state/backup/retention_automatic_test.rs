@@ -42,7 +42,7 @@ mod test {
         // Create 3 backups
         for i in 0..3 {
             state_manager
-                .set(StateScope::Global, &format!("key_{}", i), json!(i))
+                .set(StateScope::Global, &format!("key_{i}"), json!(i))
                 .await
                 .expect("Failed to set state");
 

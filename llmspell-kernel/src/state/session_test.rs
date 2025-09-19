@@ -3,10 +3,10 @@
 
 #[cfg(test)]
 mod session_tests {
+    use crate::state::StateManager;
     use crate::state::StateScope;
-    use crate::state::{StateManager, StorageBackendType};
     use serde_json::json;
-    use tempfile::TempDir;
+
     #[tokio::test]
     async fn test_session_scope_basic_operations() {
         let state_manager = StateManager::new().await.unwrap();
@@ -117,7 +117,7 @@ mod session_tests {
             state_manager
                 .set(
                     session_scope.clone(),
-                    &format!("key-{}", i),
+                    &format!("key-{i}"),
                     json!(format!("value-{}", i)),
                 )
                 .await

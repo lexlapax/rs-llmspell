@@ -311,7 +311,7 @@ mod tests {
             state_manager
                 .set(
                     StateScope::Global,
-                    &format!("concurrent_key_{}", i),
+                    &format!("concurrent_key_{i}"),
                     json!({"index": i}),
                 )
                 .await

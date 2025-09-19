@@ -99,6 +99,10 @@ impl KeyManager {
     }
 
     /// Generate a collision-resistant key for internal use
+    ///
+    /// # Panics
+    ///
+    /// Panics if system time is before UNIX epoch
     pub fn generate_internal_key(prefix: &str, id: &str) -> String {
         let timestamp = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

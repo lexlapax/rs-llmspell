@@ -276,8 +276,8 @@ mod tests {
             }
         });
 
-        let serialized = serializer.serialize(&data).unwrap();
-        let deserialized: Value = serializer.deserialize(&serialized).unwrap();
+        let serialized_data = serializer.serialize(&data).unwrap();
+        let deserialized: Value = serializer.deserialize(&serialized_data).unwrap();
 
         assert_eq!(data, deserialized);
     }
@@ -299,8 +299,8 @@ mod tests {
             }
         });
 
-        let serialized = serializer.serialize(&data).unwrap();
-        let deserialized: Value = serializer.deserialize(&serialized).unwrap();
+        let serialized_bytes = serializer.serialize(&data).unwrap();
+        let deserialized: Value = serializer.deserialize(&serialized_bytes).unwrap();
 
         // Check that passwords were redacted
         assert_eq!(deserialized["username"], "alice");

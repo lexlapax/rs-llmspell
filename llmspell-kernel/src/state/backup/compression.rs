@@ -184,9 +184,8 @@ impl BackupCompression {
         // LZ4 doesn't use traditional compression levels, but we can map them
         let acceleration = match self.compression_level.0 {
             1..=3 => 1, // Fast
-            4..=6 => 3, // Default
             7..=9 => 9, // Best
-            _ => 3,
+            _ => 3,     // Default (4..=6 and any other value)
         };
 
         lz4::block::compress(
@@ -232,20 +231,17 @@ impl BackupCompression {
         let start_time = std::time::Instant::now();
         let original_size = data.len();
 
-        let compressed = match self.compress(data) {
-            Ok(c) => c,
-            Err(_) => {
-                return CompressionAnalysis {
-                    original_size,
-                    compressed_size: original_size,
-                    compression_ratio: 0.0,
-                    compression_time_ms: 0,
-                    estimated_decompression_time_ms: 0,
-                    algorithm: self.compression_type,
-                    level: self.compression_level,
-                    is_compressible: false,
-                };
-            }
+        let Ok(compressed) = self.compress(data) else {
+            return CompressionAnalysis {
+                original_size,
+                compressed_size: original_size,
+                compression_ratio: 0.0,
+                compression_time_ms: 0,
+                estimated_decompression_time_ms: 0,
+                algorithm: self.compression_type,
+                level: self.compression_level,
+                is_compressible: false,
+            };
         };
 
         let compression_time = start_time.elapsed();
@@ -390,7 +386,7 @@ mod tests {
             let compressor = BackupCompression::new(algorithm, CompressionLevel::default());
             let compressed = compressor.compress(&data).unwrap();
             let decompressed = compressor.decompress(&compressed).unwrap();
-            assert_eq!(decompressed, data, "Failed for {:?}", algorithm);
+            assert_eq!(decompressed, data, "Failed for {algorithm:?}");
         }
     }
     #[test]
@@ -445,6 +441,6 @@ mod tests {
         // Case 3: Empty data
         let empty_data = vec![];
         let analysis3 = compressor.analyze_compression(&empty_data);
-        assert_eq!(analysis3.compression_ratio, 0.0);
+        assert!((analysis3.compression_ratio - 0.0).abs() < f64::EPSILON);
     }
 }

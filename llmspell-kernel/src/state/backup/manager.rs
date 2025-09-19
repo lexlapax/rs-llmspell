@@ -173,7 +173,7 @@ impl BackupManager {
         };
 
         // Load existing backup index
-        manager.load_backup_index()?;
+        manager.load_backup_index();
 
         Ok(manager)
     }
@@ -256,7 +256,7 @@ impl BackupManager {
                 BackupType::Full
             },
             parent_id: parent_id.clone(),
-            schema_version: self.get_current_schema_version()?,
+            schema_version: Self::get_current_schema_version(),
             checksums: Self::calculate_checksums(&data),
             compression: compression_info.clone(),
             encryption: None, // TODO: Implement encryption
@@ -534,9 +534,9 @@ impl BackupManager {
         compressor.compress(data)
     }
 
-    fn get_current_schema_version(&self) -> BackupResult<String> {
+    fn get_current_schema_version() -> String {
         // TODO: Get actual schema version from state manager
-        Ok("1.0.0".to_string())
+        "1.0.0".to_string()
     }
 
     // TODO: Implement event emission when StateEvent includes backup events
@@ -655,7 +655,7 @@ impl BackupManager {
         Ok(())
     }
 
-    fn load_backup_index(&mut self) -> Result<()> {
+    fn load_backup_index(&mut self) {
         // Load existing backup metadata from disk
         let mut loaded_backups = Vec::new();
 
@@ -686,8 +686,6 @@ impl BackupManager {
         if loaded_count > 0 {
             info!("Loaded {} existing backups from disk", loaded_count);
         }
-
-        Ok(())
     }
 
     /// Apply retention policies to manage backup storage
@@ -820,6 +818,11 @@ impl BackupManager {
     }
 
     /// Manually trigger retention policy application
+    /// Manually trigger cleanup of old backups
+    ///
+    /// # Errors
+    ///
+    /// Returns `BackupError` if cleanup fails
     pub async fn cleanup_backups(&self) -> BackupResult<RetentionReport> {
         info!("Manually triggering backup cleanup");
         self.apply_retention_policies().await
@@ -848,7 +851,7 @@ mod tests {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_secs();
-        let id = format!("backup_{}_test", timestamp);
+        let id = format!("backup_{timestamp}_test");
         assert!(id.starts_with("backup_"));
     }
     #[test]

@@ -426,7 +426,7 @@ mod tests {
                         let mut state = current
                             .ok_or_else(|| StateError::not_found("agent", "concurrent-agent"))?
                             .clone();
-                        let key = format!("thread_{}_update_{}", i, j);
+                        let key = format!("thread_{i}_update_{j}");
                         state
                             .state
                             .custom_data
@@ -449,7 +449,7 @@ mod tests {
 
         // Should have entries from all threads (some may be overwritten due to races)
         assert!(custom_data_count > 0);
-        println!("Final custom data entries: {}", custom_data_count);
+        println!("Final custom data entries: {custom_data_count}");
     }
     #[test]
     fn test_performance_comparison() {
@@ -484,18 +484,18 @@ mod tests {
         let start = Instant::now();
         for i in 0..1000 {
             let mut state = agent_state.clone();
-            state.agent_id = format!("agent-{}", i);
+            state.agent_id = format!("agent-{i}");
             let mut map = locked_map.write();
             map.insert(state.agent_id.clone(), state);
         }
         let baseline = start.elapsed();
-        println!("Baseline (RwLock HashMap): {:?}", baseline);
+        println!("Baseline (RwLock HashMap): {baseline:?}");
 
         // Lock-free store
         let store = LockFreeAgentStore::new();
         let start = Instant::now();
         for i in 0..1000 {
-            let agent_id = format!("agent-{}", i);
+            let agent_id = format!("agent-{i}");
             store
                 .update(&agent_id, |_| {
                     let mut new_state = agent_state.clone();
@@ -505,11 +505,11 @@ mod tests {
                 .unwrap();
         }
         let lockfree_time = start.elapsed();
-        println!("Lock-free store: {:?}", lockfree_time);
+        println!("Lock-free store: {lockfree_time:?}");
 
         let overhead =
             ((lockfree_time.as_nanos() as f64 / baseline.as_nanos() as f64) - 1.0) * 100.0;
-        println!("Lock-free overhead vs RwLock: {:.2}%", overhead);
+        println!("Lock-free overhead vs RwLock: {overhead:.2}%");
 
         // The lock-free implementation might be slower in single-threaded scenarios
         // but should scale much better with concurrent access
@@ -517,8 +517,7 @@ mod tests {
         // single-threaded performance for better concurrent scalability)
         assert!(
             overhead < 100.0,
-            "Lock-free overhead should be <100% in single-threaded test, got {:.2}%",
-            overhead
+            "Lock-free overhead should be <100% in single-threaded test, got {overhead:.2}%"
         );
 
         println!("\nNote: Lock-free structures excel at concurrent access, not necessarily single-threaded performance.");

@@ -320,6 +320,13 @@ impl StateManager {
     }
 
     /// Set state with hooks and persistence (uses async hooks if enabled)
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - State storage operation fails
+    /// - Hook execution fails
+    /// - Serialization fails
     #[instrument(level = "debug", skip(self, value), fields(
         scope = ?scope,
         key = %key,
@@ -399,7 +406,6 @@ impl StateManager {
 
         // Handle hook results
         let final_value = match crate::state::hooks::aggregate_hook_results(&pre_results) {
-            HookResult::Continue => value,
             HookResult::Modified(new_data) => new_data
                 .as_object()
                 .and_then(|obj| obj.get("value"))
@@ -409,7 +415,7 @@ impl StateManager {
                 debug!("State change cancelled by hook: {}", reason);
                 return Ok(());
             }
-            _ => value,
+            _ => value, // Continue and any other result use original value
         };
 
         // Perform state update IMMEDIATELY
@@ -525,7 +531,6 @@ impl StateManager {
 
         // Handle hook results
         let final_value = match crate::state::hooks::aggregate_hook_results(&pre_results) {
-            HookResult::Continue => value,
             HookResult::Modified(new_data) => new_data
                 .as_object()
                 .and_then(|obj| obj.get("value"))
@@ -535,7 +540,7 @@ impl StateManager {
                 debug!("State change cancelled by hook: {}", reason);
                 return Ok(());
             }
-            _ => value,
+            _ => value, // Continue and any other result use original value
         };
 
         // Perform state update
@@ -547,7 +552,7 @@ impl StateManager {
             "state.changed",
             &scope,
             key,
-            &old_value,
+            old_value.as_ref(),
             &final_value,
             correlation_id,
         );
@@ -748,6 +753,13 @@ impl StateManager {
     }
 
     /// Get state with explicit state class for performance optimization
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - State retrieval fails
+    /// - Deserialization fails
+    /// - Storage backend is unavailable
     #[instrument(level = "trace", skip(self), fields(
         scope = ?scope,
         key = %key,
@@ -955,6 +967,13 @@ impl StateManager {
     }
 
     /// Save agent state to persistent storage with concurrent access protection
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Agent state serialization fails
+    /// - Storage operation fails
+    /// - Lock acquisition fails
     #[instrument(level = "info", skip_all, fields(
         agent_id = %agent_state.agent_id,
         agent_type = %agent_state.agent_type
@@ -1193,6 +1212,13 @@ impl StateManager {
     }
 
     /// Load agent state from persistent storage with concurrent access protection
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Storage read operation fails
+    /// - Deserialization fails
+    /// - State is corrupted
     #[instrument(level = "info", skip(self), fields(agent_id = %agent_id))]
     pub async fn load_agent_state(
         &self,
@@ -1380,6 +1406,13 @@ impl StateManager {
     }
 
     /// Load agent state using lock-free fast path
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Storage read operation fails
+    /// - Deserialization fails
+    /// - Fast path lookup fails
     #[instrument(level = "trace", skip(self), fields(
         agent_id = %agent_id,
         fast_path = true
@@ -1560,7 +1593,7 @@ impl StateManager {
         event_type: &str,
         scope: &StateScope,
         key: &str,
-        old_value: &Option<Value>,
+        old_value: Option<&Value>,
         new_value: &Value,
         correlation_id: Uuid,
     ) -> UniversalEvent {
@@ -1689,6 +1722,10 @@ impl StateManager {
     }
 
     /// Configure hook batching for improved performance
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if configuration fails
     pub fn configure_hook_batching(
         &mut self,
         _batch_size: usize,
@@ -1700,6 +1737,13 @@ impl StateManager {
     }
 
     /// Public method to set state with async hooks and custom hook list
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - State operation fails
+    /// - Hook execution fails
+    /// - Serialization fails
     pub async fn set_with_async_hooks_public(
         &self,
         key: &str,
@@ -1741,6 +1785,13 @@ impl StateManager {
     }
 
     /// Public method to save agent state with custom async hooks
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Agent state serialization fails
+    /// - Storage operation fails
+    /// - Hook execution fails
     pub async fn save_agent_state_with_hooks(
         &self,
         agent_id: &str,
@@ -1825,6 +1876,16 @@ impl StateManager {
     }
 
     /// Track that a state operation created an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Correlation tracking fails
+    /// - State storage fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if system time is before `UNIX_EPOCH`
     pub async fn track_artifact_in_state(
         &self,
         scope: StateScope,
@@ -1892,6 +1953,10 @@ impl StateManager {
 
     /// Get all storage keys for backup/discovery purposes
     /// This is used by the backup system to discover all scopes and data
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if storage listing fails
     pub async fn get_all_storage_keys(&self) -> StateResult<Vec<String>> {
         self.storage_adapter
             .list_keys("")

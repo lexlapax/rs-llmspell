@@ -71,6 +71,33 @@ pub struct MigrationEngine {
     active_migrations: Arc<RwLock<HashMap<Uuid, MigrationContext>>>,
 }
 
+/// Parameters for handling migration success
+struct MigrationSuccessParams<'a> {
+    result: &'a mut MigrationResult,
+    plan: &'a MigrationPlan,
+    event_builder: &'a MigrationEventBuilder,
+    from_version: &'a SemanticVersion,
+    to_version: &'a SemanticVersion,
+    items_migrated: usize,
+    correlation_id: Uuid,
+    migration_id: Uuid,
+    context: &'a MigrationContext,
+}
+
+/// Parameters for handling migration failure
+struct MigrationFailureParams<'a> {
+    result: &'a mut MigrationResult,
+    plan: &'a MigrationPlan,
+    event_builder: &'a MigrationEventBuilder,
+    from_version: &'a SemanticVersion,
+    to_version: &'a SemanticVersion,
+    config: &'a MigrationConfig,
+    correlation_id: Uuid,
+    migration_id: Uuid,
+    context: &'a MigrationContext,
+    error: MigrationEngineError,
+}
+
 impl MigrationEngine {
     /// Create new migration engine with existing infrastructure
     pub fn new(
@@ -94,156 +121,69 @@ impl MigrationEngine {
     }
 
     /// Execute migration from one schema version to another
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Migration plan creation fails
+    /// - Validation fails
+    /// - Transformation fails
+    /// - Storage operations fail
     pub async fn migrate(
         &self,
         from_version: &SemanticVersion,
         to_version: &SemanticVersion,
         config: MigrationConfig,
     ) -> StateResult<MigrationResult> {
-        let migration_id = Uuid::new_v4();
-        let correlation_id = Uuid::new_v4();
-        let event_builder = MigrationEventBuilder::new(migration_id);
+        let (migration_id, correlation_id, event_builder) =
+            Self::initialize_migration(from_version, to_version);
+        let plan = self.create_migration_plan(from_version, to_version)?;
+        let (mut context, mut result) =
+            self.setup_migration_context(&plan, &config, migration_id, correlation_id);
 
-        info!(
-            "Starting migration {} from {} to {}",
-            migration_id, from_version, to_version
-        );
+        self.track_active_migration(migration_id, &context);
+        self.execute_pre_migration_setup(
+            &plan,
+            &event_builder,
+            &config,
+            correlation_id,
+            &mut result,
+        )
+        .await?;
 
-        // Create migration plan
-        let plan = {
-            let mut planner = self.migration_planner.write();
-            let registry = self.schema_registry.read();
-
-            // Register schemas in planner if needed
-            if let Some(from_schema) = registry.get_schema(from_version) {
-                planner.register_schema((*from_schema).clone());
-            } else {
-                return Err(MigrationEngineError::SchemaNotFound {
-                    version: from_version.clone(),
-                }
-                .into());
-            }
-
-            if let Some(to_schema) = registry.get_schema(to_version) {
-                planner.register_schema((*to_schema).clone());
-            } else {
-                return Err(MigrationEngineError::SchemaNotFound {
-                    version: to_version.clone(),
-                }
-                .into());
-            }
-
-            planner
-                .create_migration_plan(from_version, to_version)
-                .map_err(|e| StateError::MigrationError(e.to_string()))?
-        };
-
-        // Create migration context
-        let total_steps = plan.steps.len();
-        let registry = self.schema_registry.read().clone();
-        let mut context = MigrationContext::new(config.clone(), registry, total_steps);
-        context.set_metadata("migration_id".to_string(), serde_json::json!(migration_id));
-        context.set_metadata(
-            "correlation_id".to_string(),
-            serde_json::json!(correlation_id),
-        );
-
-        // Track active migration
-        {
-            let mut active = self.active_migrations.write();
-            active.insert(migration_id, context.clone());
-        }
-
-        let mut result =
-            MigrationResult::new(from_version.clone(), to_version.clone(), total_steps);
-
-        // Execute pre-migration hooks
-        self.execute_migration_hooks(&plan, "pre_migration", correlation_id)
-            .await?;
-
-        // Emit migration started event using new event system
-        let migration_started_event = event_builder.migration_started(
-            from_version.clone(),
-            to_version.clone(),
-            total_steps,
-            config.dry_run,
-        );
-        self.emit_typed_migration_event(&migration_started_event, correlation_id)
-            .await?;
-
-        result.mark_in_progress();
-
-        // Execute migration steps
         match self.execute_migration_plan(&plan, &mut context).await {
             Ok(items_migrated) => {
-                let duration = context.elapsed_time();
-                result.mark_completed(items_migrated, duration);
-
-                // Execute post-migration hooks
-                self.execute_migration_hooks(&plan, "post_migration", correlation_id)
-                    .await?;
-
-                // Emit migration completed event using new event system
-                let migration_completed_event = event_builder.migration_completed(
-                    from_version.clone(),
-                    to_version.clone(),
-                    duration,
+                let success_params = MigrationSuccessParams {
+                    result: &mut result,
+                    plan: &plan,
+                    event_builder: &event_builder,
+                    from_version,
+                    to_version,
                     items_migrated,
-                    total_steps,
-                );
-                self.emit_typed_migration_event(&migration_completed_event, correlation_id)
-                    .await?;
-
-                info!(
-                    "Migration {} completed successfully: {} items in {:?}",
-                    migration_id, items_migrated, duration
-                );
+                    correlation_id,
+                    migration_id,
+                    context: &context,
+                };
+                self.handle_migration_success(success_params).await?;
             }
             Err(e) => {
-                result.mark_failed(e.to_string());
-                result.add_error(e.to_string());
-
-                error!("Migration {} failed: {}", migration_id, e);
-
-                // Rollback if configured to do so
-                if config.rollback_on_error {
-                    warn!("Attempting rollback for migration {}", migration_id);
-                    match self.rollback_migration(&plan, &context) {
-                        Ok(()) => {
-                            result.mark_rolled_back();
-                            info!("Migration {} rolled back successfully", migration_id);
-                        }
-                        Err(rollback_err) => {
-                            error!(
-                                "Rollback failed for migration {}: {}",
-                                migration_id, rollback_err
-                            );
-                            result.add_error(format!("Rollback failed: {rollback_err}"));
-                        }
-                    }
-                }
-
-                // Emit migration failed event using new event system
-                let migration_failed_event = event_builder.migration_failed(
-                    from_version.clone(),
-                    to_version.clone(),
-                    e.to_string(),
-                    result.items_migrated,
-                    config.rollback_on_error,
-                );
-                self.emit_typed_migration_event(&migration_failed_event, correlation_id)
-                    .await?;
-
-                return Err(StateError::MigrationError(e.to_string()));
+                let failure_params = MigrationFailureParams {
+                    result: &mut result,
+                    plan: &plan,
+                    event_builder: &event_builder,
+                    from_version,
+                    to_version,
+                    config: &config,
+                    correlation_id,
+                    migration_id,
+                    context: &context,
+                    error: e,
+                };
+                self.handle_migration_failure(failure_params).await?;
             }
         }
 
-        // Remove from active migrations
-        {
-            let mut active = self.active_migrations.write();
-            active.remove(&migration_id);
-        }
-
+        self.cleanup_migration(migration_id);
         Ok(result)
     }
 
@@ -576,15 +516,183 @@ impl MigrationEngine {
     }
 
     /// Rollback migration (simplified implementation)
-    fn rollback_migration(
-        &self,
-        _plan: &MigrationPlan,
-        _context: &MigrationContext,
-    ) -> Result<(), MigrationEngineError> {
+    fn rollback_migration(_plan: &MigrationPlan, _context: &MigrationContext) {
         // In a real implementation, this would restore from backup
         // or apply reverse transformations
         warn!("Rollback not fully implemented - would restore from backup");
+    }
+
+    /// Initialize migration with IDs and event builder
+    fn initialize_migration(
+        from_version: &SemanticVersion,
+        to_version: &SemanticVersion,
+    ) -> (Uuid, Uuid, MigrationEventBuilder) {
+        let migration_id = Uuid::new_v4();
+        let correlation_id = Uuid::new_v4();
+        let event_builder = MigrationEventBuilder::new(migration_id);
+
+        info!(
+            "Starting migration {} from {} to {}",
+            migration_id, from_version, to_version
+        );
+
+        (migration_id, correlation_id, event_builder)
+    }
+
+    /// Create and validate migration plan
+    fn create_migration_plan(
+        &self,
+        from_version: &SemanticVersion,
+        to_version: &SemanticVersion,
+    ) -> StateResult<MigrationPlan> {
+        let mut planner = self.migration_planner.write();
+        let registry = self.schema_registry.read();
+
+        // Register schemas in planner if needed
+        if let Some(from_schema) = registry.get_schema(from_version) {
+            planner.register_schema((*from_schema).clone());
+        } else {
+            return Err(MigrationEngineError::SchemaNotFound {
+                version: from_version.clone(),
+            }
+            .into());
+        }
+
+        if let Some(to_schema) = registry.get_schema(to_version) {
+            planner.register_schema((*to_schema).clone());
+        } else {
+            return Err(MigrationEngineError::SchemaNotFound {
+                version: to_version.clone(),
+            }
+            .into());
+        }
+
+        planner
+            .create_migration_plan(from_version, to_version)
+            .map_err(|e| StateError::MigrationError(e.to_string()))
+    }
+
+    /// Setup migration context and result
+    fn setup_migration_context(
+        &self,
+        plan: &MigrationPlan,
+        config: &MigrationConfig,
+        migration_id: Uuid,
+        correlation_id: Uuid,
+    ) -> (MigrationContext, MigrationResult) {
+        let total_steps = plan.steps.len();
+        let registry = self.schema_registry.read().clone();
+        let mut context = MigrationContext::new(config.clone(), registry, total_steps);
+        context.set_metadata("migration_id".to_string(), serde_json::json!(migration_id));
+        context.set_metadata(
+            "correlation_id".to_string(),
+            serde_json::json!(correlation_id),
+        );
+
+        let result = MigrationResult::new(
+            plan.from_version.clone(),
+            plan.to_version.clone(),
+            total_steps,
+        );
+
+        (context, result)
+    }
+
+    /// Track migration in active migrations
+    fn track_active_migration(&self, migration_id: Uuid, context: &MigrationContext) {
+        let mut active = self.active_migrations.write();
+        active.insert(migration_id, context.clone());
+    }
+
+    /// Execute pre-migration setup (hooks and events)
+    async fn execute_pre_migration_setup(
+        &self,
+        plan: &MigrationPlan,
+        event_builder: &MigrationEventBuilder,
+        config: &MigrationConfig,
+        correlation_id: Uuid,
+        result: &mut MigrationResult,
+    ) -> StateResult<()> {
+        self.execute_migration_hooks(plan, "pre_migration", correlation_id)
+            .await?;
+
+        let migration_started_event = event_builder.migration_started(
+            plan.from_version.clone(),
+            plan.to_version.clone(),
+            plan.steps.len(),
+            config.dry_run,
+        );
+        self.emit_typed_migration_event(&migration_started_event, correlation_id)
+            .await?;
+
+        result.mark_in_progress();
         Ok(())
+    }
+
+    /// Handle successful migration completion
+    async fn handle_migration_success(
+        &self,
+        params: MigrationSuccessParams<'_>,
+    ) -> StateResult<()> {
+        let duration = params.context.elapsed_time();
+        params
+            .result
+            .mark_completed(params.items_migrated, duration);
+
+        self.execute_migration_hooks(params.plan, "post_migration", params.correlation_id)
+            .await?;
+
+        let migration_completed_event = params.event_builder.migration_completed(
+            params.from_version.clone(),
+            params.to_version.clone(),
+            duration,
+            params.items_migrated,
+            params.plan.steps.len(),
+        );
+        self.emit_typed_migration_event(&migration_completed_event, params.correlation_id)
+            .await?;
+
+        info!(
+            "Migration {} completed successfully: {} items in {:?}",
+            params.migration_id, params.items_migrated, duration
+        );
+
+        Ok(())
+    }
+
+    /// Handle migration failure with optional rollback
+    async fn handle_migration_failure(
+        &self,
+        params: MigrationFailureParams<'_>,
+    ) -> StateResult<()> {
+        params.result.mark_failed(params.error.to_string());
+        params.result.add_error(params.error.to_string());
+        error!("Migration {} failed: {}", params.migration_id, params.error);
+
+        if params.config.rollback_on_error {
+            warn!("Attempting rollback for migration {}", params.migration_id);
+            Self::rollback_migration(params.plan, params.context);
+            params.result.mark_rolled_back();
+            info!("Migration {} rolled back successfully", params.migration_id);
+        }
+
+        let migration_failed_event = params.event_builder.migration_failed(
+            params.from_version.clone(),
+            params.to_version.clone(),
+            params.error.to_string(),
+            params.result.items_migrated,
+            params.config.rollback_on_error,
+        );
+        self.emit_typed_migration_event(&migration_failed_event, params.correlation_id)
+            .await?;
+
+        Err(StateError::MigrationError(params.error.to_string()))
+    }
+
+    /// Clean up migration from active list
+    fn cleanup_migration(&self, migration_id: Uuid) {
+        let mut active = self.active_migrations.write();
+        active.remove(&migration_id);
     }
 
     /// Get active migrations
@@ -594,6 +702,10 @@ impl MigrationEngine {
     }
 
     /// Cancel an active migration
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if cancellation fails
     pub fn cancel_migration(&self, migration_id: Uuid) -> StateResult<()> {
         let mut active = self.active_migrations.write();
         if active.remove(&migration_id).is_some() {

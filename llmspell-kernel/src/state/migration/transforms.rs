@@ -83,15 +83,13 @@ impl FieldTransform {
     /// Get the source fields for this transformation
     pub fn source_fields(&self) -> Vec<&str> {
         match self {
-            FieldTransform::Copy { from_field, .. } => vec![from_field],
-            FieldTransform::Convert { from_field, .. } => vec![from_field],
+            FieldTransform::Copy { from_field, .. }
+            | FieldTransform::Convert { from_field, .. }
+            | FieldTransform::Split { from_field, .. } => vec![from_field],
             FieldTransform::Default { .. } => vec![],
             FieldTransform::Remove { field } => vec![field],
-            FieldTransform::Split { from_field, .. } => vec![from_field],
-            FieldTransform::Merge { from_fields, .. } => {
-                from_fields.iter().map(String::as_str).collect()
-            }
-            FieldTransform::Custom { from_fields, .. } => {
+            FieldTransform::Merge { from_fields, .. }
+            | FieldTransform::Custom { from_fields, .. } => {
                 from_fields.iter().map(String::as_str).collect()
             }
         }
@@ -100,15 +98,12 @@ impl FieldTransform {
     /// Get the target fields for this transformation
     pub fn target_fields(&self) -> Vec<&str> {
         match self {
-            FieldTransform::Copy { to_field, .. } => vec![to_field],
-            FieldTransform::Convert { to_field, .. } => vec![to_field],
+            FieldTransform::Copy { to_field, .. }
+            | FieldTransform::Convert { to_field, .. }
+            | FieldTransform::Merge { to_field, .. } => vec![to_field],
             FieldTransform::Default { field, .. } => vec![field],
             FieldTransform::Remove { .. } => vec![],
-            FieldTransform::Split { to_fields, .. } => {
-                to_fields.iter().map(String::as_str).collect()
-            }
-            FieldTransform::Merge { to_field, .. } => vec![to_field],
-            FieldTransform::Custom { to_fields, .. } => {
+            FieldTransform::Split { to_fields, .. } | FieldTransform::Custom { to_fields, .. } => {
                 to_fields.iter().map(String::as_str).collect()
             }
         }
@@ -280,6 +275,13 @@ impl DataTransformer {
     }
 
     /// Transform a single state item
+    ///
+    /// # Errors
+    ///
+    /// Returns `StateError` if:
+    /// - Transformation fails
+    /// - Validation rules are violated
+    /// - Data transformation is invalid
     pub fn transform_state(
         &self,
         state: &mut SerializableState,
@@ -356,122 +358,179 @@ impl DataTransformer {
             FieldTransform::Copy {
                 from_field,
                 to_field,
-            } => {
-                if let Some(value) = Self::get_nested_field(source, from_field) {
-                    if Self::set_nested_field(target, to_field, value.clone()) {
-                        // Remove the source field if it's different from target
-                        if from_field != to_field {
-                            Self::remove_nested_field(target, from_field);
-                        }
-                        return Ok(true);
-                    }
-                }
-                Ok(false)
-            }
-
+            } => Ok(Self::apply_copy_transform(
+                source, target, from_field, to_field,
+            )),
             FieldTransform::Convert {
                 from_field,
                 to_field,
                 from_type,
                 to_type,
                 converter,
-            } => {
-                if let Some(value) = Self::get_nested_field(source, from_field) {
-                    let converted = Self::convert_value(value, from_type, to_type, converter)?;
-                    if Self::set_nested_field(target, to_field, converted) {
-                        if from_field != to_field {
-                            Self::remove_nested_field(target, from_field);
-                        }
-                        return Ok(true);
-                    }
-                }
-                Ok(false)
-            }
-
+            } => Self::apply_convert_transform(
+                source, target, from_field, to_field, from_type, to_type, converter,
+            ),
             FieldTransform::Default { field, value } => {
-                // Check if the field already exists (handling nested paths)
-                if Self::get_nested_field(target, field).is_none()
-                    && Self::set_nested_field(target, field, value.clone())
-                {
-                    return Ok(true);
-                }
-                Ok(false)
+                Ok(Self::apply_default_transform(target, field, value))
             }
-
             FieldTransform::Remove { field } => Ok(Self::remove_nested_field(target, field)),
-
             FieldTransform::Split {
                 from_field,
                 to_fields,
                 splitter,
-            } => {
-                if let Some(value) = source.get(from_field) {
-                    let split_values = Self::split_value(value, to_fields, splitter)?;
-                    if let Some(target_obj) = target.as_object_mut() {
-                        for (field, split_value) in split_values {
-                            target_obj.insert(field, split_value);
-                        }
-                        target_obj.remove(from_field);
-                        return Ok(true);
-                    }
-                }
-                Ok(false)
-            }
-
+            } => Self::apply_split_transform(source, target, from_field, to_fields, splitter),
             FieldTransform::Merge {
                 from_fields,
                 to_field,
                 merger,
-            } => {
-                let source_values: Vec<&Value> = from_fields
-                    .iter()
-                    .filter_map(|field| source.get(field))
-                    .collect();
-
-                if !source_values.is_empty() {
-                    let merged = Self::merge_values(&source_values, merger)?;
-                    if let Some(target_obj) = target.as_object_mut() {
-                        target_obj.insert(to_field.clone(), merged);
-                        // Remove source fields
-                        for field in from_fields {
-                            target_obj.remove(field);
-                        }
-                        return Ok(true);
-                    }
-                }
-                Ok(false)
-            }
-
+            } => Self::apply_merge_transform(source, target, from_fields, to_field, merger),
             FieldTransform::Custom {
                 from_fields,
                 to_fields,
                 transformer,
                 config,
-            } => {
-                let source_values: HashMap<String, &Value> = from_fields
-                    .iter()
-                    .filter_map(|field| source.get(field).map(|v| (field.clone(), v)))
-                    .collect();
+            } => Ok(Self::apply_custom_field_transform(
+                source,
+                target,
+                from_fields,
+                to_fields,
+                transformer,
+                config,
+            )),
+        }
+    }
 
-                if !source_values.is_empty() {
-                    let transformed =
-                        Self::apply_custom_transform(&source_values, transformer, config);
-                    if let Some(target_obj) = target.as_object_mut() {
-                        for (i, to_field) in to_fields.iter().enumerate() {
-                            if let Some(value) = transformed.get(i) {
-                                target_obj.insert(to_field.clone(), value.clone());
-                            }
-                        }
-                        // Remove source fields
-                        for field in from_fields {
-                            target_obj.remove(field);
-                        }
-                        return Ok(true);
-                    }
+    /// Apply copy field transformation
+    fn apply_copy_transform(
+        source: &Value,
+        target: &mut Value,
+        from_field: &str,
+        to_field: &str,
+    ) -> bool {
+        if let Some(value) = Self::get_nested_field(source, from_field) {
+            if Self::set_nested_field(target, to_field, value.clone()) {
+                // Remove the source field if it's different from target
+                if from_field != to_field {
+                    Self::remove_nested_field(target, from_field);
                 }
-                Ok(false)
+                return true;
             }
         }
+        false
+    }
+
+    /// Apply convert field transformation
+    fn apply_convert_transform(
+        source: &Value,
+        target: &mut Value,
+        from_field: &str,
+        to_field: &str,
+        from_type: &str,
+        to_type: &str,
+        converter: &str,
+    ) -> Result<bool, TransformationError> {
+        if let Some(value) = Self::get_nested_field(source, from_field) {
+            let converted_value = Self::convert_value(value, from_type, to_type, converter)?;
+            if Self::set_nested_field(target, to_field, converted_value) {
+                if from_field != to_field {
+                    Self::remove_nested_field(target, from_field);
+                }
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Apply default field transformation
+    fn apply_default_transform(target: &mut Value, field: &str, value: &Value) -> bool {
+        // Check if the field already exists (handling nested paths)
+        if Self::get_nested_field(target, field).is_none()
+            && Self::set_nested_field(target, field, value.clone())
+        {
+            return true;
+        }
+        false
+    }
+
+    /// Apply split field transformation
+    fn apply_split_transform(
+        source: &Value,
+        target: &mut Value,
+        from_field: &str,
+        to_fields: &[String],
+        splitter: &str,
+    ) -> Result<bool, TransformationError> {
+        if let Some(value) = source.get(from_field) {
+            let split_values = Self::split_value(value, to_fields, splitter)?;
+            if let Some(target_obj) = target.as_object_mut() {
+                for (field, split_value) in split_values {
+                    target_obj.insert(field, split_value);
+                }
+                target_obj.remove(from_field);
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Apply merge field transformation
+    fn apply_merge_transform(
+        source: &Value,
+        target: &mut Value,
+        from_fields: &[String],
+        to_field: &str,
+        merger: &str,
+    ) -> Result<bool, TransformationError> {
+        let source_values: Vec<&Value> = from_fields
+            .iter()
+            .filter_map(|field| source.get(field))
+            .collect();
+
+        if !source_values.is_empty() {
+            let merged_value = Self::merge_values(&source_values, merger)?;
+            if let Some(target_obj) = target.as_object_mut() {
+                target_obj.insert(to_field.to_string(), merged_value);
+                // Remove source fields
+                for field in from_fields {
+                    target_obj.remove(field);
+                }
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
+    /// Apply custom field transformation
+    fn apply_custom_field_transform(
+        source: &Value,
+        target: &mut Value,
+        from_fields: &[String],
+        to_fields: &[String],
+        transformer: &str,
+        config: &HashMap<String, Value>,
+    ) -> bool {
+        let source_values: HashMap<String, &Value> = from_fields
+            .iter()
+            .filter_map(|field| source.get(field).map(|v| (field.clone(), v)))
+            .collect();
+
+        if !source_values.is_empty() {
+            let transformed_values =
+                Self::apply_custom_transform(&source_values, transformer, config);
+            if let Some(target_obj) = target.as_object_mut() {
+                for (i, to_field) in to_fields.iter().enumerate() {
+                    if let Some(value) = transformed_values.get(i) {
+                        target_obj.insert(to_field.clone(), value.clone());
+                    }
+                }
+                // Remove source fields
+                for field in from_fields {
+                    target_obj.remove(field);
+                }
+                return true;
+            }
+        }
+        false
     }
 
     /// Convert a value from one type to another
@@ -631,116 +690,167 @@ impl DataTransformer {
         let field_value = data.get(&rule.field);
 
         match &rule.rule_type {
-            ValidationType::NotNull => {
-                if field_value.is_none_or(serde_json::Value::is_null) {
-                    return Err(TransformationError::ValidationFailed {
-                        details: rule
-                            .error_message
-                            .clone()
-                            .unwrap_or_else(|| format!("Field '{}' cannot be null", rule.field)),
-                    });
-                }
-            }
+            ValidationType::NotNull => Self::validate_not_null(field_value, rule),
             ValidationType::Type(expected_type) => {
-                if let Some(value) = field_value {
-                    let actual_type = match value {
-                        Value::String(_) => "string",
-                        Value::Number(_) => "number",
-                        Value::Bool(_) => "boolean",
-                        Value::Array(_) => "array",
-                        Value::Object(_) => "object",
-                        Value::Null => "null",
-                    };
-                    if actual_type != expected_type {
+                Self::validate_type(field_value, rule, expected_type)
+            }
+            ValidationType::Range { min, max } => {
+                Self::validate_range(field_value, rule, min.as_ref(), max.as_ref())
+            }
+            ValidationType::Length { min, max } => {
+                Self::validate_length(field_value, rule, min.as_ref(), max.as_ref())
+            }
+            ValidationType::Pattern(pattern) => Self::validate_pattern(field_value, rule, pattern),
+            ValidationType::Custom(validator) => {
+                Self::validate_custom(rule, validator);
+                Ok(())
+            }
+        }
+    }
+
+    /// Validate that field is not null
+    fn validate_not_null(
+        field_value: Option<&Value>,
+        rule: &ValidationRule,
+    ) -> Result<(), TransformationError> {
+        if field_value.is_none_or(serde_json::Value::is_null) {
+            return Err(TransformationError::ValidationFailed {
+                details: rule
+                    .error_message
+                    .clone()
+                    .unwrap_or_else(|| format!("Field '{}' cannot be null", rule.field)),
+            });
+        }
+        Ok(())
+    }
+
+    /// Validate field type
+    fn validate_type(
+        field_value: Option<&Value>,
+        rule: &ValidationRule,
+        expected_type: &str,
+    ) -> Result<(), TransformationError> {
+        if let Some(value) = field_value {
+            let actual_type = match value {
+                Value::String(_) => "string",
+                Value::Number(_) => "number",
+                Value::Bool(_) => "boolean",
+                Value::Array(_) => "array",
+                Value::Object(_) => "object",
+                Value::Null => "null",
+            };
+            if actual_type != expected_type {
+                return Err(TransformationError::ValidationFailed {
+                    details: format!(
+                        "Field '{}' expected type '{}', got '{}'",
+                        rule.field, expected_type, actual_type
+                    ),
+                });
+            }
+        }
+        Ok(())
+    }
+
+    /// Validate numeric range
+    fn validate_range(
+        field_value: Option<&Value>,
+        rule: &ValidationRule,
+        min: Option<&f64>,
+        max: Option<&f64>,
+    ) -> Result<(), TransformationError> {
+        if let Some(value) = field_value {
+            if let Some(num) = value.as_f64() {
+                if let Some(min_val) = min {
+                    if num < *min_val {
                         return Err(TransformationError::ValidationFailed {
                             details: format!(
-                                "Field '{}' expected type '{}', got '{}'",
-                                rule.field, expected_type, actual_type
+                                "Field '{}' value {} below minimum {}",
+                                rule.field, num, min_val
+                            ),
+                        });
+                    }
+                }
+                if let Some(max_val) = max {
+                    if num > *max_val {
+                        return Err(TransformationError::ValidationFailed {
+                            details: format!(
+                                "Field '{}' value {} above maximum {}",
+                                rule.field, num, max_val
                             ),
                         });
                     }
                 }
             }
-            ValidationType::Range { min, max } => {
-                if let Some(value) = field_value {
-                    if let Some(num) = value.as_f64() {
-                        if let Some(min_val) = min {
-                            if num < *min_val {
-                                return Err(TransformationError::ValidationFailed {
-                                    details: format!(
-                                        "Field '{}' value {} below minimum {}",
-                                        rule.field, num, min_val
-                                    ),
-                                });
-                            }
-                        }
-                        if let Some(max_val) = max {
-                            if num > *max_val {
-                                return Err(TransformationError::ValidationFailed {
-                                    details: format!(
-                                        "Field '{}' value {} above maximum {}",
-                                        rule.field, num, max_val
-                                    ),
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-            ValidationType::Length { min, max } => {
-                if let Some(value) = field_value {
-                    let length = match value {
-                        Value::String(s) => s.len(),
-                        Value::Array(a) => a.len(),
-                        _ => return Ok(()), // Skip validation for non-string/array types
-                    };
+        }
+        Ok(())
+    }
 
-                    if let Some(min_len) = min {
-                        if length < *min_len {
-                            return Err(TransformationError::ValidationFailed {
-                                details: format!(
-                                    "Field '{}' length {} below minimum {}",
-                                    rule.field, length, min_len
-                                ),
-                            });
-                        }
-                    }
-                    if let Some(max_len) = max {
-                        if length > *max_len {
-                            return Err(TransformationError::ValidationFailed {
-                                details: format!(
-                                    "Field '{}' length {} above maximum {}",
-                                    rule.field, length, max_len
-                                ),
-                            });
-                        }
-                    }
+    /// Validate string/array length
+    fn validate_length(
+        field_value: Option<&Value>,
+        rule: &ValidationRule,
+        min: Option<&usize>,
+        max: Option<&usize>,
+    ) -> Result<(), TransformationError> {
+        if let Some(value) = field_value {
+            let length = match value {
+                Value::String(s) => s.len(),
+                Value::Array(a) => a.len(),
+                _ => return Ok(()), // Skip validation for non-string/array types
+            };
+
+            if let Some(min_len) = min {
+                if length < *min_len {
+                    return Err(TransformationError::ValidationFailed {
+                        details: format!(
+                            "Field '{}' length {} below minimum {}",
+                            rule.field, length, min_len
+                        ),
+                    });
                 }
             }
-            ValidationType::Pattern(pattern) => {
-                if let Some(value) = field_value {
-                    if let Some(s) = value.as_str() {
-                        // Simple pattern matching - in real implementation would use regex
-                        if !s.contains(pattern) {
-                            return Err(TransformationError::ValidationFailed {
-                                details: format!(
-                                    "Field '{}' does not match pattern '{}'",
-                                    rule.field, pattern
-                                ),
-                            });
-                        }
-                    }
+            if let Some(max_len) = max {
+                if length > *max_len {
+                    return Err(TransformationError::ValidationFailed {
+                        details: format!(
+                            "Field '{}' length {} above maximum {}",
+                            rule.field, length, max_len
+                        ),
+                    });
                 }
-            }
-            ValidationType::Custom(validator) => {
-                debug!(
-                    "Custom validator '{}' not implemented for field '{}'",
-                    validator, rule.field
-                );
             }
         }
-
         Ok(())
+    }
+
+    /// Validate string pattern
+    fn validate_pattern(
+        field_value: Option<&Value>,
+        rule: &ValidationRule,
+        pattern: &str,
+    ) -> Result<(), TransformationError> {
+        if let Some(value) = field_value {
+            if let Some(s) = value.as_str() {
+                // Simple pattern matching - in real implementation would use regex
+                if !s.contains(pattern) {
+                    return Err(TransformationError::ValidationFailed {
+                        details: format!(
+                            "Field '{}' does not match pattern '{}'",
+                            rule.field, pattern
+                        ),
+                    });
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Apply custom validation
+    fn validate_custom(rule: &ValidationRule, validator: &str) {
+        debug!(
+            "Custom validator '{}' not implemented for field '{}'",
+            validator, rule.field
+        );
     }
 }
 
