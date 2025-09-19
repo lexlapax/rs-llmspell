@@ -35,7 +35,7 @@ impl Session {
     ))]
     pub fn new(options: CreateSessionOptions) -> Self {
         let id = SessionId::new();
-        Span::current().record("session_id", &id.to_string());
+        Span::current().record("session_id", id.to_string());
         info!("Creating new session with id={}", id);
 
         let metadata = SessionMetadata::new(id, options.name.clone(), options.created_by.clone());
@@ -80,7 +80,7 @@ impl Session {
     #[instrument(level = "info", skip(self), fields(session_id = Empty))]
     pub async fn suspend(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
 
         match metadata.status {
             SessionStatus::Active => {
@@ -106,7 +106,7 @@ impl Session {
     #[instrument(level = "info", skip(self), fields(session_id = Empty))]
     pub async fn resume(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
 
         match metadata.status {
             SessionStatus::Suspended => {
@@ -170,7 +170,7 @@ impl Session {
         let mut artifacts = self.artifact_ids.write().await;
         let mut metadata = self.metadata.write().await;
 
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
 
         if !artifacts.contains(&artifact_id) {
             debug!("Adding artifact {} to session {}", artifact_id, metadata.id);
@@ -190,7 +190,7 @@ impl Session {
     pub async fn artifact_ids(&self) -> Vec<String> {
         let artifacts = self.artifact_ids.read().await.clone();
         let metadata = self.metadata.read().await;
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         Span::current().record("artifact_count", artifacts.len());
         artifacts
     }
@@ -208,7 +208,7 @@ impl Session {
         let mut state = self.state.write().await;
         let mut metadata = self.metadata.write().await;
 
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         state.insert(key, value);
         metadata.operation_count += 1;
 
@@ -222,7 +222,7 @@ impl Session {
     ))]
     pub async fn get_state(&self, key: &str) -> Option<serde_json::Value> {
         let metadata = self.metadata.read().await;
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         self.state.read().await.get(key).cloned()
     }
 
@@ -234,7 +234,7 @@ impl Session {
     pub async fn get_all_state(&self) -> HashMap<String, serde_json::Value> {
         let state = self.state.read().await.clone();
         let metadata = self.metadata.read().await;
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         Span::current().record("state_size", state.len());
         state
     }
@@ -249,7 +249,7 @@ impl Session {
         let mut state = self.state.write().await;
         let mut metadata = self.metadata.write().await;
 
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         info!("Clearing state for session {}", metadata.id);
         state.clear();
         metadata.operation_count += 1;
@@ -270,7 +270,7 @@ impl Session {
         let mut metadata = self.metadata.write().await;
         metadata.operation_count += 1;
         metadata.updated_at = Utc::now();
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         Span::current().record("new_count", metadata.operation_count);
         Ok(metadata.operation_count)
     }
@@ -283,7 +283,7 @@ impl Session {
     #[instrument(level = "trace", skip(self), fields(session_id = Empty))]
     pub async fn increment_artifact_count(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         metadata.artifact_count += 1;
         metadata.updated_at = Utc::now();
         Ok(())
@@ -297,7 +297,7 @@ impl Session {
     #[instrument(level = "trace", skip(self), fields(session_id = Empty))]
     pub async fn decrement_artifact_count(&self) -> Result<()> {
         let mut metadata = self.metadata.write().await;
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         if metadata.artifact_count > 0 {
             metadata.artifact_count -= 1;
             metadata.updated_at = Utc::now();
@@ -336,7 +336,7 @@ impl Session {
     #[instrument(level = "debug", skip(self), fields(session_id = Empty))]
     pub async fn snapshot(&self) -> SessionSnapshot {
         let metadata = self.metadata.read().await.clone();
-        Span::current().record("session_id", &metadata.id.to_string());
+        Span::current().record("session_id", metadata.id.to_string());
         debug!("Creating snapshot for session {}", metadata.id);
         SessionSnapshot {
             metadata,

@@ -59,7 +59,7 @@ impl MessageRouter {
     #[instrument(level = "debug", fields(router_id = Empty))]
     pub fn new(max_history: usize) -> Self {
         let router_id = Uuid::new_v4();
-        Span::current().record("router_id", &router_id.to_string());
+        Span::current().record("router_id", router_id.to_string());
 
         info!("Creating MessageRouter with max_history={}", max_history);
 
@@ -144,7 +144,7 @@ impl MessageRouter {
     ) -> Result<()> {
         // Generate or use existing correlation ID
         let correlation_id = self.get_or_create_correlation_id();
-        Span::current().record("correlation_id", &correlation_id.to_string());
+        Span::current().record("correlation_id", correlation_id.to_string());
 
         trace!("Routing message with correlation_id={}", correlation_id);
 
