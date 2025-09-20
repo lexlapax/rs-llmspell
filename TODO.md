@@ -3140,59 +3140,244 @@ cargo llvm-cov --workspace --html
 
 ---
 
+### Task 9.4.6: Reconnect Script Execution Pipeline (CRITICAL FIX)
+**Priority**: CRITICAL BLOCKER
+**Estimated Time**: 8 hours
+**Assignee**: Core Team Lead
+**Dependencies**: Task 9.4.5.8
+**Issue**: Phase 9 restructuring replaced real script execution with stubs, breaking all Lua applications
+
+**Description**: Reconnect the script execution pipeline by wiring llmspell-bridge's ScriptRuntime to kernel's IntegratedKernel, and properly routing Jupyter channels to stdout/stderr. Currently, CLI and kernel use placeholder implementations that don't actually execute scripts.
+
+**Root Cause Analysis:**
+- CLI's `execute_script_embedded()` just prints "Script executed successfully" without running anything
+- Kernel's `ScriptRuntime` is a stub (lines 35-94 in integrated.rs) marked "Will be replaced with llmspell-bridge::ScriptRuntime"
+- Bridge has complete working implementation but isn't being used
+- No Jupyter channel routing to stdout/stderr for print() output
+
+**Architecture to Implement:**
+```
+CLI (run command)
+  ├─> Create EmbeddedKernel with InProcessTransport
+  ├─> Kernel uses real llmspell_bridge::ScriptRuntime
+  ├─> Execute script via Jupyter protocol (execute_request)
+  ├─> Route IOPub channel messages to stdout
+  └─> Return actual script results (not placeholders)
+```
+
+#### Subtask 9.4.6.1: Replace Kernel's Stub ScriptRuntime (2 hours)**
+- [ ] Delete stub ScriptRuntime in `llmspell-kernel/src/execution/integrated.rs` (lines 35-94)
+- [ ] Add dependency: `llmspell-kernel/Cargo.toml` needs `llmspell-bridge = { path = "../llmspell-bridge" }`
+- [ ] Import and use `llmspell_bridge::ScriptRuntime` in IntegratedKernel
+- [ ] Initialize ScriptRuntime with config, ComponentRegistry, and ProviderManager
+- [ ] Pass script_args from kernel context to ScriptRuntime
+
+#### Subtask 9.4.6.2: Wire Script Execution in IntegratedKernel (2 hours)**
+- [ ] Modify `IntegratedKernel::handle_shell_message()` to handle execute_request properly
+- [ ] Create ScriptRuntime instance with Lua engine for script execution
+- [ ] Execute script using `runtime.execute_script(code).await`
+- [ ] Format results as Jupyter execute_reply with proper status and output
+- [ ] Send execution results through IOPub channel for display
+
+#### Subtask 9.4.6.3: Connect Jupyter Channels to stdout/stderr (2 hours)**
+- [ ] In `IOManager::route_output()`, handle "stream" messages from IOPub
+- [ ] Route stream messages with name="stdout" to stdout
+- [ ] Route stream messages with name="stderr" to stderr
+- [ ] Connect Lua print() output through ConsoleCapture to IOPub channel
+- [ ] Ensure error messages are routed to stderr properly
+
+#### Subtask 9.4.6.4: Fix CLI's execute_script_embedded() (1 hour)**
+- [ ] Remove placeholder implementation in `llmspell-cli/src/commands/run.rs`
+- [ ] Create KernelHandle using `start_embedded_kernel()`
+- [ ] Use `kernel_handle.execute(script_content)` to run scripts
+- [ ] Parse and display actual results (not hardcoded messages)
+- [ ] Handle streaming output if --stream flag is set
+
+#### Subtask 9.4.6.5: Validate Script Execution (1 hour)**
+- [ ] Test with simple Lua: `print("Hello, World!")` - should output to stdout
+- [ ] Test with agents: Verify Agent.builder() creates agents properly
+- [ ] Test file-organizer application: Should create /tmp files and show print output
+- [ ] Verify error handling: Lua errors should appear on stderr
+- [ ] Run full validation suite: All 9 applications should execute properly
+
+**Acceptance Criteria:**
+- [ ] `llmspell run script.lua` executes actual Lua code (not stubs)
+- [ ] Lua print() statements appear on stdout
+- [ ] Script errors appear on stderr
+- [ ] Agent creation and tool execution work properly
+- [ ] All 9 example applications run successfully with API keys
+- [ ] Validation suite shows actual agent creation (not 0 agents)
+
+**Test Commands:**
+```bash
+# Test basic execution
+echo 'print("Hello from Lua")' > test.lua
+./target/debug/llmspell run test.lua
+# Should output: "Hello from Lua" (not "Script executed successfully")
+
+# Test agent creation
+echo 'local a = Agent.builder():name("test"):build(); print(a and "Agent created" or "Failed")' > agent_test.lua
+./target/debug/llmspell run agent_test.lua
+# Should output: "Agent created" or "Failed" based on API keys
+
+# Test file-organizer
+./target/debug/llmspell run examples/script-users/applications/file-organizer/main.lua
+# Should show actual Lua print output and create /tmp files
+```
+
+**Definition of Done:**
+- [ ] Kernel uses real ScriptRuntime from bridge (no stubs)
+- [ ] CLI executes scripts through kernel (not placeholders)
+- [ ] Jupyter channels route output to stdout/stderr
+- [ ] Print statements and errors appear in terminal
+- [ ] Validation suite detects agent creation properly
+- [ ] All 9 applications execute with visible output
+
+---
+
 ## Phase 9.5: Application Validation & Future-Proofing (Days 14-16)
 
-### Task 9.5.1: Implement Application Validation Suite
+### Task 9.5.1: Implement CLI Application Validation Suite
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Assignee**: QA Team Lead
 **Dependencies**: Task 9.4.3
 
-**Description**: Create comprehensive application validation suite testing all 9 example applications across complexity layers 1-6 with performance tracking and cost analysis.
+**Description**: Create Python-based CLI validation suite that executes all 9 example Lua applications via llmspell binary, captures output, analyzes results, and verifies correct behavior.
 
-**Application Test Coverage:**
-- **Layer 1** (2-4 agents): file-organizer, research-collector
-- **Layer 2** (4 agents): content-creator ✅ (22s runtime, conditional workflows)
-- **Layer 3** (5-7 agents): personal-assistant, communication-manager, code-review-assistant ⚠️
-- **Layer 4** (8 agents): process-orchestrator ⚠️, knowledge-base ✅
-- **Layer 5** (21 agents): webapp-creator ⚠️ (120-180s, $0.50-1.00 cost)
+**Application Test Matrix:**
+```
+Layer | Agents | Applications                                      | Runtime  | Validation Focus
+------|--------|--------------------------------------------------|----------|-------------------
+  1   | 2-3    | file-organizer, research-collector              | <30s     | File creation, basic output
+  2   | 4      | content-creator                                 | ~22s     | Conditional workflows, quality scores
+  3   | 5-7    | personal-assistant, communication-manager,      | 30-60s   | State persistence, multi-agent coordination
+      |        | code-review-assistant                           |          |
+  4   | 8      | process-orchestrator, knowledge-base            | 60-90s   | Complex orchestration, RAG integration
+  5   | 21     | webapp-creator                                  | 120-180s | Full app generation, file structure
+```
 
 **Acceptance Criteria:**
-- [ ] ApplicationTestSuite with complexity-based categorization
-- [ ] Performance tracking and cost analysis
-- [ ] Memory stability validation during extended operations
-- [ ] Success rate targets: Simple 100%, Complex ≥90%, Expert ≥80%
-- [ ] Automated regression detection
-- [ ] Write code with documentation (no clippy warnings)
+- [ ] Python test suite executes llmspell binary with correct flags/configs
+- [ ] Captures and parses stdout/stderr for each application
+- [ ] Verifies files created match expected patterns from Lua logic
+- [ ] Validates output against application-specific success criteria
+- [ ] Tracks execution time, memory usage, API costs (if available)
+- [ ] Generates HTML/JSON test report with pass/fail status
+- [ ] Success rate targets: Layer 1-2: 100%, Layer 3-4: ≥90%, Layer 5: ≥80%
 
-**Implementation Steps:**
-1. Create `llmspell-testing/examples/application_suite.rs`:
-   ```rust
-   pub struct ApplicationTestSuite {
-       simple_apps: Vec<SimpleAppTest>,      // 2-4 agents, <30s
-       complex_apps: Vec<ComplexAppTest>,    // 7+ agents, >30s
-       expert_apps: Vec<ExpertAppTest>,      // 21+ agents, >120s
-       performance_metrics: PerformanceTracker,
-       cost_tracking: CostAnalyzer,
-   }
-   ```
-2. Add runtime validation across all 9 applications
-3. Implement performance tracking with regression detection
-4. Add cost analysis and memory stability monitoring
-5. Create automated test execution and reporting
+**Implementation Structure:**
+```python
+# scripts/validate_applications.py
+class ApplicationValidator:
+    def __init__(self):
+        self.llmspell_bin = "./target/debug/llmspell"
+        self.app_dir = "examples/script-users/applications"
+        self.config_dir = "examples/script-users/configs"
 
-**Test Steps:**
-1. Run full validation suite on all 9 applications
-2. Verify success rates meet targets (100%/90%/80%)
-3. Test memory stability during expert applications
-4. Validate cost tracking accuracy
+    def run_application(self, app_name, config=None, args=[]):
+        """Execute llmspell with app and capture output"""
+        cmd = [self.llmspell_bin]
+        if config:
+            cmd.extend(["-c", config])
+        cmd.extend(["run", f"{self.app_dir}/{app_name}/main.lua"])
+        cmd.extend(args)
+
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        return result
+
+    def validate_file_organizer(self):
+        """Validate file-organizer creates organized directory structure"""
+        # Run application
+        result = self.run_application("file-organizer")
+
+        # Check output for expected patterns
+        assert "File Scanner Agent created" in result.stdout
+        assert "Organization plan saved" in result.stdout
+
+        # Verify created files
+        assert os.path.exists("/tmp/organized_files/")
+        assert os.path.exists("/tmp/organization-plan.txt")
+
+        # Parse organization plan
+        with open("/tmp/organization-plan.txt") as f:
+            plan = f.read()
+            assert "Documents" in plan or "Images" in plan
+
+    def validate_content_creator(self):
+        """Validate content-creator conditional workflow and quality control"""
+        # Run with config for API keys
+        result = self.run_application(
+            "content-creator",
+            config="configs/applications.toml"
+        )
+
+        # Check conditional workflow execution
+        assert "Quality threshold" in result.stdout
+        assert "draft-content.md" in result.stdout
+
+        # Verify quality report if created
+        if os.path.exists("/tmp/quality-report.json"):
+            with open("/tmp/quality-report.json") as f:
+                report = json.load(f)
+                assert "quality_score" in report
+
+    def validate_webapp_creator(self):
+        """Validate webapp-creator generates full application structure"""
+        # This is expensive, may skip in CI
+        if not os.getenv("RUN_EXPENSIVE_TESTS"):
+            return {"status": "skipped", "reason": "expensive"}
+
+        result = self.run_application(
+            "webapp-creator",
+            config="configs/applications.toml",
+            args=["--", "--input", "user-input-demo.lua"]
+        )
+
+        # Check for 20+ agent creation
+        agent_count = result.stdout.count("Agent created")
+        assert agent_count >= 20, f"Expected 20+ agents, got {agent_count}"
+
+        # Verify generated structure
+        expected_dirs = ["frontend", "backend", "database", "tests"]
+        for dir_name in expected_dirs:
+            assert dir_name in result.stdout
+```
+
+**Test Execution Commands:**
+```bash
+# Run all application tests
+python scripts/validate_applications.py
+
+# Run specific layer tests
+python scripts/validate_applications.py --layer 1
+
+# Run with performance tracking
+python scripts/validate_applications.py --track-performance
+
+# Generate HTML report
+python scripts/validate_applications.py --report html
+
+# CI integration (skip expensive tests)
+RUN_EXPENSIVE_TESTS=0 python scripts/validate_applications.py
+```
+
+**Validation Logic Examples:**
+1. **file-organizer**: Check for /tmp/organized_files/ creation and organization-plan.txt
+2. **content-creator**: Verify quality scores and conditional editing triggered
+3. **research-collector**: Validate parallel search results aggregated
+4. **webapp-creator**: Confirm 20+ agents created and file structure generated
+5. **process-orchestrator**: Check workflow state persistence and recovery
 
 **Definition of Done:**
-- [ ] All 9 applications execute successfully
-- [ ] Success rates meet layer-specific targets
-- [ ] Performance regression detection functional
-- [ ] Memory leaks detected and resolved
-- [ ] Cost tracking within 5% accuracy
+- [x] Python validation suite in scripts/validate_applications.py
+- [ ] All 9 applications tested with appropriate configs
+- [ ] Output parsing validates against Lua logic expectations
+- [ ] File creation/modification verified
+- [ ] Performance metrics tracked (runtime, memory via /usr/bin/time -v)
+- [ ] HTML/JSON reports generated
+- [ ] CI integration with configurable test levels
+- [ ] Documentation in tests/README.md
 
 ### Task 9.5.2: Implement Future-Proofing Infrastructure
 **Priority**: HIGH
